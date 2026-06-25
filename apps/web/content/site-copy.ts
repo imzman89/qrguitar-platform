@@ -28,7 +28,7 @@ export const siteCopy = {
     eyebrow: "BUILT FOR BUILDERS, SHOPS, & COLLECTORS",
     headline: "The Permanent Record for Every Instrument.",
     body:
-      "Create a digital identity for any guitar, amp, pedal, or custom build. Keep specs, service history, ownership records, warranty info, photos, documents, and sale details connected for life.",
+      "Give any guitar, amp, pedal, or custom build a permanent record tied to its own QR code: serial, specs, photos, service history, ownership, warranty notes, documents, and sale details.",
     primaryCta: "Create a Record",
     secondaryCta: "View a Demo Record",
     trust: ["Unique QR for each instrument", "Specs, photos, repairs, and receipts", "Owner handoff when it sells"]
@@ -37,12 +37,12 @@ export const siteCopy = {
     eyebrow: "How it works",
     headline: "Simple enough for one guitar. Useful enough for a whole shop.",
     body:
-      "Start with the basic facts, put the QR where people will actually use it, then keep adding the things that usually get lost.",
+      "Create the record once, put the QR where buyers and techs will scan it, then keep the instrument's history current after every setup, repair, sale, or transfer.",
     cards: [
       {
         icon: QrCode,
         title: "Create the record",
-        copy: "Add the make, model, serial number, year, photos, owner status, build notes, and anything already known about the instrument."
+        copy: "Start with make, model, serial number, year, condition, owner status, and a main photo. Add deeper specs when you have them."
       },
       {
         icon: Smartphone,
@@ -52,16 +52,16 @@ export const siteCopy = {
       {
         icon: BadgeCheck,
         title: "Update it for life",
-        copy: "Add setup notes, service records, fretwork, receipts, videos, warranty claims, sale notes, and ownership transfers as the years go on."
+        copy: "Add setup notes, service records, fretwork, receipts, videos, warranty claims, sale notes, and ownership transfers whenever the record changes."
       }
     ],
     cta: "Create Your First Record"
   },
   customization: {
     eyebrow: "What each record holds",
-    headline: "The details guitar people ask for, before they ask.",
+    headline: "The proof buyers, shops, and builders ask for.",
     body:
-      "A QRguitar record can be as simple or as deep as the instrument needs. Start with the basics, then add the bench notes, proof, media, and history that make the piece easier to sell, service, insure, or pass on.",
+      "A strong record answers the questions that usually slow down a sale or repair: what it is, what changed, who worked on it, what paperwork exists, and what proof is missing.",
     checks: [
       { icon: CheckCircle2, copy: "Serial number, year, weight, finish, neck shape, pickup set, wiring, and build specs" },
       { icon: CheckCircle2, copy: "Setup measurements, fretwork, repairs, mods, parts, service dates, and shop notes" },
@@ -73,7 +73,7 @@ export const siteCopy = {
   audiences: {
     eyebrow: "Built for guitar people",
     headline: "For the bench, the sales floor, the collection room, and the next owner.",
-    body: "Different people need different details. QRguitar keeps those details attached to the instrument instead of buried in texts, folders, binders, and old listings.",
+    body: "Builders, shops, collectors, repair techs, and buyers all need the same truth in different moments. QRguitar keeps that record attached to the instrument instead of scattered across texts, binders, inboxes, and old listings.",
     cards: [
       {
         icon: Wrench,
@@ -83,12 +83,12 @@ export const siteCopy = {
       {
         icon: Store,
         title: "Shops and Retailers",
-        copy: "Stop losing info between the bench, sales floor, website, and buyer. Keep serials, condition notes, service work, and handoff details together."
+        copy: "Keep serials, condition notes, service work, floor photos, sale notes, and buyer handoff details in one record from intake to checkout."
       },
       {
         icon: Fingerprint,
         title: "Collectors",
-        copy: "Keep provenance, photos, values, receipts, insurance details, case candy, and private notes organized across the whole collection."
+        copy: "Keep provenance, photos, value notes, receipts, insurance details, case candy, and private owner notes organized across the whole collection."
       },
       {
         icon: UserRoundCheck,
@@ -102,7 +102,7 @@ export const siteCopy = {
     eyebrow: "Daily use",
     headline: "A QR code that earns its keep.",
     body:
-      "The code is not the product. The record is. The QR just makes the record easy to open when the instrument is in someone's hands.",
+      "The QR is the doorway. The record is the asset: the place a buyer, tech, shop, or owner can open the instrument's story when the instrument is in hand.",
     cards: [
       {
         icon: Store,
@@ -141,12 +141,12 @@ export const siteCopy = {
     appIcon: Building2,
     appTitle: "Commercial plans start at $199/year.",
     appBody:
-      "For builders, retailers, repair shops, and brands that need more than a few codes and a spreadsheet.",
+      "For builders, retailers, repair shops, and brands that need staff access, batch records, warranty tracking, and customer handoff tools.",
     steps: ["Bulk record creation", "Staff and inventory tools", "Warranty, catalog, and handoff tools"],
     eyebrow: "For businesses",
     headline: "When the records become part of how the shop runs.",
     body:
-      "Commercial plans start at $199/year because shops and brands need more: staff access, inventory views, warranty records, catalog pages, imports, customer handoff tools, and help getting set up.",
+      "Commercial plans start at $199/year because a shop account does more than make QR codes. It supports staff access, inventory views, warranty records, catalog pages, imports, customer handoffs, and setup help.",
     cards: [
       {
         icon: Database,
@@ -175,7 +175,7 @@ export const siteCopy = {
     eyebrow: "Pricing",
     headline: "Straightforward pricing for one guitar or a whole wall of them.",
     body:
-      "Buy a single record, grab a pack for a collection or batch, or use a commercial plan when QRguitar becomes part of the business.",
+      "Buy one permanent record, choose a pack for a collection or small batch, or start a commercial plan when records become part of the business.",
     plans: [
       {
         name: "Single Instrument",
@@ -205,7 +205,7 @@ export const siteCopy = {
       {
         name: "Commercial",
         price: "$199/yr",
-        copy: "For real businesses using QRguitar daily",
+        copy: "For shops, builders, retailers, and brands",
         badge: "For Shops",
         features: [
           "Starts at $199 per year",

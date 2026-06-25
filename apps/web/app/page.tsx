@@ -3,11 +3,13 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { CheckoutButton } from "../components/CheckoutButton";
 import { Footer } from "../components/Footer";
 import { LatestPublicRecord } from "../components/LatestPublicRecord";
 import { Nav } from "../components/Nav";
 import { siteCopy } from "../content/site-copy";
 import { readSiteSettings, type EditableSiteSettings } from "../lib/site-settings";
+import type { PaymentItemId } from "../lib/payments";
 
 export default function HomePage() {
   const [settings, setSettings] = useState<EditableSiteSettings | null>(null);
@@ -160,7 +162,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="section pricing-section">
+        <section className="section pricing-section" id="pricing">
           <div className="shell">
             <div className="section-header">
               <div className="eyebrow">{copy.pricing.eyebrow}</div>
@@ -169,7 +171,7 @@ export default function HomePage() {
             </div>
             <div className="pricing-grid">
               {copy.pricing.plans.map((plan) => (
-                <PricingCard key={plan.name} {...plan} />
+                <PricingCard key={plan.name} {...plan} itemId={pricingItemIdForPlan(plan.name)} />
               ))}
             </div>
             <div className="enterprise-note">
@@ -208,13 +210,15 @@ function PricingCard({
   price,
   copy,
   badge,
-  features
+  features,
+  itemId
 }: {
   name: string;
   price: string;
   copy: string;
   badge?: string;
   features: string[];
+  itemId: PaymentItemId;
 }) {
   return (
     <article className={badge ? "price-card featured" : "price-card"}>
@@ -227,9 +231,23 @@ function PricingCard({
           <li key={feature}>{feature}</li>
         ))}
       </ul>
-      <Link className="button" href="/create">
-        Get Started
-      </Link>
+      <CheckoutButton itemId={itemId}>Get Started</CheckoutButton>
     </article>
   );
+}
+
+function pricingItemIdForPlan(planName: string): PaymentItemId {
+  if (planName.includes("10")) {
+    return "pack10";
+  }
+
+  if (planName.includes("25")) {
+    return "pack25";
+  }
+
+  if (planName.toLowerCase().includes("commercial")) {
+    return "commercial";
+  }
+
+  return "single";
 }

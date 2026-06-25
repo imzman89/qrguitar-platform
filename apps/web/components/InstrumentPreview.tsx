@@ -1,5 +1,5 @@
 import { ExternalLink } from "lucide-react";
-import { instrumentDisplayName, type CustomProfileField, type CustomProfileLink } from "../lib/local-demo";
+import type { CustomProfileField, CustomProfileLink } from "../lib/local-demo";
 
 type InstrumentPreviewProps = {
   qrCode: string;
@@ -30,7 +30,15 @@ export function InstrumentPreview({
   customFields = [],
   customLinks = []
 }: InstrumentPreviewProps) {
-  const title = instrumentDisplayName({ name, brand, model, serial });
+  const nickname = name.trim();
+  const makeModel = [brand, model].filter(Boolean).join(" ");
+  const title = nickname || makeModel || serial || "Untitled instrument";
+  const subtitle = nickname
+    ? makeModel
+    : [
+        year ? `Year ${year}` : "",
+        serial ? `Serial ${serial}` : ""
+      ].filter(Boolean).join(" - ");
   const visibleFields = customFields.filter((field) => field.label.trim() && field.value.trim()).slice(0, 4);
   const visibleLinks = customLinks.filter((link) => link.label.trim() && link.url.trim()).slice(0, 3);
 
@@ -49,7 +57,7 @@ export function InstrumentPreview({
           <strong>{qrCode}</strong>
         </div>
         <h3>{title}</h3>
-        <p>{[brand, model].filter(Boolean).join(" - ") || "Instrument record"}</p>
+        {subtitle ? <p>{subtitle}</p> : null}
       </div>
 
       <div className="preview-identity-grid">

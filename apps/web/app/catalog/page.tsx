@@ -7,6 +7,8 @@ import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import {
   demoInstrument,
+  getInstrumentCondition,
+  getInstrumentVerificationStatus,
   getPublicDemoInstruments,
   instrumentDisplayName,
   instrumentToProfileUrl,
@@ -38,9 +40,7 @@ export default function CatalogPage() {
     .filter((record) => brand === "All brands" || record.brand === brand)
     .filter((record) => region === "All regions" || regionFromRecord(record) === region)
     .filter((record) => {
-      const haystack = [record.qrCode, record.name, record.brand, record.model, record.serial, record.location]
-        .join(" ")
-        .toLowerCase();
+      const haystack = [record.qrCode, record.name, record.brand, record.model, record.serial, record.location].join(" ").toLowerCase();
       return haystack.includes(query.toLowerCase());
     });
 
@@ -79,8 +79,8 @@ export default function CatalogPage() {
           <div className="dashboard-hero">
             <div>
               <div className="eyebrow">Public catalog</div>
-              <h2>Browse public QRguitar records.</h2>
-              <p>Public profiles are discoverable by default. Owners can make a record private when privacy matters.</p>
+              <h2>Search public instrument records.</h2>
+              <p>Browse guitars, amps, pedals, and shop inventory that owners have chosen to make public.</p>
             </div>
             <Link className="button" href="/create">
               Register Instrument
@@ -124,46 +124,64 @@ export default function CatalogPage() {
                 <strong>{visibleCount}</strong> of <strong>{totalCount}</strong> public records.
               </p>
               {hasFilterOrSearch ? (
-                <button className="button secondary" type="button" onClick={() => {
-                  setBrand("All brands");
-                  setRegion("All regions");
-                  setQuery("");
-                }}>
+                <button
+                  className="button secondary"
+                  type="button"
+                  onClick={() => {
+                    setBrand("All brands");
+                    setRegion("All regions");
+                    setQuery("");
+                  }}
+                >
                   <SlidersHorizontal size={14} />
                   Reset filters
                 </button>
               ) : null}
             </div>
             <div className="catalog-highlights">
-              <span>{topBrands.slice(0, 2).join(" / ") || "Premium catalog"}</span>
-              <span>{topRegions.slice(0, 2).join(" / ") || "Global collection"} | {totalCount} instruments</span>
+              <span>{topBrands.slice(0, 2).join(" / ") || "No brands listed yet"}</span>
+              <span>{topRegions.slice(0, 2).join(" / ") || "No regions listed yet"} | {totalCount} records</span>
             </div>
           </section>
 
           <section className="catalog-grid" aria-label="Public QRguitar records">
             {visibleRecords.length ? (
-              visibleRecords.map((record) => (
-              <Link className="catalog-card" href={instrumentToProfileUrl(record)} key={record.qrCode}>
-                <div
-                  className="catalog-card-image"
-                  style={
-                    record.heroImageDataUrl
-                      ? { backgroundImage: `linear-gradient(180deg, rgba(3,5,6,.05), rgba(3,5,6,.86)), url(${record.heroImageDataUrl})` }
-                      : undefined
-                  }
-                >
-                  <span>{record.qrCode}</span>
-                </div>
-                <div>
-                  <h3>{instrumentDisplayName(record)}</h3>
-                  <p>{record.brand} - {record.serial}</p>
-                  <div className="catalog-meta">
-                    <span>{record.year || "Year unknown"}</span>
-                    <span>{regionFromRecord(record) || "Region unknown"}</span>
-                  </div>
-                </div>
-              </Link>
-              ))
+              visibleRecords.map((record) => {
+                const verificationStatus = getInstrumentVerificationStatus(record);
+                const condition = getInstrumentCondition(record);
+
+                return (
+                  <Link
+                    className="catalog-card"
+                    href={instrumentToProfileUrl(record)}
+                    key={record.qrCode}
+                    aria-label={`View ${instrumentDisplayName(record)} public profile`}
+                  >
+                    <article className="catalog-card-media">
+                      <img
+                        className="catalog-card-image"
+                        src={record.heroImageDataUrl || "/media/reptile-hero.jpg"}
+                        alt={`${instrumentDisplayName(record)} main image`}
+                      />
+                      <span className="catalog-card-code">{record.qrCode}</span>
+                    </article>
+                    <div className="catalog-card-content">
+                      <h3>{instrumentDisplayName(record)}</h3>
+                      <p className="catalog-meta-line">{record.brand} - {record.serial}</p>
+                      <p className="catalog-card-summary">{record.summary || "Owner has not added public notes yet."}</p>
+                      <div className="catalog-meta">
+                        <span className={`catalog-chip catalog-chip--${condition}`}>{condition === "new" ? "New" : "Used"}</span>
+                        <span className={`catalog-chip ${verificationStatus === "verified" ? "catalog-chip--verified" : "catalog-chip--unverified"}`}>
+                          {verificationStatus === "verified" ? "Verified record" : "Unverified record"}
+                        </span>
+                        <span>{record.year || "Year unknown"}</span>
+                        <span>{regionFromRecord(record) || "Region unknown"}</span>
+                      </div>
+                      <span className="catalog-card-cta">Open record</span>
+                    </div>
+                  </Link>
+                );
+              })
             ) : (
               <div className="card catalog-empty">
                 <div className="eyebrow">No records found</div>

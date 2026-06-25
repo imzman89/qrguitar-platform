@@ -10,9 +10,12 @@ import { createSubmissionFingerprint, isRepeatedBrowserSubmission, validateInstr
 import {
   defaultQrStyle,
   findDemoInstrument,
+  getDemoUser,
+  getDemoInstruments,
   getInstrumentCondition,
   instrumentToProfileUrl,
   saveDemoInstrument,
+  userCanEditInstrument,
   type DemoInstrument,
   type QrStyle
 } from "../../../lib/local-demo";
@@ -36,7 +39,9 @@ export default function EditInstrumentPage() {
   const router = useRouter();
   const code = params.code?.toUpperCase() || "";
   const [message, setMessage] = useState("");
+  const [deniedReason, setDeniedReason] = useState("");
   const [honeypot, setHoneypot] = useState("");
+  const [ready, setReady] = useState(false);
   const [original, setOriginal] = useState<DemoInstrument | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [customFields, setCustomFields] = useState([{ id: "field-1", label: "", value: "" }]);
@@ -45,9 +50,20 @@ export default function EditInstrumentPage() {
   const [qrStyle, setQrStyle] = useState<QrStyle>(defaultQrStyle);
 
   useEffect(() => {
+    const currentUser = getDemoUser();
+    if (!currentUser) {
+      router.replace(`/login?next=${encodeURIComponent(`/edit/${code}`)}`);
+      return;
+    }
+
     const instrument = findDemoInstrument(code);
     if (!instrument) {
-      setMessage("This record was not found in this browser. Create or save the guitar first.");
+      setDeniedReason("This record is not editable from this account. Open the public profile or create the record in your own dashboard first.");
+      return;
+    }
+
+    if (!userCanEditInstrument(currentUser, instrument)) {
+      setDeniedReason("Owner tools are locked for this record. Only the account that created or owns this instrument can edit it.");
       return;
     }
 
@@ -69,7 +85,9 @@ export default function EditInstrumentPage() {
     setCustomLinks(normalizeCustomLinks(instrument));
     setGalleryImages(normalizeGalleryImages(instrument));
     setQrStyle(instrument.qrStyle || defaultQrStyle);
-  }, [code]);
+
+    setReady(true);
+  }, [code, router]);
 
   const profileHref = useMemo(() => {
     return original ? instrumentToProfileUrl(original) : `/i/${code}`;
@@ -127,18 +145,6 @@ export default function EditInstrumentPage() {
       visibility: form.visibility === "private" ? "private" : "public",
       galleryImageDataUrls: galleryImages,
       heroImageDataUrl: form.heroImageDataUrl || galleryImages[0] || "",
-      builder: "",
-      instrumentType: "",
-      finish: "",
-      bodyWood: "",
-      neckWood: "",
-      pickups: "",
-      websiteUrl: "",
-      instagramUrl: "",
-      facebookUrl: "",
-      youtubeUrl: "",
-      reverbUrl: "",
-      shopUrl: "",
       customFields: customFields.filter((field) => field.label.trim() && field.value.trim()),
       customLinks: customLinks.filter((link) => link.label.trim() && link.url.trim()),
       qrStyle,
@@ -149,6 +155,12 @@ export default function EditInstrumentPage() {
   }
 
   function saveChanges(preview = false) {
+    const currentUser = getDemoUser();
+    if (!original || !userCanEditInstrument(currentUser, original)) {
+      setMessage("Owner tools are locked for this record. Changes were not saved.");
+      return;
+    }
+
     const validationMessage = validateInstrumentSubmission(form, honeypot);
     if (validationMessage) {
       setMessage(validationMessage);
@@ -160,6 +172,18 @@ export default function EditInstrumentPage() {
       isRepeatedBrowserSubmission(`qrguitar.lastEditSubmission.${code}`, createSubmissionFingerprint(form), window)
     ) {
       setMessage("That looks like a repeated submission. Wait a few seconds and try again.");
+      return;
+    }
+
+    const instruments = getDemoInstruments();
+    const duplicateSerial = instruments.find(
+      (item) =>
+        item.qrCode.toUpperCase() !== original?.qrCode.toUpperCase() &&
+        item.serial.trim().toUpperCase() === form.serial.trim().toUpperCase()
+    );
+
+    if (duplicateSerial) {
+      setMessage(`That serial is already used by ${duplicateSerial.qrCode}. Pick a different serial or keep this one for that record.`);
       return;
     }
 
@@ -184,7 +208,33 @@ export default function EditInstrumentPage() {
     }
   }
 
-  return (
+  if (deniedReason) {
+    return (
+      <>
+        <Nav />
+        <main className="section auth-page">
+          <div className="shell">
+            <section className="card auth-card">
+              <div className="eyebrow">Owner-only editor</div>
+              <h2>This record is view-only.</h2>
+              <p>{deniedReason}</p>
+              <div className="form-actions">
+                <Link className="button" href={`/i/${code}`}>
+                  View Public Profile
+                </Link>
+                <Link className="button secondary" href="/dashboard">
+                  Open Dashboard
+                </Link>
+              </div>
+            </section>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
+  return ready ? (
     <>
       <Nav />
       <main className="section create-page">
@@ -265,13 +315,13 @@ export default function EditInstrumentPage() {
                 </div>
               </details>
               <details className="advanced-panel" open>
-                <summary>Custom details</summary>
+                <summary>Specs and custom fields</summary>
                 <div className="custom-list">
                   {customFields.map((field) => (
                     <div className="custom-row" key={field.id}>
                       <input
                         aria-label="Field label"
-                        placeholder="Field label, e.g. Builder"
+                        placeholder="Field label, e.g. Neck shape"
                         value={field.label}
                         onChange={(event) =>
                           setCustomFields((current) =>
@@ -281,7 +331,7 @@ export default function EditInstrumentPage() {
                       />
                       <input
                         aria-label="Field value"
-                        placeholder="Value"
+                        placeholder="Value, e.g. Medium C"
                         value={field.value}
                         onChange={(event) =>
                           setCustomFields((current) =>
@@ -295,12 +345,12 @@ export default function EditInstrumentPage() {
                     </div>
                   ))}
                   <button className="button secondary" type="button" onClick={() => setCustomFields((current) => [...current, { id: `field-${Date.now()}`, label: "", value: "" }])}>
-                    Add Detail
+                    Add Spec Field
                   </button>
                 </div>
               </details>
               <details className="advanced-panel" open>
-                <summary>Links</summary>
+                <summary>Website, shop, and social links</summary>
                 <div className="custom-list">
                   {customLinks.map((link) => (
                     <div className="custom-row" key={link.id}>
@@ -409,6 +459,23 @@ export default function EditInstrumentPage() {
               customLinks={customLinks}
             />
           </aside>
+        </div>
+      </main>
+      <Footer />
+    </>
+  ) : (
+    <>
+      <Nav />
+      <main className="section auth-page">
+        <div className="shell">
+          <section className="card auth-card">
+            <div className="eyebrow">Edit instrument</div>
+            <h2>Checking account...</h2>
+            <p>Sign in to make changes to this record.</p>
+            <Link className="button" href={`/login?next=${encodeURIComponent(`/edit/${code}`)}`}>
+              Sign in
+            </Link>
+          </section>
         </div>
       </main>
       <Footer />

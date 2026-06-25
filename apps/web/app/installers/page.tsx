@@ -14,19 +14,19 @@ const installerServices = [
 const vettingSteps = [
   {
     title: "Apply",
-    copy: "Luthiers, repair shops, and guitar retailers submit shop details, service area, finish experience, and references."
+    copy: "Shops submit business details, service area, finish experience, repair specialties, and references."
   },
   {
     title: "Verify",
-    copy: "QRguitar reviews the shop, confirms the real business, and labels qualified partners as vetted installers."
+    copy: "QRguitar confirms the shop is a real business and reviews whether its finish work is appropriate for under-finish QR installs."
   },
   {
     title: "Install",
-    copy: "Owners can find a nearby shop to place the QR code under finish or document a repair-linked installation."
+    copy: "Owners can find a qualified shop to install the QR, photograph the work, and attach the install notes to the instrument record."
   }
 ];
 
-const exampleInstallers = [
+const installerListings = [
   {
     name: "Proper Instruments",
     region: "Cranston, Rhode Island",
@@ -37,13 +37,13 @@ const exampleInstallers = [
     name: "Northeast Guitar Repair",
     region: "New England",
     services: "Repairs, setup, clear coat application",
-    status: "Example listing"
+    status: "Regional candidate"
   },
   {
     name: "Midwest Luthier Bench",
     region: "Great Lakes",
     services: "Restoration, refinishing, verification photos",
-    status: "Example listing"
+    status: "Regional candidate"
   }
 ];
 
@@ -56,10 +56,10 @@ export default function InstallersPage() {
           <div className="shell installer-hero-grid">
             <div>
               <div className="eyebrow">QRguitar installer network</div>
-              <h1>Find vetted shops that can install a QR code under finish.</h1>
+              <h1>Find shops that can install a QR code under finish.</h1>
               <p>
-                QRguitar should work in the real world. This network helps owners, builders, and shops connect with
-                qualified luthiers and repair benches for permanent, finish-safe QR placement.
+                Some owners will want the QR built into the instrument, not just printed on a card. This directory is for luthiers,
+                repair benches, and guitar shops that can handle finish-safe QR placement and document the work properly.
               </p>
               <div className="hero-actions">
                 <Link className="button" href="#apply">
@@ -72,10 +72,10 @@ export default function InstallersPage() {
             </div>
             <div className="installer-feature-card">
               <div className="icon"><Paintbrush size={28} /></div>
-              <h2>Under-finish ready</h2>
+              <h2>Finish-safe installation</h2>
               <p>
-                Built for permanent instrument IDs that can be applied, documented, and protected as part of a guitar's
-                physical history.
+                A proper install should be photographed, dated, and attached to the same record as the serial, service history,
+                ownership, and warranty notes.
               </p>
               <div className="installer-service-list">
                 {installerServices.map((service) => (
@@ -90,8 +90,8 @@ export default function InstallersPage() {
           <div className="shell">
             <div className="section-header">
               <div className="eyebrow">How it works</div>
-              <h2>A trusted path from QR code to permanent install.</h2>
-              <p>Owners can start with a normal QRguitar record, then find a vetted shop if they want a permanent physical installation later.</p>
+              <h2>From printed QR to permanent install.</h2>
+              <p>Owners can start with a normal QRguitar record, then work with a qualified shop if they want the code protected under finish.</p>
             </div>
             <div className="grid three">
               {vettingSteps.map((step, index) => (
@@ -108,11 +108,11 @@ export default function InstallersPage() {
         <section className="section" id="finder">
           <div className="shell split">
             <div>
-              <div className="eyebrow">Public finder</div>
-              <h2>Browse vetted installers by region, service, and shop type.</h2>
+              <div className="eyebrow">Installer finder</div>
+              <h2>Search by region, finish work, repair work, and shop type.</h2>
               <p>
-                The first version starts with a curated directory. Later, this can become a searchable national map with
-                service areas, verified reviews, repair specialties, and booking requests.
+                This directory starts with approved partner listings and regional candidates. Each listing should make it clear
+                what the shop can do, where it works, and whether it can document the installation with photos.
               </p>
               <div className="check-list">
                 <div className="check-item"><MapPin size={18} /><span>Search by city, state, or region</span></div>
@@ -121,7 +121,7 @@ export default function InstallersPage() {
               </div>
             </div>
             <div className="installer-directory">
-              {exampleInstallers.map((installer) => (
+              {installerListings.map((installer) => (
                 <article className="installer-card" key={installer.name}>
                   <div>
                     <span className="status-pill">{installer.status}</span>
@@ -141,13 +141,12 @@ export default function InstallersPage() {
               <div className="eyebrow">For luthiers and repair shops</div>
               <h2>Become a QRguitar vetted installer.</h2>
               <p>
-                Join the network early and help shape the standard for permanent QRguitar installation, verification
-                photos, repair documentation, and customer handoff.
+                Apply to be listed for under-finish QR installs, repair documentation, verification photos, and customer handoff support.
               </p>
             </div>
             <div className="installer-apply-panel">
               <h3>Early partner intake</h3>
-              <p>For now, collect these details from shops before the real application form is connected:</p>
+              <p>Send these details so QRguitar can review the shop before listing it:</p>
               <ul>
                 <li>Business name, address, website, and contact email</li>
                 <li>Finish/refinish experience and example work</li>

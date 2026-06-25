@@ -13,7 +13,7 @@
   justify-content: space-between;
   gap: 18px;
   align-items: center;
-  padding: 20px 24px;
+  padding: 18px 20px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -25,12 +25,38 @@
   display: grid;
 }
 
+.emptyState {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 42px 18px;
+  text-align: center;
+  border-bottom: 1px solid rgba(248, 246, 242, .08);
+}
+
+.emptyState strong {
+  color: var(--text);
+  font-size: 22px;
+}
+
+.emptyState p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.emptyState :global(.button) {
+  margin-top: 8px;
+}
+
 .instrumentRow {
   display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(220px, 1fr) minmax(210px, 250px) minmax(118px, 140px);
-  gap: 16px;
+  grid-template-columns: minmax(190px, 230px) minmax(220px, 1fr) minmax(270px, 320px);
+  grid-template-areas:
+    "thumb details actions"
+    "transfer transfer transfer";
+  gap: 14px;
   align-items: center;
-  padding: 14px 24px 12px;
+  padding: 10px 16px 11px;
   border-bottom: 1px solid rgba(248, 246, 242, .08);
 }
 
@@ -39,9 +65,10 @@
 }
 
 .instrumentThumb {
+  grid-area: thumb;
   width: 100%;
-  min-height: 144px;
-  aspect-ratio: 1.45 / 1;
+  min-height: 160px;
+  aspect-ratio: 1.5 / 1;
   border: 1px solid rgba(248, 246, 242, .14);
   border-radius: 10px;
   display: grid;
@@ -68,8 +95,9 @@
 }
 
 .instrumentDetails {
+  grid-area: details;
   display: grid;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
   align-content: center;
 }
@@ -82,7 +110,7 @@
 }
 
 .instrumentInfo strong {
-  font-size: 19px;
+  font-size: 18px;
   line-height: 1.15;
 }
 
@@ -103,7 +131,7 @@
 .instrumentMeta {
   align-content: center;
   border-top: 1px solid rgba(248, 246, 242, .08);
-  padding-top: 10px;
+  padding-top: 8px;
   display: grid;
   gap: 6px;
   min-width: 0;
@@ -114,6 +142,14 @@
   color: var(--muted);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.qrActionColumn {
+  grid-area: actions;
+  display: grid;
+  gap: 8px;
+  align-content: center;
+  min-width: 0;
 }
 
 .qrPanel {
@@ -130,13 +166,13 @@
 }
 
 .qrPanel :global(.qr-summary) {
-  grid-template-columns: 50px minmax(0, 1fr);
+  grid-template-columns: 52px minmax(0, 1fr);
   gap: 9px;
 }
 
 .qrPanel :global(.qr-art) {
-  width: 50px;
-  height: 50px;
+  width: 52px;
+  height: 52px;
 }
 
 .qrPanel :global(.qr-download strong) {
@@ -154,13 +190,13 @@
 }
 
 .qrPanel :global(.qr-download.editing) {
-  gap: 12px;
-  padding: 11px;
+  gap: 10px;
+  padding: 9px;
 }
 
 .qrPanel :global(.qr-download.editing .qr-summary) {
   grid-template-columns: 1fr;
-  gap: 10px;
+  gap: 8px;
 }
 
 .qrPanel :global(.qr-download.editing .qr-art) {
@@ -209,18 +245,18 @@
 
 .instrumentActions > :global(.button) {
   width: 100%;
-  min-height: 38px;
+  min-height: 34px;
   padding: 9px 14px;
   white-space: nowrap;
 }
 
 .transferPanel {
-  grid-column: 1 / -1;
-  margin-top: 2px;
+  grid-area: transfer;
   border: 1px solid rgba(200, 154, 69, .18);
   border-radius: 8px;
   background: rgba(200, 154, 69, .045);
   overflow: hidden;
+  margin-top: 0;
 }
 
 .transferPanel summary {
@@ -243,21 +279,36 @@
   font-size: 12px;
 }
 
+.lockedOwnerTools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 42px;
+  padding: 9px 14px;
+}
+
+.lockedOwnerTools span {
+  color: var(--text);
+  font-weight: 900;
+}
+
+.lockedOwnerTools strong {
+  color: var(--gold-2);
+  font-size: 12px;
+}
+
 .transferPanelBody {
   display: grid;
-  grid-template-columns: minmax(220px, .8fr) minmax(300px, 1fr) minmax(260px, .9fr);
+  grid-template-columns: minmax(220px, .8fr) minmax(300px, 1fr) minmax(240px, .9fr);
   gap: 14px;
   align-items: stretch;
   padding: 0 14px 14px;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1200px) {
   .instrumentRow {
-    grid-template-columns: minmax(190px, 250px) minmax(220px, 1fr) minmax(210px, 250px);
-  }
-
-  .instrumentActions {
-    grid-column: 3;
+    grid-template-columns: minmax(160px, 220px) minmax(220px, 1fr) minmax(250px, 280px);
   }
 }
 
@@ -268,8 +319,12 @@
 
   .instrumentRow {
     grid-template-columns: minmax(132px, 42%) minmax(0, 1fr);
-    padding: 14px;
-    gap: 12px;
+    grid-template-areas:
+      "thumb details"
+      "actions actions"
+      "transfer transfer";
+    padding: 12px;
+    gap: 10px;
   }
 
   .instrumentThumb {
@@ -289,16 +344,26 @@
     padding: 10px 0 0;
   }
 
-  .qrPanel,
+  .qrActionColumn,
   .instrumentActions,
   .transferPanel {
     grid-column: 1 / -1;
   }
 
-  .instrumentActions {
+  .qrActionColumn {
     grid-template-columns: 1fr;
-    justify-content: stretch;
+  }
+
+  .instrumentActions {
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 8px;
+    align-items: stretch;
+  }
+
+  .instrumentActions > :global(.button) {
+    min-height: 40px;
+    width: 100%;
+    text-align: center;
   }
 
   .transferPanelBody {

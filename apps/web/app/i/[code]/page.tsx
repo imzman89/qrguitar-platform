@@ -1,7 +1,6 @@
 "use client";
 
-import { Clock3, Download, FileText, Home, Image, Menu, MessageCircle, QrCode, Repeat2, Share2, ShieldCheck, SlidersHorizontal, UserCircle } from "lucide-react";
-import Link from "next/link";
+import { Clock3, DollarSign, Download, FileText, Home, Image, Menu, MessageCircle, QrCode, Repeat2, Share2, ShieldCheck, SlidersHorizontal, UserCircle } from "lucide-react";
 import { useParams, useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
 import type { CSSProperties, ReactNode } from "react";
@@ -14,6 +13,7 @@ import {
   instrumentDisplayName,
   type DemoInstrument
 } from "../../../lib/local-demo";
+import { calculateMarketEstimate, formatMoney, getComparableSalesForInstrument, type MarketEstimate } from "../../../lib/pricing-intelligence";
 
 const fallbackInstrument: DemoInstrument = demoInstrument;
 type ProfileTab = "overview" | "specs" | "timeline" | "ownership" | "media" | "repairs" | "documents";
@@ -94,6 +94,7 @@ export default function PublicProfilePage() {
   const galleryImages = Array.from(
     new Set([instrument.heroImageDataUrl, ...(instrument.galleryImageDataUrls || [])].filter(Boolean) as string[])
   ).slice(0, 20);
+  const marketEstimate = calculateMarketEstimate(instrument, getComparableSalesForInstrument(instrument));
   const isVerifiedRecord = getInstrumentVerificationStatus(instrument) === "verified";
 
   const specs = [
@@ -164,7 +165,6 @@ export default function PublicProfilePage() {
         </section>
 
         <section className="scan-actions" aria-label="Profile actions">
-          <ActionLink href={`/edit/${instrument.qrCode}`} icon={<SlidersHorizontal />} label="Edit Profile" />
           <Action icon={<Repeat2 />} label="Transfer Ownership" active={activeTab === "ownership"} onClick={() => setActiveTab("ownership")} />
           <Action icon={<Clock3 />} label="View History" active={activeTab === "timeline"} onClick={() => setActiveTab("timeline")} />
           <Action icon={<Image />} label="Media" active={activeTab === "media"} onClick={() => setActiveTab("media")} />
@@ -191,6 +191,7 @@ export default function PublicProfilePage() {
           optionalSpecs={optionalSpecs}
           profileLinks={profileLinks}
           galleryImages={galleryImages}
+          marketEstimate={marketEstimate}
         />
 
         {galleryImages.length ? (
@@ -233,7 +234,8 @@ function ProfilePanel({
   specs,
   optionalSpecs,
   profileLinks,
-  galleryImages
+  galleryImages,
+  marketEstimate
 }: {
   activeTab: ProfileTab;
   instrument: DemoInstrument;
@@ -241,11 +243,12 @@ function ProfilePanel({
   optionalSpecs: Array<{ label: string; value?: string }>;
   profileLinks: Array<{ label: string; href?: string }>;
   galleryImages: string[];
+  marketEstimate: MarketEstimate;
 }) {
   if (activeTab === "specs") {
     return (
       <section className="scan-tab-panel">
-        <PanelHeader icon={<SlidersHorizontal />} label="Specifications" title="Build details, setup notes, and serial info." />
+        <PanelHeader icon={<SlidersHorizontal />} label="Specifications" title="Serial, build specs, setup measurements, and custom fields." />
         <div className="profile-data-grid">
           {[...specs, ...optionalSpecs].map((spec) => (
             <span key={spec.label}><strong>{spec.label}</strong>{spec.value || "Not listed"}</span>
@@ -258,11 +261,11 @@ function ProfilePanel({
   if (activeTab === "timeline") {
     return (
       <section className="scan-tab-panel">
-        <PanelHeader icon={<Clock3 />} label="Timeline" title="The record stays useful as the instrument moves through the world." />
+        <PanelHeader icon={<Clock3 />} label="Timeline" title="Key events attached to this instrument record." />
         <div className="timeline-list">
           <TimelineItem date="June 2026" title="Build completed" copy={`${instrument.brand} finished ${instrumentDisplayName(instrument)} and attached the first QRguitar record.`} />
-          <TimelineItem date="June 2026" title="Delivered to Cranston Guitars" copy="Shop listing, floor tag, case card, photos, and buyer handoff are ready from the same record." />
-          <TimelineItem date="Future sale" title="Ownership transfer available" copy="The buyer can claim the record so warranty notes, documents, and history stay with the instrument." />
+          <TimelineItem date="June 2026" title="Delivered to Cranston Guitars" copy="Retail listing, floor tag, case card, photos, and buyer handoff use the same permanent record." />
+          <TimelineItem date="Future sale" title="Ownership transfer available" copy="The buyer can claim the record so warranty notes, documents, and service history stay with the instrument." />
         </div>
       </section>
     );
@@ -271,7 +274,7 @@ function ProfilePanel({
   if (activeTab === "ownership") {
     return (
       <section className="scan-tab-panel">
-        <PanelHeader icon={<Repeat2 />} label="Ownership" title="Brand, retailer, owner, and future buyer stay connected around the same instrument." />
+        <PanelHeader icon={<Repeat2 />} label="Ownership" title="Builder, retailer, owner, and future buyer are tied to the same record." />
         <div className="ownership-grid">
           <span><strong>Current owner</strong>{instrument.owner || "Unclaimed"}</span>
           <span><strong>Builder</strong>{instrument.builder || "Not listed"}</span>
@@ -286,7 +289,7 @@ function ProfilePanel({
   if (activeTab === "media") {
     return (
       <section className="scan-tab-panel">
-        <PanelHeader icon={<Image />} label="Media" title="Photos and videos that help a buyer, shop, or owner understand the instrument." />
+        <PanelHeader icon={<Image />} label="Media" title="Photos and videos that document condition, originality, and included items." />
         {galleryImages.length ? (
           <div className="public-gallery-grid">
             {galleryImages.map((imageUrl, index) => (
@@ -295,10 +298,10 @@ function ProfilePanel({
           </div>
         ) : (
           <div className="media-placeholder-grid">
-            <span>Main hero photo</span>
-            <span>Detail photos</span>
-            <span>Demo video</span>
-            <span>Condition photos</span>
+            <span>No main photo uploaded</span>
+            <span>No detail photos uploaded</span>
+            <span>No demo video linked</span>
+            <span>No condition photos attached</span>
           </div>
         )}
       </section>
@@ -308,10 +311,10 @@ function ProfilePanel({
   if (activeTab === "repairs") {
     return (
       <section className="scan-tab-panel">
-        <PanelHeader icon={<MessageCircle />} label="Repairs" title="A repair bench can see what happened before and add what happened today." />
+        <PanelHeader icon={<MessageCircle />} label="Repairs" title="Service notes for setup work, electronics, fretwork, inspections, and warranty claims." />
         <div className="timeline-list">
           <TimelineItem date="Setup card" title="Factory setup" copy="10-46 strings, low action, intonated June 2026." />
-          <TimelineItem date="Service ready" title="Repair notes" copy="Future fretwork, electronics changes, warranty work, and inspection photos can live here." />
+          <TimelineItem date="Service log" title="Repair notes" copy="Fretwork, electronics changes, warranty work, and inspection photos should be added with dates and shop names." />
         </div>
         <CollaborationThread compact />
       </section>
@@ -321,12 +324,12 @@ function ProfilePanel({
   if (activeTab === "documents") {
     return (
       <section className="scan-tab-panel">
-        <PanelHeader icon={<FileText />} label="Documents" title="The important paperwork follows the instrument." />
+        <PanelHeader icon={<FileText />} label="Documents" title="Receipts, build sheets, warranty terms, certificates, and case paperwork." />
         <div className="document-list">
-          <DocumentItem title="QRguitar certificate" copy="Verified record certificate for buyer packet or case storage." />
+          <DocumentItem title="QRguitar certificate" copy="Printable certificate showing the permanent QRguitar record ID." />
           <DocumentItem title="Build spec sheet" copy="Pickup set, wiring, neck shape, finish, weight, and setup measurements." />
-          <DocumentItem title="Warranty record" copy="Builder warranty terms and future claim notes." />
-          <DocumentItem title="Receipts and case candy" copy="Upload receipts, manuals, appraisals, photos, and supporting paperwork." />
+          <DocumentItem title="Warranty record" copy="Builder warranty terms, claim status, repair approvals, and service notes." />
+          <DocumentItem title="Receipts and case candy" copy="Receipts, manuals, appraisals, hang tags, certificates, and supporting paperwork." />
         </div>
       </section>
     );
@@ -337,6 +340,14 @@ function ProfilePanel({
       <div>
         <h2>About this instrument</h2>
         <p>{instrument.summary}</p>
+        <div className="profile-market-card">
+          <span><DollarSign size={16} /> Market estimate</span>
+          <strong>{formatMoney(marketEstimate.low)} - {formatMoney(marketEstimate.high)}</strong>
+          <p>
+            Fair center: {formatMoney(marketEstimate.fair)}. Based on {marketEstimate.compCount} sold/manual comps entered for this demo.
+            Not an official appraisal.
+          </p>
+        </div>
         {optionalSpecs.length ? (
           <div className="public-spec-list">
             {optionalSpecs.slice(0, 6).map((spec) => (
@@ -384,13 +395,13 @@ function CollaborationThread({ compact = false }: { compact?: boolean }) {
   return (
     <div className={compact ? "collaboration-thread compact" : "collaboration-thread"}>
       <div className="panel-header">
-        <span><MessageCircle size={18} /> Shared backend thread</span>
-        <h2>Proper Instruments, Cranston Guitars, repair staff, and the owner can talk around this exact record.</h2>
+        <span><MessageCircle size={18} /> Record discussion</span>
+        <h2>Builder, shop, repair staff, and owner notes stay attached to this instrument.</h2>
       </div>
       <div className="message-list">
         <Message role="Builder" name="Proper Instruments" copy="Warranty card and original setup are attached. Contact us before any finish work." />
-        <Message role="Retailer" name="Cranston Guitars" copy="Buyer asked about pickup output and case candy. Spec sheet and photos are ready in Documents." />
-        <Message role="Owner" name="Future owner" copy="Claim link received. I can keep service notes, receipts, and transfer history here after purchase." />
+        <Message role="Retailer" name="Cranston Guitars" copy="Buyer asked about pickup output and case contents. Spec sheet and photos are attached in Documents." />
+        <Message role="Owner" name="Future owner" copy="Claim link received. Service notes, receipts, and transfer history can stay with the record after purchase." />
       </div>
     </div>
   );
@@ -468,14 +479,5 @@ function Action({ icon, label, active, onClick }: { icon: ReactNode; label: stri
       {icon}
       <span>{label}</span>
     </button>
-  );
-}
-
-function ActionLink({ href, icon, label }: { href: string; icon: ReactNode; label: string }) {
-  return (
-    <Link href={href}>
-      {icon}
-      <span>{label}</span>
-    </Link>
   );
 }

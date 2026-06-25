@@ -9,6 +9,7 @@ export function Nav() {
       <nav className="nav-links" aria-label="Primary navigation">
         <Link href="/dashboard">Dashboard</Link>
         <Link href="/catalog">Catalog</Link>
+        <Link href="/bot">Expert Bot</Link>
         <Link href="/create">Create</Link>
         <Link href="/i/QRG-PI260001">Demo Profile</Link>
         <Link href="/login">Login</Link>

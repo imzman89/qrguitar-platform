@@ -10,9 +10,9 @@ import { QrDownload } from "../../components/QrDownload";
 import styles from "./dashboard-records.module.css";
 import {
   clearDemoUser,
+  cancelDemoTransfer,
   createDemoTransfer,
   deleteDemoInstrument,
-  demoInstrument,
   getDemoInstruments,
   getDemoTransfers,
   getDemoUser,
@@ -20,15 +20,18 @@ import {
   getAccountVerificationStatus,
   getInstrumentCondition,
   getInstrumentVerificationStatus,
+  getLatestDemoTransferForInstrument,
   instrumentDisplayName,
   instrumentToProfileUrl,
   saveDemoInstrument,
   transferFeeLabel,
   transferHelperCopy,
+  userCanEditInstrument,
   type DemoInstrument,
   type DemoTransfer,
   type DemoUser
 } from "../../lib/local-demo";
+import { useRouter } from "next/navigation";
 
 const starterActions = [
   {
@@ -38,16 +41,16 @@ const starterActions = [
     label: "Create Record"
   },
   {
-    title: "View demo profile",
-    copy: "Open the public-facing page a buyer, builder, or future owner would scan.",
+    title: "Open public profile",
+    copy: "See exactly what a buyer, builder, shop, or future owner sees when the QR is scanned.",
     href: "/i/QRG-PI260001",
     label: "Open Profile"
   },
   {
-    title: "Connect Supabase",
-    copy: "Turn local demo records into real saved accounts, instruments, media, and transfers.",
-    href: "/create",
-    label: "Next Step"
+    title: "Review transfers",
+    copy: "Create buyer claim links, verify handoffs, and keep the ownership trail attached to the instrument.",
+    href: "/dashboard#saved-records",
+    label: "Manage Transfers"
   }
 ];
 
@@ -55,12 +58,21 @@ export default function DashboardPage() {
   const [user, setUser] = useState<DemoUser | null>(null);
   const [instruments, setInstruments] = useState<DemoInstrument[]>([]);
   const [transfers, setTransfers] = useState<DemoTransfer[]>([]);
+  const [ready, setReady] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
-    setUser(getDemoUser());
-    setInstruments(getDemoInstruments());
-    setTransfers(getDemoTransfers());
-  }, []);
+    const currentUser = getDemoUser();
+    if (!currentUser) {
+      router.replace(`/login?next=${encodeURIComponent("/dashboard")}`);
+      return;
+    }
+
+  setUser(currentUser);
+    setInstruments(getUserOwnedInstruments(currentUser));
+    setTransfers(getUserOwnedTransfers(currentUser, getDemoTransfers()));
+    setReady(true);
+  }, [router]);
 
   const pendingTransfers = transfers.filter((transfer) => transfer.status === "sent").length;
   const verifiedRecords = instruments.filter((instrument) => getInstrumentVerificationStatus(instrument) === "verified").length;
@@ -69,10 +81,10 @@ export default function DashboardPage() {
 
   const stats = useMemo(
     () => [
-      { label: "Registered instruments", value: String(Math.max(instruments.length, 1)) },
-      { label: "Verified records", value: String(instruments.length ? verifiedRecords : 1) },
+      { label: "Registered instruments", value: String(instruments.length) },
+      { label: "Verified records", value: String(verifiedRecords) },
       { label: "Transfers pending", value: String(pendingTransfers) },
-      { label: "Public scans", value: instruments.length ? String(24 + instruments.length * 3) : "24" }
+      { label: "Public scans", value: instruments.length ? String(24 + instruments.length * 3) : "0" }
     ],
     [instruments.length, pendingTransfers, verifiedRecords]
   );
@@ -80,16 +92,38 @@ export default function DashboardPage() {
   function logout() {
     clearDemoUser();
     setUser(null);
+    router.replace("/login?next=%2Fdashboard");
+  }
+
+  if (!ready) {
+    return (
+      <>
+        <Nav />
+        <main className="section auth-page">
+          <div className="shell">
+            <section className="card auth-card">
+              <div className="eyebrow">Owner dashboard</div>
+              <h2>Checking your session...</h2>
+              <p>Please sign in to access dashboard tools.</p>
+              <Link className="button" href={`/login?next=${encodeURIComponent("/dashboard")}`}>
+                Go to login
+              </Link>
+            </section>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
   }
 
   function deleteInstrument(qrCode: string) {
     deleteDemoInstrument(qrCode);
-    setInstruments(getDemoInstruments());
+    setInstruments(getUserOwnedInstruments(user));
   }
 
   function updateInstrumentQrStyle(updatedInstrument: DemoInstrument) {
     saveDemoInstrument(updatedInstrument);
-    setInstruments(getDemoInstruments());
+    setInstruments(getUserOwnedInstruments(user));
   }
 
   return (
@@ -100,11 +134,11 @@ export default function DashboardPage() {
           <div className="dashboard-hero">
             <div>
               <div className="eyebrow">Owner dashboard</div>
-              <h2>{user ? `Welcome back, ${user.name}.` : "Manage records, QR codes, transfers, and public profiles."}</h2>
+              <h2>{user ? `Welcome back, ${user.name}.` : "Manage instrument records, QR downloads, ownership transfers, and public profiles."}</h2>
               <p>
                 {user
-                  ? `Signed in locally as ${user.email}. ${accountPlan.toUpperCase()} account: ${accountVerification === "verified" ? "verified" : accountVerification === "flagged" ? "flagged" : "unverified"}.`
-                  : "Create a local demo account to test the customer flow before we connect real authentication."}
+                  ? `Signed in as ${user.email}. ${accountPlan.toUpperCase()} account: ${accountVerification === "verified" ? "verified" : accountVerification === "flagged" ? "flagged" : "unverified"}.`
+                  : "Sign in to manage instrument records, QR downloads, transfers, and public profile visibility."}
               </p>
             </div>
             <div className="dashboard-buttons">
@@ -133,7 +167,7 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          <section className={`card ${styles.instrumentTable}`}>
+          <section className={`card ${styles.instrumentTable}`} id="saved-records">
             <div className={styles.tableHeader}>
               <div>
                 <div className="eyebrow">Your instruments</div>
@@ -144,7 +178,10 @@ export default function DashboardPage() {
               </Link>
             </div>
             <div className={styles.instrumentList}>
-              {(instruments.length ? instruments : demoRows).map((instrument) => (
+              {instruments.length ? instruments.map((instrument) => {
+                const canEditInstrument = userCanEditInstrument(user, instrument);
+
+                return (
                 <article className={styles.instrumentRow} key={instrument.qrCode}>
                   <div
                     className={styles.instrumentThumb}
@@ -170,49 +207,82 @@ export default function DashboardPage() {
                       <span>{getInstrumentVerificationStatus(instrument) === "verified" ? "Verified record" : "Unverified record"}</span>
                     </div>
                   </div>
-                  <div className={styles.qrPanel}>
-                    <QrDownload
-                      code={instrument.qrCode}
-                      label={instrumentDisplayName(instrument)}
-                      qrStyle={instrument.qrStyle}
-                      onStyleChange={(qrStyle) => updateInstrumentQrStyle({ ...instrument, qrStyle })}
-                    />
+                  <div className={styles.qrActionColumn}>
+                    <div className={styles.qrPanel}>
+                      <QrDownload
+                        code={instrument.qrCode}
+                        label={instrumentDisplayName(instrument)}
+                        qrStyle={instrument.qrStyle}
+                        onStyleChange={(qrStyle) => {
+                          if (canEditInstrument) {
+                            updateInstrumentQrStyle({ ...instrument, qrStyle });
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className={styles.instrumentActions}>
+                      {canEditInstrument ? (
+                        <Link className="button secondary" href={`/edit/${instrument.qrCode}`}>
+                          Edit Profile
+                        </Link>
+                      ) : (
+                        <Link className="button secondary" href={instrumentToProfileUrl(instrument)}>
+                          View Only
+                        </Link>
+                      )}
+                      <Link className="button secondary" href={instrumentToProfileUrl(instrument)}>
+                        View Profile
+                      </Link>
+                      {canEditInstrument ? (
+                        <button className="button secondary" type="button" onClick={() => deleteInstrument(instrument.qrCode)}>
+                          Delete
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
-                  <div className={styles.instrumentActions}>
-                    <Link className="button secondary" href={`/edit/${instrument.qrCode}`}>
-                      Edit Profile
-                    </Link>
-                    <Link className="button secondary" href={instrumentToProfileUrl(instrument)}>
-                      View Profile
-                    </Link>
-                    <button className="button secondary" type="button" onClick={() => deleteInstrument(instrument.qrCode)}>
-                      Delete
-                    </button>
-                  </div>
-                  <TransferPanel
-                    className={styles.transferPanel}
-                    bodyClassName={styles.transferPanelBody}
-                    instrument={instrument}
-                    user={user}
-                    latestTransfer={transfers.find((transfer) => transfer.guitarQrCode === instrument.qrCode)}
-                    onTransferCreated={(transfer) => {
-                      if (!instruments.find((item) => item.qrCode === instrument.qrCode)) {
-                        saveDemoInstrument(instrument);
-                        setInstruments(getDemoInstruments());
-                      }
+                  {canEditInstrument ? (
+                    <TransferPanel
+                      className={styles.transferPanel}
+                      bodyClassName={styles.transferPanelBody}
+                      instrument={instrument}
+                      user={user}
+                      latestTransfer={transfers.find((transfer) => transfer.id === getLatestDemoTransferForInstrument(instrument.qrCode)?.id)}
+                      onTransferCreated={(transfer) => {
+                        if (!instruments.find((item) => item.qrCode === instrument.qrCode)) {
+                          saveDemoInstrument(instrument);
+                          setInstruments(getUserOwnedInstruments(user));
+                        }
 
-                      setTransfers((current) => [transfer, ...current.filter((item) => item.id !== transfer.id)]);
-                    }}
-                  />
+                        setTransfers((current) => [transfer, ...current.filter((item) => item.id !== transfer.id)]);
+                      }}
+                      onTransferChanged={() => setTransfers(getUserOwnedTransfers(user, getDemoTransfers()))}
+                    />
+                  ) : (
+                    <div className={styles.transferPanel}>
+                      <div className={styles.lockedOwnerTools}>
+                        <span>Owner tools locked</span>
+                        <strong>View-only record</strong>
+                      </div>
+                    </div>
+                  )}
                 </article>
-              ))}
+              );
+              }) : (
+                <div className={styles.emptyState}>
+                  <strong>No instruments yet.</strong>
+                  <p>Register your first instrument.</p>
+                  <Link className="button" href="/create">
+                    Register Instrument
+                  </Link>
+                </div>
+              )}
             </div>
           </section>
 
           <div className="grid three dashboard-actions">
             {starterActions.map((action) => (
               <article className="card" key={action.title}>
-                <div className="icon">{action.title === "Register instrument" ? <QrCode /> : action.title === "View demo profile" ? <Eye /> : <Settings2 />}</div>
+                <div className="icon">{action.title === "Register instrument" ? <QrCode /> : action.title === "Open public profile" ? <Eye /> : <Repeat2 />}</div>
                 <h3>{action.title}</h3>
                 <p>{action.copy}</p>
                 <Link className="button secondary" href={action.href}>
@@ -227,19 +297,19 @@ export default function DashboardPage() {
               <div className="icon"><BadgeCheck /></div>
               <h3>Recent instrument activity</h3>
               <div className="activity-list">
-                <Activity icon={<QrCode size={18} />} title="QR profile ready" detail="Public profile links are working locally." />
-                <Activity icon={<ShieldCheck size={18} />} title="Customer flow staged" detail="Login, dashboard, create, and public profile now connect." />
-                <Activity icon={<Repeat2 size={18} />} title="Transfer rules ready" detail="New brand/package records can include a first handoff. Used records default to paid transfer." />
+                <Activity icon={<QrCode size={18} />} title="QR links are active" detail="Each record has a permanent public URL for scans, sale listings, print cards, and case documentation." />
+                <Activity icon={<ShieldCheck size={18} />} title="Records can be edited" detail="Create, update, preview, and publish instrument profiles from the same dashboard." />
+                <Activity icon={<Repeat2 size={18} />} title="Transfer rules are set" detail="New brand/package records can include a first handoff. Used records default to a paid transfer." />
               </div>
             </section>
             <section className="card">
               <div className="icon"><Settings2 /></div>
-              <h3>Build checklist</h3>
+              <h3>Launch checklist</h3>
               <div className="check-list">
-                <div className="check-item"><span>1</span> Local login and guitar registration</div>
-                <div className="check-item"><span>2</span> Supabase auth and database saves</div>
-                <div className="check-item"><span>3</span> QR image generation and download</div>
-                <div className="check-item"><span>4</span> Stripe checkout and real transfer emails</div>
+                <div className="check-item"><span>1</span> Create an account and register an instrument</div>
+                <div className="check-item"><span>2</span> Choose public catalog visibility or private-link access</div>
+                <div className="check-item"><span>3</span> Style, preview, and download the QR image</div>
+                <div className="check-item"><span>4</span> Start payment, ownership transfer, and buyer claim flow</div>
               </div>
             </section>
           </div>
@@ -256,7 +326,8 @@ function TransferPanel({
   instrument,
   user,
   latestTransfer,
-  onTransferCreated
+  onTransferCreated,
+  onTransferChanged
 }: {
   className: string;
   bodyClassName: string;
@@ -264,32 +335,67 @@ function TransferPanel({
   user: DemoUser | null;
   latestTransfer?: DemoTransfer;
   onTransferCreated: (transfer: DemoTransfer) => void;
+  onTransferChanged: () => void;
 }) {
-  const [toName, setToName] = useState("New owner");
-  const [toEmail, setToEmail] = useState("buyer@example.com");
+  const [toName, setToName] = useState("");
+  const [toEmail, setToEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [lastCreatedClaimUrl, setLastCreatedClaimUrl] = useState("");
 
   const claimUrl =
     typeof window !== "undefined" && latestTransfer ? `${window.location.origin}${latestTransfer.claimPath}` : "";
+  const visibleClaimUrl = claimUrl || lastCreatedClaimUrl;
   const includedFirstTransfer = transferFeeLabel(instrument).startsWith("$0");
+  const hasPendingTransfer = latestTransfer?.status === "sent";
 
   async function copyClaimLink() {
-    if (!claimUrl) {
+    if (!visibleClaimUrl) {
       return;
     }
 
-    await window.navigator.clipboard?.writeText(claimUrl);
+    await window.navigator.clipboard?.writeText(visibleClaimUrl);
     setMessage("Claim link copied. Send it to the buyer so they can accept ownership.");
   }
 
   function createTransfer() {
-    const transfer = createDemoTransfer(instrument, toEmail, toName, user?.name || instrument.owner || "Current owner");
+    const result = createDemoTransfer(
+      instrument,
+      toEmail,
+      toName,
+      user?.name || instrument.owner || "Current owner",
+      user?.email || ""
+    );
+
+    if (!result.ok) {
+      setMessage(result.reason);
+      return;
+    }
+
+    const { transfer } = result;
+    const nextClaimUrl = typeof window !== "undefined" ? `${window.location.origin}${transfer.claimPath}` : transfer.claimPath;
+    setLastCreatedClaimUrl(nextClaimUrl);
     onTransferCreated(transfer);
     setMessage(
       transfer.feeCents === 0
-        ? "Transfer link created. This record qualifies for an included first handoff."
-        : "Transfer link created. This used/customer record is marked as a paid transfer."
+        ? "Transfer link created. Copy it and send it to the buyer. They will verify email before ownership changes."
+        : "Transfer link created. Buyer must complete payment and verify email before ownership changes."
     );
+  }
+
+  function cancelTransfer() {
+    if (!latestTransfer) {
+      return;
+    }
+
+    const result = cancelDemoTransfer(latestTransfer.id);
+    if (!result.ok) {
+      setMessage(result.reason);
+      return;
+    }
+
+    setLastCreatedClaimUrl("");
+    setMessage("Pending transfer cancelled.");
+    onTransferChanged();
   }
 
   return (
@@ -301,28 +407,58 @@ function TransferPanel({
       <div className={bodyClassName}>
         <div className="transfer-copy">
           <span className="mini-eyebrow">Ownership handoff</span>
-          <strong>{includedFirstTransfer ? "Included first transfer" : "Paid transfer required"}</strong>
+          <strong>
+            {hasPendingTransfer
+              ? "Pending buyer claim"
+              : latestTransfer?.status === "accepted"
+                ? "Transfer accepted"
+                : includedFirstTransfer ? "Included first transfer" : "Paid transfer required"}
+          </strong>
           <p>{transferHelperCopy(instrument)}</p>
         </div>
         <div className="transfer-form">
           <label>
             Buyer name
-            <input value={toName} onChange={(event) => setToName(event.target.value)} />
+            <input value={toName} onChange={(event) => setToName(event.target.value)} disabled={hasPendingTransfer} />
           </label>
           <label>
             Buyer email
-            <input type="email" value={toEmail} onChange={(event) => setToEmail(event.target.value)} />
+            <input type="email" value={toEmail} onChange={(event) => setToEmail(event.target.value)} disabled={hasPendingTransfer} />
           </label>
-          <button className="button" type="button" onClick={createTransfer}>
-            <Mail size={16} />
-            Create Claim Link
-          </button>
+          {hasPendingTransfer ? (
+            <button className="button secondary" type="button" onClick={cancelTransfer}>
+              Cancel Pending
+            </button>
+          ) : (
+            <button className="button" type="button" onClick={createTransfer}>
+              <Mail size={16} />
+              Create Claim Link
+            </button>
+          )}
         </div>
         {latestTransfer ? (
           <div className="claim-link-box">
-            <span>{latestTransfer.status === "accepted" ? "Accepted transfer" : "Pending transfer"}</span>
+            <span>
+              {latestTransfer.status === "accepted"
+                ? "Accepted transfer"
+                : latestTransfer.status === "cancelled"
+                  ? "Cancelled transfer"
+                  : "Pending transfer"}
+            </span>
             <strong>{latestTransfer.toName} - {latestTransfer.toEmail}</strong>
-            <code>{claimUrl}</code>
+            <code>{visibleClaimUrl}</code>
+            {latestTransfer.status === "sent" ? (
+              <button className="button secondary" type="button" onClick={() => void copyClaimLink()}>
+                <Copy size={16} />
+                Copy Link
+              </button>
+            ) : null}
+          </div>
+        ) : lastCreatedClaimUrl ? (
+          <div className="claim-link-box">
+            <span>Pending transfer</span>
+            <strong>{toName} - {toEmail}</strong>
+            <code>{lastCreatedClaimUrl}</code>
             <button className="button secondary" type="button" onClick={() => void copyClaimLink()}>
               <Copy size={16} />
               Copy Link
@@ -335,7 +471,22 @@ function TransferPanel({
   );
 }
 
-const demoRows: DemoInstrument[] = [demoInstrument];
+function getUserOwnedInstruments(user: DemoUser | null) {
+  if (!user?.email) {
+    return [];
+  }
+
+  return getDemoInstruments().filter((instrument) => userCanEditInstrument(user, instrument));
+}
+
+function getUserOwnedTransfers(user: DemoUser | null, transfers: DemoTransfer[]) {
+  if (!user?.email) {
+    return [];
+  }
+
+  const ownedCodes = new Set(getUserOwnedInstruments(user).map((instrument) => instrument.qrCode.toUpperCase()));
+  return transfers.filter((transfer) => ownedCodes.has(transfer.guitarQrCode.toUpperCase()));
+}
 
 function Activity({ icon, title, detail }: { icon: ReactNode; title: string; detail: string }) {
   return (

@@ -1,7 +1,7 @@
 import { sampleGuitar, type GuitarProfile } from "@qrguitar/shared";
 
 export async function getGuitarByCode(code: string): Promise<GuitarProfile> {
-  // Supabase hookup goes here. For now this keeps the MVP runnable with no backend.
+  // Replace this fallback with the production instrument query when database storage is connected.
   return {
     ...sampleGuitar,
     qrCode: code.toUpperCase()

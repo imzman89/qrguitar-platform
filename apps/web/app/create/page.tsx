@@ -24,6 +24,7 @@ export default function CreatePage() {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [honeypot, setHoneypot] = useState("");
+  const [ready, setReady] = useState(false);
   const [form, setForm] = useState({
     name: "",
     brand: "Proper Instruments",
@@ -37,7 +38,7 @@ export default function CreatePage() {
     summary: "",
     visibility: "public"
   });
-  const [customFields, setCustomFields] = useState([{ id: "field-1", label: "Builder", value: "Gary Z." }]);
+  const [customFields, setCustomFields] = useState([{ id: "field-1", label: "Finish", value: "" }]);
   const [customLinks, setCustomLinks] = useState([{ id: "link-1", label: "Website", url: "" }]);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [qrCode, setQrCode] = useState(() =>
@@ -60,6 +61,16 @@ export default function CreatePage() {
   const profileHref = useMemo(() => {
     return `/i/${qrCode}`;
   }, [qrCode]);
+
+  useEffect(() => {
+    const currentUser = getDemoUser();
+    if (!currentUser) {
+      router.replace(`/login?next=${encodeURIComponent("/create")}`);
+      return;
+    }
+
+    setReady(true);
+  }, [router]);
 
   function updateField(field: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -109,6 +120,8 @@ export default function CreatePage() {
       qrCode,
       permanentPath: profileHref,
       ...form,
+      creatorAccountEmail: user?.email || "",
+      ownerAccountEmail: user?.email || "",
       instrumentCondition: form.instrumentCondition === "new" ? "new" : "used",
       creatorAccountType: plan === "brand" || plan === "commercial" ? plan : "customer",
       packageIncludesFirstTransfer: plan === "paid" || plan === "brand" || plan === "commercial",
@@ -208,7 +221,7 @@ export default function CreatePage() {
     }
   }
 
-  return (
+  return ready ? (
     <>
       <Nav />
       <main className="section create-page">
@@ -217,18 +230,17 @@ export default function CreatePage() {
             <div className="eyebrow">Create a QRguitar record</div>
             <h2>Register an instrument and preview the public profile.</h2>
             <p>
-              This works locally today. It generates a scannable-style profile URL without needing accounts,
-              payments, or Supabase connected yet.
+              Enter the core facts first. QRguitar locks the permanent ID, then you can add photos, specs, links, QR styling, and sale notes.
             </p>
               <div className="permanent-id">
                 <span>Permanent QRguitar ID</span>
                 <strong>{qrCode}</strong>
-                <small>{form.serial ? "Built from the serial number, then locked forever on creation." : "No serial yet, so QRguitar creates a unique permanent ID."}</small>
+                <small>{form.serial ? "Uses the serial number because this instrument has one." : "No serial entered. QRguitar will issue a permanent unique ID."}</small>
               </div>
               <div className="privacy-toggle" aria-label="Profile visibility">
                 <div>
                   <strong>{form.visibility === "public" ? "Public catalog" : "Private link only"}</strong>
-                  <span>{form.visibility === "public" ? "Shows on the live homepage feed and catalog." : "Hidden from public browsing. The permanent QR link still works."}</span>
+                  <span>{form.visibility === "public" ? "Can appear in the catalog and latest public record feed." : "Hidden from browsing. Anyone with the QR link can still open it."}</span>
                 </div>
                 <button
                   className="button secondary"
@@ -250,7 +262,7 @@ export default function CreatePage() {
               />
               <div className="form-section-heading">
                 <span className="eyebrow">Register basics</span>
-                <p>Just enough to create the permanent record. Everything else can be added after.</p>
+                <p>Required fields for a useful record. Optional specs, photos, links, and documents can be added next.</p>
               </div>
               <div className="form-grid">
                 <Field label="Make / brand" id="brand" value={form.brand} onChange={(value) => updateField("brand", value)} />
@@ -271,7 +283,7 @@ export default function CreatePage() {
                 </div>
               </div>
               <details className="advanced-panel">
-                <summary>Add profile basics</summary>
+                <summary>Owner, location, and public notes</summary>
                 <div className="form-grid">
                   <Field label="Display title / nickname" id="name" value={form.name} onChange={(value) => updateField("name", value)} />
                   <Field label="Owner display" id="owner" value={form.owner} onChange={(value) => updateField("owner", value)} />
@@ -285,12 +297,12 @@ export default function CreatePage() {
                     rows={5}
                     value={form.summary}
                     onChange={(event) => updateField("summary", event.target.value)}
-                    placeholder="Add provenance, build story, service notes, or anything useful later."
+                    placeholder="Example: Original owner, recent setup, included case, known modifications, warranty notes, or sale details."
                   />
                 </div>
               </details>
               <details className="advanced-panel" open>
-                <summary>Add any details</summary>
+                <summary>Specs and custom fields</summary>
                 <div className="custom-list">
                   {customFields.map((field) => (
                     <div className="custom-row" key={field.id}>
@@ -306,7 +318,7 @@ export default function CreatePage() {
                       />
                       <input
                         aria-label="Field value"
-                        placeholder="Value"
+                        placeholder="Value, e.g. Nitro relic burst"
                         value={field.value}
                         onChange={(event) =>
                           setCustomFields((current) =>
@@ -320,12 +332,12 @@ export default function CreatePage() {
                     </div>
                   ))}
                   <button className="button secondary" type="button" onClick={() => setCustomFields((current) => [...current, { id: `field-${Date.now()}`, label: "", value: "" }])}>
-                    Add Detail
+                    Add Spec Field
                   </button>
                 </div>
               </details>
               <details className="advanced-panel">
-                <summary>Add website or social links</summary>
+                <summary>Website, shop, and social links</summary>
                 <div className="custom-list">
                   {customLinks.map((link) => (
                     <div className="custom-row" key={link.id}>
@@ -380,7 +392,7 @@ export default function CreatePage() {
               <section className="qr-customizer" aria-label="QR code customization">
                 <div>
                   <span className="eyebrow">QR appearance</span>
-                  <h3>Customize the code customers download.</h3>
+                  <h3>Set the downloadable QR style.</h3>
                   <p>Keep strong contrast so the QR remains scannable on stickers, hang tags, plates, and certificates.</p>
                 </div>
                 <div className="qr-controls">
@@ -454,6 +466,23 @@ export default function CreatePage() {
               customLinks={customLinks}
             />
           </aside>
+        </div>
+      </main>
+      <Footer />
+    </>
+  ) : (
+    <>
+      <Nav />
+      <main className="section auth-page">
+        <div className="shell">
+          <section className="card auth-card">
+            <div className="eyebrow">Create instrument</div>
+            <h2>Checking account…</h2>
+            <p>You need to sign in before creating or editing records.</p>
+            <Link className="button" href={`/login?next=${encodeURIComponent("/create")}`}>
+              Sign in
+            </Link>
+          </section>
         </div>
       </main>
       <Footer />
