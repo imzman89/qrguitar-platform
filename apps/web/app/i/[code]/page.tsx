@@ -1,16 +1,38 @@
 "use client";
 
-import { Clock3, DollarSign, Download, FileText, Home, Image, Menu, MessageCircle, QrCode, Repeat2, Share2, ShieldCheck, SlidersHorizontal, UserCircle } from "lucide-react";
-import { useParams, useSearchParams } from "next/navigation";
+import {
+  ArrowLeft,
+  Clock3,
+  Download,
+  Copy,
+  DollarSign,
+  FileText,
+  Home,
+  Image,
+  MessageCircle,
+  QrCode,
+  Repeat2,
+  Share2,
+  ShieldCheck,
+  SlidersHorizontal,
+  UserCircle,
+  X
+} from "lucide-react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { BrandLogo } from "../../../components/BrandLogo";
 import {
   defaultQrStyle,
   demoInstrument,
+  getDemoTransfers,
   findDemoInstrument,
   getInstrumentVerificationStatus,
+  getDemoUser,
+  type DemoTransfer,
   instrumentDisplayName,
+  transferFeeLabel,
   type DemoInstrument
 } from "../../../lib/local-demo";
 import { calculateMarketEstimate, formatMoney, getComparableSalesForInstrument, type MarketEstimate } from "../../../lib/pricing-intelligence";
@@ -31,33 +53,61 @@ const profileTabs: Array<{ id: ProfileTab; label: string }> = [
 export default function PublicProfilePage() {
   const params = useParams<{ code: string }>();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [stored, setStored] = useState<DemoInstrument | null>(null);
+  const [transfers, setTransfers] = useState<DemoTransfer[]>([]);
+  const [shareUrl, setShareUrl] = useState("");
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
+  const [shareNotice, setShareNotice] = useState<"idle" | "copied" | "failed">("idle");
+  const [actionNotice, setActionNotice] = useState<"transfer" | "documents" | "owner" | null>(null);
+  const [mediaIndex, setMediaIndex] = useState(0);
+  const [activeMedia, setActiveMedia] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
   const code = params.code || demoInstrument.qrCode;
-  const isDemoRecord = code.toUpperCase() === demoInstrument.qrCode;
+  const isDemoRecord = code.toUpperCase() === demoInstrument.qrCode.toUpperCase();
+  const queryTab = searchParams.get("tab");
+  const currentUser = useMemo(() => getDemoUser(), []);
+  const canEdit = Boolean(currentUser) && ["owner", "builder", "shop"].includes(currentUser?.role || "");
+
+  const switchTab = (tab: ProfileTab) => {
+    setActiveTab(tab);
+    setActiveMedia(null);
+
+    if (typeof window !== "undefined" && router) {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", tab);
+      router.replace(`${url.pathname}${url.search}`, { scroll: false });
+    }
+  };
 
   useEffect(() => {
     setStored(findDemoInstrument(code));
+    setTransfers(
+      getDemoTransfers().filter((transfer) => transfer.guitarQrCode.toUpperCase() === code.toUpperCase())
+    );
   }, [code]);
 
-  const instrument = useMemo<DemoInstrument>(() => {
+  const instrument = useMemo<DemoInstrument | null>(() => {
     if (stored) {
-      const isLegacyDemoPlaceholder =
-        isDemoRecord && stored.model === "Custom Offset" && stored.brand === fallbackInstrument.brand && stored.serial === fallbackInstrument.serial;
-      const verificationStatus = stored.verificationStatus === "verified" || isLegacyDemoPlaceholder ? "verified" : "unverified";
-
       return {
         ...fallbackInstrument,
         ...stored,
-        verificationStatus,
-        model: isLegacyDemoPlaceholder ? fallbackInstrument.model : stored.model,
-        builder: isLegacyDemoPlaceholder ? fallbackInstrument.builder : stored.builder,
-        summary: isLegacyDemoPlaceholder ? fallbackInstrument.summary : stored.summary
+        qrCode: (stored.qrCode || fallbackInstrument.qrCode).toUpperCase(),
+        permanentPath: stored.permanentPath || `/i/${(stored.qrCode || fallbackInstrument.qrCode).toUpperCase()}`,
+        instrumentCondition: stored.instrumentCondition === "new" ? "new" : "used",
+        creatorAccountType: stored.creatorAccountType || "customer",
+        verificationStatus: stored.verificationStatus || (isDemoRecord ? "verified" : "unverified"),
+        heroImageDataUrl: stored.heroImageDataUrl || fallbackInstrument.heroImageDataUrl,
+        galleryImageDataUrls: stored.galleryImageDataUrls && stored.galleryImageDataUrls.length ? stored.galleryImageDataUrls : fallbackInstrument.galleryImageDataUrls
       };
     }
 
     if (isDemoRecord) {
       return fallbackInstrument;
+    }
+
+    if (!searchParams.get("name") && !searchParams.get("brand") && !searchParams.get("serial")) {
+      return null;
     }
 
     return {
@@ -88,20 +138,78 @@ export default function PublicProfilePage() {
     };
   }, [code, isDemoRecord, searchParams, stored]);
 
+  if (!instrument) {
+    return (
+      <main className="scan-profile">
+        <section className="scan-shell">
+          <section className="scan-tab-panel" aria-label="Profile not found">
+            <h2>Instrument profile not found</h2>
+            <p>This QR code record has not been published yet.</p>
+            <div className="scan-actions">
+              <Action icon={<Home />} label="Go to homepage" onClick={() => router.push("/")} />
+              <Action icon={<Download />} label="Browse catalog" onClick={() => router.push("/catalog")} />
+            </div>
+          </section>
+        </section>
+      </main>
+    );
+  }
+
   const heroStyle = instrument.heroImageDataUrl
     ? ({ "--scan-hero-image": `url("${instrument.heroImageDataUrl}")` } as CSSProperties)
     : undefined;
   const galleryImages = Array.from(
     new Set([instrument.heroImageDataUrl, ...(instrument.galleryImageDataUrls || [])].filter(Boolean) as string[])
   ).slice(0, 20);
-  const marketEstimate = calculateMarketEstimate(instrument, getComparableSalesForInstrument(instrument));
+  useEffect(() => {
+    setMediaIndex(0);
+  }, [instrument.qrCode, galleryImages.length]);
+
   const isVerifiedRecord = getInstrumentVerificationStatus(instrument) === "verified";
+  const transferMessage = transferFeeLabel(instrument);
+  const latestTransfers = [...transfers]
+    .filter((transfer) => transfer.guitarQrCode.toUpperCase() === instrument.qrCode.toUpperCase())
+    .sort((first, second) => Date.parse(second.createdAt || "") - Date.parse(first.createdAt || ""));
+  const latestTransfer = latestTransfers[0];
+  const marketEstimate = calculateMarketEstimate(instrument, getComparableSalesForInstrument(instrument));
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setShareUrl(`${window.location.origin}${instrument.permanentPath}`);
+    }
+  }, [instrument.permanentPath]);
+
+  useEffect(() => {
+    if (queryTab && (profileTabs.some((tab) => tab.id === queryTab))) {
+      setActiveTab(queryTab as ProfileTab);
+    }
+  }, [queryTab]);
+
+  async function copyProfileUrl() {
+    if (!shareUrl) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopyStatus("copied");
+      setShareNotice("copied");
+      setTimeout(() => {
+        setCopyStatus("idle");
+        setShareNotice("idle");
+      }, 1400);
+    } catch {
+      setCopyStatus("idle");
+      setShareNotice("failed");
+      setTimeout(() => setShareNotice("idle"), 1800);
+    }
+  }
 
   const specs = [
     { label: "Instrument ID", value: instrument.qrCode },
     { label: "Status", value: isVerifiedRecord ? "Verified record" : "Unverified record" },
     { label: "Owner", value: instrument.owner || "Unclaimed" },
-    { label: "Built", value: instrument.year ? `June ${instrument.year}` : "Unknown" },
+    { label: "Built", value: instrument.year || "Unknown" },
     { label: "Make / Model", value: [instrument.brand, instrument.model].filter(Boolean).join(" ") },
     { label: "Serial", value: instrument.serial },
     { label: "Builder", value: instrument.builder || "Not listed" },
@@ -132,9 +240,13 @@ export default function PublicProfilePage() {
     <main className="scan-profile">
       <section className="scan-shell">
         <div className="scan-topbar">
-          <button aria-label="Menu"><Menu size={30} /></button>
-          <div className="scan-brand">QR<span>guitar</span></div>
-          <button aria-label="Share"><Share2 size={24} /></button>
+          <button type="button" aria-label="Back to homepage" onClick={() => router.push("/")}>
+            <ArrowLeft size={24} />
+          </button>
+          <BrandLogo className="scan-brand" />
+          <button type="button" aria-label="Share this profile" onClick={copyProfileUrl}>
+            <Share2 size={24} />
+          </button>
         </div>
 
         <section className="scan-hero" style={heroStyle}>
@@ -159,24 +271,95 @@ export default function PublicProfilePage() {
             <ProfileQr code={instrument.qrCode} />
             <div>
               <strong>Scan to view</strong>
-              <span>qrguitar.com/i/{instrument.qrCode.toLowerCase()}</span>
+              <span>{shareUrl ? shareUrl.replace(/^https?:\/\//, "") : `qrguitar.com/i/${instrument.qrCode.toLowerCase()}`}</span>
             </div>
+            <button className="button secondary" type="button" onClick={copyProfileUrl}>
+              <Copy size={14} />
+              {copyStatus === "copied" ? "Copied" : "Copy URL"}
+            </button>
           </div>
+          {shareNotice === "failed" ? (
+            <small className="scan-copy-notice">Copy failed. You can copy the URL from your browser bar.</small>
+          ) : null}
         </section>
 
         <section className="scan-actions" aria-label="Profile actions">
-          <Action icon={<Repeat2 />} label="Transfer Ownership" active={activeTab === "ownership"} onClick={() => setActiveTab("ownership")} />
-          <Action icon={<Clock3 />} label="View History" active={activeTab === "timeline"} onClick={() => setActiveTab("timeline")} />
-          <Action icon={<Image />} label="Media" active={activeTab === "media"} onClick={() => setActiveTab("media")} />
-          <Action icon={<Download />} label="Certificate" active={activeTab === "documents"} onClick={() => setActiveTab("documents")} />
+            <Action
+              icon={<SlidersHorizontal />}
+              label="Edit Profile"
+              onClick={() => {
+                if (canEdit) {
+                  router.push(`/edit/${instrument.qrCode}`);
+                  return;
+                }
+
+                setActionNotice("owner");
+              }}
+            />
+          <Action
+            icon={<Repeat2 />}
+            label="Transfer Ownership"
+            active={activeTab === "ownership"}
+            onClick={() => {
+              switchTab("ownership");
+              setActionNotice("transfer");
+            }}
+          />
+          <Action icon={<Clock3 />} label="View History" active={activeTab === "timeline"} onClick={() => {
+            setActionNotice(null);
+            switchTab("timeline");
+          }} />
+          <Action
+            icon={<Image />}
+            label="Media"
+            active={activeTab === "media"}
+            onClick={() => {
+              setActionNotice(null);
+              switchTab("media");
+              setMediaIndex(0);
+            }}
+          />
+          <Action icon={<Download />} label="Certificate" active={activeTab === "documents"} onClick={() => {
+            setActionNotice("documents");
+            switchTab("documents");
+          }} />
         </section>
+
+        {actionNotice ? (
+          <section className="scan-action-panel" role="status" aria-live="polite">
+            <div>
+              {actionNotice === "transfer" ? (
+                <>
+                  <span className="scan-action-icon"><Share2 size={16} /> Transfer workflow coming soon</span>
+                  <p>When the buyer accepts a claim link, service notes and service photos move with this QR identity.</p>
+                </>
+              ) : null}
+              {actionNotice === "documents" ? (
+                <>
+                  <span className="scan-action-icon"><FileText size={16} /> Document actions ready soon</span>
+                  <p>Documents are visible here. Direct downloads and uploads will open when owner account roles are live.</p>
+                </>
+              ) : null}
+              {actionNotice === "owner" ? (
+                <>
+                  <span className="scan-action-icon"><ShieldCheck size={16} /> Owner/admin access required</span>
+                  <p>Only the owner or admin can edit this record right now. Sign in as a record owner to make changes.</p>
+                </>
+              ) : null}
+            </div>
+            <button className="button secondary" type="button" onClick={() => setActionNotice(null)}><X size={14} />Close</button>
+          </section>
+        ) : null}
 
         <nav className="scan-tabs" aria-label="Instrument profile sections">
           {profileTabs.map((tab) => (
             <button
               className={activeTab === tab.id ? "active" : undefined}
               type="button"
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActionNotice(null);
+                switchTab(tab.id);
+              }}
               key={tab.id}
             >
               {tab.label}
@@ -191,38 +374,42 @@ export default function PublicProfilePage() {
           optionalSpecs={optionalSpecs}
           profileLinks={profileLinks}
           galleryImages={galleryImages}
+          mediaIndex={mediaIndex}
+          onPickMedia={setMediaIndex}
+          onOpenMedia={setActiveMedia}
+          onDocumentView={() => setActionNotice("documents")}
+          transferMessage={transferMessage}
+          latestTransfer={latestTransfer}
           marketEstimate={marketEstimate}
         />
 
-        {galleryImages.length ? (
-          <section className="public-gallery" aria-label="Instrument photo gallery">
-            <div>
-              <span className="mini-eyebrow">Media</span>
-              <h2>Photos</h2>
-            </div>
-            <div className="public-gallery-grid">
-              {galleryImages.map((imageUrl, index) => (
-                <img src={imageUrl} alt={`${instrumentDisplayName(instrument)} photo ${index + 1}`} key={`${imageUrl}-${index}`} />
-              ))}
-            </div>
-          </section>
-        ) : null}
-
         <section className="scan-tags" aria-label="Instrument badges">
-          <span>One of One</span>
-          <span>Handmade</span>
+          <span>{instrument.visibility === "private" ? "Private" : "Public"}</span>
+          <span>{instrument.instrumentCondition ? instrument.instrumentCondition.toUpperCase() : "USED"}</span>
           <span>{instrument.location?.split(",")[0] || "Registered"}</span>
-          <span>Verified</span>
-          <span>Lifetime Record</span>
+          <span>{isVerifiedRecord ? "Verified" : "Unverified"}</span>
+          <span>{transferMessage}</span>
         </section>
 
         <nav className="scan-bottom-nav" aria-label="Mobile profile navigation">
-          <button className={activeTab === "overview" ? "active" : undefined} type="button" onClick={() => setActiveTab("overview")}><Home size={24} />Overview</button>
-          <button className={activeTab === "specs" ? "active" : undefined} type="button" onClick={() => setActiveTab("specs")}><SlidersHorizontal size={24} />Specs</button>
-          <button className={activeTab === "timeline" ? "active" : undefined} type="button" onClick={() => setActiveTab("timeline")}><Clock3 size={24} />Timeline</button>
-          <button className={activeTab === "media" ? "active" : undefined} type="button" onClick={() => setActiveTab("media")}><Image size={24} />Media</button>
-          <button className={activeTab === "ownership" ? "active" : undefined} type="button" onClick={() => setActiveTab("ownership")}><UserCircle size={24} />Owner</button>
+          <button className={activeTab === "overview" ? "active" : undefined} type="button" onClick={() => switchTab("overview")}><Home size={24} />Overview</button>
+          <button className={activeTab === "specs" ? "active" : undefined} type="button" onClick={() => switchTab("specs")}><SlidersHorizontal size={24} />Specs</button>
+          <button className={activeTab === "timeline" ? "active" : undefined} type="button" onClick={() => switchTab("timeline")}><Clock3 size={24} />Timeline</button>
+          <button className={activeTab === "media" ? "active" : undefined} type="button" onClick={() => switchTab("media")}><Image size={24} />Media</button>
+          <button className={activeTab === "ownership" ? "active" : undefined} type="button" onClick={() => switchTab("ownership")}><UserCircle size={24} />Owner</button>
         </nav>
+
+        {activeMedia ? (
+          <div className="media-overlay" role="dialog" aria-label="Media preview">
+            <div className="media-overlay-backdrop" onClick={() => setActiveMedia(null)} />
+            <section className="media-overlay-content">
+              <button className="media-overlay-close" type="button" onClick={() => setActiveMedia(null)}>
+                <X size={14} /> Close
+              </button>
+              <img src={activeMedia} alt={`${instrumentDisplayName(instrument)} preview`} />
+            </section>
+          </div>
+        ) : null}
       </section>
     </main>
   );
@@ -235,6 +422,12 @@ function ProfilePanel({
   optionalSpecs,
   profileLinks,
   galleryImages,
+  mediaIndex,
+  onPickMedia,
+  onOpenMedia,
+  onDocumentView,
+  transferMessage,
+  latestTransfer,
   marketEstimate
 }: {
   activeTab: ProfileTab;
@@ -243,12 +436,18 @@ function ProfilePanel({
   optionalSpecs: Array<{ label: string; value?: string }>;
   profileLinks: Array<{ label: string; href?: string }>;
   galleryImages: string[];
+  mediaIndex: number;
+  onPickMedia: (index: number) => void;
+  onOpenMedia: (imageUrl: string) => void;
+  onDocumentView: () => void;
+  transferMessage: string;
+  latestTransfer?: DemoTransfer;
   marketEstimate: MarketEstimate;
 }) {
   if (activeTab === "specs") {
     return (
       <section className="scan-tab-panel">
-        <PanelHeader icon={<SlidersHorizontal />} label="Specifications" title="Serial, build specs, setup measurements, and custom fields." />
+        <PanelHeader icon={<SlidersHorizontal />} label="Specifications" title="Build details, setup notes, and serial info." />
         <div className="profile-data-grid">
           {[...specs, ...optionalSpecs].map((spec) => (
             <span key={spec.label}><strong>{spec.label}</strong>{spec.value || "Not listed"}</span>
@@ -259,13 +458,26 @@ function ProfilePanel({
   }
 
   if (activeTab === "timeline") {
+    const createdDate = formatProfileDate(instrument.createdAt);
+    const transferDate = latestTransfer ? formatProfileDate(latestTransfer.createdAt) : null;
+
     return (
       <section className="scan-tab-panel">
-        <PanelHeader icon={<Clock3 />} label="Timeline" title="Key events attached to this instrument record." />
+        <PanelHeader icon={<Clock3 />} label="Timeline" title="The record stays useful as the instrument moves through the world." />
         <div className="timeline-list">
-          <TimelineItem date="June 2026" title="Build completed" copy={`${instrument.brand} finished ${instrumentDisplayName(instrument)} and attached the first QRguitar record.`} />
-          <TimelineItem date="June 2026" title="Delivered to Cranston Guitars" copy="Retail listing, floor tag, case card, photos, and buyer handoff use the same permanent record." />
-          <TimelineItem date="Future sale" title="Ownership transfer available" copy="The buyer can claim the record so warranty notes, documents, and service history stay with the instrument." />
+          <TimelineItem date={createdDate} title="Record created" copy={`${instrument.brand} attached this instrument identity for ${instrumentDisplayName(instrument)}.`} />
+          {latestTransfer ? (
+            <TimelineItem
+              date={transferDate || "Pending"}
+              title="Ownership transfer started"
+              copy={
+                latestTransfer.status === "accepted"
+                  ? `Ownership was accepted by ${latestTransfer.toName || latestTransfer.toEmail}.`
+                  : `A buyer handoff was started for ${latestTransfer.toName || latestTransfer.toEmail}.`
+              }
+            />
+          ) : null}
+          <TimelineItem date="Ongoing" title="Service and ownership updates" copy="Repair notes, service events, and ownership handoff activity stay with this record." />
         </div>
       </section>
     );
@@ -274,12 +486,12 @@ function ProfilePanel({
   if (activeTab === "ownership") {
     return (
       <section className="scan-tab-panel">
-        <PanelHeader icon={<Repeat2 />} label="Ownership" title="Builder, retailer, owner, and future buyer are tied to the same record." />
+        <PanelHeader icon={<Repeat2 />} label="Ownership" title="Brand, retailer, owner, and future buyer stay connected around the same instrument." />
         <div className="ownership-grid">
           <span><strong>Current owner</strong>{instrument.owner || "Unclaimed"}</span>
           <span><strong>Builder</strong>{instrument.builder || "Not listed"}</span>
           <span><strong>Retail shop</strong>Cranston Guitars</span>
-          <span><strong>Transfer status</strong>Ready for buyer claim</span>
+          <span><strong>Transfer policy</strong>{transferMessage}</span>
         </div>
         <CollaborationThread />
       </section>
@@ -287,21 +499,44 @@ function ProfilePanel({
   }
 
   if (activeTab === "media") {
+    const selectedMedia = galleryImages[mediaIndex] || "";
+
     return (
       <section className="scan-tab-panel">
-        <PanelHeader icon={<Image />} label="Media" title="Photos and videos that document condition, originality, and included items." />
+        <PanelHeader icon={<Image />} label="Media" title="Photos and videos that help a buyer, shop, or owner understand the instrument." />
         {galleryImages.length ? (
-          <div className="public-gallery-grid">
-            {galleryImages.map((imageUrl, index) => (
-              <img src={imageUrl} alt={`${instrumentDisplayName(instrument)} photo ${index + 1}`} key={`${imageUrl}-${index}`} />
-            ))}
+          <div className="media-preview-panel">
+            {selectedMedia ? (
+              <button
+                className="media-preview-button"
+                type="button"
+                onClick={() => onOpenMedia(selectedMedia)}
+                aria-label="Open selected media in larger view"
+              >
+                <img src={selectedMedia} className="media-preview" alt={`${instrumentDisplayName(instrument)} preview`} />
+              </button>
+            ) : null}
+            <div className="public-gallery-grid">
+              {galleryImages.map((imageUrl, index) => (
+                <button
+                  type="button"
+                  className={mediaIndex === index ? "active" : undefined}
+                  onClick={() => {
+                    onPickMedia(index);
+                    onOpenMedia(imageUrl);
+                  }}
+                  aria-label={`Select media ${index + 1}`}
+                  key={`${imageUrl}-${index}`}
+                >
+                  <img src={imageUrl} alt={`${instrumentDisplayName(instrument)} photo ${index + 1}`} />
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="media-placeholder-grid">
-            <span>No main photo uploaded</span>
-            <span>No detail photos uploaded</span>
-            <span>No demo video linked</span>
-            <span>No condition photos attached</span>
+            <span>No media uploaded yet.</span>
+            <span>Use the dashboard tool to add photos and documents.</span>
           </div>
         )}
       </section>
@@ -311,10 +546,10 @@ function ProfilePanel({
   if (activeTab === "repairs") {
     return (
       <section className="scan-tab-panel">
-        <PanelHeader icon={<MessageCircle />} label="Repairs" title="Service notes for setup work, electronics, fretwork, inspections, and warranty claims." />
+        <PanelHeader icon={<MessageCircle />} label="Repairs" title="A repair bench can see what happened before and add what happened today." />
         <div className="timeline-list">
           <TimelineItem date="Setup card" title="Factory setup" copy="10-46 strings, low action, intonated June 2026." />
-          <TimelineItem date="Service log" title="Repair notes" copy="Fretwork, electronics changes, warranty work, and inspection photos should be added with dates and shop names." />
+          <TimelineItem date="Service ready" title="Repair notes" copy="Future fretwork, electronics changes, warranty work, and inspection photos can live here." />
         </div>
         <CollaborationThread compact />
       </section>
@@ -324,12 +559,12 @@ function ProfilePanel({
   if (activeTab === "documents") {
     return (
       <section className="scan-tab-panel">
-        <PanelHeader icon={<FileText />} label="Documents" title="Receipts, build sheets, warranty terms, certificates, and case paperwork." />
+        <PanelHeader icon={<FileText />} label="Documents" title="The important paperwork follows the instrument." />
         <div className="document-list">
-          <DocumentItem title="QRguitar certificate" copy="Printable certificate showing the permanent QRguitar record ID." />
+          <DocumentItem title="QRguitar certificate" copy="Verified record certificate for buyer packet or case storage." onView={onDocumentView} />
           <DocumentItem title="Build spec sheet" copy="Pickup set, wiring, neck shape, finish, weight, and setup measurements." />
-          <DocumentItem title="Warranty record" copy="Builder warranty terms, claim status, repair approvals, and service notes." />
-          <DocumentItem title="Receipts and case candy" copy="Receipts, manuals, appraisals, hang tags, certificates, and supporting paperwork." />
+          <DocumentItem title="Warranty record" copy="Builder warranty terms and future claim notes." />
+          <DocumentItem title="Receipts and case candy" copy="Upload receipts, manuals, appraisals, photos, and supporting paperwork." />
         </div>
       </section>
     );
@@ -341,10 +576,10 @@ function ProfilePanel({
         <h2>About this instrument</h2>
         <p>{instrument.summary}</p>
         <div className="profile-market-card">
-          <span><DollarSign size={16} /> Market estimate</span>
+          <span><DollarSign size={16} /> Estimated market range</span>
           <strong>{formatMoney(marketEstimate.low)} - {formatMoney(marketEstimate.high)}</strong>
           <p>
-            Fair center: {formatMoney(marketEstimate.fair)}. Based on {marketEstimate.compCount} sold/manual comps entered for this demo.
+            Fair center: {formatMoney(marketEstimate.fair)}. Based on {marketEstimate.compCount} sold/manual demo comps.
             Not an official appraisal.
           </p>
         </div>
@@ -395,13 +630,13 @@ function CollaborationThread({ compact = false }: { compact?: boolean }) {
   return (
     <div className={compact ? "collaboration-thread compact" : "collaboration-thread"}>
       <div className="panel-header">
-        <span><MessageCircle size={18} /> Record discussion</span>
-        <h2>Builder, shop, repair staff, and owner notes stay attached to this instrument.</h2>
+        <span><MessageCircle size={18} /> Shared backend thread</span>
+        <h2>Proper Instruments, Cranston Guitars, repair staff, and the owner can talk around this exact record.</h2>
       </div>
       <div className="message-list">
         <Message role="Builder" name="Proper Instruments" copy="Warranty card and original setup are attached. Contact us before any finish work." />
-        <Message role="Retailer" name="Cranston Guitars" copy="Buyer asked about pickup output and case contents. Spec sheet and photos are attached in Documents." />
-        <Message role="Owner" name="Future owner" copy="Claim link received. Service notes, receipts, and transfer history can stay with the record after purchase." />
+        <Message role="Retailer" name="Cranston Guitars" copy="Buyer asked about pickup output and case candy. Spec sheet and photos are ready in Documents." />
+        <Message role="Owner" name="Future owner" copy="Claim link received. I can keep service notes, receipts, and transfer history here after purchase." />
       </div>
     </div>
   );
@@ -413,19 +648,6 @@ function Message({ role, name, copy }: { role: string; name: string; copy: strin
       <span>{role}</span>
       <strong>{name}</strong>
       <p>{copy}</p>
-    </article>
-  );
-}
-
-function DocumentItem({ title, copy }: { title: string; copy: string }) {
-  return (
-    <article className="document-item">
-      <FileText size={22} />
-      <div>
-        <strong>{title}</strong>
-        <p>{copy}</p>
-      </div>
-      <button type="button">View</button>
     </article>
   );
 }
@@ -464,6 +686,19 @@ function ProfileQr({ code }: { code: string }) {
   );
 }
 
+function formatProfileDate(value?: string) {
+  if (!value) {
+    return "Date unknown";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return `${parsed.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+}
+
 function Meta({ label, value }: { label: string; value: string }) {
   return (
     <div className="identity-cell">
@@ -473,11 +708,33 @@ function Meta({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Action({ icon, label, active, onClick }: { icon: ReactNode; label: string; active?: boolean; onClick: () => void }) {
+function Action({ icon, label, active, disabled, onClick }: { icon: ReactNode; label: string; active?: boolean; disabled?: boolean; onClick: () => void }) {
   return (
-    <button className={active ? "active" : undefined} type="button" onClick={onClick}>
+    <button
+      className={[active ? "active" : undefined, disabled ? "disabled" : undefined].filter(Boolean).join(" ") || undefined}
+      type="button"
+      disabled={Boolean(disabled)}
+      onClick={onClick}
+      aria-disabled={disabled || false}
+      title={disabled ? `${label} is owner/admin only` : undefined}
+    >
       {icon}
       <span>{label}</span>
     </button>
+  );
+}
+
+function DocumentItem({ title, copy, onView }: { title: string; copy: string; onView?: () => void }) {
+  return (
+    <article className="document-item">
+      <FileText size={22} />
+      <div>
+        <strong>{title}</strong>
+        <p>{copy}</p>
+      </div>
+      <button type="button" onClick={() => onView?.()} disabled={!onView} className={!onView ? "disabled" : undefined}>
+        {onView ? "View" : "Coming soon"}
+      </button>
+    </article>
   );
 }
