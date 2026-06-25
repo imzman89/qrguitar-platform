@@ -1,0 +1,23 @@
+{
+  "name": "qrguitar-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "QRguitar SaaS platform starter: web, mobile, shared types, and Supabase schema.",
+  "scripts": {
+    "dev:web": "npm --workspace apps/web run dev",
+    "dev:mobile": "npm --workspace apps/mobile run start",
+    "lint": "npm --workspaces run lint",
+    "typecheck": "npm --workspaces run typecheck"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "overrides": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
