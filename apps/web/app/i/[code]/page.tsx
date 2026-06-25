@@ -22,7 +22,6 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { BrandLogo } from "../../../components/BrandLogo";
 import {
   defaultQrStyle,
   demoInstrument,
@@ -243,7 +242,7 @@ export default function PublicProfilePage() {
           <button type="button" aria-label="Back to homepage" onClick={() => router.push("/")}>
             <ArrowLeft size={24} />
           </button>
-          <BrandLogo className="scan-brand" />
+          <strong className="scan-brand">QRguitar</strong>
           <button type="button" aria-label="Share this profile" onClick={copyProfileUrl}>
             <Share2 size={24} />
           </button>
@@ -738,3 +737,4 @@ function DocumentItem({ title, copy, onView }: { title: string; copy: string; on
     </article>
   );
 }
+
