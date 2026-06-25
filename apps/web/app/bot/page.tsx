@@ -26,7 +26,7 @@ type ChatMessage = {
   copy: string;
 };
 
-export default function ExpertBotPage() {
+export default function QRguitarBotPage() {
   const [records, setRecords] = useState<DemoInstrument[]>([demoInstrument]);
   const [selectedCode, setSelectedCode] = useState(demoInstrument.qrCode);
   const [user, setUser] = useState<DemoUser | null>(null);
@@ -35,7 +35,7 @@ export default function ExpertBotPage() {
     {
       role: "assistant",
       copy:
-        "Ask about a record, serial clue, missing proof, sale prep, repair documentation, transfer, or price check. I will separate evidence from assumptions."
+                "Ask about a record, serial clue, missing proof, sale prep, repair documentation, transfer, or price check. I will separate evidence from assumptions."
     }
   ]);
   const [response, setResponse] = useState<BotResponse>(() => buildExpertBotResponse("Check this record for missing proof", demoInstrument, null));
@@ -45,6 +45,18 @@ export default function ExpertBotPage() {
     setRecords(stored.length ? stored : [demoInstrument]);
     setUser(getDemoUser());
   }, []);
+
+  useEffect(() => {
+    const desiredCode = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("code")?.toUpperCase();
+    if (!desiredCode) {
+      return;
+    }
+
+    const matchedRecord = records.find((record) => record.qrCode.toUpperCase() === desiredCode);
+    if (matchedRecord) {
+      setSelectedCode(matchedRecord.qrCode);
+    }
+  }, [records]);
 
   const selectedInstrument = useMemo(() => {
     return records.find((record) => record.qrCode === selectedCode) || demoInstrument;
@@ -73,7 +85,7 @@ export default function ExpertBotPage() {
         <div className="shell">
           <section className="dashboard-hero expert-bot-hero">
             <div>
-              <div className="eyebrow">QRguitar Expert Bot</div>
+              <div className="eyebrow">QRguitar Bot</div>
               <h2>Instrument guidance based on the record, not guesswork.</h2>
               <p>
                 Use the bot to review serial clues, specs, proof gaps, repairs, transfers, sale prep, and market value.
@@ -113,7 +125,7 @@ export default function ExpertBotPage() {
               <div className="chat-window" aria-live="polite">
                 {messages.map((message, index) => (
                   <article className={`chat-message ${message.role}`} key={`${message.role}-${index}`}>
-                    <span>{message.role === "assistant" ? "Expert Bot" : "You"}</span>
+                <span>{message.role === "assistant" ? "QRguitar Bot" : "You"}</span>
                     <p>{message.copy}</p>
                   </article>
                 ))}
@@ -126,7 +138,7 @@ export default function ExpertBotPage() {
                   askBot();
                 }}
               >
-                <label className="sr-only" htmlFor="expert-question">Ask the QRguitar Expert Bot</label>
+                <label className="sr-only" htmlFor="expert-question">Ask the QRguitar Bot</label>
                 <textarea
                   id="expert-question"
                   value={input}

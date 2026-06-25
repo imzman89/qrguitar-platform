@@ -1,6 +1,6 @@
 "use client";
 
-import { BadgeCheck, Copy, Eye, LogOut, Mail, QrCode, Repeat2, Settings2, ShieldCheck } from "lucide-react";
+import { BadgeCheck, Bot, Copy, Eye, LogOut, Mail, QrCode, Repeat2, Settings2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -45,6 +45,12 @@ const starterActions = [
     copy: "See exactly what a buyer, builder, shop, or future owner sees when the QR is scanned.",
     href: "/i/QRG-PI260001",
     label: "Open Profile"
+  },
+  {
+    title: "QRguitar Bot",
+    copy: "Get practical guidance on missing proof, transfer notes, and sale prep for a selected instrument.",
+    href: "/bot",
+    label: "QRguitar Bot"
   },
   {
     title: "Review transfers",
@@ -282,7 +288,9 @@ export default function DashboardPage() {
           <div className="grid three dashboard-actions">
             {starterActions.map((action) => (
               <article className="card" key={action.title}>
-                <div className="icon">{action.title === "Register instrument" ? <QrCode /> : action.title === "Open public profile" ? <Eye /> : <Repeat2 />}</div>
+                <div className="icon">
+                  {action.title === "Register instrument" ? <QrCode /> : action.title === "Open public profile" ? <Eye /> : action.title === "QRguitar Bot" ? <Bot /> : <Repeat2 />}
+                </div>
                 <h3>{action.title}</h3>
                 <p>{action.copy}</p>
                 <Link className="button secondary" href={action.href}>

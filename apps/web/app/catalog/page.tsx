@@ -82,9 +82,14 @@ export default function CatalogPage() {
               <h2>Search public instrument records.</h2>
               <p>Browse guitars, amps, pedals, and shop inventory that owners have chosen to make public.</p>
             </div>
-            <Link className="button" href="/create">
-              Register Instrument
-            </Link>
+            <div className="dashboard-buttons">
+              <Link className="button" href="/create">
+                Register Instrument
+              </Link>
+              <Link className="button secondary" href="/bot">
+                QRguitar Bot
+              </Link>
+            </div>
           </div>
 
           <section className="catalog-filters" aria-label="Catalog filters">

@@ -545,6 +545,9 @@ select {
   font-weight: 900;
   letter-spacing: .05em;
   text-transform: uppercase;
+  justify-content: center;
+  justify-self: center;
+  width: max-content;
 }
 
 .catalog-chip {

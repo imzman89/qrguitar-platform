@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Clock3,
   Download,
+  Bot,
   Copy,
   DollarSign,
   FileText,
@@ -283,10 +284,17 @@ export default function PublicProfilePage() {
         </section>
 
         <section className="scan-actions" aria-label="Profile actions">
-            <Action
-              icon={<SlidersHorizontal />}
-              label="Edit Profile"
-              onClick={() => {
+          <Action
+            icon={<Bot />}
+            label="QRguitar Bot"
+            onClick={() => {
+              router.push(`/bot?code=${instrument.qrCode}`);
+            }}
+          />
+          <Action
+            icon={<SlidersHorizontal />}
+            label="Edit Profile"
+            onClick={() => {
                 if (canEdit) {
                   router.push(`/edit/${instrument.qrCode}`);
                   return;
