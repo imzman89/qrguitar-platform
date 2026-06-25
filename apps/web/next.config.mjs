@@ -26,7 +26,6 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
-  transpilePackages: ["@qrguitar/shared"],
   images: {
     remotePatterns: [
       {
