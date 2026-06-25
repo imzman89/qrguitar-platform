@@ -69,7 +69,7 @@ export const defaultSiteSettings: EditableSiteSettings = {
     description:
       "Give every guitar, amp, pedal, or custom build a permanent digital record for specs, service history, ownership, media, and documentation.",
     keywords: "guitar inventory, guitar authentication, guitar service records, instrument ownership, QR guitar, luthier records",
-    image: "/seo/qrguitar-og.png"
+    image: "/seo/qrguitar-og-v2.png"
   }
 };
 

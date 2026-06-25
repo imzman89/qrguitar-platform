@@ -229,7 +229,7 @@ export default function SiteEditorPage() {
                     <div className="seo-checklist">
                       <span><Search size={15} /> Say what QRguitar is in plain words.</span>
                       <span><Search size={15} /> Mention guitars, amps, ownership, service records, and QR codes.</span>
-                      <span><Search size={15} /> Keep the image path as <strong>/seo/qrguitar-og.png</strong> for the white/orange logo.</span>
+                      <span><Search size={15} /> Keep the image path as <strong>/seo/qrguitar-og-v2.png</strong> for the white/orange logo.</span>
                     </div>
                   </section>
                 ) : null}
