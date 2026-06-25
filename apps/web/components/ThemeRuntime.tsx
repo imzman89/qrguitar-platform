@@ -1,15 +1,19 @@
 "use client";
 
 import { useEffect } from "react";
-import { applyThemeSettings, readSiteSettings, type EditableSiteSettings } from "../lib/site-settings";
+import { applySeoSettings, applyThemeSettings, readSiteSettings, type EditableSiteSettings } from "../lib/site-settings";
 
 export function ThemeRuntime() {
   useEffect(() => {
-    applyThemeSettings(readSiteSettings());
+    const storedSettings = readSiteSettings();
+    applyThemeSettings(storedSettings);
+    applySeoSettings(storedSettings);
 
     function onSettings(event: Event) {
       const detail = (event as CustomEvent<EditableSiteSettings>).detail;
-      applyThemeSettings(detail || readSiteSettings());
+      const settings = detail || readSiteSettings();
+      applyThemeSettings(settings);
+      applySeoSettings(settings);
     }
 
     window.addEventListener("qrguitar:site-settings", onSettings);

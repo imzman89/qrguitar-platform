@@ -10,7 +10,6 @@ export function Nav() {
         <Link href="/dashboard">Dashboard</Link>
         <Link href="/catalog">Catalog</Link>
         <Link href="/create">Create</Link>
-        <Link href="/site-editor">Site Editor</Link>
         <Link href="/i/QRG-PI260001">Demo Profile</Link>
         <Link href="/login">Login</Link>
       </nav>

@@ -29,6 +29,12 @@ export type EditableSiteSettings = {
     pricingHeadline: string;
     pricingBody: string;
   };
+  seo: {
+    title: string;
+    description: string;
+    keywords: string;
+    image: string;
+  };
 };
 
 export const defaultSiteSettings: EditableSiteSettings = {
@@ -57,6 +63,13 @@ export const defaultSiteSettings: EditableSiteSettings = {
     audienceBody: siteCopy.audiences.body,
     pricingHeadline: siteCopy.pricing.headline,
     pricingBody: siteCopy.pricing.body
+  },
+  seo: {
+    title: "QRguitar | Permanent Instrument Records",
+    description:
+      "Give every guitar, amp, pedal, or custom build a permanent digital record for specs, service history, ownership, media, and documentation.",
+    keywords: "guitar inventory, guitar authentication, guitar service records, instrument ownership, QR guitar, luthier records",
+    image: "/seo/qrguitar-og.png"
   }
 };
 
@@ -75,6 +88,10 @@ export function mergeSiteSettings(settings?: Partial<EditableSiteSettings> | nul
     sections: {
       ...defaultSiteSettings.sections,
       ...(settings?.sections || {})
+    },
+    seo: {
+      ...defaultSiteSettings.seo,
+      ...(settings?.seo || {})
     }
   };
 }
@@ -116,4 +133,42 @@ export function applyThemeSettings(settings: EditableSiteSettings) {
   root.style.setProperty("--gold-2", settings.colors.gold);
   root.style.setProperty("--cream", settings.colors.cream);
   root.style.setProperty("--text", settings.colors.text);
+}
+
+export function applySeoSettings(settings: EditableSiteSettings) {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  document.title = settings.seo.title;
+  setMetaTag("description", settings.seo.description);
+  setMetaTag("keywords", settings.seo.keywords);
+  setMetaProperty("og:title", settings.seo.title);
+  setMetaProperty("og:description", settings.seo.description);
+  setMetaProperty("og:image", settings.seo.image);
+  setMetaProperty("twitter:title", settings.seo.title);
+  setMetaProperty("twitter:description", settings.seo.description);
+  setMetaProperty("twitter:image", settings.seo.image);
+}
+
+function setMetaTag(name: string, content: string) {
+  let tag = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
+  if (!tag) {
+    tag = document.createElement("meta");
+    tag.name = name;
+    document.head.appendChild(tag);
+  }
+
+  tag.content = content;
+}
+
+function setMetaProperty(property: string, content: string) {
+  let tag = document.querySelector<HTMLMetaElement>(`meta[property="${property}"]`);
+  if (!tag) {
+    tag = document.createElement("meta");
+    tag.setAttribute("property", property);
+    document.head.appendChild(tag);
+  }
+
+  tag.content = content;
 }

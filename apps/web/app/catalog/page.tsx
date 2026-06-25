@@ -21,9 +21,6 @@ export default function CatalogPage() {
   const [region, setRegion] = useState("All regions");
   const [query, setQuery] = useState("");
   const [sortMode, setSortMode] = useState<"Newest" | "Oldest" | "Brand A-Z" | "Region A-Z">("Newest");
-  const [catalogToolsText, setCatalogToolsText] = useState("");
-  const [catalogToolsMessage, setCatalogToolsMessage] = useState("");
-  const recordsStorageKey = "qrguitar.demoInstruments";
 
   useEffect(() => {
     const publicRecords = getPublicDemoInstruments();
@@ -74,37 +71,6 @@ export default function CatalogPage() {
     return unique(records.map(regionFromRecord).filter(Boolean));
   }, [records]);
 
-  function refreshRecordsFromStorage() {
-    const publicRecords = getPublicDemoInstruments();
-    if (publicRecords.length) {
-      setRecords(publicRecords);
-    } else {
-      setRecords(fallbackRecords);
-    }
-  }
-
-  function exportRecords() {
-    const current = localStorage.getItem(recordsStorageKey) || "[]";
-    setCatalogToolsText(current);
-    setCatalogToolsMessage("Copied local records JSON to the form. Paste this into the other browser.");
-    void navigator.clipboard.writeText(current);
-  }
-
-  function importRecords() {
-    try {
-      const parsed = JSON.parse(catalogToolsText || "[]");
-      if (!Array.isArray(parsed)) {
-        throw new Error("Invalid JSON list");
-      }
-
-      localStorage.setItem(recordsStorageKey, JSON.stringify(parsed));
-      refreshRecordsFromStorage();
-      setCatalogToolsMessage(`Imported ${parsed.length} records. Refresh catalog now.`);
-    } catch {
-      setCatalogToolsMessage("Paste a valid JSON array from another browser first.");
-    }
-  }
-
   return (
     <>
       <Nav />
@@ -152,51 +118,26 @@ export default function CatalogPage() {
             </label>
           </section>
 
-          <section className="card" aria-label="Catalog discovery highlights">
+          <section className="catalog-summary" aria-label="Catalog discovery highlights">
             <div className="catalog-toolbar">
               <p>
                 <strong>{visibleCount}</strong> of <strong>{totalCount}</strong> public records.
               </p>
-              <button className="button secondary" type="button" onClick={() => {
-                setBrand("All brands");
-                setRegion("All regions");
-                setQuery("");
-              }} disabled={!hasFilterOrSearch}>
-                <SlidersHorizontal size={14} />
-                Reset filters
-              </button>
+              {hasFilterOrSearch ? (
+                <button className="button secondary" type="button" onClick={() => {
+                  setBrand("All brands");
+                  setRegion("All regions");
+                  setQuery("");
+                }}>
+                  <SlidersHorizontal size={14} />
+                  Reset filters
+                </button>
+              ) : null}
             </div>
             <div className="catalog-highlights">
               <span>{topBrands.slice(0, 2).join(" / ") || "Premium catalog"}</span>
               <span>{topRegions.slice(0, 2).join(" / ") || "Global collection"} | {totalCount} instruments</span>
             </div>
-          </section>
-
-          <section className="card" aria-label="Local catalog migration">
-            <div className="eyebrow">Catalog sync (optional)</div>
-            <p>Useful for local testing across different browsers. Your public catalog still works without using this.</p>
-            <details className="advanced-panel">
-              <summary>Advanced: sync data between browsers</summary>
-              <div className="form-grid">
-                <button className="button secondary" type="button" onClick={exportRecords}>
-                  Export local catalog records
-                </button>
-                <button className="button secondary" type="button" onClick={importRecords}>
-                  Import records into this browser
-                </button>
-              </div>
-              <div className="field">
-                <label htmlFor="catalog-sync">Catalog data</label>
-                <textarea
-                  id="catalog-sync"
-                  rows={4}
-                  value={catalogToolsText}
-                  onChange={(event) => setCatalogToolsText(event.target.value)}
-                  placeholder='Paste JSON array from another browser (from Export local catalog records)'
-                />
-              </div>
-              <small>{catalogToolsMessage}</small>
-            </details>
           </section>
 
           <section className="catalog-grid" aria-label="Public QRguitar records">
