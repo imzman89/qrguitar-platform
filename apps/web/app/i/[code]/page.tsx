@@ -520,10 +520,7 @@ function ProfilePanel({
                 <button
                   type="button"
                   className={mediaIndex === index ? "active" : undefined}
-                  onClick={() => {
-                    onPickMedia(index);
-                    onOpenMedia(imageUrl);
-                  }}
+                  onClick={() => onPickMedia(index)}
                   aria-label={`Select media ${index + 1}`}
                   key={`${imageUrl}-${index}`}
                 >
@@ -737,4 +734,5 @@ function DocumentItem({ title, copy, onView }: { title: string; copy: string; on
     </article>
   );
 }
+
 
