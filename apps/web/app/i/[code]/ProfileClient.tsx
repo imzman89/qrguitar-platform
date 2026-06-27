@@ -41,9 +41,7 @@ const profileTabs: Array<{ id: ProfileTab; label: string }> = [
   { id: "overview", label: "Overview" },
   { id: "specs", label: "Specifications" },
   { id: "timeline", label: "Timeline" },
-  { id: "ownership", label: "Ownership" },
   { id: "media", label: "Media" },
-  { id: "repairs", label: "Repairs" },
   { id: "documents", label: "Documents" }
 ];
 
@@ -446,7 +444,8 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           ) : null}
         </section>
 
-        <section className="scan-actions" aria-label="Profile actions">
+        {canEdit ? (
+        <section className="scan-actions" aria-label="Owner profile actions">
           {canEdit ? (
             <Action
               icon={<SlidersHorizontal />}
@@ -467,25 +466,8 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
               }}
             />
           ) : null}
-          <Action icon={<Clock3 />} label="View History" active={activeTab === "timeline"} onClick={() => {
-            setActionNotice(null);
-            switchTab("timeline");
-          }} />
-          <Action
-            icon={<Image />}
-            label="Media"
-            active={activeTab === "media"}
-            onClick={() => {
-              setActionNotice(null);
-              switchTab("media");
-              setMediaIndex(0);
-            }}
-          />
-          <Action icon={<Download />} label="Certificate" active={activeTab === "documents"} onClick={() => {
-            setActionNotice("documents");
-            switchTab("documents");
-          }} />
         </section>
+        ) : null}
 
         {actionNotice ? (
           <section className="scan-action-panel" role="status" aria-live="polite">
@@ -558,7 +540,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           <button className={activeTab === "specs" ? "active" : undefined} type="button" onClick={() => switchTab("specs")}><SlidersHorizontal size={24} />Specs</button>
           <button className={activeTab === "timeline" ? "active" : undefined} type="button" onClick={() => switchTab("timeline")}><Clock3 size={24} />Timeline</button>
           <button className={activeTab === "media" ? "active" : undefined} type="button" onClick={() => switchTab("media")}><Image size={24} />Media</button>
-          <button className={activeTab === "ownership" ? "active" : undefined} type="button" onClick={() => switchTab("ownership")}><UserCircle size={24} />Owner</button>
+          <button className={activeTab === "documents" ? "active" : undefined} type="button" onClick={() => switchTab("documents")}><FileText size={24} />Documents</button>
         </nav>
 
         {activeMedia ? (

@@ -40,11 +40,11 @@ const entries: KnowledgeEntry[] = [
   },
   {
     topic: "pricing",
-    triggers: ["cost", "price", "pricing", "plan", "free", "$12", "$50", "$99", "$199"],
+    triggers: ["cost", "price", "pricing", "plan", "free", "beta", "paid help"],
     answer:
-      "QRguitar is free to start during launch. Paid help is available by request for verification review, record cleanup, local QR install options, builder/shop onboarding, custom QR hardware, and commercial beta tools. There is no public checkout live yet.",
+      "QRguitar records are free during public beta. Paid help is separate and handled by request for verification review, record cleanup, QR installs, custom QR hardware, and builder/shop onboarding. There is no public checkout live yet.",
     evidence: ["QRguitar launch pricing model"],
-    nextSteps: ["Create a free launch record to test the system.", "Email support@qrguitar.com for verification help, installs, or builder/shop beta onboarding."]
+    nextSteps: ["Create a free beta record to test the system.", "Email support@qrguitar.com for verification help, QR installs, hardware, or builder/shop onboarding."]
   },
   {
     topic: "create",

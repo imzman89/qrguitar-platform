@@ -58,7 +58,7 @@ export default function DashboardPage() {
   const [instruments, setInstruments] = useState<DemoInstrument[]>([]);
   const [transfers, setTransfers] = useState<DemoTransfer[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(true);
-  const [authChecked, setAuthChecked] = useState(false);
+  const [authChecked, setAuthChecked] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -194,8 +194,19 @@ export default function DashboardPage() {
           <div className="shell">
             <section className="card auth-card sign-in-required-card">
               <div className="eyebrow">Dashboard</div>
-              <h2>Checking your QRguitar session.</h2>
-              <p>Loading your account and saved records.</p>
+              <h2>Sign in to manage your QRguitar records.</h2>
+              <p>Manage your records, photos, documents, visibility, and QR downloads from your dashboard.</p>
+              <div className="form-actions">
+                <Link className="button" href={`/login?next=${encodeURIComponent("/dashboard")}`}>
+                  Sign in
+                </Link>
+                <Link className="button secondary" href={`/login?next=${encodeURIComponent("/dashboard")}`}>
+                  Create account
+                </Link>
+                <Link className="button secondary" href="/i/QRG-PI260001">
+                  View demo record
+                </Link>
+              </div>
             </section>
           </div>
         </main>
@@ -213,19 +224,16 @@ export default function DashboardPage() {
             <section className="card auth-card sign-in-required-card">
               <div className="eyebrow">Dashboard</div>
               <h2>Sign in to manage your QRguitar records.</h2>
-              <p>Your dashboard holds private records, QR downloads, transfer links, plan limits, and owner-only actions.</p>
+              <p>Manage your records, photos, documents, visibility, and QR downloads from your dashboard.</p>
               <div className="form-actions">
                 <Link className="button" href={`/login?next=${encodeURIComponent("/dashboard")}`}>
-                  Sign In
+                  Sign in
                 </Link>
                 <Link className="button secondary" href={`/login?next=${encodeURIComponent("/dashboard")}`}>
                   Create account
                 </Link>
                 <Link className="button secondary" href="/i/QRG-PI260001">
                   View demo record
-                </Link>
-                <Link className="button secondary" href="/catalog">
-                  Browse Catalog
                 </Link>
               </div>
             </section>

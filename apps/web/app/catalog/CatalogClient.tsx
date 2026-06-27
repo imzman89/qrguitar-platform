@@ -17,9 +17,6 @@ import {
 export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrument[] }) {
   const [records, setRecords] = useState<DemoInstrument[]>(dedupeByCodeAndDate(initialRecords));
   const [brand, setBrand] = useState("All brands");
-  const [region, setRegion] = useState("All regions");
-  const [type, setType] = useState("All types");
-  const [status, setStatus] = useState("All statuses");
   const [query, setQuery] = useState("");
   const [sortMode, setSortMode] = useState<"Newest" | "Oldest">("Newest");
 
@@ -64,17 +61,11 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
   }, [loadRecords]);
 
   const brands = useMemo(() => ["All brands", ...unique(records.map((record) => record.brand).filter(Boolean))], [records]);
-  const regions = useMemo(() => ["All regions", ...unique(records.map(regionFromRecord).filter(Boolean))], [records]);
-  const types = useMemo(() => ["All types", ...unique(records.map((record) => record.instrumentType || "").filter(Boolean))], [records]);
 
-  const hasFilterOrSearch =
-    brand !== "All brands" || region !== "All regions" || type !== "All types" || status !== "All statuses" || query.trim().length > 0;
+  const hasFilterOrSearch = brand !== "All brands" || query.trim().length > 0;
 
   const filtered = records
     .filter((record) => brand === "All brands" || record.brand === brand)
-    .filter((record) => region === "All regions" || regionFromRecord(record) === region)
-    .filter((record) => type === "All types" || (record.instrumentType || "") === type)
-    .filter((record) => status === "All statuses" || (getInstrumentVerificationStatus(record) === "verified" ? "Verified" : "Unverified") === status)
     .filter((record) => {
       const haystack = [record.qrCode, record.name, record.brand, record.model, record.serial, record.location, record.instrumentType].join(" ").toLowerCase();
       return haystack.includes(query.toLowerCase());
@@ -99,10 +90,6 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
     return unique(records.map((record) => record.brand).filter(Boolean));
   }, [records]);
 
-  const topRegions = useMemo(() => {
-    return unique(records.map(regionFromRecord).filter(Boolean));
-  }, [records]);
-
   return (
     <>
       <Nav />
@@ -120,30 +107,17 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
           </div>
 
           <section className="catalog-filters" aria-label="Catalog filters">
+            <label className="catalog-search">
+              Search
+              <span>
+                <Search size={16} />
+                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Serial, model, brand..." />
+              </span>
+            </label>
             <label>
               Brand
               <select value={brand} onChange={(event) => setBrand(event.target.value)}>
                 {brands.map((item) => <option key={item}>{item}</option>)}
-              </select>
-            </label>
-            <label>
-              Region
-              <select value={region} onChange={(event) => setRegion(event.target.value)}>
-                {regions.map((item) => <option key={item}>{item}</option>)}
-              </select>
-            </label>
-            <label>
-              Type
-              <select value={type} onChange={(event) => setType(event.target.value)}>
-                {types.map((item) => <option key={item}>{item}</option>)}
-              </select>
-            </label>
-            <label>
-              Status
-              <select value={status} onChange={(event) => setStatus(event.target.value)}>
-                <option>All statuses</option>
-                <option>Verified</option>
-                <option>Unverified</option>
               </select>
             </label>
             <label>
@@ -173,9 +147,6 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
                   type="button"
                   onClick={() => {
                     setBrand("All brands");
-                    setRegion("All regions");
-                    setType("All types");
-                    setStatus("All statuses");
                     setQuery("");
                   }}
                 >
@@ -186,7 +157,7 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
             </div>
             <div className="catalog-highlights">
               <span>{topBrands.slice(0, 2).join(" / ") || "Premium catalog"}</span>
-              <span>{topRegions.slice(0, 2).join(" / ") || "Global collection"} | {totalCount} instruments</span>
+              <span>{totalCount} public {totalCount === 1 ? "record" : "records"}</span>
             </div>
           </section>
 

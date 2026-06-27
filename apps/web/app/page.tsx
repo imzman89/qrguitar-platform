@@ -173,10 +173,6 @@ export default function HomePage() {
                 <PricingCard key={plan.name} {...plan} />
               ))}
             </div>
-            <div className="enterprise-note">
-              <strong>{copy.pricing.enterpriseTitle}</strong>
-              <span>{copy.pricing.enterpriseBody}</span>
-            </div>
           </div>
         </section>
       </main>
@@ -210,12 +206,12 @@ function PricingCard({
 }) {
   const normalizedName = name.trim().toLowerCase();
   const cta =
-    normalizedName === "free starter"
-      ? "Create Free Record"
-      : normalizedName === "commercial"
-        ? "Contact QRguitar"
-        : "Request This Plan";
-  const href = normalizedName === "free starter" ? "/create" : `mailto:support@qrguitar.com?subject=${encodeURIComponent(`QRguitar ${name}`)}`;
+    normalizedName === "create records"
+      ? "Create a Record"
+      : normalizedName === "verification & setup help"
+        ? "Request Help"
+        : "Contact QRguitar";
+  const href = normalizedName === "create records" ? "/create" : `mailto:support@qrguitar.com?subject=${encodeURIComponent(`QRguitar ${name}`)}`;
 
   return (
     <article className={badge ? "price-card featured" : "price-card"}>

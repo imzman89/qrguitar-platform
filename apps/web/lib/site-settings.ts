@@ -99,13 +99,16 @@ export const defaultSiteSettings: EditableSiteSettings = {
     pricingEyebrow: siteCopy.pricing.eyebrow,
     pricingHeadline: siteCopy.pricing.headline,
     pricingBody: siteCopy.pricing.body,
-    pricingCards: siteCopy.pricing.plans.map((plan) => ({
-      name: plan.name,
-      price: plan.price,
-      copy: plan.copy,
-      badge: plan.badge,
-      features: [...plan.features]
-    })),
+    pricingCards: siteCopy.pricing.plans.map((plan) => {
+      const typedPlan = plan as typeof plan & { badge?: string };
+      return {
+        name: typedPlan.name,
+        price: typedPlan.price,
+        copy: typedPlan.copy,
+        badge: typedPlan.badge,
+        features: [...typedPlan.features]
+      };
+    }),
     pricingEnterpriseTitle: siteCopy.pricing.enterpriseTitle,
     pricingEnterpriseBody: siteCopy.pricing.enterpriseBody
   },
@@ -132,14 +135,14 @@ function normalizePricingCards(cards: PricingPlanInput[]) {
       features: item.features && item.features.length ? item.features.map((feature) => feature?.trim() || "") : [""]
     }));
 
-  const freePlan = defaultSiteSettings.sections.pricingCards.find((plan) => plan.name.toLowerCase() === "launch registry");
-  const withoutFree = cleaned.filter((item) => !["free", "launch registry"].includes(item.name.toLowerCase()));
+  const freePlan = defaultSiteSettings.sections.pricingCards.find((plan) => plan.name.toLowerCase() === "create records");
+  const withoutFree = cleaned.filter((item) => !["free", "launch registry", "free starter", "create records"].includes(item.name.toLowerCase()));
 
   if (!freePlan) {
     return cleaned;
   }
 
-  const existingFree = cleaned.find((item) => ["free", "launch registry"].includes(item.name.toLowerCase()));
+    const existingFree = cleaned.find((item) => ["free", "launch registry", "free starter", "create records"].includes(item.name.toLowerCase()));
   return [existingFree ? { ...freePlan, ...existingFree } : freePlan, ...withoutFree];
 }
 

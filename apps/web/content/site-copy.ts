@@ -172,53 +172,37 @@ export const siteCopy = {
     cta: "Start a Commercial Plan"
   },
   pricing: {
-    eyebrow: "Pricing",
-    headline: "Start free. Verify the records that matter.",
+    eyebrow: "Public beta",
+    headline: "Free records during beta. Paid help when you need it.",
     body:
-      "Create records during launch, keep private records private, and contact QRguitar when you need verified records, printable QR use, bulk inventory, or shop tools.",
+      "Create QRguitar records without a hard paywall while the registry grows. Paid services are available for verification help, QR installs, custom QR hardware, and builder/shop onboarding.",
     plans: [
       {
-        name: "Free Starter",
-        price: "$0",
-        badge: "Launch Access",
-        copy: "For testing QRguitar with a couple of unverified records before paying for verification or bulk use.",
+        name: "Create Records",
+        price: "Free during beta",
+        copy: "Create public, private, or unlisted records for guitars, amps, pedals, and builds. QR downloads are included.",
         features: [
-          "Up to 2 unverified records",
-          "Public, private, or unlisted visibility",
-          "Photos, specs, notes, and hidden documents",
-          "No verification badge or transfer automation"
+          "Public, private, or unlisted",
+          "Photos, specs, documents, and notes",
+          "QR code download included"
         ]
       },
       {
-        name: "Single Record",
-        price: "$12",
-        copy: "For one guitar, amp, pedal, or instrument that deserves a permanent, verified QRguitar record.",
-        features: ["1 verified record", "Permanent QRguitar ID", "Printable QR download", "Specs, media, docs, and service history"]
+        name: "Verification & Setup Help",
+        price: "From $19",
+        copy: "Get help cleaning up a record, checking specs, organizing photos, and preparing a stronger public profile.",
+        features: ["Spec cleanup", "Provenance and document review", "Verified badge help"]
       },
       {
-        name: "10-Record Pack",
-        price: "$50",
-        copy: "For collections, small shop batches, repairs, or inventory that needs more than one record.",
-        features: ["10 verified records", "Bulk-friendly dashboard", "Printable QR downloads", "Good for collections and small batches"]
-      },
-      {
-        name: "25-Record Pack",
-        price: "$99",
-        copy: "For builders, retailers, and serious collectors who need clean records at a better per-instrument price.",
-        badge: "Best Value",
-        features: ["25 verified records", "Manual launch owner-handoff support for eligible new instruments", "Inventory and catalog-ready records", "Ideal for builders and shops"]
-      },
-      {
-        name: "Commercial",
-        price: "From $199/yr",
-        copy: "For businesses that need staff access, inventory help, warranty records, catalog support, and customer handoff tools.",
-        badge: "For Shops",
-        features: ["Commercial account setup", "Staff and inventory support", "Warranty and catalog tools", "Builder, retailer, and repair-shop onboarding"]
+        name: "Shop, Builder & QR Install",
+        price: "From $49",
+        copy: "For shops, builders, and local players who want hands-on setup, QR hardware, neck plates, tags, or under-finish install support.",
+        features: ["Builder/shop onboarding", "QR stickers, tags, and plates", "Cranston, RI install options"]
       }
     ],
-    enterpriseTitle: "Verification and install help",
+    enterpriseTitle: "No checkout is live yet",
     enterpriseBody:
-      "Manual verification, QR install planning, and hardware programs are handled by request. Ownership automation is still in beta."
+      "Create records for free during beta. Paid help is handled manually by request."
   },
   preview: {
     specsIcon: Layers3,
