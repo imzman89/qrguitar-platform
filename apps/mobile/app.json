@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "QRguitar",
+    "slug": "qrguitar",
+    "scheme": "qrguitar",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.qrguitar.app"
+    },
+    "android": {
+      "package": "com.qrguitar.app"
+    }
+  }
+}

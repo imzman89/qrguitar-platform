@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "framework": "nextjs",
+  "buildCommand": "npm run build --workspace @qrguitar/web",
+  "outputDirectory": "apps/web/.next",
+  "installCommand": "npm install"
+}
