@@ -62,12 +62,12 @@ export default function HomePage() {
       },
       pricing: {
         ...siteCopy.pricing,
-        eyebrow: resolved.pricing.eyebrow,
-        headline: resolved.pricing.headline,
-        body: resolved.pricing.body,
-        plans: resolved.pricing.plans,
-        enterpriseTitle: resolved.pricing.enterpriseTitle,
-        enterpriseBody: resolved.pricing.enterpriseBody
+        eyebrow: siteCopy.pricing.eyebrow,
+        headline: siteCopy.pricing.headline,
+        body: siteCopy.pricing.body,
+        plans: siteCopy.pricing.plans,
+        enterpriseTitle: siteCopy.pricing.enterpriseTitle,
+        enterpriseBody: siteCopy.pricing.enterpriseBody
       }
     };
   }, [settings]);

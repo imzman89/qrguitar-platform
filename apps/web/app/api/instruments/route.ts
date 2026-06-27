@@ -507,6 +507,12 @@ function mapInstrumentRow({
   };
 }
 
+function stripAnonymousInstrumentFields(instrument: DemoInstrument) {
+  const publicInstrument = { ...instrument };
+  delete publicInstrument.ownerUserEmail;
+  return publicInstrument;
+}
+
 async function loadRecordsForUser(supabase: ReturnType<typeof createServerSupabaseClient>, owner: User): Promise<LoadRecordsResult> {
   if (!supabase) {
     return { records: [], ownerEmail: owner.email || "", ownerName: "", error: "Supabase is not configured." };
@@ -694,7 +700,7 @@ async function loadPublicRecords(supabase: ReturnType<typeof createServerSupabas
           ownerName: profilesById.get(guitar.owner_id || "")?.display_name || guitar.builder || ""
         });
         instrument.documentFiles = documents;
-        return instrument;
+        return stripAnonymousInstrumentFields(instrument);
       })
     )
   };
@@ -789,7 +795,7 @@ export async function GET(request: Request) {
       ((documentsResult.data || []) as GuitarDocumentRow[]).filter((document) => document.is_public)
     );
 
-    return NextResponse.json({ ok: true, instrument } satisfies SupabaseReadResponse, { status: 200 });
+    return NextResponse.json({ ok: true, instrument: stripAnonymousInstrumentFields(instrument) } satisfies SupabaseReadResponse, { status: 200 });
   }
 
   const publicResult = await loadPublicRecords(supabase);

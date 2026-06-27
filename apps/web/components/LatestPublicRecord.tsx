@@ -2,23 +2,87 @@
 
 import { ArrowRight, Globe2, QrCode } from "lucide-react";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import {
-  demoInstrument,
   instrumentDisplayName,
   type DemoInstrument
 } from "../lib/local-demo";
 
-const fallbackLatest: DemoInstrument = demoInstrument;
+type InstrumentsResponse = {
+  ok?: boolean;
+  instruments?: DemoInstrument[];
+};
 
 export function LatestPublicRecord() {
-  const latest = fallbackLatest;
+  const [latest, setLatest] = useState<DemoInstrument | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadLatestPublicRecord() {
+      try {
+        const response = await fetch("/api/instruments", {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" }
+        });
+        const payload = (await response.json().catch(() => null)) as InstrumentsResponse | null;
+        const newestPublicRecord = payload?.ok && Array.isArray(payload.instruments) ? payload.instruments[0] || null : null;
+
+        if (active) {
+          setLatest(newestPublicRecord);
+        }
+      } catch {
+        if (active) {
+          setLatest(null);
+        }
+      } finally {
+        if (active) {
+          setLoaded(true);
+        }
+      }
+    }
+
+    loadLatestPublicRecord();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (!loaded) {
+    return (
+      <article className="latest-record-card latest-record-card--empty" aria-label="Loading latest public QRguitar record">
+        <div className="latest-record-empty">
+          <span><Globe2 size={14} /> Latest public record</span>
+          <h2>Loading latest record.</h2>
+          <p>Checking the public QRguitar catalog now.</p>
+        </div>
+      </article>
+    );
+  }
+
+  if (!latest) {
+    return (
+      <article className="latest-record-card latest-record-card--empty" aria-label="No public QRguitar records yet">
+        <div className="latest-record-empty">
+          <span><Globe2 size={14} /> Latest public record</span>
+          <h2>No public records yet.</h2>
+          <p>Create the first public QRguitar record.</p>
+          <Link className="button" href="/create">
+            Create Record
+          </Link>
+        </div>
+      </article>
+    );
+  }
+
   const location = latest.location || "Location private";
   const title = instrumentDisplayName(latest);
-  const createdLabel = useMemo(() => formatCreatedAt(latest.createdAt), [latest.createdAt]);
+  const createdLabel = formatCreatedAt(latest.createdAt);
 
   return (
-    <article className="latest-record-card" aria-label="Featured public QRguitar record">
+    <article className="latest-record-card" aria-label="Latest public QRguitar record">
       <div
         className="latest-record-hero"
         style={
@@ -28,7 +92,7 @@ export function LatestPublicRecord() {
         }
       >
         <div className="latest-live-row">
-          <span><Globe2 size={14} /> Featured public record</span>
+          <span><Globe2 size={14} /> Latest public record</span>
           <strong>{createdLabel}</strong>
         </div>
         <h2>{title}</h2>
