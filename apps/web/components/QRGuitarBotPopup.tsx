@@ -45,6 +45,25 @@ export function QRGuitarBotPopup() {
   );
 
   const instrument = useMemo(() => scopedInstrument, [scopedInstrument]);
+  const quickPromptFor = (label: string, defaultPrompt: string) => {
+    if (instrument) {
+      return defaultPrompt;
+    }
+
+    if (label === "Identify") {
+      return "Help me identify an instrument. Tell me exactly what details and photos you need.";
+    }
+
+    if (label === "Price Check") {
+      return "Help me price an instrument. Tell me exactly what facts and comparable sales you need.";
+    }
+
+    if (label === "Verify Record") {
+      return "Tell me what proof is needed to verify an instrument record.";
+    }
+
+    return defaultPrompt;
+  };
 
   useEffect(() => {
     const context = getBotInstrumentContext(pathname || "", null);
@@ -65,7 +84,7 @@ export function QRGuitarBotPopup() {
         role: "assistant",
         copy: shouldClearScope
           ? `Ask about ${shouldClearScope.name || shouldClearScope.brand || "this instrument"}: proof, pricing, repairs, transfers, or listing prep.`
-          : "The Guitar Expert and Assistant. Ask about guitars, amps, pedals, pricing, serials, repairs, listings, transfers, or QRguitar."
+          : "The Guitar Expert and Assistant. Ask about a guitar, amp, pedal, price, serial, repair, listing, QRguitar record, or account issue."
       }
     ]);
   }, [instrument?.qrCode, instrument?.name]);
@@ -177,7 +196,7 @@ export function QRGuitarBotPopup() {
                 disabled={isThinking}
                 onClick={() => {
                   if (!isThinking) {
-                    void askBot(prompt);
+                    void askBot(quickPromptFor(label, prompt));
                   }
                 }}
               >

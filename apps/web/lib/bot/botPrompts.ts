@@ -77,6 +77,7 @@ export function buildTransferPrompt(message: string, instrument: DemoInstrument 
 }
 
 export function buildSupportPrompt(message: string, instrument: DemoInstrument | null): BotResultPayload {
+  const text = String(message || "").toLowerCase();
   const knowledge = buildKnowledgeAnswer(message);
 
   if (knowledge) {
@@ -90,14 +91,42 @@ export function buildSupportPrompt(message: string, instrument: DemoInstrument |
     };
   }
 
+  if (/\b(hi|hello|hey|yo|help|need help|can you help)\b/.test(text)) {
+    return {
+      answer:
+        "Yes. Tell me what you are working on: identifying a guitar, pricing one, checking proof, writing a listing, fixing a record, or handling an account/order issue. If it is about a specific instrument, send the QRguitar ID or the make, model, serial, year, condition, and photos you have.",
+      confidence: "medium",
+      evidenceUsed: ["General QRguitar assistant scope"],
+      missingEvidence: ["The specific task or instrument details"],
+      suggestedNextSteps: [
+        "For pricing: send make, model, year, condition, originality, mods, case, location, and sold comps.",
+        "For identification: send serial, headstock, front/back, neck, electronics, and any paperwork.",
+        `For account/order problems: email ${supportEmail} with your account email and QRguitar ID.`
+      ],
+      warnings: ["I can guide checks, but I will not claim authentication or live market value without proof."]
+    };
+  }
+
+  if (/\b(thanks|thank you|ty|awesome|cool|perfect|got it)\b/.test(text)) {
+    return {
+      answer:
+        "Anytime. Send the guitar details, QRguitar ID, or the next issue you want to solve and I will keep it practical.",
+      confidence: "medium",
+      evidenceUsed: ["Conversation context"],
+      missingEvidence: ["Next question or instrument details"],
+      suggestedNextSteps: ["Ask for Identify, Price Check, Verify Record, or Create Listing."],
+      warnings: []
+    };
+  }
+
   if (!instrument) {
     return {
       answer:
-        `Ask about guitars, amps, pedals, QRguitar records, visibility, repairs, listings, serials, transfers, pricing, or documentation. For account or order help, email ${supportEmail}.`,
+        `I can help, but I need one clear target. For a guitar question, send make, model, serial, year, condition, photos, and what you want to know. For QRguitar account/order help, email ${supportEmail} with your account email and QRguitar ID.`,
       confidence: "low",
       evidenceUsed: ["No scoped record"],
-      missingEvidence: ["Specific instrument details or scope"],
-      suggestedNextSteps: ["Ask a specific guitar or QRguitar question.", "Open the bot from a record page for record-aware checks.", `Email ${supportEmail} for account support.`],
+      missingEvidence: ["Specific instrument details or QRguitar issue"],
+      suggestedNextSteps: ["Tell me if this is Identify, Price Check, Verify Record, Listing, Transfer, or Support.", "Open the bot from a record page for record-aware checks.", `Email ${supportEmail} for account/order support.`],
       warnings: ["General suggestions are still valid but not proof."]
     };
   }

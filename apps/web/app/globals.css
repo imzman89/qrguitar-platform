@@ -1289,14 +1289,17 @@ select {
 }
 
 .pricing-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 16px;
   align-items: stretch;
 }
 
 .price-card {
   position: relative;
+  flex: 1 1 255px;
+  max-width: 370px;
   min-height: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1335,7 +1338,7 @@ select {
   color: var(--text);
   font-size: clamp(31px, 2.65vw, 46px);
   font-weight: 950;
-  line-height: 1;
+  line-height: 1.28;
   overflow-wrap: anywhere;
 }
 
@@ -4274,10 +4277,6 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .pricing-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .price-card {
     min-height: 0;
   }
@@ -4557,10 +4556,6 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
     display: grid;
   }
 
-  .pricing-grid {
-    grid-template-columns: 1fr;
-  }
-
   .commercial-button {
     width: 100%;
   }
@@ -4669,10 +4664,6 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 
   .phone-screen {
     min-height: 430px;
-  }
-
-  .price {
-    font-size: 54px;
   }
 
   .scan-hero {

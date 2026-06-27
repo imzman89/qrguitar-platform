@@ -176,11 +176,11 @@ const entries: KnowledgeEntry[] = [
   },
   {
     topic: "support",
-    triggers: ["support", "contact", "help", "order", "problem", "issue"],
+    triggers: ["support", "contact", "help", "order", "problem", "issue", "login", "account", "password", "checkout", "payment"],
     answer:
-      `For QRguitar help, account issues, records, orders, or shop setup, contact ${supportEmail}. I can also answer basic questions here about records, QR codes, visibility, catalog, transfers, pricing, and documentation.`,
+      `For account, order, payment, login, or shop setup help, email ${supportEmail}. Include your email address, any QRguitar ID, what you were trying to do, and what went wrong. Do not send card numbers or private payment details in chat.`,
     evidence: ["Support policy"],
-    nextSteps: [`Email ${supportEmail} with your QRguitar ID if the issue is record-specific.`, "Avoid sending private payment details in chat."]
+    nextSteps: [`Email ${supportEmail} with the QRguitar ID if the issue is record-specific.`, "Tell me the instrument or account issue and I can help you organize what to send."]
   }
 ];
 

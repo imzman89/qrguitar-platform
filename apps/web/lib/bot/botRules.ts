@@ -113,6 +113,10 @@ export function classifyIntent(message: string): BotIntent {
     return "scope-block";
   }
 
+  if (/\b(order|checkout|payment|paid|invoice|receipt|login|account|password|email|support|contact|problem|issue)\b/.test(text)) {
+    return "support";
+  }
+
   if (/\b(how much does it cost|what does it cost|qrguitar.*(cost|pricing|plans?)|free plan|paid plan)\b/.test(text)) {
     return "support";
   }

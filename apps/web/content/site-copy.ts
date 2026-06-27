@@ -173,56 +173,52 @@ export const siteCopy = {
   },
   pricing: {
     eyebrow: "Pricing",
-    headline: "Free to start. Built to grow with shops, builders, and collectors.",
+    headline: "Start free. Verify the records that matter.",
     body:
-      "Create records during launch without a hard paywall. Paid services are available for verification help, QR installs, builder/shop onboarding, and custom QR hardware.",
+      "Create records during launch, keep private records private, and contact QRguitar when you need verified records, printable QR use, bulk inventory, or shop tools.",
     plans: [
       {
-        name: "Launch Registry",
-        price: "$0 beta",
+        name: "Free Starter",
+        price: "$0",
         badge: "Launch Access",
-        copy: "Create instrument records during launch. Public, private, or unlisted. QR downloads included.",
+        copy: "For testing QRguitar with a couple of unverified records before paying for verification or bulk use.",
         features: [
-          "Public, private, or unlisted records",
-          "QR downloads included",
-          "Photos, specs, documents, and notes",
-          "No hard paywall during launch"
+          "Up to 2 unverified records",
+          "Public, private, or unlisted visibility",
+          "Photos, specs, notes, and hidden documents",
+          "No verification badge or transfer automation"
         ]
       },
       {
-        name: "Verified Record Help",
-        price: "From $19",
-        copy: "Manual QRguitar review, spec cleanup, provenance support, and verified badge help.",
-        features: ["Record review", "Spec cleanup", "Provenance support", "Verified badge guidance"]
+        name: "Single Record",
+        price: "$12",
+        copy: "For one guitar, amp, pedal, or instrument that deserves a permanent, verified QRguitar record.",
+        features: ["1 verified record", "Permanent QRguitar ID", "Printable QR download", "Specs, media, docs, and service history"]
       },
       {
-        name: "Local QR Install",
-        price: "From $49",
-        copy: "QR stickers, plates, neck plates, and under-finish QR install options in Cranston, RI.",
-        features: ["Sticker and plate options", "Neck plate planning", "Under-finish install support", "Local Cranston, RI help"]
+        name: "10-Record Pack",
+        price: "$50",
+        copy: "For collections, small shop batches, repairs, or inventory that needs more than one record.",
+        features: ["10 verified records", "Bulk-friendly dashboard", "Printable QR downloads", "Good for collections and small batches"]
       },
       {
-        name: "Builder / Shop Beta",
-        price: "By request",
-        copy: "Bulk records, inventory help, builder/shop identity, and onboarding support.",
+        name: "25-Record Pack",
+        price: "$99",
+        copy: "For builders, retailers, and serious collectors who need clean records at a better per-instrument price.",
+        badge: "Best Value",
+        features: ["25 verified records", "Manual launch owner-handoff support for eligible new instruments", "Inventory and catalog-ready records", "Ideal for builders and shops"]
+      },
+      {
+        name: "Commercial",
+        price: "From $199/yr",
+        copy: "For businesses that need staff access, inventory help, warranty records, catalog support, and customer handoff tools.",
         badge: "For Shops",
-        features: ["Bulk record setup", "Inventory help", "Builder/shop profile support", "Hands-on onboarding"]
-      },
-      {
-        name: "Custom QR Hardware",
-        price: "Coming soon",
-        copy: "Neck plates, tags, certificates, case cards, and branded QR programs.",
-        features: [
-          "Team accounts",
-          "Plate and tag options",
-          "Branded QR print-ready assets",
-          "Custom install workflows"
-        ]
+        features: ["Commercial account setup", "Staff and inventory support", "Warranty and catalog tools", "Builder, retailer, and repair-shop onboarding"]
       }
     ],
-    enterpriseTitle: "Launch services",
+    enterpriseTitle: "Verification and install help",
     enterpriseBody:
-      "During launch, QRguitar is free to start. Paid help is available for verification, setup, QR hardware, local installs, builder/shop onboarding, and manual support."
+      "Manual verification, QR install planning, and hardware programs are handled by request. Ownership automation is still in beta."
   },
   preview: {
     specsIcon: Layers3,

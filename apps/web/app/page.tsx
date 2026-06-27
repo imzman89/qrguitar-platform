@@ -210,18 +210,12 @@ function PricingCard({
 }) {
   const normalizedName = name.trim().toLowerCase();
   const cta =
-    normalizedName === "launch registry"
+    normalizedName === "free starter"
       ? "Create Free Record"
-      : normalizedName === "verified record help"
-        ? "Request Verification"
-        : normalizedName === "local qr install"
-          ? "Contact Support"
-          : normalizedName === "builder / shop beta"
-            ? "Join Builder Beta"
-            : normalizedName === "custom qr hardware"
-              ? "Contact Support"
-            : "Contact Support";
-  const href = normalizedName === "launch registry" ? "/create" : `mailto:support@qrguitar.com?subject=${encodeURIComponent(`QRguitar ${name}`)}`;
+      : normalizedName === "commercial"
+        ? "Contact QRguitar"
+        : "Request This Plan";
+  const href = normalizedName === "free starter" ? "/create" : `mailto:support@qrguitar.com?subject=${encodeURIComponent(`QRguitar ${name}`)}`;
 
   return (
     <article className={badge ? "price-card featured" : "price-card"}>
