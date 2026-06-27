@@ -32,7 +32,7 @@ export const supportEmail = "support@qrguitar.com";
 const entries: KnowledgeEntry[] = [
   {
     topic: "about",
-    triggers: ["what is qrguitar", "what does qrguitar do", "why qrguitar", "serial number"],
+    triggers: ["what is qrguitar", "what does qrguitar do", "why qrguitar", "how does this work", "how does this all work", "how does it work", "how it works", "what can you do", "serial number"],
     answer:
       "QRguitar gives a guitar, amp, pedal, or instrument a permanent digital record tied to one QRguitar ID. A serial number identifies a thing; a QRguitar record keeps the story with it: specs, photos, repairs, documents, ownership notes, and sale or transfer history.",
     evidence: ["QRguitar product scope", "Permanent record workflow"],

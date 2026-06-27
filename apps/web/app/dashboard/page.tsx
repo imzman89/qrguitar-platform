@@ -143,7 +143,7 @@ export default function DashboardPage() {
   ).length;
   const accountPlan = getAccountPlan(user);
   const displayName = useMemo(() => getDisplayName(user), [user?.name, user?.email, user?.role]);
-  const accountSummary = `${accountPlan.toUpperCase()} account.`;
+  const accountSummary = accountPlan === "free" ? "Beta access." : `${accountPlan.charAt(0).toUpperCase()}${accountPlan.slice(1)} account.`;
 
   function refreshInstruments() {
     if (!user?.email) {
@@ -505,7 +505,7 @@ function TransferPanel({
         <div className="transfer-copy">
           <span className="mini-eyebrow">Ownership transfer beta</span>
           <strong>Create a claim link for the next owner.</strong>
-          <p>Payments are not collected through QRguitar during beta.</p>
+          <p>Owner-transfer tools are in beta. Use this only when you are ready to invite the next owner.</p>
         </div>
         <div className="transfer-form">
           <label>

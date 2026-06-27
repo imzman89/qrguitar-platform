@@ -109,6 +109,10 @@ function score(text: string, patterns: RegExp[]) {
 export function classifyIntent(message: string): BotIntent {
   const text = normalize(message);
 
+  if (/\b(how does (this|it|qrguitar) (all )?work|how it works|how do i use (this|qrguitar)|what can (you|this) do)\b/.test(text)) {
+    return "support";
+  }
+
   if (!isOutOfScope(text)) {
     return "scope-block";
   }

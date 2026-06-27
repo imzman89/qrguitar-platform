@@ -218,14 +218,14 @@ export function buildExpertBotResponse(message: string, instrument?: DemoInstrum
 
   const fallback = supportFallback(text, instrument || null);
   const finalEvidence = brandLine ? [brandLine, ...evidenceSeed, ...fallback.evidenceUsed] : [...evidenceSeed, ...fallback.evidenceUsed];
-  const needsScopedRecordPrompt = !instrument && fallback.evidenceUsed.includes("No scoped record");
+  const needsRecordPrompt = !instrument && fallback.evidenceUsed.includes("No instrument record attached");
   return {
     ...fallback,
     intent: "support",
     evidenceUsed: finalEvidence,
     evidenceFound: finalEvidence,
     paidContext: !instrument ? "Attach an instrument record for record-aware guidance." : expertBotKnowledgePolicy[0],
-    answer: fallback.answer + (needsScopedRecordPrompt ? " Open with a scoped record for strongest checks." : ""),
+    answer: fallback.answer + (needsRecordPrompt ? " Open me from an instrument page if you want me to use that record." : ""),
     title: instrument ? fallback.title : "General QRguitar guidance"
   };
 }

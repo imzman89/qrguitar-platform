@@ -124,9 +124,9 @@ export function buildSupportPrompt(message: string, instrument: DemoInstrument |
       answer:
         `I can help, but I need one clear target. For a guitar question, send make, model, serial, year, condition, photos, and what you want to know. For QRguitar account/order help, email ${supportEmail} with your account email and QRguitar ID.`,
       confidence: "low",
-      evidenceUsed: ["No scoped record"],
+      evidenceUsed: ["No instrument record attached"],
       missingEvidence: ["Specific instrument details or QRguitar issue"],
-      suggestedNextSteps: ["Tell me if this is Identify, Price Check, Verify Record, Listing, Transfer, or Support.", "Open the bot from a record page for record-aware checks.", `Email ${supportEmail} for account/order support.`],
+      suggestedNextSteps: ["Tell me if this is Identify, Price Check, Verify Record, Listing, Transfer, or Support.", "Open the bot from a record page if you want me to use that record.", `Email ${supportEmail} for account/order support.`],
       warnings: ["General suggestions are still valid but not proof."]
     };
   }
@@ -149,7 +149,7 @@ export function buildSupportPrompt(message: string, instrument: DemoInstrument |
 export function buildScopeBlockPrompt(message: string): BotResultPayload {
   return {
     answer:
-      "I can help with guitars, amps, pedals, builders, shops, sales, transfers, repairs, records, and QRguitar workflows only. Ask me inside that lane.",
+      "I can help with guitars, amps, pedals, builders, shops, sales, transfers, repairs, records, and QRguitar workflows. Ask me about one of those and I will keep the answer practical.",
     confidence: "low" as const,
     evidenceUsed: ["Question topic"],
     missingEvidence: ["A guitar or QRguitar-related question"],

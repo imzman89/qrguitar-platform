@@ -173,30 +173,30 @@ export const siteCopy = {
   },
   pricing: {
     eyebrow: "Public beta",
-    headline: "Free records during beta. Paid help when you need it.",
+    headline: "Create records free. Get paid help when you need it.",
     body:
-      "Create QRguitar records without a hard paywall while the registry grows. Paid services are available for verification help, QR installs, custom QR hardware, and builder/shop onboarding.",
+      "QRguitar records are free during public beta while the registry grows. Paid help is available for record cleanup, verification support, QR installs, custom QR hardware, and builder/shop onboarding.",
     plans: [
       {
-        name: "Create Records",
-        price: "Free during beta",
-        copy: "Create public, private, or unlisted records for guitars, amps, pedals, and builds. QR downloads are included.",
+        name: "Free Records",
+        price: "$0 during beta",
+        copy: "Create public, private, or unlisted records for guitars, amps, pedals, and builds.",
         features: [
-          "Public, private, or unlisted",
+          "QR download included",
           "Photos, specs, documents, and notes",
-          "QR code download included"
+          "Built for testing, selling, servicing, and collecting"
         ]
       },
       {
-        name: "Verification & Setup Help",
+        name: "Record Help",
         price: "From $19",
-        copy: "Get help cleaning up a record, checking specs, organizing photos, and preparing a stronger public profile.",
-        features: ["Spec cleanup", "Provenance and document review", "Verified badge help"]
+        copy: "Get help cleaning up a record, checking specs, organizing photos, and making the public profile stronger.",
+        features: ["Spec cleanup", "Provenance and document review", "Verified badge support"]
       },
       {
-        name: "Shop, Builder & QR Install",
+        name: "Shop & Install Help",
         price: "From $49",
-        copy: "For shops, builders, and local players who want hands-on setup, QR hardware, neck plates, tags, or under-finish install support.",
+        copy: "Hands-on QRguitar setup for shops, builders, and local players who want QR hardware or install support.",
         features: ["Builder/shop onboarding", "QR stickers, tags, and plates", "Cranston, RI install options"]
       }
     ],

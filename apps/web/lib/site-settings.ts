@@ -135,14 +135,14 @@ function normalizePricingCards(cards: PricingPlanInput[]) {
       features: item.features && item.features.length ? item.features.map((feature) => feature?.trim() || "") : [""]
     }));
 
-  const freePlan = defaultSiteSettings.sections.pricingCards.find((plan) => plan.name.toLowerCase() === "create records");
-  const withoutFree = cleaned.filter((item) => !["free", "launch registry", "free starter", "create records"].includes(item.name.toLowerCase()));
+  const freePlan = defaultSiteSettings.sections.pricingCards.find((plan) => plan.name.toLowerCase() === "free records");
+  const withoutFree = cleaned.filter((item) => !["free", "launch registry", "free starter", "create records", "free records"].includes(item.name.toLowerCase()));
 
   if (!freePlan) {
     return cleaned;
   }
 
-    const existingFree = cleaned.find((item) => ["free", "launch registry", "free starter", "create records"].includes(item.name.toLowerCase()));
+    const existingFree = cleaned.find((item) => ["free", "launch registry", "free starter", "create records", "free records"].includes(item.name.toLowerCase()));
   return [existingFree ? { ...freePlan, ...existingFree } : freePlan, ...withoutFree];
 }
 
