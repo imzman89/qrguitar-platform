@@ -2,7 +2,7 @@
 
 import { ArrowRight, Globe2, QrCode } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   demoInstrument,
   instrumentDisplayName,
@@ -12,51 +12,13 @@ import {
 const fallbackLatest: DemoInstrument = demoInstrument;
 
 export function LatestPublicRecord() {
-  const [latest, setLatest] = useState<DemoInstrument>(fallbackLatest);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    fetch("/api/instruments", { cache: "no-store" })
-      .then(async (response) => {
-        const payload = (await response.json().catch(() => null)) as { ok?: boolean; instruments?: DemoInstrument[] } | null;
-        if (!response.ok || !payload?.ok || !Array.isArray(payload.instruments) || payload.instruments.length === 0) {
-          return dedupeByCodeAndDate([fallbackLatest]);
-        }
-
-        return dedupeByCodeAndDate(payload.instruments);
-      })
-      .then((records) => {
-        if (cancelled || !records.length) {
-          return;
-        }
-
-        const newestPublic = records
-          .slice()
-          .sort((a, b) => Date.parse(b.createdAt || "") - Date.parse(a.createdAt || ""))[0];
-
-        if (newestPublic) {
-          setLatest(newestPublic);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          const merged = dedupeByCodeAndDate([fallbackLatest]);
-          setLatest(merged[0] || fallbackLatest);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
+  const latest = fallbackLatest;
   const location = latest.location || "Location private";
   const title = instrumentDisplayName(latest);
   const createdLabel = useMemo(() => formatCreatedAt(latest.createdAt), [latest.createdAt]);
 
   return (
-    <article className="latest-record-card" aria-label="Latest public QRguitar record">
+    <article className="latest-record-card" aria-label="Featured public QRguitar record">
       <div
         className="latest-record-hero"
         style={
@@ -66,7 +28,7 @@ export function LatestPublicRecord() {
         }
       >
         <div className="latest-live-row">
-          <span><Globe2 size={14} /> Latest public record</span>
+          <span><Globe2 size={14} /> Featured public record</span>
           <strong>{createdLabel}</strong>
         </div>
         <h2>{title}</h2>
@@ -140,29 +102,4 @@ function formatCreatedAt(value: string) {
 
   const years = Math.floor(days / 365);
   return `${years} year${years === 1 ? "" : "s"} ago`;
-}
-
-function parseCreatedAt(value: string) {
-  const time = Date.parse(value || "");
-  return Number.isFinite(time) ? time : 0;
-}
-
-function dedupeByCodeAndDate(records: DemoInstrument[]) {
-  const latestByCode = new Map<string, DemoInstrument>();
-
-  for (const record of records.filter((instrument) => instrument?.qrCode)) {
-    const code = record.qrCode.toUpperCase();
-    const existing = latestByCode.get(code);
-
-    if (!existing || parseCreatedAt(record.createdAt || "") > parseCreatedAt(existing.createdAt || "")) {
-      latestByCode.set(code, {
-        ...record,
-        qrCode: code,
-        createdAt: record.createdAt || new Date(0).toISOString(),
-        permanentPath: record.permanentPath || `/i/${code}`
-      });
-    }
-  }
-
-  return Array.from(latestByCode.values()).sort((first, second) => parseCreatedAt(second.createdAt) - parseCreatedAt(first.createdAt));
 }

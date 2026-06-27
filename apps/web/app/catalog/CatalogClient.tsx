@@ -127,13 +127,6 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
                 <option>Oldest</option>
               </select>
             </label>
-            <label className="catalog-search">
-              Search
-              <span>
-                <Search size={16} />
-                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Serial, model, brand..." />
-              </span>
-            </label>
           </section>
 
           <section className="catalog-summary" aria-label="Catalog discovery highlights">

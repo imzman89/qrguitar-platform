@@ -14,7 +14,6 @@ import {
   Share2,
   ShieldCheck,
   SlidersHorizontal,
-  UserCircle,
   X
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -266,7 +265,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     })
     : [];
   const isVerifiedRecord = instrument ? getInstrumentVerificationStatus(instrument) === "verified" : false;
-  const transferMessage = "Ownership handoff support is in beta. Contact support for manual help.";
+  const transferMessage = "Owner-transfer tools are in beta. Contact support for manual help.";
   const latestTransfers = instrument
     ? [...transfers]
       .filter((transfer) => transfer.guitarQrCode.toUpperCase() === instrument.qrCode.toUpperCase())
@@ -369,7 +368,6 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     { label: "Make / Model", value: [instrument.brand, instrument.model].filter(Boolean).join(" ") },
     { label: "Serial / Build ID", value: instrument.serial },
     { label: "Builder", value: instrument.builder || "Not listed" },
-    { label: "Transfer policy", value: "Ownership handoff support is in beta." },
     { label: "Location", value: instrument.location || "Not listed" }
   ];
 
@@ -511,7 +509,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           ))}
         </nav>
 
-        <ProfilePanel
+          <ProfilePanel
           activeTab={activeTab}
           instrument={instrument}
           specs={specs}
@@ -525,6 +523,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           onDocumentView={() => setActionNotice("documents")}
           transferMessage={transferMessage}
           latestTransfer={latestTransfer}
+          isVerifiedRecord={isVerifiedRecord}
         />
 
         <section className="scan-tags" aria-label="Instrument badges">
@@ -532,16 +531,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           <span>{instrument.instrumentCondition ? instrument.instrumentCondition.toUpperCase() : "USED"}</span>
           <span>{instrument.location?.split(",")[0] || "Registered"}</span>
           <span>{isVerifiedRecord ? "Verified" : "Unverified"}</span>
-          <span>{transferMessage}</span>
         </section>
-
-        <nav className="scan-bottom-nav" aria-label="Mobile profile navigation">
-          <button className={activeTab === "overview" ? "active" : undefined} type="button" onClick={() => switchTab("overview")}><Home size={24} />Overview</button>
-          <button className={activeTab === "specs" ? "active" : undefined} type="button" onClick={() => switchTab("specs")}><SlidersHorizontal size={24} />Specs</button>
-          <button className={activeTab === "timeline" ? "active" : undefined} type="button" onClick={() => switchTab("timeline")}><Clock3 size={24} />Timeline</button>
-          <button className={activeTab === "media" ? "active" : undefined} type="button" onClick={() => switchTab("media")}><Image size={24} />Media</button>
-          <button className={activeTab === "documents" ? "active" : undefined} type="button" onClick={() => switchTab("documents")}><FileText size={24} />Documents</button>
-        </nav>
 
         {activeMedia ? (
           <div className="media-overlay" role="dialog" aria-label="Media preview">
@@ -572,7 +562,8 @@ function ProfilePanel({
   onOpenMedia,
   onDocumentView,
   transferMessage,
-  latestTransfer
+  latestTransfer,
+  isVerifiedRecord
 }: {
   activeTab: ProfileTab;
   instrument: DemoInstrument;
@@ -587,6 +578,7 @@ function ProfilePanel({
   onDocumentView: () => void;
   transferMessage: string;
   latestTransfer?: DemoTransfer;
+  isVerifiedRecord: boolean;
 }) {
   if (activeTab === "specs") {
     return (
@@ -635,11 +627,10 @@ function ProfilePanel({
           <span><strong>Current owner</strong>{instrument.owner || "Unclaimed"}</span>
           <span><strong>Builder</strong>{instrument.builder || "Not listed"}</span>
           <span><strong>Visibility</strong>{instrument.visibility === "private" ? "Private record" : "Public record"}</span>
-                  <span><strong>Transfer policy</strong>{transferMessage}</span>
                 </div>
                 <EmptyPanel
                   title="Transfer tools live here."
-                  copy="Ownership handoff support is in beta. For now, keep transfer records private until the handoff is accepted."
+                  copy={transferMessage}
                 />
       </section>
     );
@@ -749,7 +740,7 @@ function ProfilePanel({
         <p>{instrument.summary || "This QRguitar record keeps the core facts, media, paperwork, and ownership history with the instrument."}</p>
         {optionalSpecs.length ? (
           <div className="public-spec-list">
-            {optionalSpecs.slice(0, 6).map((spec) => (
+            {optionalSpecs.map((spec) => (
               <span key={spec.label}><strong>{spec.label}</strong>{spec.value}</span>
             ))}
           </div>
@@ -765,7 +756,7 @@ function ProfilePanel({
       <div className="maker-signature">
         <strong>{instrument.brand?.slice(0, 1) || "P"}</strong>
         <span>{instrument.brand || "Proper Instruments"}</span>
-        <em>{instrument.builder ? "Verified Builder" : "Verified Record"}</em>
+        <em>{isVerifiedRecord ? "Verified record" : "Unverified record"}</em>
       </div>
     </section>
   );
