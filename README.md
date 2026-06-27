@@ -113,7 +113,7 @@ Optional placeholders:
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
 NEXT_PUBLIC_SUPPORT_EMAIL=support@qrguitar.com
-NEXT_PUBLIC_CONTACT_EMAIL=greg@qrguitar.com
+NEXT_PUBLIC_CONTACT_EMAIL=gary@qrguitar.com
 EMAIL_FROM=QRguitar <noreply@qrguitar.com>
 SMTP_FROM=noreply@qrguitar.com
 SMTP_REPLY_TO=support@qrguitar.com
@@ -225,68 +225,59 @@ Do not delete unrelated DNS records. Leave future email records alone until emai
 
 QRguitar uses two separate email pieces:
 
-- Zoho Mail Free for real inboxes people can email.
-- Brevo Free SMTP for automated app and Supabase Auth emails.
+- Zoho Mail for real `@qrguitar.com` inboxes people can email.
+- Brevo SMTP for automated app and Supabase Auth emails.
 
 Do not commit or print SMTP passwords, Brevo keys, Zoho passwords, Supabase keys, or any other email secrets.
 
-### Email Addresses
+### Current Email Setup
 
-Create these addresses on `qrguitar.com`:
+Zoho Mail receives `qrguitar.com` email.
 
 ```text
-greg@qrguitar.com      main owner inbox
-support@qrguitar.com   customer/support inbox
-admin@qrguitar.com     internal/admin inbox
-noreply@qrguitar.com   automated app/Auth emails only
+gary@qrguitar.com      main owner mailbox
+support@qrguitar.com   alias to gary@qrguitar.com
+admin@qrguitar.com     alias to gary@qrguitar.com
+info@qrguitar.com      alias to gary@qrguitar.com
+noreply@qrguitar.com   alias to gary@qrguitar.com; automated sender only
 ```
 
-Public support/contact links should use `support@qrguitar.com`. Owner/admin setup notes can use `greg@qrguitar.com`. Automated senders should use `noreply@qrguitar.com`.
+Public support/contact links should use `support@qrguitar.com`. Owner/admin setup notes can use `gary@qrguitar.com`. Automated senders should use `noreply@qrguitar.com`; customers should not be told to email noreply.
+
+No catch-all mailbox is enabled.
 
 ### App Email Env Vars
 
-Keep these in `.env.example`, `apps/web/.env.example`, and Vercel when email is wired:
+Keep these in `.env.example`, `apps/web/.env.example`, and Vercel:
 
 ```text
 NEXT_PUBLIC_SUPPORT_EMAIL=support@qrguitar.com
-NEXT_PUBLIC_CONTACT_EMAIL=greg@qrguitar.com
+NEXT_PUBLIC_CONTACT_EMAIL=gary@qrguitar.com
 EMAIL_FROM=QRguitar <noreply@qrguitar.com>
 SMTP_FROM=noreply@qrguitar.com
 SMTP_REPLY_TO=support@qrguitar.com
 ```
 
-These values are labels/placeholders until an email provider is connected. Do not add SMTP credentials to the repo.
+These are safe labels and public contact values. Do not add SMTP host usernames, passwords, API keys, or provider secrets to the repo.
 
-### A. Zoho Mail Free Inbox Setup
+### Zoho Mail
 
-1. Create a Zoho Mail account.
-2. Add the domain `qrguitar.com`.
-3. Create these mailboxes:
-   - `greg@qrguitar.com`
-   - `support@qrguitar.com`
-   - `admin@qrguitar.com`
-   - `noreply@qrguitar.com`
-4. In Zoho, copy the DNS records it gives you:
-   - domain verification TXT/CNAME
-   - MX records
-   - SPF TXT
-   - DKIM TXT/CNAME
-5. Add those records only at the active DNS host for `qrguitar.com`.
-6. Do not enable catch-all.
-7. Do not delete Vercel website DNS records.
+Zoho Mail handles the real mailbox and aliases:
 
-### B. Brevo SMTP Setup
+- Main mailbox: `gary@qrguitar.com`
+- Aliases to Gary: `support@qrguitar.com`, `admin@qrguitar.com`, `info@qrguitar.com`, `noreply@qrguitar.com`
 
-1. Create a Brevo free account.
-2. Add and verify `qrguitar.com` as a sending domain.
-3. Copy Brevo's SPF/DKIM DNS records.
-4. Add those records only at the active DNS host for `qrguitar.com`.
-5. Generate SMTP credentials in Brevo.
-6. Keep the SMTP username/password private. Do not commit them, paste them into docs, or print them in terminal output.
+DNS includes Zoho MX, SPF, DKIM, and domain verification records. Do not delete these records and do not enable catch-all.
 
-### C. Supabase Auth SMTP Setup
+### Brevo SMTP
 
-In Supabase Dashboard:
+Brevo handles transactional/Auth sending for QRguitar. The `qrguitar.com` sending domain is authenticated in Brevo with DNS records for verification and DKIM.
+
+Keep Brevo SMTP credentials private. Do not commit them, paste them into docs, or print them in terminal output.
+
+### Supabase Auth SMTP
+
+Supabase Auth SMTP is connected to Brevo:
 
 ```text
 Authentication -> Emails -> SMTP Settings
@@ -298,17 +289,17 @@ Use:
 Sender name: QRguitar
 Sender email: noreply@qrguitar.com
 Reply-to: support@qrguitar.com
-SMTP host: from Brevo
-SMTP port: from Brevo, usually 587
-SMTP username: from Brevo
-SMTP password: from Brevo
+SMTP host: Brevo
+SMTP port: Brevo, usually 587
+SMTP username: Brevo SMTP username
+SMTP password: Brevo SMTP password
 ```
 
-Then send a Supabase SMTP test email.
+Use Supabase's test email tool after SMTP changes.
 
-### D. DNS Notes
+### DNS Notes
 
-DNS may be hosted at Vercel, Porkbun, Cloudflare, or wherever the current nameservers point. Add Zoho and Brevo TXT/MX/CNAME records only in the active DNS host.
+DNS records include MX, SPF, DKIM, and DMARC for QRguitar email. DNS may be hosted at Vercel, Porkbun, Cloudflare, or wherever the current nameservers point. Add or edit mail DNS records only in the active DNS host.
 
 Do not remove:
 
@@ -316,6 +307,7 @@ Do not remove:
 - Supabase records
 - Zoho verification/MX/SPF/DKIM records
 - Brevo SPF/DKIM records
+- DMARC records
 - Future email TXT records
 
 ### Supabase Email Templates
@@ -345,12 +337,14 @@ Keep the messages short and clear. Do not mention unfinished payments, transfers
 
 ### Email Verification Checklist
 
-- Zoho inbox receives mail at `greg@qrguitar.com`.
+- Zoho inbox receives mail at `gary@qrguitar.com`.
 - Zoho inbox receives mail at `support@qrguitar.com`.
+- Zoho aliases `admin@qrguitar.com`, `info@qrguitar.com`, and `noreply@qrguitar.com` route to Gary.
 - Zoho MX records pass.
 - Zoho SPF/DKIM records pass.
 - Brevo sending domain is verified.
 - Brevo SPF/DKIM records pass.
+- DMARC record is present.
 - Supabase SMTP test email sends.
 - Signup confirmation email arrives.
 - Password reset email arrives.
