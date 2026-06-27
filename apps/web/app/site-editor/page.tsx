@@ -152,6 +152,21 @@ export default function SiteEditorPage() {
     applyThemeSettings(next);
   }
 
+  function updateCategoryOption(index: number, value: string) {
+    const next = [...settings.instrumentCategories];
+    next[index] = value;
+    setSettings({ ...settings, instrumentCategories: next });
+  }
+
+  function addCategoryOption() {
+    setSettings({ ...settings, instrumentCategories: [...settings.instrumentCategories, "New category"] });
+  }
+
+  function removeCategoryOption(index: number) {
+    const next = settings.instrumentCategories.filter((_, current) => current !== index);
+    setSettings({ ...settings, instrumentCategories: next.length ? next : defaultSiteSettings.instrumentCategories });
+  }
+
   function updateHero(field: keyof EditableSiteSettings["hero"], value: string) {
     const next = { ...settings, hero: { ...settings.hero, [field]: value } };
     setSettings(next);
@@ -382,6 +397,27 @@ export default function SiteEditorPage() {
                     />
                     <TextField label="Brand name" value={settings.brandName} onChange={(value) => update("brandName", value)} />
                     <TextArea label="Footer line" value={settings.tagline} onChange={(value) => update("tagline", value)} rows={3} />
+                    <div className="editor-subsection">
+                      <div className="subsection-head">
+                        <h3>Instrument categories</h3>
+                        <button type="button" className="button secondary" onClick={addCategoryOption}>
+                          <Plus size={14} /> Add category
+                        </button>
+                      </div>
+                      <p className="editor-help-text">These options feed the Type / category dropdown on create and edit forms.</p>
+                      {settings.instrumentCategories.map((category, index) => (
+                        <div key={`category-${index}`} className="editor-array-card feature-row">
+                          <TextField
+                            label={`Category ${index + 1}`}
+                            value={category}
+                            onChange={(value) => updateCategoryOption(index, value)}
+                          />
+                          <button type="button" className="button secondary" onClick={() => removeCategoryOption(index)}>
+                            <Trash2 size={14} /> Remove category
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </section>
                 ) : null}
 

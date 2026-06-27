@@ -1,5 +1,6 @@
 import { CheckCircle2 } from "lucide-react";
 import { siteCopy } from "../content/site-copy";
+import { defaultInstrumentCategories, normalizeInstrumentCategories } from "./instrument-categories";
 
 export const siteSettingsKey = "qrguitar.siteSettings";
 
@@ -15,6 +16,7 @@ type PricingPlanInput = {
 export type EditableSiteSettings = {
   brandName: string;
   tagline: string;
+  instrumentCategories: string[];
   colors: {
     background: string;
     panel: string;
@@ -66,6 +68,7 @@ export type EditableSiteSettings = {
 export const defaultSiteSettings: EditableSiteSettings = {
   brandName: "QRguitar",
   tagline: "Permanent records for guitars, amps, pedals, builders, shops, collectors, and future owners.",
+  instrumentCategories: [...defaultInstrumentCategories],
   colors: {
     background: "#070c10",
     panel: "#11191e",
@@ -135,21 +138,27 @@ function normalizePricingCards(cards: PricingPlanInput[]) {
       features: item.features && item.features.length ? item.features.map((feature) => feature?.trim() || "") : [""]
     }));
 
-  const freePlan = defaultSiteSettings.sections.pricingCards.find((plan) => plan.name.toLowerCase() === "free records");
-  const withoutFree = cleaned.filter((item) => !["free", "launch registry", "free starter", "create records", "free records"].includes(item.name.toLowerCase()));
-
-  if (!freePlan) {
-    return cleaned;
+  const defaultCards = defaultSiteSettings.sections.pricingCards;
+  const freePlan = defaultCards.find((plan) => plan.name.toLowerCase() === "free public beta");
+  const commercialPlan = defaultCards.find((plan) => plan.name.toLowerCase() === "commercial / brand setup");
+  if (!freePlan || !commercialPlan) {
+    return defaultCards;
   }
 
-    const existingFree = cleaned.find((item) => ["free", "launch registry", "free starter", "create records", "free records"].includes(item.name.toLowerCase()));
-  return [existingFree ? { ...freePlan, ...existingFree } : freePlan, ...withoutFree];
+  const existingFree = cleaned.find((item) => item.name.toLowerCase() === freePlan.name.toLowerCase());
+  const existingCommercial = cleaned.find((item) => item.name.toLowerCase() === commercialPlan.name.toLowerCase());
+
+  return [
+    existingFree ? { ...freePlan, ...existingFree, name: freePlan.name } : freePlan,
+    existingCommercial ? { ...commercialPlan, ...existingCommercial, name: commercialPlan.name } : commercialPlan
+  ];
 }
 
 export function mergeSiteSettings(settings?: Partial<EditableSiteSettings> | null): EditableSiteSettings {
   return {
     ...defaultSiteSettings,
     ...(settings || {}),
+    instrumentCategories: normalizeInstrumentCategories(settings?.instrumentCategories),
     colors: {
       ...defaultSiteSettings.colors,
       ...(settings?.colors || {})

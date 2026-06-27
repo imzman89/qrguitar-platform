@@ -27,13 +27,13 @@
 
 .instrumentRow {
   display: grid;
-  grid-template-columns: minmax(190px, 230px) minmax(220px, 1fr) minmax(270px, 320px);
+  grid-template-columns: minmax(150px, 190px) minmax(240px, 1fr) minmax(270px, 310px);
   grid-template-areas:
     "thumb details actions"
     "transfer transfer transfer";
-  gap: 14px;
+  gap: 12px;
   align-items: center;
-  padding: 10px 16px 11px;
+  padding: 12px 16px;
   border-bottom: 1px solid rgba(248, 246, 242, .08);
 }
 
@@ -44,19 +44,23 @@
 .instrumentThumb {
   grid-area: thumb;
   width: 100%;
-  min-height: 160px;
-  aspect-ratio: 1.5 / 1;
-  border: 1px solid rgba(248, 246, 242, .14);
+  min-height: 124px;
+  aspect-ratio: 4 / 3;
+  border: 1px solid rgba(248, 246, 242, .18);
   border-radius: 10px;
   display: grid;
   place-items: center;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, rgba(3, 5, 6, .08), rgba(3, 5, 6, .8)),
-    url("https://images.unsplash.com/photo-1516924962500-2b4b3b99ea02?auto=format&fit=crop&w=700&q=82") center/cover;
-  background-size: cover;
-  background-position: center;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .34);
+  background: #090f12;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .035);
+}
+
+.instrumentThumb img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center;
 }
 
 .instrumentThumb span {
@@ -74,7 +78,7 @@
 .instrumentDetails {
   grid-area: details;
   display: grid;
-  gap: 10px;
+  gap: 9px;
   min-width: 0;
   align-content: center;
 }
@@ -98,32 +102,54 @@
   white-space: nowrap;
 }
 
+.instrumentBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.instrumentBadges small,
 .instrumentInfo small {
+  width: fit-content;
+  border: 1px solid rgba(240, 161, 43, .24);
+  border-radius: 999px;
+  padding: 4px 8px;
   color: var(--gold-2);
   font-size: 12px;
   font-weight: 850;
   text-transform: uppercase;
+  background: rgba(240, 161, 43, .08);
 }
 
+.instrumentBadges small + small,
 .instrumentInfo small + small {
+  border-color: rgba(248, 246, 242, .12);
   color: var(--muted);
   font-size: 11px;
   font-weight: 650;
-  text-transform: none;
+  text-transform: uppercase;
+  background: rgba(248, 246, 242, .04);
 }
 
 .instrumentMeta {
   align-content: center;
   border-top: 1px solid rgba(248, 246, 242, .08);
   padding-top: 8px;
-  display: grid;
-  gap: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
   min-width: 0;
 }
 
 .instrumentMeta span {
+  border: 1px solid rgba(248, 246, 242, .09);
+  border-radius: 999px;
+  padding: 4px 8px;
   overflow: hidden;
   color: var(--muted);
+  background: rgba(248, 246, 242, .035);
+  font-size: 11px;
+  font-weight: 750;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -273,7 +299,7 @@
 
 @media (max-width: 1200px) {
   .instrumentRow {
-    grid-template-columns: minmax(160px, 220px) minmax(220px, 1fr) minmax(250px, 280px);
+    grid-template-columns: minmax(140px, 180px) minmax(220px, 1fr) minmax(250px, 280px);
   }
 }
 

@@ -1088,7 +1088,7 @@ export function isFreeInstrumentLimitReached(user: DemoUser | null, instruments:
   }
 
   const ownedRecords = instruments.filter((instrument) => !isDemoInstrumentRecord(instrument)).length;
-  return ownedRecords >= 2;
+  return ownedRecords >= 25;
 }
 
 export function getInstrumentCondition(instrument: Pick<DemoInstrument, "instrumentCondition">): InstrumentCondition {
@@ -1142,7 +1142,7 @@ export function transferStatusLabel(transfer: Pick<DemoTransfer, "status" | "fee
 
 export function transferPaymentInstructions(transfer: Pick<DemoTransfer, "feeCents" | "paymentCollected" | "paymentMethod">) {
   void transfer;
-  return "Payments are not collected through QRguitar during beta.";
+  return "Owner-transfer tools are in beta. Contact support@qrguitar.com for manual help.";
 }
 
 function normalizeDemoInstrument(instrument: DemoInstrument): DemoInstrument {

@@ -173,34 +173,36 @@ export const siteCopy = {
   },
   pricing: {
     eyebrow: "Public beta",
-    headline: "Create records free. Get paid help when you need it.",
+    headline: "Create records free. Commercial setup starts at $99+.",
     body:
-      "QRguitar records are free during public beta while the registry grows. Paid help is available for record cleanup, verification support, QR installs, custom QR hardware, and builder/shop onboarding.",
+      "During public beta, users can create instrument records without a hard paywall. Verification, QR hardware, install help, builder/shop onboarding, and commercial setup are available as paid services.",
     plans: [
       {
-        name: "Free Records",
-        price: "$0 during beta",
-        copy: "Create public, private, or unlisted records for guitars, amps, pedals, and builds.",
+        name: "Free Public Beta",
+        price: "$0",
+        copy: "Create up to 25 records during public beta. Add photos, specs, documents, notes, visibility settings, and QR downloads without a hard paywall.",
         features: [
-          "QR download included",
+          "Up to 25 records during beta",
+          "Public, private, or unlisted",
+          "No verified badge included",
+          "Verify important records later",
           "Photos, specs, documents, and notes",
-          "Built for testing, selling, servicing, and collecting"
         ]
       },
       {
-        name: "Record Help",
-        price: "From $19",
-        copy: "Get help cleaning up a record, checking specs, organizing photos, and making the public profile stronger.",
-        features: ["Spec cleanup", "Provenance and document review", "Verified badge support"]
-      },
-      {
-        name: "Shop & Install Help",
-        price: "From $49",
-        copy: "Hands-on QRguitar setup for shops, builders, and local players who want QR hardware or install support.",
-        features: ["Builder/shop onboarding", "QR stickers, tags, and plates", "Cranston, RI install options"]
+        name: "Commercial / Brand Setup",
+        price: "From $99+",
+        copy: "For builders, retailers, repair shops, brands, and commercial accounts that want onboarding help, bulk setup, QR hardware, verification support, or a branded rollout.",
+        features: [
+          "Builder, retailer, and shop onboarding",
+          "Bulk record setup and inventory help",
+          "QR plates, tags, stickers, and install options",
+          "Verification support available",
+          "Custom pricing based on business needs"
+        ]
       }
     ],
-    enterpriseTitle: "No checkout is live yet",
+    enterpriseTitle: "Commercial setup by request",
     enterpriseBody:
       "Create records for free during beta. Paid help is handled manually by request."
   },

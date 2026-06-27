@@ -42,9 +42,9 @@ const entries: KnowledgeEntry[] = [
     topic: "pricing",
     triggers: ["cost", "price", "pricing", "plan", "free", "beta", "paid help"],
     answer:
-      "QRguitar records are free during public beta. Paid help is separate and handled by request for verification review, record cleanup, QR installs, custom QR hardware, and builder/shop onboarding. There is no public checkout live yet.",
+      "QRguitar records are free during public beta: $0 for up to 25 records with photos, specs, documents, visibility settings, and QR downloads. Free records do not include a verified badge. Verified badge upgrades can be requested later for important records. Commercial / Brand Setup starts at $99+ for builders, retailers, repair shops, brands, onboarding, bulk setup, QR hardware, verification support, and business rollout help. There is no public checkout live yet.",
     evidence: ["QRguitar launch pricing model"],
-    nextSteps: ["Create a free beta record to test the system.", "Email support@qrguitar.com for verification help, QR installs, hardware, or builder/shop onboarding."]
+    nextSteps: ["Create a free beta record to test the system.", "Email support@qrguitar.com for commercial setup, verification help, QR installs, hardware, or builder/shop onboarding."]
   },
   {
     topic: "create",
@@ -170,7 +170,7 @@ const entries: KnowledgeEntry[] = [
     topic: "gear",
     triggers: ["amps", "amp", "amplifier", "pedals", "pedal"],
     answer:
-      "QRguitar can be used for guitars, amps, pedals, and other music gear. The record should match the object: amps need transformer, speaker, tube, service, and safety notes; pedals need version, PCB/revision, power, mods, and condition notes.",
+      "QRguitar can be used for Electric Guitar, Acoustic Guitar, Bass Guitar, Other Guitar, Amplifier, Pedal, Custom Build, and Brand Asset records. The record should match the object: amps need transformer, speaker, tube, service, and safety notes; pedals need version, PCB/revision, power, mods, and condition notes.",
     evidence: ["Gear support scope"],
     nextSteps: ["Use the type field to label the gear correctly.", "Add photos and service/mod notes that match the item."]
   },

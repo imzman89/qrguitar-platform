@@ -1298,8 +1298,8 @@ select {
 
 .price-card {
   position: relative;
-  flex: 1 1 290px;
-  max-width: 390px;
+  flex: 1 1 340px;
+  max-width: 510px;
   min-height: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1547,6 +1547,13 @@ select {
 
 .editor-card + .editor-card {
   margin-top: 22px;
+}
+
+.editor-help-text {
+  margin: -4px 0 4px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .editor-card-header h2 {
@@ -1940,7 +1947,8 @@ select {
 
 .form {
   display: grid;
-  gap: 16px;
+  gap: 18px;
+  padding: clamp(18px, 2.4vw, 26px);
 }
 
 .form-grid {
@@ -1974,12 +1982,23 @@ select {
   color: var(--text);
 }
 
+.field input:focus-visible,
+.field textarea:focus-visible,
+.field select:focus-visible,
+.custom-row input:focus-visible {
+  outline: 2px solid rgba(240, 161, 43, .42);
+  outline-offset: 2px;
+  border-color: rgba(240, 161, 43, .55);
+}
+
 .field textarea {
   resize: vertical;
 }
 
 .photo-field input[type="file"] {
-  padding: 12px;
+  border-style: dashed;
+  padding: 14px;
+  background: rgba(248, 246, 242, .035);
   cursor: pointer;
 }
 
@@ -2006,8 +2025,8 @@ select {
   gap: 14px;
   border: 1px solid rgba(248, 246, 242, .12);
   border-radius: 8px;
-  padding: 16px;
-  background: rgba(0, 0, 0, .16);
+  padding: 14px;
+  background: rgba(248, 246, 242, .035);
 }
 
 .photo-manager.empty {
@@ -2031,7 +2050,7 @@ select {
 
 .photo-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 12px;
 }
 
@@ -2103,6 +2122,10 @@ select {
 .form-section-heading {
   display: grid;
   gap: 5px;
+  border: 1px solid rgba(248, 246, 242, .1);
+  border-radius: 8px;
+  padding: 14px;
+  background: rgba(248, 246, 242, .03);
 }
 
 .form-section-heading p {
@@ -2115,13 +2138,13 @@ select {
   border: 1px solid rgba(248, 246, 242, .12);
   border-radius: 8px;
   padding: 0;
-  background: rgba(0, 0, 0, .14);
+  background: rgba(248, 246, 242, .03);
   overflow: hidden;
 }
 
 .advanced-panel summary {
   cursor: pointer;
-  padding: 16px 18px;
+  padding: 15px 18px;
   color: var(--gold-2);
   font-weight: 900;
   text-transform: uppercase;
@@ -2143,7 +2166,7 @@ select {
 
 .custom-row {
   display: grid;
-  grid-template-columns: minmax(0, .95fr) minmax(0, 1.25fr) minmax(88px, auto);
+  grid-template-columns: minmax(0, .95fr) minmax(0, 1.25fr) minmax(104px, auto);
   gap: 10px;
   align-items: center;
   min-width: 0;
@@ -2237,6 +2260,7 @@ select {
 }
 
 .create-layout {
+  grid-template-columns: minmax(0, 1.04fr) minmax(320px, .62fr);
   align-items: start;
 }
 
@@ -2265,7 +2289,7 @@ select {
 }
 
 .instrument-preview {
-  width: min(100%, 430px);
+  width: min(100%, 390px);
   overflow: hidden;
   border: 1px solid rgba(248, 246, 242, .14);
   border-radius: 10px;

@@ -877,9 +877,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "Could not verify user record limit." }, { status: 500 });
   }
 
-  if (!isVerifiedPlan(resolvedAccountPlan) && instrumentCount >= 2) {
+  if (!isVerifiedPlan(resolvedAccountPlan) && instrumentCount >= 25) {
     return NextResponse.json(
-      { ok: false, message: "Free users can only create 2 instruments. Upgrade to add more records." },
+      { ok: false, message: "Free public beta accounts can create up to 25 records. Contact QRguitar for commercial setup or bulk onboarding." },
       { status: 402 }
     );
   }

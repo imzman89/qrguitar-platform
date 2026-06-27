@@ -17,7 +17,6 @@ import {
   getInstrumentCondition,
   getInstrumentVerificationStatus,
   getLatestDemoTransferForInstrument,
-  instrumentDisplayName,
   instrumentToProfileUrl,
   transferStatusLabel,
   type DemoInstrument,
@@ -306,49 +305,48 @@ export default function DashboardPage() {
                   const totalDocs = instrument.documentFiles?.length || 0;
                   const publicDocs = instrument.documentFiles?.filter((file) => file.visibility !== "hidden").length || 0;
                   const hiddenDocs = Math.max(0, totalDocs - publicDocs);
+                  const imageUrl = instrument.heroImageDataUrl || instrument.galleryImageDataUrls?.[0] || "";
+                  const condition = getInstrumentCondition(instrument);
+                  const verificationStatus = getInstrumentVerificationStatus(instrument);
+                  const title = dashboardRecordTitle(instrument);
+                  const meta = dashboardRecordMeta(instrument, condition);
+                  const category = instrument.instrumentType || "Instrument";
 
                   return (
                     <article className={styles.instrumentRow} key={instrument.qrCode}>
-                      <div
-                        className={styles.instrumentThumb}
-                        style={
-                          instrument.heroImageDataUrl
-                            ? { backgroundImage: `linear-gradient(180deg, rgba(3,5,6,.08), rgba(3,5,6,.74)), url(${instrument.heroImageDataUrl})` }
-                            : undefined
-                        }
-                        aria-hidden="true"
-                      >
-                        {!instrument.heroImageDataUrl ? <span>QR</span> : null}
+                      <div className={styles.instrumentThumb} aria-hidden="true">
+                        {imageUrl ? <img src={imageUrl} alt="" loading="lazy" /> : <span>QR</span>}
                       </div>
                       <div className={styles.instrumentDetails}>
                         <div className={styles.instrumentInfo}>
-                          <strong>{instrumentDisplayName(instrument)}</strong>
-                          <span>{instrument.brand} - {instrument.serial}</span>
-                          <small>{instrument.galleryImageDataUrls?.length || (instrument.heroImageDataUrl ? 1 : 0)} photos</small>
-                          <small>{totalDocs ? `${publicDocs} public docs${hiddenDocs ? `, ${hiddenDocs} hidden` : ""}` : "No documents yet"}</small>
+                          <strong>{title}</strong>
+                          <span>{meta}</span>
+                          <div className={styles.instrumentBadges}>
+                            <small>{verificationStatus === "verified" ? "Verified record" : "Unverified record"}</small>
+                            <small>{category}</small>
+                          </div>
                         </div>
                         <div className={styles.instrumentMeta}>
-                          <span>{instrument.model}</span>
-                          <span>{instrument.year}</span>
-                          <span>{getInstrumentCondition(instrument) === "new" ? "New" : "Used"}</span>
-                          <span>{getInstrumentVerificationStatus(instrument) === "verified" ? "Verified record" : "Unverified record"}</span>
+                          <span>{instrument.galleryImageDataUrls?.length || (instrument.heroImageDataUrl ? 1 : 0)} photos</span>
+                          <span>{totalDocs ? `${publicDocs} public docs${hiddenDocs ? `, ${hiddenDocs} hidden` : ""}` : "No documents yet"}</span>
+                          <span>{instrument.visibility === "private" ? "Private" : instrument.visibility === "unlisted" ? "Unlisted" : "Public"}</span>
                         </div>
                       </div>
                       <div className={styles.qrActionColumn}>
                         <div className={styles.qrPanel}>
                           <QrDownload
                             code={instrument.qrCode}
-                            label={instrumentDisplayName(instrument)}
+                            label={title}
                             qrStyle={instrument.qrStyle}
                             onStyleChange={(qrStyle) => setInstruments((current) => current.map((item) => item.qrCode === instrument.qrCode ? { ...item, qrStyle } : item))}
                           />
                         </div>
                         <div className={styles.instrumentActions}>
                           <Link className="button secondary" href={`/edit/${instrument.qrCode}`}>
-                            Edit Profile
+                            Edit Record
                           </Link>
                           <Link className="button secondary" href={instrumentToProfileUrl(instrument)}>
-                            View Profile
+                            View Record
                           </Link>
                         </div>
                       </div>
@@ -592,6 +590,35 @@ function TransferPanel({
       </div>
     </details>
   );
+}
+
+function dashboardRecordTitle(instrument: DemoInstrument) {
+  const explicitName = String(instrument.name || "").trim();
+  const brand = String(instrument.brand || "").trim();
+  const model = String(instrument.model || "").trim();
+
+  if (explicitName && !sameText(explicitName, brand) && !sameText(explicitName, model)) {
+    return explicitName;
+  }
+
+  if (brand && model) {
+    return model.toLowerCase().startsWith(`${brand.toLowerCase()} `) ? model : `${brand} ${model}`;
+  }
+
+  return brand || model || instrument.serial || instrument.qrCode || "Untitled instrument";
+}
+
+function dashboardRecordMeta(instrument: DemoInstrument, condition: "new" | "used") {
+  return [
+    instrument.brand,
+    instrument.serial || instrument.qrCode,
+    instrument.year,
+    condition === "new" ? "New" : "Used"
+  ].filter(Boolean).join(" • ");
+}
+
+function sameText(first: string, second: string) {
+  return first.trim().toLowerCase() === second.trim().toLowerCase();
 }
 
 function Activity({ icon, title, detail }: { icon: ReactNode; title: string; detail: string }) {

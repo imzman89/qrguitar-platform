@@ -14,6 +14,7 @@ import {
   type DemoInstrument,
   type QrStyle
 } from "../../../lib/local-demo";
+import { defaultSiteSettings, readSiteSettings } from "../../../lib/site-settings";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../../lib/supabase-browser";
 
 const emptyForm = {
@@ -54,9 +55,14 @@ export default function EditInstrumentPage() {
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [documents, setDocuments] = useState<{ id: string; name: string; dataUrl: string; visibility: "public" | "hidden" }[]>([]);
   const [qrStyle, setQrStyle] = useState<QrStyle>(defaultQrStyle);
+  const [categoryOptions, setCategoryOptions] = useState(defaultSiteSettings.instrumentCategories);
 
   useEffect(() => {
     let cancelled = false;
+    const syncCategoryOptions = () => setCategoryOptions(readSiteSettings().instrumentCategories);
+
+    syncCategoryOptions();
+    window.addEventListener("qrguitar:site-settings", syncCategoryOptions);
 
     async function loadInstrument() {
       try {
@@ -127,6 +133,7 @@ export default function EditInstrumentPage() {
 
     return () => {
       cancelled = true;
+      window.removeEventListener("qrguitar:site-settings", syncCategoryOptions);
     };
   }, [code, router]);
 
@@ -367,7 +374,13 @@ export default function EditInstrumentPage() {
                 <Field label="Model" id="model" value={form.model} onChange={(value) => updateField("model", value)} />
                 <Field label="Serial number" id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} />
                 <Field label="Year" id="year" value={form.year} onChange={(value) => updateField("year", value)} />
-                <Field label="Type" id="instrumentType" value={form.instrumentType} onChange={(value) => updateField("instrumentType", value)} />
+                <CategoryField
+                  label="Type / category"
+                  id="instrumentType"
+                  value={form.instrumentType}
+                  options={categoryOptions}
+                  onChange={(value) => updateField("instrumentType", value)}
+                />
                 <div className="field">
                   <label htmlFor="instrumentCondition">Condition / status</label>
                   <select
@@ -738,7 +751,7 @@ function fileToCompressedDataUrl(file: File) {
     reader.onload = () => {
       const image = new Image();
       image.onload = () => {
-        const maxSide = 1400;
+        const maxSide = 2000;
         const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
         const canvas = document.createElement("canvas");
         canvas.width = Math.round(image.width * scale);
@@ -751,7 +764,7 @@ function fileToCompressedDataUrl(file: File) {
         }
 
         context.drawImage(image, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", 0.78));
+        resolve(canvas.toDataURL(file.type === "image/webp" ? "image/webp" : "image/jpeg", 0.88));
       };
       image.onerror = () => reject(new Error("Could not load image."));
       image.src = String(reader.result);
@@ -848,6 +861,38 @@ function Field({
     <div className="field">
       <label htmlFor={id}>{label}</label>
       <input id={id} name={id} value={value} onChange={(event) => onChange(event.target.value)} />
+    </div>
+  );
+}
+
+function CategoryField({
+  label,
+  id,
+  value,
+  options,
+  onChange
+}: {
+  label: string;
+  id: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  const cleanedValue = value.trim();
+  const hasCustomValue = cleanedValue && !options.some((option) => option.toLowerCase() === cleanedValue.toLowerCase());
+
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      <select id={id} name={id} value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">Select category</option>
+        {hasCustomValue ? <option value={cleanedValue}>{cleanedValue}</option> : null}
+        {options.map((option) => (
+          <option value={option} key={option}>
+            {option}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
