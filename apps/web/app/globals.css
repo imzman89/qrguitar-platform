@@ -257,21 +257,26 @@ select {
 
 .latest-record-hero {
   min-height: 390px;
+  position: relative;
   display: grid;
   align-content: end;
   gap: 8px;
-  padding: 24px;
+  padding: 82px 24px 24px;
   background:
     linear-gradient(180deg, rgba(7, 12, 16, .06) 0%, rgba(7, 12, 16, .34) 38%, rgba(7, 12, 16, .96) 100%),
     url("https://images.unsplash.com/photo-1510915361894-db8b60106cb1?auto=format&fit=crop&w=900&q=80") center/cover;
 }
 
 .latest-live-row {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  right: 18px;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 18px;
   color: var(--muted-strong);
   font-size: 12px;
   font-weight: 900;
@@ -290,6 +295,8 @@ select {
 }
 
 .latest-record-card h2 {
+  position: relative;
+  z-index: 1;
   max-width: 100%;
   margin: 0;
   overflow-wrap: anywhere;
@@ -298,6 +305,8 @@ select {
 }
 
 .latest-record-card p {
+  position: relative;
+  z-index: 1;
   margin: 0;
   color: var(--muted-strong);
 }
@@ -4783,6 +4792,13 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 
   .latest-record-hero {
     min-height: 320px;
+    padding: 74px 18px 18px;
+  }
+
+  .latest-live-row {
+    top: 16px;
+    left: 16px;
+    right: 16px;
   }
 
   .latest-record-actions .button {
