@@ -450,8 +450,7 @@ function mapInstrumentRow({
       value: spec.value
     }));
 
-  const demoHeroFallback = guitar.qr_code?.toUpperCase() === "QRG-PI260001" ? "/media/reptile-hero.jpg" : "";
-  const heroImageDataUrl = guitar.hero_image_path || media[0]?.storage_path || demoHeroFallback;
+  const heroImageDataUrl = guitar.hero_image_path || media[0]?.storage_path || "";
   const galleryImageDataUrls = Array.from(
     new Set([heroImageDataUrl, ...media.map((item) => item.storage_path)].filter(isRenderablePublicMediaSource))
   );
@@ -869,7 +868,7 @@ export async function POST(request: Request) {
   }
 
   // New records get a permanent QRguitar ID independent of the serial/build ID.
-  // Existing legacy IDs like QRG-PI260001 and QRG-E985125 remain unchanged forever.
+  // Existing legacy IDs like QRG-E985125 and QRG-05068283 remain unchanged forever.
   let qrCode = makeNewPermanentQrCode();
   for (let attempt = 0; attempt < 24; attempt += 1) {
     const { count } = await supabase.from("guitars").select("id", { count: "exact", head: true }).eq("qr_code", qrCode);

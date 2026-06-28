@@ -22,10 +22,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { BrandLogo } from "../../../components/BrandLogo";
 import {
-  defaultQrStyle,
-  demoInstrument,
   getDemoTransfers,
-  findDemoInstrument,
   getInstrumentVerificationStatus,
   type DemoTransfer,
   instrumentDisplayName,
@@ -33,7 +30,6 @@ import {
 } from "../../../lib/local-demo";
 import { createBrowserSupabaseClient } from "../../../lib/supabase-browser";
 
-const fallbackInstrument: DemoInstrument = demoInstrument;
 type ProfileTab = "overview" | "specs" | "timeline" | "ownership" | "media" | "repairs" | "documents";
 
 const profileTabs: Array<{ id: ProfileTab; label: string }> = [
@@ -57,8 +53,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
   const [mediaIndex, setMediaIndex] = useState(0);
   const [activeMedia, setActiveMedia] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
-  const code = codeParam || initialInstrument?.qrCode || demoInstrument.qrCode;
-  const isDemoRecord = code.toUpperCase() === demoInstrument.qrCode.toUpperCase();
+  const code = codeParam || initialInstrument?.qrCode || "";
   const queryTab = searchParams.get("tab");
   const [currentUserEmail, setCurrentUserEmail] = useState("");
 
@@ -79,12 +74,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     setStored(initialInstrument);
 
     async function loadInstrument() {
-      const normalizedCode = String(code || fallbackInstrument.qrCode).trim().toUpperCase();
-      const localRecord = findDemoInstrument(normalizedCode);
-      const demoFallback = localRecord ?? (isDemoRecord ? fallbackInstrument : null);
-      const hasFallbackFromDemo = Boolean(demoFallback);
-      const shouldFallback = hasFallbackFromDemo;
-      const queryHasContext = Boolean(searchParams.get("name") || searchParams.get("brand") || searchParams.get("serial"));
+      const normalizedCode = String(code || "").trim().toUpperCase();
 
       let settled = false;
 
@@ -103,16 +93,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
       };
 
       const fallbackNow = () => {
-        if (isDemoRecord && demoFallback) {
-          markResolved(demoFallback);
-          return;
-        }
-
-        if (!queryHasContext) {
-          markResolved(null);
-        } else {
-          markResolved(null);
-        }
+        markResolved(null);
       };
 
       const timeout = setTimeout(() => {
@@ -120,10 +101,6 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           fallbackNow();
         }
       }, 1800);
-
-      if (!initialInstrument && demoFallback) {
-        markResolved(demoFallback);
-      }
 
       try {
         const controller = new AbortController();
@@ -140,8 +117,6 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
         if (!cancelled) {
           if (response.ok && payload?.ok && payload.instrument) {
             markResolved(payload.instrument, true);
-          } else if (!settled && shouldFallback && demoFallback) {
-            markResolved(demoFallback);
           } else if (!settled) {
             markResolved(null);
           }
@@ -159,7 +134,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     return () => {
       cancelled = true;
     };
-  }, [code, isDemoRecord, searchParams, initialInstrument]);
+  }, [code, initialInstrument]);
 
   useEffect(() => {
     const supabase = createBrowserSupabaseClient();
@@ -175,8 +150,8 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     if (stored) {
       return {
         ...stored,
-        qrCode: (stored.qrCode || fallbackInstrument.qrCode).toUpperCase(),
-        permanentPath: stored.permanentPath || `/i/${(stored.qrCode || fallbackInstrument.qrCode).toUpperCase()}`,
+        qrCode: (stored.qrCode || code).toUpperCase(),
+        permanentPath: stored.permanentPath || `/i/${(stored.qrCode || code).toUpperCase()}`,
         name: stored.name || "",
         brand: stored.brand || "",
         model: stored.model || "",
@@ -193,57 +168,19 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
         pickups: stored.pickups || "",
         instrumentCondition: stored.instrumentCondition === "new" ? "new" : "used",
         creatorAccountType: stored.creatorAccountType || "customer",
-        verificationStatus: stored.verificationStatus || (isDemoRecord ? "verified" : "unverified"),
-        heroImageDataUrl: stored.heroImageDataUrl || (isDemoRecord ? fallbackInstrument.heroImageDataUrl : ""),
+        verificationStatus: stored.verificationStatus || "unverified",
+        heroImageDataUrl: stored.heroImageDataUrl || "",
         galleryImageDataUrls: stored.galleryImageDataUrls && stored.galleryImageDataUrls.length
           ? stored.galleryImageDataUrls
-          : isDemoRecord
-            ? fallbackInstrument.galleryImageDataUrls
-            : [],
+          : [],
         documentFiles: stored.documentFiles && stored.documentFiles.length
           ? stored.documentFiles
-          : isDemoRecord
-            ? fallbackInstrument.documentFiles
-            : []
+          : []
       };
     }
 
-    if (isDemoRecord) {
-      return fallbackInstrument;
-    }
-
-    if (!searchParams.get("name") && !searchParams.get("brand") && !searchParams.get("serial")) {
-      return null;
-    }
-
-    return {
-      qrCode: code.toUpperCase(),
-      permanentPath: `/i/${code.toUpperCase()}`,
-      name: searchParams.get("name") || fallbackInstrument.name,
-      brand: searchParams.get("brand") || fallbackInstrument.brand,
-      model: searchParams.get("model") || fallbackInstrument.model,
-      serial: searchParams.get("serial") || fallbackInstrument.serial,
-      year: searchParams.get("year") || fallbackInstrument.year,
-      instrumentType: searchParams.get("instrumentType") || fallbackInstrument.instrumentType,
-      builder: searchParams.get("builder") || fallbackInstrument.builder,
-      owner: searchParams.get("owner") || fallbackInstrument.owner,
-      location: searchParams.get("location") || fallbackInstrument.location,
-      summary: searchParams.get("summary") || fallbackInstrument.summary,
-      heroImageDataUrl: fallbackInstrument.heroImageDataUrl,
-      galleryImageDataUrls: fallbackInstrument.galleryImageDataUrls,
-      finish: fallbackInstrument.finish,
-      bodyWood: fallbackInstrument.bodyWood,
-      neckWood: fallbackInstrument.neckWood,
-      pickups: fallbackInstrument.pickups,
-      websiteUrl: fallbackInstrument.websiteUrl,
-      shopUrl: fallbackInstrument.shopUrl,
-      customFields: fallbackInstrument.customFields,
-      customLinks: fallbackInstrument.customLinks,
-      documentFiles: fallbackInstrument.documentFiles,
-      qrStyle: defaultQrStyle,
-      createdAt: fallbackInstrument.createdAt
-    };
-  }, [code, isDemoRecord, searchParams, stored]);
+    return null;
+  }, [code, stored]);
 
   const canEdit = Boolean(currentUserEmail && instrument?.ownerUserEmail && currentUserEmail === instrument.ownerUserEmail.toLowerCase());
 

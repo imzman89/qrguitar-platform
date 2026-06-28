@@ -1,4 +1,4 @@
-import { demoInstrument, type DemoInstrument } from "./local-demo";
+import type { DemoInstrument } from "./local-demo";
 
 export type ComparableSale = {
   id: string;
@@ -33,68 +33,7 @@ export type MarketEstimate = {
   activeListings: ComparableSale[];
 };
 
-export const demoComparableSales: ComparableSale[] = [
-  {
-    id: "comp-pi-01",
-    instrumentQrCode: demoInstrument.qrCode,
-    title: "Proper Instruments custom offset, boutique single-builder sale",
-    price: 2450,
-    currency: "USD",
-    date: "2026-05-18",
-    condition: "excellent",
-    sourceType: "manual-shop-comp",
-    sourceLabel: "Manual shop-entered sold comp",
-    notes: "Comparable boutique offset build with documented specs."
-  },
-  {
-    id: "comp-pi-02",
-    instrumentQrCode: demoInstrument.qrCode,
-    title: "Handbuilt offset, relic finish, boutique pickups",
-    price: 2750,
-    currency: "USD",
-    date: "2026-04-27",
-    condition: "excellent",
-    sourceType: "sold-comp",
-    sourceLabel: "Owner-entered sold comp",
-    notes: "Similar build level, no QRguitar transfer data."
-  },
-  {
-    id: "comp-pi-03",
-    instrumentQrCode: demoInstrument.qrCode,
-    title: "Custom boutique S-style/offset hybrid with case",
-    price: 2200,
-    currency: "USD",
-    date: "2026-03-12",
-    condition: "very-good",
-    sourceType: "sold-comp",
-    sourceLabel: "Owner-entered sold comp",
-    notes: "Lower because of fewer documents and non-original pickups."
-  },
-  {
-    id: "comp-pi-04",
-    instrumentQrCode: demoInstrument.qrCode,
-    title: "Proper Instruments builder MSRP reference",
-    price: 2995,
-    currency: "USD",
-    date: "2026-06-01",
-    condition: "new",
-    sourceType: "builder-msrp",
-    sourceLabel: "Builder MSRP reference",
-    notes: "Asking/reference price, not a completed sale."
-  },
-  {
-    id: "comp-pi-05",
-    instrumentQrCode: demoInstrument.qrCode,
-    title: "Active boutique custom offset listing",
-    price: 3199,
-    currency: "USD",
-    date: "2026-06-20",
-    condition: "new",
-    sourceType: "active-listing",
-    sourceLabel: "Active listing context",
-    notes: "Asking price only. Not proof of sale value."
-  }
-];
+export const demoComparableSales: ComparableSale[] = [];
 
 export function getComparableSalesForInstrument(instrument: Pick<DemoInstrument, "qrCode">) {
   return demoComparableSales.filter((comp) => comp.instrumentQrCode.toUpperCase() === instrument.qrCode.toUpperCase());

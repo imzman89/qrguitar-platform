@@ -30,7 +30,7 @@ export const siteCopy = {
     body:
       "Create a digital identity for any guitar, amp, pedal, or custom build. Keep specs, service history, ownership records, warranty info, photos, documents, and sale details connected for life.",
     primaryCta: "Create a Record",
-    secondaryCta: "View a Demo Record",
+    secondaryCta: "Browse Public Records",
     trust: ["Unique QR for each instrument", "Specs, photos, repairs, and receipts", "Owner-transfer tools in beta"]
   },
   workflow: {

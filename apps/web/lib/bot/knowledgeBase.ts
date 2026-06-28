@@ -136,9 +136,9 @@ const entries: KnowledgeEntry[] = [
   },
   {
     topic: "proper-instruments",
-    triggers: ["proper instruments", "reptile", "proper build"],
+    triggers: ["proper instruments", "proper build"],
     answer:
-      "Proper Instruments records should lean on builder proof: build specs, serial, finish, pickups, setup notes, final photos, warranty notes, and ownership history. The Reptile demo record is meant to show that kind of builder-grade profile.",
+      "Proper Instruments records should lean on builder proof: build specs, serial, finish, pickups, setup notes, final photos, warranty notes, and ownership history.",
     evidence: ["Proper Instruments context"],
     nextSteps: ["Keep builder specs public.", "Keep receipts or internal notes hidden unless they should be shared."]
   },

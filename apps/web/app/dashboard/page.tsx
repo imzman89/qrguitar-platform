@@ -1,6 +1,6 @@
 "use client";
 
-import { BadgeCheck, Copy, Eye, LogOut, Mail, QrCode, Repeat2, Settings2, ShieldCheck } from "lucide-react";
+import { BadgeCheck, Copy, LogOut, Mail, QrCode, Repeat2, Settings2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -32,12 +32,6 @@ const starterActions = [
     copy: "Create a profile, preview the public record, and generate the first QR link.",
     href: "/create",
     label: "Create Record"
-  },
-  {
-    title: "View demo record",
-    copy: "Open the public-facing page a buyer, builder, or future owner would scan.",
-    href: "/i/QRG-PI260001",
-    label: "Open"
   },
   {
     title: "Browse public catalog",
@@ -202,8 +196,8 @@ export default function DashboardPage() {
                 <Link className="button secondary" href={`/login?next=${encodeURIComponent("/dashboard")}`}>
                   Create account
                 </Link>
-                <Link className="button secondary" href="/i/QRG-PI260001">
-                  View demo record
+                <Link className="button secondary" href="/catalog">
+                  Browse catalog
                 </Link>
               </div>
             </section>
@@ -231,8 +225,8 @@ export default function DashboardPage() {
                 <Link className="button secondary" href={`/login?next=${encodeURIComponent("/dashboard")}`}>
                   Create account
                 </Link>
-                <Link className="button secondary" href="/i/QRG-PI260001">
-                  View demo record
+                <Link className="button secondary" href="/catalog">
+                  Browse catalog
                 </Link>
               </div>
             </section>
@@ -379,7 +373,7 @@ export default function DashboardPage() {
       <div className="grid three dashboard-actions">
               {starterActions.map((action) => (
               <article className="card" key={action.title}>
-                <div className="icon">{action.title === "Register instrument" ? <QrCode /> : action.title === "View demo record" ? <Eye /> : <Settings2 />}</div>
+                <div className="icon">{action.title === "Register instrument" ? <QrCode /> : <Settings2 />}</div>
                 <h3>{action.title}</h3>
                 <p>{action.copy}</p>
                 <Link className="button secondary" href={action.href}>

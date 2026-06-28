@@ -157,8 +157,7 @@ function mapRecord({
   const condition = specs.find((spec) => spec.label.toLowerCase() === "condition")?.value.toLowerCase() === "new" ? "new" : "used";
   const type = cleanPublicSpecValue(specs.find((spec) => spec.label.toLowerCase() === "type")?.value);
   const finish = cleanPublicSpecValue(specs.find((spec) => spec.label.toLowerCase() === "finish")?.value);
-  const demoHeroFallback = guitar.qr_code?.toUpperCase() === "QRG-PI260001" ? "/media/reptile-hero.jpg" : "";
-  const hero = publicUrlOrStoragePath(guitar.hero_image_path) || media[0] || demoHeroFallback;
+  const hero = publicUrlOrStoragePath(guitar.hero_image_path) || media[0] || "";
   const gallery = Array.from(new Set([hero, ...media].filter(isRenderablePublicMediaSource)));
 
   return {

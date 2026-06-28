@@ -1,7 +1,4 @@
-import {
-  demoInstrument,
-  type DemoInstrument
-} from "./local-demo";
+import { defaultQrStyle, type DemoInstrument } from "./local-demo";
 
 export type BotSearchParams = {
   get: (key: string) => string | null;
@@ -57,7 +54,6 @@ function buildFromQuery(rawCode: string, query: BotSearchParams | null) {
   }
 
   return {
-    ...demoInstrument,
     qrCode: code,
     permanentPath: `/i/${code}`,
     name: name || `${brand || "Unknown"} ${model || "Instrument"}`.trim() || "Instrument",
@@ -66,17 +62,20 @@ function buildFromQuery(rawCode: string, query: BotSearchParams | null) {
     serial: serial || `${code}`,
     year: year || "Unknown",
     location: location || "Unlisted location",
-    instrumentType: instrumentType || demoInstrument.instrumentType,
-    builder: builder || demoInstrument.builder,
+    instrumentType: instrumentType || "",
+    builder: builder || "",
     summary: summary || `Instrument record loaded from query context for ${code}.`,
-    owner: owner || demoInstrument.owner,
+    owner: owner || "Unclaimed",
     instrumentCondition: condition === "new" ? "new" : "used",
     visibility: visibility === "private" ? "private" : "public",
     packageIncludesFirstTransfer: parseBoolean(query && query.get ? query.get("packageIncludesFirstTransfer") : null),
     creatorAccountType: "customer",
     createdAt: new Date().toISOString(),
-    galleryImageDataUrls: demoInstrument.galleryImageDataUrls,
-    qrStyle: demoInstrument.qrStyle
+    galleryImageDataUrls: [],
+    customFields: [],
+    customLinks: [],
+    documentFiles: [],
+    qrStyle: defaultQrStyle
   } as DemoInstrument;
 }
 
@@ -85,10 +84,6 @@ export function getBotInstrumentContext(pathname: string, searchParams: BotSearc
 
   if (codeFromPath) {
     const demoMatch = buildFromQuery(codeFromPath, searchParams);
-    if (codeFromPath.toUpperCase() === demoInstrument.qrCode.toUpperCase()) {
-      return { instrument: demoInstrument, source: "route" };
-    }
-
     if (demoMatch) {
       return { instrument: demoMatch, source: "query" };
     }
@@ -104,4 +99,3 @@ export function getBotInstrumentContext(pathname: string, searchParams: BotSearc
 
   return { instrument: null, source: "none" };
 }
-

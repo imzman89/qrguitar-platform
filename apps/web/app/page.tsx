@@ -86,7 +86,7 @@ export default function HomePage() {
                 <Link className="button" href="/create">
                   {copy.hero.primaryCta}
                 </Link>
-                <Link className="button secondary" href="/i/QRG-PI260001">
+                <Link className="button secondary" href="/catalog">
                   {copy.hero.secondaryCta}
                 </Link>
               </div>

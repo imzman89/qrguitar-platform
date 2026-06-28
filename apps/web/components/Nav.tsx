@@ -40,7 +40,6 @@ export function Nav() {
         <Link href="/dashboard">Dashboard</Link>
         <Link href="/catalog">Catalog</Link>
         <Link href="/create">Create</Link>
-        <Link href="/i/QRG-PI260001">Demo Record</Link>
         {isSignedIn ? (
           <button type="button" onClick={() => void logout()}>Logout</button>
         ) : (

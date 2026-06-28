@@ -9,7 +9,7 @@ Free-tier MVP for QRguitar: permanent digital records for guitars, amps, pedals,
 - Supabase database/auth/storage schema
 - Public instrument catalog and profile pages
 - Authenticated dashboard, create flow, and edit flow
-- QR-friendly URLs like `/i/QRG-PI260001`
+- QR-friendly URLs like `/i/QRG-E985125`
 - Floating QRguitar Bot helper with local fallback logic
 
 ## Free Stack
@@ -365,7 +365,7 @@ Then verify:
 ```text
 /
 /catalog
-/i/QRG-PI260001
+/i/QRG-E985125
 /create
 /dashboard
 ```
@@ -376,7 +376,7 @@ After production deploy, test:
 https://www.qrguitar.com
 https://qrguitar.com
 https://www.qrguitar.com/catalog
-https://www.qrguitar.com/i/QRG-PI260001
+https://www.qrguitar.com/i/QRG-E985125
 https://www.qrguitar.com/create
 https://www.qrguitar.com/dashboard
 ```

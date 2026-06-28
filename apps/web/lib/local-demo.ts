@@ -633,10 +633,7 @@ export function isDemoInstrumentRecord(instrument: Pick<DemoInstrument, "qrCode"
 }
 
 export function getPublicDemoInstruments() {
-  return dedupeDemoInstruments([
-    demoInstrument,
-    ...getDemoInstruments().filter((instrument) => instrument.visibility !== "private")
-  ]);
+  return dedupeDemoInstruments(getDemoInstruments().filter((instrument) => instrument.visibility !== "private"));
 }
 
 export function saveDemoInstrument(instrument: DemoInstrument) {
