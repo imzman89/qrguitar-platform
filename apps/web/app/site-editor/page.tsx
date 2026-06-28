@@ -360,20 +360,20 @@ export default function SiteEditorPage() {
         },
         body: JSON.stringify({ settings })
       });
-      const payload = (await response.json()) as { ok?: boolean; message?: string };
+      const payload = (await response.json()) as { ok?: boolean; message?: string; settings?: EditableSiteSettings };
 
       if (!response.ok || !payload.ok) {
-        setMessage(payload.message || "Saved locally, but could not publish to every device.");
+        setMessage(`Save failed (${response.status}): ${payload.message || "Could not publish to every device."}`);
         return;
       }
 
-      const published = await fetchPublishedSiteSettings();
+      const published = payload.settings || (await fetchPublishedSiteSettings());
       if (published) {
         setSettings(published);
         applyThemeSettings(published);
       }
 
-      setMessage("Published. Refresh desktop or mobile to see the same site.");
+      setMessage(payload.message || "Published globally.");
     } catch {
       setMessage("Saved locally, but publishing failed. Check your connection and try Save again.");
     } finally {

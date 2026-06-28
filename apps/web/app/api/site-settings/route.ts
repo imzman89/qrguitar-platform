@@ -10,6 +10,7 @@ export const fetchCache = "force-no-store";
 const NO_STORE_HEADERS = {
   "Cache-Control": "no-store, no-cache, must-revalidate"
 };
+const OWNER_EMAIL_FALLBACKS = ["getgrowingri@gmail.com", "gary@qrguitar.com"];
 
 type SiteContentRow = {
   content_value: Partial<EditableSiteSettings> | null;
@@ -30,7 +31,7 @@ function normalizeEmail(value?: string | null) {
 }
 
 function readAdminEmails() {
-  return (process.env.QRGUITAR_ADMIN_EMAILS || "")
+  return `${process.env.QRGUITAR_ADMIN_EMAILS || ""},${process.env.QRGUITAR_OWNER_EMAILS || ""}`
     .split(",")
     .map((item) => normalizeEmail(item))
     .filter(Boolean);
@@ -38,7 +39,8 @@ function readAdminEmails() {
 
 async function canPublishSettings(userId: string, email?: string | null) {
   const adminEmails = readAdminEmails();
-  if (adminEmails.includes(normalizeEmail(email))) {
+  const normalizedEmail = normalizeEmail(email);
+  if (adminEmails.includes(normalizedEmail) || OWNER_EMAIL_FALLBACKS.includes(normalizedEmail)) {
     return true;
   }
 
@@ -90,7 +92,7 @@ export async function PUT(request: Request) {
 
   const allowed = await canPublishSettings(user.id, user.email);
   if (!allowed) {
-    return noStoreJson({ ok: false, message: "Only the QRguitar owner can publish site settings." }, { status: 403 });
+    return noStoreJson({ ok: false, message: "Only the QRguitar owner can publish site settings. Add this account to QRGUITAR_ADMIN_EMAILS if needed." }, { status: 403 });
   }
 
   let body: { settings?: Partial<EditableSiteSettings> };
@@ -111,11 +113,15 @@ export async function PUT(request: Request) {
   );
 
   if (saveError) {
-    return noStoreJson({ ok: false, message: "Could not publish site settings." }, { status: 500 });
+    return noStoreJson({ ok: false, message: `Could not publish site settings: ${saveError.message}` }, { status: 500 });
   }
 
   revalidatePath("/");
   revalidatePath("/api/site-settings");
 
-  return noStoreJson({ ok: true, settings });
+  return noStoreJson({ ok: true, message: "Published globally.", contentKey: publishedSiteSettingsKey, settings });
+}
+
+export async function PATCH(request: Request) {
+  return PUT(request);
 }
