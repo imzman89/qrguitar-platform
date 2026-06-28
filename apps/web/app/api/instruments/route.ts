@@ -4,6 +4,7 @@ import type { User } from "@supabase/supabase-js";
 import { revalidatePath, unstable_noStore as noStore } from "next/cache";
 import { createServerSupabaseClient, getAuthenticatedUser, getSupabaseEnvStatus } from "../../../lib/supabase-server";
 import { defaultQrStyle, type DemoInstrument, type QrStyle } from "../../../lib/local-demo";
+import { defaultRecordTrustSettings, mergeRecordTrustSettings, recordTrustContentKey, type RecordTrustSettings } from "../../../lib/record-trust";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -44,6 +45,13 @@ type CreateInstrumentRequest = {
 
 type UpdateInstrumentRequest = Omit<CreateInstrumentRequest, "accountPlan"> & {
   qrCode: string;
+  verificationOnly?: boolean;
+  verificationStatus?: "verified" | "unverified";
+  authenticityStatus?: "confirmed" | "unconfirmed";
+  showVerificationBadge?: boolean;
+  showAuthenticityBadge?: boolean;
+  publicVerificationNote?: string;
+  publicAuthenticityNote?: string;
 };
 
 type SupabaseCreateResponse = {
@@ -108,6 +116,11 @@ type GuitarSpecRow = {
 type ProfileRow = {
   id: string;
   display_name: string | null;
+};
+
+type SiteContentRow = {
+  content_key: string;
+  content_value: Partial<RecordTrustSettings> | null;
 };
 
 function noStoreJson<T>(body: T, init: ResponseInit = {}) {
@@ -219,6 +232,26 @@ function hasLaunchTestingAccess(email: string) {
   }
 
   return [...readServerEmailList("QRGUITAR_ADMIN_EMAILS"), ...readServerEmailList("QRGUITAR_BETA_TESTER_EMAILS")].includes(normalized);
+}
+
+function readAdminEmailList() {
+  return `${process.env.QRGUITAR_ADMIN_EMAILS || ""},${process.env.QRGUITAR_OWNER_EMAILS || ""}`
+    .split(",")
+    .map((item) => normalizeLookupEmail(item))
+    .filter(Boolean);
+}
+
+async function canManageRecordVerification(supabase: ReturnType<typeof createServerSupabaseClient>, user: User) {
+  if (readAdminEmailList().includes(normalizeLookupEmail(user.email || ""))) {
+    return true;
+  }
+
+  if (!supabase) {
+    return false;
+  }
+
+  const profile = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle<{ role?: string | null }>();
+  return profile.data?.role === "admin";
 }
 
 function coerceAccountPlan(value: string): AccountPlan {
@@ -459,13 +492,15 @@ function mapInstrumentRow({
   media,
   specs,
   ownerEmail,
-  ownerName
+  ownerName,
+  trust
 }: {
   guitar: GuitarRow;
   media: GuitarMediaRow[];
   specs: GuitarSpecRow[];
   ownerEmail?: string;
   ownerName?: string;
+  trust?: RecordTrustSettings;
 }): DemoInstrument {
   const customFields = specs
     .filter((spec) => {
@@ -495,6 +530,11 @@ function mapInstrumentRow({
     creatorAccountType: "customer",
     packageIncludesFirstTransfer: false,
     verificationStatus: guitar.status === "verified" ? "verified" : "unverified",
+    authenticityStatus: trust?.authenticityStatus || "unconfirmed",
+    showVerificationBadge: trust?.showVerificationBadge === false ? false : true,
+    showAuthenticityBadge: trust?.showAuthenticityBadge === false ? false : true,
+    publicVerificationNote: trust?.publicVerificationNote || "",
+    publicAuthenticityNote: trust?.publicAuthenticityNote || "",
     instrumentType: specValue(specs, "Type") || guitar.model || "",
     builder: guitar.builder || specValue(specs, "Builder"),
     owner: ownerName || ownerEmail || "Unclaimed",
@@ -510,6 +550,26 @@ function mapInstrumentRow({
     qrStyle: defaultQrStyle as QrStyle,
     createdAt: guitar.created_at
   };
+}
+
+async function loadTrustSettingsMap(supabase: ReturnType<typeof createServerSupabaseClient>, qrCodes: string[]) {
+  const trustByCode = new Map<string, RecordTrustSettings>();
+  if (!supabase || !qrCodes.length) {
+    return trustByCode;
+  }
+
+  const keys = qrCodes.map(recordTrustContentKey);
+  const result = await supabase.from("site_content").select("content_key,content_value").in("content_key", keys);
+  if (result.error) {
+    return trustByCode;
+  }
+
+  for (const row of (result.data || []) as SiteContentRow[]) {
+    const code = row.content_key.replace(/^record_trust:/, "").toUpperCase();
+    trustByCode.set(code, mergeRecordTrustSettings(row.content_value));
+  }
+
+  return trustByCode;
 }
 
 function stripAnonymousInstrumentFields(instrument: DemoInstrument) {
@@ -539,6 +599,7 @@ async function loadRecordsForUser(supabase: ReturnType<typeof createServerSupaba
   }
 
   const guitarIds = guitars.data.map((item) => item.id);
+  const trustByCode = await loadTrustSettingsMap(supabase, guitars.data.map((item) => item.qr_code));
   const [mediaResult, specsResult, documentsResult] = await Promise.all([
     guitarIds.length
       ? supabase.from("guitar_media").select("guitar_id,storage_path").in("guitar_id", guitarIds)
@@ -603,7 +664,8 @@ async function loadRecordsForUser(supabase: ReturnType<typeof createServerSupaba
           media: media.map((storagePath) => ({ guitar_id: guitar.id, storage_path: storagePath })),
           specs: specsByGuitar.get(guitar.id) || [],
           ownerEmail: owner.email || "",
-          ownerName: profile.data?.display_name || owner.user_metadata?.display_name || owner.email || ""
+          ownerName: profile.data?.display_name || owner.user_metadata?.display_name || owner.email || "",
+          trust: trustByCode.get((guitar as GuitarRow).qr_code.toUpperCase())
         });
         instrument.documentFiles = documents;
         return instrument;
@@ -634,6 +696,7 @@ async function loadPublicRecords(supabase: ReturnType<typeof createServerSupabas
   }
 
   const guitarIds = guitars.data.map((item) => item.id);
+  const trustByCode = await loadTrustSettingsMap(supabase, guitars.data.map((item) => item.qr_code));
   const [mediaResult, specsResult, documentsResult, profilesResult] = await Promise.all([
     guitarIds.length
       ? supabase.from("guitar_media").select("guitar_id,storage_path").in("guitar_id", guitarIds)
@@ -702,7 +765,8 @@ async function loadPublicRecords(supabase: ReturnType<typeof createServerSupabas
           media: media.map((storagePath) => ({ guitar_id: guitar.id, storage_path: storagePath })),
           specs: specsByGuitar.get(guitar.id) || [],
           ownerEmail: "",
-          ownerName: profilesById.get(guitar.owner_id || "")?.display_name || guitar.builder || ""
+          ownerName: profilesById.get(guitar.owner_id || "")?.display_name || guitar.builder || "",
+          trust: trustByCode.get((guitar as GuitarRow).qr_code.toUpperCase())
         });
         instrument.documentFiles = documents;
         return stripAnonymousInstrumentFields(instrument);
@@ -739,7 +803,10 @@ export async function GET(request: Request) {
         return noStoreJson({ ok: false, message: "Instrument not found for this account." } satisfies SupabaseReadResponse, { status: 404 });
       }
 
-      return noStoreJson({ ok: true, instrument } satisfies SupabaseReadResponse, { status: 200 });
+      return noStoreJson(
+        { ok: true, instrument, canManageVerification: await canManageRecordVerification(supabase, auth.user) } as SupabaseReadResponse & { canManageVerification: boolean },
+        { status: 200 }
+      );
     }
 
     const result = await loadRecordsForUser(supabase, auth.user);
@@ -793,7 +860,8 @@ export async function GET(request: Request) {
       media: media.map((storagePath) => ({ guitar_id: guitar.id, storage_path: storagePath })),
       specs: (specsResult.data || []) as GuitarSpecRow[],
       ownerEmail: "",
-      ownerName: profileResult.data?.display_name || guitar.builder || "Unclaimed"
+      ownerName: profileResult.data?.display_name || guitar.builder || "Unclaimed",
+      trust: (await loadTrustSettingsMap(supabase, [guitar.qr_code])).get(guitar.qr_code.toUpperCase())
     });
 
     instrument.documentFiles = await resolveDocumentSources(
@@ -1058,6 +1126,68 @@ export async function PATCH(request: Request) {
     body = (await request.json()) as UpdateInstrumentRequest;
   } catch {
     return NextResponse.json({ ok: false, message: "Invalid request body." } satisfies SupabaseCreateResponse, { status: 400 });
+  }
+
+  if (body.verificationOnly) {
+    const qrCode = String(body.qrCode || "").trim().toUpperCase();
+    const verificationStatus = body.verificationStatus === "verified" ? "verified" : "unverified";
+    const authenticityStatus = body.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed";
+    if (!qrCode) {
+      return NextResponse.json({ ok: false, message: "Missing QRguitar ID." }, { status: 400 });
+    }
+
+    const existing = await supabase.from("guitars").select("id,owner_id,status").eq("qr_code", qrCode).maybeSingle<GuitarRow>();
+    if (existing.error || !existing.data) {
+      return NextResponse.json({ ok: false, message: "Instrument record was not found." }, { status: 404 });
+    }
+
+    const isRecordOwner = existing.data.owner_id === auth.user.id;
+    const isAdmin = await canManageRecordVerification(supabase, auth.user);
+    if (!isRecordOwner && !isAdmin) {
+      return NextResponse.json({ ok: false, message: "Only the record owner or QRguitar admin can change badge display." }, { status: 403 });
+    }
+
+    if (isAdmin) {
+      const result = await supabase
+        .from("guitars")
+        .update({ status: verificationStatus, updated_at: new Date().toISOString() })
+        .eq("qr_code", qrCode);
+
+      if (result.error) {
+        return NextResponse.json({ ok: false, message: result.error.message || "Could not update verification." }, { status: 500 });
+      }
+    }
+
+    const currentTrust = (await loadTrustSettingsMap(supabase, [qrCode])).get(qrCode) || defaultRecordTrustSettings;
+    const trust = mergeRecordTrustSettings({
+      ...currentTrust,
+      authenticityStatus: isAdmin ? authenticityStatus : currentTrust.authenticityStatus,
+      showVerificationBadge: typeof body.showVerificationBadge === "boolean" ? body.showVerificationBadge : currentTrust.showVerificationBadge,
+      showAuthenticityBadge: typeof body.showAuthenticityBadge === "boolean" ? body.showAuthenticityBadge : currentTrust.showAuthenticityBadge,
+      publicVerificationNote: isAdmin ? body.publicVerificationNote : currentTrust.publicVerificationNote,
+      publicAuthenticityNote: isAdmin ? body.publicAuthenticityNote : currentTrust.publicAuthenticityNote
+    });
+    const trustResult = await supabase.from("site_content").upsert(
+      {
+        content_key: recordTrustContentKey(qrCode),
+        content_value: trust,
+        updated_at: new Date().toISOString()
+      },
+      { onConflict: "content_key" }
+    );
+    if (trustResult.error) {
+      return NextResponse.json({ ok: false, message: trustResult.error.message || "Could not update trust settings." }, { status: 500 });
+    }
+
+    revalidatePublicRecordSurfaces(qrCode);
+    return noStoreJson({
+      ok: true,
+      qrCode,
+      permanentPath: `/i/${qrCode}`,
+      message: "Trust settings updated.",
+      verificationStatus: isAdmin ? verificationStatus : existing.data.status === "verified" ? "verified" : "unverified",
+      ...trust
+    }, { status: 200 });
   }
 
   const input = {

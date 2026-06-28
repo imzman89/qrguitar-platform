@@ -160,6 +160,7 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
             {visibleRecords.length ? (
               visibleRecords.map((record) => {
                 const verificationStatus = getInstrumentVerificationStatus(record);
+                const authenticityStatus = record.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed";
                 const condition = getInstrumentCondition(record);
                 const imageUrl = record.heroImageDataUrl || record.galleryImageDataUrls?.[0] || "";
 
@@ -191,9 +192,16 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
                         <p className="catalog-card-summary">{record.summary || "Record details will appear as the owner adds photos, specs, and history."}</p>
                         <div className="catalog-meta">
                           <span className={`catalog-chip catalog-chip--${condition}`}>{condition === "new" ? "New" : "Used"}</span>
-                          <span className={`catalog-chip ${verificationStatus === "verified" ? "catalog-chip--verified" : "catalog-chip--unverified"}`}>
-                            {verificationStatus === "verified" ? "Verified" : "Unverified"}
-                          </span>
+                          {record.showVerificationBadge !== false ? (
+                            <span className={`catalog-chip ${verificationStatus === "verified" ? "catalog-chip--verified" : "catalog-chip--unverified"}`}>
+                              {verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"}
+                            </span>
+                          ) : null}
+                          {record.showAuthenticityBadge !== false ? (
+                            <span className={`catalog-chip ${authenticityStatus === "confirmed" ? "catalog-chip--verified" : "catalog-chip--unverified"}`}>
+                              {authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}
+                            </span>
+                          ) : null}
                           <span>{record.year || "Year unknown"}</span>
                           <span>{formatRecordLocation(record) || "Location unknown"}</span>
                           <span>{record.galleryImageDataUrls?.length || (record.heroImageDataUrl ? 1 : 0)} photos</span>

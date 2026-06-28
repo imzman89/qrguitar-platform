@@ -303,6 +303,7 @@ export default function DashboardPage() {
                   const imageUrl = instrument.heroImageDataUrl || instrument.galleryImageDataUrls?.[0] || "";
                   const condition = getInstrumentCondition(instrument);
                   const verificationStatus = getInstrumentVerificationStatus(instrument);
+                  const authenticityStatus = instrument.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed";
                   const title = dashboardRecordTitle(instrument);
                   const meta = dashboardRecordMeta(instrument, condition);
                   const category = instrument.instrumentType || "Instrument";
@@ -322,7 +323,12 @@ export default function DashboardPage() {
                             <strong>{title}</strong>
                             <span title={meta}>{meta}</span>
                             <div className={styles.instrumentBadges}>
-                              <small>{verificationStatus === "verified" ? "Verified" : "Unverified"}</small>
+                              {instrument.showVerificationBadge !== false ? (
+                                <small>{verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"}</small>
+                              ) : null}
+                              {instrument.showAuthenticityBadge !== false ? (
+                                <small>{authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}</small>
+                              ) : null}
                               <small>{category}</small>
                             </div>
                           </div>
@@ -397,7 +403,7 @@ export default function DashboardPage() {
               <div className="activity-list">
                 <Activity icon={<QrCode size={18} />} title="Permanent record links" detail="Every instrument keeps one QRguitar URL that stays the same as details are updated." />
                 <Activity icon={<ShieldCheck size={18} />} title="Owner account flow" detail="Sign in, create records, edit details, and manage public or private visibility from one dashboard." />
-                <Activity icon={<Repeat2 size={18} />} title="Ownership change" detail="Owner-transfer tools are in beta. Contact support@qrguitar.com for manual launch help." />
+                <Activity icon={<ShieldCheck size={18} />} title="Why verify?" detail="Verification helps sellers, shops, builders, and collectors organize proof, receipts, photos, service history, and optional authenticity review for higher-value instruments." />
               </div>
             </section>
             <section className="card">

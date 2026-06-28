@@ -56,6 +56,13 @@ export default function EditInstrumentPage() {
   const [documents, setDocuments] = useState<{ id: string; name: string; dataUrl: string; visibility: "public" | "hidden" }[]>([]);
   const [qrStyle, setQrStyle] = useState<QrStyle>(defaultQrStyle);
   const [categoryOptions, setCategoryOptions] = useState(defaultSiteSettings.instrumentCategories);
+  const [verificationStatus, setVerificationStatus] = useState<"verified" | "unverified">("unverified");
+  const [authenticityStatus, setAuthenticityStatus] = useState<"confirmed" | "unconfirmed">("unconfirmed");
+  const [showVerificationBadge, setShowVerificationBadge] = useState(true);
+  const [showAuthenticityBadge, setShowAuthenticityBadge] = useState(true);
+  const [publicVerificationNote, setPublicVerificationNote] = useState("");
+  const [publicAuthenticityNote, setPublicAuthenticityNote] = useState("");
+  const [canManageVerification, setCanManageVerification] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,7 +86,9 @@ export default function EditInstrumentPage() {
         const response = await fetch(`/api/instruments?scope=mine&code=${encodeURIComponent(code)}`, {
           headers: { authorization: `Bearer ${token}` }
         });
-        const payload = (await response.json().catch(() => null)) as { ok?: boolean; instrument?: DemoInstrument; message?: string } | null;
+        const payload = (await response.json().catch(() => null)) as
+          | { ok?: boolean; instrument?: DemoInstrument; message?: string; canManageVerification?: boolean }
+          | null;
 
         if (response.ok && payload?.ok && payload.instrument) {
           const instrument = payload.instrument;
@@ -111,6 +120,13 @@ export default function EditInstrumentPage() {
             setGalleryImages(normalizeGalleryImages(instrument));
             setDocuments(normalizeDocumentFiles(instrument));
             setQrStyle(instrument.qrStyle || defaultQrStyle);
+            setVerificationStatus(instrument.verificationStatus === "verified" ? "verified" : "unverified");
+            setAuthenticityStatus(instrument.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed");
+            setShowVerificationBadge(instrument.showVerificationBadge !== false);
+            setShowAuthenticityBadge(instrument.showAuthenticityBadge !== false);
+            setPublicVerificationNote(instrument.publicVerificationNote || "");
+            setPublicAuthenticityNote(instrument.publicAuthenticityNote || "");
+            setCanManageVerification(Boolean(payload.canManageVerification));
             setReady(true);
           }
           return;
@@ -330,6 +346,69 @@ export default function EditInstrumentPage() {
     }
   }
 
+  async function saveVerification() {
+    if (!original) {
+      return;
+    }
+
+    try {
+      const token = await getSupabaseAccessToken();
+      const response = await fetch("/api/instruments", {
+        method: "PATCH",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          qrCode: original.qrCode || code,
+          verificationOnly: true,
+          verificationStatus,
+          authenticityStatus,
+          showVerificationBadge,
+          showAuthenticityBadge,
+          publicVerificationNote,
+          publicAuthenticityNote
+        })
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        ok?: boolean;
+        message?: string;
+        verificationStatus?: "verified" | "unverified";
+        authenticityStatus?: "confirmed" | "unconfirmed";
+        showVerificationBadge?: boolean;
+        showAuthenticityBadge?: boolean;
+        publicVerificationNote?: string;
+        publicAuthenticityNote?: string;
+      } | null;
+
+      if (!response.ok || !payload?.ok) {
+        setMessage(payload?.message || "Could not update verification.");
+        return;
+      }
+
+      const nextVerification = payload.verificationStatus || verificationStatus;
+      const nextAuthenticity = payload.authenticityStatus || authenticityStatus;
+      setVerificationStatus(nextVerification);
+      setAuthenticityStatus(nextAuthenticity);
+      setShowVerificationBadge(payload.showVerificationBadge !== false);
+      setShowAuthenticityBadge(payload.showAuthenticityBadge !== false);
+      setPublicVerificationNote(payload.publicVerificationNote || "");
+      setPublicAuthenticityNote(payload.publicAuthenticityNote || "");
+      setOriginal({
+        ...original,
+        verificationStatus: nextVerification,
+        authenticityStatus: nextAuthenticity,
+        showVerificationBadge: payload.showVerificationBadge !== false,
+        showAuthenticityBadge: payload.showAuthenticityBadge !== false,
+        publicVerificationNote: payload.publicVerificationNote || "",
+        publicAuthenticityNote: payload.publicAuthenticityNote || ""
+      });
+      setMessage("Trust settings updated. The permanent QRguitar ID and URL stayed the same.");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("qrguitar:catalog-updated"));
+      }
+    } catch {
+      setMessage("Could not update verification. Check your connection and try again.");
+    }
+  }
+
   return ready && original && !forbidden ? (
     <>
       <Nav />
@@ -360,6 +439,69 @@ export default function EditInstrumentPage() {
                   {form.visibility === "public" ? "Make Private" : "Make Public"}
                 </button>
               </div>
+              <section className="card verification-card" aria-label="Trust and verification">
+                <div>
+                  <span className="eyebrow">Trust & Verification</span>
+                  <h3>{verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"}</h3>
+                  <p>
+                    {verificationStatus === "verified"
+                      ? "This record is verified by QRguitar."
+                      : "Verified records are available with paid QRguitar verification. Paid verification is handled manually during beta."}
+                  </p>
+                  <p>
+                    {authenticityStatus === "confirmed"
+                      ? "Authenticity confirmed by QRguitar from available evidence."
+                      : "Authenticity confirmation is available as a paid review feature. Paid verification and authenticity review are handled manually during beta."}
+                  </p>
+                </div>
+                <div className="form-grid">
+                  {canManageVerification ? (
+                    <>
+                    <div className="field">
+                      <label htmlFor="verificationStatus">Admin verification status</label>
+                      <select
+                        id="verificationStatus"
+                        value={verificationStatus}
+                        onChange={(event) => setVerificationStatus(event.target.value === "verified" ? "verified" : "unverified")}
+                      >
+                        <option value="unverified">Unverified</option>
+                        <option value="verified">Verified</option>
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label htmlFor="authenticityStatus">Admin authenticity status</label>
+                      <select
+                        id="authenticityStatus"
+                        value={authenticityStatus}
+                        onChange={(event) => setAuthenticityStatus(event.target.value === "confirmed" ? "confirmed" : "unconfirmed")}
+                      >
+                        <option value="unconfirmed">Authenticity Unconfirmed</option>
+                        <option value="confirmed">Authenticity Confirmed</option>
+                      </select>
+                    </div>
+                    <div className="field custom-wide">
+                      <label htmlFor="publicVerificationNote">Public verification note</label>
+                      <textarea id="publicVerificationNote" rows={3} value={publicVerificationNote} onChange={(event) => setPublicVerificationNote(event.target.value)} />
+                    </div>
+                    <div className="field custom-wide">
+                      <label htmlFor="publicAuthenticityNote">Public authenticity note</label>
+                      <textarea id="publicAuthenticityNote" rows={3} value={publicAuthenticityNote} onChange={(event) => setPublicAuthenticityNote(event.target.value)} />
+                    </div>
+                    </>
+                  ) : null}
+                  <label className="toggle-field">
+                    <input type="checkbox" checked={showVerificationBadge} onChange={(event) => setShowVerificationBadge(event.target.checked)} />
+                    Show verification badge publicly
+                  </label>
+                  <label className="toggle-field">
+                    <input type="checkbox" checked={showAuthenticityBadge} onChange={(event) => setShowAuthenticityBadge(event.target.checked)} />
+                    Show authenticity badge publicly
+                  </label>
+                  <button className="button secondary" type="button" onClick={() => void saveVerification()}>
+                    Save trust settings
+                  </button>
+                </div>
+              </section>
             <form className="card form">
               <input
                 aria-hidden="true"

@@ -3285,16 +3285,23 @@ select {
 
 .verified-badge {
   width: fit-content;
-  min-height: 54px;
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
+}
+
+.verified-badge span {
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   border: 1px solid var(--gold);
   border-radius: 8px;
-  padding: 12px 18px;
+  padding: 10px 16px;
   background: rgba(0, 0, 0, .38);
   color: var(--gold-2);
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 800;
   text-transform: uppercase;
 }

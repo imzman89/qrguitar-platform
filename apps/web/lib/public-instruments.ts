@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from "./supabase-server";
 import { defaultQrStyle, type DemoInstrument } from "./local-demo";
+import { mergeRecordTrustSettings, recordTrustContentKey, type RecordTrustSettings } from "./record-trust";
 import { unstable_noStore as noStore } from "next/cache";
 
 type GuitarRow = {
@@ -42,6 +43,11 @@ type DocumentRow = {
 type ProfileRow = {
   id: string;
   display_name: string | null;
+};
+
+type SiteContentRow = {
+  content_key: string;
+  content_value: Partial<RecordTrustSettings> | null;
 };
 
 const stalePublicSpecValues = new Set([
@@ -143,13 +149,15 @@ function mapRecord({
   media,
   specs,
   documents,
-  ownerName
+  ownerName,
+  trust
 }: {
   guitar: GuitarRow;
   media: string[];
   specs: SpecRow[];
   documents: NonNullable<DemoInstrument["documentFiles"]>;
   ownerName?: string;
+  trust?: RecordTrustSettings;
 }): DemoInstrument {
   const customFields = specs
     .filter((spec) => !["condition", "type", "finish"].includes(spec.label.toLowerCase()))
@@ -173,6 +181,11 @@ function mapRecord({
     creatorAccountType: "customer",
     packageIncludesFirstTransfer: false,
     verificationStatus: guitar.status === "verified" ? "verified" : "unverified",
+    authenticityStatus: trust?.authenticityStatus || "unconfirmed",
+    showVerificationBadge: trust?.showVerificationBadge === false ? false : true,
+    showAuthenticityBadge: trust?.showAuthenticityBadge === false ? false : true,
+    publicVerificationNote: trust?.publicVerificationNote || "",
+    publicAuthenticityNote: trust?.publicAuthenticityNote || "",
     instrumentType: type,
     builder: guitar.builder || "",
     owner: ownerName || guitar.builder || "Unclaimed",
@@ -189,6 +202,26 @@ function mapRecord({
     qrStyle: defaultQrStyle,
     createdAt: guitar.created_at || new Date().toISOString()
   };
+}
+
+async function loadTrustSettingsMap(qrCodes: string[]) {
+  const trustByCode = new Map<string, RecordTrustSettings>();
+  const supabase = createServerSupabaseClient();
+  if (!supabase || !qrCodes.length) {
+    return trustByCode;
+  }
+
+  const result = await supabase.from("site_content").select("content_key,content_value").in("content_key", qrCodes.map(recordTrustContentKey));
+  if (result.error) {
+    return trustByCode;
+  }
+
+  for (const row of (result.data || []) as SiteContentRow[]) {
+    const code = row.content_key.replace(/^record_trust:/, "").toUpperCase();
+    trustByCode.set(code, mergeRecordTrustSettings(row.content_value));
+  }
+
+  return trustByCode;
 }
 
 async function loadRelated(guitars: GuitarRow[]) {
@@ -252,6 +285,7 @@ export async function getPublicInstruments() {
 
   const guitars = data as GuitarRow[];
   const related = await loadRelated(guitars);
+  const trustByCode = await loadTrustSettingsMap(guitars.map((guitar) => guitar.qr_code));
 
   return Promise.all(
     guitars.map(async (guitar) => {
@@ -264,7 +298,8 @@ export async function getPublicInstruments() {
         media,
         documents,
         specs: related.specs.get(guitar.id) || [],
-        ownerName: related.profiles.get(guitar.owner_id || "")?.display_name || guitar.builder || ""
+        ownerName: related.profiles.get(guitar.owner_id || "")?.display_name || guitar.builder || "",
+        trust: trustByCode.get(guitar.qr_code.toUpperCase())
       });
     })
   );
@@ -296,12 +331,14 @@ export async function getPublicInstrumentByCode(code: string) {
   const media = await resolveMediaSources((related.media.get(data.id) || []).filter((storagePath) => storagePath !== heroStoragePath));
   const heroImagePath = heroStoragePath ? (await resolveMediaSources([heroStoragePath]))[0] : "";
   const documents = await resolveDocumentSources(related.documents.get(data.id) || []);
+  const trustByCode = await loadTrustSettingsMap([data.qr_code]);
 
   return mapRecord({
     guitar: { ...data, hero_image_path: heroImagePath || data.hero_image_path },
     media,
     documents,
     specs: related.specs.get(data.id) || [],
-    ownerName: related.profiles.get(data.owner_id || "")?.display_name || data.builder || "Unclaimed"
+    ownerName: related.profiles.get(data.owner_id || "")?.display_name || data.builder || "Unclaimed",
+    trust: trustByCode.get(data.qr_code.toUpperCase())
   });
 }

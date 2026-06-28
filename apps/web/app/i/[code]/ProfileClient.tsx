@@ -175,6 +175,11 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
         instrumentCondition: stored.instrumentCondition === "new" ? "new" : "used",
         creatorAccountType: stored.creatorAccountType || "customer",
         verificationStatus: stored.verificationStatus || "unverified",
+        authenticityStatus: stored.authenticityStatus || "unconfirmed",
+        showVerificationBadge: stored.showVerificationBadge !== false,
+        showAuthenticityBadge: stored.showAuthenticityBadge !== false,
+        publicVerificationNote: stored.publicVerificationNote || "",
+        publicAuthenticityNote: stored.publicAuthenticityNote || "",
         heroImageDataUrl: stored.heroImageDataUrl || "",
         galleryImageDataUrls: stored.galleryImageDataUrls && stored.galleryImageDataUrls.length
           ? stored.galleryImageDataUrls
@@ -208,6 +213,9 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     })
     : [];
   const isVerifiedRecord = instrument ? getInstrumentVerificationStatus(instrument) === "verified" : false;
+  const isAuthenticityConfirmed = instrument?.authenticityStatus === "confirmed";
+  const showVerificationBadge = instrument?.showVerificationBadge !== false;
+  const showAuthenticityBadge = instrument?.showAuthenticityBadge !== false;
   const formattedLocation = instrument ? formatRecordLocation(instrument) : "";
   const transferMessage = "Owner-transfer tools are in beta. Contact support for manual help.";
   const latestTransfers = instrument
@@ -306,7 +314,8 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
 
   const specs = [
     { label: "Instrument ID", value: instrument.qrCode },
-    { label: "Status", value: isVerifiedRecord ? "Verified" : "Unverified" },
+    ...(showVerificationBadge ? [{ label: "Verification", value: isVerifiedRecord ? "Verified by QRguitar" : "Unverified" }] : []),
+    ...(showAuthenticityBadge ? [{ label: "Authenticity", value: isAuthenticityConfirmed ? "Authenticity Confirmed" : "Authenticity Unconfirmed" }] : []),
     { label: "Owner", value: publicOwnerDisplay(instrument) },
     { label: "Built", value: instrument.year || "Unknown" },
     { label: "Make / Model", value: [instrument.brand, instrument.model].filter(Boolean).join(" ") },
@@ -357,8 +366,12 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           </div>
           <h1>{instrumentDisplayName(instrument)}</h1>
           <div className="verified-badge">
-            <ShieldCheck size={23} />
-            <span>{isVerifiedRecord ? "Verified" : "Unverified"}</span>
+            {showVerificationBadge ? (
+              <span><ShieldCheck size={20} /> {isVerifiedRecord ? "Verified by QRguitar" : "Unverified"}</span>
+            ) : null}
+            {showAuthenticityBadge ? (
+              <span><ShieldCheck size={20} /> {isAuthenticityConfirmed ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}</span>
+            ) : null}
           </div>
         </section>
 
@@ -383,6 +396,24 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
             <small className="scan-copy-notice">Copy failed. You can copy the URL from your browser bar.</small>
           ) : null}
         </section>
+
+        {showVerificationBadge && isVerifiedRecord ? (
+          <section className="scan-action-panel" aria-label="Verification note">
+            <div>
+              <span className="scan-action-icon"><ShieldCheck size={16} /> Verified by QRguitar</span>
+              <p>{instrument.publicVerificationNote || "Verified by QRguitar means this record has been reviewed for identity, ownership, build details, photos, documents, or provenance details available at the time of review. It is not a guarantee of future condition."}</p>
+            </div>
+          </section>
+        ) : null}
+
+        {showAuthenticityBadge && isAuthenticityConfirmed ? (
+          <section className="scan-action-panel" aria-label="Authenticity note">
+            <div>
+              <span className="scan-action-icon"><ShieldCheck size={16} /> Authenticity Confirmed</span>
+              <p>{instrument.publicAuthenticityNote || "Authenticity Confirmed means QRguitar reviewed available evidence supporting the instrument's identity and authenticity at the time of review. It is not a guarantee against hidden issues, future changes, or undisclosed modifications."}</p>
+            </div>
+          </section>
+        ) : null}
 
         {canEdit ? (
         <section className="scan-actions" aria-label="Owner profile actions">
@@ -472,7 +503,8 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           <span>{instrument.visibility === "private" ? "Private" : "Public"}</span>
           <span>{instrument.instrumentCondition ? instrument.instrumentCondition.toUpperCase() : "USED"}</span>
           <span>{formattedLocation || "Registered"}</span>
-          <span>{isVerifiedRecord ? "Verified" : "Unverified"}</span>
+          {showVerificationBadge ? <span>{isVerifiedRecord ? "Verified by QRguitar" : "Unverified"}</span> : null}
+          {showAuthenticityBadge ? <span>{isAuthenticityConfirmed ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}</span> : null}
         </section>
 
         {activeMedia ? (

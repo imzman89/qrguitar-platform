@@ -28,6 +28,7 @@ export type CreatorAccountType = "customer" | "brand" | "shop" | "commercial";
 export type AccountPlan = "free" | "paid" | "brand" | "commercial";
 export type AccountVerificationStatus = "unverified" | "verified" | "flagged";
 export type RecordVerificationStatus = "unverified" | "verified";
+export type RecordAuthenticityStatus = "unconfirmed" | "confirmed";
 
 export type DemoInstrument = {
   qrCode: string;
@@ -41,6 +42,11 @@ export type DemoInstrument = {
   creatorAccountType?: CreatorAccountType;
   packageIncludesFirstTransfer?: boolean;
   verificationStatus?: RecordVerificationStatus;
+  authenticityStatus?: RecordAuthenticityStatus;
+  showVerificationBadge?: boolean;
+  showAuthenticityBadge?: boolean;
+  publicVerificationNote?: string;
+  publicAuthenticityNote?: string;
   instrumentType?: string;
   builder?: string;
   owner: string;
