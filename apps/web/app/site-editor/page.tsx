@@ -64,6 +64,7 @@ export default function SiteEditorPage() {
   const [ownerStatus, setOwnerStatus] = useState("Local owner login is managed here.");
   const [authChecked, setAuthChecked] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const activePasscodeHint = isOwnerPasscodeSet ? "custom owner passcode configured" : `default (${ownerPasscode})`;
 
@@ -340,6 +341,11 @@ export default function SiteEditorPage() {
 
   async function onSave(event?: FormEvent) {
     event?.preventDefault();
+    if (isSaving) {
+      return;
+    }
+
+    setIsSaving(true);
     saveSiteSettings(settings);
     saveBotSettings(botSettings);
     setMessage("Saving and publishing site settings...");
@@ -370,6 +376,8 @@ export default function SiteEditorPage() {
       setMessage("Published. Refresh desktop or mobile to see the same site.");
     } catch {
       setMessage("Saved locally, but publishing failed. Check your connection and try Save again.");
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -953,8 +961,8 @@ export default function SiteEditorPage() {
                   <small>qrguitar.com</small>
                 </div>
                 <div className="editor-save-bar">
-                  <button className="button" type="submit">
-                    <Save size={16} /> Save Changes
+                  <button className="button" type="button" onClick={() => void onSave()} disabled={isSaving}>
+                    <Save size={16} /> {isSaving ? "Saving..." : "Save Changes"}
                   </button>
                   <button className="button secondary" type="button" onClick={onReset}>
                     <RotateCcw size={16} /> Reset Changes
