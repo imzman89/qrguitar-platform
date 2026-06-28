@@ -140,15 +140,6 @@ function supabaseWriteUnavailableResponse() {
   return NextResponse.json({ ok: false, message } satisfies SupabaseCreateResponse, { status: 503 });
 }
 
-function sanitizeCodePart(value: string) {
-  return value
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9-]/g, "")
-    .replace(/-+/g, "-")
-    .slice(0, 24);
-}
-
 function normalizeLookupEmail(value: string) {
   const trimmed = String(value || "").trim().toLowerCase();
   const parts = trimmed.split("@");
@@ -166,21 +157,8 @@ function normalizeLookupEmail(value: string) {
   return trimmed;
 }
 
-function makeBaseCode(serial: string) {
-  const body = sanitizeCodePart(serial);
-  if (body) {
-    return `QRG-${body}`.slice(0, 32);
-  }
-
-  return `QRG-${randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase()}`;
-}
-
-function nextFreeCode(existing?: string) {
-  if (!existing) {
-    return `QRG-${randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase()}`;
-  }
-
-  return `${existing}-${randomUUID().replace(/-/g, "").slice(0, 4).toUpperCase()}`;
+function makeNewPermanentQrCode() {
+  return `QRG-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`;
 }
 
 function mapPlan(plan: AccountPlan): SupabasePlan {
@@ -890,14 +868,16 @@ export async function POST(request: Request) {
     );
   }
 
-  let qrCode = makeBaseCode(input.serial);
-  for (let attempt = 0; attempt < 16; attempt += 1) {
+  // New records get a permanent QRguitar ID independent of the serial/build ID.
+  // Existing legacy IDs like QRG-PI260001 and QRG-E985125 remain unchanged forever.
+  let qrCode = makeNewPermanentQrCode();
+  for (let attempt = 0; attempt < 24; attempt += 1) {
     const { count } = await supabase.from("guitars").select("id", { count: "exact", head: true }).eq("qr_code", qrCode);
     if (!count) {
       break;
     }
 
-    qrCode = nextFreeCode(qrCode);
+    qrCode = makeNewPermanentQrCode();
   }
 
   const uploadedSources = Array.from(new Set([body.heroImageDataUrl || "", ...input.photos].filter(Boolean)));

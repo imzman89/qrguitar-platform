@@ -948,11 +948,7 @@ export function acceptDemoTransfer(id: string, user: DemoUser) {
 
 export function generatePermanentQrCode(existingCodes: string[] = [], serialNumber = "") {
   const taken = new Set(existingCodes.map((code) => code.toUpperCase()));
-  const serialBody = sanitizeCodePart(serialNumber);
-
-  if (serialBody) {
-    return `QRG-${serialBody}`;
-  }
+  void serialNumber;
 
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const code = `QRG-${randomCodeBody()}`;
@@ -963,15 +959,6 @@ export function generatePermanentQrCode(existingCodes: string[] = [], serialNumb
   }
 
   return `QRG-${Date.now().toString(36).toUpperCase()}`;
-}
-
-function sanitizeCodePart(value: string) {
-  return value
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9-]/g, "")
-    .replace(/-+/g, "-")
-    .slice(0, 24);
 }
 
 function randomCodeBody() {

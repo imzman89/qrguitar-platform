@@ -51,15 +51,6 @@ export default function CreatePage() {
   const [qrStyle, setQrStyle] = useState<QrStyle>(defaultQrStyle);
   const [categoryOptions, setCategoryOptions] = useState(defaultSiteSettings.instrumentCategories);
 
-  useEffect(() => {
-    setQrCode(
-      generatePermanentQrCode(
-        getDemoInstruments().map((instrument) => instrument.qrCode),
-        form.serial
-      )
-    );
-  }, [form.serial]);
-
   const profileHref = useMemo(() => {
     return `/i/${qrCode}`;
   }, [qrCode]);
@@ -307,7 +298,7 @@ export default function CreatePage() {
               <div className="permanent-id">
                 <span>Permanent QRguitar ID</span>
                 <strong>{qrCode}</strong>
-                <small>{form.serial ? "Built from the serial number, then locked forever on creation." : "No serial yet, so QRguitar creates a unique permanent ID."}</small>
+                <small>This ID is separate from the serial number and locks forever when the record is created.</small>
               </div>
               <div className="privacy-toggle" aria-label="Profile visibility">
                 <div>
