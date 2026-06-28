@@ -308,24 +308,30 @@ export default function DashboardPage() {
 
                   return (
                     <article className={styles.instrumentRow} key={instrument.qrCode}>
-                      <div className={styles.instrumentThumb} aria-hidden="true">
-                        {imageUrl ? <img src={imageUrl} alt="" loading="lazy" /> : <span>QR</span>}
-                      </div>
-                      <div className={styles.instrumentDetails}>
-                        <div className={styles.instrumentInfo}>
-                          <strong>{title}</strong>
-                          <span title={meta}>{meta}</span>
-                          <div className={styles.instrumentBadges}>
-                            <small>{verificationStatus === "verified" ? "Verified record" : "Unverified record"}</small>
-                            <small>{category}</small>
+                      <Link
+                        className={styles.instrumentBodyLink}
+                        href={instrumentToProfileUrl(instrument)}
+                        aria-label={`Open ${title} profile`}
+                      >
+                        <div className={styles.instrumentThumb} aria-hidden="true">
+                          {imageUrl ? <img src={imageUrl} alt="" loading="lazy" /> : <span>QR</span>}
+                        </div>
+                        <div className={styles.instrumentDetails}>
+                          <div className={styles.instrumentInfo}>
+                            <strong>{title}</strong>
+                            <span title={meta}>{meta}</span>
+                            <div className={styles.instrumentBadges}>
+                              <small>{verificationStatus === "verified" ? "Verified record" : "Unverified record"}</small>
+                              <small>{category}</small>
+                            </div>
+                          </div>
+                          <div className={styles.instrumentMeta}>
+                            <span>{instrument.galleryImageDataUrls?.length || (instrument.heroImageDataUrl ? 1 : 0)} photos</span>
+                            <span>{totalDocs ? `${publicDocs} public docs${hiddenDocs ? `, ${hiddenDocs} hidden` : ""}` : "No documents yet"}</span>
+                            <span>{instrument.visibility === "private" ? "Private" : instrument.visibility === "unlisted" ? "Unlisted" : "Public"}</span>
                           </div>
                         </div>
-                        <div className={styles.instrumentMeta}>
-                          <span>{instrument.galleryImageDataUrls?.length || (instrument.heroImageDataUrl ? 1 : 0)} photos</span>
-                          <span>{totalDocs ? `${publicDocs} public docs${hiddenDocs ? `, ${hiddenDocs} hidden` : ""}` : "No documents yet"}</span>
-                          <span>{instrument.visibility === "private" ? "Private" : instrument.visibility === "unlisted" ? "Unlisted" : "Public"}</span>
-                        </div>
-                      </div>
+                      </Link>
                       <div className={styles.qrActionColumn}>
                         <div className={styles.qrPanel}>
                           <QrDownload
