@@ -320,7 +320,7 @@ export default function DashboardPage() {
                       <div className={styles.instrumentDetails}>
                         <div className={styles.instrumentInfo}>
                           <strong>{title}</strong>
-                          <span>{meta}</span>
+                          <span title={meta}>{meta}</span>
                           <div className={styles.instrumentBadges}>
                             <small>{verificationStatus === "verified" ? "Verified record" : "Unverified record"}</small>
                             <small>{category}</small>

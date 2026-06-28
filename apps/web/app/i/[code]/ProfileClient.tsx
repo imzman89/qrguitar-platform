@@ -363,7 +363,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
   const specs = [
     { label: "Instrument ID", value: instrument.qrCode },
     { label: "Status", value: isVerifiedRecord ? "Verified record" : "Unverified record" },
-    { label: "Owner", value: instrument.owner || "Unclaimed" },
+    { label: "Owner", value: publicOwnerDisplay(instrument) },
     { label: "Built", value: instrument.year || "Unknown" },
     { label: "Make / Model", value: [instrument.brand, instrument.model].filter(Boolean).join(" ") },
     { label: "Serial / Build ID", value: instrument.serial },
@@ -547,6 +547,17 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
       </section>
     </main>
   );
+}
+
+function publicOwnerDisplay(instrument: DemoInstrument) {
+  const owner = String(instrument.owner || "").trim();
+  const personalFallback = /^(gary|greg|owner)$/i.test(owner);
+
+  if (!owner || personalFallback) {
+    return instrument.builder || instrument.brand || "Unclaimed";
+  }
+
+  return owner;
 }
 
 function ProfilePanel({

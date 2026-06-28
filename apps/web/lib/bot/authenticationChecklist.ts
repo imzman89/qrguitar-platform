@@ -18,7 +18,7 @@ export function buildAuthenticationChecklist(instrument: DemoInstrument | null):
       evidenceUsed: ["General QRguitar authentication workflow only"],
       missingEvidence: ["Instrument brand", "Model", "Serial", "Year", "Ownership timeline", "Photos", "Receipts or transfer records"],
       suggestedNextSteps: ["Open the bot from /i/[QR ID]", "Add serial, photos, and proof documents", "Attach ownership and repair history"],
-      warnings: ["No verification can be confirmed without a scoped record."]
+      warnings: ["No verification can be confirmed without an attached instrument record."]
     };
   }
 

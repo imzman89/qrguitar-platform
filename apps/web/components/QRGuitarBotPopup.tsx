@@ -216,7 +216,7 @@ export function QRGuitarBotPopup() {
             {isThinking ? (
               <article className="qrguitar-chat-message assistant is-thinking">
                 <span>QRguitar Bot</span>
-                <p>Checking profile context and preparing an answer…</p>
+                <p>Working on it...</p>
               </article>
             ) : null}
           </div>

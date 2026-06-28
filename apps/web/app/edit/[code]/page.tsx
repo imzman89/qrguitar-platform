@@ -395,7 +395,7 @@ export default function EditInstrumentPage() {
                 </div>
               </div>
               <details className="advanced-panel">
-                <summary>Profile basics</summary>
+                <summary>Add Profile Basics</summary>
                 <div className="form-grid">
                   <Field label="Display title / nickname" id="name" value={form.name} onChange={(value) => updateField("name", value)} />
                   <Field label="Builder (optional)" id="builder" value={form.builder} onChange={(value) => updateField("builder", value)} />
@@ -435,7 +435,7 @@ export default function EditInstrumentPage() {
                 </div>
               </details>
               <details className="advanced-panel" open>
-                <summary>Custom details</summary>
+                <summary>Add Any Details</summary>
                 <div className="custom-list">
                   {customFields.map((field) => (
                     <div className="custom-row" key={field.id}>
@@ -470,7 +470,7 @@ export default function EditInstrumentPage() {
                 </div>
               </details>
               <details className="advanced-panel" open>
-                <summary>Links</summary>
+                <summary>Add Website or Social Links</summary>
                 <div className="custom-list">
                   {customLinks.map((link) => (
                     <div className="custom-row" key={link.id}>

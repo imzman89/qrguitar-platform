@@ -71,8 +71,8 @@ function asCompatible(response: {
 }
 
 function starterScopeEvidence(message: string, instrument?: DemoInstrument | null) {
-  const base = ["QR context", `Message topic: ${String(message || "open lane").trim()}`];
-  base.push(instrument ? `Record: ${instrument.qrCode}` : "General mode");
+  const base = ["QRguitar context", `Message topic: ${String(message || "general question").trim()}`];
+  base.push(instrument ? `Record: ${instrument.qrCode}` : "No attached record");
   const settings = readBotSettings();
   return [...base, ...getBotKnowledgeBullets(settings, message || "", 2)];
 }
