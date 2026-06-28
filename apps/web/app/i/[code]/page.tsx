@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
+import { unstable_noStore as noStore } from "next/cache";
 import { notFound } from "next/navigation";
 import { ProfileClient } from "./ProfileClient";
 import { getPublicInstrumentByCode } from "../../../lib/public-instruments";
 import { buildRecordJsonLd, buildRecordMetadata } from "../../../lib/seo";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 async function loadInstrument(codeParam: string) {
+  noStore();
   const code = String(codeParam || "").trim().toUpperCase();
   const instrument = code ? await getPublicInstrumentByCode(code).catch(() => null) : null;
   return { code, instrument };

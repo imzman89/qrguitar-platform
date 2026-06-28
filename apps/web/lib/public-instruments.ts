@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from "./supabase-server";
 import { defaultQrStyle, type DemoInstrument } from "./local-demo";
+import { unstable_noStore as noStore } from "next/cache";
 
 type GuitarRow = {
   id: string;
@@ -233,6 +234,7 @@ async function loadRelated(guitars: GuitarRow[]) {
 }
 
 export async function getPublicInstruments() {
+  noStore();
   const supabase = createServerSupabaseClient();
   if (!supabase) {
     return [];
@@ -269,6 +271,7 @@ export async function getPublicInstruments() {
 }
 
 export async function getPublicInstrumentByCode(code: string) {
+  noStore();
   const supabase = createServerSupabaseClient();
   if (!supabase) {
     return null;

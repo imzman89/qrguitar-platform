@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import type { User } from "@supabase/supabase-js";
+import { revalidatePath, unstable_noStore as noStore } from "next/cache";
 import { createServerSupabaseClient, getAuthenticatedUser, getSupabaseEnvStatus } from "../../../lib/supabase-server";
 import { defaultQrStyle, type DemoInstrument, type QrStyle } from "../../../lib/local-demo";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 const MEDIA_BUCKET = "instrument-media";
 const DOCUMENT_BUCKET = "instrument-documents";
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7;
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate"
+};
 
 type AccountPlan = "free" | "paid" | "brand" | "commercial";
 
@@ -102,6 +110,26 @@ type ProfileRow = {
   display_name: string | null;
 };
 
+function noStoreJson<T>(body: T, init: ResponseInit = {}) {
+  return NextResponse.json(body, {
+    ...init,
+    headers: {
+      ...NO_STORE_HEADERS,
+      ...(init.headers || {})
+    }
+  });
+}
+
+function revalidatePublicRecordSurfaces(qrCode: string) {
+  const code = String(qrCode || "").trim().toUpperCase();
+  revalidatePath("/");
+  revalidatePath("/catalog");
+  revalidatePath("/api/instruments");
+  if (code) {
+    revalidatePath(`/i/${code}`);
+  }
+}
+
 function isProductionRuntime() {
   return process.env.NODE_ENV === "production";
 }
@@ -113,7 +141,7 @@ function supabaseUnavailableResponse(action: "read" | "write") {
     ? "QRguitar records are temporarily unavailable."
     : `Supabase is not configured for ${action}. Missing: ${missing}. Add the values to apps/web/.env.local locally and Vercel Environment Variables in production.`;
 
-  return NextResponse.json(
+  return noStoreJson(
     { ok: false, instruments: [], count: 0, message } satisfies SupabaseReadResponse,
     { status: isProductionRuntime() ? 200 : 503 }
   );
@@ -124,7 +152,7 @@ function supabaseReadErrorResponse(message: string) {
     ? "QRguitar records are temporarily unavailable."
     : `Supabase read failed: ${message}`;
 
-  return NextResponse.json(
+  return noStoreJson(
     { ok: false, instruments: [], count: 0, message: safeMessage } satisfies SupabaseReadResponse,
     { status: isProductionRuntime() ? 200 : 502 }
   );
@@ -137,7 +165,7 @@ function supabaseWriteUnavailableResponse() {
     ? "QRguitar records are temporarily unavailable."
     : `Supabase is not configured for write. Missing: ${missing}. Add the values to apps/web/.env.local locally and Vercel Environment Variables in production.`;
 
-  return NextResponse.json({ ok: false, message } satisfies SupabaseCreateResponse, { status: 503 });
+  return noStoreJson({ ok: false, message } satisfies SupabaseCreateResponse, { status: 503 });
 }
 
 function normalizeLookupEmail(value: string) {
@@ -684,6 +712,7 @@ async function loadPublicRecords(supabase: ReturnType<typeof createServerSupabas
 }
 
 export async function GET(request: Request) {
+  noStore();
   const supabase = createServerSupabaseClient();
   if (!supabase) {
     return supabaseUnavailableResponse("read");
@@ -696,7 +725,7 @@ export async function GET(request: Request) {
   if (scope === "mine") {
     const auth = await getAuthenticatedUser(request);
     if (!auth.user) {
-      return NextResponse.json({ ok: false, instruments: [], count: 0, message: auth.error || "Sign in required." } satisfies SupabaseReadResponse, { status: 401 });
+      return noStoreJson({ ok: false, instruments: [], count: 0, message: auth.error || "Sign in required." } satisfies SupabaseReadResponse, { status: 401 });
     }
 
     if (code) {
@@ -707,10 +736,10 @@ export async function GET(request: Request) {
 
       const instrument = ownerRecord.records.find((record) => record.qrCode.toUpperCase() === code.toUpperCase());
       if (!instrument) {
-        return NextResponse.json({ ok: false, message: "Instrument not found for this account." } satisfies SupabaseReadResponse, { status: 404 });
+        return noStoreJson({ ok: false, message: "Instrument not found for this account." } satisfies SupabaseReadResponse, { status: 404 });
       }
 
-      return NextResponse.json({ ok: true, instrument } satisfies SupabaseReadResponse, { status: 200 });
+      return noStoreJson({ ok: true, instrument } satisfies SupabaseReadResponse, { status: 200 });
     }
 
     const result = await loadRecordsForUser(supabase, auth.user);
@@ -718,7 +747,7 @@ export async function GET(request: Request) {
       return supabaseReadErrorResponse(result.error);
     }
 
-    return NextResponse.json(
+    return noStoreJson(
       { ok: true, instruments: result.records, count: result.records.length } satisfies SupabaseReadResponse,
       { status: 200 }
     );
@@ -731,11 +760,11 @@ export async function GET(request: Request) {
     }
 
     if (!guitar) {
-      return NextResponse.json({ ok: false, message: "Instrument not found." } satisfies SupabaseReadResponse, { status: 404 });
+      return noStoreJson({ ok: false, message: "Instrument not found." } satisfies SupabaseReadResponse, { status: 404 });
     }
 
     if (guitar.visibility === "private") {
-      return NextResponse.json({ ok: false, message: "This record is private." } satisfies SupabaseReadResponse, { status: 403 });
+      return noStoreJson({ ok: false, message: "This record is private." } satisfies SupabaseReadResponse, { status: 403 });
     }
 
     const [mediaResult, specsResult, documentsResult, profileResult] = await Promise.all([
@@ -772,7 +801,7 @@ export async function GET(request: Request) {
       ((documentsResult.data || []) as GuitarDocumentRow[]).filter((document) => document.is_public)
     );
 
-    return NextResponse.json({ ok: true, instrument: stripAnonymousInstrumentFields(instrument) } satisfies SupabaseReadResponse, { status: 200 });
+    return noStoreJson({ ok: true, instrument: stripAnonymousInstrumentFields(instrument) } satisfies SupabaseReadResponse, { status: 200 });
   }
 
   const publicResult = await loadPublicRecords(supabase);
@@ -780,13 +809,14 @@ export async function GET(request: Request) {
     return supabaseReadErrorResponse(publicResult.error);
   }
 
-  return NextResponse.json(
+  return noStoreJson(
     { ok: true, instruments: publicResult.records, count: publicResult.records.length } satisfies SupabaseReadResponse,
     { status: 200 }
   );
 }
 
 export async function POST(request: Request) {
+  noStore();
   const supabase = createServerSupabaseClient();
 
   if (!supabase) {
@@ -936,7 +966,8 @@ export async function POST(request: Request) {
 
     const mediaInsert = await supabase.from("guitar_media").insert(mediaPayload);
     if (mediaInsert.error) {
-      return NextResponse.json(
+      revalidatePublicRecordSurfaces(insertedGuitar.qr_code);
+      return noStoreJson(
         { ok: true, qrCode: insertedGuitar.qr_code, permanentPath: insertedGuitar.permanent_path, message: "Saved. Media placeholders could not be saved." },
         { status: 200 }
       );
@@ -965,7 +996,8 @@ export async function POST(request: Request) {
 
     const documentInsert = await supabase.from("guitar_documents").insert(documentPayload);
     if (documentInsert.error) {
-      return NextResponse.json(
+      revalidatePublicRecordSurfaces(insertedGuitar.qr_code);
+      return noStoreJson(
         { ok: true, qrCode: insertedGuitar.qr_code, permanentPath: insertedGuitar.permanent_path, message: "Saved. Document files could not be saved." },
         { status: 200 }
       );
@@ -988,13 +1020,15 @@ export async function POST(request: Request) {
   const specInsert = await supabase.from("guitar_specs").insert(specRows);
 
   if (specInsert.error) {
-    return NextResponse.json(
+    revalidatePublicRecordSurfaces(insertedGuitar.qr_code);
+    return noStoreJson(
       { ok: true, qrCode: insertedGuitar.qr_code, permanentPath: insertedGuitar.permanent_path, message: "Saved. Condition details could not be saved." },
       { status: 200 }
     );
   }
 
-  return NextResponse.json(
+  revalidatePublicRecordSurfaces(insertedGuitar.qr_code);
+  return noStoreJson(
     {
       ok: true,
       qrCode: insertedGuitar.qr_code,
@@ -1006,6 +1040,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  noStore();
   const supabase = createServerSupabaseClient();
 
   if (!supabase) {
@@ -1148,7 +1183,8 @@ export async function PATCH(request: Request) {
 
     const mediaInsert = await supabase.from("guitar_media").insert(mediaPayload);
     if (mediaInsert.error) {
-      return NextResponse.json({ ok: true, qrCode: input.qrCode, permanentPath: `/i/${input.qrCode}`, message: "Saved. Media placeholders could not be refreshed." }, { status: 200 });
+      revalidatePublicRecordSurfaces(input.qrCode);
+      return noStoreJson({ ok: true, qrCode: input.qrCode, permanentPath: `/i/${input.qrCode}`, message: "Saved. Media placeholders could not be refreshed." }, { status: 200 });
     }
   }
 
@@ -1189,7 +1225,8 @@ export async function PATCH(request: Request) {
     }));
     const documentInsert = await supabase.from("guitar_documents").insert(documentPayload);
     if (documentInsert.error) {
-      return NextResponse.json({ ok: true, qrCode: input.qrCode, permanentPath: `/i/${input.qrCode}`, message: "Saved. Document files could not be refreshed." }, { status: 200 });
+      revalidatePublicRecordSurfaces(input.qrCode);
+      return noStoreJson({ ok: true, qrCode: input.qrCode, permanentPath: `/i/${input.qrCode}`, message: "Saved. Document files could not be refreshed." }, { status: 200 });
     }
   }
 
@@ -1209,10 +1246,12 @@ export async function PATCH(request: Request) {
   ];
   const specInsert = await supabase.from("guitar_specs").insert(specRows);
   if (specInsert.error) {
-    return NextResponse.json({ ok: true, qrCode: input.qrCode, permanentPath: `/i/${input.qrCode}`, message: "Saved. Condition details could not be refreshed." }, { status: 200 });
+    revalidatePublicRecordSurfaces(input.qrCode);
+    return noStoreJson({ ok: true, qrCode: input.qrCode, permanentPath: `/i/${input.qrCode}`, message: "Saved. Condition details could not be refreshed." }, { status: 200 });
   }
 
-  return NextResponse.json({
+  revalidatePublicRecordSurfaces(input.qrCode);
+  return noStoreJson({
     ok: true,
     qrCode: input.qrCode,
     permanentPath: `/i/${input.qrCode}`,

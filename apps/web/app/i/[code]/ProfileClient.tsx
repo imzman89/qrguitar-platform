@@ -108,7 +108,11 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 1800);
 
-        const response = await fetch(`/api/instruments?code=${encodeURIComponent(normalizedCode)}`, { signal: controller.signal });
+        const response = await fetch(`/api/instruments?code=${encodeURIComponent(normalizedCode)}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+          signal: controller.signal
+        });
         const payload = (await response.json().catch(() => null)) as
           | ({ ok?: boolean; instrument?: DemoInstrument; message?: string } | null)
           | null;

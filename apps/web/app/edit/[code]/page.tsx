@@ -312,6 +312,11 @@ export default function EditInstrumentPage() {
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("qrguitar:catalog-updated"));
       }
+      await fetch(`/api/instruments?code=${encodeURIComponent(original?.qrCode || code)}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" }
+      }).catch(() => null);
+      router.refresh();
 
       if (preview) {
         router.push(instrumentToProfileUrl(instrument));
