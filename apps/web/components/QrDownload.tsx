@@ -1,5 +1,6 @@
 "use client";
 
+import { Download, X } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useMemo, useState } from "react";
 import { defaultQrStyle, type QrStyle } from "../lib/local-demo";
@@ -227,14 +228,25 @@ export function QrDownload({ code, label, qrStyle, onStyleChange }: QrDownloadPr
 
       {isLightboxOpen && dataUrl ? (
         <div className="media-overlay-backdrop" onClick={() => setIsLightboxOpen(false)} role="presentation">
-          <div className="media-overlay-content qr-lightbox" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
-            <button className="media-overlay-close" type="button" onClick={() => setIsLightboxOpen(false)} aria-label="Close QR preview">
-              ×
-            </button>
-            <img className="qr-lightbox-image" src={dataUrl} alt="QR code preview" />
-            <a className="button" href={dataUrl} download={`qrguitar-${code}.png`}>
-              Download
-            </a>
+          <div className="media-overlay-content qr-lightbox" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="QR preview">
+            <div className="qr-lightbox-header">
+              <strong>QR Preview</strong>
+              <button className="media-overlay-close qr-lightbox-close" type="button" onClick={() => setIsLightboxOpen(false)} aria-label="Close QR preview">
+                <X size={14} />
+                <span>Close</span>
+              </button>
+            </div>
+            <div className="qr-lightbox-body">
+              <div className={`qr-lightbox-frame ${isTransparent ? "transparent" : ""}`}>
+                <img className="qr-lightbox-image" src={dataUrl} alt="QR code preview" />
+              </div>
+            </div>
+            <div className="qr-lightbox-footer">
+              <a className="button qr-lightbox-download" href={dataUrl} download={`qrguitar-${code}.png`}>
+                <Download size={15} />
+                Download PNG
+              </a>
+            </div>
           </div>
         </div>
       ) : null}
