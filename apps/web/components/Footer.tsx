@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BrandLogo } from "./BrandLogo";
-import { defaultSiteSettings, readSiteSettings, type EditableSiteSettings } from "../lib/site-settings";
+import { defaultSiteSettings, fetchPublishedSiteSettings, type EditableSiteSettings } from "../lib/site-settings";
 import { createBrowserSupabaseClient } from "../lib/supabase-browser";
 
 export function Footer() {
@@ -12,22 +12,27 @@ export function Footer() {
 
   useEffect(() => {
     const supabase = createBrowserSupabaseClient();
-    setSettings(readSiteSettings());
+    void fetchPublishedSiteSettings().then((published) => {
+      if (published) {
+        setSettings(published);
+      }
+    });
     supabase.auth.getSession().then(({ data }) => setIsSignedIn(Boolean(data.session?.user)));
 
-    function onSettings() {
-      setSettings(readSiteSettings());
+    function onSettings(event: Event) {
+      const detail = (event as CustomEvent<EditableSiteSettings>).detail;
+      if (detail) {
+        setSettings(detail);
+      }
     }
 
     window.addEventListener("qrguitar:site-settings", onSettings);
-    window.addEventListener("storage", onSettings);
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsSignedIn(Boolean(session?.user));
     });
 
     return () => {
       window.removeEventListener("qrguitar:site-settings", onSettings);
-      window.removeEventListener("storage", onSettings);
       listener.subscription.unsubscribe();
     };
   }, []);

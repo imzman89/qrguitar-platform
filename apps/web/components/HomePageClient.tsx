@@ -8,24 +8,35 @@ import { LatestPublicRecord } from "./LatestPublicRecord";
 import { Nav } from "./Nav";
 import { siteCopy } from "../content/site-copy";
 import type { DemoInstrument } from "../lib/local-demo";
-import { buildEditableHomeCopy, readSiteSettings, type EditableSiteSettings } from "../lib/site-settings";
+import { buildEditableHomeCopy, fetchPublishedSiteSettings, type EditableSiteSettings } from "../lib/site-settings";
 
-export function HomePageClient({ initialLatestRecord }: { initialLatestRecord: DemoInstrument | null }) {
-  const [settings, setSettings] = useState<EditableSiteSettings | null>(null);
+export function HomePageClient({
+  initialLatestRecord,
+  initialSettings
+}: {
+  initialLatestRecord: DemoInstrument | null;
+  initialSettings: EditableSiteSettings;
+}) {
+  const [settings, setSettings] = useState<EditableSiteSettings | null>(initialSettings);
 
   useEffect(() => {
-    setSettings(readSiteSettings());
+    void fetchPublishedSiteSettings().then((published) => {
+      if (published) {
+        setSettings(published);
+      }
+    });
 
-    function onSettings() {
-      setSettings(readSiteSettings());
+    function onSettings(event: Event) {
+      const detail = (event as CustomEvent<EditableSiteSettings>).detail;
+      if (detail) {
+        setSettings(detail);
+      }
     }
 
     window.addEventListener("qrguitar:site-settings", onSettings);
-    window.addEventListener("storage", onSettings);
 
     return () => {
       window.removeEventListener("qrguitar:site-settings", onSettings);
-      window.removeEventListener("storage", onSettings);
     };
   }, []);
 
@@ -63,12 +74,12 @@ export function HomePageClient({ initialLatestRecord }: { initialLatestRecord: D
       },
       pricing: {
         ...siteCopy.pricing,
-        eyebrow: siteCopy.pricing.eyebrow,
-        headline: siteCopy.pricing.headline,
-        body: siteCopy.pricing.body,
-        plans: siteCopy.pricing.plans,
-        enterpriseTitle: siteCopy.pricing.enterpriseTitle,
-        enterpriseBody: siteCopy.pricing.enterpriseBody
+        eyebrow: resolved.pricing.eyebrow,
+        headline: resolved.pricing.headline,
+        body: resolved.pricing.body,
+        plans: resolved.pricing.plans,
+        enterpriseTitle: resolved.pricing.enterpriseTitle,
+        enterpriseBody: resolved.pricing.enterpriseBody
       }
     };
   }, [settings]);

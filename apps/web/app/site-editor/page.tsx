@@ -23,13 +23,14 @@ import {
 import {
   applyThemeSettings,
   defaultSiteSettings,
+  fetchPublishedSiteSettings,
   readSiteSettings,
   resetSiteSettings,
   saveSiteSettings,
   siteSettingsKey,
   type EditableSiteSettings
 } from "../../lib/site-settings";
-import { createBrowserSupabaseClient } from "../../lib/supabase-browser";
+import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
 
 const editorGateKey = "qrguitar.siteEditorUnlocked";
 const ownerPasscodeKey = "qrguitar.ownerPasscode";
@@ -116,10 +117,24 @@ export default function SiteEditorPage() {
     setNewPasscode(storedPasscode);
     setOwnerUsername(ownerCredentials.username);
     setOwnerPassword(ownerCredentials.password);
+    const hasLocalDraft = Boolean(window.localStorage.getItem(siteSettingsKey));
     const stored = readSiteSettings();
     setSettings(stored);
     setBotSettings(readBotSettings());
     applyThemeSettings(stored);
+
+    void fetchPublishedSiteSettings().then((published) => {
+      if (published && !hasLocalDraft) {
+        setSettings(published);
+        applyThemeSettings(published);
+        setMessage("Published site settings loaded. Save to update every device.");
+        return;
+      }
+
+      if (hasLocalDraft) {
+        setMessage("Local draft loaded. Click Save Changes to publish it across desktop and mobile.");
+      }
+    });
   }, [authChecked, isSignedIn]);
 
   const settingsJson = useMemo(() => JSON.stringify(settings, null, 2), [settings]);
@@ -323,11 +338,39 @@ export default function SiteEditorPage() {
     applyThemeSettings(updated);
   }
 
-  function onSave(event?: FormEvent) {
+  async function onSave(event?: FormEvent) {
     event?.preventDefault();
     saveSiteSettings(settings);
     saveBotSettings(botSettings);
-    setMessage("Saved locally. Homepage and bot updates are live in this browser.");
+    setMessage("Saving and publishing site settings...");
+
+    try {
+      const token = await getSupabaseAccessToken();
+      const response = await fetch("/api/site-settings", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ settings })
+      });
+      const payload = (await response.json()) as { ok?: boolean; message?: string };
+
+      if (!response.ok || !payload.ok) {
+        setMessage(payload.message || "Saved locally, but could not publish to every device.");
+        return;
+      }
+
+      const published = await fetchPublishedSiteSettings();
+      if (published) {
+        setSettings(published);
+        applyThemeSettings(published);
+      }
+
+      setMessage("Published. Refresh desktop or mobile to see the same site.");
+    } catch {
+      setMessage("Saved locally, but publishing failed. Check your connection and try Save again.");
+    }
   }
 
   function onReset() {
@@ -371,12 +414,12 @@ export default function SiteEditorPage() {
                 Owner only
               </div>
               <h1>QRguitar site editor.</h1>
-              <p>Local admin controls for homepage copy, brand text, and theme colors. This stays hidden from normal public navigation.</p>
+              <p>Owner controls for published homepage copy, brand text, SEO, and theme colors. This stays hidden from normal public navigation.</p>
             </div>
             <div className="editor-status card">
               <SlidersHorizontal size={28} />
               <strong>{message}</strong>
-              <span>Passcode-gated local editor. Real admin auth comes later.</span>
+              <span>Passcode-gated owner editor. Save publishes changes across desktop and mobile.</span>
             </div>
           </div>
 

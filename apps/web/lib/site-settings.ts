@@ -3,6 +3,7 @@ import { siteCopy } from "../content/site-copy";
 import { defaultInstrumentCategories, normalizeInstrumentCategories } from "./instrument-categories";
 
 export const siteSettingsKey = "qrguitar.siteSettings";
+export const publishedSiteSettingsKey = "homepage";
 
 type CardInput = { title: string; copy: string };
 type PricingPlanInput = {
@@ -200,6 +201,26 @@ export function readSiteSettings() {
     return stored ? mergeSiteSettings(JSON.parse(stored) as Partial<EditableSiteSettings>) : defaultSiteSettings;
   } catch {
     return defaultSiteSettings;
+  }
+}
+
+export async function fetchPublishedSiteSettings() {
+  try {
+    const response = await fetch(`/api/site-settings?fresh=${Date.now()}`, {
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-store"
+      }
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json()) as { ok?: boolean; settings?: Partial<EditableSiteSettings> | null };
+    return payload.ok && payload.settings ? mergeSiteSettings(payload.settings) : null;
+  } catch {
+    return null;
   }
 }
 
