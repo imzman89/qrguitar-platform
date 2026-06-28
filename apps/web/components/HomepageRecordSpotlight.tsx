@@ -2,6 +2,7 @@ import { ArrowRight, Globe2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { instrumentDisplayName, type DemoInstrument } from "../lib/local-demo";
+import { formatRecordLocation } from "../lib/record-location";
 
 type HomepageRecordSpotlightProps = {
   promotedQrCode?: string;
@@ -87,7 +88,7 @@ export function HomepageRecordSpotlight({ promotedQrCode = "" }: HomepageRecordS
           <div className="homepage-record-facts">
             <span>{spotlightRecord.qrCode}</span>
             <span>{spotlightRecord.year || "Year unknown"}</span>
-            <span>{spotlightRecord.location || "Location private"}</span>
+            <span>{formatRecordLocation(spotlightRecord) || "Location private"}</span>
           </div>
           <Link className="button" href={spotlightRecord.permanentPath || `/i/${spotlightRecord.qrCode}`}>
             Open record <ArrowRight size={16} />

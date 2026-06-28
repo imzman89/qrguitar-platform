@@ -29,6 +29,7 @@ import {
   instrumentDisplayName,
   type DemoInstrument
 } from "../../../lib/local-demo";
+import { formatRecordLocation } from "../../../lib/record-location";
 import { createBrowserSupabaseClient } from "../../../lib/supabase-browser";
 
 type ProfileTab = "overview" | "specs" | "timeline" | "ownership" | "media" | "repairs" | "documents";
@@ -203,6 +204,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     })
     : [];
   const isVerifiedRecord = instrument ? getInstrumentVerificationStatus(instrument) === "verified" : false;
+  const formattedLocation = instrument ? formatRecordLocation(instrument) : "";
   const transferMessage = "Owner-transfer tools are in beta. Contact support for manual help.";
   const latestTransfers = instrument
     ? [...transfers]
@@ -306,7 +308,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     { label: "Make / Model", value: [instrument.brand, instrument.model].filter(Boolean).join(" ") },
     { label: "Serial / Build ID", value: instrument.serial },
     { label: "Builder", value: instrument.builder || "Not listed" },
-    { label: "Location", value: instrument.location || "Not listed" }
+    { label: "Location", value: formattedLocation || "Not listed" }
   ];
 
   const stalePublicValues = new Set(["custom reptile finish", "custom offset", "alder", "maple neck, rosewood board"]);
@@ -465,7 +467,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
         <section className="scan-tags" aria-label="Instrument badges">
           <span>{instrument.visibility === "private" ? "Private" : "Public"}</span>
           <span>{instrument.instrumentCondition ? instrument.instrumentCondition.toUpperCase() : "USED"}</span>
-          <span>{instrument.location?.split(",")[0] || "Registered"}</span>
+          <span>{formattedLocation || "Registered"}</span>
           <span>{isVerifiedRecord ? "Verified" : "Unverified"}</span>
         </section>
 

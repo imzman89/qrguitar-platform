@@ -14,6 +14,7 @@ import {
   instrumentToProfileUrl,
   type DemoInstrument
 } from "../../lib/local-demo";
+import { formatRecordLocation } from "../../lib/record-location";
 
 export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrument[] }) {
   const [records, setRecords] = useState<DemoInstrument[]>(dedupeByCodeAndDate(initialRecords));
@@ -194,7 +195,7 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
                             {verificationStatus === "verified" ? "Verified" : "Unverified"}
                           </span>
                           <span>{record.year || "Year unknown"}</span>
-                          <span>{regionFromRecord(record) || "Region unknown"}</span>
+                          <span>{formatRecordLocation(record) || "Location unknown"}</span>
                           <span>{record.galleryImageDataUrls?.length || (record.heroImageDataUrl ? 1 : 0)} photos</span>
                           <span>{record.documentFiles?.filter((file) => file.visibility !== "hidden").length || 0} docs</span>
                         </div>
@@ -222,11 +223,6 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
 
 function unique(values: string[]) {
   return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
-}
-
-function regionFromRecord(record: DemoInstrument) {
-  const pieces = (record.location || "").split(",").map((piece) => piece.trim()).filter(Boolean);
-  return pieces.length >= 2 ? pieces[pieces.length - 2] : pieces[0] || "";
 }
 
 function dedupeByCodeAndDate(records: DemoInstrument[]) {

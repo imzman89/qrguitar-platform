@@ -1,3 +1,5 @@
+import { formatRecordLocation } from "./record-location";
+
 export type DemoUser = {
   name: string;
   email: string;
@@ -1024,7 +1026,7 @@ export function instrumentSubtitle(instrument: Pick<DemoInstrument, "brand" | "m
   const brand = String(instrument.brand || "").trim();
   const serial = String(instrument.serial || "").trim();
   const qrCode = String(instrument.qrCode || "").trim();
-  const location = String(instrument.location || "").split(",").map((piece) => piece.trim()).filter(Boolean)[0] || "";
+  const location = formatRecordLocation({ location: instrument.location }) || "";
   const year = String(instrument.year || "").trim();
   const pieces = [brand && !title.startsWith(brand.toLowerCase()) ? brand : brand, serial || qrCode, year && location ? `${year} • ${location}` : year || location].filter(Boolean);
   return pieces.slice(0, 3).join(" • ");

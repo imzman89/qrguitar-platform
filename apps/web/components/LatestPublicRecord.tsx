@@ -8,6 +8,7 @@ import {
   instrumentDisplayName,
   type DemoInstrument
 } from "../lib/local-demo";
+import { formatRecordLocation } from "../lib/record-location";
 
 type InstrumentsResponse = {
   ok?: boolean;
@@ -92,7 +93,7 @@ export function LatestPublicRecord() {
     );
   }
 
-  const location = latest.location || "Location private";
+  const location = formatRecordLocation(latest) || "Location private";
   const title = instrumentDisplayName(latest);
   const createdLabel = formatCreatedAt(latest.createdAt);
 

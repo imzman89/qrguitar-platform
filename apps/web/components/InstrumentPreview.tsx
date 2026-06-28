@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import { instrumentDisplayName, type CustomProfileField, type CustomProfileLink } from "../lib/local-demo";
+import { formatRecordLocation } from "../lib/record-location";
 
 type InstrumentPreviewProps = {
   qrCode: string;
@@ -31,6 +32,7 @@ export function InstrumentPreview({
   customLinks = []
 }: InstrumentPreviewProps) {
   const title = instrumentDisplayName({ name, brand, model, serial });
+  const formattedLocation = formatRecordLocation({ location });
   const visibleFields = customFields.filter((field) => field.label.trim() && field.value.trim()).slice(0, 4);
   const visibleLinks = customLinks.filter((link) => link.label.trim() && link.url.trim()).slice(0, 3);
 
@@ -56,7 +58,7 @@ export function InstrumentPreview({
         <PreviewMeta label="Serial" value={serial || "Not listed"} />
         <PreviewMeta label="Year" value={year || "Not listed"} />
         <PreviewMeta label="Owner" value={owner || "Unclaimed"} />
-        <PreviewMeta label="Location" value={location || "Not listed"} />
+        <PreviewMeta label="Location" value={formattedLocation || "Not listed"} />
       </div>
 
       {summary ? <p className="preview-summary">{summary}</p> : null}
