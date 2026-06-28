@@ -116,9 +116,8 @@ export const defaultSiteSettings: EditableSiteSettings = {
     pricingEnterpriseBody: siteCopy.pricing.enterpriseBody
   },
   seo: {
-    title: "QRguitar | Permanent Instrument Records",
-    description:
-      "Give every guitar, amp, pedal, or custom build a permanent digital record for specs, service history, ownership, media, and documentation.",
+    title: "QRguitar",
+    description: "Permanent QR records for guitars, amps, pedals, builders, shops, and collectors.",
     keywords: "guitar inventory, guitar authentication, guitar service records, instrument ownership, QRguitar, luthier records",
     image: "/seo/qrguitar-og-v2.png",
     canonicalUrl: "https://www.qrguitar.com",
