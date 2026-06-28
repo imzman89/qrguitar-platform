@@ -159,6 +159,11 @@ export default function LoginPage() {
               </>
             ) : (
               <>
+                <div className="auth-card-head">
+                  <span>{mode === "register" ? "New account" : "Account access"}</span>
+                  <strong>{mode === "register" ? "Create a QRguitar login." : "Welcome back."}</strong>
+                </div>
+
                 {mode === "register" ? (
                   <div className="field">
                     <label htmlFor="name">Display name</label>
@@ -190,10 +195,16 @@ export default function LoginPage() {
                 </div>
 
                 {mode !== "register" ? (
-                  <p className="fine-print">
-                    Need an account? <button className="link-button" type="button" onClick={() => switchMode("register")}>Create one</button>
-                  </p>
-                ) : null}
+                  <div className="auth-switch-line">
+                    <span>Need an account?</span>
+                    <button className="link-button" type="button" onClick={() => switchMode("register")}>Create one</button>
+                  </div>
+                ) : (
+                  <div className="auth-switch-line">
+                    <span>Already have an account?</span>
+                    <button className="link-button" type="button" onClick={() => switchMode("login")}>Sign in</button>
+                  </div>
+                )}
               </>
             )}
 

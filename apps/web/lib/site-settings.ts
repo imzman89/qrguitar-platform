@@ -60,6 +60,7 @@ export type EditableSiteSettings = {
     description: string;
     keywords: string;
     image: string;
+    favicon: string;
     canonicalUrl: string;
     twitterHandle: string;
     robots: string;
@@ -121,6 +122,7 @@ export const defaultSiteSettings: EditableSiteSettings = {
     description: "Permanent QR records for guitars, amps, pedals, builders, shops, and collectors.",
     keywords: "guitar inventory, guitar authentication, guitar service records, instrument ownership, QRguitar, luthier records",
     image: "/seo/qrguitar-og-v2.png",
+    favicon: "/qrguitar-logo-white-orange.svg",
     canonicalUrl: "https://www.qrguitar.com",
     twitterHandle: "@qrguitar",
     robots: "index, follow"
@@ -308,6 +310,10 @@ export function applySeoSettings(settings: EditableSiteSettings) {
     return;
   }
 
+  const canonicalUrl = settings.seo.canonicalUrl || "https://www.qrguitar.com";
+  const seoImage = toAbsolutePublicUrl(settings.seo.image || "/seo/qrguitar-og-v2.png", canonicalUrl);
+  const favicon = toAbsolutePublicUrl(settings.seo.favicon || "/qrguitar-logo-white-orange.svg", canonicalUrl);
+
   document.title = settings.seo.title;
   setMetaTag("description", settings.seo.description);
   setMetaTag("keywords", settings.seo.keywords);
@@ -315,31 +321,33 @@ export function applySeoSettings(settings: EditableSiteSettings) {
   setMetaProperty("og:site_name", settings.brandName);
   setMetaProperty("og:title", settings.seo.title);
   setMetaProperty("og:description", settings.seo.description);
-  setMetaProperty("og:image", settings.seo.image);
-  setMetaProperty("og:url", settings.seo.canonicalUrl);
+  setMetaProperty("og:image", seoImage);
+  setMetaProperty("og:url", canonicalUrl);
   setMetaProperty("og:locale", "en_US");
   setMetaProperty("og:type", "website");
   setMetaTag("twitter:title", settings.seo.title);
   setMetaTag("twitter:description", settings.seo.description);
-  setMetaTag("twitter:image", settings.seo.image);
+  setMetaTag("twitter:image", seoImage);
   setMetaTag("twitter:card", "summary_large_image");
   setMetaTag("twitter:site", settings.seo.twitterHandle);
-  setCanonicalLink(settings.seo.canonicalUrl);
+  setCanonicalLink(canonicalUrl);
+  setIconLink("icon", favicon);
+  setIconLink("apple-touch-icon", favicon);
   setJsonLd({
     "@context": "https://schema.org",
     "@graph": [
       {
         "@type": "Organization",
         name: settings.brandName || "QRguitar",
-        url: settings.seo.canonicalUrl,
+        url: canonicalUrl,
         description: settings.seo.description,
         sameAs: [settings.seo.twitterHandle].filter(Boolean),
-        logo: `${settings.seo.canonicalUrl}/seo/qrguitar-og-v2.png`
+        logo: seoImage
       },
       {
         "@type": "WebSite",
         name: settings.brandName || "QRguitar",
-        url: settings.seo.canonicalUrl,
+        url: canonicalUrl,
         description: settings.seo.description,
         publisher: {
           "@type": "Organization",
@@ -349,6 +357,16 @@ export function applySeoSettings(settings: EditableSiteSettings) {
       }
     ]
   });
+}
+
+function toAbsolutePublicUrl(pathOrUrl: string, siteUrl: string) {
+  if (/^https?:\/\//i.test(pathOrUrl)) {
+    return pathOrUrl;
+  }
+
+  const base = siteUrl.replace(/\/$/, "");
+  const path = pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
+  return `${base}${path}`;
 }
 
 function setMetaTag(name: string, content: string) {
@@ -390,6 +408,21 @@ function setCanonicalLink(href: string) {
   if (!link) {
     link = document.createElement("link");
     link.rel = "canonical";
+    document.head.appendChild(link);
+  }
+
+  link.href = href;
+}
+
+function setIconLink(rel: string, href: string) {
+  if (!href) {
+    return;
+  }
+
+  let link = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
+  if (!link) {
+    link = document.createElement("link");
+    link.rel = rel;
     document.head.appendChild(link);
   }
 

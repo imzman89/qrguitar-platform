@@ -1,10 +1,57 @@
 import { HomePageClient } from "../components/HomePageClient";
 import { getPublicInstruments } from "../lib/public-instruments";
 import { loadPublishedSiteSettings } from "../lib/site-settings-server";
+import { absoluteSiteUrl } from "../lib/seo";
 import { unstable_noStore as noStore } from "next/cache";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+export async function generateMetadata(): Promise<Metadata> {
+  const publishedSettings = await loadPublishedSiteSettings();
+  const title = publishedSettings.seo.title || "QRguitar";
+  const description = publishedSettings.seo.description || "Permanent QR records for guitars, amps, pedals, builders, shops, and collectors.";
+  const canonical = publishedSettings.seo.canonicalUrl || "https://www.qrguitar.com";
+  const image = absoluteSiteUrl(publishedSettings.seo.image || "/seo/qrguitar-og-v2.png");
+  const favicon = absoluteSiteUrl(publishedSettings.seo.favicon || "/qrguitar-logo-white-orange.svg");
+
+  return {
+    title,
+    description,
+    keywords: publishedSettings.seo.keywords,
+    alternates: {
+      canonical
+    },
+    icons: {
+      icon: favicon,
+      apple: favicon
+    },
+    robots: publishedSettings.seo.robots || "index, follow",
+    openGraph: {
+      title,
+      description,
+      url: canonical,
+      siteName: publishedSettings.brandName || "QRguitar",
+      type: "website",
+      images: [
+        {
+          url: image,
+          width: 1200,
+          height: 630,
+          alt: `${publishedSettings.brandName || "QRguitar"} social preview`
+        }
+      ]
+    },
+    twitter: {
+      card: "summary_large_image",
+      site: publishedSettings.seo.twitterHandle || "@qrguitar",
+      title,
+      description,
+      images: [image]
+    }
+  };
+}
 
 export default async function HomePage() {
   noStore();

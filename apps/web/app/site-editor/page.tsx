@@ -1,6 +1,6 @@
 "use client";
 
-import { Clipboard, Eye, LockKeyhole, Plus, RotateCcw, Save, Search, ShieldCheck, SlidersHorizontal, Trash2 } from "lucide-react";
+import { Clipboard, Eye, Image as ImageIcon, LockKeyhole, Plus, RotateCcw, Save, Search, ShieldCheck, SlidersHorizontal, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -14,12 +14,6 @@ import {
   saveBotSettings,
   type EditableBotSettings
 } from "../../lib/bot-settings";
-import {
-  defaultOwnerCredentials,
-  getOwnerCredentials,
-  resetOwnerCredentials,
-  setOwnerCredentials
-} from "../../lib/local-demo";
 import {
   applyThemeSettings,
   defaultSiteSettings,
@@ -36,6 +30,19 @@ const editorGateKey = "qrguitar.siteEditorUnlocked";
 const ownerPasscodeKey = "qrguitar.ownerPasscode";
 const ownerPasscode = "admin";
 type EditorTab = "brand" | "hero" | "sections" | "colors" | "seo" | "bot" | "preview";
+
+const seoImageOptions = [
+  { label: "White / orange social card", value: "/seo/qrguitar-og-v2.png" },
+  { label: "Alternate social card", value: "/seo/qrguitar-og.png" },
+  { label: "Text logo", value: "/seo/qrguitar-text-logo.svg" },
+  { label: "Header logo", value: "/qrguitar-logo-white-orange.svg" }
+];
+
+const faviconOptions = [
+  { label: "QRguitar logo", value: "/qrguitar-logo-white-orange.svg" },
+  { label: "Text logo", value: "/seo/qrguitar-text-logo.svg" },
+  { label: "Social card", value: "/seo/qrguitar-og-v2.png" }
+];
 
 const tabs: Array<{ id: EditorTab; label: string }> = [
   { id: "brand", label: "Brand" },
@@ -59,14 +66,43 @@ export default function SiteEditorPage() {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isOwnerPasscodeSet, setIsOwnerPasscodeSet] = useState(false);
   const [copyError, setCopyError] = useState(false);
-  const [ownerUsername, setOwnerUsername] = useState(defaultOwnerCredentials.username);
-  const [ownerPassword, setOwnerPassword] = useState(defaultOwnerCredentials.password);
-  const [ownerStatus, setOwnerStatus] = useState("Local owner login is managed here.");
   const [authChecked, setAuthChecked] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const activePasscodeHint = isOwnerPasscodeSet ? "custom owner passcode configured" : `default (${ownerPasscode})`;
+  const editorStatusTitle = !authChecked
+    ? "Checking owner access."
+    : !isSignedIn
+      ? "Sign in required."
+      : isUnlocked
+        ? message
+        : "Owner passcode required.";
+  const editorStatusBody = !authChecked
+    ? "Confirming your QRguitar session before editor tools load."
+    : !isSignedIn
+      ? "Sign in with the owner account before changing live site settings."
+      : isUnlocked
+        ? "Save publishes changes across desktop, mobile, and public visitors."
+        : "Unlock the protected editor before changing published site settings.";
+  const seoChecks = [
+    {
+      label: "Title",
+      value: settings.seo.title.length >= 45 && settings.seo.title.length <= 60 ? "Good" : "Needs 45-60 characters"
+    },
+    {
+      label: "Description",
+      value: settings.seo.description.length >= 120 && settings.seo.description.length <= 160 ? "Good" : "Needs 120-160 characters"
+    },
+    {
+      label: "Social image",
+      value: settings.seo.image ? "Set" : "Missing"
+    },
+    {
+      label: "Tab thumbnail",
+      value: settings.seo.favicon ? "Set" : "Missing"
+    }
+  ];
 
   useEffect(() => {
     const supabase = createBrowserSupabaseClient();
@@ -110,14 +146,10 @@ export default function SiteEditorPage() {
     }
 
     const storedPasscode = window.localStorage.getItem(ownerPasscodeKey) || ownerPasscode;
-    const ownerCredentials = getOwnerCredentials();
-
     setIsUnlocked(window.localStorage.getItem(editorGateKey) === "true");
 
     setIsOwnerPasscodeSet(Boolean(window.localStorage.getItem(ownerPasscodeKey)));
     setNewPasscode(storedPasscode);
-    setOwnerUsername(ownerCredentials.username);
-    setOwnerPassword(ownerCredentials.password);
     const hasLocalDraft = Boolean(window.localStorage.getItem(siteSettingsKey));
     const stored = readSiteSettings();
     setSettings(stored);
@@ -178,26 +210,6 @@ export default function SiteEditorPage() {
     setIsOwnerPasscodeSet(false);
     setNewPasscode(ownerPasscode);
     setPasscodeMessage("Passcode reset to default admin.");
-  }
-
-  function saveOwnerLogin() {
-    const username = ownerUsername.trim();
-    const password = ownerPassword.trim();
-
-    if (!username || !password) {
-      setOwnerStatus("Both owner username and password are required.");
-      return;
-    }
-
-    setOwnerCredentials({ username, password });
-    setOwnerStatus(`Owner login updated to "${username}".`);
-  }
-
-  function resetOwnerLogin() {
-    resetOwnerCredentials();
-    setOwnerUsername(defaultOwnerCredentials.username);
-    setOwnerPassword(defaultOwnerCredentials.password);
-    setOwnerStatus("Owner login reset to admin / admin.");
   }
 
   function update<K extends keyof EditableSiteSettings>(section: K, value: EditableSiteSettings[K]) {
@@ -426,8 +438,8 @@ export default function SiteEditorPage() {
             </div>
             <div className="editor-status card">
               <SlidersHorizontal size={28} />
-              <strong>{message}</strong>
-              <span>Passcode-gated owner editor. Save publishes changes across desktop and mobile.</span>
+              <strong>{editorStatusTitle}</strong>
+              <span>{editorStatusBody}</span>
             </div>
           </div>
 
@@ -836,14 +848,14 @@ export default function SiteEditorPage() {
                   <section className="card editor-card">
                     <EditorHeader
                       label="SEO"
-                      title="Search and social previews"
-                      copy="Keep this practical and specific so people understand your platform quickly."
+                      title="Search, sharing, and traffic"
+                      copy="Control the words and images people see in Google, text messages, Facebook, X, and link previews."
                     />
                     <div className="seo-editor-grid">
-                      <TextField label="Google title" value={settings.seo.title} onChange={(value) => updateSeo("title", value)} />
+                      <TextField label="Google page title" value={settings.seo.title} onChange={(value) => updateSeo("title", value)} />
                       <CharacterHint current={settings.seo.title.length} target="Good target: 45-60 characters" />
                       <TextArea
-                        label="Google description"
+                        label="Google page description"
                         value={settings.seo.description}
                         onChange={(value) => updateSeo("description", value)}
                         rows={4}
@@ -871,18 +883,64 @@ export default function SiteEditorPage() {
                         onChange={(value) => updateSeo("robots", value)}
                         rows={2}
                       />
-                      <TextField
-                        label="Text message preview image"
-                        value={settings.seo.image}
-                        onChange={(value) => updateSeo("image", value)}
-                      />
+                      <div className="editor-subsection seo-image-editor">
+                        <div className="subsection-head">
+                          <div>
+                            <h3>SEO images</h3>
+                            <span className="editor-inline-note">Pick the image used for social shares, text previews, and homepage Open Graph metadata.</span>
+                          </div>
+                          <ImageIcon size={18} />
+                        </div>
+                        <div className="seo-image-options">
+                          {seoImageOptions.map((option) => (
+                            <button
+                              className={settings.seo.image === option.value ? "active" : ""}
+                              type="button"
+                              key={option.value}
+                              onClick={() => updateSeo("image", option.value)}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                        <TextField
+                          label="Custom image path or URL"
+                          value={settings.seo.image}
+                          onChange={(value) => updateSeo("image", value)}
+                        />
+                        <small className="editor-inline-note">Best size: 1200 x 630 PNG or JPG. Use a full URL or a file path from the public folder, like /seo/qrguitar-og-v2.png.</small>
+                      </div>
+                      <div className="editor-subsection seo-image-editor">
+                        <div className="subsection-head">
+                          <div>
+                            <h3>Browser tab thumbnail</h3>
+                            <span className="editor-inline-note">This controls the favicon/tab icon people see in browser tabs, bookmarks, and saved shortcuts.</span>
+                          </div>
+                          <ImageIcon size={18} />
+                        </div>
+                        <div className="seo-image-options">
+                          {faviconOptions.map((option) => (
+                            <button
+                              className={settings.seo.favicon === option.value ? "active" : ""}
+                              type="button"
+                              key={option.value}
+                              onClick={() => updateSeo("favicon", option.value)}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                        <TextField
+                          label="Custom tab icon path or URL"
+                          value={settings.seo.favicon}
+                          onChange={(value) => updateSeo("favicon", value)}
+                        />
+                      </div>
                     </div>
                     <div className="seo-checklist">
-                      <span><Search size={15} /> Use plain words around the instrument record: build history, ownership, service, and sales details.</span>
-                      <span><Search size={15} /> Mention geography if relevant (example: Rhode Island repair network, US builders, global collectors).</span>
-                      <span>
-                        <Search size={15} /> Keep image path as <strong>/seo/qrguitar-og-v2.png</strong> for white/orange logo.
-                      </span>
+                      <span><Search size={15} /> Say what QRguitar does in plain words: permanent records, photos, specs, documents, service history, ownership, and QR codes.</span>
+                      <span><Search size={15} /> Include real guitar-world phrases customers search for, such as guitar inventory, service records, warranty records, builders, shops, and collectors.</span>
+                      <span><Search size={15} /> Use location terms only when they are true, such as Rhode Island guitar repair, Cranston guitar shop, or US builder records.</span>
                     </div>
                   </section>
                 ) : null}
@@ -960,6 +1018,14 @@ export default function SiteEditorPage() {
                   <p>{settings.seo.description}</p>
                   <small>qrguitar.com</small>
                 </div>
+                <div className="seo-preview-card favicon-preview-card">
+                  <span className="mini-eyebrow">Browser tab</span>
+                  <div className="favicon-preview-row">
+                    <img src={settings.seo.favicon} alt="" />
+                    <strong>{settings.seo.title || "QRguitar"}</strong>
+                  </div>
+                  <p>Saved tab icon and title preview.</p>
+                </div>
                 <div className="editor-save-bar">
                   <button className="button" type="button" onClick={() => void onSave()} disabled={isSaving}>
                     <Save size={16} /> {isSaving ? "Saving..." : "Save Changes"}
@@ -977,36 +1043,22 @@ export default function SiteEditorPage() {
                     <Clipboard size={16} /> Copy Current Settings JSON
                   </button>
                 </div>
-                <div className="editor-save-bar">
+                <div className="editor-save-bar owner-access-card">
+                  <span className="mini-eyebrow">Owner access</span>
                   <div className="field">
-                    <span>Owner username</span>
-                    <input value={ownerUsername} onChange={(event) => setOwnerUsername(event.target.value)} />
-                  </div>
-                  <div className="field">
-                    <span>Owner password</span>
-                    <input type="password" value={ownerPassword} onChange={(event) => setOwnerPassword(event.target.value)} />
-                  </div>
-                  <button className="button secondary" type="button" onClick={saveOwnerLogin}>
-                    Save owner login
-                  </button>
-                  <button className="button secondary" type="button" onClick={resetOwnerLogin}>
-                    Reset to admin/admin
-                  </button>
-                </div>
-                <small className="editor-local-note">{ownerStatus}</small>
-                <div className="editor-save-bar">
-                  <div className="field">
-                    <span>Owner passcode</span>
+                    <span>Site editor passcode</span>
                     <input value={newPasscode} onChange={(event) => setNewPasscode(event.target.value)} />
                   </div>
-                  <button className="button secondary" type="button" onClick={setEditorPasscode}>
-                    Save passcode
-                  </button>
-                  <button className="button secondary" type="button" onClick={resetEditorPasscode}>
-                    Reset to admin
-                  </button>
+                  <div className="owner-access-actions">
+                    <button className="button secondary" type="button" onClick={setEditorPasscode}>
+                      Save passcode
+                    </button>
+                    <button className="button secondary" type="button" onClick={resetEditorPasscode}>
+                      Reset to admin
+                    </button>
+                  </div>
+                  <small className="editor-local-note">{passcodeMessage || activePasscodeHint}</small>
                 </div>
-                <small className="editor-local-note">{passcodeMessage || activePasscodeHint}</small>
                 <small className="editor-local-note">Local key: {siteSettingsKey}</small>
                 <small className="editor-local-note">Bot key: {botSettingsKey}</small>
               </aside>

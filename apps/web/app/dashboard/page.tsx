@@ -186,10 +186,16 @@ export default function DashboardPage() {
         <Nav />
         <main className="section auth-page">
           <div className="shell">
-            <section className="card auth-card sign-in-required-card">
+            <section className="card auth-card sign-in-required-card dashboard-signin-card">
+              <div className="dashboard-signin-icon"><ShieldCheck size={24} /></div>
               <div className="eyebrow">Dashboard</div>
               <h2>Sign in to manage your QRguitar records.</h2>
               <p>Manage your records, photos, documents, visibility, and QR downloads from your dashboard.</p>
+              <div className="dashboard-signin-points">
+                <span>Private inventory</span>
+                <span>QR downloads</span>
+                <span>Photos and documents</span>
+              </div>
               <div className="form-actions">
                 <Link className="button" href={`/login?next=${encodeURIComponent("/dashboard")}`}>
                   Sign in
@@ -215,10 +221,16 @@ export default function DashboardPage() {
         <Nav />
         <main className="section auth-page">
           <div className="shell">
-            <section className="card auth-card sign-in-required-card">
+            <section className="card auth-card sign-in-required-card dashboard-signin-card">
+              <div className="dashboard-signin-icon"><ShieldCheck size={24} /></div>
               <div className="eyebrow">Dashboard</div>
               <h2>Sign in to manage your QRguitar records.</h2>
               <p>Manage your records, photos, documents, visibility, and QR downloads from your dashboard.</p>
+              <div className="dashboard-signin-points">
+                <span>Private inventory</span>
+                <span>QR downloads</span>
+                <span>Photos and documents</span>
+              </div>
               <div className="form-actions">
                 <Link className="button" href={`/login?next=${encodeURIComponent("/dashboard")}`}>
                   Sign in

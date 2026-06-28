@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { BrandLogo } from "../../../components/BrandLogo";
 import { RecordShareButton } from "../../../components/RecordShareButton";
@@ -195,9 +195,6 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
 
   const canEdit = Boolean(currentUserEmail && instrument?.ownerUserEmail && currentUserEmail === instrument.ownerUserEmail.toLowerCase());
 
-  const heroStyle = instrument?.heroImageDataUrl
-    ? ({ "--scan-hero-image": `url("${instrument.heroImageDataUrl}")` } as CSSProperties)
-    : undefined;
   const galleryImages = instrument
     ? Array.from(
       new Set([instrument.heroImageDataUrl, ...(instrument.galleryImageDataUrls || [])].filter(Boolean) as string[])
@@ -359,19 +356,28 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           <RecordShareButton className="scan-share-button" code={instrument.qrCode} title={instrumentDisplayName(instrument)} />
         </div>
 
-        <section className="scan-hero" style={heroStyle}>
-          <div className="builder-mark">
-            <strong>{instrument.brand || "QRguitar"}</strong>
-            <span>{instrument.model || instrument.instrumentType || "Instrument"}</span>
+        <section className="scan-hero">
+          <div className="scan-hero-media">
+            {instrument.heroImageDataUrl ? (
+              <img src={instrument.heroImageDataUrl} alt={`${instrumentDisplayName(instrument)} main photo`} />
+            ) : (
+              <div className="scan-hero-empty">No main photo yet</div>
+            )}
           </div>
-          <h1>{instrumentDisplayName(instrument)}</h1>
-          <div className="verified-badge">
-            {showVerificationBadge ? (
-              <span><ShieldCheck size={20} /> {isVerifiedRecord ? "Verified by QRguitar" : "Unverified"}</span>
-            ) : null}
-            {showAuthenticityBadge ? (
-              <span><ShieldCheck size={20} /> {isAuthenticityConfirmed ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}</span>
-            ) : null}
+          <div className="scan-hero-info">
+            <div className="builder-mark">
+              <strong>{instrument.brand || "QRguitar"}</strong>
+              <span>{instrument.model || instrument.instrumentType || "Instrument"}</span>
+            </div>
+            <h1>{instrumentDisplayName(instrument)}</h1>
+            <div className="verified-badge">
+              {showVerificationBadge ? (
+                <span><ShieldCheck size={20} /> {isVerifiedRecord ? "Verified by QRguitar" : "Unverified"}</span>
+              ) : null}
+              {showAuthenticityBadge ? (
+                <span><ShieldCheck size={20} /> {isAuthenticityConfirmed ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}</span>
+              ) : null}
+            </div>
           </div>
         </section>
 
