@@ -21,6 +21,7 @@ import QRCode from "qrcode";
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { BrandLogo } from "../../../components/BrandLogo";
+import { RecordShareButton } from "../../../components/RecordShareButton";
 import {
   getDemoTransfers,
   getInstrumentVerificationStatus,
@@ -340,9 +341,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
             <ArrowLeft size={24} />
           </button>
           <BrandLogo className="scan-brand" />
-          <button type="button" aria-label="Share this profile" onClick={copyProfileUrl}>
-            <Share2 size={24} />
-          </button>
+          <RecordShareButton className="scan-share-button" code={instrument.qrCode} title={instrumentDisplayName(instrument)} />
         </div>
 
         <section className="scan-hero" style={heroStyle}>

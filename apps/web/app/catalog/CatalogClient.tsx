@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
+import { RecordShareButton } from "../../components/RecordShareButton";
 import {
   getInstrumentCondition,
   getInstrumentVerificationStatus,
@@ -162,44 +163,46 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
                 const imageUrl = record.heroImageDataUrl || record.galleryImageDataUrls?.[0] || "";
 
                 return (
-                  <Link
+                  <article
                     className="catalog-card"
-                    href={instrumentToProfileUrl(record)}
                     key={record.qrCode}
                     aria-label={`View ${instrumentDisplayName(record)} public profile`}
                   >
-                    <article className="catalog-card-media">
-                      {imageUrl ? (
-                        <img
-                          className="catalog-card-image"
-                          src={imageUrl}
-                          alt={`${instrumentDisplayName(record)} main image`}
-                        />
-                      ) : (
-                        <div className="catalog-card-image catalog-card-image--empty">
-                          <strong>{record.brand?.slice(0, 2).toUpperCase() || "QR"}</strong>
-                          <span>No public photo yet</span>
-                        </div>
-                      )}
-                      <span className="catalog-card-code">{record.qrCode}</span>
-                    </article>
-                    <div className="catalog-card-content">
-                      <h3>{instrumentDisplayName(record)}</h3>
-                      <p className="catalog-meta-line">{instrumentSubtitle(record)}</p>
-                      <p className="catalog-card-summary">{record.summary || "Record details will appear as the owner adds photos, specs, and history."}</p>
-                      <div className="catalog-meta">
-                        <span className={`catalog-chip catalog-chip--${condition}`}>{condition === "new" ? "New" : "Used"}</span>
-                        <span className={`catalog-chip ${verificationStatus === "verified" ? "catalog-chip--verified" : "catalog-chip--unverified"}`}>
-                          {verificationStatus === "verified" ? "Verified record" : "Unverified record"}
-                        </span>
-                        <span>{record.year || "Year unknown"}</span>
-                        <span>{regionFromRecord(record) || "Region unknown"}</span>
-                        <span>{record.galleryImageDataUrls?.length || (record.heroImageDataUrl ? 1 : 0)} photos</span>
-                        <span>{record.documentFiles?.filter((file) => file.visibility !== "hidden").length || 0} docs</span>
+                    <Link className="catalog-card-main" href={instrumentToProfileUrl(record)}>
+                      <div className="catalog-card-media">
+                        {imageUrl ? (
+                          <img
+                            className="catalog-card-image"
+                            src={imageUrl}
+                            alt={`${instrumentDisplayName(record)} main image`}
+                          />
+                        ) : (
+                          <div className="catalog-card-image catalog-card-image--empty">
+                            <strong>{record.brand?.slice(0, 2).toUpperCase() || "QR"}</strong>
+                            <span>No public photo yet</span>
+                          </div>
+                        )}
+                        <span className="catalog-card-code">{record.qrCode}</span>
                       </div>
-                      <span className="catalog-card-cta">View Record</span>
-                    </div>
-                  </Link>
+                      <div className="catalog-card-content">
+                        <h3>{instrumentDisplayName(record)}</h3>
+                        <p className="catalog-meta-line">{instrumentSubtitle(record)}</p>
+                        <p className="catalog-card-summary">{record.summary || "Record details will appear as the owner adds photos, specs, and history."}</p>
+                        <div className="catalog-meta">
+                          <span className={`catalog-chip catalog-chip--${condition}`}>{condition === "new" ? "New" : "Used"}</span>
+                          <span className={`catalog-chip ${verificationStatus === "verified" ? "catalog-chip--verified" : "catalog-chip--unverified"}`}>
+                            {verificationStatus === "verified" ? "Verified record" : "Unverified record"}
+                          </span>
+                          <span>{record.year || "Year unknown"}</span>
+                          <span>{regionFromRecord(record) || "Region unknown"}</span>
+                          <span>{record.galleryImageDataUrls?.length || (record.heroImageDataUrl ? 1 : 0)} photos</span>
+                          <span>{record.documentFiles?.filter((file) => file.visibility !== "hidden").length || 0} docs</span>
+                        </div>
+                        <span className="catalog-card-cta">View Record</span>
+                      </div>
+                    </Link>
+                    <RecordShareButton className="catalog-card-share" code={record.qrCode} title={instrumentDisplayName(record)} />
+                  </article>
                 );
               })
             ) : (

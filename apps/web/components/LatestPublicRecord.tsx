@@ -3,6 +3,7 @@
 import { ArrowRight, Globe2, QrCode } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { RecordShareButton } from "./RecordShareButton";
 import {
   instrumentDisplayName,
   type DemoInstrument
@@ -52,11 +53,25 @@ export function LatestPublicRecord() {
 
   if (!loaded) {
     return (
-      <article className="latest-record-card latest-record-card--empty" aria-label="Loading latest public QRguitar record">
-        <div className="latest-record-empty">
-          <span><Globe2 size={14} /> Latest public record</span>
-          <h2>Loading latest record.</h2>
-          <p>Checking the public QRguitar catalog now.</p>
+      <article className="latest-record-card latest-record-card--skeleton" aria-label="Latest public QRguitar record">
+        <div className="latest-record-hero">
+          <div className="latest-live-row">
+            <span><Globe2 size={14} /> Latest public record</span>
+          </div>
+          <div className="latest-skeleton-line latest-skeleton-line--title" aria-hidden="true" />
+          <div className="latest-skeleton-line latest-skeleton-line--copy" aria-hidden="true" />
+        </div>
+        <div className="latest-record-meta" aria-hidden="true">
+          {["id", "region", "year", "status"].map((item) => (
+            <div key={item}>
+              <span className="latest-skeleton-line latest-skeleton-line--label" />
+              <strong className="latest-skeleton-line latest-skeleton-line--value" />
+            </div>
+          ))}
+        </div>
+        <div className="latest-record-actions" aria-hidden="true">
+          <span className="latest-skeleton-line latest-skeleton-line--button" />
+          <span className="latest-skeleton-line latest-skeleton-line--button latest-skeleton-line--button-secondary" />
         </div>
       </article>
     );
@@ -93,7 +108,10 @@ export function LatestPublicRecord() {
       >
         <div className="latest-live-row">
           <span><Globe2 size={14} /> Latest public record</span>
-          <strong>{createdLabel}</strong>
+          <span className="latest-live-actions">
+            <strong>{createdLabel}</strong>
+            <RecordShareButton code={latest.qrCode} title={title} />
+          </span>
         </div>
         <h2>{title}</h2>
         <p>{latest.brand} - {latest.serial}</p>
