@@ -191,7 +191,7 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
                         <div className="catalog-meta">
                           <span className={`catalog-chip catalog-chip--${condition}`}>{condition === "new" ? "New" : "Used"}</span>
                           <span className={`catalog-chip ${verificationStatus === "verified" ? "catalog-chip--verified" : "catalog-chip--unverified"}`}>
-                            {verificationStatus === "verified" ? "Verified record" : "Unverified record"}
+                            {verificationStatus === "verified" ? "Verified" : "Unverified"}
                           </span>
                           <span>{record.year || "Year unknown"}</span>
                           <span>{regionFromRecord(record) || "Region unknown"}</span>

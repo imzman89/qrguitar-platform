@@ -300,7 +300,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
 
   const specs = [
     { label: "Instrument ID", value: instrument.qrCode },
-    { label: "Status", value: isVerifiedRecord ? "Verified record" : "Unverified record" },
+    { label: "Status", value: isVerifiedRecord ? "Verified" : "Unverified" },
     { label: "Owner", value: publicOwnerDisplay(instrument) },
     { label: "Built", value: instrument.year || "Unknown" },
     { label: "Make / Model", value: [instrument.brand, instrument.model].filter(Boolean).join(" ") },
@@ -352,7 +352,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           <h1>{instrumentDisplayName(instrument)}</h1>
           <div className="verified-badge">
             <ShieldCheck size={23} />
-            <span>{isVerifiedRecord ? "Verified Identity" : "Unverified Record"}</span>
+            <span>{isVerifiedRecord ? "Verified" : "Unverified"}</span>
           </div>
         </section>
 
@@ -703,7 +703,7 @@ function ProfilePanel({
       <div className="maker-signature">
         <strong>{instrument.brand?.slice(0, 1) || "P"}</strong>
         <span>{instrument.brand || "Proper Instruments"}</span>
-        <em>{isVerifiedRecord ? "Verified record" : "Unverified record"}</em>
+        <em>{isVerifiedRecord ? "Verified" : "Unverified"}</em>
       </div>
     </section>
   );
