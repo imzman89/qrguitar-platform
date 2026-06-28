@@ -175,6 +175,7 @@ export default function DashboardPage() {
   async function logout() {
     const supabase = createBrowserSupabaseClient();
     await supabase.auth.signOut();
+    window.localStorage.removeItem("qrguitar.siteEditorUnlocked");
     setUser(null);
     router.replace("/login?next=%2Fdashboard");
   }

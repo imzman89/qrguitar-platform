@@ -15,9 +15,9 @@ type InstrumentsResponse = {
   instruments?: DemoInstrument[];
 };
 
-export function LatestPublicRecord() {
-  const [latest, setLatest] = useState<DemoInstrument | null>(null);
-  const [loaded, setLoaded] = useState(false);
+export function LatestPublicRecord({ initialRecord = null }: { initialRecord?: DemoInstrument | null }) {
+  const [latest, setLatest] = useState<DemoInstrument | null>(initialRecord);
+  const [loaded, setLoaded] = useState(Boolean(initialRecord));
 
   useEffect(() => {
     let active = true;

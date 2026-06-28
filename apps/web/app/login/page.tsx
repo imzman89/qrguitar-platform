@@ -22,8 +22,12 @@ export default function LoginPage() {
   const [isSignedIn, setIsSignedIn] = useState(false);
 
   useEffect(() => {
-    const nextPath = sanitizeNext(new URLSearchParams(window.location.search).get("next"));
+    const params = new URLSearchParams(window.location.search);
+    const nextPath = sanitizeNext(params.get("next"));
     setSafeNext(nextPath);
+    if (params.get("reason") === "session-expired") {
+      setStatus("Your session expired. Please sign in again.");
+    }
 
     supabase.auth.getSession().then(({ data }) => {
       const signedIn = Boolean(data.session?.user);
@@ -109,6 +113,7 @@ export default function LoginPage() {
   async function logout() {
     setIsWorking(true);
     await supabase.auth.signOut();
+    window.localStorage.removeItem("qrguitar.siteEditorUnlocked");
     setIsWorking(false);
     setIsSignedIn(false);
     setStatus("Signed out.");

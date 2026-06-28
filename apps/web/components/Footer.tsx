@@ -35,6 +35,7 @@ export function Footer() {
   async function logout() {
     const supabase = createBrowserSupabaseClient();
     await supabase.auth.signOut();
+    window.localStorage.removeItem("qrguitar.siteEditorUnlocked");
     setIsSignedIn(false);
   }
 

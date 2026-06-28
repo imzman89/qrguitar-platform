@@ -2,6 +2,7 @@
 
 import { Clipboard, Eye, LockKeyhole, Plus, RotateCcw, Save, Search, ShieldCheck, SlidersHorizontal, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
@@ -15,7 +16,6 @@ import {
 } from "../../lib/bot-settings";
 import {
   defaultOwnerCredentials,
-  getDemoUser,
   getOwnerCredentials,
   resetOwnerCredentials,
   setOwnerCredentials
@@ -29,6 +29,7 @@ import {
   siteSettingsKey,
   type EditableSiteSettings
 } from "../../lib/site-settings";
+import { createBrowserSupabaseClient } from "../../lib/supabase-browser";
 
 const editorGateKey = "qrguitar.siteEditorUnlocked";
 const ownerPasscodeKey = "qrguitar.ownerPasscode";
@@ -46,6 +47,7 @@ const tabs: Array<{ id: EditorTab; label: string }> = [
 ];
 
 export default function SiteEditorPage() {
+  const router = useRouter();
   const [settings, setSettings] = useState<EditableSiteSettings>(defaultSiteSettings);
   const [botSettings, setBotSettings] = useState<EditableBotSettings>(defaultBotSettings);
   const [message, setMessage] = useState("Ready to edit.");
@@ -59,20 +61,56 @@ export default function SiteEditorPage() {
   const [ownerUsername, setOwnerUsername] = useState(defaultOwnerCredentials.username);
   const [ownerPassword, setOwnerPassword] = useState(defaultOwnerCredentials.password);
   const [ownerStatus, setOwnerStatus] = useState("Local owner login is managed here.");
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isSignedIn, setIsSignedIn] = useState(false);
 
   const activePasscodeHint = isOwnerPasscodeSet ? "custom owner passcode configured" : `default (${ownerPasscode})`;
 
   useEffect(() => {
+    const supabase = createBrowserSupabaseClient();
+    let cancelled = false;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) {
+        return;
+      }
+
+      const hasSession = Boolean(data.session?.user);
+      setIsSignedIn(hasSession);
+      setAuthChecked(true);
+
+      if (!hasSession) {
+        window.localStorage.removeItem(editorGateKey);
+        router.replace(`/login?next=${encodeURIComponent("/site-editor")}&reason=session-expired`);
+      }
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const hasSession = Boolean(session?.user);
+      setIsSignedIn(hasSession);
+      setAuthChecked(true);
+
+      if (!hasSession) {
+        window.localStorage.removeItem(editorGateKey);
+        setIsUnlocked(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      listener.subscription.unsubscribe();
+    };
+  }, [router]);
+
+  useEffect(() => {
+    if (!authChecked || !isSignedIn) {
+      return;
+    }
+
     const storedPasscode = window.localStorage.getItem(ownerPasscodeKey) || ownerPasscode;
-    const isOwnerSession = getDemoUser()?.role === "owner";
     const ownerCredentials = getOwnerCredentials();
 
-    if (isOwnerSession) {
-      setIsUnlocked(true);
-      window.localStorage.setItem(editorGateKey, "true");
-    } else {
-      setIsUnlocked(window.localStorage.getItem(editorGateKey) === "true");
-    }
+    setIsUnlocked(window.localStorage.getItem(editorGateKey) === "true");
 
     setIsOwnerPasscodeSet(Boolean(window.localStorage.getItem(ownerPasscodeKey)));
     setNewPasscode(storedPasscode);
@@ -82,7 +120,7 @@ export default function SiteEditorPage() {
     setSettings(stored);
     setBotSettings(readBotSettings());
     applyThemeSettings(stored);
-  }, []);
+  }, [authChecked, isSignedIn]);
 
   const settingsJson = useMemo(() => JSON.stringify(settings, null, 2), [settings]);
 
@@ -342,7 +380,32 @@ export default function SiteEditorPage() {
             </div>
           </div>
 
-          {!isUnlocked ? (
+          {!authChecked ? (
+            <section className="card owner-gate">
+              <LockKeyhole size={34} />
+              <div>
+                <span className="mini-eyebrow">Checking session</span>
+                <h2>Checking owner access.</h2>
+                <p>Confirming your QRguitar session before loading editor controls.</p>
+              </div>
+            </section>
+          ) : null}
+
+          {authChecked && !isSignedIn ? (
+            <section className="card owner-gate">
+              <LockKeyhole size={34} />
+              <div>
+                <span className="mini-eyebrow">Sign in required</span>
+                <h2>Your session expired.</h2>
+                <p>Please sign in again before opening owner tools.</p>
+              </div>
+              <Link className="button" href={`/login?next=${encodeURIComponent("/site-editor")}&reason=session-expired`}>
+                Sign in again
+              </Link>
+            </section>
+          ) : null}
+
+          {authChecked && isSignedIn && !isUnlocked ? (
             <form className="card owner-gate" onSubmit={unlockEditor}>
               <LockKeyhole size={34} />
               <div>
@@ -372,7 +435,9 @@ export default function SiteEditorPage() {
                 </button>
               </div>
             </form>
-          ) : (
+          ) : null}
+
+          {authChecked && isSignedIn && isUnlocked ? (
             <form className="site-editor-layout admin-editor-layout" onSubmit={onSave}>
               <section className="admin-editor-main">
                 <div className="editor-tabs" role="tablist" aria-label="Site editor sections">
@@ -895,7 +960,7 @@ export default function SiteEditorPage() {
                 <small className="editor-local-note">Bot key: {botSettingsKey}</small>
               </aside>
             </form>
-          )}
+          ) : null}
         </div>
       </main>
       <Footer />
