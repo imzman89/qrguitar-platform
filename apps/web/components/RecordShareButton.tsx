@@ -22,16 +22,17 @@ export function RecordShareButton({ code, title, className = "" }: RecordShareBu
     event.stopPropagation();
 
     try {
-      if (navigator.share) {
+      const shouldUseNativeShare = typeof navigator.share === "function" && window.matchMedia?.("(pointer: coarse)").matches;
+
+      if (shouldUseNativeShare) {
         await navigator.share({
           title: label,
           text: `QRguitar record for ${label}`,
           url
         });
-      } else {
-        await copyUrl(url);
       }
 
+      await copyUrl(url);
       setStatus("copied");
       window.setTimeout(() => setStatus("idle"), 1400);
     } catch {
