@@ -4,6 +4,7 @@ import type { User } from "@supabase/supabase-js";
 import { revalidatePath, unstable_noStore as noStore } from "next/cache";
 import { createServerSupabaseClient, getAuthenticatedUser, getSupabaseEnvStatus } from "../../../lib/supabase-server";
 import { defaultQrStyle, type DemoInstrument, type QrStyle } from "../../../lib/local-demo";
+import { getPublicInstrumentByCode } from "../../../lib/public-instruments";
 import { defaultRecordTrustSettings, mergeRecordTrustSettings, recordTrustContentKey, type RecordTrustSettings } from "../../../lib/record-trust";
 
 export const dynamic = "force-dynamic";
@@ -821,55 +822,19 @@ export async function GET(request: Request) {
   }
 
   if (code) {
-    const { data: guitar, error } = await supabase.from("guitars").select("*").eq("qr_code", code.toUpperCase()).maybeSingle<GuitarRow>();
-    if (error) {
-      return supabaseReadErrorResponse(error.message);
+    const publicLookup = await getPublicInstrumentByCode(code)
+      .then((instrument) => ({ instrument, error: "" }))
+      .catch((error: Error) => ({ instrument: null, error: error.message || "Could not load public instrument." }));
+
+    if (publicLookup.error) {
+      return supabaseReadErrorResponse(publicLookup.error);
     }
 
-    if (!guitar) {
+    if (!publicLookup.instrument) {
       return noStoreJson({ ok: false, message: "Instrument not found." } satisfies SupabaseReadResponse, { status: 404 });
     }
 
-    if (guitar.visibility === "private") {
-      return noStoreJson({ ok: false, message: "This record is private." } satisfies SupabaseReadResponse, { status: 403 });
-    }
-
-    const [mediaResult, specsResult, documentsResult, profileResult] = await Promise.all([
-      supabase.from("guitar_media").select("guitar_id,storage_path").eq("guitar_id", guitar.id),
-      supabase.from("guitar_specs").select("guitar_id,label,value").eq("guitar_id", guitar.id),
-      supabase.from("guitar_documents").select("guitar_id,name,storage_path,is_public").eq("guitar_id", guitar.id),
-      guitar.owner_id ? supabase.from("profiles").select("id,display_name").eq("id", guitar.owner_id).maybeSingle<ProfileRow>() : Promise.resolve({ data: null, error: null })
-    ]);
-
-    const relatedError = mediaResult.error || specsResult.error || documentsResult.error || profileResult.error;
-    if (relatedError) {
-      return supabaseReadErrorResponse(relatedError.message);
-    }
-
-    const heroStoragePath = guitar.hero_image_path || "";
-    const media = await resolveImageSources(
-      supabase,
-      ((mediaResult.data || []) as GuitarMediaRow[])
-        .map((item) => item.storage_path)
-        .filter((storagePath) => storagePath !== heroStoragePath)
-    );
-    const heroImagePath = heroStoragePath ? await resolveImageSource(supabase, heroStoragePath) : "";
-
-    const instrument = mapInstrumentRow({
-      guitar: { ...guitar, hero_image_path: heroImagePath || guitar.hero_image_path },
-      media: media.map((storagePath) => ({ guitar_id: guitar.id, storage_path: storagePath })),
-      specs: (specsResult.data || []) as GuitarSpecRow[],
-      ownerEmail: "",
-      ownerName: profileResult.data?.display_name || guitar.builder || "Unclaimed",
-      trust: (await loadTrustSettingsMap(supabase, [guitar.qr_code])).get(guitar.qr_code.toUpperCase())
-    });
-
-    instrument.documentFiles = await resolveDocumentSources(
-      supabase,
-      ((documentsResult.data || []) as GuitarDocumentRow[]).filter((document) => document.is_public)
-    );
-
-    return noStoreJson({ ok: true, instrument: stripAnonymousInstrumentFields(instrument) } satisfies SupabaseReadResponse, { status: 200 });
+    return noStoreJson({ ok: true, instrument: stripAnonymousInstrumentFields(publicLookup.instrument) } satisfies SupabaseReadResponse, { status: 200 });
   }
 
   const publicResult = await loadPublicRecords(supabase);
