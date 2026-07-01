@@ -17,6 +17,17 @@ import {
 import { defaultSiteSettings, readSiteSettings } from "../../lib/site-settings";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
 
+const documentTypeOptions = ["Receipt", "Invoice", "Appraisal", "Certificate", "Build Sheet", "Service Slip", "Insurance Photo", "Warranty", "Authenticity Evidence", "Other"];
+type DocumentDraft = {
+  id: string;
+  name: string;
+  dataUrl: string;
+  visibility: "public" | "hidden";
+  documentType: string;
+  publicDescription: string;
+  privateNotes: string;
+};
+
 export default function CreatePage() {
   const router = useRouter();
   const [message, setMessage] = useState("");
@@ -46,7 +57,7 @@ export default function CreatePage() {
   const [customFields, setCustomFields] = useState<{ id: string; label: string; value: string }[]>([]);
   const [customLinks, setCustomLinks] = useState([{ id: "link-1", label: "Website", url: "" }]);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
-  const [documents, setDocuments] = useState<{ id: string; name: string; dataUrl: string; visibility: "public" | "hidden" }[]>([]);
+  const [documents, setDocuments] = useState<DocumentDraft[]>([]);
   const [qrCode, setQrCode] = useState(() => generatePermanentQrCode(getDemoInstruments().map((instrument) => instrument.qrCode), ""));
   const [qrStyle, setQrStyle] = useState<QrStyle>(defaultQrStyle);
   const [categoryOptions, setCategoryOptions] = useState(defaultSiteSettings.instrumentCategories);
@@ -147,7 +158,10 @@ export default function CreatePage() {
         id: `doc-${Date.now()}-${index}`,
         name: file.name,
         dataUrl: await fileToDataUrl(file),
-        visibility: "hidden" as const
+        visibility: "hidden" as const,
+        documentType: "Receipt",
+        publicDescription: "",
+        privateNotes: ""
       }))
     );
 
@@ -214,7 +228,14 @@ export default function CreatePage() {
           summary: form.summary || "",
           heroImageDataUrl: form.heroImageDataUrl,
           photos: galleryImages,
-          documents: documents.map((document) => ({ name: document.name, dataUrl: document.dataUrl, visibility: document.visibility })),
+          documents: documents.map((document) => ({
+            name: document.name,
+            dataUrl: document.dataUrl,
+            visibility: document.visibility,
+            documentType: document.documentType,
+            publicDescription: document.publicDescription,
+            privateNotes: document.privateNotes
+          })),
           customFields: [
             form.weight.trim() ? { label: "Weight", value: form.weight.trim() } : null,
             form.ownerStatus.trim() ? { label: "Owner status", value: form.ownerStatus.trim() } : null,
@@ -487,41 +508,98 @@ export default function CreatePage() {
                   multiple
                   onChange={(event) => void addDocuments(event.target.files)}
                 />
-                <span>Upload certificates, receipts, spec sheets, or setup notes. Up to 10 files.</span>
+                <span>Store receipts, invoices, build sheets, service slips, appraisal notes, and authenticity evidence with the instrument record. Up to 10 files.</span>
               </div>
               {documents.length ? (
-                <section className="photo-manager" aria-label="Document manager">
+                <section className="photo-manager proof-vault" aria-label="Proof Vault document manager">
                   <div className="photo-manager-header">
-                    <strong>{documents.length}/10 documents</strong>
-                    <span>Documents stay hidden on public listings unless you mark them public.</span>
+                    <strong>Proof Vault / Documents</strong>
+                    <span>{documents.length}/10 files. Private documents stay hidden unless you mark them public.</span>
                   </div>
-                  <div className="check-list">
+                  <div className="proof-vault-list">
                     {documents.map((document) => (
-                      <div className="check-item" key={document.id}>
-                        <span>•</span>
-                        {document.name}
-                        <button
-                          className="button secondary"
-                          type="button"
-                          onClick={() =>
-                            setDocuments((current) =>
-                              current.map((item) =>
-                                item.id === document.id
-                                  ? { ...item, visibility: item.visibility === "public" ? "hidden" : "public" }
-                                  : item
+                      <div className="proof-vault-item" key={document.id}>
+                        <div className="proof-vault-item-header">
+                          <strong>{document.name || "Untitled document"}</strong>
+                          <span className={document.visibility === "public" ? "status-pill verified-pill" : "status-pill neutral-pill"}>
+                            {document.visibility === "public" ? "Public" : "Private"}
+                          </span>
+                        </div>
+                        <div className="form-grid compact">
+                          <div className="field">
+                            <label htmlFor={`${document.id}-title`}>Title</label>
+                            <input
+                              id={`${document.id}-title`}
+                              value={document.name}
+                              onChange={(event) =>
+                                setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, name: event.target.value } : item))
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor={`${document.id}-type`}>Document type</label>
+                            <select
+                              id={`${document.id}-type`}
+                              value={document.documentType}
+                              onChange={(event) =>
+                                setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, documentType: event.target.value } : item))
+                              }
+                            >
+                              {documentTypeOptions.map((type) => <option value={type} key={type}>{type}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                        <div className="field">
+                          <label htmlFor={`${document.id}-public-description`}>Public description</label>
+                          <textarea
+                            id={`${document.id}-public-description`}
+                            value={document.publicDescription}
+                            onChange={(event) =>
+                              setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, publicDescription: event.target.value } : item))
+                            }
+                            placeholder="Optional public context if this document is shared."
+                          />
+                        </div>
+                        <div className="field">
+                          <label htmlFor={`${document.id}-private-notes`}>Private notes</label>
+                          <textarea
+                            id={`${document.id}-private-notes`}
+                            value={document.privateNotes}
+                            onChange={(event) =>
+                              setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, privateNotes: event.target.value } : item))
+                            }
+                            placeholder="Owner-only proof notes. Never shown on public profile."
+                          />
+                        </div>
+                        <div className="proof-vault-actions">
+                          <button
+                            className="button secondary"
+                            type="button"
+                            onClick={() =>
+                              setDocuments((current) =>
+                                current.map((item) =>
+                                  item.id === document.id
+                                    ? { ...item, visibility: item.visibility === "public" ? "hidden" : "public" }
+                                    : item
+                                )
                               )
-                            )
-                          }
-                        >
-                          {document.visibility === "public" ? "Public" : "Hidden"}
-                        </button>
-                        <button
-                          className="button secondary"
-                          type="button"
-                          onClick={() => setDocuments((current) => current.filter((item) => item.id !== document.id))}
-                        >
-                          Remove
-                        </button>
+                            }
+                          >
+                            {document.visibility === "public" ? "Make Private" : "Make Public"}
+                          </button>
+                          {document.dataUrl ? (
+                            <a className="button secondary" href={document.dataUrl} target="_blank" rel="noreferrer">
+                              Open
+                            </a>
+                          ) : null}
+                          <button
+                            className="button secondary"
+                            type="button"
+                            onClick={() => setDocuments((current) => current.filter((item) => item.id !== document.id))}
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>

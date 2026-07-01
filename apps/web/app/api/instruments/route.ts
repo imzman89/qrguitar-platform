@@ -14,6 +14,7 @@ export const fetchCache = "force-no-store";
 const MEDIA_BUCKET = "instrument-media";
 const DOCUMENT_BUCKET = "instrument-documents";
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7;
+const ALLOWED_DOCUMENT_MIME_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
 const NO_STORE_HEADERS = {
   "Cache-Control": "no-store, no-cache, must-revalidate"
 };
@@ -39,7 +40,14 @@ type CreateInstrumentRequest = {
   summary: string;
   photos: string[];
   heroImageDataUrl?: string;
-  documents?: Array<{ name: string; dataUrl: string; visibility?: "public" | "hidden" }>;
+  documents?: Array<{
+    name: string;
+    dataUrl: string;
+    visibility?: "public" | "hidden";
+    documentType?: string;
+    publicDescription?: string;
+    privateNotes?: string;
+  }>;
   customFields?: Array<{ label: string; value: string }>;
   accountPlan?: AccountPlan;
 };
@@ -113,6 +121,11 @@ type GuitarDocumentRow = {
   name: string;
   storage_path: string;
   is_public: boolean;
+  document_type?: string | null;
+  public_description?: string | null;
+  private_notes?: string | null;
+  updated_at?: string | null;
+  created_at?: string | null;
 };
 
 type GuitarSpecRow = {
@@ -353,6 +366,10 @@ function documentExtensionForMimeType(mimeType: string) {
   return "bin";
 }
 
+function cleanDocumentText(value: unknown, maxLength = 1000) {
+  return String(value || "").trim().slice(0, maxLength);
+}
+
 async function uploadImageSource(
   supabase: NonNullable<ReturnType<typeof createServerSupabaseClient>>,
   ownerId: string,
@@ -367,6 +384,10 @@ async function uploadImageSource(
   const parsed = parseDataUrl(source);
   if (!parsed) {
     return null;
+  }
+
+  if (!ALLOWED_DOCUMENT_MIME_TYPES.has(parsed.mimeType)) {
+    throw new Error("Only PDF, JPG, PNG, and WEBP proof files are supported.");
   }
 
   const objectPath = `${ownerId}/${guitarId}/${prefix}-${randomUUID()}.${documentExtensionForMimeType(parsed.mimeType)}`;
@@ -396,6 +417,10 @@ async function uploadDocumentSource(
   const parsed = parseDataUrl(source);
   if (!parsed) {
     return null;
+  }
+
+  if (!ALLOWED_DOCUMENT_MIME_TYPES.has(parsed.mimeType)) {
+    throw new Error("Only PDF, JPG, PNG, and WEBP proof files are supported.");
   }
 
   const objectPath = `${ownerId}/${guitarId}/${prefix}-${randomUUID()}.${documentExtensionForMimeType(parsed.mimeType)}`;
@@ -488,15 +513,50 @@ async function mapExistingMediaSource(
   return "";
 }
 
+async function mapExistingDocumentSource(
+  supabase: NonNullable<ReturnType<typeof createServerSupabaseClient>>,
+  rows: GuitarDocumentRow[],
+  source: string
+) {
+  if (!source || isDataUrl(source)) {
+    return "";
+  }
+
+  if (rows.some((row) => row.storage_path === source)) {
+    return source;
+  }
+
+  const decodedSource = decodeURIComponent(source);
+  const pathFromUrl = rows.find((row) => decodedSource.includes(row.storage_path));
+  if (pathFromUrl) {
+    return pathFromUrl.storage_path;
+  }
+
+  for (const row of rows) {
+    const signedUrl = await resolveDocumentSource(supabase, row.storage_path);
+    if (source === signedUrl) {
+      return row.storage_path;
+    }
+  }
+
+  return "";
+}
+
 async function resolveDocumentSources(
   supabase: NonNullable<ReturnType<typeof createServerSupabaseClient>>,
-  documents: GuitarDocumentRow[]
+  documents: GuitarDocumentRow[],
+  includePrivate = false
 ) {
   return Promise.all(
     documents.map(async (document) => ({
       name: document.name,
       url: await resolveDocumentSource(supabase, document.storage_path),
-      visibility: document.is_public ? "public" as const : "hidden" as const
+      visibility: document.is_public ? "public" as const : "hidden" as const,
+      documentType: document.document_type || "",
+      publicDescription: document.public_description || "",
+      ...(includePrivate ? { privateNotes: document.private_notes || "" } : {}),
+      createdAt: document.created_at || "",
+      updatedAt: document.updated_at || ""
     }))
   );
 }
@@ -705,7 +765,7 @@ async function loadRecordsForUser(supabase: ReturnType<typeof createServerSupaba
       ? supabase.from("guitar_specs").select("guitar_id,label,value").in("guitar_id", guitarIds)
       : Promise.resolve({ data: [], error: null }),
     guitarIds.length
-      ? supabase.from("guitar_documents").select("guitar_id,name,storage_path,is_public").in("guitar_id", guitarIds)
+      ? supabase.from("guitar_documents").select("guitar_id,name,storage_path,is_public,document_type,public_description,private_notes,created_at,updated_at").in("guitar_id", guitarIds)
       : Promise.resolve({ data: [], error: null })
   ]);
 
@@ -754,7 +814,7 @@ async function loadRecordsForUser(supabase: ReturnType<typeof createServerSupaba
             .filter((storagePath) => storagePath !== heroStoragePath)
         );
         const heroImagePath = heroStoragePath ? await resolveImageSource(supabase, heroStoragePath) : "";
-        const documents = await resolveDocumentSources(supabase, documentsByGuitar.get(guitar.id) || []);
+        const documents = await resolveDocumentSources(supabase, documentsByGuitar.get(guitar.id) || [], true);
 
         const instrument = mapInstrumentRow({
           guitar: { ...(guitar as GuitarRow), hero_image_path: heroImagePath || (guitar as GuitarRow).hero_image_path },
@@ -810,7 +870,7 @@ async function loadPublicRecords(supabase: ReturnType<typeof createServerSupabas
       ? supabase.from("guitar_specs").select("guitar_id,label,value").in("guitar_id", guitarIds)
       : Promise.resolve({ data: [], error: null }),
     guitarIds.length
-      ? supabase.from("guitar_documents").select("guitar_id,name,storage_path,is_public").in("guitar_id", guitarIds)
+      ? supabase.from("guitar_documents").select("guitar_id,name,storage_path,is_public,document_type,public_description,created_at,updated_at").in("guitar_id", guitarIds)
       : Promise.resolve({ data: [], error: null }),
     guitarIds.length
       ? supabase.from("profiles").select("id,display_name").in("id", guitars.data.map((item) => item.owner_id).filter(Boolean) as string[])
@@ -1112,14 +1172,17 @@ export async function POST(request: Request) {
     }
   }
 
-  const uploadedDocuments: Array<{ name: string; storagePath: string; isPublic: boolean }> = [];
+  const uploadedDocuments: Array<{ name: string; storagePath: string; isPublic: boolean; documentType: string; publicDescription: string; privateNotes: string }> = [];
   for (const [index, document] of (body.documents || []).entries()) {
     const uploadedPath = await uploadDocumentSource(supabase, ownerUser.id, insertedGuitar.id, document.dataUrl, `document-${index + 1}`);
     if (uploadedPath) {
       uploadedDocuments.push({
         name: document.name || `Document ${index + 1}`,
         storagePath: uploadedPath,
-        isPublic: document.visibility === "public"
+        isPublic: document.visibility === "public",
+        documentType: cleanDocumentText(document.documentType, 80) || "Other",
+        publicDescription: cleanDocumentText(document.publicDescription, 1000),
+        privateNotes: cleanDocumentText(document.privateNotes, 2000)
       });
     }
   }
@@ -1129,7 +1192,12 @@ export async function POST(request: Request) {
       guitar_id: insertedGuitar.id,
       name: document.name.slice(0, 200),
       storage_path: document.storagePath.slice(0, 2000),
-      is_public: document.isPublic
+      is_public: document.isPublic,
+      uploaded_by_user_id: ownerUser.id,
+      file_name: document.name.slice(0, 255),
+      document_type: document.documentType,
+      public_description: document.publicDescription || null,
+      private_notes: document.privateNotes || null
     }));
 
     const documentInsert = await supabase.from("guitar_documents").insert(documentPayload);
@@ -1392,29 +1460,48 @@ export async function PATCH(request: Request) {
 
   const existingDocumentsResult = await supabase
     .from("guitar_documents")
-    .select("guitar_id,name,storage_path,is_public")
+    .select("guitar_id,name,storage_path,is_public,document_type,public_description,private_notes,created_at,updated_at")
     .eq("guitar_id", existingGuitar.id);
   const existingDocuments = ((existingDocumentsResult.data || []) as GuitarDocumentRow[]);
-  const uploadedDocuments: Array<{ name: string; storagePath: string; isPublic: boolean }> = [];
+  const uploadedDocuments: Array<{ name: string; storagePath: string; isPublic: boolean; documentType: string; publicDescription: string; privateNotes: string }> = [];
   for (const [index, document] of (body.documents || []).entries()) {
     const uploadedPath = await uploadDocumentSource(supabase, ownerUser.id, existingGuitar.id, document.dataUrl, `document-${index + 1}`);
+    const metadata = {
+      documentType: cleanDocumentText(document.documentType, 80) || "Other",
+      publicDescription: cleanDocumentText(document.publicDescription, 1000),
+      privateNotes: cleanDocumentText(document.privateNotes, 2000)
+    };
     if (uploadedPath) {
       uploadedDocuments.push({
         name: document.name || `Document ${index + 1}`,
         storagePath: uploadedPath,
-        isPublic: document.visibility === "public"
+        isPublic: document.visibility === "public",
+        ...metadata
       });
       continue;
     }
 
-    const existingDocument = existingDocuments.find((item) => item.name === document.name);
+    const existingPath = await mapExistingDocumentSource(supabase, existingDocuments, document.dataUrl);
+    const existingDocument = existingPath
+      ? existingDocuments.find((item) => item.storage_path === existingPath)
+      : existingDocuments.find((item) => item.name === document.name);
     if (existingDocument) {
       uploadedDocuments.push({
         name: document.name || `Document ${index + 1}`,
         storagePath: existingDocument.storage_path,
-        isPublic: document.visibility === "public"
+        isPublic: document.visibility === "public",
+        ...metadata
       });
     }
+  }
+
+  const nextDocumentPaths = new Set(uploadedDocuments.map((document) => document.storagePath));
+  const removedDocumentPaths = existingDocuments
+    .filter((document) => !nextDocumentPaths.has(document.storage_path))
+    .map((document) => document.storage_path)
+    .filter(Boolean);
+  if (removedDocumentPaths.length > 0) {
+    await supabase.storage.from(DOCUMENT_BUCKET).remove(removedDocumentPaths);
   }
 
   await supabase.from("guitar_documents").delete().eq("guitar_id", existingGuitar.id);
@@ -1423,7 +1510,13 @@ export async function PATCH(request: Request) {
       guitar_id: existingGuitar.id,
       name: document.name.slice(0, 200),
       storage_path: document.storagePath.slice(0, 2000),
-      is_public: document.isPublic
+      is_public: document.isPublic,
+      uploaded_by_user_id: ownerUser.id,
+      file_name: document.name.slice(0, 255),
+      document_type: document.documentType,
+      public_description: document.publicDescription || null,
+      private_notes: document.privateNotes || null,
+      updated_at: new Date().toISOString()
     }));
     const documentInsert = await supabase.from("guitar_documents").insert(documentPayload);
     if (documentInsert.error) {

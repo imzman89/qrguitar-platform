@@ -95,9 +95,17 @@ create table public.guitar_media (
 create table public.guitar_documents (
   id uuid primary key default gen_random_uuid(),
   guitar_id uuid not null references public.guitars(id) on delete cascade,
+  uploaded_by_user_id uuid references auth.users(id) on delete set null,
   name text not null,
   storage_path text not null,
+  document_type text,
+  file_name text,
+  mime_type text,
+  file_size_bytes bigint,
   is_public boolean not null default false,
+  public_description text,
+  private_notes text,
+  updated_at timestamptz not null default now(),
   created_at timestamptz not null default now()
 );
 

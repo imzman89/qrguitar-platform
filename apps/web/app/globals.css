@@ -2303,6 +2303,46 @@ select {
   font-size: 13px;
 }
 
+.proof-vault {
+  gap: 14px;
+}
+
+.proof-vault-list {
+  display: grid;
+  gap: 12px;
+}
+
+.proof-vault-item {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(248, 246, 242, .1);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(7, 12, 16, .42);
+}
+
+.proof-vault-item-header,
+.proof-vault-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.proof-vault-item-header strong {
+  min-width: 0;
+  color: var(--text);
+}
+
+.proof-vault-actions {
+  justify-content: flex-start;
+}
+
+.form-grid.compact {
+  gap: 10px;
+}
+
 .photo-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));

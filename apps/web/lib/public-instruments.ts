@@ -41,6 +41,9 @@ type DocumentRow = {
   name: string;
   storage_path: string;
   is_public: boolean;
+  document_type?: string | null;
+  public_description?: string | null;
+  created_at?: string | null;
 };
 
 type TimelineRow = {
@@ -150,12 +153,26 @@ async function resolveDocumentSources(documents: DocumentRow[]) {
     if (source === document.storage_path && !source.startsWith("/")) {
       const { data } = await supabase.storage.from("instrument-documents").createSignedUrl(source, 60 * 15);
       if (data?.signedUrl) {
-        resolved.push({ name: document.name, url: data.signedUrl, visibility: "public" });
+        resolved.push({
+          name: document.name,
+          url: data.signedUrl,
+          visibility: "public",
+          documentType: document.document_type || "",
+          publicDescription: document.public_description || "",
+          createdAt: document.created_at || ""
+        });
       }
       continue;
     }
 
-    resolved.push({ name: document.name, url: source, visibility: "public" });
+    resolved.push({
+      name: document.name,
+      url: source,
+      visibility: "public",
+      documentType: document.document_type || "",
+      publicDescription: document.public_description || "",
+      createdAt: document.created_at || ""
+    });
   }
 
   return resolved;
@@ -279,7 +296,7 @@ async function loadRelated(guitars: GuitarRow[]) {
   const [mediaResult, specsResult, documentsResult, profilesResult, serviceEventsResult] = await Promise.all([
     supabase.from("guitar_media").select("guitar_id,storage_path").in("guitar_id", ids),
     supabase.from("guitar_specs").select("guitar_id,label,value").in("guitar_id", ids),
-    supabase.from("guitar_documents").select("guitar_id,name,storage_path,is_public").in("guitar_id", ids),
+    supabase.from("guitar_documents").select("guitar_id,name,storage_path,is_public,document_type,public_description,created_at").in("guitar_id", ids),
     ownerIds.length ? supabase.from("profiles").select("id,display_name").in("id", ownerIds) : Promise.resolve({ data: [], error: null }),
     supabase
       .from("guitar_timeline_events")

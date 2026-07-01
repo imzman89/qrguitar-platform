@@ -97,6 +97,11 @@ export type CustomDocumentFile = {
   name: string;
   url: string;
   visibility?: "public" | "hidden";
+  documentType?: string;
+  publicDescription?: string;
+  privateNotes?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type ServiceHistoryEntry = {

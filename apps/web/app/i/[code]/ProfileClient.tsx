@@ -586,7 +586,7 @@ function ProfilePanel({
   optionalSpecs: Array<{ label: string; value?: string }>;
   profileLinks: Array<{ label: string; href?: string }>;
   galleryImages: string[];
-  documentFiles: Array<{ name: string; url: string }>;
+  documentFiles: Array<{ name: string; url: string; documentType?: string; publicDescription?: string }>;
   mediaIndex: number;
   onPickMedia: (index: number) => void;
   onOpenMedia: (imageUrl: string) => void;
@@ -746,7 +746,12 @@ function ProfilePanel({
         {hasVisibleDocuments ? (
           <div className="document-list">
             {documentFiles.map((file, index) => (
-              <DocumentItem key={`${file.name}-${index}`} title={file.name} copy="Tap to open the file." href={file.url} />
+              <DocumentItem
+                key={`${file.name}-${index}`}
+                title={file.name}
+                copy={[file.documentType, file.publicDescription || "Tap to open the file."].filter(Boolean).join(" - ")}
+                href={file.url}
+              />
             ))}
           </div>
         ) : isPrivateListing ? (
