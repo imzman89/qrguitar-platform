@@ -45,7 +45,9 @@ export type DemoInstrument = {
   authenticityStatus?: RecordAuthenticityStatus;
   showVerificationBadge?: boolean;
   showAuthenticityBadge?: boolean;
+  internalVerificationNote?: string;
   publicVerificationNote?: string;
+  internalAuthenticityNote?: string;
   publicAuthenticityNote?: string;
   instrumentType?: string;
   builder?: string;

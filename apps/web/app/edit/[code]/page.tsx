@@ -60,7 +60,9 @@ export default function EditInstrumentPage() {
   const [authenticityStatus, setAuthenticityStatus] = useState<"confirmed" | "unconfirmed">("unconfirmed");
   const [showVerificationBadge, setShowVerificationBadge] = useState(true);
   const [showAuthenticityBadge, setShowAuthenticityBadge] = useState(true);
+  const [internalVerificationNote, setInternalVerificationNote] = useState("");
   const [publicVerificationNote, setPublicVerificationNote] = useState("");
+  const [internalAuthenticityNote, setInternalAuthenticityNote] = useState("");
   const [publicAuthenticityNote, setPublicAuthenticityNote] = useState("");
   const [canManageVerification, setCanManageVerification] = useState(false);
 
@@ -124,7 +126,9 @@ export default function EditInstrumentPage() {
             setAuthenticityStatus(instrument.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed");
             setShowVerificationBadge(instrument.showVerificationBadge !== false);
             setShowAuthenticityBadge(instrument.showAuthenticityBadge !== false);
+            setInternalVerificationNote(instrument.internalVerificationNote || "");
             setPublicVerificationNote(instrument.publicVerificationNote || "");
+            setInternalAuthenticityNote(instrument.internalAuthenticityNote || "");
             setPublicAuthenticityNote(instrument.publicAuthenticityNote || "");
             setCanManageVerification(Boolean(payload.canManageVerification));
             setReady(true);
@@ -363,7 +367,9 @@ export default function EditInstrumentPage() {
           authenticityStatus,
           showVerificationBadge,
           showAuthenticityBadge,
+          internalVerificationNote,
           publicVerificationNote,
+          internalAuthenticityNote,
           publicAuthenticityNote
         })
       });
@@ -374,7 +380,9 @@ export default function EditInstrumentPage() {
         authenticityStatus?: "confirmed" | "unconfirmed";
         showVerificationBadge?: boolean;
         showAuthenticityBadge?: boolean;
+        internalVerificationNote?: string;
         publicVerificationNote?: string;
+        internalAuthenticityNote?: string;
         publicAuthenticityNote?: string;
       } | null;
 
@@ -389,7 +397,9 @@ export default function EditInstrumentPage() {
       setAuthenticityStatus(nextAuthenticity);
       setShowVerificationBadge(payload.showVerificationBadge !== false);
       setShowAuthenticityBadge(payload.showAuthenticityBadge !== false);
+      setInternalVerificationNote(payload.internalVerificationNote || "");
       setPublicVerificationNote(payload.publicVerificationNote || "");
+      setInternalAuthenticityNote(payload.internalAuthenticityNote || "");
       setPublicAuthenticityNote(payload.publicAuthenticityNote || "");
       setOriginal({
         ...original,
@@ -397,7 +407,9 @@ export default function EditInstrumentPage() {
         authenticityStatus: nextAuthenticity,
         showVerificationBadge: payload.showVerificationBadge !== false,
         showAuthenticityBadge: payload.showAuthenticityBadge !== false,
+        internalVerificationNote: payload.internalVerificationNote || "",
         publicVerificationNote: payload.publicVerificationNote || "",
+        internalAuthenticityNote: payload.internalAuthenticityNote || "",
         publicAuthenticityNote: payload.publicAuthenticityNote || ""
       });
       setMessage("Trust settings updated. The permanent QRguitar ID and URL stayed the same.");
@@ -480,8 +492,16 @@ export default function EditInstrumentPage() {
                       </select>
                     </div>
                     <div className="field custom-wide">
+                      <label htmlFor="internalVerificationNote">Internal verification note</label>
+                      <textarea id="internalVerificationNote" rows={3} value={internalVerificationNote} onChange={(event) => setInternalVerificationNote(event.target.value)} />
+                    </div>
+                    <div className="field custom-wide">
                       <label htmlFor="publicVerificationNote">Public verification note</label>
                       <textarea id="publicVerificationNote" rows={3} value={publicVerificationNote} onChange={(event) => setPublicVerificationNote(event.target.value)} />
+                    </div>
+                    <div className="field custom-wide">
+                      <label htmlFor="internalAuthenticityNote">Internal authenticity note</label>
+                      <textarea id="internalAuthenticityNote" rows={3} value={internalAuthenticityNote} onChange={(event) => setInternalAuthenticityNote(event.target.value)} />
                     </div>
                     <div className="field custom-wide">
                       <label htmlFor="publicAuthenticityNote">Public authenticity note</label>

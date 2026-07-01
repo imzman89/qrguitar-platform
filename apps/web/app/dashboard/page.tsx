@@ -415,7 +415,14 @@ export default function DashboardPage() {
               <div className="activity-list">
                 <Activity icon={<QrCode size={18} />} title="Permanent record links" detail="Every instrument keeps one QRguitar URL that stays the same as details are updated." />
                 <Activity icon={<ShieldCheck size={18} />} title="Owner account flow" detail="Sign in, create records, edit details, and manage public or private visibility from one dashboard." />
-                <Activity icon={<ShieldCheck size={18} />} title="Why verify?" detail="Verification helps sellers, shops, builders, and collectors organize proof, receipts, photos, service history, and optional authenticity review for higher-value instruments." />
+                <Activity icon={<ShieldCheck size={18} />} title="Why verify?" detail="Paid verification and authenticity review are handled manually during beta." />
+              </div>
+              <div className="check-list">
+                <div className="check-item"><span>1</span> Builds trust when selling</div>
+                <div className="check-item"><span>2</span> Helps shops and builders stand behind records</div>
+                <div className="check-item"><span>3</span> Keeps provenance cleaner over time</div>
+                <div className="check-item"><span>4</span> Helps collectors organize proof, receipts, photos, and service history</div>
+                <div className="check-item"><span>5</span> Adds an optional authenticity review layer for higher-value instruments</div>
               </div>
             </section>
             <section className="card">

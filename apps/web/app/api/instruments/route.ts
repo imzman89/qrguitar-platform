@@ -51,7 +51,9 @@ type UpdateInstrumentRequest = Omit<CreateInstrumentRequest, "accountPlan"> & {
   authenticityStatus?: "confirmed" | "unconfirmed";
   showVerificationBadge?: boolean;
   showAuthenticityBadge?: boolean;
+  internalVerificationNote?: string;
   publicVerificationNote?: string;
+  internalAuthenticityNote?: string;
   publicAuthenticityNote?: string;
 };
 
@@ -494,7 +496,8 @@ function mapInstrumentRow({
   specs,
   ownerEmail,
   ownerName,
-  trust
+  trust,
+  exposeInternalTrust = false
 }: {
   guitar: GuitarRow;
   media: GuitarMediaRow[];
@@ -502,6 +505,7 @@ function mapInstrumentRow({
   ownerEmail?: string;
   ownerName?: string;
   trust?: RecordTrustSettings;
+  exposeInternalTrust?: boolean;
 }): DemoInstrument {
   const customFields = specs
     .filter((spec) => {
@@ -534,7 +538,9 @@ function mapInstrumentRow({
     authenticityStatus: trust?.authenticityStatus || "unconfirmed",
     showVerificationBadge: trust?.showVerificationBadge === false ? false : true,
     showAuthenticityBadge: trust?.showAuthenticityBadge === false ? false : true,
+    ...(exposeInternalTrust ? { internalVerificationNote: trust?.internalVerificationNote || "" } : {}),
     publicVerificationNote: trust?.publicVerificationNote || "",
+    ...(exposeInternalTrust ? { internalAuthenticityNote: trust?.internalAuthenticityNote || "" } : {}),
     publicAuthenticityNote: trust?.publicAuthenticityNote || "",
     instrumentType: specValue(specs, "Type") || guitar.model || "",
     builder: guitar.builder || specValue(specs, "Builder"),
@@ -666,7 +672,8 @@ async function loadRecordsForUser(supabase: ReturnType<typeof createServerSupaba
           specs: specsByGuitar.get(guitar.id) || [],
           ownerEmail: owner.email || "",
           ownerName: profile.data?.display_name || owner.user_metadata?.display_name || owner.email || "",
-          trust: trustByCode.get((guitar as GuitarRow).qr_code.toUpperCase())
+          trust: trustByCode.get((guitar as GuitarRow).qr_code.toUpperCase()),
+          exposeInternalTrust: true
         });
         instrument.documentFiles = documents;
         return instrument;
@@ -1129,7 +1136,9 @@ export async function PATCH(request: Request) {
       authenticityStatus: isAdmin ? authenticityStatus : currentTrust.authenticityStatus,
       showVerificationBadge: typeof body.showVerificationBadge === "boolean" ? body.showVerificationBadge : currentTrust.showVerificationBadge,
       showAuthenticityBadge: typeof body.showAuthenticityBadge === "boolean" ? body.showAuthenticityBadge : currentTrust.showAuthenticityBadge,
+      internalVerificationNote: isAdmin ? body.internalVerificationNote : currentTrust.internalVerificationNote,
       publicVerificationNote: isAdmin ? body.publicVerificationNote : currentTrust.publicVerificationNote,
+      internalAuthenticityNote: isAdmin ? body.internalAuthenticityNote : currentTrust.internalAuthenticityNote,
       publicAuthenticityNote: isAdmin ? body.publicAuthenticityNote : currentTrust.publicAuthenticityNote
     });
     const trustResult = await supabase.from("site_content").upsert(
