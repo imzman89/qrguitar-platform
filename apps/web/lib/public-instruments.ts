@@ -19,6 +19,9 @@ type GuitarRow = {
   visibility: string | null;
   summary: string | null;
   hero_image_path: string | null;
+  safety_status?: string | null;
+  safety_status_updated_at?: string | null;
+  public_safety_note?: string | null;
   created_at: string | null;
 };
 
@@ -202,6 +205,9 @@ function mapRecord({
     showAuthenticityBadge: trust?.showAuthenticityBadge === false ? false : true,
     publicVerificationNote: trust?.publicVerificationNote || "",
     publicAuthenticityNote: trust?.publicAuthenticityNote || "",
+    safetyStatus: guitar.safety_status === "lost" || guitar.safety_status === "stolen" || guitar.safety_status === "recovered" ? guitar.safety_status : "clear",
+    publicSafetyNote: guitar.public_safety_note || "",
+    safetyStatusUpdatedAt: guitar.safety_status_updated_at || "",
     instrumentType: type,
     builder: guitar.builder || "",
     owner: ownerName || guitar.builder || "Unclaimed",
@@ -329,7 +335,7 @@ export async function getPublicInstruments() {
 
   const { data, error } = await supabase
     .from("guitars")
-    .select("id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,builder,location,status,visibility,summary,hero_image_path,created_at")
+    .select("id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,created_at")
     .eq("visibility", "public")
     .order("created_at", { ascending: false });
 
@@ -369,7 +375,7 @@ export async function getPublicInstrumentByCode(code: string) {
 
   const { data, error } = await supabase
     .from("guitars")
-    .select("id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,builder,location,status,visibility,summary,hero_image_path,created_at")
+    .select("id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,created_at")
     .eq("qr_code", code.toUpperCase())
     .maybeSingle<GuitarRow>();
 

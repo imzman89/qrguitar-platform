@@ -181,6 +181,9 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
         showAuthenticityBadge: stored.showAuthenticityBadge !== false,
         publicVerificationNote: stored.publicVerificationNote || "",
         publicAuthenticityNote: stored.publicAuthenticityNote || "",
+        safetyStatus: stored.safetyStatus === "lost" || stored.safetyStatus === "stolen" || stored.safetyStatus === "recovered" ? stored.safetyStatus : "clear",
+        publicSafetyNote: stored.publicSafetyNote || "",
+        safetyStatusUpdatedAt: stored.safetyStatusUpdatedAt || "",
         heroImageDataUrl: stored.heroImageDataUrl || "",
         galleryImageDataUrls: stored.galleryImageDataUrls && stored.galleryImageDataUrls.length
           ? stored.galleryImageDataUrls
@@ -217,6 +220,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
   const isAuthenticityConfirmed = instrument?.authenticityStatus === "confirmed";
   const showVerificationBadge = instrument?.showVerificationBadge !== false;
   const showAuthenticityBadge = instrument?.showAuthenticityBadge !== false;
+  const safetyStatus = instrument?.safetyStatus === "lost" || instrument?.safetyStatus === "stolen" ? instrument.safetyStatus : "clear";
   const formattedLocation = instrument ? formatRecordLocation(instrument) : "";
   const transferMessage = "Owner-transfer tools are in beta. Contact support for manual help.";
   const latestTransfers = instrument
@@ -385,6 +389,18 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           </div>
         </section>
 
+        {safetyStatus === "lost" || safetyStatus === "stolen" ? (
+          <section className={`scan-safety-alert scan-safety-alert--${safetyStatus}`} aria-label={`Reported ${safetyStatus}`}>
+            <strong>{safetyStatus === "lost" ? "Reported Lost" : "Reported Stolen"}</strong>
+            <p>
+              {safetyStatus === "lost"
+                ? "This instrument has been marked lost by the current record owner."
+                : "This instrument has been marked stolen by the current record owner."}
+            </p>
+            {instrument.publicSafetyNote ? <p>{instrument.publicSafetyNote}</p> : null}
+          </section>
+        ) : null}
+
         <section className="identity-card">
           <div className="identity-grid">
             {specs.map((spec) => (
@@ -514,6 +530,8 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           <span>{instrument.visibility === "private" ? "Private" : "Public"}</span>
           <span>{instrument.instrumentCondition ? instrument.instrumentCondition.toUpperCase() : "USED"}</span>
           <span>{formattedLocation || "Registered"}</span>
+          {safetyStatus === "lost" ? <span>Reported Lost</span> : null}
+          {safetyStatus === "stolen" ? <span>Reported Stolen</span> : null}
           {showVerificationBadge ? <span>{isVerifiedRecord ? "Verified by QRguitar" : "Unverified"}</span> : null}
           {showAuthenticityBadge ? <span>{isAuthenticityConfirmed ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}</span> : null}
         </section>

@@ -42,6 +42,11 @@ create table public.guitars (
   visibility guitar_visibility not null default 'public',
   summary text not null default '',
   hero_image_path text,
+  safety_status text not null default 'clear' check (safety_status in ('clear', 'lost', 'stolen', 'recovered')),
+  safety_status_updated_at timestamptz,
+  safety_status_updated_by uuid references auth.users(id) on delete set null,
+  safety_note text,
+  public_safety_note text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

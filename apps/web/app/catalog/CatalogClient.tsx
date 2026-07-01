@@ -162,6 +162,7 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
                 const verificationStatus = getInstrumentVerificationStatus(record);
                 const authenticityStatus = record.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed";
                 const condition = getInstrumentCondition(record);
+                const safetyStatus = record.safetyStatus === "lost" || record.safetyStatus === "stolen" ? record.safetyStatus : "clear";
                 const imageUrl = record.heroImageDataUrl || record.galleryImageDataUrls?.[0] || "";
 
                 return (
@@ -202,6 +203,8 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
                               {authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}
                             </span>
                           ) : null}
+                          {safetyStatus === "lost" ? <span className="catalog-chip catalog-chip--safety">Reported Lost</span> : null}
+                          {safetyStatus === "stolen" ? <span className="catalog-chip catalog-chip--safety">Reported Stolen</span> : null}
                           <span>{record.year || "Year unknown"}</span>
                           <span>{formatRecordLocation(record) || "Location unknown"}</span>
                           <span>{record.galleryImageDataUrls?.length || (record.heroImageDataUrl ? 1 : 0)} photos</span>

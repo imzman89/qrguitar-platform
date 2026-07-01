@@ -77,6 +77,10 @@ export default function EditInstrumentPage() {
   const [internalAuthenticityNote, setInternalAuthenticityNote] = useState("");
   const [publicAuthenticityNote, setPublicAuthenticityNote] = useState("");
   const [canManageVerification, setCanManageVerification] = useState(false);
+  const [safetyStatus, setSafetyStatus] = useState<"clear" | "lost" | "stolen" | "recovered">("clear");
+  const [publicSafetyNote, setPublicSafetyNote] = useState("");
+  const [safetyNote, setSafetyNote] = useState("");
+  const [savingSafety, setSavingSafety] = useState(false);
   const [serviceEvents, setServiceEvents] = useState<ServiceHistoryEntry[]>([]);
   const [serviceForm, setServiceForm] = useState(emptyServiceForm);
   const [editingServiceId, setEditingServiceId] = useState("");
@@ -146,6 +150,9 @@ export default function EditInstrumentPage() {
             setPublicVerificationNote(instrument.publicVerificationNote || "");
             setInternalAuthenticityNote(instrument.internalAuthenticityNote || "");
             setPublicAuthenticityNote(instrument.publicAuthenticityNote || "");
+            setSafetyStatus(instrument.safetyStatus === "lost" || instrument.safetyStatus === "stolen" || instrument.safetyStatus === "recovered" ? instrument.safetyStatus : "clear");
+            setPublicSafetyNote(instrument.publicSafetyNote || "");
+            setSafetyNote(instrument.safetyNote || "");
             setCanManageVerification(Boolean(payload.canManageVerification));
             setServiceEvents(instrument.serviceEvents || []);
             setReady(true);
@@ -554,6 +561,54 @@ export default function EditInstrumentPage() {
     }
   }
 
+  async function saveSafetyStatus() {
+    if (!original) {
+      return;
+    }
+
+    setSavingSafety(true);
+    setMessage("");
+    try {
+      const token = await getSupabaseAccessToken();
+      const response = await fetch("/api/safety-status", {
+        method: "PATCH",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          qrCode: original.qrCode || code,
+          safetyStatus,
+          publicSafetyNote,
+          safetyNote
+        })
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { ok?: boolean; message?: string; safetyStatus?: "clear" | "lost" | "stolen" | "recovered"; publicSafetyNote?: string; safetyStatusUpdatedAt?: string }
+        | null;
+
+      if (!response.ok || !payload?.ok) {
+        setMessage(payload?.message || "Could not update safety status.");
+        return;
+      }
+
+      const nextSafetyStatus = payload.safetyStatus || safetyStatus;
+      setSafetyStatus(nextSafetyStatus);
+      setPublicSafetyNote(payload.publicSafetyNote || "");
+      setOriginal({
+        ...original,
+        safetyStatus: nextSafetyStatus,
+        publicSafetyNote: payload.publicSafetyNote || "",
+        safetyStatusUpdatedAt: payload.safetyStatusUpdatedAt || ""
+      });
+      setMessage("Safety status updated. The permanent QRguitar ID and URL stayed the same.");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("qrguitar:catalog-updated"));
+      }
+    } catch {
+      setMessage("Could not update safety status. Check your connection and try again.");
+    } finally {
+      setSavingSafety(false);
+    }
+  }
+
   return ready && original && !forbidden ? (
     <>
       <Nav />
@@ -652,6 +707,49 @@ export default function EditInstrumentPage() {
                   </label>
                   <button className="button secondary" type="button" onClick={() => void saveVerification()}>
                     Save trust settings
+                  </button>
+                </div>
+              </section>
+              <section className="card verification-card" aria-label="Safety status">
+                <div>
+                  <span className="eyebrow">Safety Status</span>
+                  <h3>{safetyStatus === "lost" ? "Reported Lost" : safetyStatus === "stolen" ? "Reported Stolen" : safetyStatus === "recovered" ? "Recovered" : "Clear"}</h3>
+                  <p>Mark a record lost or stolen so anyone who scans the QR can see the alert.</p>
+                </div>
+                <div className="form-grid">
+                  <div className="field">
+                    <label htmlFor="safetyStatus">Current status</label>
+                    <select
+                      id="safetyStatus"
+                      value={safetyStatus}
+                      onChange={(event) => setSafetyStatus(event.target.value === "lost" || event.target.value === "stolen" || event.target.value === "recovered" ? event.target.value : "clear")}
+                    >
+                      <option value="clear">Clear</option>
+                      <option value="lost">Lost</option>
+                      <option value="stolen">Stolen</option>
+                      <option value="recovered">Recovered</option>
+                    </select>
+                  </div>
+                  <div className="field custom-wide">
+                    <label htmlFor="publicSafetyNote">Public safety note</label>
+                    <textarea
+                      id="publicSafetyNote"
+                      rows={3}
+                      value={publicSafetyNote}
+                      onChange={(event) => setPublicSafetyNote(event.target.value)}
+                    />
+                  </div>
+                  <div className="field custom-wide">
+                    <label htmlFor="safetyNote">Private/internal note</label>
+                    <textarea
+                      id="safetyNote"
+                      rows={3}
+                      value={safetyNote}
+                      onChange={(event) => setSafetyNote(event.target.value)}
+                    />
+                  </div>
+                  <button className="button secondary" type="button" onClick={() => void saveSafetyStatus()} disabled={savingSafety}>
+                    {savingSafety ? "Saving..." : "Save Safety Status"}
                   </button>
                 </div>
               </section>

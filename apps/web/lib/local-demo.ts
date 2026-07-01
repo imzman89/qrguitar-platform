@@ -29,6 +29,7 @@ export type AccountPlan = "free" | "paid" | "brand" | "commercial";
 export type AccountVerificationStatus = "unverified" | "verified" | "flagged";
 export type RecordVerificationStatus = "unverified" | "verified";
 export type RecordAuthenticityStatus = "unconfirmed" | "confirmed";
+export type RecordSafetyStatus = "clear" | "lost" | "stolen" | "recovered";
 
 export type DemoInstrument = {
   qrCode: string;
@@ -49,6 +50,10 @@ export type DemoInstrument = {
   publicVerificationNote?: string;
   internalAuthenticityNote?: string;
   publicAuthenticityNote?: string;
+  safetyStatus?: RecordSafetyStatus;
+  publicSafetyNote?: string;
+  safetyStatusUpdatedAt?: string;
+  safetyNote?: string;
   instrumentType?: string;
   builder?: string;
   owner: string;

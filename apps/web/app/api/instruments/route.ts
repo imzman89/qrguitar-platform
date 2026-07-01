@@ -95,6 +95,11 @@ type GuitarRow = {
   visibility: string;
   summary: string;
   hero_image_path: string | null;
+  safety_status?: string | null;
+  safety_status_updated_at?: string | null;
+  safety_status_updated_by?: string | null;
+  safety_note?: string | null;
+  public_safety_note?: string | null;
   created_at: string;
 };
 
@@ -557,6 +562,10 @@ function mapInstrumentRow({
     publicVerificationNote: trust?.publicVerificationNote || "",
     ...(exposeInternalTrust ? { internalAuthenticityNote: trust?.internalAuthenticityNote || "" } : {}),
     publicAuthenticityNote: trust?.publicAuthenticityNote || "",
+    safetyStatus: guitar.safety_status === "lost" || guitar.safety_status === "stolen" || guitar.safety_status === "recovered" ? guitar.safety_status : "clear",
+    publicSafetyNote: guitar.public_safety_note || "",
+    safetyStatusUpdatedAt: guitar.safety_status_updated_at || "",
+    ...(exposeInternalTrust ? { safetyNote: guitar.safety_note || "" } : {}),
     instrumentType: specValue(specs, "Type") || guitar.model || "",
     builder: guitar.builder || specValue(specs, "Builder"),
     owner: ownerName || ownerEmail || "Unclaimed",
@@ -656,6 +665,7 @@ async function loadTrustSettingsMap(supabase: ReturnType<typeof createServerSupa
 function stripAnonymousInstrumentFields(instrument: DemoInstrument) {
   const publicInstrument = { ...instrument };
   delete publicInstrument.ownerUserEmail;
+  delete publicInstrument.safetyNote;
   return publicInstrument;
 }
 

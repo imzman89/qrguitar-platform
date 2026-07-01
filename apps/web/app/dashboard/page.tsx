@@ -299,6 +299,7 @@ export default function DashboardPage() {
                   const condition = getInstrumentCondition(instrument);
                   const verificationStatus = getInstrumentVerificationStatus(instrument);
                   const authenticityStatus = instrument.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed";
+                  const safetyStatus = instrument.safetyStatus === "lost" || instrument.safetyStatus === "stolen" ? instrument.safetyStatus : "clear";
                   const title = dashboardRecordTitle(instrument);
                   const meta = dashboardRecordMeta(instrument, condition);
                   const category = instrument.instrumentType || "Instrument";
@@ -324,6 +325,8 @@ export default function DashboardPage() {
                               {instrument.showAuthenticityBadge !== false ? (
                                 <small>{authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}</small>
                               ) : null}
+                              {safetyStatus === "lost" ? <small>Reported Lost</small> : null}
+                              {safetyStatus === "stolen" ? <small>Reported Stolen</small> : null}
                               <small>{category}</small>
                             </div>
                           </div>
