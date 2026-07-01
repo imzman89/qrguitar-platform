@@ -72,6 +72,12 @@ type SiteContentRow = {
   content_value: Partial<RecordTrustSettings> | null;
 };
 
+const RETIRED_PUBLIC_RECORD_CODES = new Set(["QRG-PI260001"]);
+
+export function isRetiredPublicRecordCode(code: string) {
+  return RETIRED_PUBLIC_RECORD_CODES.has(String(code || "").trim().toUpperCase());
+}
+
 const stalePublicSpecValues = new Set([
   "custom reptile finish",
   "alder",
@@ -399,6 +405,10 @@ export async function getPublicInstruments() {
 
 export async function getPublicInstrumentByCode(code: string) {
   noStore();
+  if (isRetiredPublicRecordCode(code)) {
+    return null;
+  }
+
   const supabase = createServerSupabaseClient();
   if (!supabase) {
     return null;
