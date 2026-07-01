@@ -9,14 +9,10 @@ import { Nav } from "../../components/Nav";
 import { QrDownload } from "../../components/QrDownload";
 import styles from "./dashboard-records.module.css";
 import {
-  cancelDemoTransfer,
-  createDemoTransfer,
-  getDemoTransfers,
   getAccountPlan,
   getDisplayName,
   getInstrumentCondition,
   getInstrumentVerificationStatus,
-  getLatestDemoTransferForInstrument,
   instrumentToProfileUrl,
   transferStatusLabel,
   type DemoInstrument,
@@ -74,8 +70,6 @@ export default function DashboardPage() {
       }
     });
 
-    setTransfers(getDemoTransfers());
-
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       authResolved = true;
       window.clearTimeout(timeout);
@@ -100,24 +94,17 @@ export default function DashboardPage() {
     let cancelled = false;
     setLoadingRecords(true);
 
-    getSupabaseAccessToken()
-      .then((token) => fetch("/api/instruments?scope=mine", { headers: { authorization: `Bearer ${token}` } }))
-      .then(async (response) => {
-        const payload = (await response.json().catch(() => null)) as
-          | { ok?: boolean; instruments?: DemoInstrument[]; count?: number; message?: string }
-          | null;
+    getSupabaseAccessToken().then(async (token) => {
+      const [records, transferRecords] = await Promise.all([
+        loadDashboardInstruments(token),
+        loadDashboardTransfers(token)
+      ]);
 
-        if (!response.ok || !payload?.ok) {
-          return [];
-        }
-
-        return payload.instruments || [];
-      })
-      .then((records) => {
         if (!cancelled) {
           setInstruments(mergeDashboardRecords(records, user));
+        setTransfers(transferRecords);
         }
-      })
+    })
       .finally(() => {
         if (!cancelled) {
           setLoadingRecords(false);
@@ -145,21 +132,17 @@ export default function DashboardPage() {
     }
 
     getSupabaseAccessToken()
-      .then((token) => fetch("/api/instruments?scope=mine", { headers: { authorization: `Bearer ${token}` } }))
-      .then(async (response) => {
-        const payload = (await response.json().catch(() => null)) as
-          | { ok?: boolean; instruments?: DemoInstrument[]; count?: number; message?: string }
-          | null;
-
-        if (!response.ok || !payload?.ok) {
-          return [];
-        }
-
-        return payload.instruments || [];
+      .then(async (token) => {
+        const [records, transferRecords] = await Promise.all([
+          loadDashboardInstruments(token),
+          loadDashboardTransfers(token)
+        ]);
+        return { records, transferRecords };
       })
-      .then((records) => setInstruments(mergeDashboardRecords(records, user)));
-
-    setTransfers(getDemoTransfers());
+      .then(({ records, transferRecords }) => {
+        setInstruments(mergeDashboardRecords(records, user));
+        setTransfers(transferRecords);
+      });
   }
 
   const stats = useMemo(
@@ -374,11 +357,11 @@ export default function DashboardPage() {
                         bodyClassName={styles.transferPanelBody}
                         instrument={instrument}
                         user={user}
-                        latestTransfer={transfers.find((transfer) => transfer.id === getLatestDemoTransferForInstrument(instrument.qrCode)?.id)}
+                        latestTransfer={latestTransferForInstrument(transfers, instrument.qrCode)}
                         onTransferCreated={(transfer) => {
                           setTransfers((current) => [transfer, ...current.filter((item) => item.id !== transfer.id)]);
                         }}
-                        onTransferChanged={() => setTransfers(getDemoTransfers())}
+                        onTransferChanged={refreshInstruments}
                       />
                     </article>
                   );
@@ -465,6 +448,7 @@ function TransferPanel({
   const [transferNote, setTransferNote] = useState("");
   const [message, setMessage] = useState("");
   const [lastCreatedClaimUrl, setLastCreatedClaimUrl] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const claimUrl =
     typeof window !== "undefined" && latestTransfer ? `${window.location.origin}${latestTransfer.claimPath}` : "";
@@ -481,42 +465,77 @@ function TransferPanel({
     setMessage("Claim link copied. Send this link to the next owner.");
   }
 
-  function createTransfer() {
-    const result = createDemoTransfer(
-      instrument,
-      toEmail,
-      toName,
-      user?.name || instrument.owner || "Current owner",
-      user?.email || ""
-    );
+  async function createTransfer() {
+    setMessage("");
+    setSaving(true);
+    try {
+      const token = await getSupabaseAccessToken();
+      const response = await fetch("/api/transfers", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          qrCode: instrument.qrCode,
+          toEmail,
+          toName
+        })
+      });
+      const result = (await response.json().catch(() => null)) as
+        | { ok?: boolean; message?: string; transfer?: DemoTransfer }
+        | null;
 
-    if (!result.ok) {
-      setMessage(result.reason);
-      return;
+      if (!response.ok || !result?.ok || !result.transfer) {
+        setMessage(result?.message || "Could not create transfer.");
+        return;
+      }
+
+      const nextClaimUrl = typeof window !== "undefined" ? `${window.location.origin}${result.transfer.claimPath}` : result.transfer.claimPath;
+      setLastCreatedClaimUrl(nextClaimUrl);
+      setTransferNote("");
+      onTransferCreated(result.transfer);
+      setMessage(result.message || "Claim link created. Send this link to the next owner.");
+    } finally {
+      setSaving(false);
     }
-
-    const { transfer } = result;
-    const nextClaimUrl = typeof window !== "undefined" ? `${window.location.origin}${transfer.claimPath}` : transfer.claimPath;
-    setLastCreatedClaimUrl(nextClaimUrl);
-    setTransferNote("");
-    onTransferCreated(transfer);
-    setMessage("Claim link created. Send this link to the next owner.");
   }
 
-  function cancelTransfer() {
+  async function cancelTransfer() {
     if (!latestTransfer) {
       return;
     }
 
-    const result = cancelDemoTransfer(latestTransfer.id);
-    if (!result.ok) {
-      setMessage(result.reason);
-      return;
-    }
+    setMessage("");
+    setSaving(true);
+    try {
+      const token = await getSupabaseAccessToken();
+      const response = await fetch("/api/transfers", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ id: latestTransfer.id, action: "cancel" })
+      });
+      const result = (await response.json().catch(() => null)) as
+        | { ok?: boolean; message?: string; transfer?: DemoTransfer }
+        | null;
 
-    setLastCreatedClaimUrl("");
-    setMessage("Transfer cancelled.");
-    onTransferChanged();
+      if (!response.ok || !result?.ok) {
+        setMessage(result?.message || "Could not cancel transfer.");
+        return;
+      }
+
+      setLastCreatedClaimUrl("");
+      if (result.transfer) {
+        onTransferCreated(result.transfer);
+      }
+      setMessage(result.message || "Transfer cancelled.");
+      onTransferChanged();
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -570,16 +589,17 @@ function TransferPanel({
                 <button
                   className="button secondary"
                   type="button"
-                  onClick={cancelTransfer}
+                  onClick={() => void cancelTransfer()}
+                  disabled={saving}
                 >
                   Cancel Transfer
                 </button>
               ) : null}
             </div>
           ) : (
-            <button className="button" type="button" onClick={createTransfer}>
+            <button className="button" type="button" onClick={() => void createTransfer()} disabled={saving}>
               <Mail size={16} />
-              Create Claim Link
+              {saving ? "Creating..." : "Create Claim Link"}
             </button>
           )}
         </div>
@@ -632,6 +652,54 @@ function dashboardRecordTitle(instrument: DemoInstrument) {
   }
 
   return brand || model || instrument.serial || instrument.qrCode || "Untitled instrument";
+}
+
+async function loadDashboardInstruments(token: string) {
+  if (!token) {
+    return [];
+  }
+
+  const response = await fetch("/api/instruments?scope=mine", { headers: { authorization: `Bearer ${token}` } });
+  const payload = (await response.json().catch(() => null)) as
+    | { ok?: boolean; instruments?: DemoInstrument[]; count?: number; message?: string }
+    | null;
+
+  if (!response.ok || !payload?.ok) {
+    return [];
+  }
+
+  return payload.instruments || [];
+}
+
+async function loadDashboardTransfers(token: string) {
+  if (!token) {
+    return [];
+  }
+
+  const response = await fetch("/api/transfers?scope=mine", { headers: { authorization: `Bearer ${token}` } });
+  const payload = (await response.json().catch(() => null)) as
+    | { ok?: boolean; transfers?: DemoTransfer[]; message?: string }
+    | null;
+
+  if (!response.ok || !payload?.ok) {
+    return [];
+  }
+
+  return payload.transfers || [];
+}
+
+function latestTransferForInstrument(transfers: DemoTransfer[], qrCode: string) {
+  return transfers
+    .filter((transfer) => transfer.guitarQrCode.toUpperCase() === qrCode.toUpperCase())
+    .sort((first, second) => {
+      if (first.status === "sent" && second.status !== "sent") {
+        return -1;
+      }
+      if (first.status !== "sent" && second.status === "sent") {
+        return 1;
+      }
+      return Date.parse(second.createdAt || "") - Date.parse(first.createdAt || "");
+    })[0];
 }
 
 function dashboardRecordMeta(instrument: DemoInstrument, condition: "new" | "used") {

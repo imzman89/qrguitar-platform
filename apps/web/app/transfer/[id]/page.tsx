@@ -2,125 +2,104 @@
 
 import { BadgeCheck, Copy, LogIn, Repeat2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Footer } from "../../../components/Footer";
 import { Nav } from "../../../components/Nav";
-import {
-  acceptDemoTransfer,
-  findDemoInstrument,
-  findDemoTransfer,
-  getDemoUser,
-  instrumentToProfileUrl,
-  sendDemoTransferClaimCode,
-  saveDemoUser,
-  transferStatusLabel,
-  verifyDemoTransferClaimCode,
-  type DemoInstrument,
-  type DemoTransfer,
-  type DemoUser
-} from "../../../lib/local-demo";
+import { transferStatusLabel, type DemoTransfer } from "../../../lib/local-demo";
+import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../../lib/supabase-browser";
+
+type TransferPayload = {
+  ok?: boolean;
+  message?: string;
+  transfer?: DemoTransfer;
+  permanentPath?: string;
+  requiresSignIn?: boolean;
+};
 
 export default function TransferClaimPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
+  const transferId = String(params.id || "");
   const [transfer, setTransfer] = useState<DemoTransfer | null>(null);
-  const [instrument, setInstrument] = useState<DemoInstrument | null>(null);
+  const [permanentPath, setPermanentPath] = useState("");
   const [message, setMessage] = useState("");
-  const [verificationCode, setVerificationCode] = useState("");
-  const [localCodeNotice, setLocalCodeNotice] = useState("");
-  const [account, setAccount] = useState<DemoUser>({
-    name: "",
-    email: "",
-    role: "owner",
-    plan: "free",
-    verificationStatus: "unverified"
-  });
+  const [loading, setLoading] = useState(true);
+  const [signedIn, setSignedIn] = useState(false);
+  const [accepting, setAccepting] = useState(false);
 
   useEffect(() => {
-    const foundTransfer = findDemoTransfer(params.id);
-    setTransfer(foundTransfer);
+    let cancelled = false;
 
-    if (foundTransfer) {
-      setInstrument(findDemoInstrument(foundTransfer.guitarQrCode));
-      setAccount((current) => ({
-        ...current,
-        name: foundTransfer.toName || current.name,
-        email: foundTransfer.toEmail || current.email
-      }));
+    async function loadTransfer() {
+      setLoading(true);
+      const supabase = createBrowserSupabaseClient();
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token || "";
+      const response = await fetch(`/api/transfers?id=${encodeURIComponent(transferId)}`, {
+        headers: token ? { authorization: `Bearer ${token}` } : undefined
+      });
+      const payload = (await response.json().catch(() => null)) as TransferPayload | null;
+
+      if (cancelled) {
+        return;
+      }
+
+      setSignedIn(Boolean(data.session?.user));
+      if (!response.ok || !payload?.ok || !payload.transfer) {
+        setTransfer(null);
+        setMessage(payload?.message || "This claim link was not found.");
+      } else {
+        setTransfer(payload.transfer);
+        setMessage("");
+      }
+      setLoading(false);
     }
 
-    const user = getDemoUser();
-    if (user) {
-      setAccount(user);
-    }
-  }, [params.id]);
+    void loadTransfer();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [transferId]);
 
   const profileHref = useMemo(() => {
-    if (instrument) {
-      return instrumentToProfileUrl(instrument);
+    if (permanentPath) {
+      return permanentPath;
     }
 
-    return transfer ? `/i/${transfer.guitarQrCode}` : "/dashboard";
-  }, [instrument, transfer]);
+    return transfer?.guitarQrCode ? `/i/${transfer.guitarQrCode}` : "/dashboard";
+  }, [permanentPath, transfer?.guitarQrCode]);
 
-  function acceptTransfer() {
+  async function acceptTransfer() {
     if (!transfer) {
       return;
     }
 
-    const user: DemoUser = {
-      ...account,
-      name: account.name.trim() || transfer.toName || "New owner",
-      email: account.email.trim() || transfer.toEmail,
-      role: "owner",
-      plan: account.plan || "free",
-      verificationStatus: account.verificationStatus || "unverified"
-    };
+    setAccepting(true);
+    setMessage("");
+    try {
+      const token = await getSupabaseAccessToken();
+      const response = await fetch("/api/transfers", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ id: transfer.id, action: "accept" })
+      });
+      const payload = (await response.json().catch(() => null)) as TransferPayload | null;
 
-    saveDemoUser(user);
-    const accepted = acceptDemoTransfer(transfer.id, user);
+      if (!response.ok || !payload?.ok || !payload.transfer) {
+        setMessage(payload?.message || "Could not accept this transfer.");
+        return;
+      }
 
-    if (!accepted.ok) {
-      setMessage(accepted.reason);
-      return;
+      setTransfer(payload.transfer);
+      setPermanentPath(payload.permanentPath || "");
+      setMessage(payload.message || "Ownership accepted. The permanent QRguitar URL stayed the same.");
+    } finally {
+      setAccepting(false);
     }
-
-    setTransfer(accepted.transfer);
-    setInstrument(findDemoInstrument(accepted.transfer.guitarQrCode));
-    setMessage("Ownership accepted. This guitar is now attached to your local QRguitar account.");
-  }
-
-  function sendVerificationCode() {
-    if (!transfer) {
-      return;
-    }
-
-    const result = sendDemoTransferClaimCode(transfer.id, account.email);
-    if (!result.ok) {
-      setMessage(result.reason);
-      return;
-    }
-
-    setTransfer(result.transfer);
-    setLocalCodeNotice(`Local test code: ${result.code}`);
-    setMessage("Verification code sent. Paste it below to unlock ownership acceptance.");
-  }
-
-  function verifyClaimEmail() {
-    if (!transfer) {
-      return;
-    }
-
-    const result = verifyDemoTransferClaimCode(transfer.id, account.email, verificationCode);
-    if (!result.ok) {
-      setMessage(result.reason);
-      return;
-    }
-
-    setTransfer(result.transfer);
-    setLocalCodeNotice("");
-    setMessage("Buyer email verified. You can accept ownership now.");
   }
 
   async function copyProfileLink() {
@@ -132,19 +111,38 @@ export default function TransferClaimPage() {
     setMessage("Profile link copied.");
   }
 
+  if (loading) {
+    return (
+      <>
+        <Nav />
+        <main className="section auth-page">
+          <div className="shell auth-layout">
+            <section className="card auth-card">
+              <div className="eyebrow">Ownership transfer</div>
+              <h1>Checking claim link.</h1>
+              <p>Loading this ownership transfer now.</p>
+            </section>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
   if (!transfer) {
     return (
       <>
         <Nav />
         <main className="section auth-page">
           <div className="shell auth-layout">
-            <section>
+            <section className="card auth-card">
               <div className="eyebrow">Ownership transfer</div>
               <h1>This claim link was not found.</h1>
               <p>Ask the seller, builder, or shop to create a fresh QRguitar ownership transfer link.</p>
               <Link className="button" href="/dashboard">
                 Go to Dashboard
               </Link>
+              {message ? <p className="form-message">{message}</p> : null}
             </section>
           </div>
         </main>
@@ -160,25 +158,25 @@ export default function TransferClaimPage() {
         <div className="shell transfer-claim-layout">
           <section>
             <div className="eyebrow">Ownership transfer</div>
-              <h1>Accept ownership of {transfer.guitarName}.</h1>
+            <h1>Accept ownership of {transfer.guitarName}.</h1>
             <p>
               {transfer.status === "accepted"
-                ? "This claim has already been received. The permanent QR link stays with the instrument."
-              : transfer.status === "cancelled"
-                  ? "This transfer was cancelled. Ask the seller, builder, or shop for a fresh transfer link."
-                  : "Owner transfer tools are in beta. Verify your email so the current owner has a clean claim request to review."}
+                ? "This claim has already been accepted. The permanent QR link stays with the instrument."
+                : transfer.status === "cancelled"
+                  ? "This transfer was cancelled. Ask the current owner for a fresh transfer link."
+                  : "Sign in with the recipient email on this transfer to accept ownership. The QRguitar URL will not change."}
             </p>
             <div className="transfer-summary card">
               <div className="icon">
                 <Repeat2 />
               </div>
               <div>
-                <span>From</span>
-                <strong>{transfer.fromOwnerName}</strong>
+                <span>Record</span>
+                <strong>{transfer.guitarName}</strong>
               </div>
               <div>
-                <span>To</span>
-                <strong>{transfer.toName || transfer.toEmail}</strong>
+                <span>QRguitar ID</span>
+                <strong>{transfer.guitarQrCode}</strong>
               </div>
               <div>
                 <span>Status</span>
@@ -187,7 +185,7 @@ export default function TransferClaimPage() {
             </div>
             <div className="claim-assurance">
               <span><ShieldCheck size={18} /> Permanent QR link stays the same</span>
-              <span><BadgeCheck size={18} /> New owner email must be verified</span>
+              <span><BadgeCheck size={18} /> Recipient must be signed in</span>
             </div>
           </section>
 
@@ -196,13 +194,13 @@ export default function TransferClaimPage() {
               <>
                 <div className="icon"><BadgeCheck /></div>
                 <h3>Ownership accepted.</h3>
-                <p>This record now reflects the new owner and keeps the same permanent QRguitar link.</p>
+                <p>This record now belongs to the accepting account and keeps the same permanent QRguitar link.</p>
                 <Link className="button" href={profileHref}>
-                  View Guitar Profile
+                  View Record
                 </Link>
                 <button className="button secondary" type="button" onClick={() => void copyProfileLink()}>
                   <Copy size={16} />
-                  Copy Profile Link
+                  Copy Record Link
                 </button>
                 <Link className="button secondary" href="/dashboard">
                   Open Dashboard
@@ -214,61 +212,32 @@ export default function TransferClaimPage() {
                 <h3>This transfer was cancelled.</h3>
                 <p>The current owner needs to create a new claim link before this instrument can be handed off.</p>
                 <Link className="button" href={profileHref}>
-                  View Guitar Profile
+                  View Record
+                </Link>
+              </>
+            ) : !signedIn ? (
+              <>
+                <div className="icon"><LogIn /></div>
+                <h3>Sign in to accept ownership.</h3>
+                <p>Create an account or sign in with the recipient email on this transfer. Then return to this claim link to accept it.</p>
+                <Link className="button" href={`/login?next=${encodeURIComponent(`/transfer/${transfer.id}`)}`}>
+                  Sign in
+                </Link>
+                <Link className="button secondary" href={`/login?next=${encodeURIComponent(`/transfer/${transfer.id}`)}`}>
+                  Create account
                 </Link>
               </>
             ) : (
               <>
                 <div className="icon"><LogIn /></div>
-                <h3>Verify your email.</h3>
-                <p>Enter the details from the ownership transfer, send the verification code, then submit the claim for the current owner to review.</p>
-                <div className="field">
-                  <label htmlFor="claimName">Your name</label>
-                  <input
-                    id="claimName"
-                    value={account.name}
-                    onChange={(event) => setAccount({ ...account, name: event.target.value })}
-                    placeholder="Your name"
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor="claimEmail">Your email</label>
-                  <input
-                    id="claimEmail"
-                    type="email"
-                    value={account.email}
-                    onChange={(event) => setAccount({ ...account, email: event.target.value })}
-                    placeholder="you@example.com"
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor="claimCode">Verification code</label>
-                  <input
-                    id="claimCode"
-                    value={verificationCode}
-                    onChange={(event) => setVerificationCode(event.target.value)}
-                    placeholder={transfer.claimEmailVerifiedAt ? "Email verified" : "Send code first"}
-                    disabled={Boolean(transfer.claimEmailVerifiedAt)}
-                  />
-                </div>
-                {localCodeNotice ? <p className="fine-print">{localCodeNotice}</p> : null}
-                {transfer.claimEmailVerifiedAt ? (
-                  <button className="button" type="button" onClick={acceptTransfer}>
-                    Submit Ownership Claim
-                  </button>
-                ) : (
-                  <>
-                    <button className="button" type="button" onClick={sendVerificationCode}>
-                      Send Verification Code
-                    </button>
-                    <button className="button secondary" type="button" onClick={verifyClaimEmail}>
-                      Verify Email
-                    </button>
-                  </>
-                )}
-                <button className="button secondary" type="button" onClick={() => router.push(profileHref)}>
-                  Preview Profile First
+                <h3>Ready to accept.</h3>
+                <p>Accepting transfers ownership of this QRguitar record to your signed-in account. The public QR URL stays unchanged.</p>
+                <button className="button" type="button" onClick={() => void acceptTransfer()} disabled={accepting}>
+                  {accepting ? "Accepting..." : "Accept Ownership"}
                 </button>
+                <Link className="button secondary" href={profileHref}>
+                  Preview Record First
+                </Link>
               </>
             )}
             {message ? <p className="form-message">{message}</p> : null}
