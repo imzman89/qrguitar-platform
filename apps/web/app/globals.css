@@ -937,6 +937,52 @@ select {
   line-height: 1.6;
 }
 
+.legal-page {
+  max-width: 860px;
+}
+
+.legal-page h1 {
+  max-width: 720px;
+  margin: 12px 0 18px;
+  font-size: clamp(42px, 7vw, 76px);
+  line-height: .96;
+}
+
+.legal-page > p {
+  max-width: 720px;
+  color: var(--muted-strong);
+  font-size: 18px;
+  line-height: 1.7;
+}
+
+.legal-card {
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 20px;
+  background: rgba(248, 246, 242, .04);
+}
+
+.legal-card h2 {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: 22px;
+}
+
+.legal-card p {
+  margin: 0 0 10px;
+  color: var(--muted-strong);
+  line-height: 1.65;
+}
+
+.legal-card p:last-child {
+  margin-bottom: 0;
+}
+
+.legal-card a:not(.button) {
+  color: var(--gold);
+}
+
 .grid {
   display: grid;
   gap: 24px;

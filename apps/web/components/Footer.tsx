@@ -55,6 +55,9 @@ export function Footer() {
           <Link href="/dashboard">Dashboard</Link>
           <Link href="/catalog">Catalog</Link>
           <Link href="/create">Create</Link>
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/terms">Terms</Link>
+          <Link href="/contact">Contact</Link>
           {isSignedIn ? (
             <button type="button" onClick={() => void logout()}>Logout</button>
           ) : (
