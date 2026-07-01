@@ -154,7 +154,7 @@ export const defaultQrStyle: QrStyle = {
   foreground: "#f8f6f2",
   background: "#071014",
   includeLabel: true,
-  labelText: "Scan for verified QRguitar record",
+  labelText: "Scan QRguitar record",
   shape: "classic"
 };
 

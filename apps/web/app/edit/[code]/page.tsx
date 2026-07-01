@@ -42,6 +42,18 @@ const emptyForm = {
 const managedFieldLabels = new Set(["instrument type", "builder", "finish", "weight", "owner status", "specs notes", "service notes"]);
 const serviceEventTypes = ["Setup", "Repair", "Modification", "Pickup Install", "Wiring", "Fretwork", "Inspection", "Appraisal/Review", "Cleaning", "Other"];
 const documentTypeOptions = ["Receipt", "Invoice", "Appraisal", "Certificate", "Build Sheet", "Service Slip", "Insurance Photo", "Warranty", "Authenticity Evidence", "Other"];
+const oldVerifiedQrLabel = "Scan for verified QRguitar record";
+const safeDefaultQrLabel = "Scan QRguitar record";
+const qaTestStrings = new Set([
+  "QA Lost Test",
+  "PRIVATE SAFETY NOTE SHOULD NOT LEAK",
+  "QA Public Service Test",
+  "QA Private Service Test",
+  "QA Public Proof Test",
+  "QA Private Proof Test",
+  "TEST LIVE SAVE",
+  "Cross-Platform Live Test"
+]);
 type DocumentDraft = {
   id: string;
   name: string;
@@ -92,6 +104,7 @@ export default function EditInstrumentPage() {
   const [publicSafetyNote, setPublicSafetyNote] = useState("");
   const [safetyNote, setSafetyNote] = useState("");
   const [savingSafety, setSavingSafety] = useState(false);
+  const [savingRecord, setSavingRecord] = useState(false);
   const [serviceEvents, setServiceEvents] = useState<ServiceHistoryEntry[]>([]);
   const [serviceForm, setServiceForm] = useState(emptyServiceForm);
   const [editingServiceId, setEditingServiceId] = useState("");
@@ -152,7 +165,7 @@ export default function EditInstrumentPage() {
             setCustomLinks(normalizeCustomLinks(instrument));
             setGalleryImages(normalizeGalleryImages(instrument));
             setDocuments(normalizeDocumentFiles(instrument));
-            setQrStyle(instrument.qrStyle || defaultQrStyle);
+            setQrStyle(normalizeQrStyle(instrument.qrStyle));
             setVerificationStatus(instrument.verificationStatus === "verified" ? "verified" : "unverified");
             setAuthenticityStatus(instrument.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed");
             setShowVerificationBadge(instrument.showVerificationBadge !== false);
@@ -162,8 +175,8 @@ export default function EditInstrumentPage() {
             setInternalAuthenticityNote(instrument.internalAuthenticityNote || "");
             setPublicAuthenticityNote(instrument.publicAuthenticityNote || "");
             setSafetyStatus(instrument.safetyStatus === "lost" || instrument.safetyStatus === "stolen" || instrument.safetyStatus === "recovered" ? instrument.safetyStatus : "clear");
-            setPublicSafetyNote(instrument.publicSafetyNote || "");
-            setSafetyNote(instrument.safetyNote || "");
+            setPublicSafetyNote(stripQaTestString(instrument.publicSafetyNote || ""));
+            setSafetyNote(stripQaTestString(instrument.safetyNote || ""));
             setCanManageVerification(Boolean(payload.canManageVerification));
             setServiceEvents(instrument.serviceEvents || []);
             setReady(true);
@@ -207,6 +220,32 @@ export default function EditInstrumentPage() {
 
   function updateServiceField(field: keyof typeof serviceForm, value: string | boolean) {
     setServiceForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function normalizeQrStyle(style?: QrStyle): QrStyle {
+    const next = style || defaultQrStyle;
+    return {
+      ...next,
+      labelText: next.labelText === oldVerifiedQrLabel ? safeDefaultQrLabel : next.labelText || safeDefaultQrLabel
+    };
+  }
+
+  function stripQaTestString(value: string) {
+    const trimmed = String(value || "").trim();
+    return qaTestStrings.has(trimmed) ? "" : value;
+  }
+
+  function safetyStatusLabel(status: typeof safetyStatus) {
+    if (status === "lost") {
+      return "Reported Lost";
+    }
+    if (status === "stolen") {
+      return "Reported Stolen";
+    }
+    if (status === "recovered") {
+      return "Recovered";
+    }
+    return "No Alert";
   }
 
   async function refreshServiceEvents(qrCode = original?.qrCode || code) {
@@ -450,6 +489,9 @@ export default function EditInstrumentPage() {
       return;
     }
 
+    setSavingRecord(true);
+    setMessage("");
+
     try {
       const token = await getSupabaseAccessToken();
       const response = await fetch("/api/instruments", {
@@ -494,9 +536,50 @@ export default function EditInstrumentPage() {
       const payload = (await response.json().catch(() => null)) as { ok?: boolean; qrCode?: string; permanentPath?: string; message?: string } | null;
 
       if (!response.ok || !payload?.ok) {
-        setMessage(payload?.message || "Could not save record.");
+        setMessage(`Record details failed: ${payload?.message || "Could not save record."}`);
         return;
       }
+
+      if (canManageVerification) {
+        const trustResult = await saveVerificationSettings(token || "");
+        if (!trustResult.ok) {
+          setMessage(`Trust settings failed: ${trustResult.message}`);
+          return;
+        }
+      }
+
+      const safetyResult = await saveSafetySettings(token || "");
+      if (!safetyResult.ok) {
+        setMessage(`Safety status failed: ${safetyResult.message}`);
+        return;
+      }
+
+      const freshRecord = await fetch(`/api/instruments?scope=mine&code=${encodeURIComponent(original?.qrCode || code)}`, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+          authorization: `Bearer ${token}`
+        }
+      })
+        .then((result) => result.json())
+        .catch(() => null) as { ok?: boolean; instrument?: DemoInstrument } | null;
+
+      const savedInstrument = freshRecord?.ok && freshRecord.instrument
+        ? { ...freshRecord.instrument, qrStyle: normalizeQrStyle(freshRecord.instrument.qrStyle) }
+        : {
+          ...instrument,
+          verificationStatus,
+          authenticityStatus,
+          showVerificationBadge,
+          showAuthenticityBadge,
+          internalVerificationNote,
+          publicVerificationNote,
+          internalAuthenticityNote,
+          publicAuthenticityNote,
+          safetyStatus,
+          publicSafetyNote,
+          safetyNote
+        };
 
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("qrguitar:catalog-updated"));
@@ -508,24 +591,25 @@ export default function EditInstrumentPage() {
       router.refresh();
 
       if (preview) {
-        router.push(instrumentToProfileUrl(instrument));
+        router.push(instrumentToProfileUrl(savedInstrument));
         return;
       }
 
-      setOriginal(instrument);
-      setMessage("Changes saved. The permanent QRguitar ID and URL stayed the same.");
+      setOriginal(savedInstrument);
+      setMessage("Saved. The permanent QRguitar ID and URL stayed the same.");
     } catch {
-      setMessage("That photo is too large for browser test storage. Try a smaller image for now.");
+      setMessage("Record details failed: check your connection and file sizes, then try again.");
+    } finally {
+      setSavingRecord(false);
     }
   }
 
-  async function saveVerification() {
+  async function saveVerificationSettings(token: string) {
     if (!original) {
-      return;
+      return { ok: false, message: "Record was not loaded." };
     }
 
     try {
-      const token = await getSupabaseAccessToken();
       const response = await fetch("/api/instruments", {
         method: "PATCH",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
@@ -556,8 +640,7 @@ export default function EditInstrumentPage() {
       } | null;
 
       if (!response.ok || !payload?.ok) {
-        setMessage(payload?.message || "Could not update verification.");
-        return;
+        return { ok: false, message: payload?.message || "Could not update verification." };
       }
 
       const nextVerification = payload.verificationStatus || verificationStatus;
@@ -581,24 +664,19 @@ export default function EditInstrumentPage() {
         internalAuthenticityNote: payload.internalAuthenticityNote || "",
         publicAuthenticityNote: payload.publicAuthenticityNote || ""
       });
-      setMessage("Trust settings updated. The permanent QRguitar ID and URL stayed the same.");
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("qrguitar:catalog-updated"));
-      }
+      return { ok: true, message: "Trust settings saved." };
     } catch {
-      setMessage("Could not update verification. Check your connection and try again.");
+      return { ok: false, message: "Could not update verification. Check your connection and try again." };
     }
   }
 
-  async function saveSafetyStatus() {
+  async function saveSafetySettings(token: string) {
     if (!original) {
-      return;
+      return { ok: false, message: "Record was not loaded." };
     }
 
     setSavingSafety(true);
-    setMessage("");
     try {
-      const token = await getSupabaseAccessToken();
       const response = await fetch("/api/safety-status", {
         method: "PATCH",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
@@ -614,8 +692,7 @@ export default function EditInstrumentPage() {
         | null;
 
       if (!response.ok || !payload?.ok) {
-        setMessage(payload?.message || "Could not update safety status.");
-        return;
+        return { ok: false, message: payload?.message || "Could not update safety status." };
       }
 
       const nextSafetyStatus = payload.safetyStatus || safetyStatus;
@@ -627,12 +704,9 @@ export default function EditInstrumentPage() {
         publicSafetyNote: payload.publicSafetyNote || "",
         safetyStatusUpdatedAt: payload.safetyStatusUpdatedAt || ""
       });
-      setMessage("Safety status updated. The permanent QRguitar ID and URL stayed the same.");
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("qrguitar:catalog-updated"));
-      }
+      return { ok: true, message: "Safety status saved." };
     } catch {
-      setMessage("Could not update safety status. Check your connection and try again.");
+      return { ok: false, message: "Could not update safety status. Check your connection and try again." };
     } finally {
       setSavingSafety(false);
     }
@@ -686,6 +760,10 @@ export default function EditInstrumentPage() {
                 <div className="form-grid">
                   {canManageVerification ? (
                     <>
+                    <div className="form-section-heading custom-wide">
+                      <span className="eyebrow">Admin Trust Controls</span>
+                      <p>Set binary trust badges and notes. These changes save through the main Save Changes button.</p>
+                    </div>
                     <div className="field">
                       <label htmlFor="verificationStatus">Admin verification status</label>
                       <select
@@ -734,15 +812,12 @@ export default function EditInstrumentPage() {
                     <input type="checkbox" checked={showAuthenticityBadge} onChange={(event) => setShowAuthenticityBadge(event.target.checked)} />
                     Show authenticity badge publicly
                   </label>
-                  <button className="button secondary" type="button" onClick={() => void saveVerification()}>
-                    Save trust settings
-                  </button>
                 </div>
               </section>
-              <section className="card verification-card" aria-label="Safety status">
+              <section className="card verification-card" aria-label="Lost or stolen alert">
                 <div>
-                  <span className="eyebrow">Safety Status</span>
-                  <h3>{safetyStatus === "lost" ? "Reported Lost" : safetyStatus === "stolen" ? "Reported Stolen" : safetyStatus === "recovered" ? "Recovered" : "Clear"}</h3>
+                  <span className="eyebrow">Lost / Stolen Alert</span>
+                  <h3>{safetyStatusLabel(safetyStatus)}</h3>
                   <p>Mark a record lost or stolen so anyone who scans the QR can see the alert.</p>
                 </div>
                 <div className="form-grid">
@@ -753,21 +828,29 @@ export default function EditInstrumentPage() {
                       value={safetyStatus}
                       onChange={(event) => setSafetyStatus(event.target.value === "lost" || event.target.value === "stolen" || event.target.value === "recovered" ? event.target.value : "clear")}
                     >
-                      <option value="clear">Clear</option>
-                      <option value="lost">Lost</option>
-                      <option value="stolen">Stolen</option>
+                      <option value="clear">No Alert</option>
+                      <option value="lost">Reported Lost</option>
+                      <option value="stolen">Reported Stolen</option>
                       <option value="recovered">Recovered</option>
                     </select>
                   </div>
-                  <div className="field custom-wide">
-                    <label htmlFor="publicSafetyNote">Public safety note</label>
-                    <textarea
-                      id="publicSafetyNote"
-                      rows={3}
-                      value={publicSafetyNote}
-                      onChange={(event) => setPublicSafetyNote(event.target.value)}
-                    />
-                  </div>
+                  {safetyStatus === "clear" ? (
+                    <div className="field custom-wide">
+                      <label>No public safety alert</label>
+                      <span className="fine-print">No public safety alert is shown while status is No Alert.</span>
+                    </div>
+                  ) : (
+                    <div className="field custom-wide">
+                      <label htmlFor="publicSafetyNote">Public safety note</label>
+                      <textarea
+                        id="publicSafetyNote"
+                        rows={3}
+                        value={publicSafetyNote}
+                        onChange={(event) => setPublicSafetyNote(event.target.value)}
+                        placeholder={safetyStatus === "lost" ? "Reported Lost: This instrument has been marked lost by the current record owner." : safetyStatus === "stolen" ? "Reported Stolen: This instrument has been marked stolen by the current record owner." : "Recovered status note."}
+                      />
+                    </div>
+                  )}
                   <div className="field custom-wide">
                     <label htmlFor="safetyNote">Private/internal note</label>
                     <textarea
@@ -777,9 +860,6 @@ export default function EditInstrumentPage() {
                       onChange={(event) => setSafetyNote(event.target.value)}
                     />
                   </div>
-                  <button className="button secondary" type="button" onClick={() => void saveSafetyStatus()} disabled={savingSafety}>
-                    {savingSafety ? "Saving..." : "Save Safety Status"}
-                  </button>
                 </div>
               </section>
             <form className="card form">
@@ -1095,7 +1175,7 @@ export default function EditInstrumentPage() {
                   </label>
                   <div className="form-actions">
                     <button className="button" type="button" onClick={() => void saveServiceEntry()} disabled={savingService}>
-                      {savingService ? "Saving..." : editingServiceId ? "Update Service Entry" : "Save Service Entry"}
+                      {savingService ? "Saving..." : editingServiceId ? "Update Service Entry" : "Add to Service History"}
                     </button>
                     {editingServiceId ? (
                       <button className="button secondary" type="button" onClick={resetServiceForm}>
@@ -1160,11 +1240,11 @@ export default function EditInstrumentPage() {
               </section>
               {message ? <p className="form-message">{message}</p> : null}
               <div className="form-actions">
-                <button className="button" type="button" onClick={() => void saveChanges(false)}>
-                  Save Changes
+                <button className="button" type="button" onClick={() => void saveChanges(false)} disabled={savingRecord || savingSafety}>
+                  {savingRecord ? "Saving..." : "Save Changes"}
                 </button>
-                <button className="button" type="button" onClick={() => void saveChanges(true)}>
-                  Save and View Profile
+                <button className="button" type="button" onClick={() => void saveChanges(true)} disabled={savingRecord || savingSafety}>
+                  {savingRecord ? "Saving..." : "Save and View Profile"}
                 </button>
                 <Link className="button secondary" href="/dashboard">
                   Back to Dashboard
