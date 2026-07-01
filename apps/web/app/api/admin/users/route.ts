@@ -109,7 +109,7 @@ export async function GET(request: Request) {
   if (status === "active" || status === "locked" || status === "banned") {
     users = users.filter((user) => user.accountStatus === status);
   } else if (status === "admin") {
-    users = users.filter((user) => user.role === "admin" || user.role === "owner");
+    users = users.filter((user) => user.role === "admin");
   } else if (status === "inactive") {
     users = users.filter((user) => !user.lastSignInAt);
   }

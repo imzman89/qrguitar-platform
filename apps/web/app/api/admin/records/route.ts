@@ -13,9 +13,11 @@ type GuitarRow = {
   name: string | null;
   brand: string | null;
   model: string | null;
+  serial_number?: string | null;
   status: string | null;
   visibility: string | null;
   safety_status?: string | null;
+  public_safety_note?: string | null;
   created_at: string | null;
   updated_at?: string | null;
 };
@@ -45,11 +47,11 @@ export async function GET(request: Request) {
   const [guitarsResult, documentsResult, serviceResult, transfersResult, authUsers] = await Promise.all([
     supabase
       .from("guitars")
-      .select("id,owner_id,qr_code,permanent_path,name,brand,model,status,visibility,safety_status,created_at,updated_at")
+      .select("id,owner_id,qr_code,permanent_path,name,brand,model,serial_number,status,visibility,safety_status,public_safety_note,created_at,updated_at")
       .order("created_at", { ascending: false }),
-    supabase.from("guitar_documents").select("id,guitar_id,is_public,document_type,created_at"),
-    supabase.from("guitar_timeline_events").select("id,guitar_id,is_public,event_type,title,created_at"),
-    supabase.from("ownership_transfers").select("id,guitar_id,status,to_email,created_at,accepted_at"),
+    supabase.from("guitar_documents").select("id,guitar_id,name,file_name,file_size_bytes,is_public,document_type,created_at,updated_at"),
+    supabase.from("guitar_timeline_events").select("id,guitar_id,is_public,event_type,title,event_date,shop_name,location,created_at"),
+    supabase.from("ownership_transfers").select("id,guitar_id,from_owner_id,accepted_by,status,to_email,created_at,accepted_at"),
     supabase.auth.admin.listUsers({ page: 1, perPage: 1000 })
   ]);
 
@@ -58,6 +60,7 @@ export async function GET(request: Request) {
   }
 
   const guitars = (guitarsResult.data || []) as GuitarRow[];
+  const recordsById = new Map(guitars.map((guitar) => [guitar.id, guitar]));
   const documentCounts = countByGuitar((documentsResult.data || []) as Array<{ guitar_id: string | null }>);
   const serviceCounts = countByGuitar((serviceResult.data || []) as Array<{ guitar_id: string | null }>);
   const transferCounts = countByGuitar((transfersResult.data || []) as Array<{ guitar_id: string | null }>);
@@ -84,12 +87,16 @@ export async function GET(request: Request) {
         title: guitar.name || [guitar.brand, guitar.model].filter(Boolean).join(" ") || guitar.qr_code,
         brand: guitar.brand || "",
         model: guitar.model || "",
+        serialNumber: guitar.serial_number || "",
         ownerId: guitar.owner_id || "",
         ownerEmail: usersById.get(guitar.owner_id || "") || "",
         visibility: guitar.visibility || "private",
         verificationStatus: guitar.status === "verified" ? "Verified" : "Unverified",
         authenticityStatus: trust?.authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed",
+        showVerificationBadge: trust?.showVerificationBadge !== false,
+        showAuthenticityBadge: trust?.showAuthenticityBadge !== false,
         safetyStatus: guitar.safety_status || "clear",
+        publicSafetyNote: guitar.public_safety_note || "",
         serviceEventCount: serviceCounts.get(guitar.id) || 0,
         proofDocumentCount: documentCounts.get(guitar.id) || 0,
         transferCount: transferCounts.get(guitar.id) || 0,
@@ -97,8 +104,55 @@ export async function GET(request: Request) {
         updatedAt: guitar.updated_at || ""
       };
     }),
-    proofDocuments: documentsResult.data || [],
-    serviceEvents: serviceResult.data || [],
-    transfers: transfersResult.data || []
+    proofDocuments: ((documentsResult.data || []) as Array<Record<string, unknown>>).map((document) => {
+      const guitar = recordsById.get(String(document.guitar_id || ""));
+      return {
+        id: document.id,
+        guitar_id: document.guitar_id,
+        recordCode: guitar?.qr_code || "",
+        recordTitle: guitar?.name || [guitar?.brand, guitar?.model].filter(Boolean).join(" ") || guitar?.qr_code || "",
+        ownerEmail: usersById.get(guitar?.owner_id || "") || "",
+        is_public: document.is_public === true,
+        document_type: document.document_type || "",
+        name: document.name || document.file_name || "Document",
+        file_size: document.file_size_bytes || null,
+        created_at: document.created_at || "",
+        updated_at: document.updated_at || ""
+      };
+    }),
+    serviceEvents: ((serviceResult.data || []) as Array<Record<string, unknown>>).map((event) => {
+      const guitar = recordsById.get(String(event.guitar_id || ""));
+      return {
+        id: event.id,
+        guitar_id: event.guitar_id,
+        recordCode: guitar?.qr_code || "",
+        recordTitle: guitar?.name || [guitar?.brand, guitar?.model].filter(Boolean).join(" ") || guitar?.qr_code || "",
+        ownerEmail: usersById.get(guitar?.owner_id || "") || "",
+        is_public: event.is_public === true,
+        event_type: event.event_type || "",
+        title: event.title || "Service entry",
+        service_date: event.event_date || "",
+        shop_name: event.shop_name || "",
+        location: event.location || "",
+        created_at: event.created_at || ""
+      };
+    }),
+    transfers: ((transfersResult.data || []) as Array<Record<string, unknown>>).map((transfer) => {
+      const guitar = recordsById.get(String(transfer.guitar_id || ""));
+      return {
+        id: transfer.id,
+        guitar_id: transfer.guitar_id,
+        recordCode: guitar?.qr_code || "",
+        recordTitle: guitar?.name || [guitar?.brand, guitar?.model].filter(Boolean).join(" ") || guitar?.qr_code || "",
+        fromOwnerEmail: usersById.get(String(transfer.from_owner_id || "")) || "",
+        acceptedByEmail: usersById.get(String(transfer.accepted_by || "")) || "",
+        to_email: transfer.to_email || "",
+        status: transfer.status || "",
+        created_at: transfer.created_at || "",
+        accepted_at: transfer.accepted_at || "",
+        cancelled_at: "",
+        expires_at: ""
+      };
+    })
   });
 }

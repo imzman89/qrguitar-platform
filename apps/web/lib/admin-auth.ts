@@ -53,7 +53,7 @@ function cleanAccountStatus(value?: string | null): AccountStatus {
 }
 
 export function isAdminRole(role?: string | null) {
-  return role === "owner" || role === "admin";
+  return role === "admin";
 }
 
 async function loadProfileAccess(
@@ -125,6 +125,20 @@ export async function getAdminContext(request: Request): Promise<AdminContext> {
       ok: false,
       status: 403,
       message: "Admin access required.",
+      user: auth.user,
+      email,
+      role,
+      accountStatus,
+      hidePublicContent: profileResult.profile?.hide_public_content === true,
+      accessSource: "none"
+    };
+  }
+
+  if (!envAllowed && (accountStatus === "locked" || accountStatus === "banned")) {
+    return {
+      ok: false,
+      status: 403,
+      message: "Admin account is not active.",
       user: auth.user,
       email,
       role,

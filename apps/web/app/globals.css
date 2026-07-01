@@ -5579,7 +5579,7 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 
 .admin-filter-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
+  grid-template-columns: minmax(0, 1fr) 220px 220px;
   gap: 10px;
 }
 
@@ -5619,10 +5619,104 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   text-transform: uppercase;
 }
 
+.admin-overview-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 16px;
+  align-items: start;
+}
+
+.admin-stat-card {
+  width: 100%;
+  text-align: left;
+  color: var(--cream);
+  cursor: pointer;
+}
+
+.admin-stat-card:hover,
+.admin-attention-row:hover,
+.admin-mini-list button:hover,
+.admin-inline-badges button:hover {
+  border-color: rgba(240, 161, 43, .45);
+  background: rgba(240, 161, 43, .08);
+}
+
+.admin-section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.admin-section-head h2 {
+  margin: 0 0 6px;
+}
+
+.admin-section-head p,
+.admin-empty {
+  margin: 0;
+  color: var(--muted);
+}
+
+.admin-inline-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.admin-inline-badges button,
+.admin-attention-row,
+.admin-mini-list button {
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 999px;
+  padding: 6px 9px;
+  background: rgba(255, 255, 255, .035);
+  color: var(--cream);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.admin-attention-row,
+.admin-mini-list button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  border-radius: 12px;
+  text-align: left;
+}
+
+.admin-mini-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.admin-details {
+  margin-top: 8px;
+  color: var(--muted);
+}
+
+.admin-details code {
+  display: block;
+  max-width: min(100%, 760px);
+  overflow-wrap: anywhere;
+  white-space: normal;
+  margin-top: 6px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 10px;
+  padding: 8px;
+  background: rgba(0, 0, 0, .25);
+  color: var(--cream);
+  font-size: 11px;
+}
+
 @media (max-width: 900px) {
   .admin-hero,
   .admin-row,
-  .admin-filter-row {
+  .admin-filter-row,
+  .admin-overview-layout {
     grid-template-columns: 1fr;
   }
 

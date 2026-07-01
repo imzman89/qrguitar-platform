@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { adminJson, cleanAccountStatus, cleanText, requireAdmin } from "../../_utils";
-import { logAdminAuditEvent } from "../../../../../lib/admin-auth";
+import { isAdminRole, logAdminAuditEvent, normalizeEmail, readAdminEmailList, type ServerSupabaseClient } from "../../../../../lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -16,6 +16,21 @@ type Body = {
 function roleValue(value: unknown) {
   const role = cleanText(value, 20);
   return role === "admin" || role === "owner" || role === "builder" || role === "shop" ? role : null;
+}
+
+async function countOtherAdminAccess(supabase: ServerSupabaseClient, targetUserId: string) {
+  const [profilesResult, usersResult] = await Promise.all([
+    supabase.from("profiles").select("id,role").neq("id", targetUserId),
+    supabase.auth.admin.listUsers({ page: 1, perPage: 1000 })
+  ]);
+
+  const roleAdmins = ((profilesResult.data || []) as Array<{ id?: string | null; role?: string | null }>)
+    .filter((profile) => isAdminRole(profile.role)).length;
+  const envEmails = readAdminEmailList();
+  const envAdmins = (usersResult.data?.users || [])
+    .filter((user) => user.id !== targetUserId && envEmails.includes(normalizeEmail(user.email))).length;
+
+  return roleAdmins + envAdmins;
 }
 
 export async function PATCH(request: Request, context: { params: { id: string } }) {
@@ -34,6 +49,18 @@ export async function PATCH(request: Request, context: { params: { id: string } 
   const action = cleanText(body?.action, 60);
   const reason = cleanText(body?.reason, 1000);
   const now = new Date().toISOString();
+  const targetUser = await supabase.auth.admin.getUserById(targetUserId);
+  const targetEmail = normalizeEmail(targetUser.data?.user?.email);
+  const targetIsEnvManaged = readAdminEmailList().includes(targetEmail);
+  const selfDestructiveAction = ["lock", "ban", "change_role"].includes(action);
+
+  if (targetUser.error || !targetUser.data?.user) {
+    return adminJson({ ok: false, message: "User was not found." }, { status: 404 });
+  }
+
+  if (admin.user?.id === targetUserId && selfDestructiveAction) {
+    return adminJson({ ok: false, message: "You cannot remove your own admin access from this panel." }, { status: 400 });
+  }
 
   const update: Record<string, unknown> = {};
   let auditAction = action;
@@ -85,6 +112,19 @@ export async function PATCH(request: Request, context: { params: { id: string } 
     if (!nextRole) {
       return adminJson({ ok: false, message: "Valid role is required." }, { status: 400 });
     }
+
+    if (targetIsEnvManaged && !isAdminRole(nextRole)) {
+      return adminJson({ ok: false, message: "This admin is managed by server environment settings." }, { status: 400 });
+    }
+
+    const currentProfile = await supabase.from("profiles").select("role").eq("id", targetUserId).maybeSingle<{ role?: string | null }>();
+    if (isAdminRole(currentProfile.data?.role) && !isAdminRole(nextRole)) {
+      const otherAdmins = await countOtherAdminAccess(supabase, targetUserId);
+      if (otherAdmins < 1) {
+        return adminJson({ ok: false, message: "At least one owner or admin must remain." }, { status: 400 });
+      }
+    }
+
     Object.assign(update, { role: nextRole });
     auditReason = reason || `Role changed to ${nextRole}.`;
   } else if (action === "admin_note") {
