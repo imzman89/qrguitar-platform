@@ -40,6 +40,20 @@ type DocumentRow = {
   is_public: boolean;
 };
 
+type TimelineRow = {
+  id: string;
+  guitar_id: string;
+  event_date: string | null;
+  event_type: string | null;
+  title: string;
+  description: string | null;
+  shop_name: string | null;
+  location: string | null;
+  is_public: boolean | null;
+  created_at: string;
+  updated_at: string | null;
+};
+
 type ProfileRow = {
   id: string;
   display_name: string | null;
@@ -149,6 +163,7 @@ function mapRecord({
   media,
   specs,
   documents,
+  serviceEvents,
   ownerName,
   trust
 }: {
@@ -156,6 +171,7 @@ function mapRecord({
   media: string[];
   specs: SpecRow[];
   documents: NonNullable<DemoInstrument["documentFiles"]>;
+  serviceEvents?: NonNullable<DemoInstrument["serviceEvents"]>;
   ownerName?: string;
   trust?: RecordTrustSettings;
 }): DemoInstrument {
@@ -199,8 +215,24 @@ function mapRecord({
     customFields,
     customLinks: [],
     documentFiles: documents,
+    serviceEvents: serviceEvents || [],
     qrStyle: defaultQrStyle,
     createdAt: guitar.created_at || new Date().toISOString()
+  };
+}
+
+function mapPublicServiceEvent(row: TimelineRow) {
+  return {
+    id: row.id,
+    serviceDate: row.event_date || "",
+    eventType: row.event_type || "",
+    title: row.title || "Service entry",
+    publicDescription: row.description || "",
+    shopName: row.shop_name || "",
+    location: row.location || "",
+    isPublic: row.is_public === true,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at || undefined
   };
 }
 
@@ -227,20 +259,35 @@ async function loadTrustSettingsMap(qrCodes: string[]) {
 async function loadRelated(guitars: GuitarRow[]) {
   const supabase = createServerSupabaseClient();
   if (!supabase || !guitars.length) {
-    return { media: new Map<string, string[]>(), specs: new Map<string, SpecRow[]>(), documents: new Map<string, DocumentRow[]>(), profiles: new Map<string, ProfileRow>() };
+    return {
+      media: new Map<string, string[]>(),
+      specs: new Map<string, SpecRow[]>(),
+      documents: new Map<string, DocumentRow[]>(),
+      profiles: new Map<string, ProfileRow>(),
+      serviceEvents: new Map<string, ReturnType<typeof mapPublicServiceEvent>[]>()
+    };
   }
 
   const ids = guitars.map((guitar) => guitar.id);
   const ownerIds = guitars.map((guitar) => guitar.owner_id).filter(Boolean) as string[];
-  const [mediaResult, specsResult, documentsResult, profilesResult] = await Promise.all([
+  const [mediaResult, specsResult, documentsResult, profilesResult, serviceEventsResult] = await Promise.all([
     supabase.from("guitar_media").select("guitar_id,storage_path").in("guitar_id", ids),
     supabase.from("guitar_specs").select("guitar_id,label,value").in("guitar_id", ids),
     supabase.from("guitar_documents").select("guitar_id,name,storage_path,is_public").in("guitar_id", ids),
-    ownerIds.length ? supabase.from("profiles").select("id,display_name").in("id", ownerIds) : Promise.resolve({ data: [], error: null })
+    ownerIds.length ? supabase.from("profiles").select("id,display_name").in("id", ownerIds) : Promise.resolve({ data: [], error: null }),
+    supabase
+      .from("guitar_timeline_events")
+      .select("id,guitar_id,event_date,event_type,title,description,shop_name,location,is_public,created_at,updated_at")
+      .in("guitar_id", ids)
+      .eq("is_public", true)
+      .order("event_date", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
   ]);
 
-  if (mediaResult.error || specsResult.error || documentsResult.error || profilesResult.error) {
-    throw new Error(mediaResult.error?.message || specsResult.error?.message || documentsResult.error?.message || profilesResult.error?.message || "Could not load related instrument data.");
+  const serviceEventsColumnsMissing = serviceEventsResult.error && /column .* does not exist/i.test(serviceEventsResult.error.message);
+
+  if (mediaResult.error || specsResult.error || documentsResult.error || profilesResult.error || (serviceEventsResult.error && !serviceEventsColumnsMissing)) {
+    throw new Error(mediaResult.error?.message || specsResult.error?.message || documentsResult.error?.message || profilesResult.error?.message || serviceEventsResult.error?.message || "Could not load related instrument data.");
   }
 
   const media = new Map<string, string[]>();
@@ -263,7 +310,14 @@ async function loadRelated(guitars: GuitarRow[]) {
     profiles.set(row.id, row);
   }
 
-  return { media, specs, documents, profiles };
+  const serviceEvents = new Map<string, ReturnType<typeof mapPublicServiceEvent>[]>();
+  if (!serviceEventsColumnsMissing) {
+    for (const row of (serviceEventsResult.data || []) as TimelineRow[]) {
+      serviceEvents.set(row.guitar_id, [...(serviceEvents.get(row.guitar_id) || []), mapPublicServiceEvent(row)]);
+    }
+  }
+
+  return { media, specs, documents, profiles, serviceEvents };
 }
 
 export async function getPublicInstruments() {
@@ -297,6 +351,7 @@ export async function getPublicInstruments() {
         guitar: { ...guitar, hero_image_path: heroImagePath || guitar.hero_image_path },
         media,
         documents,
+        serviceEvents: related.serviceEvents.get(guitar.id) || [],
         specs: related.specs.get(guitar.id) || [],
         ownerName: related.profiles.get(guitar.owner_id || "")?.display_name || guitar.builder || "",
         trust: trustByCode.get(guitar.qr_code.toUpperCase())
@@ -337,6 +392,7 @@ export async function getPublicInstrumentByCode(code: string) {
     guitar: { ...data, hero_image_path: heroImagePath || data.hero_image_path },
     media,
     documents,
+    serviceEvents: related.serviceEvents.get(data.id) || [],
     specs: related.specs.get(data.id) || [],
     ownerName: related.profiles.get(data.owner_id || "")?.display_name || data.builder || "Unclaimed",
     trust: trustByCode.get(data.qr_code.toUpperCase())
