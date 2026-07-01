@@ -123,10 +123,12 @@ with check (
 create policy "Public timeline is readable"
 on public.guitar_timeline_events for select
 using (
+  is_public = true
+  and
   exists (
     select 1 from public.guitars
     where guitars.id = guitar_timeline_events.guitar_id
-    and (guitars.visibility = 'public' or guitars.owner_id = auth.uid())
+    and guitars.visibility = 'public'
   )
 );
 
@@ -136,14 +138,28 @@ using (
   exists (
     select 1 from public.guitars
     where guitars.id = guitar_timeline_events.guitar_id
-    and guitars.owner_id = auth.uid()
+    and (
+      guitars.owner_id = auth.uid()
+      or exists (
+        select 1 from public.profiles
+        where profiles.id = auth.uid()
+        and profiles.role = 'admin'
+      )
+    )
   )
 )
 with check (
   exists (
     select 1 from public.guitars
     where guitars.id = guitar_timeline_events.guitar_id
-    and guitars.owner_id = auth.uid()
+    and (
+      guitars.owner_id = auth.uid()
+      or exists (
+        select 1 from public.profiles
+        where profiles.id = auth.uid()
+        and profiles.role = 'admin'
+      )
+    )
   )
 );
 

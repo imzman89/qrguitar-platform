@@ -69,6 +69,7 @@ export type DemoInstrument = {
   customFields?: CustomProfileField[];
   customLinks?: CustomProfileLink[];
   documentFiles?: CustomDocumentFile[];
+  serviceEvents?: ServiceHistoryEntry[];
   heroImageDataUrl?: string;
   galleryImageDataUrls?: string[];
   qrStyle: QrStyle;
@@ -91,6 +92,20 @@ export type CustomDocumentFile = {
   name: string;
   url: string;
   visibility?: "public" | "hidden";
+};
+
+export type ServiceHistoryEntry = {
+  id: string;
+  serviceDate?: string;
+  eventType?: string;
+  title: string;
+  publicDescription?: string;
+  privateNotes?: string;
+  shopName?: string;
+  location?: string;
+  isPublic: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type DemoTransfer = {

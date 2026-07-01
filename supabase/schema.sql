@@ -65,9 +65,16 @@ create table public.guitar_specs (
 create table public.guitar_timeline_events (
   id uuid primary key default gen_random_uuid(),
   guitar_id uuid not null references public.guitars(id) on delete cascade,
+  created_by_user_id uuid references auth.users(id) on delete set null,
   event_date date,
+  event_type text,
   title text not null,
   description text not null default '',
+  private_notes text,
+  shop_name text,
+  location text,
+  is_public boolean not null default false,
+  updated_at timestamptz not null default now(),
   created_at timestamptz not null default now()
 );
 
@@ -178,10 +185,12 @@ using (
 create policy "Public timeline is readable"
 on public.guitar_timeline_events for select
 using (
+  is_public = true
+  and
   exists (
     select 1 from public.guitars
     where guitars.id = guitar_timeline_events.guitar_id
-    and (guitars.visibility = 'public' or guitars.owner_id = auth.uid())
+    and guitars.visibility = 'public'
   )
 );
 
@@ -191,7 +200,14 @@ using (
   exists (
     select 1 from public.guitars
     where guitars.id = guitar_timeline_events.guitar_id
-    and guitars.owner_id = auth.uid()
+    and (
+      guitars.owner_id = auth.uid()
+      or exists (
+        select 1 from public.profiles
+        where profiles.id = auth.uid()
+        and profiles.role = 'admin'
+      )
+    )
   )
 );
 

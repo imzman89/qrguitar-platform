@@ -116,6 +116,21 @@ type GuitarSpecRow = {
   value: string;
 };
 
+type GuitarTimelineRow = {
+  id: string;
+  guitar_id: string;
+  event_date: string | null;
+  event_type?: string | null;
+  title: string;
+  description: string | null;
+  private_notes?: string | null;
+  shop_name?: string | null;
+  location?: string | null;
+  is_public?: boolean | null;
+  created_at: string;
+  updated_at?: string | null;
+};
+
 type ProfileRow = {
   id: string;
   display_name: string | null;
@@ -559,6 +574,65 @@ function mapInstrumentRow({
   };
 }
 
+function mapServiceEvent(row: GuitarTimelineRow, includePrivate = false) {
+  return {
+    id: row.id,
+    serviceDate: row.event_date || "",
+    eventType: row.event_type || "",
+    title: row.title || "Service entry",
+    publicDescription: row.description || "",
+    ...(includePrivate ? { privateNotes: row.private_notes || "" } : {}),
+    shopName: row.shop_name || "",
+    location: row.location || "",
+    isPublic: row.is_public === true,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at || undefined
+  };
+}
+
+async function loadServiceEventsByGuitar(
+  supabase: NonNullable<ReturnType<typeof createServerSupabaseClient>>,
+  guitarIds: string[],
+  includePrivate = false
+) {
+  const eventsByGuitar = new Map<string, ReturnType<typeof mapServiceEvent>[]>();
+  const uniqueIds = Array.from(new Set(guitarIds.filter(Boolean)));
+
+  if (!uniqueIds.length) {
+    return eventsByGuitar;
+  }
+
+  let query = supabase
+    .from("guitar_timeline_events")
+    .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_at,updated_at")
+    .in("guitar_id", uniqueIds)
+    .order("event_date", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false });
+
+  if (!includePrivate) {
+    query = query.eq("is_public", true);
+  }
+
+  const result = await query;
+
+  if (result.error) {
+    if (/column .* does not exist/i.test(result.error.message)) {
+      return eventsByGuitar;
+    }
+
+    throw new Error(result.error.message);
+  }
+
+  for (const item of result.data || []) {
+    const row = item as GuitarTimelineRow;
+    const list = eventsByGuitar.get(row.guitar_id) || [];
+    list.push(mapServiceEvent(row, includePrivate));
+    eventsByGuitar.set(row.guitar_id, list);
+  }
+
+  return eventsByGuitar;
+}
+
 async function loadTrustSettingsMap(supabase: ReturnType<typeof createServerSupabaseClient>, qrCodes: string[]) {
   const trustByCode = new Map<string, RecordTrustSettings>();
   if (!supabase || !qrCodes.length) {
@@ -607,6 +681,12 @@ async function loadRecordsForUser(supabase: ReturnType<typeof createServerSupaba
 
   const guitarIds = guitars.data.map((item) => item.id);
   const trustByCode = await loadTrustSettingsMap(supabase, guitars.data.map((item) => item.qr_code));
+  let serviceEventsByGuitar = new Map<string, ReturnType<typeof mapServiceEvent>[]>();
+  try {
+    serviceEventsByGuitar = await loadServiceEventsByGuitar(supabase, guitarIds, true);
+  } catch {
+    serviceEventsByGuitar = new Map();
+  }
   const [mediaResult, specsResult, documentsResult] = await Promise.all([
     guitarIds.length
       ? supabase.from("guitar_media").select("guitar_id,storage_path").in("guitar_id", guitarIds)
@@ -676,6 +756,7 @@ async function loadRecordsForUser(supabase: ReturnType<typeof createServerSupaba
           exposeInternalTrust: true
         });
         instrument.documentFiles = documents;
+        instrument.serviceEvents = serviceEventsByGuitar.get(guitar.id) || [];
         return instrument;
       })
     ),
@@ -705,6 +786,12 @@ async function loadPublicRecords(supabase: ReturnType<typeof createServerSupabas
 
   const guitarIds = guitars.data.map((item) => item.id);
   const trustByCode = await loadTrustSettingsMap(supabase, guitars.data.map((item) => item.qr_code));
+  let serviceEventsByGuitar = new Map<string, ReturnType<typeof mapServiceEvent>[]>();
+  try {
+    serviceEventsByGuitar = await loadServiceEventsByGuitar(supabase, guitarIds, false);
+  } catch {
+    serviceEventsByGuitar = new Map();
+  }
   const [mediaResult, specsResult, documentsResult, profilesResult] = await Promise.all([
     guitarIds.length
       ? supabase.from("guitar_media").select("guitar_id,storage_path").in("guitar_id", guitarIds)
@@ -777,6 +864,7 @@ async function loadPublicRecords(supabase: ReturnType<typeof createServerSupabas
           trust: trustByCode.get((guitar as GuitarRow).qr_code.toUpperCase())
         });
         instrument.documentFiles = documents;
+        instrument.serviceEvents = serviceEventsByGuitar.get(guitar.id) || [];
         return stripAnonymousInstrumentFields(instrument);
       })
     )

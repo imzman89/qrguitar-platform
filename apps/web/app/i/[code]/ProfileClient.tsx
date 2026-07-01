@@ -27,7 +27,8 @@ import {
   getInstrumentVerificationStatus,
   type DemoTransfer,
   instrumentDisplayName,
-  type DemoInstrument
+  type DemoInstrument,
+  type ServiceHistoryEntry
 } from "../../../lib/local-demo";
 import { formatRecordLocation } from "../../../lib/record-location";
 import { createBrowserSupabaseClient } from "../../../lib/supabase-browser";
@@ -186,6 +187,9 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           : [],
         documentFiles: stored.documentFiles && stored.documentFiles.length
           ? stored.documentFiles
+          : [],
+        serviceEvents: stored.serviceEvents && stored.serviceEvents.length
+          ? stored.serviceEvents
           : []
       };
     }
@@ -503,6 +507,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           transferMessage={transferMessage}
           latestTransfer={latestTransfer}
           isVerifiedRecord={isVerifiedRecord}
+          serviceEvents={instrument.serviceEvents || []}
         />
 
         <section className="scan-tags" aria-label="Instrument badges">
@@ -554,7 +559,8 @@ function ProfilePanel({
   onDocumentView,
   transferMessage,
   latestTransfer,
-  isVerifiedRecord
+  isVerifiedRecord,
+  serviceEvents
 }: {
   activeTab: ProfileTab;
   instrument: DemoInstrument;
@@ -570,6 +576,7 @@ function ProfilePanel({
   transferMessage: string;
   latestTransfer?: DemoTransfer;
   isVerifiedRecord: boolean;
+  serviceEvents: ServiceHistoryEntry[];
 }) {
   if (activeTab === "specs") {
     return (
@@ -587,12 +594,25 @@ function ProfilePanel({
   if (activeTab === "timeline") {
     const createdDate = formatProfileDate(instrument.createdAt);
     const transferDate = latestTransfer ? formatProfileDate(latestTransfer.createdAt) : null;
+    const publicServiceEvents = serviceEvents.filter((entry) => entry.isPublic);
 
     return (
       <section className="scan-tab-panel">
         <PanelHeader icon={<Clock3 />} label="Timeline" title="The record stays useful as the instrument moves through the world." />
         <div className="timeline-list">
           <TimelineItem date={createdDate} title="Record created" copy={`${instrument.brand} attached this instrument identity for ${instrumentDisplayName(instrument)}.`} />
+          {publicServiceEvents.map((entry) => (
+            <TimelineItem
+              date={formatProfileDate(entry.serviceDate || entry.createdAt)}
+              title={entry.title}
+              copy={[
+                entry.eventType,
+                entry.publicDescription,
+                [entry.shopName, entry.location].filter(Boolean).join(" · ")
+              ].filter(Boolean).join(" · ")}
+              key={entry.id}
+            />
+          ))}
           {latestTransfer ? (
             <TimelineItem
               date={transferDate || "Pending"}
@@ -604,7 +624,9 @@ function ProfilePanel({
               }
             />
           ) : null}
-          <TimelineItem date="Ongoing" title="Service and ownership updates" copy="Repair notes, service events, and ownership-change activity stay with this record." />
+          {!publicServiceEvents.length ? (
+            <TimelineItem date="Ongoing" title="No public service history yet." copy="Setups, repairs, inspections, and maintenance can be added by the owner or admin." />
+          ) : null}
         </div>
       </section>
     );

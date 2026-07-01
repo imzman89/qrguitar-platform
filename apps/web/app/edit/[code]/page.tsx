@@ -12,7 +12,8 @@ import {
   getInstrumentCondition,
   instrumentToProfileUrl,
   type DemoInstrument,
-  type QrStyle
+  type QrStyle,
+  type ServiceHistoryEntry
 } from "../../../lib/local-demo";
 import { defaultSiteSettings, readSiteSettings } from "../../../lib/site-settings";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../../lib/supabase-browser";
@@ -39,6 +40,17 @@ const emptyForm = {
 };
 
 const managedFieldLabels = new Set(["instrument type", "builder", "finish", "weight", "owner status", "specs notes", "service notes"]);
+const serviceEventTypes = ["Setup", "Repair", "Modification", "Pickup Install", "Wiring", "Fretwork", "Inspection", "Appraisal/Review", "Cleaning", "Other"];
+const emptyServiceForm = {
+  serviceDate: "",
+  eventType: "Setup",
+  title: "",
+  publicDescription: "",
+  privateNotes: "",
+  shopName: "",
+  location: "",
+  isPublic: false
+};
 
 export default function EditInstrumentPage() {
   const params = useParams<{ code: string }>();
@@ -65,6 +77,10 @@ export default function EditInstrumentPage() {
   const [internalAuthenticityNote, setInternalAuthenticityNote] = useState("");
   const [publicAuthenticityNote, setPublicAuthenticityNote] = useState("");
   const [canManageVerification, setCanManageVerification] = useState(false);
+  const [serviceEvents, setServiceEvents] = useState<ServiceHistoryEntry[]>([]);
+  const [serviceForm, setServiceForm] = useState(emptyServiceForm);
+  const [editingServiceId, setEditingServiceId] = useState("");
+  const [savingService, setSavingService] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -131,7 +147,9 @@ export default function EditInstrumentPage() {
             setInternalAuthenticityNote(instrument.internalAuthenticityNote || "");
             setPublicAuthenticityNote(instrument.publicAuthenticityNote || "");
             setCanManageVerification(Boolean(payload.canManageVerification));
+            setServiceEvents(instrument.serviceEvents || []);
             setReady(true);
+            void refreshServiceEvents(instrument.qrCode);
           }
           return;
         }
@@ -167,6 +185,121 @@ export default function EditInstrumentPage() {
 
   function updateQrStyle(field: keyof QrStyle, value: string | boolean) {
     setQrStyle((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateServiceField(field: keyof typeof serviceForm, value: string | boolean) {
+    setServiceForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function refreshServiceEvents(qrCode = original?.qrCode || code) {
+    if (!qrCode) {
+      return;
+    }
+
+    const token = await getSupabaseAccessToken();
+    const response = await fetch(`/api/service-events?scope=owner&code=${encodeURIComponent(qrCode)}`, {
+      cache: "no-store",
+      headers: { authorization: `Bearer ${token}` }
+    });
+    const payload = (await response.json().catch(() => null)) as
+      | { ok?: boolean; serviceEvents?: ServiceHistoryEntry[]; message?: string }
+      | null;
+
+    if (response.ok && payload?.ok) {
+      setServiceEvents(payload.serviceEvents || []);
+    }
+  }
+
+  function editServiceEvent(entry: ServiceHistoryEntry) {
+    setEditingServiceId(entry.id);
+    setServiceForm({
+      serviceDate: entry.serviceDate || "",
+      eventType: entry.eventType || "Other",
+      title: entry.title || "",
+      publicDescription: entry.publicDescription || "",
+      privateNotes: entry.privateNotes || "",
+      shopName: entry.shopName || "",
+      location: entry.location || "",
+      isPublic: entry.isPublic === true
+    });
+  }
+
+  function resetServiceForm() {
+    setEditingServiceId("");
+    setServiceForm(emptyServiceForm);
+  }
+
+  async function saveServiceEntry() {
+    if (!original) {
+      return;
+    }
+
+    if (!serviceForm.title.trim()) {
+      setMessage("Service entry title is required.");
+      return;
+    }
+
+    setSavingService(true);
+    setMessage("");
+    try {
+      const token = await getSupabaseAccessToken();
+      const response = await fetch("/api/service-events", {
+        method: editingServiceId ? "PATCH" : "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          id: editingServiceId,
+          qrCode: original.qrCode,
+          ...serviceForm
+        })
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { ok?: boolean; serviceEvent?: ServiceHistoryEntry; message?: string }
+        | null;
+
+      if (!response.ok || !payload?.ok || !payload.serviceEvent) {
+        setMessage(payload?.message || "Could not save service entry.");
+        return;
+      }
+
+      setServiceEvents((current) => {
+        const next = [payload.serviceEvent as ServiceHistoryEntry, ...current.filter((item) => item.id !== payload.serviceEvent?.id)];
+        return sortServiceEvents(next);
+      });
+      resetServiceForm();
+      setMessage(payload.message || "Service entry saved. The permanent QRguitar URL stayed the same.");
+    } finally {
+      setSavingService(false);
+    }
+  }
+
+  async function deleteServiceEntry(entry: ServiceHistoryEntry) {
+    if (!original) {
+      return;
+    }
+
+    setSavingService(true);
+    setMessage("");
+    try {
+      const token = await getSupabaseAccessToken();
+      const response = await fetch(`/api/service-events?code=${encodeURIComponent(original.qrCode)}&id=${encodeURIComponent(entry.id)}`, {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${token}` }
+      });
+      const payload = (await response.json().catch(() => null)) as { ok?: boolean; message?: string } | null;
+
+      if (!response.ok || !payload?.ok) {
+        setMessage(payload?.message || "Could not delete service entry.");
+        return;
+      }
+
+      setServiceEvents((current) => current.filter((item) => item.id !== entry.id));
+      if (editingServiceId === entry.id) {
+        resetServiceForm();
+      }
+      setMessage(payload.message || "Service entry deleted.");
+    } finally {
+      setSavingService(false);
+    }
   }
 
   async function addProfilePhotos(files: FileList | null) {
@@ -735,6 +868,85 @@ export default function EditInstrumentPage() {
                 onSelectMain={selectMainPhoto}
                 onRemove={removePhoto}
               />
+              <section className="qr-customizer" aria-label="Service history">
+                <div>
+                  <span className="eyebrow">Service history</span>
+                  <h3>Service History Timeline</h3>
+                  <p>Service history helps keep setups, repairs, modifications, inspections, and ownership records organized over the life of the instrument.</p>
+                </div>
+                <div className="qr-controls">
+                  <div className="field">
+                    <label htmlFor="serviceDate">Date</label>
+                    <input id="serviceDate" type="date" value={serviceForm.serviceDate} onChange={(event) => updateServiceField("serviceDate", event.target.value)} />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="serviceType">Type</label>
+                    <select id="serviceType" value={serviceForm.eventType} onChange={(event) => updateServiceField("eventType", event.target.value)}>
+                      {serviceEventTypes.map((type) => <option value={type} key={type}>{type}</option>)}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="serviceTitle">Title</label>
+                    <input id="serviceTitle" value={serviceForm.title} onChange={(event) => updateServiceField("title", event.target.value)} placeholder="Setup, repair, inspection..." />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="serviceShop">Shop/tech/business name</label>
+                    <input id="serviceShop" value={serviceForm.shopName} onChange={(event) => updateServiceField("shopName", event.target.value)} />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="serviceLocation">Location</label>
+                    <input id="serviceLocation" value={serviceForm.location} onChange={(event) => updateServiceField("location", event.target.value)} />
+                  </div>
+                  <div className="field custom-wide">
+                    <label htmlFor="servicePublicDescription">Public description</label>
+                    <textarea id="servicePublicDescription" rows={3} value={serviceForm.publicDescription} onChange={(event) => updateServiceField("publicDescription", event.target.value)} />
+                  </div>
+                  <div className="field custom-wide">
+                    <label htmlFor="servicePrivateNotes">Private notes</label>
+                    <textarea id="servicePrivateNotes" rows={3} value={serviceForm.privateNotes} onChange={(event) => updateServiceField("privateNotes", event.target.value)} />
+                  </div>
+                  <label className="toggle-field">
+                    <input type="checkbox" checked={serviceForm.isPublic} onChange={(event) => updateServiceField("isPublic", event.target.checked)} />
+                    Show this service entry on the public record
+                  </label>
+                  <div className="form-actions">
+                    <button className="button" type="button" onClick={() => void saveServiceEntry()} disabled={savingService}>
+                      {savingService ? "Saving..." : editingServiceId ? "Update Service Entry" : "Save Service Entry"}
+                    </button>
+                    {editingServiceId ? (
+                      <button className="button secondary" type="button" onClick={resetServiceForm}>
+                        Cancel Edit
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+                {serviceEvents.length ? (
+                  <div className="timeline-list">
+                    {serviceEvents.map((entry) => (
+                      <article className="timeline-item" key={entry.id}>
+                        <span>{entry.serviceDate || "Date not listed"} · {entry.isPublic ? "Public" : "Private"}</span>
+                        <h3>{entry.title}</h3>
+                        <p>{[entry.eventType, entry.shopName, entry.location].filter(Boolean).join(" · ") || "Service entry"}</p>
+                        {entry.publicDescription ? <p>{entry.publicDescription}</p> : null}
+                        {entry.privateNotes ? <p className="fine-print">Private: {entry.privateNotes}</p> : null}
+                        <div className="form-actions">
+                          <button className="button secondary" type="button" onClick={() => editServiceEvent(entry)}>
+                            Edit Entry
+                          </button>
+                          <button className="button secondary" type="button" onClick={() => void deleteServiceEntry(entry)} disabled={savingService}>
+                            Delete Entry
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="photo-manager empty">
+                    <strong>No service history yet</strong>
+                    <span>Add setups, repairs, modifications, inspections, cleaning, and maintenance notes here.</span>
+                  </div>
+                )}
+              </section>
               <section className="qr-customizer" aria-label="QR code customization">
                 <div>
                   <span className="eyebrow">QR appearance</span>
@@ -1011,6 +1223,14 @@ function normalizeDocumentFiles(instrument: DemoInstrument) {
     dataUrl: file.url,
     visibility: file.visibility === "public" ? "public" as const : "hidden" as const
   }));
+}
+
+function sortServiceEvents(events: ServiceHistoryEntry[]) {
+  return [...events].sort((first, second) => {
+    const firstDate = Date.parse(first.serviceDate || first.createdAt || "");
+    const secondDate = Date.parse(second.serviceDate || second.createdAt || "");
+    return (Number.isNaN(secondDate) ? 0 : secondDate) - (Number.isNaN(firstDate) ? 0 : firstDate);
+  });
 }
 
 function Field({
