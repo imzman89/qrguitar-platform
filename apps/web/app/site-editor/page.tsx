@@ -230,7 +230,7 @@ export default function SiteEditorPage() {
 
   function removeCategoryOption(index: number) {
     const next = settings.instrumentCategories.filter((_, current) => current !== index);
-    setSettings({ ...settings, instrumentCategories: next.length ? next : defaultSiteSettings.instrumentCategories });
+    setSettings({ ...settings, instrumentCategories: next });
   }
 
   function updateHero(field: keyof EditableSiteSettings["hero"], value: string) {
@@ -281,8 +281,7 @@ export default function SiteEditorPage() {
 
   function removeSectionCard(section: "howCards" | "audienceCards", index: number) {
     const next = settings.sections[section].filter((_, current) => current !== index);
-    const fallback = next.length > 0 ? next : [{ title: "New card", copy: "Add details here." }];
-    const updated = { ...settings, sections: { ...settings.sections, [section]: fallback } };
+    const updated = { ...settings, sections: { ...settings.sections, [section]: next } };
     setSettings(updated);
     applyThemeSettings(updated);
   }
@@ -304,8 +303,7 @@ export default function SiteEditorPage() {
 
   function removeDetailsCheck(index: number) {
     const next = settings.sections.detailsChecks.filter((_, current) => current !== index);
-    const fallback = next.length > 0 ? next : ["A useful check you want buyers to know"];
-    const updated = { ...settings, sections: { ...settings.sections, detailsChecks: fallback } };
+    const updated = { ...settings, sections: { ...settings.sections, detailsChecks: next } };
     setSettings(updated);
     applyThemeSettings(updated);
   }
@@ -342,9 +340,6 @@ export default function SiteEditorPage() {
     const next = [...settings.sections.pricingCards];
     const plan = { ...next[planIndex] };
     plan.features = (plan.features || []).filter((_, current) => current !== featureIndex);
-    if (plan.features.length === 0) {
-      plan.features = ["Add one benefit for this plan."];
-    }
     next[planIndex] = plan;
     const updated = { ...settings, sections: { ...settings.sections, pricingCards: next } };
     setSettings(updated);

@@ -5619,6 +5619,35 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   text-transform: uppercase;
 }
 
+.admin-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, .72);
+}
+
+.admin-modal {
+  width: min(720px, calc(100vw - 28px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  border-color: rgba(240, 161, 43, .22);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .45);
+}
+
+.admin-modal label,
+.admin-modal-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-modal-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .admin-overview-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
@@ -5737,6 +5766,10 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 
   .admin-row-actions {
     justify-content: flex-start;
+  }
+
+  .admin-modal-grid {
+    grid-template-columns: 1fr;
   }
 }
 

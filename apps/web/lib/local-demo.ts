@@ -54,6 +54,8 @@ export type DemoInstrument = {
   publicSafetyNote?: string;
   safetyStatusUpdatedAt?: string;
   safetyNote?: string;
+  collectionRemovedAt?: string;
+  collectionRemovedReason?: string;
   instrumentType?: string;
   builder?: string;
   owner: string;

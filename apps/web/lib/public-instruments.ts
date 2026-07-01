@@ -22,6 +22,8 @@ type GuitarRow = {
   safety_status?: string | null;
   safety_status_updated_at?: string | null;
   public_safety_note?: string | null;
+  admin_archived_at?: string | null;
+  owner_removed_at?: string | null;
   created_at: string | null;
 };
 
@@ -368,8 +370,10 @@ export async function getPublicInstruments() {
 
   const { data, error } = await supabase
     .from("guitars")
-    .select("id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,created_at")
+    .select("id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at")
     .eq("visibility", "public")
+    .is("admin_archived_at", null)
+    .is("owner_removed_at", null)
     .order("created_at", { ascending: false });
 
   if (error || !data) {
@@ -416,7 +420,7 @@ export async function getPublicInstrumentByCode(code: string) {
 
   const { data, error } = await supabase
     .from("guitars")
-    .select("id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,created_at")
+    .select("id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at")
     .eq("qr_code", code.toUpperCase())
     .maybeSingle<GuitarRow>();
 
@@ -424,7 +428,7 @@ export async function getPublicInstrumentByCode(code: string) {
     throw new Error(error.message);
   }
 
-  if (!data || data.visibility === "private") {
+  if (!data || data.visibility === "private" || data.admin_archived_at || data.owner_removed_at) {
     return null;
   }
 

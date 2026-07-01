@@ -157,10 +157,14 @@ function normalizePricingCards(cards: PricingPlanInput[]) {
 }
 
 export function mergeSiteSettings(settings?: Partial<EditableSiteSettings> | null): EditableSiteSettings {
+  const hasSettings = Boolean(settings);
+  const sections: Partial<EditableSiteSettings["sections"]> = settings?.sections || {};
   return {
     ...defaultSiteSettings,
     ...(settings || {}),
-    instrumentCategories: normalizeInstrumentCategories(settings?.instrumentCategories),
+    instrumentCategories: Array.isArray(settings?.instrumentCategories)
+      ? normalizeInstrumentCategories(settings.instrumentCategories, false)
+      : hasSettings ? [] : defaultSiteSettings.instrumentCategories,
     colors: {
       ...defaultSiteSettings.colors,
       ...(settings?.colors || {})
@@ -171,19 +175,19 @@ export function mergeSiteSettings(settings?: Partial<EditableSiteSettings> | nul
     },
     sections: {
       ...defaultSiteSettings.sections,
-      ...(settings?.sections || {}),
-      howCards: (settings?.sections?.howCards && settings.sections.howCards.length ? settings.sections.howCards : defaultSiteSettings.sections.howCards).map((item) => ({
+      ...sections,
+      howCards: Array.isArray(sections.howCards) ? sections.howCards.map((item) => ({
         title: item?.title?.trim() || "",
         copy: item?.copy?.trim() || ""
-      })),
-      detailsChecks: settings?.sections?.detailsChecks && settings.sections.detailsChecks.length
-        ? settings.sections.detailsChecks.map((item) => item?.trim() || "")
+      })) : defaultSiteSettings.sections.howCards,
+      detailsChecks: Array.isArray(sections.detailsChecks)
+        ? sections.detailsChecks.map((item) => item?.trim() || "")
         : defaultSiteSettings.sections.detailsChecks,
-      audienceCards: settings?.sections?.audienceCards && settings.sections.audienceCards.length
-        ? settings.sections.audienceCards.map((item) => ({ title: item?.title?.trim() || "", copy: item?.copy?.trim() || "" }))
+      audienceCards: Array.isArray(sections.audienceCards)
+        ? sections.audienceCards.map((item) => ({ title: item?.title?.trim() || "", copy: item?.copy?.trim() || "" }))
         : defaultSiteSettings.sections.audienceCards,
-      pricingCards: settings?.sections?.pricingCards && settings.sections.pricingCards.length
-        ? normalizePricingCards(settings.sections.pricingCards)
+      pricingCards: Array.isArray(sections.pricingCards)
+        ? sections.pricingCards.length ? normalizePricingCards(sections.pricingCards) : []
         : defaultSiteSettings.sections.pricingCards
     },
     seo: {

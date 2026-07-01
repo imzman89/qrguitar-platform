@@ -9,11 +9,11 @@ export const defaultInstrumentCategories = [
   "Brand Asset"
 ];
 
-export function normalizeInstrumentCategories(categories?: string[] | null) {
+export function normalizeInstrumentCategories(categories?: string[] | null, includeDefaults = true) {
   const cleaned = (categories || [])
     .map((category) => String(category || "").trim())
     .filter(Boolean);
 
-  const merged = [...defaultInstrumentCategories, ...cleaned];
+  const merged = includeDefaults ? [...defaultInstrumentCategories, ...cleaned] : cleaned;
   return Array.from(new Set(merged));
 }

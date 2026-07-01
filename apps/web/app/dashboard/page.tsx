@@ -48,6 +48,8 @@ export default function DashboardPage() {
   const [transfers, setTransfers] = useState<DemoTransfer[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(true);
   const [authChecked, setAuthChecked] = useState(true);
+  const [dashboardMessage, setDashboardMessage] = useState("");
+  const [showRemovedRecords, setShowRemovedRecords] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -96,7 +98,7 @@ export default function DashboardPage() {
 
     getSupabaseAccessToken().then(async (token) => {
       const [records, transferRecords] = await Promise.all([
-        loadDashboardInstruments(token),
+        loadDashboardInstruments(token, showRemovedRecords),
         loadDashboardTransfers(token)
       ]);
 
@@ -114,7 +116,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [user?.email]);
+  }, [showRemovedRecords, user?.email]);
 
   const instrumentCodes = useMemo(() => new Set(instruments.map((instrument) => instrument.qrCode.toUpperCase())), [instruments]);
   const verifiedRecords = instruments.filter((instrument) => getInstrumentVerificationStatus(instrument) === "verified").length;
@@ -134,7 +136,7 @@ export default function DashboardPage() {
     getSupabaseAccessToken()
       .then(async (token) => {
         const [records, transferRecords] = await Promise.all([
-          loadDashboardInstruments(token),
+          loadDashboardInstruments(token, showRemovedRecords),
           loadDashboardTransfers(token)
         ]);
         return { records, transferRecords };
@@ -161,6 +163,59 @@ export default function DashboardPage() {
     window.localStorage.removeItem("qrguitar.siteEditorUnlocked");
     setUser(null);
     router.replace("/login?next=%2Fdashboard");
+  }
+
+  async function removeFromCollection(instrument: DemoInstrument) {
+    const allowed = getInstrumentVerificationStatus(instrument) !== "verified" && instrument.authenticityStatus !== "confirmed";
+    if (!allowed) {
+      setDashboardMessage("Verified and authenticity-confirmed records are preserved for provenance. Transfer ownership or contact QRguitar admin for permanent removal.");
+      return;
+    }
+
+    const confirmed = window.confirm("Remove this record from your active collection? The QRguitar ID stays reserved and the record is hidden from public view.");
+    if (!confirmed) {
+      return;
+    }
+
+    const token = await getSupabaseAccessToken();
+    const response = await fetch("/api/instruments", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        qrCode: instrument.qrCode,
+        action: "remove_from_collection",
+        reason: "Owner removed record from collection."
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    setDashboardMessage(payload.message || (response.ok ? "Record removed from active collection." : "Could not remove this record."));
+    if (response.ok) {
+      refreshInstruments();
+    }
+  }
+
+  async function restoreToCollection(instrument: DemoInstrument) {
+    const token = await getSupabaseAccessToken();
+    const response = await fetch("/api/instruments", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        qrCode: instrument.qrCode,
+        action: "restore_to_collection",
+        reason: "Owner restored record to collection."
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    setDashboardMessage(payload.message || (response.ok ? "Record restored to active collection." : "Could not restore this record."));
+    if (response.ok) {
+      refreshInstruments();
+    }
   }
 
   if (!authChecked) {
@@ -264,6 +319,7 @@ export default function DashboardPage() {
               </Link>
             </div>
           </div>
+          {dashboardMessage ? <div className="admin-message">{dashboardMessage}</div> : null}
 
           <div className="stats-grid">
             {stats.map((stat) => (
@@ -283,6 +339,9 @@ export default function DashboardPage() {
               <Link className="button secondary" href="/create">
                 Add Guitar
               </Link>
+              <button className="button secondary" type="button" onClick={() => setShowRemovedRecords((value) => !value)}>
+                {showRemovedRecords ? "Show Active" : "Show Removed"}
+              </button>
             </div>
             <div className={styles.instrumentList}>
               {loadingRecords ? (
@@ -335,6 +394,7 @@ export default function DashboardPage() {
                             <span>{instrument.serviceEvents?.length ? `${instrument.serviceEvents.length} service ${instrument.serviceEvents.length === 1 ? "entry" : "entries"}` : "No service history yet"}</span>
                             <span>{totalDocs ? `${publicDocs} public docs${hiddenDocs ? `, ${hiddenDocs} hidden` : ""}` : "No documents yet"}</span>
                             <span>{instrument.visibility === "private" ? "Private" : instrument.visibility === "unlisted" ? "Unlisted" : "Public"}</span>
+                            {instrument.collectionRemovedAt ? <span>Removed from collection</span> : null}
                           </div>
                         </div>
                       </Link>
@@ -354,6 +414,15 @@ export default function DashboardPage() {
                           <Link className="button secondary" href={instrumentToProfileUrl(instrument)}>
                             View Record
                           </Link>
+                          {instrument.collectionRemovedAt ? (
+                            <button className="button secondary" type="button" onClick={() => void restoreToCollection(instrument)}>
+                              Restore to Collection
+                            </button>
+                          ) : (
+                            <button className="button secondary" type="button" onClick={() => void removeFromCollection(instrument)}>
+                              Remove from Collection
+                            </button>
+                          )}
                         </div>
                       </div>
                       <TransferPanel
@@ -658,12 +727,12 @@ function dashboardRecordTitle(instrument: DemoInstrument) {
   return brand || model || instrument.serial || instrument.qrCode || "Untitled instrument";
 }
 
-async function loadDashboardInstruments(token: string) {
+async function loadDashboardInstruments(token: string, includeRemoved = false) {
   if (!token) {
     return [];
   }
 
-  const response = await fetch("/api/instruments?scope=mine", { headers: { authorization: `Bearer ${token}` } });
+  const response = await fetch(`/api/instruments?scope=mine${includeRemoved ? "&includeRemoved=1" : ""}`, { headers: { authorization: `Bearer ${token}` } });
   const payload = (await response.json().catch(() => null)) as
     | { ok?: boolean; instruments?: DemoInstrument[]; count?: number; message?: string }
     | null;

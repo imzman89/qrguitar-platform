@@ -17,6 +17,11 @@ type Body = {
   showAuthenticityBadge?: boolean;
   safetyStatus?: string;
   publicSafetyNote?: string;
+  safetyNote?: string;
+  internalVerificationNote?: string;
+  publicVerificationNote?: string;
+  internalAuthenticityNote?: string;
+  publicAuthenticityNote?: string;
 };
 
 function cleanVisibility(value: unknown) {
@@ -37,6 +42,10 @@ function cleanSafety(value: unknown) {
   return safety === "lost" || safety === "stolen" || safety === "recovered" ? safety : "clear";
 }
 
+function hasBodyField(body: Body | null, key: keyof Body) {
+  return Boolean(body && Object.prototype.hasOwnProperty.call(body, key));
+}
+
 export async function PATCH(request: Request, context: { params: { id: string } }) {
   const access = await requireAdmin(request);
   if (!access.ok) {
@@ -52,7 +61,7 @@ export async function PATCH(request: Request, context: { params: { id: string } 
 
   const existing = await supabase
     .from("guitars")
-    .select("id,owner_id,qr_code,permanent_path,name,brand,model,status,visibility,safety_status,public_safety_note")
+    .select("id,owner_id,qr_code,permanent_path,name,brand,model,status,visibility,safety_status,public_safety_note,admin_archived_at,owner_removed_at")
     .eq("id", recordId)
     .maybeSingle<{
       id: string;
@@ -66,6 +75,8 @@ export async function PATCH(request: Request, context: { params: { id: string } 
       visibility?: string | null;
       safety_status?: string | null;
       public_safety_note?: string | null;
+      admin_archived_at?: string | null;
+      owner_removed_at?: string | null;
     }>();
 
   if (existing.error) {
@@ -82,13 +93,40 @@ export async function PATCH(request: Request, context: { params: { id: string } 
   let auditReason = reason || null;
 
   if (action === "archive") {
-    Object.assign(updates, { visibility: "private" });
+    if (!reason) {
+      return adminJson({ ok: false, message: "Archive reason is required." }, { status: 400 });
+    }
+    Object.assign(updates, {
+      visibility: "private",
+      admin_archived_at: now,
+      admin_archived_by: admin.email,
+      admin_archive_reason: reason
+    });
     auditAction = "record_archived";
-    auditReason = reason || "Record hidden from public admin surfaces.";
-  } else if (action === "restore_public") {
-    Object.assign(updates, { visibility: "public" });
+    auditReason = reason;
+  } else if (action === "restore_archive") {
+    if (!reason) {
+      return adminJson({ ok: false, message: "Restore reason is required." }, { status: 400 });
+    }
+    Object.assign(updates, {
+      visibility: "private",
+      admin_archived_at: null,
+      admin_archived_by: null,
+      admin_archive_reason: null
+    });
     auditAction = "record_restored";
-    auditReason = reason || "Record restored to public visibility.";
+    auditReason = reason;
+  } else if (action === "restore_to_collection") {
+    if (!reason) {
+      return adminJson({ ok: false, message: "Restore reason is required." }, { status: 400 });
+    }
+    Object.assign(updates, {
+      owner_removed_at: null,
+      owner_removed_by: null,
+      owner_removed_reason: null
+    });
+    auditAction = "record_restored_to_collection";
+    auditReason = reason;
   } else if (action === "set_visibility") {
     const nextVisibility = cleanVisibility(body?.visibility);
     if (!nextVisibility) {
@@ -107,7 +145,8 @@ export async function PATCH(request: Request, context: { params: { id: string } 
     Object.assign(updates, {
       safety_status: nextSafety,
       safety_status_updated_at: now,
-      public_safety_note: nextSafety === "clear" ? "" : cleanText(body?.publicSafetyNote, 1000)
+      public_safety_note: nextSafety === "clear" ? "" : cleanText(body?.publicSafetyNote, 1000),
+      safety_note: cleanText(body?.safetyNote, 2000)
     });
     auditAction = "safety_status_updated";
     auditReason = reason || `Safety status set to ${nextSafety}.`;
@@ -119,7 +158,11 @@ export async function PATCH(request: Request, context: { params: { id: string } 
       ...merged,
       authenticityStatus: action === "set_authenticity" ? cleanAuthenticity(body?.authenticityStatus) : merged.authenticityStatus,
       showVerificationBadge: typeof body?.showVerificationBadge === "boolean" ? body.showVerificationBadge : merged.showVerificationBadge,
-      showAuthenticityBadge: typeof body?.showAuthenticityBadge === "boolean" ? body.showAuthenticityBadge : merged.showAuthenticityBadge
+      showAuthenticityBadge: typeof body?.showAuthenticityBadge === "boolean" ? body.showAuthenticityBadge : merged.showAuthenticityBadge,
+      internalVerificationNote: hasBodyField(body, "internalVerificationNote") ? cleanText(body?.internalVerificationNote, 2000) : merged.internalVerificationNote,
+      publicVerificationNote: hasBodyField(body, "publicVerificationNote") ? cleanText(body?.publicVerificationNote, 1000) : merged.publicVerificationNote,
+      internalAuthenticityNote: hasBodyField(body, "internalAuthenticityNote") ? cleanText(body?.internalAuthenticityNote, 2000) : merged.internalAuthenticityNote,
+      publicAuthenticityNote: hasBodyField(body, "publicAuthenticityNote") ? cleanText(body?.publicAuthenticityNote, 1000) : merged.publicAuthenticityNote
     });
     const trustSaved = await supabase.from("site_content").upsert(
       {
@@ -157,6 +200,31 @@ export async function PATCH(request: Request, context: { params: { id: string } 
   const saved = await supabase.from("guitars").update(updates).eq("id", record.id).select("id,qr_code,permanent_path,status,visibility,safety_status,public_safety_note,updated_at").maybeSingle();
   if (saved.error) {
     return adminJson({ ok: false, message: saved.error.message || "Could not update record." }, { status: 500 });
+  }
+
+  if (action === "set_verification" && ["internalVerificationNote", "publicVerificationNote", "internalAuthenticityNote", "publicAuthenticityNote"].some((key) => hasBodyField(body, key as keyof Body))) {
+    const trustKey = recordTrustContentKey(record.qr_code);
+    const current = await supabase.from("site_content").select("content_value").eq("content_key", trustKey).maybeSingle<{ content_value?: unknown }>();
+    const merged = mergeRecordTrustSettings(current.data?.content_value as Parameters<typeof mergeRecordTrustSettings>[0]);
+    const nextTrust = mergeRecordTrustSettings({
+      ...merged,
+      internalVerificationNote: hasBodyField(body, "internalVerificationNote") ? cleanText(body?.internalVerificationNote, 2000) : merged.internalVerificationNote,
+      publicVerificationNote: hasBodyField(body, "publicVerificationNote") ? cleanText(body?.publicVerificationNote, 1000) : merged.publicVerificationNote,
+      internalAuthenticityNote: hasBodyField(body, "internalAuthenticityNote") ? cleanText(body?.internalAuthenticityNote, 2000) : merged.internalAuthenticityNote,
+      publicAuthenticityNote: hasBodyField(body, "publicAuthenticityNote") ? cleanText(body?.publicAuthenticityNote, 1000) : merged.publicAuthenticityNote
+    });
+    const trustSaved = await supabase.from("site_content").upsert(
+      {
+        content_key: trustKey,
+        content_value: nextTrust,
+        updated_by: admin.user?.id || null,
+        updated_at: now
+      },
+      { onConflict: "content_key" }
+    );
+    if (trustSaved.error) {
+      return adminJson({ ok: false, message: trustSaved.error.message || "Could not save trust notes." }, { status: 500 });
+    }
   }
 
   await logAdminAuditEvent(supabase, {

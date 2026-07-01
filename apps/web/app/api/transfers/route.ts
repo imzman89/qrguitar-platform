@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
 import { createServerSupabaseClient, getAuthenticatedUser } from "../../../lib/supabase-server";
-import { assertAccountCanWrite, isAdminRole, normalizeEmail as normalizeAdminEmail, readAdminEmailList } from "../../../lib/admin-auth";
+import { assertAccountCanWrite, isAdminRole, logAdminAuditEvent, normalizeEmail as normalizeAdminEmail, readAdminEmailList } from "../../../lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -276,7 +276,7 @@ export async function PATCH(request: Request) {
     return json({ ok: false, message: writeAccess.message }, { status: writeAccess.status });
   }
 
-  const body = await request.json().catch(() => null) as { id?: string; action?: "cancel" | "accept" } | null;
+  const body = await request.json().catch(() => null) as { id?: string; action?: "cancel" | "accept"; reason?: string } | null;
   const id = String(body?.id || "").trim();
   const action = body?.action;
 
@@ -312,6 +312,19 @@ export async function PATCH(request: Request) {
 
     if (update.error || !update.data) {
       return json({ ok: false, message: update.error?.message || "Could not cancel transfer." }, { status: 500 });
+    }
+
+    if (isAdmin) {
+      await logAdminAuditEvent(supabase, {
+        actorUserId: auth.user.id,
+        actorEmail: auth.user.email || "",
+        action: "transfer_cancelled",
+        targetType: "transfer",
+        targetId: id,
+        targetUserId: transfer.from_owner_id || null,
+        reason: String(body?.reason || "").trim() || "Transfer cancelled.",
+        metadata: { guitarId: transfer.guitar_id, qrCode: guitar?.qr_code || "" }
+      });
     }
 
     return json({ ok: true, transfer: mapTransfer(update.data, guitar, true), message: "Transfer cancelled." });

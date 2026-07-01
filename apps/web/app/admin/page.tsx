@@ -48,6 +48,17 @@ type AdminRecord = {
   showAuthenticityBadge?: boolean;
   safetyStatus: string;
   publicSafetyNote?: string;
+  safetyNote?: string;
+  adminArchivedAt?: string;
+  adminArchiveReason?: string;
+  ownerRemovedAt?: string;
+  ownerRemovedReason?: string;
+  isArchived?: boolean;
+  isOwnerRemoved?: boolean;
+  internalVerificationNote?: string;
+  publicVerificationNote?: string;
+  internalAuthenticityNote?: string;
+  publicAuthenticityNote?: string;
   serviceEventCount: number;
   proofDocumentCount: number;
   transferCount: number;
@@ -131,6 +142,44 @@ type SectionId =
   | "access"
   | "audit";
 
+type PendingAdminAction =
+  | {
+      kind: "user";
+      user: AdminUser;
+      action: string;
+      extra?: Record<string, unknown>;
+      title: string;
+      target: string;
+      reason: string;
+      note?: string;
+      includeNote?: boolean;
+    }
+  | {
+      kind: "record";
+      record: AdminRecord;
+      action: string;
+      extra?: Record<string, unknown>;
+      title: string;
+      target: string;
+      reason: string;
+      includeTrustNotes?: boolean;
+      includeSafetyNotes?: boolean;
+      internalVerificationNote?: string;
+      publicVerificationNote?: string;
+      internalAuthenticityNote?: string;
+      publicAuthenticityNote?: string;
+      publicSafetyNote?: string;
+      safetyNote?: string;
+    }
+  | {
+      kind: "transfer";
+      transfer: AdminTransfer;
+      action: "cancel";
+      title: string;
+      target: string;
+      reason: string;
+    };
+
 const sections: Array<{ id: SectionId; label: string }> = [
   { id: "overview", label: "Overview" },
   { id: "users", label: "Users" },
@@ -204,7 +253,9 @@ function actionLabel(action: string) {
     trust_status_updated: "Trust status updated",
     authenticity_status_updated: "Authenticity status updated",
     trust_badge_visibility_updated: "Trust badge visibility updated",
-    safety_status_updated: "Safety status updated"
+    safety_status_updated: "Safety status updated",
+    record_removed_from_collection: "Record removed from collection",
+    record_restored_to_collection: "Record restored to collection"
   };
   return labels[action] || statLabel(action);
 }
@@ -229,6 +280,7 @@ export default function AdminPage() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState("");
   const [loading, setLoading] = useState(true);
+  const [pendingAction, setPendingAction] = useState<PendingAdminAction | null>(null);
 
   const tokenPromise = useMemo(() => getSupabaseAccessToken(), []);
 
@@ -288,17 +340,30 @@ export default function AdminPage() {
     loadAdmin();
   }, [loadAdmin]);
 
-  async function updateUser(user: AdminUser, action: string, extra: Record<string, unknown> = {}) {
-    const token = await tokenPromise;
-    if (!token) {
-      setMessage("Sign in required.");
+  function beginUserAction(user: AdminUser, action: string, extra: Record<string, unknown> = {}, options: { includeNote?: boolean; title?: string } = {}) {
+    const needsReason = ["lock", "unlock", "ban", "unban", "hide_public_content", "restore_public_content", "change_role", "admin_note"].includes(action);
+    if (!needsReason) {
+      void updateUser(user, action, extra);
       return;
     }
 
-    const needsReason = ["lock", "ban", "hide_public_content", "change_role"].includes(action);
-    const reason = needsReason ? window.prompt("Reason for audit log:") : "";
-    if (needsReason && !reason) {
-      setMessage("Action cancelled. A reason is required.");
+    setPendingAction({
+      kind: "user",
+      user,
+      action,
+      extra,
+      title: options.title || actionLabel(action),
+      target: user.email || user.id,
+      reason: "",
+      note: options.includeNote ? user.adminNotes || "" : undefined,
+      includeNote: options.includeNote
+    });
+  }
+
+  async function updateUser(user: AdminUser, action: string, extra: Record<string, unknown> = {}, reason = "") {
+    const token = await tokenPromise;
+    if (!token) {
+      setMessage("Sign in required.");
       return;
     }
 
@@ -319,18 +384,36 @@ export default function AdminPage() {
     }
   }
 
-  async function updateRecord(record: AdminRecord, action: string, extra: Record<string, unknown> = {}) {
-    const token = await tokenPromise;
-    if (!token) {
-      setMessage("Sign in required.");
+  function beginRecordAction(record: AdminRecord, action: string, extra: Record<string, unknown> = {}, options: { includeTrustNotes?: boolean; includeSafetyNotes?: boolean; title?: string } = {}) {
+    const needsReason = ["archive", "restore_archive", "restore_to_collection", "set_visibility", "set_verification", "set_safety", "set_authenticity", "set_trust_badge_visibility"].includes(action);
+    if (!needsReason) {
+      void updateRecord(record, action, extra);
       return;
     }
 
-    const reason = ["archive", "restore_public", "set_visibility", "set_verification", "set_safety", "set_authenticity"].includes(action)
-      ? window.prompt("Reason for audit log:")
-      : "";
-    if (!reason && action !== "set_trust_badge_visibility") {
-      setMessage("Action cancelled. A reason is required.");
+    setPendingAction({
+      kind: "record",
+      record,
+      action,
+      extra,
+      title: options.title || actionLabel(action),
+      target: `${record.qrCode} - ${record.title}`,
+      reason: "",
+      includeTrustNotes: options.includeTrustNotes,
+      includeSafetyNotes: options.includeSafetyNotes,
+      internalVerificationNote: record.internalVerificationNote || "",
+      publicVerificationNote: record.publicVerificationNote || "",
+      internalAuthenticityNote: record.internalAuthenticityNote || "",
+      publicAuthenticityNote: record.publicAuthenticityNote || "",
+      publicSafetyNote: record.publicSafetyNote || "",
+      safetyNote: record.safetyNote || ""
+    });
+  }
+
+  async function updateRecord(record: AdminRecord, action: string, extra: Record<string, unknown> = {}, reason = "") {
+    const token = await tokenPromise;
+    if (!token) {
+      setMessage("Sign in required.");
       return;
     }
 
@@ -341,7 +424,7 @@ export default function AdminPage() {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ action, reason, ...extra })
+      body: JSON.stringify({ action, reason: reason || action, ...extra })
     });
     const payload = await response.json().catch(() => ({}));
     setMessage(payload.message || (response.ok ? "Record action saved." : "Record action failed."));
@@ -349,6 +432,85 @@ export default function AdminPage() {
     if (response.ok) {
       await loadAdmin();
     }
+  }
+
+  function beginTransferAction(transfer: AdminTransfer, action: "cancel") {
+    setPendingAction({
+      kind: "transfer",
+      transfer,
+      action,
+      title: "Cancel Transfer",
+      target: `${transfer.recordCode || transfer.guitar_id} - ${transfer.to_email || "recipient not listed"}`,
+      reason: ""
+    });
+  }
+
+  async function updateTransfer(transfer: AdminTransfer, action: "cancel", reason = "") {
+    const token = await tokenPromise;
+    if (!token) {
+      setMessage("Sign in required.");
+      return;
+    }
+
+    setBusy(`${action}:${transfer.id}`);
+    const response = await fetch("/api/transfers", {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ id: transfer.id, action, reason })
+    });
+    const payload = await response.json().catch(() => ({}));
+    setMessage(payload.message || (response.ok ? "Transfer action saved." : "Transfer action failed."));
+    setBusy("");
+    if (response.ok) {
+      await loadAdmin();
+    }
+  }
+
+  async function confirmPendingAction() {
+    if (!pendingAction) {
+      return;
+    }
+
+    const reason = pendingAction.reason.trim();
+    if (!reason) {
+      setMessage("A reason is required before this admin action can run.");
+      return;
+    }
+
+    if (pendingAction.kind === "user") {
+      await updateUser(
+        pendingAction.user,
+        pendingAction.action,
+        pendingAction.includeNote ? { ...pendingAction.extra, adminNotes: pendingAction.note || "" } : pendingAction.extra,
+        reason
+      );
+    } else if (pendingAction.kind === "record") {
+      await updateRecord(
+        pendingAction.record,
+        pendingAction.action,
+        {
+          ...pendingAction.extra,
+          ...(pendingAction.includeTrustNotes ? {
+            internalVerificationNote: pendingAction.internalVerificationNote || "",
+            publicVerificationNote: pendingAction.publicVerificationNote || "",
+            internalAuthenticityNote: pendingAction.internalAuthenticityNote || "",
+            publicAuthenticityNote: pendingAction.publicAuthenticityNote || ""
+          } : {}),
+          ...(pendingAction.includeSafetyNotes ? {
+            publicSafetyNote: pendingAction.publicSafetyNote || "",
+            safetyNote: pendingAction.safetyNote || ""
+          } : {})
+        },
+        reason
+      );
+    } else {
+      await updateTransfer(pendingAction.transfer, pendingAction.action, reason);
+    }
+
+    setPendingAction(null);
   }
 
   const filteredUsers = useMemo(() => {
@@ -378,7 +540,10 @@ export default function AdminPage() {
     let list = records.filter((record) => {
       const haystack = normalize(`${record.qrCode} ${record.title} ${record.brand} ${record.model} ${record.serialNumber} ${record.ownerEmail}`);
       if (search && !haystack.includes(search)) return false;
-      if (!recordFilter) return true;
+      if (!recordFilter || recordFilter === "active") return !record.isArchived && !record.isOwnerRemoved;
+      if (recordFilter === "archived") return record.isArchived === true;
+      if (recordFilter === "owner-removed") return record.isOwnerRemoved === true;
+      if (recordFilter === "orphaned") return !record.ownerId;
       if (recordFilter === "public" || recordFilter === "private" || recordFilter === "unlisted") return record.visibility === recordFilter;
       if (recordFilter === "verified") return record.verificationStatus === "Verified";
       if (recordFilter === "unverified") return record.verificationStatus === "Unverified";
@@ -454,9 +619,13 @@ export default function AdminPage() {
           </select>
         ) : kind === "records" ? (
           <select value={recordFilter} onChange={(event) => setRecordFilter(event.target.value)}>
-            <option value="">All records</option>
+            <option value="">Active records</option>
+            <option value="archived">Archived</option>
+            <option value="owner-removed">Owner Removed</option>
+            <option value="orphaned">Orphaned / No owner</option>
             <option value="public">Public</option>
             <option value="private">Private</option>
+            <option value="unlisted">Unlisted</option>
             <option value="verified">Verified</option>
             <option value="unverified">Unverified</option>
             <option value="authenticity-confirmed">Authenticity Confirmed</option>
@@ -499,7 +668,11 @@ export default function AdminPage() {
           <div className="admin-row" key={record.id}>
             <div>
               <strong>{record.qrCode} - {record.title}</strong>
-              <span>{[record.brand, record.model, record.serialNumber].filter(Boolean).join(" / ") || "Instrument"} - {record.visibility}</span>
+              <span>
+                {[record.brand, record.model, record.serialNumber].filter(Boolean).join(" / ") || "Instrument"} - {record.visibility}
+                {record.isArchived ? " - Archived" : ""}
+                {record.isOwnerRemoved ? " - Owner removed" : ""}
+              </span>
               <small>
                 Owner {record.ownerEmail || "No email"} - Proof {record.proofDocumentCount} - Service {record.serviceEventCount} - Transfers {record.transferCount}
               </small>
@@ -512,8 +685,20 @@ export default function AdminPage() {
             <div className="admin-row-actions">
               <Link href={record.permanentPath}>Open</Link>
               <Link href={`/edit/${record.qrCode}`}>Edit</Link>
-              <button type="button" disabled={busy === `archive:${record.id}`} onClick={() => updateRecord(record, "archive")}>Archive</button>
-              <button type="button" disabled={busy === `restore_public:${record.id}`} onClick={() => updateRecord(record, "restore_public")}>Restore public</button>
+              {record.visibility !== "public" && !record.isArchived && !record.isOwnerRemoved ? (
+                <button type="button" disabled={busy === `set_visibility:${record.id}`} onClick={() => beginRecordAction(record, "set_visibility", { visibility: "public" }, { title: "Make Public" })}>Make Public</button>
+              ) : null}
+              {record.visibility !== "private" && !record.isArchived ? (
+                <button type="button" disabled={busy === `set_visibility:${record.id}`} onClick={() => beginRecordAction(record, "set_visibility", { visibility: "private" }, { title: "Make Private" })}>Make Private</button>
+              ) : null}
+              {record.isArchived ? (
+                <button type="button" disabled={busy === `restore_archive:${record.id}`} onClick={() => beginRecordAction(record, "restore_archive", {}, { title: "Restore from Archive" })}>Restore from Archive</button>
+              ) : (
+                <button type="button" disabled={busy === `archive:${record.id}`} onClick={() => beginRecordAction(record, "archive", {}, { title: "Archive Record" })}>Archive</button>
+              )}
+              {record.isOwnerRemoved ? (
+                <button type="button" disabled={busy === `restore_to_collection:${record.id}`} onClick={() => beginRecordAction(record, "restore_to_collection", {}, { title: "Restore to Collection" })}>Restore to Collection</button>
+              ) : null}
             </div>
           </div>
         )) : <p className="admin-empty">No records match this view.</p>}
@@ -599,20 +784,17 @@ export default function AdminPage() {
                   {user.adminNotes ? <small>Admin note saved.</small> : null}
                 </div>
                 <div className="admin-row-actions">
-                  <button type="button" disabled={busy === `lock:${user.id}`} onClick={() => updateUser(user, "lock")}>Lock</button>
-                  <button type="button" disabled={busy === `unlock:${user.id}`} onClick={() => updateUser(user, "unlock")}>Unlock</button>
-                  <button type="button" disabled={busy === `ban:${user.id}`} onClick={() => updateUser(user, "ban")}>Remove Access</button>
-                  <button type="button" disabled={busy === `unban:${user.id}`} onClick={() => updateUser(user, "unban")}>Restore Access</button>
-                  <button type="button" onClick={() => updateUser(user, user.hidePublicContent ? "restore_public_content" : "hide_public_content")}>
+                  <button type="button" disabled={busy === `lock:${user.id}`} onClick={() => beginUserAction(user, "lock", {}, { title: "Lock Account" })}>Lock</button>
+                  <button type="button" disabled={busy === `unlock:${user.id}`} onClick={() => beginUserAction(user, "unlock", {}, { title: "Unlock Account" })}>Unlock</button>
+                  <button type="button" disabled={busy === `ban:${user.id}`} onClick={() => beginUserAction(user, "ban", {}, { title: "Remove Access" })}>Remove Access</button>
+                  <button type="button" disabled={busy === `unban:${user.id}`} onClick={() => beginUserAction(user, "unban", {}, { title: "Restore Access" })}>Restore Access</button>
+                  <button type="button" onClick={() => beginUserAction(user, user.hidePublicContent ? "restore_public_content" : "hide_public_content", {}, { title: user.hidePublicContent ? "Restore Public Content" : "Hide Public Content" })}>
                     {user.hidePublicContent ? "Restore Public" : "Hide Public"}
                   </button>
-                  <button type="button" onClick={() => updateUser(user, "change_role", { role: user.role === "admin" ? "owner" : "admin" })}>
+                  <button type="button" onClick={() => beginUserAction(user, "change_role", { role: user.role === "admin" ? "owner" : "admin" }, { title: user.role === "admin" ? "Remove Admin" : "Add Admin" })}>
                     {user.role === "admin" ? "Remove Admin" : "Add Admin"}
                   </button>
-                  <button type="button" onClick={() => {
-                    const note = window.prompt("Internal admin note:", user.adminNotes || "");
-                    if (note !== null) updateUser(user, "admin_note", { adminNotes: note });
-                  }}>Note</button>
+                  <button type="button" onClick={() => beginUserAction(user, "admin_note", {}, { includeNote: true, title: "Save Admin Note" })}>Note</button>
                 </div>
               </div>
             )) : <p className="admin-empty">No users match this view.</p>}
@@ -656,16 +838,16 @@ export default function AdminPage() {
                 </div>
                 <div className="admin-row-actions">
                   <Link href={`/edit/${record.qrCode}`}>Full Editor</Link>
-                  <button type="button" onClick={() => updateRecord(record, "set_verification", { verificationStatus: record.verificationStatus === "Verified" ? "unverified" : "verified" })}>
+                  <button type="button" onClick={() => beginRecordAction(record, "set_verification", { verificationStatus: record.verificationStatus === "Verified" ? "unverified" : "verified" }, { includeTrustNotes: true })}>
                     {record.verificationStatus === "Verified" ? "Set Unverified" : "Set Verified"}
                   </button>
-                  <button type="button" onClick={() => updateRecord(record, "set_authenticity", { authenticityStatus: record.authenticityStatus === "Authenticity Confirmed" ? "unconfirmed" : "confirmed" })}>
+                  <button type="button" onClick={() => beginRecordAction(record, "set_authenticity", { authenticityStatus: record.authenticityStatus === "Authenticity Confirmed" ? "unconfirmed" : "confirmed" }, { includeTrustNotes: true })}>
                     {record.authenticityStatus === "Authenticity Confirmed" ? "Set Unconfirmed" : "Set Confirmed"}
                   </button>
-                  <button type="button" onClick={() => updateRecord(record, "set_trust_badge_visibility", { showVerificationBadge: record.showVerificationBadge === false })}>
+                  <button type="button" onClick={() => beginRecordAction(record, "set_trust_badge_visibility", { showVerificationBadge: record.showVerificationBadge === false }, { includeTrustNotes: true, title: "Update Verification Badge Visibility" })}>
                     {record.showVerificationBadge === false ? "Show Verified Badge" : "Hide Verified Badge"}
                   </button>
-                  <button type="button" onClick={() => updateRecord(record, "set_trust_badge_visibility", { showAuthenticityBadge: record.showAuthenticityBadge === false })}>
+                  <button type="button" onClick={() => beginRecordAction(record, "set_trust_badge_visibility", { showAuthenticityBadge: record.showAuthenticityBadge === false }, { includeTrustNotes: true, title: "Update Authenticity Badge Visibility" })}>
                     {record.showAuthenticityBadge === false ? "Show Auth Badge" : "Hide Auth Badge"}
                   </button>
                 </div>
@@ -696,10 +878,10 @@ export default function AdminPage() {
                 </div>
                 <div className="admin-row-actions">
                   <Link href={`/edit/${record.qrCode}`}>Full Editor</Link>
-                  <button type="button" onClick={() => updateRecord(record, "set_safety", { safetyStatus: "clear" })}>No Alert</button>
-                  <button type="button" onClick={() => updateRecord(record, "set_safety", { safetyStatus: "lost", publicSafetyNote: "This instrument has been reported lost." })}>Lost</button>
-                  <button type="button" onClick={() => updateRecord(record, "set_safety", { safetyStatus: "stolen", publicSafetyNote: "This instrument has been reported stolen." })}>Stolen</button>
-                  <button type="button" onClick={() => updateRecord(record, "set_safety", { safetyStatus: "recovered" })}>Recovered</button>
+                  <button type="button" onClick={() => beginRecordAction(record, "set_safety", { safetyStatus: "clear" }, { includeSafetyNotes: true })}>No Alert</button>
+                  <button type="button" onClick={() => beginRecordAction(record, "set_safety", { safetyStatus: "lost", publicSafetyNote: "This instrument has been reported lost." }, { includeSafetyNotes: true })}>Lost</button>
+                  <button type="button" onClick={() => beginRecordAction(record, "set_safety", { safetyStatus: "stolen", publicSafetyNote: "This instrument has been reported stolen." }, { includeSafetyNotes: true })}>Stolen</button>
+                  <button type="button" onClick={() => beginRecordAction(record, "set_safety", { safetyStatus: "recovered" }, { includeSafetyNotes: true })}>Recovered</button>
                 </div>
               </div>
             ))}
@@ -730,6 +912,11 @@ export default function AdminPage() {
                 <div className="admin-row-actions">
                   {transfer.recordCode ? <Link href={`/i/${transfer.recordCode}`}>Open Record</Link> : null}
                   {transfer.recordCode ? <Link href={`/edit/${transfer.recordCode}`}>Edit Record</Link> : null}
+                  {transfer.status === "sent" ? (
+                    <button type="button" disabled={busy === `cancel:${transfer.id}`} onClick={() => beginTransferAction(transfer, "cancel")}>
+                      Cancel Transfer
+                    </button>
+                  ) : null}
                 </div>
               </div>
             )) : <p className="admin-empty">No transfers match this view.</p>}
@@ -807,12 +994,47 @@ export default function AdminPage() {
     }
 
     if (activeSection === "access") {
+      const accessTarget = users.find((user) => normalize(user.email) === normalize(adminSearch));
+      const dbAdmins = users.filter((user) => user.role === "admin");
       return (
         <section className="card admin-panel-card">
           <h2>Admin access</h2>
           <p>Signed in as {overview?.admin?.email || "authorized admin"}.</p>
           <p>Role: {overview?.admin?.role || "Not listed"} - Source: {overview?.admin?.accessSource || "unknown"} - Status: {overview?.admin?.accountStatus || "active"}</p>
           <p>Admin access is controlled by profile role or server environment allowlists. Environment-managed access cannot be removed from this UI.</p>
+          <div className="admin-filter-row">
+            <input value={adminSearch} onChange={(event) => setAdminSearch(event.target.value)} placeholder="User email for admin access" />
+            <button
+              type="button"
+              disabled={!accessTarget || accessTarget.role === "admin"}
+              onClick={() => accessTarget ? beginUserAction(accessTarget, "change_role", { role: "admin" }, { title: "Add Admin" }) : undefined}
+            >
+              Add Admin
+            </button>
+            <button
+              type="button"
+              disabled={!accessTarget || accessTarget.role !== "admin"}
+              onClick={() => accessTarget ? beginUserAction(accessTarget, "change_role", { role: "owner" }, { title: "Remove Admin" }) : undefined}
+            >
+              Remove Admin
+            </button>
+          </div>
+          <div className="admin-table">
+            {dbAdmins.length ? dbAdmins.map((user) => (
+              <div className="admin-row" key={user.id}>
+                <div>
+                  <strong>{user.email}</strong>
+                  <span>Database admin - {user.accountStatus}</span>
+                </div>
+                <div className="admin-row-actions">
+                  <button type="button" onClick={() => beginUserAction(user, "change_role", { role: "owner" }, { title: "Remove Admin" })}>
+                    Remove Admin
+                  </button>
+                </div>
+              </div>
+            )) : <p className="admin-empty">No database admin users listed.</p>}
+          </div>
+          {overview?.admin?.accessSource === "env" ? <p>Current access is managed by environment.</p> : null}
         </section>
       );
     }
@@ -868,6 +1090,81 @@ export default function AdminPage() {
               </button>
             ))}
           </div>
+          {pendingAction ? (
+            <div className="admin-modal-backdrop" role="presentation">
+              <section className="card admin-modal" role="dialog" aria-modal="true" aria-label={pendingAction.title}>
+                <div className="admin-section-head">
+                  <div>
+                    <div className="eyebrow">Confirm admin action</div>
+                    <h2>{pendingAction.title}</h2>
+                    <p>{pendingAction.target}</p>
+                  </div>
+                  <button type="button" className="button secondary" onClick={() => setPendingAction(null)}>
+                    Cancel
+                  </button>
+                </div>
+                {pendingAction.kind === "user" && pendingAction.includeNote ? (
+                  <label>
+                    Internal admin note
+                    <textarea
+                      value={pendingAction.note || ""}
+                      onChange={(event) => setPendingAction({ ...pendingAction, note: event.target.value })}
+                      rows={4}
+                    />
+                  </label>
+                ) : null}
+                {pendingAction.kind === "record" && pendingAction.includeTrustNotes ? (
+                  <div className="admin-modal-grid">
+                    <label>
+                      Public verification note
+                      <textarea value={pendingAction.publicVerificationNote || ""} onChange={(event) => setPendingAction({ ...pendingAction, publicVerificationNote: event.target.value })} rows={3} />
+                    </label>
+                    <label>
+                      Internal verification note
+                      <textarea value={pendingAction.internalVerificationNote || ""} onChange={(event) => setPendingAction({ ...pendingAction, internalVerificationNote: event.target.value })} rows={3} />
+                    </label>
+                    <label>
+                      Public authenticity note
+                      <textarea value={pendingAction.publicAuthenticityNote || ""} onChange={(event) => setPendingAction({ ...pendingAction, publicAuthenticityNote: event.target.value })} rows={3} />
+                    </label>
+                    <label>
+                      Internal authenticity note
+                      <textarea value={pendingAction.internalAuthenticityNote || ""} onChange={(event) => setPendingAction({ ...pendingAction, internalAuthenticityNote: event.target.value })} rows={3} />
+                    </label>
+                  </div>
+                ) : null}
+                {pendingAction.kind === "record" && pendingAction.includeSafetyNotes ? (
+                  <div className="admin-modal-grid">
+                    <label>
+                      Public safety note
+                      <textarea value={pendingAction.publicSafetyNote || ""} onChange={(event) => setPendingAction({ ...pendingAction, publicSafetyNote: event.target.value })} rows={3} />
+                    </label>
+                    <label>
+                      Private/internal safety note
+                      <textarea value={pendingAction.safetyNote || ""} onChange={(event) => setPendingAction({ ...pendingAction, safetyNote: event.target.value })} rows={3} />
+                    </label>
+                  </div>
+                ) : null}
+                <label>
+                  Reason
+                  <textarea
+                    value={pendingAction.reason}
+                    onChange={(event) => setPendingAction({ ...pendingAction, reason: event.target.value })}
+                    placeholder="Required for the audit log"
+                    rows={3}
+                  />
+                </label>
+                <div className="form-actions">
+                  <button className="button" type="button" onClick={() => void confirmPendingAction()}>
+                    Confirm
+                  </button>
+                  <button className="button secondary" type="button" onClick={() => setPendingAction(null)}>
+                    Cancel
+                  </button>
+                </div>
+              </section>
+            </div>
+          ) : null}
           {content}
         </div>
       </main>

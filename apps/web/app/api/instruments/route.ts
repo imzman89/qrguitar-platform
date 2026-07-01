@@ -6,7 +6,7 @@ import { createServerSupabaseClient, getAuthenticatedUser, getSupabaseEnvStatus 
 import { defaultQrStyle, type DemoInstrument, type QrStyle } from "../../../lib/local-demo";
 import { getPublicInstrumentByCode, isRetiredPublicRecordCode } from "../../../lib/public-instruments";
 import { defaultRecordTrustSettings, mergeRecordTrustSettings, recordTrustContentKey, type RecordTrustSettings } from "../../../lib/record-trust";
-import { assertAccountCanWrite } from "../../../lib/admin-auth";
+import { assertAccountCanWrite, logAdminAuditEvent } from "../../../lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -55,6 +55,8 @@ type CreateInstrumentRequest = {
 
 type UpdateInstrumentRequest = Omit<CreateInstrumentRequest, "accountPlan"> & {
   qrCode: string;
+  action?: "remove_from_collection" | "restore_to_collection";
+  reason?: string;
   verificationOnly?: boolean;
   verificationStatus?: "verified" | "unverified";
   authenticityStatus?: "confirmed" | "unconfirmed";
@@ -109,6 +111,12 @@ type GuitarRow = {
   safety_status_updated_by?: string | null;
   safety_note?: string | null;
   public_safety_note?: string | null;
+  admin_archived_at?: string | null;
+  admin_archived_by?: string | null;
+  admin_archive_reason?: string | null;
+  owner_removed_at?: string | null;
+  owner_removed_by?: string | null;
+  owner_removed_reason?: string | null;
   created_at: string;
 };
 
@@ -629,6 +637,7 @@ function mapInstrumentRow({
     publicSafetyNote: guitar.public_safety_note || "",
     safetyStatusUpdatedAt: guitar.safety_status_updated_at || "",
     ...(exposeInternalTrust ? { safetyNote: guitar.safety_note || "" } : {}),
+    ...(guitar.owner_removed_at ? { collectionRemovedAt: guitar.owner_removed_at, collectionRemovedReason: guitar.owner_removed_reason || "" } : {}),
     instrumentType: specValue(specs, "Type") || guitar.model || "",
     builder: guitar.builder || specValue(specs, "Builder"),
     owner: ownerName || ownerEmail || "Unclaimed",
@@ -732,13 +741,21 @@ function stripAnonymousInstrumentFields(instrument: DemoInstrument) {
   return publicInstrument;
 }
 
-async function loadRecordsForUser(supabase: ReturnType<typeof createServerSupabaseClient>, owner: User): Promise<LoadRecordsResult> {
+async function loadRecordsForUser(supabase: ReturnType<typeof createServerSupabaseClient>, owner: User, includeRemoved = false): Promise<LoadRecordsResult> {
   if (!supabase) {
     return { records: [], ownerEmail: owner.email || "", ownerName: "", error: "Supabase is not configured." };
   }
 
   const profile = await supabase.from("profiles").select("id,display_name").eq("id", owner.id).maybeSingle<ProfileRow>();
-  const guitars = await supabase.from("guitars").select("*").eq("owner_id", owner.id).order("created_at", { ascending: false });
+  let guitarQuery = supabase
+    .from("guitars")
+    .select("*")
+    .eq("owner_id", owner.id)
+    .order("created_at", { ascending: false });
+  if (!includeRemoved) {
+    guitarQuery = guitarQuery.is("owner_removed_at", null);
+  }
+  const guitars = await guitarQuery;
 
   if (profile.error) {
     return { records: [], ownerEmail: owner.email || "", ownerName: owner.email || "", error: profile.error.message };
@@ -847,6 +864,8 @@ async function loadPublicRecords(supabase: ReturnType<typeof createServerSupabas
     .from("guitars")
     .select("*")
     .eq("visibility", "public")
+    .is("admin_archived_at", null)
+    .is("owner_removed_at", null)
     .order("created_at", { ascending: false });
 
   if (guitars.error) {
@@ -967,6 +986,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code") || "";
   const scope = url.searchParams.get("scope") || "";
+  const includeRemoved = url.searchParams.get("includeRemoved") === "1";
 
   if (scope === "mine") {
     const auth = await getAuthenticatedUser(request);
@@ -975,7 +995,7 @@ export async function GET(request: Request) {
     }
 
     if (code) {
-      const ownerRecord = await loadRecordsForUser(supabase, auth.user);
+      const ownerRecord = await loadRecordsForUser(supabase, auth.user, includeRemoved);
       if (ownerRecord.error) {
         return supabaseReadErrorResponse(ownerRecord.error);
       }
@@ -991,7 +1011,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const result = await loadRecordsForUser(supabase, auth.user);
+    const result = await loadRecordsForUser(supabase, auth.user, includeRemoved);
     if (result.error) {
       return supabaseReadErrorResponse(result.error);
     }
@@ -1357,6 +1377,82 @@ export async function PATCH(request: Request) {
       message: "Trust settings updated.",
       verificationStatus: isAdmin ? verificationStatus : existing.data.status === "verified" ? "verified" : "unverified",
       ...trust
+    }, { status: 200 });
+  }
+
+  if (body.action === "remove_from_collection" || body.action === "restore_to_collection") {
+    const qrCode = String(body.qrCode || "").trim().toUpperCase();
+    const reason = String(body.reason || "").trim().slice(0, 1000);
+    if (!qrCode) {
+      return NextResponse.json({ ok: false, message: "Missing QRguitar ID." }, { status: 400 });
+    }
+
+    const existing = await supabase
+      .from("guitars")
+      .select("id,owner_id,qr_code,permanent_path,status")
+      .eq("qr_code", qrCode)
+      .maybeSingle<GuitarRow>();
+    if (existing.error || !existing.data) {
+      return NextResponse.json({ ok: false, message: "Instrument record was not found." }, { status: 404 });
+    }
+
+    if (existing.data.owner_id !== auth.user.id) {
+      return NextResponse.json({ ok: false, message: "Only the owner can update this collection record." }, { status: 403 });
+    }
+
+    const trust = (await loadTrustSettingsMap(supabase, [qrCode])).get(qrCode) || defaultRecordTrustSettings;
+    if (body.action === "remove_from_collection" && (existing.data.status === "verified" || trust.authenticityStatus === "confirmed")) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "Verified and authenticity-confirmed records are preserved for provenance. Transfer ownership or contact QRguitar admin for permanent removal."
+        },
+        { status: 403 }
+      );
+    }
+
+    const now = new Date().toISOString();
+    const update = body.action === "remove_from_collection"
+      ? {
+          owner_removed_at: now,
+          owner_removed_by: auth.user.id,
+          owner_removed_reason: reason || "Owner removed record from collection.",
+          visibility: "private",
+          updated_at: now
+        }
+      : {
+          owner_removed_at: null,
+          owner_removed_by: null,
+          owner_removed_reason: null,
+          updated_at: now
+        };
+
+    const result = await supabase
+      .from("guitars")
+      .update(update)
+      .eq("id", existing.data.id)
+      .eq("owner_id", auth.user.id);
+    if (result.error) {
+      return NextResponse.json({ ok: false, message: result.error.message || "Could not update collection." }, { status: 500 });
+    }
+
+    await logAdminAuditEvent(supabase, {
+      actorUserId: auth.user.id,
+      actorEmail: auth.user.email || "",
+      action: body.action === "remove_from_collection" ? "record_removed_from_collection" : "record_restored_to_collection",
+      targetType: "guitar",
+      targetId: qrCode,
+      targetUserId: auth.user.id,
+      reason: reason || null,
+      metadata: { qrCode }
+    });
+
+    revalidatePublicRecordSurfaces(qrCode);
+    return noStoreJson({
+      ok: true,
+      qrCode,
+      permanentPath: existing.data.permanent_path || `/i/${qrCode}`,
+      message: body.action === "remove_from_collection" ? "Record removed from your active collection." : "Record restored to your active collection."
     }, { status: 200 });
   }
 

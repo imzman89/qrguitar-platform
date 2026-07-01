@@ -18,6 +18,11 @@ type GuitarRow = {
   visibility: string | null;
   safety_status?: string | null;
   public_safety_note?: string | null;
+  safety_note?: string | null;
+  admin_archived_at?: string | null;
+  admin_archive_reason?: string | null;
+  owner_removed_at?: string | null;
+  owner_removed_reason?: string | null;
   created_at: string | null;
   updated_at?: string | null;
 };
@@ -47,7 +52,7 @@ export async function GET(request: Request) {
   const [guitarsResult, documentsResult, serviceResult, transfersResult, authUsers] = await Promise.all([
     supabase
       .from("guitars")
-      .select("id,owner_id,qr_code,permanent_path,name,brand,model,serial_number,status,visibility,safety_status,public_safety_note,created_at,updated_at")
+      .select("id,owner_id,qr_code,permanent_path,name,brand,model,serial_number,status,visibility,safety_status,public_safety_note,safety_note,admin_archived_at,admin_archive_reason,owner_removed_at,owner_removed_reason,created_at,updated_at")
       .order("created_at", { ascending: false }),
     supabase.from("guitar_documents").select("id,guitar_id,name,file_name,file_size_bytes,is_public,document_type,created_at,updated_at"),
     supabase.from("guitar_timeline_events").select("id,guitar_id,is_public,event_type,title,event_date,shop_name,location,created_at"),
@@ -97,6 +102,17 @@ export async function GET(request: Request) {
         showAuthenticityBadge: trust?.showAuthenticityBadge !== false,
         safetyStatus: guitar.safety_status || "clear",
         publicSafetyNote: guitar.public_safety_note || "",
+        safetyNote: guitar.safety_note || "",
+        adminArchivedAt: guitar.admin_archived_at || "",
+        adminArchiveReason: guitar.admin_archive_reason || "",
+        ownerRemovedAt: guitar.owner_removed_at || "",
+        ownerRemovedReason: guitar.owner_removed_reason || "",
+        isArchived: Boolean(guitar.admin_archived_at),
+        isOwnerRemoved: Boolean(guitar.owner_removed_at),
+        publicVerificationNote: trust?.publicVerificationNote || "",
+        internalVerificationNote: trust?.internalVerificationNote || "",
+        publicAuthenticityNote: trust?.publicAuthenticityNote || "",
+        internalAuthenticityNote: trust?.internalAuthenticityNote || "",
         serviceEventCount: serviceCounts.get(guitar.id) || 0,
         proofDocumentCount: documentCounts.get(guitar.id) || 0,
         transferCount: transferCounts.get(guitar.id) || 0,
