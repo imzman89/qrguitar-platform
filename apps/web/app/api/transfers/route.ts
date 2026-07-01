@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
 import { createServerSupabaseClient, getAuthenticatedUser } from "../../../lib/supabase-server";
+import { assertAccountCanWrite, isAdminRole, normalizeEmail as normalizeAdminEmail, readAdminEmailList } from "../../../lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -66,8 +67,12 @@ function transferStatus(status: TransferRow["status"]) {
 }
 
 async function canAdminister(supabase: ServerSupabaseClient, user: User) {
+  if (readAdminEmailList().includes(normalizeAdminEmail(user.email))) {
+    return true;
+  }
+
   const profile = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle<ProfileRow>();
-  return profile?.data?.role === "admin";
+  return isAdminRole(profile?.data?.role);
 }
 
 function mapTransfer(row: TransferRow, guitar?: GuitarRow | null, includePrivate = false) {
@@ -190,6 +195,11 @@ export async function POST(request: Request) {
     return json({ ok: false, message: auth.error || "Sign in required." }, { status: 401 });
   }
 
+  const writeAccess = await assertAccountCanWrite(supabase, auth.user);
+  if (!writeAccess.ok) {
+    return json({ ok: false, message: writeAccess.message }, { status: writeAccess.status });
+  }
+
   const body = await request.json().catch(() => null) as { qrCode?: string; toEmail?: string; toName?: string } | null;
   const qrCode = String(body?.qrCode || "").trim().toUpperCase();
   const toEmail = normalizeEmail(body?.toEmail || "");
@@ -259,6 +269,11 @@ export async function PATCH(request: Request) {
   const auth = await getAuthenticatedUser(request);
   if (!auth.user) {
     return json({ ok: false, message: auth.error || "Sign in required." }, { status: 401 });
+  }
+
+  const writeAccess = await assertAccountCanWrite(supabase, auth.user);
+  if (!writeAccess.ok) {
+    return json({ ok: false, message: writeAccess.message }, { status: writeAccess.status });
   }
 
   const body = await request.json().catch(() => null) as { id?: string; action?: "cancel" | "accept" } | null;

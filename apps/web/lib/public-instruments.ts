@@ -63,6 +63,8 @@ type TimelineRow = {
 type ProfileRow = {
   id: string;
   display_name: string | null;
+  account_status?: string | null;
+  hide_public_content?: boolean | null;
 };
 
 type SiteContentRow = {
@@ -297,7 +299,7 @@ async function loadRelated(guitars: GuitarRow[]) {
     supabase.from("guitar_media").select("guitar_id,storage_path").in("guitar_id", ids),
     supabase.from("guitar_specs").select("guitar_id,label,value").in("guitar_id", ids),
     supabase.from("guitar_documents").select("guitar_id,name,storage_path,is_public,document_type,public_description,created_at").in("guitar_id", ids),
-    ownerIds.length ? supabase.from("profiles").select("id,display_name").in("id", ownerIds) : Promise.resolve({ data: [], error: null }),
+    ownerIds.length ? supabase.from("profiles").select("id,display_name,account_status,hide_public_content").in("id", ownerIds) : Promise.resolve({ data: [], error: null }),
     supabase
       .from("guitar_timeline_events")
       .select("id,guitar_id,event_date,event_type,title,description,shop_name,location,is_public,created_at,updated_at")
@@ -309,7 +311,15 @@ async function loadRelated(guitars: GuitarRow[]) {
 
   const serviceEventsColumnsMissing = serviceEventsResult.error && /column .* does not exist/i.test(serviceEventsResult.error.message);
 
-  if (mediaResult.error || specsResult.error || documentsResult.error || profilesResult.error || (serviceEventsResult.error && !serviceEventsColumnsMissing)) {
+  let profileRows = (profilesResult.data || []) as ProfileRow[];
+  let profileError = profilesResult.error;
+  if (profileError && /column .* does not exist/i.test(profileError.message || "") && ownerIds.length) {
+    const fallbackProfiles = await supabase.from("profiles").select("id,display_name").in("id", ownerIds);
+    profileRows = (fallbackProfiles.data || []) as ProfileRow[];
+    profileError = fallbackProfiles.error;
+  }
+
+  if (mediaResult.error || specsResult.error || documentsResult.error || profileError || (serviceEventsResult.error && !serviceEventsColumnsMissing)) {
     throw new Error(mediaResult.error?.message || specsResult.error?.message || documentsResult.error?.message || profilesResult.error?.message || serviceEventsResult.error?.message || "Could not load related instrument data.");
   }
 
@@ -329,7 +339,7 @@ async function loadRelated(guitars: GuitarRow[]) {
   }
 
   const profiles = new Map<string, ProfileRow>();
-  for (const row of (profilesResult.data || []) as ProfileRow[]) {
+  for (const row of profileRows) {
     profiles.set(row.id, row);
   }
 
@@ -362,10 +372,14 @@ export async function getPublicInstruments() {
 
   const guitars = data as GuitarRow[];
   const related = await loadRelated(guitars);
-  const trustByCode = await loadTrustSettingsMap(guitars.map((guitar) => guitar.qr_code));
+  const visibleGuitars = guitars.filter((guitar) => {
+    const profile = related.profiles.get(guitar.owner_id || "");
+    return !(profile?.hide_public_content === true && (profile.account_status === "locked" || profile.account_status === "banned"));
+  });
+  const trustByCode = await loadTrustSettingsMap(visibleGuitars.map((guitar) => guitar.qr_code));
 
   return Promise.all(
-    guitars.map(async (guitar) => {
+    visibleGuitars.map(async (guitar) => {
       const heroStoragePath = guitar.hero_image_path || "";
       const media = await resolveMediaSources((related.media.get(guitar.id) || []).filter((storagePath) => storagePath !== heroStoragePath));
       const heroImagePath = heroStoragePath ? (await resolveMediaSources([heroStoragePath]))[0] : "";
@@ -405,6 +419,10 @@ export async function getPublicInstrumentByCode(code: string) {
   }
 
   const related = await loadRelated([data]);
+  const ownerProfile = related.profiles.get(data.owner_id || "");
+  if (ownerProfile?.hide_public_content === true && (ownerProfile.account_status === "locked" || ownerProfile.account_status === "banned")) {
+    return null;
+  }
   const heroStoragePath = data.hero_image_path || "";
   const media = await resolveMediaSources((related.media.get(data.id) || []).filter((storagePath) => storagePath !== heroStoragePath));
   const heroImagePath = heroStoragePath ? (await resolveMediaSources([heroStoragePath]))[0] : "";

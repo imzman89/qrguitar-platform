@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient, getAuthenticatedUser } from "../../../lib/supabase-server";
+import { assertAccountCanWrite, isAdminRole, normalizeEmail, readAdminEmailList } from "../../../lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -50,8 +51,12 @@ function needsMigration(message?: string) {
 }
 
 async function canAdminister(supabase: ServerSupabaseClient, user: User) {
+  if (readAdminEmailList().includes(normalizeEmail(user.email))) {
+    return true;
+  }
+
   const profile = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle<{ role?: string | null }>();
-  return profile.data?.role === "admin";
+  return isAdminRole(profile.data?.role);
 }
 
 async function loadGuitarByCode(supabase: ServerSupabaseClient, qrCode: string) {
@@ -124,6 +129,13 @@ export async function PATCH(request: Request) {
   const access = await requireOwnerOrAdmin(request, loaded.guitar, supabase);
   if (access.error) {
     return json({ ok: false, message: access.error }, { status: access.user ? 403 : 401 });
+  }
+
+  if (access.user) {
+    const writeAccess = await assertAccountCanWrite(supabase, access.user);
+    if (!writeAccess.ok) {
+      return json({ ok: false, message: writeAccess.message }, { status: writeAccess.status });
+    }
   }
 
   const now = new Date().toISOString();

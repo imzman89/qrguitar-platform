@@ -6,6 +6,7 @@ import { createServerSupabaseClient, getAuthenticatedUser, getSupabaseEnvStatus 
 import { defaultQrStyle, type DemoInstrument, type QrStyle } from "../../../lib/local-demo";
 import { getPublicInstrumentByCode } from "../../../lib/public-instruments";
 import { defaultRecordTrustSettings, mergeRecordTrustSettings, recordTrustContentKey, type RecordTrustSettings } from "../../../lib/record-trust";
+import { assertAccountCanWrite } from "../../../lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -152,6 +153,8 @@ type GuitarTimelineRow = {
 type ProfileRow = {
   id: string;
   display_name: string | null;
+  account_status?: string | null;
+  hide_public_content?: boolean | null;
 };
 
 type SiteContentRow = {
@@ -287,7 +290,7 @@ async function canManageRecordVerification(supabase: ReturnType<typeof createSer
   }
 
   const profile = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle<{ role?: string | null }>();
-  return profile.data?.role === "admin";
+  return profile.data?.role === "admin" || profile.data?.role === "owner";
 }
 
 function coerceAccountPlan(value: string): AccountPlan {
@@ -873,11 +876,19 @@ async function loadPublicRecords(supabase: ReturnType<typeof createServerSupabas
       ? supabase.from("guitar_documents").select("guitar_id,name,storage_path,is_public,document_type,public_description,created_at,updated_at").in("guitar_id", guitarIds)
       : Promise.resolve({ data: [], error: null }),
     guitarIds.length
-      ? supabase.from("profiles").select("id,display_name").in("id", guitars.data.map((item) => item.owner_id).filter(Boolean) as string[])
+      ? supabase.from("profiles").select("id,display_name,account_status,hide_public_content").in("id", guitars.data.map((item) => item.owner_id).filter(Boolean) as string[])
       : Promise.resolve({ data: [], error: null })
   ]);
 
-  const relatedError = mediaResult.error || specsResult.error || documentsResult.error || profilesResult.error;
+  let profileRows = (profilesResult.data || []) as ProfileRow[];
+  let profilesError = profilesResult.error;
+  if (profilesError && /column .* does not exist/i.test(profilesError.message || "")) {
+    const fallbackProfiles = await supabase.from("profiles").select("id,display_name").in("id", guitars.data.map((item) => item.owner_id).filter(Boolean) as string[]);
+    profileRows = (fallbackProfiles.data || []) as ProfileRow[];
+    profilesError = fallbackProfiles.error;
+  }
+
+  const relatedError = mediaResult.error || specsResult.error || documentsResult.error || profilesError;
   if (relatedError) {
     return { records: [] as DemoInstrument[], error: relatedError.message };
   }
@@ -907,14 +918,19 @@ async function loadPublicRecords(supabase: ReturnType<typeof createServerSupabas
   }
 
   const profilesById = new Map<string, ProfileRow>();
-  for (const item of profilesResult.data || []) {
+  for (const item of profileRows) {
     const row = item as ProfileRow;
     profilesById.set(row.id, row);
   }
 
+  const visibleGuitars = guitars.data.filter((guitar) => {
+    const profile = profilesById.get((guitar as GuitarRow).owner_id || "");
+    return !(profile?.hide_public_content === true && (profile.account_status === "locked" || profile.account_status === "banned"));
+  });
+
   return {
     records: await Promise.all(
-      guitars.data.map(async (guitar) => {
+      visibleGuitars.map(async (guitar) => {
         const heroStoragePath = (guitar as GuitarRow).hero_image_path || "";
         const media = await resolveImageSources(
           supabase,
@@ -1024,6 +1040,11 @@ export async function POST(request: Request) {
   const auth = await getAuthenticatedUser(request);
   if (!auth.user) {
     return NextResponse.json({ ok: false, message: auth.error || "Sign in required." } satisfies SupabaseCreateResponse, { status: 401 });
+  }
+
+  const writeAccess = await assertAccountCanWrite(supabase, auth.user);
+  if (!writeAccess.ok) {
+    return NextResponse.json({ ok: false, message: writeAccess.message } satisfies SupabaseCreateResponse, { status: writeAccess.status });
   }
 
   let body: CreateInstrumentRequest;
@@ -1256,6 +1277,11 @@ export async function PATCH(request: Request) {
   const auth = await getAuthenticatedUser(request);
   if (!auth.user) {
     return NextResponse.json({ ok: false, message: auth.error || "Sign in required." } satisfies SupabaseCreateResponse, { status: 401 });
+  }
+
+  const writeAccess = await assertAccountCanWrite(supabase, auth.user);
+  if (!writeAccess.ok) {
+    return NextResponse.json({ ok: false, message: writeAccess.message } satisfies SupabaseCreateResponse, { status: writeAccess.status });
   }
 
   let body: UpdateInstrumentRequest;

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { revalidatePath, unstable_noStore as noStore } from "next/cache";
-import { createServerSupabaseClient, getAuthenticatedUser, getSupabaseEnvStatus } from "../../../lib/supabase-server";
+import { createServerSupabaseClient, getSupabaseEnvStatus } from "../../../lib/supabase-server";
 import { defaultSiteSettings, mergeSiteSettings, publishedSiteSettingsKey, type EditableSiteSettings } from "../../../lib/site-settings";
+import { getAdminContext } from "../../../lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -10,7 +11,6 @@ export const fetchCache = "force-no-store";
 const NO_STORE_HEADERS = {
   "Cache-Control": "no-store, no-cache, must-revalidate"
 };
-const OWNER_EMAIL_FALLBACKS = ["getgrowingri@gmail.com", "gary@qrguitar.com"];
 
 type SiteContentRow = {
   content_value: Partial<EditableSiteSettings> | null;
@@ -24,33 +24,6 @@ function noStoreJson<T>(body: T, init: ResponseInit = {}) {
       ...(init.headers || {})
     }
   });
-}
-
-function normalizeEmail(value?: string | null) {
-  return String(value || "").trim().toLowerCase();
-}
-
-function readAdminEmails() {
-  return `${process.env.QRGUITAR_ADMIN_EMAILS || ""},${process.env.QRGUITAR_OWNER_EMAILS || ""}`
-    .split(",")
-    .map((item) => normalizeEmail(item))
-    .filter(Boolean);
-}
-
-async function canPublishSettings(userId: string, email?: string | null) {
-  const adminEmails = readAdminEmails();
-  const normalizedEmail = normalizeEmail(email);
-  if (adminEmails.includes(normalizedEmail) || OWNER_EMAIL_FALLBACKS.includes(normalizedEmail)) {
-    return true;
-  }
-
-  const supabase = createServerSupabaseClient();
-  if (!supabase) {
-    return false;
-  }
-
-  const { data } = await supabase.from("profiles").select("role").eq("id", userId).maybeSingle<{ role: string | null }>();
-  return data?.role === "admin";
 }
 
 export async function GET() {
@@ -85,14 +58,9 @@ export async function PUT(request: Request) {
     return noStoreJson({ ok: false, message: "Supabase site settings are not configured." }, { status: 503 });
   }
 
-  const { user, error } = await getAuthenticatedUser(request);
-  if (!user) {
-    return noStoreJson({ ok: false, message: error || "Sign in required." }, { status: 401 });
-  }
-
-  const allowed = await canPublishSettings(user.id, user.email);
-  if (!allowed) {
-    return noStoreJson({ ok: false, message: "Only the QRguitar owner can publish site settings. Add this account to QRGUITAR_ADMIN_EMAILS if needed." }, { status: 403 });
+  const admin = await getAdminContext(request);
+  if (!admin.ok) {
+    return noStoreJson({ ok: false, message: admin.message }, { status: admin.status });
   }
 
   let body: { settings?: Partial<EditableSiteSettings> };

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient, getAuthenticatedUser } from "../../../lib/supabase-server";
+import { assertAccountCanWrite, isAdminRole, normalizeEmail, readAdminEmailList } from "../../../lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -100,8 +101,12 @@ function mapServiceEvent(row: ServiceEventRow, includePrivate = false) {
 }
 
 async function canAdminister(supabase: ServerSupabaseClient, user: User) {
+  if (readAdminEmailList().includes(normalizeEmail(user.email))) {
+    return true;
+  }
+
   const profile = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle<{ role?: string | null }>();
-  return profile.data?.role === "admin";
+  return isAdminRole(profile.data?.role);
 }
 
 async function loadGuitarByCode(supabase: ServerSupabaseClient, qrCode: string) {
@@ -210,6 +215,11 @@ export async function POST(request: Request) {
     return json({ ok: false, message: access.error }, { status: access.user ? 403 : 401 });
   }
 
+  const writeAccess = await assertAccountCanWrite(supabase, access.user);
+  if (!writeAccess.ok) {
+    return json({ ok: false, message: writeAccess.message }, { status: writeAccess.status });
+  }
+
   const title = cleanText(body?.title, 180);
   if (!title) {
     return json({ ok: false, message: "Service title is required." }, { status: 400 });
@@ -261,6 +271,13 @@ export async function PATCH(request: Request) {
   const access = await requireOwnerOrAdmin(request, guitar, supabase);
   if (access.error) {
     return json({ ok: false, message: access.error }, { status: access.user ? 403 : 401 });
+  }
+
+  if (access.user) {
+    const writeAccess = await assertAccountCanWrite(supabase, access.user);
+    if (!writeAccess.ok) {
+      return json({ ok: false, message: writeAccess.message }, { status: writeAccess.status });
+    }
   }
 
   const title = cleanText(body?.title, 180);
@@ -315,6 +332,13 @@ export async function DELETE(request: Request) {
   const access = await requireOwnerOrAdmin(request, guitar, supabase);
   if (access.error) {
     return json({ ok: false, message: access.error }, { status: access.user ? 403 : 401 });
+  }
+
+  if (access.user) {
+    const writeAccess = await assertAccountCanWrite(supabase, access.user);
+    if (!writeAccess.ok) {
+      return json({ ok: false, message: writeAccess.message }, { status: writeAccess.status });
+    }
   }
 
   const deleted = await supabase.from("guitar_timeline_events").delete().eq("id", id).eq("guitar_id", guitar.id);
