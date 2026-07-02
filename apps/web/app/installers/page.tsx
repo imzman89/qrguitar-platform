@@ -26,27 +26,6 @@ const vettingSteps = [
   }
 ];
 
-const exampleInstallers = [
-  {
-    name: "Proper Instruments",
-    region: "Cranston, Rhode Island",
-    services: "Custom builds, finish work, QR placement",
-    status: "Founding installer"
-  },
-  {
-    name: "Northeast Guitar Repair",
-    region: "New England",
-    services: "Repairs, setup, clear coat application",
-    status: "Example listing"
-  },
-  {
-    name: "Midwest Luthier Bench",
-    region: "Great Lakes",
-    services: "Restoration, refinishing, verification photos",
-    status: "Example listing"
-  }
-];
-
 export default function InstallersPage() {
   return (
     <>
@@ -111,8 +90,8 @@ export default function InstallersPage() {
               <div className="eyebrow">Public finder</div>
               <h2>Browse vetted installers by region, service, and shop type.</h2>
               <p>
-                The first version starts with a curated directory. Later, this can become a searchable national map with
-                service areas, verified reviews, repair specialties, and booking requests.
+                Approved installers will appear here after QRguitar reviews the shop, service area, finish experience,
+                and installation process. No shop is listed until it has been accepted.
               </p>
               <div className="check-list">
                 <div className="check-item"><MapPin size={18} /><span>Search by city, state, or region</span></div>
@@ -121,16 +100,14 @@ export default function InstallersPage() {
               </div>
             </div>
             <div className="installer-directory">
-              {exampleInstallers.map((installer) => (
-                <article className="installer-card" key={installer.name}>
-                  <div>
-                    <span className="status-pill">{installer.status}</span>
-                    <h3>{installer.name}</h3>
-                    <p>{installer.region}</p>
-                  </div>
-                  <strong>{installer.services}</strong>
-                </article>
-              ))}
+              <article className="installer-card">
+                <div>
+                  <span className="status-pill">Directory opening soon</span>
+                  <h3>No vetted installers listed yet</h3>
+                  <p>QRguitar is accepting early shop applications before public installer listings go live.</p>
+                </div>
+                <strong>Interested shops can apply below.</strong>
+              </article>
             </div>
           </div>
         </section>
