@@ -345,8 +345,7 @@ export default function AdminPage() {
   }, [loadAdmin]);
 
   function beginUserAction(user: AdminUser, action: string, extra: Record<string, unknown> = {}, options: { includeNote?: boolean; title?: string } = {}) {
-    const needsConfirmation = ["lock", "unlock", "ban", "unban", "hide_public_content", "restore_public_content", "change_role", "admin_note"].includes(action);
-    if (!needsConfirmation) {
+    if (!options.includeNote) {
       void updateUser(user, action, extra);
       return;
     }
@@ -389,8 +388,7 @@ export default function AdminPage() {
   }
 
   function beginRecordAction(record: AdminRecord, action: string, extra: Record<string, unknown> = {}, options: { includeTrustNotes?: boolean; includeSafetyNotes?: boolean; title?: string } = {}) {
-    const needsConfirmation = ["archive", "restore_archive", "restore_to_collection", "set_visibility"].includes(action) || options.includeTrustNotes || options.includeSafetyNotes;
-    if (!needsConfirmation) {
+    if (!options.includeTrustNotes && !options.includeSafetyNotes) {
       void updateRecord(record, action, extra);
       return;
     }
@@ -439,14 +437,7 @@ export default function AdminPage() {
   }
 
   function beginTransferAction(transfer: AdminTransfer, action: "cancel") {
-    setPendingAction({
-      kind: "transfer",
-      transfer,
-      action,
-      title: "Cancel Transfer",
-      target: `${transfer.recordCode || transfer.guitar_id} - ${transfer.to_email || "recipient not listed"}`,
-      reason: ""
-    });
+    void updateTransfer(transfer, action);
   }
 
   async function updateTransfer(transfer: AdminTransfer, action: "cancel", reason = "") {
