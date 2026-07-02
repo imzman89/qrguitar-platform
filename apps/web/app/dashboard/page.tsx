@@ -126,6 +126,11 @@ export default function DashboardPage() {
   const accountPlan = getAccountPlan(user);
   const displayName = useMemo(() => getDisplayName(user), [user?.name, user?.email, user?.role]);
   const accountSummary = accountPlan === "free" ? "Beta access." : `${accountPlan.charAt(0).toUpperCase()}${accountPlan.slice(1)} account.`;
+  const publicRecords = instruments.filter((instrument) => instrument.visibility !== "private").length;
+  const privateRecords = instruments.filter((instrument) => instrument.visibility === "private").length;
+  const unlistedRecords = instruments.filter((instrument) => instrument.visibility === "unlisted").length;
+  const recordsWithPhotos = instruments.filter((instrument) => instrument.heroImageDataUrl || instrument.galleryImageDataUrls?.length).length;
+  const hiddenDocumentCount = instruments.reduce((total, instrument) => total + (instrument.documentFiles?.filter((file) => file.visibility === "hidden").length || 0), 0);
 
   function refreshInstruments() {
     if (!user?.email) {
@@ -152,9 +157,9 @@ export default function DashboardPage() {
       { label: "Registered instruments", value: String(instruments.length) },
       { label: "Verified records", value: String(verifiedRecords) },
       { label: "Transfers pending", value: String(pendingTransfers) },
-      { label: "Public records", value: String(instruments.filter((instrument) => instrument.visibility !== "private").length) }
+      { label: "Public records", value: String(publicRecords) }
     ],
-    [instruments, pendingTransfers, verifiedRecords]
+    [instruments, pendingTransfers, publicRecords, verifiedRecords]
   );
 
   async function logout() {
@@ -464,31 +469,53 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          <div className="split dashboard-split">
-            <section className="card">
+          <div className="split dashboard-split dashboard-owner-tools">
+            <section className="card dashboard-health-card">
               <div className="icon"><BadgeCheck /></div>
-              <h3>What is working</h3>
-              <div className="activity-list">
-                <Activity icon={<QrCode size={18} />} title="Permanent record links" detail="Every instrument keeps one QRguitar URL that stays the same as details are updated." />
-                <Activity icon={<ShieldCheck size={18} />} title="Owner account flow" detail="Sign in, create records, edit details, and manage public or private visibility from one dashboard." />
-                <Activity icon={<ShieldCheck size={18} />} title="Why verify?" detail="Paid verification and authenticity review are handled manually during beta." />
+              <h3>Collection health</h3>
+              <div className="dashboard-health-grid">
+                <div>
+                  <strong>{recordsWithPhotos}/{instruments.length || 0}</strong>
+                  <span>Records with photos</span>
+                </div>
+                <div>
+                  <strong>{publicRecords}</strong>
+                  <span>Public</span>
+                </div>
+                <div>
+                  <strong>{privateRecords}</strong>
+                  <span>Private</span>
+                </div>
+                <div>
+                  <strong>{hiddenDocumentCount}</strong>
+                  <span>Hidden docs</span>
+                </div>
               </div>
-              <div className="check-list">
-                <div className="check-item"><span>1</span> Builds trust when selling</div>
-                <div className="check-item"><span>2</span> Helps shops and builders stand behind records</div>
-                <div className="check-item"><span>3</span> Keeps provenance cleaner over time</div>
-                <div className="check-item"><span>4</span> Helps collectors organize proof, receipts, photos, and service history</div>
-                <div className="check-item"><span>5</span> Adds an optional authenticity review layer for higher-value instruments</div>
+              <div className="activity-list compact">
+                <Activity icon={<QrCode size={18} />} title="Permanent QR URLs" detail="Editing serials, specs, photos, or titles does not change the QRguitar link." />
+                <Activity icon={<ShieldCheck size={18} />} title="Visibility control" detail={`${publicRecords} public, ${privateRecords} private${unlistedRecords ? `, ${unlistedRecords} unlisted` : ""}.`} />
               </div>
             </section>
-            <section className="card">
+            <section className="card dashboard-next-card">
               <div className="icon"><Settings2 /></div>
-              <h3>What to do next</h3>
-              <div className="check-list">
-                <div className="check-item"><span>1</span> Register the instrument with its core details and photos</div>
-                <div className="check-item"><span>2</span> Review the public record the buyer or shop will actually see</div>
-                <div className="check-item"><span>3</span> Download the QR in the format you want to use</div>
-                <div className="check-item"><span>4</span> Contact support@qrguitar.com if you need manual ownership help during launch</div>
+              <h3>Next best actions</h3>
+              <div className="dashboard-action-list">
+                <Link href="/create">
+                  <strong>Add another record</strong>
+                  <span>Register a guitar, amp, pedal, or build.</span>
+                </Link>
+                <Link href="/catalog">
+                  <strong>Review public catalog</strong>
+                  <span>See what buyers and shops can view.</span>
+                </Link>
+                <a href="mailto:support@qrguitar.com?subject=QRguitar%20verification%20help">
+                  <strong>Request verification help</strong>
+                  <span>Manual review is available during beta.</span>
+                </a>
+                <a href="mailto:support@qrguitar.com?subject=QRguitar%20ownership%20transfer%20help">
+                  <strong>Manual transfer help</strong>
+                  <span>Use support for edge cases while transfers mature.</span>
+                </a>
               </div>
             </section>
           </div>

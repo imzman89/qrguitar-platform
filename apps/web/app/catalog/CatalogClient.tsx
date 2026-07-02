@@ -188,6 +188,7 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
                         <span className="catalog-card-code">{record.qrCode}</span>
                       </div>
                       <div className="catalog-card-content">
+                        <span className="catalog-card-kicker">Permanent QRguitar record</span>
                         <h3>{instrumentDisplayName(record)}</h3>
                         <p className="catalog-meta-line">{instrumentSubtitle(record)}</p>
                         <p className="catalog-card-summary">{record.summary || "Record details will appear as the owner adds photos, specs, and history."}</p>

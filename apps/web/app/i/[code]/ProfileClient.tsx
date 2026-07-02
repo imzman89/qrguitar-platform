@@ -319,15 +319,15 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
 
   const specs = [
     { label: "Instrument ID", value: instrument.qrCode },
-    ...(showVerificationBadge ? [{ label: "Verification", value: isVerifiedRecord ? "Verified by QRguitar" : "Unverified" }] : []),
-    ...(showAuthenticityBadge ? [{ label: "Authenticity", value: isAuthenticityConfirmed ? "Authenticity Confirmed" : "Authenticity Unconfirmed" }] : []),
-    { label: "Owner", value: publicOwnerDisplay(instrument) },
-    { label: "Built", value: instrument.year || "Unknown" },
     { label: "Make / Model", value: [instrument.brand, instrument.model].filter(Boolean).join(" ") },
     { label: "Serial / Build ID", value: instrument.serial },
-    { label: "Builder", value: instrument.builder || "Not listed" },
-    { label: "Location", value: formattedLocation || "Not listed" }
-  ];
+    { label: "Year", value: instrument.year || "Unknown" },
+    ...(formattedLocation ? [{ label: "Location", value: formattedLocation }] : []),
+    { label: "Visibility", value: instrument.visibility === "private" ? "Private record" : instrument.visibility === "unlisted" ? "Unlisted record" : "Public record" },
+    { label: "Media / Docs", value: `${galleryImages.length} photos / ${documentFiles.length} docs` },
+    ...(showVerificationBadge ? [{ label: "Verification", value: isVerifiedRecord ? "Verified by QRguitar" : "Unverified" }] : []),
+    ...(showAuthenticityBadge ? [{ label: "Authenticity", value: isAuthenticityConfirmed ? "Authenticity Confirmed" : "Authenticity Unconfirmed" }] : [])
+  ].filter((spec) => spec.value);
 
   const stalePublicValues = new Set(["custom reptile finish", "custom offset", "alder", "maple neck, rosewood board"]);
 
@@ -656,7 +656,7 @@ function ProfilePanel({
         <PanelHeader icon={<Repeat2 />} label="Ownership" title="Brand, retailer, owner, and future buyer stay connected around the same instrument." />
         <div className="ownership-grid">
           <span><strong>Current owner</strong>{instrument.owner || "Unclaimed"}</span>
-          <span><strong>Builder</strong>{instrument.builder || "Not listed"}</span>
+          {instrument.builder ? <span><strong>Builder</strong>{instrument.builder}</span> : null}
           <span><strong>Visibility</strong>{instrument.visibility === "private" ? "Private record" : "Public record"}</span>
                 </div>
                 <EmptyPanel
@@ -789,11 +789,13 @@ function ProfilePanel({
           </div>
         ) : null}
       </div>
-      <div className="maker-signature">
-        <strong>{instrument.brand?.slice(0, 1) || "P"}</strong>
-        <span>{instrument.brand || "Proper Instruments"}</span>
-        <em>{isVerifiedRecord ? "Verified" : "Unverified"}</em>
-      </div>
+      {instrument.brand ? (
+        <div className="maker-signature">
+          <span>Brand</span>
+          <strong>{instrument.brand}</strong>
+          <em>{isVerifiedRecord ? "Verified by QRguitar" : "Unverified"}</em>
+        </div>
+      ) : null}
     </section>
   );
 }
