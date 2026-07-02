@@ -50,8 +50,8 @@ const tabs: Array<{ id: EditorTab; label: string }> = [
   { id: "sections", label: "Homepage Sections" },
   { id: "colors", label: "Theme Colors" },
   { id: "seo", label: "SEO" },
-  { id: "bot", label: "Bot" },
-  { id: "preview", label: "Preview" }
+  { id: "bot", label: "Bot Notes" },
+  { id: "preview", label: "Settings JSON" }
 ];
 
 export default function SiteEditorPage() {
@@ -943,9 +943,9 @@ export default function SiteEditorPage() {
                 {activeTab === "bot" ? (
                   <section className="card editor-card">
                     <EditorHeader
-                      label="Bot"
-                      title="Bot knowledge and training notes"
-                      copy="Use this to keep feeding the assistant shop knowledge, maker checks, and support rules without rewriting bot code every time."
+                      label="Bot Notes"
+                      title="Assistant notes"
+                      copy="Notes saved for future assistant behavior. This does not retrain or change the live bot by itself."
                     />
                     <TextArea
                       label="Knowledge notes"
@@ -971,9 +971,9 @@ export default function SiteEditorPage() {
                 {activeTab === "preview" ? (
                   <section className="card editor-card">
                     <EditorHeader
-                      label="Preview"
-                      title="Current settings JSON"
-                      copy="Useful for backup, comparing changes, or moving settings to another browser."
+                      label="Settings JSON"
+                      title="Current Published Settings JSON"
+                      copy="Backup and compare published settings. This is not a visual preview."
                     />
                     <textarea className="settings-json-preview" readOnly rows={16} value={settingsJson} />
                     <div className="preview-actions">
@@ -1008,7 +1008,9 @@ export default function SiteEditorPage() {
                 </div>
                 <div className="seo-preview-card">
                   <span className="mini-eyebrow">SEO preview</span>
-                  <img src={settings.seo.image} alt="QRguitar SEO preview" />
+                  <div className="seo-preview-wordmark" aria-label="QRguitar SEO preview wordmark">
+                    <span>QR</span><strong>guitar</strong>
+                  </div>
                   <strong>{settings.seo.title}</strong>
                   <p>{settings.seo.description}</p>
                   <small>qrguitar.com</small>

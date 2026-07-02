@@ -100,6 +100,9 @@ type AdminTransfer = {
   guitar_id: string;
   recordCode?: string;
   recordTitle?: string;
+  recordVisibility?: string;
+  recordIsArchived?: boolean;
+  recordIsOwnerRemoved?: boolean;
   fromOwnerEmail?: string;
   acceptedByEmail?: string;
   to_email?: string;
@@ -241,8 +244,8 @@ function actionLabel(action: string) {
   const labels: Record<string, string> = {
     lock: "Account locked",
     unlock: "Account unlocked",
-    ban: "User access removed",
-    unban: "User access restored",
+    ban: "User removed",
+    unban: "User restored",
     hide_public_content: "Public content hidden",
     restore_public_content: "Public content restored",
     change_role: "Role changed",
@@ -341,8 +344,8 @@ export default function AdminPage() {
   }, [loadAdmin]);
 
   function beginUserAction(user: AdminUser, action: string, extra: Record<string, unknown> = {}, options: { includeNote?: boolean; title?: string } = {}) {
-    const needsReason = ["lock", "unlock", "ban", "unban", "hide_public_content", "restore_public_content", "change_role", "admin_note"].includes(action);
-    if (!needsReason) {
+    const needsConfirmation = ["lock", "unlock", "ban", "unban", "hide_public_content", "restore_public_content", "change_role", "admin_note"].includes(action);
+    if (!needsConfirmation) {
       void updateUser(user, action, extra);
       return;
     }
@@ -374,7 +377,7 @@ export default function AdminPage() {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ action, reason: reason || action, ...extra })
+      body: JSON.stringify({ action, reason, ...extra })
     });
     const payload = await response.json().catch(() => ({}));
     setMessage(payload.message || (response.ok ? "Admin action saved." : "Admin action failed."));
@@ -385,8 +388,8 @@ export default function AdminPage() {
   }
 
   function beginRecordAction(record: AdminRecord, action: string, extra: Record<string, unknown> = {}, options: { includeTrustNotes?: boolean; includeSafetyNotes?: boolean; title?: string } = {}) {
-    const needsReason = ["archive", "restore_archive", "restore_to_collection", "set_visibility", "set_verification", "set_safety", "set_authenticity", "set_trust_badge_visibility"].includes(action);
-    if (!needsReason) {
+    const needsConfirmation = ["archive", "restore_archive", "restore_to_collection", "set_visibility"].includes(action) || options.includeTrustNotes || options.includeSafetyNotes;
+    if (!needsConfirmation) {
       void updateRecord(record, action, extra);
       return;
     }
@@ -424,7 +427,7 @@ export default function AdminPage() {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ action, reason: reason || action, ...extra })
+      body: JSON.stringify({ action, reason, ...extra })
     });
     const payload = await response.json().catch(() => ({}));
     setMessage(payload.message || (response.ok ? "Record action saved." : "Record action failed."));
@@ -475,10 +478,6 @@ export default function AdminPage() {
     }
 
     const reason = pendingAction.reason.trim();
-    if (!reason) {
-      setMessage("A reason is required before this admin action can run.");
-      return;
-    }
 
     if (pendingAction.kind === "user") {
       await updateUser(
@@ -683,7 +682,11 @@ export default function AdminPage() {
               </div>
             </div>
             <div className="admin-row-actions">
-              <Link href={record.permanentPath}>Open</Link>
+              {record.visibility === "public" && !record.isArchived && !record.isOwnerRemoved ? (
+                <Link href={record.permanentPath}>Open Public</Link>
+              ) : (
+                <button type="button" disabled title="Private, archived, or removed records do not have an active public page.">No public page</button>
+              )}
               <Link href={`/edit/${record.qrCode}`}>Edit</Link>
               {record.visibility !== "public" && !record.isArchived && !record.isOwnerRemoved ? (
                 <button type="button" disabled={busy === `set_visibility:${record.id}`} onClick={() => beginRecordAction(record, "set_visibility", { visibility: "public" }, { title: "Make Public" })}>Make Public</button>
@@ -694,7 +697,7 @@ export default function AdminPage() {
               {record.isArchived ? (
                 <button type="button" disabled={busy === `restore_archive:${record.id}`} onClick={() => beginRecordAction(record, "restore_archive", {}, { title: "Restore from Archive" })}>Restore from Archive</button>
               ) : (
-                <button type="button" disabled={busy === `archive:${record.id}`} onClick={() => beginRecordAction(record, "archive", {}, { title: "Archive Record" })}>Archive</button>
+                <button type="button" disabled={busy === `archive:${record.id}`} onClick={() => beginRecordAction(record, "archive", {}, { title: "Archive Record" })}>Archive Record</button>
               )}
               {record.isOwnerRemoved ? (
                 <button type="button" disabled={busy === `restore_to_collection:${record.id}`} onClick={() => beginRecordAction(record, "restore_to_collection", {}, { title: "Restore to Collection" })}>Restore to Collection</button>
@@ -786,8 +789,8 @@ export default function AdminPage() {
                 <div className="admin-row-actions">
                   <button type="button" disabled={busy === `lock:${user.id}`} onClick={() => beginUserAction(user, "lock", {}, { title: "Lock Account" })}>Lock</button>
                   <button type="button" disabled={busy === `unlock:${user.id}`} onClick={() => beginUserAction(user, "unlock", {}, { title: "Unlock Account" })}>Unlock</button>
-                  <button type="button" disabled={busy === `ban:${user.id}`} onClick={() => beginUserAction(user, "ban", {}, { title: "Remove Access" })}>Remove Access</button>
-                  <button type="button" disabled={busy === `unban:${user.id}`} onClick={() => beginUserAction(user, "unban", {}, { title: "Restore Access" })}>Restore Access</button>
+                  <button type="button" disabled={busy === `ban:${user.id}`} onClick={() => beginUserAction(user, "ban", {}, { title: "Remove User" })}>Remove User</button>
+                  <button type="button" disabled={busy === `unban:${user.id}`} onClick={() => beginUserAction(user, "unban", {}, { title: "Restore User" })}>Restore User</button>
                   <button type="button" onClick={() => beginUserAction(user, user.hidePublicContent ? "restore_public_content" : "hide_public_content", {}, { title: user.hidePublicContent ? "Restore Public Content" : "Hide Public Content" })}>
                     {user.hidePublicContent ? "Restore Public" : "Hide Public"}
                   </button>
@@ -838,17 +841,23 @@ export default function AdminPage() {
                 </div>
                 <div className="admin-row-actions">
                   <Link href={`/edit/${record.qrCode}`}>Full Editor</Link>
-                  <button type="button" onClick={() => beginRecordAction(record, "set_verification", { verificationStatus: record.verificationStatus === "Verified" ? "unverified" : "verified" }, { includeTrustNotes: true })}>
+                  <button type="button" disabled={busy === `set_verification:${record.id}`} onClick={() => void updateRecord(record, "set_verification", { verificationStatus: record.verificationStatus === "Verified" ? "unverified" : "verified" })}>
                     {record.verificationStatus === "Verified" ? "Set Unverified" : "Set Verified"}
                   </button>
-                  <button type="button" onClick={() => beginRecordAction(record, "set_authenticity", { authenticityStatus: record.authenticityStatus === "Authenticity Confirmed" ? "unconfirmed" : "confirmed" }, { includeTrustNotes: true })}>
+                  <button type="button" disabled={busy === `set_authenticity:${record.id}`} onClick={() => void updateRecord(record, "set_authenticity", { authenticityStatus: record.authenticityStatus === "Authenticity Confirmed" ? "unconfirmed" : "confirmed" })}>
                     {record.authenticityStatus === "Authenticity Confirmed" ? "Set Unconfirmed" : "Set Confirmed"}
                   </button>
-                  <button type="button" onClick={() => beginRecordAction(record, "set_trust_badge_visibility", { showVerificationBadge: record.showVerificationBadge === false }, { includeTrustNotes: true, title: "Update Verification Badge Visibility" })}>
+                  <button type="button" disabled={busy === `set_trust_badge_visibility:${record.id}`} onClick={() => void updateRecord(record, "set_trust_badge_visibility", { showVerificationBadge: record.showVerificationBadge === false })}>
                     {record.showVerificationBadge === false ? "Show Verified Badge" : "Hide Verified Badge"}
                   </button>
-                  <button type="button" onClick={() => beginRecordAction(record, "set_trust_badge_visibility", { showAuthenticityBadge: record.showAuthenticityBadge === false }, { includeTrustNotes: true, title: "Update Authenticity Badge Visibility" })}>
+                  <button type="button" disabled={busy === `set_trust_badge_visibility:${record.id}`} onClick={() => void updateRecord(record, "set_trust_badge_visibility", { showAuthenticityBadge: record.showAuthenticityBadge === false })}>
                     {record.showAuthenticityBadge === false ? "Show Auth Badge" : "Hide Auth Badge"}
+                  </button>
+                  <button type="button" onClick={() => beginRecordAction(record, "set_trust_badge_visibility", {
+                    showVerificationBadge: record.showVerificationBadge !== false,
+                    showAuthenticityBadge: record.showAuthenticityBadge !== false
+                  }, { includeTrustNotes: true, title: "Edit Trust Notes" })}>
+                    Edit Notes
                   </button>
                 </div>
               </div>
@@ -878,10 +887,11 @@ export default function AdminPage() {
                 </div>
                 <div className="admin-row-actions">
                   <Link href={`/edit/${record.qrCode}`}>Full Editor</Link>
-                  <button type="button" onClick={() => beginRecordAction(record, "set_safety", { safetyStatus: "clear" }, { includeSafetyNotes: true })}>No Alert</button>
-                  <button type="button" onClick={() => beginRecordAction(record, "set_safety", { safetyStatus: "lost", publicSafetyNote: "This instrument has been reported lost." }, { includeSafetyNotes: true })}>Lost</button>
-                  <button type="button" onClick={() => beginRecordAction(record, "set_safety", { safetyStatus: "stolen", publicSafetyNote: "This instrument has been reported stolen." }, { includeSafetyNotes: true })}>Stolen</button>
-                  <button type="button" onClick={() => beginRecordAction(record, "set_safety", { safetyStatus: "recovered" }, { includeSafetyNotes: true })}>Recovered</button>
+                  <button type="button" disabled={busy === `set_safety:${record.id}`} onClick={() => void updateRecord(record, "set_safety", { safetyStatus: "clear" })}>No Alert</button>
+                  <button type="button" disabled={busy === `set_safety:${record.id}`} onClick={() => void updateRecord(record, "set_safety", { safetyStatus: "lost", publicSafetyNote: "This instrument has been reported lost." })}>Lost</button>
+                  <button type="button" disabled={busy === `set_safety:${record.id}`} onClick={() => void updateRecord(record, "set_safety", { safetyStatus: "stolen", publicSafetyNote: "This instrument has been reported stolen." })}>Stolen</button>
+                  <button type="button" disabled={busy === `set_safety:${record.id}`} onClick={() => void updateRecord(record, "set_safety", { safetyStatus: "recovered" })}>Recovered</button>
+                  <button type="button" onClick={() => beginRecordAction(record, "set_safety", { safetyStatus: record.safetyStatus || "clear" }, { includeSafetyNotes: true, title: "Edit Safety Notes" })}>Edit Notes</button>
                 </div>
               </div>
             ))}
@@ -901,25 +911,38 @@ export default function AdminPage() {
           </div>
           {filterControls("transfers")}
           <div className="admin-table">
-            {filteredTransfers.length ? filteredTransfers.map((transfer) => (
-              <div className="admin-row" key={transfer.id}>
-                <div>
-                  <strong>{transfer.status} - {transfer.recordCode || transfer.guitar_id}</strong>
-                  <span>{transfer.recordTitle || "Record"} - From {transfer.fromOwnerEmail || "unknown"} - To {transfer.to_email || transfer.acceptedByEmail || "not listed"}</span>
-                  <small>Created {formatDate(transfer.created_at)} - Accepted {formatDate(transfer.accepted_at)}</small>
-                  <small>Claim link cannot be reconstructed. Create a new transfer from record owner tools.</small>
+            {filteredTransfers.length ? filteredTransfers.map((transfer) => {
+              const hasPublicPage = transfer.recordCode && transfer.recordVisibility === "public" && !transfer.recordIsArchived && !transfer.recordIsOwnerRemoved;
+              return (
+                <div className="admin-row" key={transfer.id}>
+                  <div>
+                    <strong>{transfer.status} - {transfer.recordCode || transfer.guitar_id}</strong>
+                    <span>{transfer.recordTitle || "Record"} - From {transfer.fromOwnerEmail || "unknown"} - To {transfer.to_email || transfer.acceptedByEmail || "not listed"}</span>
+                    <small>Created {formatDate(transfer.created_at)} - Accepted {formatDate(transfer.accepted_at)}</small>
+                    <small>Claim link cannot be reconstructed. Create a new transfer from record owner tools.</small>
+                  </div>
+                  <div className="admin-row-actions">
+                    {transfer.recordCode ? <Link href={`/edit/${transfer.recordCode}`}>Edit Record</Link> : null}
+                    {hasPublicPage ? (
+                      <Link href={`/i/${transfer.recordCode}`}>Open Public Page</Link>
+                    ) : (
+                      <button type="button" disabled title="Private, archived, or removed transfer records do not have an active public page.">No public page</button>
+                    )}
+                    {transfer.fromOwnerEmail ? (
+                      <button type="button" onClick={() => { setAdminSearch(transfer.fromOwnerEmail || ""); goToSection("users"); }}>View From User</button>
+                    ) : null}
+                    {transfer.acceptedByEmail ? (
+                      <button type="button" onClick={() => { setAdminSearch(transfer.acceptedByEmail || ""); goToSection("users"); }}>View Recipient</button>
+                    ) : null}
+                    {transfer.status === "sent" ? (
+                      <button type="button" disabled={busy === `cancel:${transfer.id}`} onClick={() => beginTransferAction(transfer, "cancel")}>
+                        Cancel Transfer
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-                <div className="admin-row-actions">
-                  {transfer.recordCode ? <Link href={`/i/${transfer.recordCode}`}>Open Record</Link> : null}
-                  {transfer.recordCode ? <Link href={`/edit/${transfer.recordCode}`}>Edit Record</Link> : null}
-                  {transfer.status === "sent" ? (
-                    <button type="button" disabled={busy === `cancel:${transfer.id}`} onClick={() => beginTransferAction(transfer, "cancel")}>
-                      Cancel Transfer
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            )) : <p className="admin-empty">No transfers match this view.</p>}
+              );
+            }) : <p className="admin-empty">No transfers match this view.</p>}
           </div>
         </section>
       );
@@ -1146,11 +1169,11 @@ export default function AdminPage() {
                   </div>
                 ) : null}
                 <label>
-                  Reason
+                  Optional admin note
                   <textarea
                     value={pendingAction.reason}
                     onChange={(event) => setPendingAction({ ...pendingAction, reason: event.target.value })}
-                    placeholder="Required for the audit log"
+                    placeholder="Optional note for the audit log"
                     rows={3}
                   />
                 </label>

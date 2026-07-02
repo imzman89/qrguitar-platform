@@ -1960,6 +1960,31 @@ select {
   background: #070c10;
 }
 
+.seo-preview-wordmark {
+  margin: 0;
+  min-height: 168px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-top: 1px solid rgba(248, 246, 242, .08);
+  border-bottom: 1px solid rgba(248, 246, 242, .08);
+  background:
+    linear-gradient(135deg, rgba(240, 161, 43, .18), transparent 42%),
+    #070c10;
+  color: var(--text);
+  font-size: clamp(38px, 5vw, 62px);
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.seo-preview-wordmark strong {
+  display: inline;
+  margin: 0;
+  color: var(--gold);
+  font-size: inherit;
+  line-height: 1;
+}
+
 .seo-preview-card strong {
   margin-top: 12px;
   color: var(--text);

@@ -93,21 +93,14 @@ export async function PATCH(request: Request, context: { params: { id: string } 
   let auditReason = reason || null;
 
   if (action === "archive") {
-    if (!reason) {
-      return adminJson({ ok: false, message: "Archive reason is required." }, { status: 400 });
-    }
     Object.assign(updates, {
       visibility: "private",
       admin_archived_at: now,
       admin_archived_by: admin.email,
-      admin_archive_reason: reason
+      admin_archive_reason: reason || null
     });
     auditAction = "record_archived";
-    auditReason = reason;
   } else if (action === "restore_archive") {
-    if (!reason) {
-      return adminJson({ ok: false, message: "Restore reason is required." }, { status: 400 });
-    }
     Object.assign(updates, {
       visibility: "private",
       admin_archived_at: null,
@@ -115,18 +108,13 @@ export async function PATCH(request: Request, context: { params: { id: string } 
       admin_archive_reason: null
     });
     auditAction = "record_restored";
-    auditReason = reason;
   } else if (action === "restore_to_collection") {
-    if (!reason) {
-      return adminJson({ ok: false, message: "Restore reason is required." }, { status: 400 });
-    }
     Object.assign(updates, {
       owner_removed_at: null,
       owner_removed_by: null,
       owner_removed_reason: null
     });
     auditAction = "record_restored_to_collection";
-    auditReason = reason;
   } else if (action === "set_visibility") {
     const nextVisibility = cleanVisibility(body?.visibility);
     if (!nextVisibility) {

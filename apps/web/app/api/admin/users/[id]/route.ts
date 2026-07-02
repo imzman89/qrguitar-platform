@@ -67,14 +67,11 @@ export async function PATCH(request: Request, context: { params: { id: string } 
   let auditReason = reason;
 
   if (action === "lock") {
-    if (!reason) {
-      return adminJson({ ok: false, message: "Lock reason is required." }, { status: 400 });
-    }
     Object.assign(update, {
       account_status: "locked",
       account_locked_at: now,
       account_locked_by: admin.email,
-      account_lock_reason: reason
+      account_lock_reason: reason || null
     });
   } else if (action === "unlock") {
     Object.assign(update, {
@@ -84,14 +81,11 @@ export async function PATCH(request: Request, context: { params: { id: string } 
       account_lock_reason: null
     });
   } else if (action === "ban") {
-    if (!reason) {
-      return adminJson({ ok: false, message: "Ban reason is required." }, { status: 400 });
-    }
     Object.assign(update, {
       account_status: "banned",
       account_banned_at: now,
       account_banned_by: admin.email,
-      account_ban_reason: reason,
+      account_ban_reason: reason || null,
       hide_public_content: true
     });
   } else if (action === "unban") {
@@ -99,7 +93,8 @@ export async function PATCH(request: Request, context: { params: { id: string } 
       account_status: "active",
       account_banned_at: null,
       account_banned_by: null,
-      account_ban_reason: null
+      account_ban_reason: null,
+      hide_public_content: false
     });
   } else if (action === "hide_public_content") {
     Object.assign(update, { hide_public_content: true });
