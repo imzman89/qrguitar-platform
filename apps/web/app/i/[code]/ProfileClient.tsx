@@ -530,10 +530,10 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           <span>{instrument.visibility === "private" ? "Private" : "Public"}</span>
           <span>{instrument.instrumentCondition ? instrument.instrumentCondition.toUpperCase() : "USED"}</span>
           <span>{formattedLocation || "Registered"}</span>
-          {safetyStatus === "lost" ? <span>Reported Lost</span> : null}
-          {safetyStatus === "stolen" ? <span>Reported Stolen</span> : null}
-          {showVerificationBadge ? <span>{isVerifiedRecord ? "Verified by QRguitar" : "Unverified"}</span> : null}
-          {showAuthenticityBadge ? <span>{isAuthenticityConfirmed ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}</span> : null}
+          {safetyStatus === "lost" ? <span className="scan-tag--safety">Reported Lost</span> : null}
+          {safetyStatus === "stolen" ? <span className="scan-tag--safety">Reported Stolen</span> : null}
+          {showVerificationBadge ? <span className={isVerifiedRecord ? "scan-tag--verified" : ""}>{isVerifiedRecord ? "Verified by QRguitar" : "Unverified"}</span> : null}
+          {showAuthenticityBadge ? <span className={isAuthenticityConfirmed ? "scan-tag--verified" : ""}>{isAuthenticityConfirmed ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}</span> : null}
         </section>
 
         {activeMedia ? (

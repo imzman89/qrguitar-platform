@@ -142,7 +142,6 @@ type SectionId =
   | "transfers"
   | "proof"
   | "service"
-  | "site-editor"
   | "access"
   | "audit";
 
@@ -193,7 +192,6 @@ const sections: Array<{ id: SectionId; label: string }> = [
   { id: "transfers", label: "Transfers" },
   { id: "proof", label: "Proof Vault" },
   { id: "service", label: "Service History" },
-  { id: "site-editor", label: "Site Editor" },
   { id: "access", label: "Admin Access" },
   { id: "audit", label: "Audit Log" }
 ];
@@ -284,6 +282,7 @@ export default function AdminPage() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState("");
   const [loading, setLoading] = useState(true);
+  const [adminAuthorized, setAdminAuthorized] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAdminAction | null>(null);
 
   const tokenPromise = useMemo(() => getSupabaseAccessToken(), []);
@@ -312,6 +311,7 @@ export default function AdminPage() {
     setMessage("");
     const token = await tokenPromise;
     if (!token) {
+      setAdminAuthorized(false);
       setMessage("Sign in with an authorized admin account.");
       setLoading(false);
       return;
@@ -336,6 +336,7 @@ export default function AdminPage() {
     setUsers(usersJson.users || []);
     setRecordsPayload(recordsJson);
     setAuditEvents(auditJson.auditEvents || []);
+    setAdminAuthorized(overviewResponse.ok && usersResponse.ok && recordsResponse.ok && auditResponse.ok);
     setMessage(overviewJson.message || usersJson.message || recordsJson.message || auditJson.message || overviewJson.migrationNotice || usersJson.migrationNotice || "");
     setLoading(false);
   }, [tokenPromise]);
@@ -996,16 +997,6 @@ export default function AdminPage() {
       );
     }
 
-    if (activeSection === "site-editor") {
-      return (
-        <section className="card admin-panel-card">
-          <h2>Site editor</h2>
-          <p>Open the published site editor for homepage copy, footer text, beta language, SEO settings, and theme controls.</p>
-          <Link className="button" href="/admin/site-editor">Open Site Editor</Link>
-        </section>
-      );
-    }
-
     if (activeSection === "access") {
       const accessTarget = users.find((user) => normalize(user.email) === normalize(adminSearch));
       const dbAdmins = users.filter((user) => user.role === "admin");
@@ -1093,16 +1084,29 @@ export default function AdminPage() {
               <h1>QRguitar admin panel.</h1>
               <p>Manage users, records, trust controls, safety alerts, transfers, proof documents, service history, site settings, and audit events.</p>
             </div>
-            <Link className="button secondary" href="/admin/site-editor">Site Editor</Link>
+            {adminAuthorized ? <Link className="button secondary" href="/admin/site-editor">Site Editor</Link> : null}
           </div>
-          {message ? <div className="admin-message">{message}</div> : null}
-          <div className="admin-tabs" role="tablist" aria-label="Admin sections">
-            {sections.map((section) => (
-              <button type="button" className={section.id === activeSection ? "active" : ""} onClick={() => goToSection(section.id)} key={section.id}>
-                {section.label}
-              </button>
-            ))}
-          </div>
+          {!adminAuthorized ? (
+            <section className="card admin-panel-card admin-login-card">
+              <div className="eyebrow">Admin access</div>
+              <h2>{loading ? "Checking admin access." : "Sign in with an authorized admin account."}</h2>
+              <p>{loading ? "Confirming your session before admin tools load." : "Owner tools stay hidden until an authorized admin account is signed in."}</p>
+              <Link className="button" href={`/login?next=${encodeURIComponent("/admin")}`}>
+                Sign in
+              </Link>
+            </section>
+          ) : (
+            <>
+              {message ? <div className="admin-message">{message}</div> : null}
+              <div className="admin-tabs" role="tablist" aria-label="Admin sections">
+                {sections.map((section) => (
+                  <button type="button" className={section.id === activeSection ? "active" : ""} onClick={() => goToSection(section.id)} key={section.id}>
+                    {section.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           {pendingAction ? (
             <div className="admin-modal-backdrop" role="presentation">
               <section className="card admin-modal" role="dialog" aria-modal="true" aria-label={pendingAction.title}>
@@ -1169,7 +1173,7 @@ export default function AdminPage() {
               </section>
             </div>
           ) : null}
-          {content}
+          {adminAuthorized ? content : null}
         </div>
       </main>
       <Footer />

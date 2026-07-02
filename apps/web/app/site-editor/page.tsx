@@ -1009,7 +1009,7 @@ export default function SiteEditorPage() {
                 <div className="seo-preview-card">
                   <span className="mini-eyebrow">SEO preview</span>
                   <div className="seo-preview-wordmark" aria-label="QRguitar SEO preview wordmark">
-                    <span>QR</span><strong>guitar</strong>
+                    <img src="/qrguitar-logo-white-orange.svg" alt="QRguitar logo preview" />
                   </div>
                   <strong>{settings.seo.title}</strong>
                   <p>{settings.seo.description}</p>

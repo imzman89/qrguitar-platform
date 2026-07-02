@@ -130,7 +130,15 @@ export async function PATCH(request: Request, context: { params: { id: string } 
     Object.assign(update, { account_status: status });
   }
 
-  const saved = await supabase.from("profiles").update(update).eq("id", targetUserId).select("id,role,account_status,hide_public_content,admin_notes").maybeSingle();
+  const profilePayload = {
+    id: targetUserId,
+    ...update
+  };
+  const saved = await supabase
+    .from("profiles")
+    .upsert(profilePayload, { onConflict: "id" })
+    .select("id,role,account_status,hide_public_content,admin_notes")
+    .maybeSingle();
   if (saved.error) {
     const needsMigration = /column .* does not exist|relation .* does not exist/i.test(saved.error.message || "");
     return adminJson(
