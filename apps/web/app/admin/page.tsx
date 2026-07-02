@@ -21,6 +21,7 @@ type AdminUser = {
   lastSignInAt: string;
   role: string;
   accountStatus: string;
+  envManaged?: boolean;
   hidePublicContent: boolean;
   adminNotes: string;
   recordCount: number;
@@ -477,14 +478,12 @@ export default function AdminPage() {
       return;
     }
 
-    const reason = pendingAction.reason.trim();
-
     if (pendingAction.kind === "user") {
       await updateUser(
         pendingAction.user,
         pendingAction.action,
         pendingAction.includeNote ? { ...pendingAction.extra, adminNotes: pendingAction.note || "" } : pendingAction.extra,
-        reason
+        ""
       );
     } else if (pendingAction.kind === "record") {
       await updateRecord(
@@ -503,10 +502,10 @@ export default function AdminPage() {
             safetyNote: pendingAction.safetyNote || ""
           } : {})
         },
-        reason
+        ""
       );
     } else {
-      await updateTransfer(pendingAction.transfer, pendingAction.action, reason);
+      await updateTransfer(pendingAction.transfer, pendingAction.action, "");
     }
 
     setPendingAction(null);
@@ -1036,10 +1035,10 @@ export default function AdminPage() {
             </button>
             <button
               type="button"
-              disabled={!accessTarget || accessTarget.role !== "admin"}
+              disabled={!accessTarget || accessTarget.role !== "admin" || accessTarget.envManaged === true}
               onClick={() => accessTarget ? beginUserAction(accessTarget, "change_role", { role: "owner" }, { title: "Remove Admin" }) : undefined}
             >
-              Remove Admin
+              {accessTarget?.envManaged ? "Managed by environment" : "Remove Admin"}
             </button>
           </div>
           <div className="admin-table">
@@ -1047,11 +1046,11 @@ export default function AdminPage() {
               <div className="admin-row" key={user.id}>
                 <div>
                   <strong>{user.email}</strong>
-                  <span>Database admin - {user.accountStatus}</span>
+                  <span>{user.envManaged ? "Managed by environment" : "Database admin"} - {user.accountStatus}</span>
                 </div>
                 <div className="admin-row-actions">
-                  <button type="button" onClick={() => beginUserAction(user, "change_role", { role: "owner" }, { title: "Remove Admin" })}>
-                    Remove Admin
+                  <button type="button" disabled={user.envManaged === true} onClick={() => beginUserAction(user, "change_role", { role: "owner" }, { title: "Remove Admin" })}>
+                    {user.envManaged ? "Managed by environment" : "Remove Admin"}
                   </button>
                 </div>
               </div>
@@ -1168,15 +1167,6 @@ export default function AdminPage() {
                     </label>
                   </div>
                 ) : null}
-                <label>
-                  Optional admin note
-                  <textarea
-                    value={pendingAction.reason}
-                    onChange={(event) => setPendingAction({ ...pendingAction, reason: event.target.value })}
-                    placeholder="Optional note for the audit log"
-                    rows={3}
-                  />
-                </label>
                 <div className="form-actions">
                   <button className="button" type="button" onClick={() => void confirmPendingAction()}>
                     Confirm

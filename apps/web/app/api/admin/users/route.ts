@@ -1,4 +1,5 @@
 import { adminJson, requireAdmin } from "../_utils";
+import { normalizeEmail, readAdminEmailList } from "../../../../lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -46,6 +47,7 @@ export async function GET(request: Request) {
     .select("id,display_name,role,account_status,hide_public_content,admin_notes,created_at");
   const profileRows = profileResult.error ? [] : ((profileResult.data || []) as ProfileRow[]);
   const profiles = new Map(profileRows.map((profile) => [profile.id, profile]));
+  const envAdminEmails = readAdminEmailList();
 
   const [guitars, documents, serviceEvents, transfers] = await Promise.all([
     supabase.from("guitars").select("id,owner_id,visibility"),
@@ -87,6 +89,7 @@ export async function GET(request: Request) {
     return {
       id: user.id,
       email: user.email || "",
+      envManaged: envAdminEmails.includes(normalizeEmail(user.email)),
       createdAt: user.created_at || "",
       lastSignInAt: user.last_sign_in_at || "",
       role: profile?.role || "owner",
