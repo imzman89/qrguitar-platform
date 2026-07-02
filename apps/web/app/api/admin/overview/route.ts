@@ -23,9 +23,8 @@ export async function GET(request: Request) {
   const { supabase, admin } = access;
   const authUsers = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
   const users = authUsers.data?.users || [];
-  const activeUsers = users.filter((user) => user.last_sign_in_at).length;
-
   const [
+    activeUsers,
     totalRecords,
     publicRecords,
     privateRecords,
@@ -38,6 +37,7 @@ export async function GET(request: Request) {
     lockedUsers,
     bannedUsers
   ] = await Promise.all([
+    tableCount(supabase, "profiles", [["account_status", "active"]]),
     tableCount(supabase, "guitars"),
     tableCount(supabase, "guitars", [["visibility", "public"]]),
     tableCount(supabase, "guitars", [["visibility", "private"]]),

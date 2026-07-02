@@ -64,6 +64,7 @@ export default function SiteEditorPage() {
   const [newPasscode, setNewPasscode] = useState(ownerPasscode);
   const [passcodeMessage, setPasscodeMessage] = useState("");
   const [isUnlocked, setIsUnlocked] = useState(false);
+  const [isAdminSession, setIsAdminSession] = useState(false);
   const [isOwnerPasscodeSet, setIsOwnerPasscodeSet] = useState(false);
   const [copyError, setCopyError] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
@@ -119,8 +120,24 @@ export default function SiteEditorPage() {
 
       if (!hasSession) {
         window.localStorage.removeItem(editorGateKey);
+        setIsAdminSession(false);
         router.replace(`/login?next=${encodeURIComponent("/site-editor")}&reason=session-expired`);
+        return;
       }
+
+      void getSupabaseAccessToken().then(async (token) => {
+        if (!token || cancelled) return;
+        const response = await fetch("/api/admin/overview", {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store"
+        });
+        if (response.ok && !cancelled) {
+          setIsAdminSession(true);
+          setIsUnlocked(true);
+          window.localStorage.setItem(editorGateKey, "true");
+          setMessage("Admin session verified. Editor unlocked.");
+        }
+      });
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -131,6 +148,7 @@ export default function SiteEditorPage() {
       if (!hasSession) {
         window.localStorage.removeItem(editorGateKey);
         setIsUnlocked(false);
+        setIsAdminSession(false);
       }
     });
 
@@ -146,7 +164,9 @@ export default function SiteEditorPage() {
     }
 
     const storedPasscode = window.localStorage.getItem(ownerPasscodeKey) || ownerPasscode;
-    setIsUnlocked(window.localStorage.getItem(editorGateKey) === "true");
+    if (!isAdminSession) {
+      setIsUnlocked(window.localStorage.getItem(editorGateKey) === "true");
+    }
 
     setIsOwnerPasscodeSet(Boolean(window.localStorage.getItem(ownerPasscodeKey)));
     setNewPasscode(storedPasscode);
@@ -168,7 +188,7 @@ export default function SiteEditorPage() {
         setMessage("Local draft loaded. Click Save Changes to publish it across desktop and mobile.");
       }
     });
-  }, [authChecked, isSignedIn]);
+  }, [authChecked, isAdminSession, isSignedIn]);
 
   const settingsJson = useMemo(() => JSON.stringify(settings, null, 2), [settings]);
 
@@ -348,6 +368,7 @@ export default function SiteEditorPage() {
 
   async function onSave(event?: FormEvent) {
     event?.preventDefault();
+
     if (isSaving) {
       return;
     }
@@ -496,7 +517,7 @@ export default function SiteEditorPage() {
           ) : null}
 
           {authChecked && isSignedIn && isUnlocked ? (
-            <form className="site-editor-layout admin-editor-layout" onSubmit={onSave}>
+            <div className="site-editor-layout admin-editor-layout">
               <section className="admin-editor-main">
                 <div className="editor-tabs" role="tablist" aria-label="Site editor sections">
                   {tabs.map((tab) => (
@@ -1033,9 +1054,9 @@ export default function SiteEditorPage() {
                   <button className="button secondary" type="button" onClick={resetToDefaults}>
                     <RotateCcw size={16} /> Reset to defaults
                   </button>
-                  <Link className="button secondary" href="/?fresh=editor">
+                  <a className="button secondary" href="/?fresh=editor">
                     <Eye size={16} /> View Live Homepage
-                  </Link>
+                  </a>
                   <button className="button secondary" type="button" onClick={() => void copySettingsJson()}>
                     <Clipboard size={16} /> Copy Current Settings JSON
                   </button>
@@ -1059,7 +1080,7 @@ export default function SiteEditorPage() {
                 <small className="editor-local-note">Local key: {siteSettingsKey}</small>
                 <small className="editor-local-note">Bot key: {botSettingsKey}</small>
               </aside>
-            </form>
+            </div>
           ) : null}
         </div>
       </main>

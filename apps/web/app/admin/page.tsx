@@ -728,7 +728,7 @@ export default function AdminPage() {
         { label: "Reported lost", value: counts.lostRecords || 0, section: "safety" as SectionId, filter: "lost" },
         { label: "Reported stolen", value: counts.stolenRecords || 0, section: "safety" as SectionId, filter: "stolen" },
         { label: "Pending transfers", value: counts.pendingTransfers || 0, section: "transfers" as SectionId, filter: "pending" },
-        { label: "Locked/removed accounts", value: (counts.lockedUsers || 0) + (counts.bannedUsers || 0), section: "users" as SectionId, filter: "locked" }
+        { label: "Removed accounts", value: counts.bannedUsers || 0, section: "users" as SectionId, filter: "banned" }
       ];
       return (
         <div className="admin-overview-layout">
