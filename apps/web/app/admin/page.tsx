@@ -239,6 +239,13 @@ function safetyLabel(value?: string) {
   return "No Alert";
 }
 
+function adminChipClass(kind: "role" | "status", value?: string) {
+  const clean = normalize(value);
+  if (kind === "role" && (clean === "admin" || clean === "owner")) return `admin-chip admin-chip--${clean}`;
+  if (kind === "status" && (clean === "active" || clean === "locked" || clean === "banned")) return `admin-chip admin-chip--${clean}`;
+  return "admin-chip";
+}
+
 function actionLabel(action: string) {
   const labels: Record<string, string> = {
     lock: "Account locked",
@@ -772,22 +779,36 @@ export default function AdminPage() {
               <div className="admin-row" key={user.id}>
                 <div>
                   <strong>{user.email || user.id}</strong>
-                  <span>{user.role} - {user.accountStatus} - {user.recordCount} records ({user.publicRecordCount} public / {user.privateRecordCount} private)</span>
+                  <span className="admin-user-summary">
+                    <span className={adminChipClass("role", user.role)}>{user.role}</span>
+                    <span className={adminChipClass("status", user.accountStatus)}>{user.accountStatus}</span>
+                    <span>{user.recordCount} records ({user.publicRecordCount} public / {user.privateRecordCount} private)</span>
+                  </span>
                   <small>Created {formatDate(user.createdAt)} - Last sign-in {formatDate(user.lastSignInAt)} - Proof {user.proofDocumentCount} - Service {user.serviceEventCount} - Transfers {user.transferCount}</small>
                   {user.hidePublicContent ? <small>Public content hidden by admin.</small> : null}
                   {user.adminNotes ? <small>Admin note saved.</small> : null}
                 </div>
                 <div className="admin-row-actions">
-                  <button type="button" disabled={busy === `lock:${user.id}`} onClick={() => beginUserAction(user, "lock", {}, { title: "Lock Account" })}>Lock</button>
-                  <button type="button" disabled={busy === `unlock:${user.id}`} onClick={() => beginUserAction(user, "unlock", {}, { title: "Unlock Account" })}>Unlock</button>
-                  <button type="button" disabled={busy === `ban:${user.id}`} onClick={() => beginUserAction(user, "ban", {}, { title: "Remove User" })}>Remove User</button>
-                  <button type="button" disabled={busy === `unban:${user.id}`} onClick={() => beginUserAction(user, "unban", {}, { title: "Restore User" })}>Restore User</button>
-                  <button type="button" onClick={() => beginUserAction(user, user.hidePublicContent ? "restore_public_content" : "hide_public_content", {}, { title: user.hidePublicContent ? "Restore Public Content" : "Hide Public Content" })}>
-                    {user.hidePublicContent ? "Restore Public" : "Hide Public"}
-                  </button>
-                  <button type="button" onClick={() => beginUserAction(user, "change_role", { role: user.role === "admin" ? "owner" : "admin" }, { title: user.role === "admin" ? "Remove Admin" : "Add Admin" })}>
-                    {user.role === "admin" ? "Remove Admin" : "Add Admin"}
-                  </button>
+                  {user.accountStatus === "locked" ? (
+                    <button type="button" disabled={busy === `unlock:${user.id}`} onClick={() => beginUserAction(user, "unlock", {}, { title: "Unlock Account" })}>Unlock</button>
+                  ) : user.accountStatus !== "banned" ? (
+                    <button type="button" disabled={busy === `lock:${user.id}`} onClick={() => beginUserAction(user, "lock", {}, { title: "Lock Account" })}>Lock</button>
+                  ) : null}
+                  {user.accountStatus === "banned" ? (
+                    <button type="button" disabled={busy === `unban:${user.id}`} onClick={() => beginUserAction(user, "unban", {}, { title: "Restore User" })}>Restore User</button>
+                  ) : (
+                    <button type="button" disabled={busy === `ban:${user.id}`} onClick={() => beginUserAction(user, "ban", {}, { title: "Remove User" })}>Remove User</button>
+                  )}
+                  {user.hidePublicContent ? (
+                    <button type="button" disabled={busy === `restore_public_content:${user.id}`} onClick={() => beginUserAction(user, "restore_public_content", {}, { title: "Restore Public Content" })}>Restore Public</button>
+                  ) : user.accountStatus !== "banned" ? (
+                    <button type="button" disabled={busy === `hide_public_content:${user.id}`} onClick={() => beginUserAction(user, "hide_public_content", {}, { title: "Hide Public Content" })}>Hide Public</button>
+                  ) : null}
+                  {user.accountStatus !== "banned" ? (
+                    <button type="button" onClick={() => beginUserAction(user, "change_role", { role: user.role === "admin" ? "owner" : "admin" }, { title: user.role === "admin" ? "Remove Admin" : "Add Admin" })}>
+                      {user.role === "admin" ? "Remove Admin" : "Add Admin"}
+                    </button>
+                  ) : null}
                   <button type="button" onClick={() => beginUserAction(user, "admin_note", {}, { includeNote: true, title: "Save Admin Note" })}>Note</button>
                 </div>
               </div>
@@ -897,7 +918,7 @@ export default function AdminPage() {
           <div className="admin-section-head">
             <div>
               <h2>Transfers</h2>
-              <p>Read-only transfer summary. Claim links cannot be reconstructed here.</p>
+              <p>Track ownership handoffs, review transfer status, and jump back to the related record or account.</p>
             </div>
           </div>
           {filterControls("transfers")}
@@ -907,10 +928,14 @@ export default function AdminPage() {
               return (
                 <div className="admin-row" key={transfer.id}>
                   <div>
-                    <strong>{transfer.status} - {transfer.recordCode || transfer.guitar_id}</strong>
-                    <span>{transfer.recordTitle || "Record"} - From {transfer.fromOwnerEmail || "unknown"} - To {transfer.to_email || transfer.acceptedByEmail || "not listed"}</span>
+                    <strong>{transfer.recordTitle || "QRguitar record"}</strong>
+                    <span className="admin-user-summary">
+                      <span className={`admin-chip admin-chip--transfer-${normalize(transfer.status)}`}>{transfer.status || "unknown"}</span>
+                      <span>{transfer.recordCode || transfer.guitar_id}</span>
+                      <span>{transfer.recordVisibility || "no public page"}</span>
+                    </span>
+                    <small>From {transfer.fromOwnerEmail || "unknown owner"} - To {transfer.to_email || transfer.acceptedByEmail || "not listed"}</small>
                     <small>Created {formatDate(transfer.created_at)} - Accepted {formatDate(transfer.accepted_at)}</small>
-                    <small>Claim link cannot be reconstructed. Create a new transfer from record owner tools.</small>
                   </div>
                   <div className="admin-row-actions">
                     {transfer.recordCode ? <Link href={`/edit/${transfer.recordCode}`}>Edit Record</Link> : null}

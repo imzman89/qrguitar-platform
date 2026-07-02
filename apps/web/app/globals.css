@@ -279,37 +279,52 @@ select {
 
 .latest-live-row {
   position: absolute;
-  top: 18px;
-  left: 18px;
-  right: 18px;
+  top: 14px;
+  left: 14px;
+  right: 14px;
   z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   color: var(--muted-strong);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
   text-transform: uppercase;
 }
 
-.latest-live-row span {
+.latest-live-row > span:first-child,
+.latest-live-actions > strong {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  min-height: 32px;
-  padding: 7px 10px;
-  border: 1px solid rgba(255, 255, 255, .16);
+  gap: 5px;
+  min-height: 25px;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, .14);
   border-radius: 999px;
-  color: #ffd98a;
-  background: rgba(2, 5, 6, .56);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, .22);
-  backdrop-filter: blur(10px);
+  color: #ffe0a1;
+  background: rgba(2, 5, 6, .48);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, .18);
+  backdrop-filter: blur(8px);
   text-shadow: 0 1px 2px rgba(0, 0, 0, .75);
 }
 
 .latest-live-actions {
+  display: inline-flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 7px;
+  min-width: 0;
+}
+
+.latest-live-actions .record-share-button {
+  width: 29px;
+  height: 29px;
+  border-color: rgba(255, 255, 255, .14);
+  color: #f8f6f2;
+  background: rgba(2, 5, 6, .52);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, .18);
+  backdrop-filter: blur(8px);
 }
 
 .latest-record-card h2 {
@@ -5756,6 +5771,64 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 .admin-row small {
   display: block;
   color: var(--muted);
+}
+
+.admin-row .admin-user-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 3px;
+  color: var(--muted-strong);
+}
+
+.admin-row .admin-chip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 22px;
+  border: 1px solid rgba(248, 246, 242, .12);
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: var(--muted-strong);
+  background: rgba(248, 246, 242, .045);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.admin-row .admin-chip--active,
+.admin-row .admin-chip--transfer-accepted {
+  border-color: rgba(68, 211, 143, .35);
+  color: #8ff0b8;
+  background: rgba(68, 211, 143, .12);
+}
+
+.admin-row .admin-chip--banned,
+.admin-row .admin-chip--transfer-cancelled {
+  border-color: rgba(255, 94, 94, .42);
+  color: #ff9b9b;
+  background: rgba(255, 94, 94, .13);
+}
+
+.admin-row .admin-chip--locked,
+.admin-row .admin-chip--transfer-sent {
+  border-color: rgba(240, 161, 43, .42);
+  color: #ffd98a;
+  background: rgba(240, 161, 43, .13);
+}
+
+.admin-row .admin-chip--owner {
+  border-color: rgba(240, 161, 43, .5);
+  color: var(--gold-2);
+  background: rgba(240, 161, 43, .14);
+}
+
+.admin-row .admin-chip--admin {
+  border-color: rgba(117, 188, 255, .42);
+  color: #a8d7ff;
+  background: rgba(117, 188, 255, .13);
 }
 
 .admin-stat-card strong {
