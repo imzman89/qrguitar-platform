@@ -1,5 +1,5 @@
 import { revalidatePath } from "next/cache";
-import { adminJson, cleanAccountStatus, cleanText, requireAdmin } from "../../_utils";
+import { adminJson, cleanText, requireAdmin } from "../../_utils";
 import { isAdminRole, logAdminAuditEvent, normalizeEmail, readAdminEmailList, type ServerSupabaseClient } from "../../../../../lib/admin-auth";
 import { mergeRecordTrustSettings, recordTrustContentKey } from "../../../../../lib/record-trust";
 
@@ -239,8 +239,7 @@ export async function PATCH(request: Request, context: { params: { id: string } 
     Object.assign(update, { admin_notes: cleanText(body?.adminNotes, 4000) });
     auditAction = "admin_note";
   } else {
-    const status = cleanAccountStatus(body?.action);
-    Object.assign(update, { account_status: status });
+    return adminJson({ ok: false, message: "Unsupported user action." }, { status: 400 });
   }
 
   const profilePayload = {
@@ -253,12 +252,12 @@ export async function PATCH(request: Request, context: { params: { id: string } 
     .select("id,role,account_status,hide_public_content,admin_notes")
     .maybeSingle();
   if (saved.error) {
-    const needsMigration = /column .* does not exist|relation .* does not exist/i.test(saved.error.message || "");
+    const needsMigration = /column .* does not exist|relation .* does not exist|profiles_account_status_check|check constraint/i.test(saved.error.message || "");
     return adminJson(
       {
         ok: false,
         message: needsMigration
-          ? "Run supabase/admin-panel-foundation.sql before using account controls."
+          ? "Run the updated supabase/admin-panel-foundation.sql before using removed-account controls."
           : saved.error.message || "Could not update user."
       },
       { status: needsMigration ? 503 : 500 }

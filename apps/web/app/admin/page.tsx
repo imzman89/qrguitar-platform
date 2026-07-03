@@ -1080,7 +1080,7 @@ export default function AdminPage() {
 
     if (activeSection === "access") {
       const accessTarget = users.find((user) => normalize(user.email) === normalize(adminSearch));
-      const dbAdmins = users.filter((user) => user.role === "admin");
+      const dbAdmins = users.filter((user) => user.role === "admin" || user.envManaged === true);
       return (
         <section className="card admin-panel-card">
           <h2>Admin access</h2>
