@@ -1,7 +1,7 @@
 import type { User } from "@supabase/supabase-js";
 import { createServerSupabaseClient, getAuthenticatedUser } from "./supabase-server";
 
-export type AccountStatus = "active" | "locked" | "banned";
+export type AccountStatus = "active" | "locked" | "banned" | "removed";
 
 export type AdminAccessSource = "role" | "env" | "none";
 
@@ -49,7 +49,7 @@ export function readAdminEmailList() {
 }
 
 function cleanAccountStatus(value?: string | null): AccountStatus {
-  return value === "locked" || value === "banned" ? value : "active";
+  return value === "locked" || value === "banned" || value === "removed" ? value : "active";
 }
 
 export function isAdminRole(role?: string | null) {
@@ -134,7 +134,7 @@ export async function getAdminContext(request: Request): Promise<AdminContext> {
     };
   }
 
-  if (!envAllowed && (accountStatus === "locked" || accountStatus === "banned")) {
+  if (!envAllowed && (accountStatus === "locked" || accountStatus === "banned" || accountStatus === "removed")) {
     return {
       ok: false,
       status: 403,
@@ -174,6 +174,10 @@ export async function assertAccountCanWrite(supabase: ServerSupabaseClient, user
 
   if (accountStatus === "banned") {
     return { ok: false, status: 403, message: "This account cannot make changes. Contact QRguitar support for help." };
+  }
+
+  if (accountStatus === "removed") {
+    return { ok: false, status: 403, message: "This account has been removed. Contact QRguitar support for help." };
   }
 
   return { ok: true, status: 200, message: "" };

@@ -384,7 +384,7 @@ export async function getPublicInstruments() {
   const related = await loadRelated(guitars);
   const visibleGuitars = guitars.filter((guitar) => {
     const profile = related.profiles.get(guitar.owner_id || "");
-    return !(profile?.hide_public_content === true && (profile.account_status === "locked" || profile.account_status === "banned"));
+    return profile?.hide_public_content !== true && profile?.account_status !== "banned" && profile?.account_status !== "removed";
   });
   const trustByCode = await loadTrustSettingsMap(visibleGuitars.map((guitar) => guitar.qr_code));
 
@@ -434,7 +434,7 @@ export async function getPublicInstrumentByCode(code: string) {
 
   const related = await loadRelated([data]);
   const ownerProfile = related.profiles.get(data.owner_id || "");
-  if (ownerProfile?.hide_public_content === true && (ownerProfile.account_status === "locked" || ownerProfile.account_status === "banned")) {
+  if (ownerProfile?.hide_public_content === true || ownerProfile?.account_status === "banned" || ownerProfile?.account_status === "removed") {
     return null;
   }
   const heroStoragePath = data.hero_image_path || "";

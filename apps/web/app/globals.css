@@ -5806,6 +5806,7 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 }
 
 .admin-row .admin-chip--banned,
+.admin-row .admin-chip--removed,
 .admin-row .admin-chip--transfer-cancelled {
   border-color: rgba(255, 94, 94, .42);
   color: #ff9b9b;
@@ -5829,6 +5830,18 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   border-color: rgba(117, 188, 255, .42);
   color: #a8d7ff;
   background: rgba(117, 188, 255, .13);
+}
+
+.admin-row .admin-chip--env-admin {
+  border-color: rgba(190, 144, 255, .5);
+  color: #dcc7ff;
+  background: rgba(190, 144, 255, .14);
+}
+
+.admin-row .admin-chip--user {
+  border-color: rgba(248, 246, 242, .16);
+  color: var(--muted-strong);
+  background: rgba(248, 246, 242, .06);
 }
 
 .admin-stat-card strong {

@@ -42,7 +42,7 @@ export function cleanText(value: unknown, maxLength = 2000) {
 
 export function cleanAccountStatus(value: unknown) {
   const status = cleanText(value, 20).toLowerCase();
-  return status === "locked" || status === "banned" ? status : "active";
+  return status === "locked" || status === "banned" || status === "removed" ? status : "active";
 }
 
 export function safeDate(value?: string | null) {

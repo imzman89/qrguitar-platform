@@ -17,7 +17,7 @@ alter table public.profiles
 
 alter table public.profiles
   add constraint profiles_account_status_check
-  check (account_status in ('active', 'locked', 'banned'));
+  check (account_status in ('active', 'locked', 'banned', 'removed'));
 
 create table if not exists public.admin_audit_events (
   id uuid primary key default gen_random_uuid(),

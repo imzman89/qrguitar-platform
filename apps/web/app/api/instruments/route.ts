@@ -944,7 +944,7 @@ async function loadPublicRecords(supabase: ReturnType<typeof createServerSupabas
 
   const visibleGuitars = guitars.data.filter((guitar) => {
     const profile = profilesById.get((guitar as GuitarRow).owner_id || "");
-    return !(profile?.hide_public_content === true && (profile.account_status === "locked" || profile.account_status === "banned"));
+    return profile?.hide_public_content !== true && profile?.account_status !== "banned" && profile?.account_status !== "removed";
   });
 
   return {

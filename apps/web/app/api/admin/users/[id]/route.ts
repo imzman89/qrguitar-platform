@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { adminJson, cleanAccountStatus, cleanText, requireAdmin } from "../../_utils";
 import { isAdminRole, logAdminAuditEvent, normalizeEmail, readAdminEmailList, type ServerSupabaseClient } from "../../../../../lib/admin-auth";
+import { mergeRecordTrustSettings, recordTrustContentKey } from "../../../../../lib/record-trust";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -15,7 +16,7 @@ type Body = {
 
 function roleValue(value: unknown) {
   const role = cleanText(value, 20);
-  return role === "admin" || role === "owner" || role === "builder" || role === "shop" ? role : null;
+  return role === "admin" || role === "user" || role === "owner" || role === "builder" || role === "shop" ? role : null;
 }
 
 async function countOtherAdminAccess(supabase: ServerSupabaseClient, targetUserId: string) {
@@ -31,6 +32,52 @@ async function countOtherAdminAccess(supabase: ServerSupabaseClient, targetUserI
     .filter((user) => user.id !== targetUserId && envEmails.includes(normalizeEmail(user.email))).length;
 
   return roleAdmins + envAdmins;
+}
+
+async function loadDeleteEligibility(supabase: ServerSupabaseClient, targetUserId: string, targetIsEnvManaged: boolean) {
+  const blockers: string[] = [];
+  const [profileResult, guitarsResult, documentsResult, serviceResult, transfersResult] = await Promise.all([
+    supabase.from("profiles").select("role").eq("id", targetUserId).maybeSingle<{ role?: string | null }>(),
+    supabase.from("guitars").select("id,qr_code,status").eq("owner_id", targetUserId),
+    supabase.from("guitar_documents").select("id,guitars(owner_id)"),
+    supabase.from("guitar_timeline_events").select("id,guitars(owner_id)"),
+    supabase.from("ownership_transfers").select("id,from_owner_id,accepted_by").or(`from_owner_id.eq.${targetUserId},accepted_by.eq.${targetUserId}`)
+  ]);
+
+  const guitarRows = (guitarsResult.data || []) as Array<{ id?: string | null; qr_code?: string | null; status?: string | null }>;
+  const ownedNestedCount = (rows: unknown[]) => {
+    let count = 0;
+    for (const row of rows as Array<{ guitars?: { owner_id?: string | null } | Array<{ owner_id?: string | null }> }>) {
+      const guitar = Array.isArray(row.guitars) ? row.guitars[0] : row.guitars;
+      if (guitar?.owner_id === targetUserId) {
+        count += 1;
+      }
+    }
+    return count;
+  };
+  const proofCount = ownedNestedCount(documentsResult.data || []);
+  const serviceCount = ownedNestedCount(serviceResult.data || []);
+  const transferCount = ((transfersResult.data || []) as Array<unknown>).length;
+  const verifiedCount = guitarRows.filter((guitar) => guitar.status === "verified").length;
+  let authenticityConfirmedCount = 0;
+
+  const trustKeys = guitarRows.map((guitar) => guitar.qr_code ? recordTrustContentKey(guitar.qr_code) : "").filter(Boolean);
+  if (trustKeys.length) {
+    const trustResult = await supabase.from("site_content").select("content_value").in("content_key", trustKeys);
+    authenticityConfirmedCount = ((trustResult.data || []) as Array<{ content_value?: unknown }>)
+      .filter((row) => mergeRecordTrustSettings(row.content_value as Parameters<typeof mergeRecordTrustSettings>[0]).authenticityStatus === "confirmed").length;
+  }
+
+  if (targetIsEnvManaged) blockers.push("environment-managed admin");
+  if (isAdminRole(profileResult.data?.role)) blockers.push("admin access");
+  if (guitarRows.length) blockers.push("records");
+  if (proofCount) blockers.push("proof documents");
+  if (serviceCount) blockers.push("service history");
+  if (transferCount) blockers.push("transfers");
+  if (verifiedCount) blockers.push("verified records");
+  if (authenticityConfirmedCount) blockers.push("authenticity-confirmed records");
+
+  return { ok: blockers.length === 0, blockers };
 }
 
 export async function PATCH(request: Request, context: { params: { id: string } }) {
@@ -52,7 +99,7 @@ export async function PATCH(request: Request, context: { params: { id: string } 
   const targetUser = await supabase.auth.admin.getUserById(targetUserId);
   const targetEmail = normalizeEmail(targetUser.data?.user?.email);
   const targetIsEnvManaged = readAdminEmailList().includes(targetEmail);
-  const selfDestructiveAction = ["lock", "ban", "change_role"].includes(action);
+  const selfDestructiveAction = ["lock", "ban", "remove", "delete_empty_user", "change_role"].includes(action);
 
   if (targetUser.error || !targetUser.data?.user) {
     return adminJson({ ok: false, message: "User was not found." }, { status: 404 });
@@ -60,6 +107,10 @@ export async function PATCH(request: Request, context: { params: { id: string } 
 
   if (admin.user?.id === targetUserId && selfDestructiveAction) {
     return adminJson({ ok: false, message: "You cannot remove your own admin access from this panel." }, { status: 400 });
+  }
+
+  if (targetIsEnvManaged && ["lock", "ban", "remove", "delete_empty_user", "change_role"].includes(action)) {
+    return adminJson({ ok: false, message: "This admin is managed by server environment settings." }, { status: 400 });
   }
 
   const update: Record<string, unknown> = {};
@@ -88,6 +139,7 @@ export async function PATCH(request: Request, context: { params: { id: string } 
       account_ban_reason: reason || null,
       hide_public_content: true
     });
+    auditAction = "user_banned";
   } else if (action === "unban") {
     Object.assign(update, {
       account_status: "active",
@@ -96,6 +148,67 @@ export async function PATCH(request: Request, context: { params: { id: string } 
       account_ban_reason: null,
       hide_public_content: false
     });
+    auditAction = "user_unbanned";
+  } else if (action === "remove") {
+    const currentProfile = await supabase.from("profiles").select("role").eq("id", targetUserId).maybeSingle<{ role?: string | null }>();
+    if (isAdminRole(currentProfile.data?.role)) {
+      const otherAdmins = await countOtherAdminAccess(supabase, targetUserId);
+      if (otherAdmins < 1) {
+        return adminJson({ ok: false, message: "At least one admin must remain." }, { status: 400 });
+      }
+    }
+
+    Object.assign(update, {
+      account_status: "removed",
+      account_locked_at: null,
+      account_locked_by: null,
+      account_lock_reason: null,
+      account_banned_at: null,
+      account_banned_by: null,
+      account_ban_reason: null,
+      hide_public_content: true
+    });
+    auditAction = "user_removed";
+  } else if (action === "restore_user") {
+    Object.assign(update, {
+      account_status: "active",
+      account_locked_at: null,
+      account_locked_by: null,
+      account_lock_reason: null,
+      account_banned_at: null,
+      account_banned_by: null,
+      account_ban_reason: null,
+      hide_public_content: false
+    });
+    auditAction = "user_restored";
+  } else if (action === "delete_empty_user") {
+    const eligibility = await loadDeleteEligibility(supabase, targetUserId, targetIsEnvManaged);
+    if (!eligibility.ok) {
+      return adminJson({ ok: false, message: `Cannot delete this user: ${eligibility.blockers.join(", ")}.` }, { status: 400 });
+    }
+
+    await logAdminAuditEvent(supabase, {
+      actorUserId: admin.user?.id,
+      actorEmail: admin.email,
+      action: "empty_user_deleted",
+      targetType: "profile",
+      targetId: targetUserId,
+      targetUserId,
+      reason: auditReason || null,
+      metadata: { email: targetEmail ? "redacted" : "" }
+    });
+
+    const authDelete = await supabase.auth.admin.deleteUser(targetUserId);
+    if (authDelete.error) {
+      return adminJson({ ok: false, message: authDelete.error.message || "Could not delete user." }, { status: 500 });
+    }
+
+    await supabase.from("profiles").delete().eq("id", targetUserId);
+    revalidatePath("/");
+    revalidatePath("/catalog");
+    revalidatePath("/api/instruments");
+
+    return adminJson({ ok: true, message: "Empty user deleted." });
   } else if (action === "hide_public_content") {
     Object.assign(update, { hide_public_content: true });
     auditAction = "hide_public_content";

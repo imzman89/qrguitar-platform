@@ -22,6 +22,9 @@ type AdminUser = {
   role: string;
   accountStatus: string;
   envManaged?: boolean;
+  isEmpty?: boolean;
+  deleteEligible?: boolean;
+  deleteDisabledReason?: string;
   hidePublicContent: boolean;
   adminNotes: string;
   recordCount: number;
@@ -30,6 +33,10 @@ type AdminUser = {
   proofDocumentCount: number;
   serviceEventCount: number;
   transferCount: number;
+  pendingTransferCount?: number;
+  acceptedTransferCount?: number;
+  verifiedRecordCount?: number;
+  authenticityConfirmedRecordCount?: number;
 };
 
 type AdminRecord = {
@@ -201,6 +208,7 @@ const overviewLinks: Record<string, { section: SectionId; filter?: string }> = {
   activeUsers: { section: "users", filter: "active" },
   lockedUsers: { section: "users", filter: "locked" },
   bannedUsers: { section: "users", filter: "banned" },
+  removedUsers: { section: "users", filter: "removed" },
   totalRecords: { section: "records" },
   publicRecords: { section: "records", filter: "public" },
   privateRecords: { section: "records", filter: "private" },
@@ -241,17 +249,37 @@ function safetyLabel(value?: string) {
 
 function adminChipClass(kind: "role" | "status", value?: string) {
   const clean = normalize(value);
-  if (kind === "role" && (clean === "admin" || clean === "owner")) return `admin-chip admin-chip--${clean}`;
-  if (kind === "status" && (clean === "active" || clean === "locked" || clean === "banned")) return `admin-chip admin-chip--${clean}`;
+  if (kind === "role" && (clean === "admin" || clean === "owner" || clean === "env-admin" || clean === "user")) return `admin-chip admin-chip--${clean}`;
+  if (kind === "status" && (clean === "active" || clean === "locked" || clean === "banned" || clean === "removed")) return `admin-chip admin-chip--${clean}`;
   return "admin-chip";
+}
+
+function userRoleLabel(user: AdminUser) {
+  if (user.envManaged) return "Env Admin";
+  if (user.role === "admin") return "Admin";
+  return "User";
+}
+
+function userRoleChipValue(user: AdminUser) {
+  if (user.envManaged) return "env-admin";
+  if (user.role === "admin") return "admin";
+  return "user";
 }
 
 function actionLabel(action: string) {
   const labels: Record<string, string> = {
     lock: "Account locked",
     unlock: "Account unlocked",
-    ban: "User removed",
-    unban: "User restored",
+    ban: "User banned",
+    unban: "User unbanned",
+    remove: "User removed",
+    restore_user: "User restored",
+    delete_empty_user: "Empty user deleted",
+    user_banned: "User banned",
+    user_unbanned: "User unbanned",
+    user_removed: "User removed",
+    user_restored: "User restored",
+    empty_user_deleted: "Empty user deleted",
     hide_public_content: "Public content hidden",
     restore_public_content: "Public content restored",
     change_role: "Role changed",
@@ -352,8 +380,8 @@ export default function AdminPage() {
     loadAdmin();
   }, [loadAdmin]);
 
-  function beginUserAction(user: AdminUser, action: string, extra: Record<string, unknown> = {}, options: { includeNote?: boolean; title?: string } = {}) {
-    if (!options.includeNote) {
+  function beginUserAction(user: AdminUser, action: string, extra: Record<string, unknown> = {}, options: { includeNote?: boolean; confirm?: boolean; title?: string } = {}) {
+    if (!options.includeNote && !options.confirm) {
       void updateUser(user, action, extra);
       return;
     }
@@ -516,7 +544,15 @@ export default function AdminPage() {
       const matchesSearch = !search || normalize(`${user.email} ${user.id}`).includes(search);
       const matchesFilter =
         !userFilter ||
-        (userFilter === "inactive" ? !user.lastSignInAt : userFilter === "admin" ? user.role === "admin" : user.accountStatus === userFilter);
+        (userFilter === "admin"
+          ? user.role === "admin" || user.envManaged === true
+          : userFilter === "normal"
+            ? user.role !== "admin" && user.envManaged !== true
+            : userFilter === "empty"
+              ? user.isEmpty === true
+              : userFilter === "has-records"
+                ? user.recordCount > 0
+                : user.accountStatus === userFilter);
       return matchesSearch && matchesFilter;
     });
 
@@ -601,10 +637,13 @@ export default function AdminPage() {
           <select value={userFilter} onChange={(event) => setUserFilter(event.target.value)}>
             <option value="">All users</option>
             <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
             <option value="locked">Locked</option>
-            <option value="banned">Removed</option>
+            <option value="banned">Banned</option>
+            <option value="removed">Removed</option>
             <option value="admin">Admins</option>
+            <option value="normal">Normal users</option>
+            <option value="empty">Empty users</option>
+            <option value="has-records">Users with records</option>
           </select>
         ) : kind === "transfers" ? (
           <select value={transferFilter} onChange={(event) => setTransferFilter(event.target.value)}>
@@ -644,8 +683,11 @@ export default function AdminPage() {
         {kind !== "audit" ? (
           <select value={sortKey} onChange={(event) => setSortKey(event.target.value)}>
             <option value="created-desc">Newest</option>
+            <option value="email">Email</option>
             <option value="title">Title</option>
             <option value="owner">Owner</option>
+            <option value="status">Status</option>
+            <option value="role">Role</option>
             <option value="visibility">Visibility</option>
             <option value="verification">Verification</option>
             <option value="authenticity">Authenticity</option>
@@ -728,7 +770,8 @@ export default function AdminPage() {
         { label: "Reported lost", value: counts.lostRecords || 0, section: "safety" as SectionId, filter: "lost" },
         { label: "Reported stolen", value: counts.stolenRecords || 0, section: "safety" as SectionId, filter: "stolen" },
         { label: "Pending transfers", value: counts.pendingTransfers || 0, section: "transfers" as SectionId, filter: "pending" },
-        { label: "Removed accounts", value: counts.bannedUsers || 0, section: "users" as SectionId, filter: "banned" }
+        { label: "Banned accounts", value: counts.bannedUsers || 0, section: "users" as SectionId, filter: "banned" },
+        { label: "Removed accounts", value: counts.removedUsers || 0, section: "users" as SectionId, filter: "removed" }
       ];
       return (
         <div className="admin-overview-layout">
@@ -780,7 +823,7 @@ export default function AdminPage() {
                 <div>
                   <strong>{user.email || user.id}</strong>
                   <span className="admin-user-summary">
-                    <span className={adminChipClass("role", user.role)}>{user.role}</span>
+                    <span className={adminChipClass("role", userRoleChipValue(user))}>{userRoleLabel(user)}</span>
                     <span className={adminChipClass("status", user.accountStatus)}>{user.accountStatus}</span>
                     <span>{user.recordCount} records ({user.publicRecordCount} public / {user.privateRecordCount} private)</span>
                   </span>
@@ -789,27 +832,40 @@ export default function AdminPage() {
                   {user.adminNotes ? <small>Admin note saved.</small> : null}
                 </div>
                 <div className="admin-row-actions">
-                  {user.accountStatus === "locked" ? (
+                  {user.accountStatus === "removed" ? null : user.accountStatus === "locked" ? (
                     <button type="button" disabled={busy === `unlock:${user.id}`} onClick={() => beginUserAction(user, "unlock", {}, { title: "Unlock Account" })}>Unlock</button>
-                  ) : user.accountStatus !== "banned" ? (
-                    <button type="button" disabled={busy === `lock:${user.id}`} onClick={() => beginUserAction(user, "lock", {}, { title: "Lock Account" })}>Lock</button>
-                  ) : null}
-                  {user.accountStatus === "banned" ? (
-                    <button type="button" disabled={busy === `unban:${user.id}`} onClick={() => beginUserAction(user, "unban", {}, { title: "Restore User" })}>Restore User</button>
                   ) : (
-                    <button type="button" disabled={busy === `ban:${user.id}`} onClick={() => beginUserAction(user, "ban", {}, { title: "Remove User" })}>Remove User</button>
+                    <button type="button" disabled={user.envManaged === true || busy === `lock:${user.id}`} title={user.envManaged ? "Environment-managed admin access is not changed here." : ""} onClick={() => beginUserAction(user, "lock", {}, { title: "Lock Account" })}>Lock</button>
+                  )}
+                  {user.accountStatus === "banned" ? (
+                    <button type="button" disabled={busy === `unban:${user.id}`} onClick={() => beginUserAction(user, "unban", {}, { title: "Unban User" })}>Unban</button>
+                  ) : user.accountStatus !== "removed" ? (
+                    <button type="button" disabled={user.envManaged === true || busy === `ban:${user.id}`} title={user.envManaged ? "Environment-managed admin access is not changed here." : ""} onClick={() => beginUserAction(user, "ban", {}, { title: "Ban User" })}>Ban User</button>
+                  ) : null}
+                  {user.accountStatus === "removed" ? (
+                    <button type="button" disabled={busy === `restore_user:${user.id}`} onClick={() => beginUserAction(user, "restore_user", {}, { title: "Restore User" })}>Restore User</button>
+                  ) : (
+                    <button type="button" disabled={user.envManaged === true || busy === `remove:${user.id}`} title={user.envManaged ? "Environment-managed admin access is not changed here." : ""} onClick={() => beginUserAction(user, "remove", {}, { title: "Remove User" })}>Remove User</button>
                   )}
                   {user.hidePublicContent ? (
                     <button type="button" disabled={busy === `restore_public_content:${user.id}`} onClick={() => beginUserAction(user, "restore_public_content", {}, { title: "Restore Public Content" })}>Restore Public</button>
-                  ) : user.accountStatus !== "banned" ? (
+                  ) : user.accountStatus !== "banned" && user.accountStatus !== "removed" ? (
                     <button type="button" disabled={busy === `hide_public_content:${user.id}`} onClick={() => beginUserAction(user, "hide_public_content", {}, { title: "Hide Public Content" })}>Hide Public</button>
                   ) : null}
-                  {user.accountStatus !== "banned" ? (
-                    <button type="button" onClick={() => beginUserAction(user, "change_role", { role: user.role === "admin" ? "owner" : "admin" }, { title: user.role === "admin" ? "Remove Admin" : "Add Admin" })}>
-                      {user.role === "admin" ? "Remove Admin" : "Add Admin"}
+                  {user.accountStatus !== "banned" && user.accountStatus !== "removed" ? (
+                    <button type="button" disabled={user.envManaged === true} title={user.envManaged ? "Environment-managed admin access is not changed here." : ""} onClick={() => beginUserAction(user, "change_role", { role: user.role === "admin" ? "user" : "admin" }, { title: user.role === "admin" ? "Remove Admin" : "Add Admin" })}>
+                      {user.envManaged ? "Env Admin" : user.role === "admin" ? "Remove Admin" : "Add Admin"}
                     </button>
                   ) : null}
                   <button type="button" onClick={() => beginUserAction(user, "admin_note", {}, { includeNote: true, title: "Save Admin Note" })}>Note</button>
+                  <button
+                    type="button"
+                    disabled={!user.deleteEligible || busy === `delete_empty_user:${user.id}`}
+                    title={user.deleteEligible ? "Permanently delete this empty auth user." : user.deleteDisabledReason || "Only empty non-admin users can be deleted."}
+                    onClick={() => beginUserAction(user, "delete_empty_user", {}, { confirm: true, title: "Delete Empty User" })}
+                  >
+                    Delete Empty User
+                  </button>
                 </div>
               </div>
             )) : <p className="admin-empty">No users match this view.</p>}
@@ -1043,7 +1099,7 @@ export default function AdminPage() {
             <button
               type="button"
               disabled={!accessTarget || accessTarget.role !== "admin" || accessTarget.envManaged === true}
-              onClick={() => accessTarget ? beginUserAction(accessTarget, "change_role", { role: "owner" }, { title: "Remove Admin" }) : undefined}
+              onClick={() => accessTarget ? beginUserAction(accessTarget, "change_role", { role: "user" }, { title: "Remove Admin" }) : undefined}
             >
               {accessTarget?.envManaged ? "Managed by environment" : "Remove Admin"}
             </button>
@@ -1056,7 +1112,7 @@ export default function AdminPage() {
                   <span>{user.envManaged ? "Managed by environment" : "Database admin"} - {user.accountStatus}</span>
                 </div>
                 <div className="admin-row-actions">
-                  <button type="button" disabled={user.envManaged === true} onClick={() => beginUserAction(user, "change_role", { role: "owner" }, { title: "Remove Admin" })}>
+                  <button type="button" disabled={user.envManaged === true} onClick={() => beginUserAction(user, "change_role", { role: "user" }, { title: "Remove Admin" })}>
                     {user.envManaged ? "Managed by environment" : "Remove Admin"}
                   </button>
                 </div>

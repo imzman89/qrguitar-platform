@@ -35,7 +35,8 @@ export async function GET(request: Request) {
     serviceEntries,
     proofDocuments,
     lockedUsers,
-    bannedUsers
+    bannedUsers,
+    removedUsers
   ] = await Promise.all([
     tableCount(supabase, "profiles", [["account_status", "active"]]),
     tableCount(supabase, "guitars"),
@@ -48,7 +49,8 @@ export async function GET(request: Request) {
     tableCount(supabase, "guitar_timeline_events"),
     tableCount(supabase, "guitar_documents"),
     tableCount(supabase, "profiles", [["account_status", "locked"]]),
-    tableCount(supabase, "profiles", [["account_status", "banned"]])
+    tableCount(supabase, "profiles", [["account_status", "banned"]]),
+    tableCount(supabase, "profiles", [["account_status", "removed"]])
   ]);
 
   return adminJson({
@@ -64,6 +66,7 @@ export async function GET(request: Request) {
       activeUsers,
       lockedUsers,
       bannedUsers,
+      removedUsers,
       totalRecords,
       publicRecords,
       privateRecords,
