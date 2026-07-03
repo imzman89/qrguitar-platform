@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
-import { createServerSupabaseClient, getAuthenticatedUser } from "../../../lib/supabase-server";
+import { createClient } from "@supabase/supabase-js";
+import { createServerSupabaseClient, getAuthenticatedUser, getSupabaseEnvStatus } from "../../../lib/supabase-server";
 import { assertAccountCanWrite, isAdminRole, logAdminAuditEvent, normalizeEmail as normalizeAdminEmail, readAdminEmailList } from "../../../lib/admin-auth";
 
 export const dynamic = "force-dynamic";
@@ -62,6 +63,12 @@ function transferClaimPath(id: string) {
   return `/transfer/${id}`;
 }
 
+function transferClaimUrl(request: Request, id: string) {
+  const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || getSupabaseEnvStatus().siteUrl;
+  const origin = configuredSiteUrl || new URL(request.url).origin;
+  return `${origin.replace(/\/$/, "")}${transferClaimPath(id)}`;
+}
+
 function transferStatus(status: TransferRow["status"]) {
   return status === "accepted" || status === "cancelled" ? status : "sent";
 }
@@ -89,6 +96,40 @@ function mapTransfer(row: TransferRow, guitar?: GuitarRow | null, includePrivate
     feeCents: row.fee_cents || 0,
     paymentCollected: true
   };
+}
+
+async function sendTransferClaimEmail(request: Request, transfer: TransferRow, guitar: GuitarRow) {
+  const env = getSupabaseEnvStatus();
+  if (!env.supabaseUrl || !env.hasAnonKey) {
+    return { ok: false, message: "Supabase Auth email is not configured." };
+  }
+
+  const authClient = createClient(env.supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  });
+  const claimUrl = transferClaimUrl(request, transfer.id);
+  const recordName = guitar.name || guitar.model || guitar.qr_code;
+  const { error } = await authClient.auth.signInWithOtp({
+    email: transfer.to_email,
+    options: {
+      shouldCreateUser: true,
+      emailRedirectTo: claimUrl,
+      data: {
+        display_name: transfer.to_name || "",
+        transfer_record: recordName,
+        transfer_qr_code: guitar.qr_code
+      }
+    }
+  });
+
+  if (error) {
+    return { ok: false, message: error.message || "Could not send transfer email." };
+  }
+
+  return { ok: true, message: "Transfer email sent." };
 }
 
 async function loadGuitarsById(supabase: ServerSupabaseClient, ids: string[]) {
@@ -233,7 +274,15 @@ export async function POST(request: Request) {
     .maybeSingle<TransferRow>();
 
   if (existing.data) {
-    return json({ ok: true, transfer: mapTransfer(existing.data, guitarResult.data, true), message: "A pending transfer already exists." });
+    const emailResult = await sendTransferClaimEmail(request, existing.data, guitarResult.data);
+    return json({
+      ok: true,
+      transfer: mapTransfer(existing.data, guitarResult.data, true),
+      emailSent: emailResult.ok,
+      message: emailResult.ok
+        ? "Pending transfer already exists. A fresh claim email was sent to the recipient."
+        : `Pending transfer already exists. Copy the claim link manually; email was not sent: ${emailResult.message}`
+    });
   }
 
   const created = await supabase
@@ -253,10 +302,15 @@ export async function POST(request: Request) {
     return json({ ok: false, message: created.error?.message || "Could not create transfer." }, { status: 500 });
   }
 
+  const emailResult = await sendTransferClaimEmail(request, created.data, guitarResult.data);
+
   return json({
     ok: true,
     transfer: mapTransfer(created.data, guitarResult.data, true),
-    message: "Transfer created. Send this claim link to the new owner."
+    emailSent: emailResult.ok,
+    message: emailResult.ok
+      ? "Transfer created and emailed to the recipient. You can also copy the claim link."
+      : `Transfer created. Copy the claim link manually; email was not sent: ${emailResult.message}`
   });
 }
 
@@ -343,7 +397,7 @@ export async function PATCH(request: Request) {
     id: auth.user.id,
     display_name: existingProfile.data?.display_name || auth.user.user_metadata?.display_name || auth.user.email || "",
     plan: existingProfile.data?.plan || "single",
-    role: existingProfile.data?.role || "owner"
+    role: existingProfile.data?.role || "user"
   }, { onConflict: "id" });
 
   if (profileUpsert.error) {

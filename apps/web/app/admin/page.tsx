@@ -115,6 +115,7 @@ type AdminTransfer = {
   acceptedByEmail?: string;
   to_email?: string;
   status: string;
+  claimPath?: string;
   created_at?: string;
   accepted_at?: string;
 };
@@ -498,6 +499,17 @@ export default function AdminPage() {
     if (response.ok) {
       await loadAdmin();
     }
+  }
+
+  async function copyTransferClaimLink(transfer: AdminTransfer) {
+    if (!transfer.claimPath) {
+      setMessage("No active claim link is available for this transfer.");
+      return;
+    }
+
+    const url = `${window.location.origin}${transfer.claimPath}`;
+    await window.navigator.clipboard?.writeText(url);
+    setMessage("Transfer claim link copied.");
   }
 
   async function confirmPendingAction() {
@@ -992,6 +1004,7 @@ export default function AdminPage() {
                     </span>
                     <small>From {transfer.fromOwnerEmail || "unknown owner"} - To {transfer.to_email || transfer.acceptedByEmail || "not listed"}</small>
                     <small>Created {formatDate(transfer.created_at)} - Accepted {formatDate(transfer.accepted_at)}</small>
+                    {transfer.status === "sent" && transfer.claimPath ? <small>Claim link is active until the transfer is accepted or cancelled.</small> : null}
                   </div>
                   <div className="admin-row-actions">
                     {transfer.recordCode ? <Link href={`/edit/${transfer.recordCode}`}>Edit Record</Link> : null}
@@ -1005,6 +1018,11 @@ export default function AdminPage() {
                     ) : null}
                     {transfer.acceptedByEmail ? (
                       <button type="button" onClick={() => { setAdminSearch(transfer.acceptedByEmail || ""); goToSection("users"); }}>View Recipient</button>
+                    ) : null}
+                    {transfer.status === "sent" && transfer.claimPath ? (
+                      <button type="button" onClick={() => void copyTransferClaimLink(transfer)}>
+                        Copy Claim Link
+                      </button>
                     ) : null}
                     {transfer.status === "sent" ? (
                       <button type="button" disabled={busy === `cancel:${transfer.id}`} onClick={() => beginTransferAction(transfer, "cancel")}>

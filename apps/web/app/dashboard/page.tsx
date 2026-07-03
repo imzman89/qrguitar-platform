@@ -545,7 +545,6 @@ function TransferPanel({
 }) {
   const [toName, setToName] = useState("");
   const [toEmail, setToEmail] = useState("");
-  const [transferNote, setTransferNote] = useState("");
   const [message, setMessage] = useState("");
   const [lastCreatedClaimUrl, setLastCreatedClaimUrl] = useState("");
   const [saving, setSaving] = useState(false);
@@ -562,7 +561,7 @@ function TransferPanel({
     }
 
     await window.navigator.clipboard?.writeText(visibleClaimUrl);
-    setMessage("Claim link copied. Send this link to the next owner.");
+    setMessage("Claim link copied.");
   }
 
   async function createTransfer() {
@@ -593,9 +592,8 @@ function TransferPanel({
 
       const nextClaimUrl = typeof window !== "undefined" ? `${window.location.origin}${result.transfer.claimPath}` : result.transfer.claimPath;
       setLastCreatedClaimUrl(nextClaimUrl);
-      setTransferNote("");
       onTransferCreated(result.transfer);
-      setMessage(result.message || "Claim link created. Send this link to the next owner.");
+      setMessage(result.message || "Transfer email sent. You can also copy the claim link.");
     } finally {
       setSaving(false);
     }
@@ -647,8 +645,8 @@ function TransferPanel({
       <div className={bodyClassName}>
         <div className="transfer-copy">
           <span className="mini-eyebrow">Ownership transfer beta</span>
-          <strong>Create a claim link for the next owner.</strong>
-          <p>Owner-transfer tools are in beta. Use this only when you are ready to invite the next owner.</p>
+          <strong>Email a claim link to the next owner.</strong>
+          <p>The recipient signs in with the email below, opens the claim link, and accepts the same permanent QRguitar record.</p>
         </div>
         <div className="transfer-form">
           <label>
@@ -668,15 +666,6 @@ function TransferPanel({
               onChange={(event) => setToEmail(event.target.value)}
               disabled={hasPendingTransfer}
               placeholder="new-owner@example.com"
-            />
-          </label>
-          <label>
-            Optional note
-            <input
-              value={transferNote}
-              onChange={(event) => setTransferNote(event.target.value)}
-              disabled={hasPendingTransfer}
-              placeholder="Short private note for this beta transfer"
             />
           </label>
           {hasPendingTransfer ? (
@@ -699,7 +688,7 @@ function TransferPanel({
           ) : (
             <button className="button" type="button" onClick={() => void createTransfer()} disabled={saving}>
               <Mail size={16} />
-              {saving ? "Creating..." : "Create Claim Link"}
+              {saving ? "Sending..." : "Send Transfer Email"}
             </button>
           )}
         </div>

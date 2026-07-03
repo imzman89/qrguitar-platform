@@ -167,6 +167,7 @@ export async function GET(request: Request) {
         acceptedByEmail: usersById.get(String(transfer.accepted_by || "")) || "",
         to_email: transfer.to_email || "",
         status: transfer.status || "",
+        claimPath: transfer.id ? `/transfer/${transfer.id}` : "",
         created_at: transfer.created_at || "",
         accepted_at: transfer.accepted_at || "",
         cancelled_at: "",

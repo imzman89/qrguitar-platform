@@ -119,7 +119,7 @@ SMTP_FROM=noreply@qrguitar.com
 SMTP_REPLY_TO=support@qrguitar.com
 ```
 
-`OPENAI_API_KEY` is optional. Leave it blank unless a paid AI integration is intentionally wired. SMTP/email sending is not wired yet; the email values are placeholders for future transactional email setup.
+`OPENAI_API_KEY` is optional. Leave it blank unless a paid AI integration is intentionally wired. QRguitar uses Supabase Auth email delivery for account emails and transfer claim links; Supabase SMTP should stay connected to Brevo in production.
 
 For local development, put the same values in:
 
@@ -393,3 +393,9 @@ https://www.qrguitar.com/dashboard
 8. Builder/shop dashboards
 9. Stripe pricing
 10. iOS/Android publishing
+
+## Ownership transfer email flow
+
+When an owner starts a transfer from the dashboard, QRguitar creates a pending claim link and asks Supabase Auth to email the recipient a sign-in link that opens `/transfer/[id]`. The recipient must sign in with that same email address before accepting ownership. The permanent QRguitar URL stays unchanged.
+
+During beta, transfer emails depend on the existing Supabase Auth SMTP configuration. Keep Stripe/payment handling separate until paid/free transfer rules are finalized.
