@@ -335,6 +335,8 @@ Sender: noreply@qrguitar.com
 
 Keep the messages short and clear. Do not mention unfinished payments, transfers, or future features in Auth emails.
 
+Ready-to-paste branded templates live in `docs/supabase-auth-email-templates.md`.
+
 ### Email Verification Checklist
 
 - Zoho inbox receives mail at `gary@qrguitar.com`.

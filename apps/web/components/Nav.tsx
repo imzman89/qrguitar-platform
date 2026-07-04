@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { UserCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { BrandLogo } from "./BrandLogo";
 import { createBrowserSupabaseClient } from "../lib/supabase-browser";
@@ -42,7 +43,13 @@ export function Nav() {
         <Link href="/catalog">Catalog</Link>
         <Link href="/create">Create</Link>
         {isSignedIn ? (
-          <button type="button" onClick={() => void logout()}>Logout</button>
+          <>
+            <Link className="nav-account-link" href="/account" aria-label="Account">
+              <UserCircle size={18} aria-hidden="true" />
+              <span>Account</span>
+            </Link>
+            <button type="button" onClick={() => void logout()}>Logout</button>
+          </>
         ) : (
           <Link href="/login">Login</Link>
         )}

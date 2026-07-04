@@ -126,6 +126,27 @@ select {
   text-transform: inherit;
 }
 
+.nav-account-link {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(248, 246, 242, .16);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(248, 246, 242, .82);
+  background: rgba(248, 246, 242, .045);
+}
+
+.nav-account-link span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .nav-links a:hover,
 .nav-links a:focus-visible,
 .nav-links button:hover,
@@ -3510,6 +3531,117 @@ select {
   font-weight: 900;
 }
 
+.auth-inline-link {
+  display: inline-flex;
+  margin-top: 12px;
+  border: 1px solid rgba(240, 161, 43, .34);
+  border-radius: 999px;
+  padding: 8px 11px;
+  background: rgba(240, 161, 43, .08);
+  color: var(--gold-2);
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.mini-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.mini-chip-row span {
+  border: 1px solid rgba(248, 246, 242, .16);
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(248, 246, 242, .05);
+  color: var(--muted-strong);
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.account-hero-copy {
+  align-self: center;
+}
+
+.account-quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.account-quick-links a {
+  border: 1px solid rgba(248, 246, 242, .15);
+  border-radius: 999px;
+  padding: 9px 12px;
+  background: rgba(248, 246, 242, .045);
+  color: var(--muted-strong);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.account-settings-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.account-settings-card {
+  padding: 24px;
+  background:
+    radial-gradient(circle at 90% 0%, rgba(240, 161, 43, .09), transparent 14rem),
+    linear-gradient(180deg, rgba(248, 246, 242, .045), rgba(248, 246, 242, .018)),
+    var(--panel);
+}
+
+.account-settings-card .auth-card-head strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.field-note,
+.account-card-copy {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.account-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.account-status-grid div {
+  border: 1px solid rgba(248, 246, 242, .12);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(7, 12, 16, .34);
+}
+
+.account-status-grid span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--gold-2);
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.account-status-grid strong {
+  color: var(--text);
+  font-size: 14px;
+  text-transform: capitalize;
+}
+
+.account-form-message {
+  margin: 0;
+}
+
 .auth-owner-tools summary {
   cursor: pointer;
   color: var(--gold-2);
@@ -5205,6 +5337,24 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
     text-align: left;
   }
 
+  .nav-account-link {
+    width: auto;
+    height: auto;
+    border: 0;
+    justify-content: flex-start;
+    gap: 8px;
+    background: transparent;
+  }
+
+  .nav-account-link span {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+
   .nav-links a:hover,
   .nav-links a:focus-visible,
   .nav-links button:hover,
@@ -5215,6 +5365,10 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   .hero {
     min-height: 0;
     padding: 38px 0 52px;
+  }
+
+  .account-status-grid {
+    grid-template-columns: 1fr;
   }
 
   .hero-grid,
