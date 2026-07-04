@@ -55,10 +55,10 @@ export function InstrumentPreview({
       </div>
 
       <div className="preview-identity-grid">
-        <PreviewMeta label="Serial" value={serial || "Not listed"} />
-        <PreviewMeta label="Year" value={year || "Not listed"} />
+        <PreviewMeta label="Serial" value={serial || "Add detail"} />
+        <PreviewMeta label="Year" value={year || "Add detail"} />
         <PreviewMeta label="Owner" value={owner || "Unclaimed"} />
-        <PreviewMeta label="Location" value={formattedLocation || "Not listed"} />
+        <PreviewMeta label="Location" value={formattedLocation || "Add detail"} />
       </div>
 
       {summary ? <p className="preview-summary">{summary}</p> : null}

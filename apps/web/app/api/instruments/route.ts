@@ -4,7 +4,7 @@ import type { User } from "@supabase/supabase-js";
 import { revalidatePath, unstable_noStore as noStore } from "next/cache";
 import { createServerSupabaseClient, getAuthenticatedUser, getSupabaseEnvStatus } from "../../../lib/supabase-server";
 import { defaultQrStyle, type DemoInstrument, type QrStyle } from "../../../lib/local-demo";
-import { getPublicInstrumentByCode, isRetiredPublicRecordCode } from "../../../lib/public-instruments";
+import { getPublicInstrumentByCode } from "../../../lib/public-instruments";
 import { defaultRecordTrustSettings, mergeRecordTrustSettings, recordTrustContentKey, type RecordTrustSettings } from "../../../lib/record-trust";
 import { assertAccountCanWrite, logAdminAuditEvent } from "../../../lib/admin-auth";
 
@@ -1032,10 +1032,6 @@ export async function GET(request: Request) {
   }
 
   if (code) {
-    if (isRetiredPublicRecordCode(code)) {
-      return noStoreJson({ ok: false, message: "Instrument not found." } satisfies SupabaseReadResponse, { status: 404 });
-    }
-
     const publicLookup = await getPublicInstrumentByCode(code)
       .then((instrument) => ({ instrument, error: "" }))
       .catch((error: Error) => ({ instrument: null, error: error.message || "Could not load public instrument." }));

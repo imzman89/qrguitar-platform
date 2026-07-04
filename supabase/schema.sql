@@ -225,50 +225,5 @@ using (
   )
 );
 
-insert into public.guitars (
-  qr_code,
-  permanent_path,
-  name,
-  brand,
-  model,
-  year,
-  serial_number,
-  builder,
-  location,
-  status,
-  visibility,
-  summary,
-  hero_image_path
-) values (
-  'QRG-PI260001',
-  '/i/QRG-PI260001',
-  'Reptile',
-  'Proper Instruments',
-  '1-of-1 Reptile',
-  '2026',
-  'PI260001',
-  'Proper Instruments',
-  'Cranston, RI',
-  'verified',
-  'public',
-  'Reptile is a one-of-one Proper Instruments build from Cranston, Rhode Island, equipped with Proper Passive tone controls, a Proper Pickups ''64 Closetcaster pickup set, a nitro-finished neck, and a permanent QRguitar record.',
-  '/media/reptile-hero.jpg'
-);
-
-insert into public.guitar_specs (guitar_id, label, value, sort_order)
-select guitars.id, seed.label, seed.value, seed.sort_order
-from public.guitars
-cross join (
-  values
-    ('Condition', 'new', 1),
-    ('Type', 'Electric guitar', 2),
-    ('Electronics', 'Proper Passive tone controls', 3),
-    ('Pickups', 'Proper Pickups ''64 Closetcaster pickup set', 4),
-    ('Neck', 'Nitro-finished neck, slim ''60s C profile', 5),
-    ('Fingerboard', 'Rosewood', 6),
-    ('Radius', '9.5 inch', 7),
-    ('Case', 'Hardshell case included', 8),
-    ('QR Record', 'Lifetime QRguitar tracker', 9),
-    ('Weight', '7.4 lbs', 10)
-) as seed(label, value, sort_order)
-where guitars.qr_code = 'QRG-PI260001';
+-- Production schema intentionally does not seed public instrument records.
+-- Create records through the application so ownership, media, visibility, and audit data stay accurate.

@@ -100,11 +100,6 @@ export function CollectibleRecordCard({
         </div>
       </Link>
 
-      {secondaryHref && secondaryLabel ? (
-        <Link className="collectible-card-secondary-link" href={secondaryHref} aria-label={secondaryLabel}>
-          {secondaryLabel}
-        </Link>
-      ) : null}
       <RecordShareButton className="collectible-card-share" code={record.qrCode} title={title} />
     </article>
   );

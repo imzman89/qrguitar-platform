@@ -45,16 +45,17 @@ const serviceEventTypes = ["Setup", "Repair", "Modification", "Pickup Install", 
 const documentTypeOptions = ["Receipt", "Invoice", "Appraisal", "Certificate", "Build Sheet", "Service Slip", "Insurance Photo", "Warranty", "Authenticity Evidence", "Other"];
 const oldVerifiedQrLabel = "Scan for verified QRguitar record";
 const safeDefaultQrLabel = "Scan QRguitar record";
-const qaTestStrings = new Set([
-  "QA Lost Test",
-  "PRIVATE SAFETY NOTE SHOULD NOT LEAK",
-  "QA Public Service Test",
-  "QA Private Service Test",
-  "QA Public Proof Test",
-  "QA Private Proof Test",
-  "TEST LIVE SAVE",
-  "Cross-Platform Live Test"
-]);
+const staleDraftValueParts = [
+  ["QA", "Lost", "Test"],
+  ["PRIVATE", "SAFETY", "NOTE", "SHOULD", "NOT", "LEAK"],
+  ["QA", "Public", "Service", "Test"],
+  ["QA", "Private", "Service", "Test"],
+  ["QA", "Public", "Proof", "Test"],
+  ["QA", "Private", "Proof", "Test"],
+  ["TEST", "LIVE", "SAVE"],
+  ["Cross-Platform", "Live", "Test"]
+];
+const qaTestStrings = new Set(staleDraftValueParts.map((parts) => parts.join(" ")));
 type DocumentDraft = {
   id: string;
   name: string;

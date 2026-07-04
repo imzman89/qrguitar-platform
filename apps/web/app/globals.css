@@ -711,18 +711,18 @@ select {
 .collectible-card-eyebrow,
 .collectible-card-age,
 .collectible-card-code {
-  min-height: 24px;
+  min-height: 22px;
   border: 1px solid rgba(255, 255, 255, .1);
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 5px 8px 4px;
+  padding: 4px 7px 3px;
   color: #f8e5b4;
-  background: rgba(5, 7, 8, .66);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, .22);
+  background: rgba(5, 7, 8, .5);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .18);
   backdrop-filter: blur(10px);
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 950;
   line-height: 1;
   text-transform: uppercase;
@@ -751,7 +751,7 @@ select {
 .collectible-card--latest .collectible-card-content {
   grid-template-columns: 1fr;
   border-top: 0;
-  padding-bottom: 62px;
+  padding-bottom: 24px;
 }
 
 .collectible-card h3 {
@@ -792,23 +792,22 @@ select {
 
 .record-badge,
 .collectible-card-facts span {
-  --badge-text: rgba(238, 234, 224, .88);
-  --badge-fill: rgba(248, 246, 242, .055);
-  --badge-glow: rgba(248, 246, 242, .08);
+  --badge-text: rgba(238, 234, 224, .82);
+  --badge-fill: rgba(248, 246, 242, .03);
+  --badge-glow: rgba(248, 246, 242, .07);
+  --badge-dot: rgba(248, 246, 242, .35);
   width: fit-content;
   max-width: 100%;
   min-height: 25px;
-  border: 1px solid rgba(248, 246, 242, .12);
+  border: 1px solid rgba(248, 246, 242, .105);
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 3px;
   color: var(--badge-text);
-  background:
-    linear-gradient(180deg, rgba(248, 246, 242, .07), rgba(248, 246, 242, .025)),
-    rgba(4, 7, 9, .42);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 8px 18px rgba(0, 0, 0, .14);
+  background: rgba(4, 7, 9, .34);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .03), 0 6px 14px rgba(0, 0, 0, .1);
   font-size: 10.5px;
   font-weight: 900;
   line-height: 1;
@@ -828,47 +827,53 @@ select {
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
-  padding: 3px 6px 2px;
+  padding: 3px 5px 2px;
   color: var(--badge-text);
-  background: var(--badge-fill);
-  box-shadow: inset 0 0 0 1px var(--badge-glow);
+  background: transparent;
+  box-shadow: none;
   white-space: normal;
 }
 
 .record-badge--verified {
-  --badge-text: #d9ffe7;
-  --badge-fill: rgba(28, 139, 74, .52);
-  --badge-glow: rgba(126, 244, 167, .26);
+  --badge-text: #a8d9ba;
+  --badge-fill: rgba(37, 148, 83, .045);
+  --badge-glow: rgba(126, 244, 167, .1);
+  --badge-dot: rgba(92, 200, 128, .55);
 }
 
 .record-badge--auth-confirmed {
-  --badge-text: #e8ffd1;
-  --badge-fill: rgba(88, 143, 48, .48);
-  --badge-glow: rgba(184, 245, 117, .24);
+  --badge-text: #c0d9a4;
+  --badge-fill: rgba(104, 153, 45, .045);
+  --badge-glow: rgba(184, 245, 117, .09);
+  --badge-dot: rgba(164, 210, 102, .52);
 }
 
 .record-badge--unverified {
-  --badge-text: rgba(235, 220, 194, .92);
-  --badge-fill: rgba(151, 119, 61, .2);
-  --badge-glow: rgba(238, 202, 132, .16);
+  --badge-text: rgba(214, 202, 182, .88);
+  --badge-fill: rgba(151, 119, 61, .075);
+  --badge-glow: rgba(238, 202, 132, .1);
+  --badge-dot: rgba(214, 176, 106, .45);
 }
 
 .record-badge--auth-unconfirmed {
-  --badge-text: rgba(231, 211, 172, .92);
-  --badge-fill: rgba(124, 91, 42, .2);
-  --badge-glow: rgba(224, 177, 94, .16);
+  --badge-text: rgba(218, 194, 151, .9);
+  --badge-fill: rgba(124, 91, 42, .075);
+  --badge-glow: rgba(224, 177, 94, .1);
+  --badge-dot: rgba(207, 157, 78, .48);
 }
 
 .record-badge--safety {
-  --badge-text: #ffe1dc;
-  --badge-fill: rgba(165, 38, 30, .58);
-  --badge-glow: rgba(255, 119, 103, .26);
+  --badge-text: #daa19c;
+  --badge-fill: rgba(165, 38, 30, .055);
+  --badge-glow: rgba(255, 119, 103, .1);
+  --badge-dot: rgba(219, 82, 72, .58);
 }
 
 .record-badge--condition {
-  --badge-text: #dbe8ed;
-  --badge-fill: rgba(111, 132, 142, .22);
-  --badge-glow: rgba(208, 226, 235, .12);
+  --badge-text: #cfdde3;
+  --badge-fill: rgba(111, 132, 142, .08);
+  --badge-glow: rgba(208, 226, 235, .08);
+  --badge-dot: rgba(184, 202, 211, .44);
 }
 
 .collectible-card-facts {
@@ -917,7 +922,7 @@ select {
 }
 
 .collectible-card--latest .collectible-card-secondary-link {
-  bottom: 62px;
+  bottom: 20px;
 }
 
 .collectible-card-cta:hover,
@@ -4481,6 +4486,7 @@ select {
 }
 
 .scan-hero-info {
+  min-width: 0;
   display: grid;
   gap: 16px;
   padding: 30px 32px 34px;
@@ -4511,10 +4517,13 @@ select {
 .scan-hero h1 {
   margin: 0;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(42px, 7vw, 72px);
+  max-width: 100%;
+  font-size: clamp(38px, 6.2vw, 68px);
   font-weight: 700;
-  line-height: .96;
+  line-height: .98;
   letter-spacing: 0;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 
 .verified-badge {
@@ -4526,20 +4535,18 @@ select {
 }
 
 .verified-badge span {
-  --badge-text: #d9ffe7;
-  --badge-fill: rgba(28, 139, 74, .34);
-  --badge-glow: rgba(126, 244, 167, .22);
+  --badge-text: #a8d9ba;
+  --badge-fill: rgba(248, 246, 242, .03);
+  --badge-glow: rgba(248, 246, 242, .08);
   min-height: 30px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid rgba(248, 246, 242, .13);
+  border: 1px solid rgba(248, 246, 242, .11);
   border-radius: 999px;
   padding: 6px 10px;
-  background:
-    linear-gradient(180deg, var(--badge-fill), rgba(248, 246, 242, .025)),
-    rgba(4, 7, 9, .56);
-  box-shadow: inset 0 0 0 1px var(--badge-glow), inset 0 1px 0 rgba(255, 255, 255, .045);
+  background: rgba(4, 7, 9, .44);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .035);
   color: var(--badge-text);
   font-size: 11px;
   font-weight: 800;
@@ -4547,9 +4554,9 @@ select {
 }
 
 .verified-badge span + span {
-  --badge-text: #e8ffd1;
-  --badge-fill: rgba(88, 143, 48, .3);
-  --badge-glow: rgba(184, 245, 117, .2);
+  --badge-text: #c0d9a4;
+  --badge-fill: rgba(248, 246, 242, .03);
+  --badge-glow: rgba(248, 246, 242, .08);
 }
 
 .identity-card {
@@ -5088,8 +5095,8 @@ select {
 }
 
 .public-gallery-grid button.active {
-  border-color: var(--gold-2);
-  box-shadow: 0 0 0 2px rgba(240, 161, 43, .5);
+  border-color: rgba(240, 161, 43, .58);
+  box-shadow: 0 0 0 1px rgba(240, 161, 43, .28);
 }
 
 .scan-overview {
@@ -5347,53 +5354,53 @@ select {
 
 .scan-tags {
   display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  padding: 24px 28px;
-  scrollbar-width: none;
+  flex-wrap: wrap;
+  gap: 8px;
+  overflow: visible;
+  padding: 20px 28px 24px;
 }
 
 .scan-tags span {
   --badge-text: rgba(238, 234, 224, .9);
-  --badge-fill: rgba(248, 246, 242, .045);
-  --badge-glow: rgba(248, 246, 242, .08);
-  flex: 0 0 auto;
+  --badge-fill: rgba(248, 246, 242, .03);
+  --badge-glow: rgba(248, 246, 242, .07);
+  flex: 0 1 auto;
   border: 1px solid rgba(255, 255, 255, .12);
   border-radius: 999px;
-  padding: 9px 13px 8px;
+  padding: 7px 10px 6px;
   background:
     linear-gradient(180deg, var(--badge-fill), rgba(255, 255, 255, .025)),
     rgba(4, 7, 9, .42);
   color: var(--badge-text);
   box-shadow: inset 0 0 0 1px var(--badge-glow), inset 0 1px 0 rgba(255, 255, 255, .04);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 850;
   line-height: 1;
   text-transform: uppercase;
 }
 
 .scan-tags .scan-tag--verified {
-  --badge-text: #d9ffe7;
-  --badge-fill: rgba(28, 139, 74, .36);
-  --badge-glow: rgba(126, 244, 167, .22);
+  --badge-text: #a8d9ba;
+  --badge-fill: rgba(248, 246, 242, .03);
+  --badge-glow: rgba(248, 246, 242, .08);
 }
 
 .scan-tags .scan-tag--auth-confirmed {
-  --badge-text: #e8ffd1;
-  --badge-fill: rgba(88, 143, 48, .32);
-  --badge-glow: rgba(184, 245, 117, .2);
+  --badge-text: #c0d9a4;
+  --badge-fill: rgba(248, 246, 242, .03);
+  --badge-glow: rgba(248, 246, 242, .08);
 }
 
 .scan-tags .scan-tag--auth-unconfirmed {
-  --badge-text: rgba(231, 211, 172, .92);
-  --badge-fill: rgba(124, 91, 42, .18);
-  --badge-glow: rgba(224, 177, 94, .14);
+  --badge-text: rgba(218, 194, 151, .9);
+  --badge-fill: rgba(124, 91, 42, .075);
+  --badge-glow: rgba(224, 177, 94, .1);
 }
 
 .scan-tags .scan-tag--safety {
-  --badge-text: #ffe1dc;
-  --badge-fill: rgba(165, 38, 30, .42);
-  --badge-glow: rgba(255, 119, 103, .22);
+  --badge-text: #daa19c;
+  --badge-fill: rgba(248, 246, 242, .03);
+  --badge-glow: rgba(248, 246, 242, .08);
 }
 
 .scan-bottom-nav {

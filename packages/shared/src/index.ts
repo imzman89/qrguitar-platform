@@ -148,16 +148,16 @@ export type ProfilePrivacy = {
 
 export const sampleGuitar: GuitarProfile = {
   id: "sample-1",
-  qrCode: "QRG-PI260001",
-  name: "Reptile",
-  brand: "Proper Instruments",
-  model: "1-of-1 Reptile",
+  qrCode: "QRG-LOCAL-SAMPLE",
+  name: "Local Sample Guitar",
+  brand: "QRguitar Lab",
+  model: "Development Sample",
   year: "2026",
-  serialNumber: "PI260001",
+  serialNumber: "LOCAL-SAMPLE",
   instrumentType: "Electric guitar",
-  builder: "Proper Instruments",
-  location: "Cranston, Rhode Island, USA",
-  status: "verified",
+  builder: "QRguitar Lab",
+  location: "Local development",
+  status: "unverified",
   ownerDisplayName: "Unclaimed",
   visibility: "public",
   transferable: true,
@@ -169,16 +169,13 @@ export const sampleGuitar: GuitarProfile = {
     badgeLabels: ["One of One", "Handmade", "Verified", "Lifetime Record"]
   },
   summary:
-    "Reptile is a one-of-one Proper Instruments build from Cranston, Rhode Island, equipped with Proper Passive tone controls, a Proper Pickups '64 Closetcaster pickup set, a nitro-finished neck, and a permanent QRguitar record.",
+    "Local development sample used only when a placeholder record is needed.",
   specs: [
-    { label: "Electronics", value: "Proper Passive tone controls" },
-    { label: "Pickups", value: "Proper Pickups '64 Closetcaster pickup set" },
-    { label: "Neck", value: "Nitro-finished neck, slim '60s C profile" },
-    { label: "Fingerboard", value: "Rosewood" },
-    { label: "Radius", value: "9.5 inch" },
-    { label: "Case", value: "Hardshell case included" },
+    { label: "Electronics", value: "Local sample electronics" },
+    { label: "Pickups", value: "Local sample pickup set" },
+    { label: "Neck", value: "Local sample neck profile" },
     { label: "QR Record", value: "Lifetime QRguitar tracker" },
-    { label: "Weight", value: "7.4 lbs" }
+    { label: "Weight", value: "Sample weight" }
   ],
   timeline: [
     {
@@ -202,8 +199,8 @@ export const sampleGuitar: GuitarProfile = {
     forSale: false
   },
   qr: {
-    permanentUrl: "https://www.qrguitar.com/i/QRG-PI260001",
-    scanCount: 24
+    permanentUrl: "https://www.qrguitar.com/i/QRG-LOCAL-SAMPLE",
+    scanCount: 0
   },
   privacy: {
     ownerContactVisibility: "private",

@@ -404,7 +404,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
         <section className="identity-card">
           <div className="identity-grid">
             {specs.map((spec) => (
-              <Meta label={spec.label} value={spec.value || "Not listed"} key={spec.label} />
+              <Meta label={spec.label} value={spec.value} key={spec.label} />
             ))}
           </div>
           <div className="scan-qr">
@@ -662,7 +662,7 @@ function ProfilePanel({
         <PanelHeader icon={<SlidersHorizontal />} label="Specifications" title="Build details, setup notes, and serial info." />
         <div className="profile-data-grid">
           {visibleSpecs.map((spec) => (
-            <span key={spec.label}><strong>{spec.label}</strong>{spec.value || "Not listed"}</span>
+            <span key={spec.label}><strong>{spec.label}</strong>{spec.value}</span>
           ))}
         </div>
       </section>
@@ -784,7 +784,7 @@ function ProfilePanel({
         {serviceNotes.length ? (
           <div className="profile-data-grid">
             {serviceNotes.map((spec) => (
-              <span key={spec.label}><strong>{spec.label}</strong>{spec.value || "Not listed"}</span>
+              <span key={spec.label}><strong>{spec.label}</strong>{spec.value}</span>
             ))}
           </div>
         ) : (

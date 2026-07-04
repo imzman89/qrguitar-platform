@@ -60,7 +60,7 @@ http://localhost:3000
 Try:
 
 ```text
-http://localhost:3000/i/QRG-0001
+http://localhost:3000/catalog
 ```
 
 ## 6. Run Mobile

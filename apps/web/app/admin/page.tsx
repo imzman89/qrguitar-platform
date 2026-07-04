@@ -1103,7 +1103,7 @@ export default function AdminPage() {
         <section className="card admin-panel-card">
           <h2>Admin access</h2>
           <p>Signed in as {overview?.admin?.email || "authorized admin"}.</p>
-          <p>Role: {overview?.admin?.role || "Not listed"} - Source: {overview?.admin?.accessSource || "unknown"} - Status: {overview?.admin?.accountStatus || "active"}</p>
+          <p>Role: {overview?.admin?.role || "Not set"} - Source: {overview?.admin?.accessSource || "unknown"} - Status: {overview?.admin?.accountStatus || "active"}</p>
           <p>Admin access is controlled by profile role or server environment allowlists. Environment-managed access cannot be removed from this UI.</p>
           <div className="admin-filter-row">
             <input value={adminSearch} onChange={(event) => setAdminSearch(event.target.value)} placeholder="User email for admin access" />
