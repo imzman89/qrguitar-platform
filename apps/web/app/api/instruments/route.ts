@@ -1426,7 +1426,14 @@ export async function PATCH(request: Request) {
     }, { status: 200 });
   }
 
-  if (body.action === "remove_from_collection" || body.action === "restore_to_collection") {
+  if (body.action === "restore_to_collection") {
+    return NextResponse.json(
+      { ok: false, message: "Deleted records cannot be restored. Create a new QRguitar record instead." },
+      { status: 410 }
+    );
+  }
+
+  if (body.action === "remove_from_collection") {
     const qrCode = String(body.qrCode || "").trim().toUpperCase();
     const reason = String(body.reason || "").trim().slice(0, 1000);
     if (!qrCode) {
@@ -1462,16 +1469,11 @@ export async function PATCH(request: Request) {
       ? {
           owner_removed_at: now,
           owner_removed_by: auth.user.id,
-          owner_removed_reason: reason || "Owner removed record from collection.",
+          owner_removed_reason: reason || "Owner permanently deleted record from dashboard.",
           visibility: "private",
           updated_at: now
         }
-      : {
-          owner_removed_at: null,
-          owner_removed_by: null,
-          owner_removed_reason: null,
-          updated_at: now
-        };
+      : {};
 
     const result = await supabase
       .from("guitars")
@@ -1485,7 +1487,7 @@ export async function PATCH(request: Request) {
     await logAdminAuditEvent(supabase, {
       actorUserId: auth.user.id,
       actorEmail: auth.user.email || "",
-      action: body.action === "remove_from_collection" ? "record_removed_from_collection" : "record_restored_to_collection",
+      action: "record_removed_from_collection",
       targetType: "guitar",
       targetId: qrCode,
       targetUserId: auth.user.id,
@@ -1498,7 +1500,7 @@ export async function PATCH(request: Request) {
       ok: true,
       qrCode,
       permanentPath: existing.data.permanent_path || `/i/${qrCode}`,
-      message: body.action === "remove_from_collection" ? "Record removed from your active collection." : "Record restored to your active collection."
+      message: "Record permanently deleted from your dashboard. This cannot be undone."
     }, { status: 200 });
   }
 

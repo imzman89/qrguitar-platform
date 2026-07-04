@@ -109,12 +109,7 @@ export async function PATCH(request: Request, context: { params: { id: string } 
     });
     auditAction = "record_restored";
   } else if (action === "restore_to_collection") {
-    Object.assign(updates, {
-      owner_removed_at: null,
-      owner_removed_by: null,
-      owner_removed_reason: null
-    });
-    auditAction = "record_restored_to_collection";
+    return adminJson({ ok: false, message: "Deleted dashboard records cannot be restored. Create a new record instead." }, { status: 410 });
   } else if (action === "set_visibility") {
     const nextVisibility = cleanVisibility(body?.visibility);
     if (!nextVisibility) {

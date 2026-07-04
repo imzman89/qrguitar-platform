@@ -292,8 +292,8 @@ function actionLabel(action: string) {
     authenticity_status_updated: "Authenticity status updated",
     trust_badge_visibility_updated: "Trust badge visibility updated",
     safety_status_updated: "Safety status updated",
-    record_removed_from_collection: "Record removed from collection",
-    record_restored_to_collection: "Record restored to collection"
+    record_removed_from_collection: "Record deleted from dashboard",
+    record_restored_to_collection: "Historical recovery event"
   };
   return labels[action] || statLabel(action);
 }
@@ -722,7 +722,7 @@ export default function AdminPage() {
               <span>
                 {[record.brand, record.model, record.serialNumber].filter(Boolean).join(" / ") || "Instrument"} - {record.visibility}
                 {record.isArchived ? " - Archived" : ""}
-                {record.isOwnerRemoved ? " - Owner removed" : ""}
+                {record.isOwnerRemoved ? " - Deleted by owner" : ""}
               </span>
               <small>
                 Owner {record.ownerEmail || "No email"} - Proof {record.proofDocumentCount} - Service {record.serviceEventCount} - Transfers {record.transferCount}
@@ -752,7 +752,7 @@ export default function AdminPage() {
                 <button type="button" disabled={busy === `archive:${record.id}`} onClick={() => beginRecordAction(record, "archive", {}, { title: "Archive Record" })}>Archive Record</button>
               )}
               {record.isOwnerRemoved ? (
-                <button type="button" disabled={busy === `restore_to_collection:${record.id}`} onClick={() => beginRecordAction(record, "restore_to_collection", {}, { title: "Restore to Collection" })}>Restore to Collection</button>
+                <button type="button" disabled title="Deleted dashboard records cannot be restored. Create a new record instead.">Deleted</button>
               ) : null}
             </div>
           </div>

@@ -49,7 +49,6 @@ export default function DashboardPage() {
   const [loadingRecords, setLoadingRecords] = useState(true);
   const [authChecked, setAuthChecked] = useState(true);
   const [dashboardMessage, setDashboardMessage] = useState("");
-  const [showRemovedRecords, setShowRemovedRecords] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -98,7 +97,7 @@ export default function DashboardPage() {
 
     getSupabaseAccessToken().then(async (token) => {
       const [records, transferRecords] = await Promise.all([
-        loadDashboardInstruments(token, showRemovedRecords),
+        loadDashboardInstruments(token, false),
         loadDashboardTransfers(token)
       ]);
 
@@ -116,7 +115,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [showRemovedRecords, user?.email]);
+  }, [user?.email]);
 
   const instrumentCodes = useMemo(() => new Set(instruments.map((instrument) => instrument.qrCode.toUpperCase())), [instruments]);
   const verifiedRecords = instruments.filter((instrument) => getInstrumentVerificationStatus(instrument) === "verified").length;
@@ -141,7 +140,7 @@ export default function DashboardPage() {
     getSupabaseAccessToken()
       .then(async (token) => {
         const [records, transferRecords] = await Promise.all([
-          loadDashboardInstruments(token, showRemovedRecords),
+          loadDashboardInstruments(token, false),
           loadDashboardTransfers(token)
         ]);
         return { records, transferRecords };
@@ -177,7 +176,7 @@ export default function DashboardPage() {
       return;
     }
 
-    const confirmed = window.confirm("Remove this record from your active collection? The QRguitar ID stays reserved and the record is hidden from public view.");
+    const confirmed = window.confirm("Permanently delete this record from your QRguitar dashboard? This cannot be undone. The QRguitar ID stays reserved, but the record will be removed from your active account and hidden from public view.");
     if (!confirmed) {
       return;
     }
@@ -192,32 +191,11 @@ export default function DashboardPage() {
       body: JSON.stringify({
         qrCode: instrument.qrCode,
         action: "remove_from_collection",
-        reason: "Owner removed record from collection."
+        reason: "Owner permanently deleted record from dashboard."
       })
     });
     const payload = await response.json().catch(() => ({}));
-    setDashboardMessage(payload.message || (response.ok ? "Record removed from active collection." : "Could not remove this record."));
-    if (response.ok) {
-      refreshInstruments();
-    }
-  }
-
-  async function restoreToCollection(instrument: DemoInstrument) {
-    const token = await getSupabaseAccessToken();
-    const response = await fetch("/api/instruments", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        qrCode: instrument.qrCode,
-        action: "restore_to_collection",
-        reason: "Owner restored record to collection."
-      })
-    });
-    const payload = await response.json().catch(() => ({}));
-    setDashboardMessage(payload.message || (response.ok ? "Record restored to active collection." : "Could not restore this record."));
+    setDashboardMessage(payload.message || (response.ok ? "Record permanently deleted from your dashboard." : "Could not delete this record."));
     if (response.ok) {
       refreshInstruments();
     }
@@ -334,9 +312,6 @@ export default function DashboardPage() {
               <Link className="button secondary" href="/create">
                 Add Guitar
               </Link>
-              <button className="button secondary" type="button" onClick={() => setShowRemovedRecords((value) => !value)}>
-                {showRemovedRecords ? "Show Active" : "Show Removed"}
-              </button>
             </div>
             <div className={styles.instrumentList}>
               {loadingRecords ? (
@@ -393,7 +368,6 @@ export default function DashboardPage() {
                             <span>{instrument.serviceEvents?.length ? `${instrument.serviceEvents.length} service ${instrument.serviceEvents.length === 1 ? "entry" : "entries"}` : "No service history yet"}</span>
                             <span>{totalDocs ? `${publicDocs} public docs${hiddenDocs ? `, ${hiddenDocs} hidden` : ""}` : "No documents yet"}</span>
                             <span>{instrument.visibility === "private" ? "Private" : instrument.visibility === "unlisted" ? "Unlisted" : "Public"}</span>
-                            {instrument.collectionRemovedAt ? <span>Removed from collection</span> : null}
                           </div>
                         </div>
                       </Link>
@@ -413,15 +387,9 @@ export default function DashboardPage() {
                           <Link className="button secondary" href={instrumentToProfileUrl(instrument)}>
                             View Record
                           </Link>
-                          {instrument.collectionRemovedAt ? (
-                            <button className="button secondary" type="button" onClick={() => void restoreToCollection(instrument)}>
-                              Restore to Collection
-                            </button>
-                          ) : (
-                            <button className="button secondary" type="button" onClick={() => void removeFromCollection(instrument)}>
-                              Remove from Collection
-                            </button>
-                          )}
+                          <button className="button secondary" type="button" onClick={() => void removeFromCollection(instrument)}>
+                            Delete Record
+                          </button>
                         </div>
                       </div>
                       <TransferPanel
