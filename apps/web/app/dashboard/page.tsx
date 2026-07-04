@@ -19,7 +19,7 @@ import {
   type DemoTransfer,
   type DemoUser
 } from "../../lib/local-demo";
-import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
+import { clearQrGuitarSessionState, createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
 import { useRouter } from "next/navigation";
 
 const starterActions = [
@@ -165,7 +165,7 @@ export default function DashboardPage() {
   async function logout() {
     const supabase = createBrowserSupabaseClient();
     await supabase.auth.signOut();
-    window.localStorage.removeItem("qrguitar.siteEditorUnlocked");
+    clearQrGuitarSessionState();
     setUser(null);
     router.replace("/login?next=%2Fdashboard");
   }

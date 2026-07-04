@@ -4,6 +4,20 @@ import { createClient } from "@supabase/supabase-js";
 
 let browserClient: ReturnType<typeof createClient> | null = null;
 
+export const sessionStartedAtKey = "qrguitar.sessionStartedAt";
+export const lastActivityAtKey = "qrguitar.lastActivityAt";
+export const sessionExpiredMessageKey = "qrguitar.sessionExpiredMessage";
+
+export function clearQrGuitarSessionState() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem(sessionStartedAtKey);
+  window.localStorage.removeItem(lastActivityAtKey);
+  window.localStorage.removeItem("qrguitar.siteEditorUnlocked");
+}
+
 export function createBrowserSupabaseClient() {
   if (browserClient) {
     return browserClient;

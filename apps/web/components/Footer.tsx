@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BrandLogo } from "./BrandLogo";
 import { defaultSiteSettings, fetchPublishedSiteSettings, type EditableSiteSettings } from "../lib/site-settings";
-import { createBrowserSupabaseClient } from "../lib/supabase-browser";
+import { clearQrGuitarSessionState, createBrowserSupabaseClient } from "../lib/supabase-browser";
 
 export function Footer() {
   const [settings, setSettings] = useState<EditableSiteSettings>(defaultSiteSettings);
@@ -40,7 +40,7 @@ export function Footer() {
   async function logout() {
     const supabase = createBrowserSupabaseClient();
     await supabase.auth.signOut();
-    window.localStorage.removeItem("qrguitar.siteEditorUnlocked");
+    clearQrGuitarSessionState();
     setIsSignedIn(false);
   }
 

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { LogOut, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { BrandLogo } from "./BrandLogo";
-import { createBrowserSupabaseClient } from "../lib/supabase-browser";
+import { clearQrGuitarSessionState, createBrowserSupabaseClient } from "../lib/supabase-browser";
 
 export function Nav() {
   const [isSignedIn, setIsSignedIn] = useState(false);
@@ -14,7 +14,7 @@ export function Nav() {
   async function logout() {
     const supabase = createBrowserSupabaseClient();
     await supabase.auth.signOut();
-    window.localStorage.removeItem("qrguitar.siteEditorUnlocked");
+    clearQrGuitarSessionState();
     setIsSignedIn(false);
     setIsOpen(false);
     setAccountMenuOpen(false);

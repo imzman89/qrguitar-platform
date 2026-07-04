@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
-import { createBrowserSupabaseClient } from "../../lib/supabase-browser";
+import { clearQrGuitarSessionState, createBrowserSupabaseClient, sessionExpiredMessageKey } from "../../lib/supabase-browser";
 
 type LoginMode = "login" | "register" | "reset";
 
@@ -25,8 +25,10 @@ export default function LoginPage() {
     const params = new URLSearchParams(window.location.search);
     const nextPath = sanitizeNext(params.get("next"));
     setSafeNext(nextPath);
-    if (params.get("reason") === "session-expired") {
-      setStatus("Your session expired. Please sign in again.");
+    const expiredMessage = window.localStorage.getItem(sessionExpiredMessageKey);
+    if (params.get("reason") === "session-expired" || expiredMessage) {
+      setStatus(expiredMessage || "Your session expired. Please sign in again.");
+      window.localStorage.removeItem(sessionExpiredMessageKey);
     }
 
     supabase.auth.getSession().then(({ data }) => {
@@ -79,6 +81,7 @@ export default function LoginPage() {
     }
 
     if (data.session) {
+      window.localStorage.removeItem(sessionExpiredMessageKey);
       router.replace(safeNext);
       return;
     }
@@ -107,6 +110,7 @@ export default function LoginPage() {
       return;
     }
 
+    window.localStorage.removeItem(sessionExpiredMessageKey);
     router.replace(safeNext);
   }
 
@@ -136,7 +140,7 @@ export default function LoginPage() {
   async function logout() {
     setIsWorking(true);
     await supabase.auth.signOut();
-    window.localStorage.removeItem("qrguitar.siteEditorUnlocked");
+    clearQrGuitarSessionState();
     setIsWorking(false);
     setIsSignedIn(false);
     setStatus("Signed out.");

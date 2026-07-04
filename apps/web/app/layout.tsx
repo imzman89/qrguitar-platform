@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { ThemeRuntime } from "../components/ThemeRuntime";
+import { SessionLifecycle } from "../components/SessionLifecycle";
 import { buildDefaultMetadata, buildOrganizationJsonLd } from "../lib/seo";
 
 const QRGuitarBotPopup = dynamic(() =>
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body>
         <ThemeRuntime />
+        <SessionLifecycle />
         <script
           id="qrguitar-organization-jsonld"
           type="application/ld+json"

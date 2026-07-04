@@ -5,7 +5,7 @@ import { LockKeyhole, LogOut, ShieldCheck, UserRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
-import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
+import { clearQrGuitarSessionState, createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
 
 type AccountPayload = {
   ok?: boolean;
@@ -123,7 +123,7 @@ export default function AccountPage() {
   async function signOut() {
     setIsWorking(true);
     await supabase.auth.signOut();
-    window.localStorage.removeItem("qrguitar.siteEditorUnlocked");
+    clearQrGuitarSessionState();
     window.dispatchEvent(new CustomEvent("qrguitar:auth"));
     window.location.href = "/";
   }
