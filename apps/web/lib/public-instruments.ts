@@ -238,7 +238,6 @@ function mapRecord({
     instrumentType: type,
     builder: guitar.builder || "",
     owner: ownerName || guitar.builder || "Unclaimed",
-    ownerUserEmail: "",
     location: guitar.location || "",
     visibility: guitar.visibility === "private" ? "private" : guitar.visibility === "unlisted" ? "unlisted" : "public",
     summary: publicSummary(guitar.summary),
