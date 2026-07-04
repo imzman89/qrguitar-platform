@@ -28,6 +28,27 @@ type DocumentDraft = {
   privateNotes: string;
 };
 
+type BulkImportRow = {
+  id: string;
+  name: string;
+  brand: string;
+  model: string;
+  serial: string;
+  year: string;
+  instrumentType: string;
+  condition: "new" | "used";
+  location: string;
+  visibility: "public" | "private" | "unlisted";
+  photo: string;
+  summary: string;
+  serialNotUsed: boolean;
+  error: string;
+};
+
+const bulkHeaders = ["brand", "model", "serial", "year", "type", "condition", "location", "visibility", "photo", "summary"];
+const bulkTemplate = `${bulkHeaders.join("\t")}
+Fender\tStratocaster\tABC123\t2005\tElectric Guitar\tused\tCranston, RI\tprivate\thttps://example.com/photo.jpg\tOwned since 2024`;
+
 export default function CreatePage() {
   const router = useRouter();
   const [message, setMessage] = useState("");
@@ -39,6 +60,8 @@ export default function CreatePage() {
     brand: "",
     model: "",
     serial: "",
+    serialNotUsed: false,
+    showSerialPublic: true,
     year: "",
     instrumentType: "",
     builder: "",
@@ -61,10 +84,16 @@ export default function CreatePage() {
   const [qrCode, setQrCode] = useState(() => generatePermanentQrCode(getDemoInstruments().map((instrument) => instrument.qrCode), ""));
   const [qrStyle, setQrStyle] = useState<QrStyle>(defaultQrStyle);
   const [categoryOptions, setCategoryOptions] = useState(defaultSiteSettings.instrumentCategories);
+  const [accountRecordCount, setAccountRecordCount] = useState(0);
+  const [bulkText, setBulkText] = useState(bulkTemplate);
+  const [bulkRows, setBulkRows] = useState<BulkImportRow[]>([]);
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   const profileHref = useMemo(() => {
     return `/i/${qrCode}`;
   }, [qrCode]);
+
+  const bulkImportUnlocked = accountRecordCount > 0;
 
   const previewFields = useMemo<CustomProfileField[]>(
     () =>
@@ -98,6 +127,19 @@ export default function CreatePage() {
           ...current,
           owner: current.owner || String(sessionUser.user_metadata?.display_name || sessionUser.email?.split("@")[0] || "")
         }));
+        void getSupabaseAccessToken().then(async (token) => {
+          if (!token || cancelled) {
+            return;
+          }
+          const response = await fetch("/api/account", {
+            cache: "no-store",
+            headers: { authorization: `Bearer ${token}` }
+          });
+          const payload = await response.json().catch(() => null) as { ok?: boolean; account?: { stats?: { records?: number } } } | null;
+          if (!cancelled && response.ok && payload?.ok) {
+            setAccountRecordCount(payload.account?.stats?.records || 0);
+          }
+        });
       }
       setAuthChecked(true);
     });
@@ -121,6 +163,118 @@ export default function CreatePage() {
 
   function updateQrStyle(field: keyof QrStyle, value: string | boolean) {
     setQrStyle((current) => ({ ...current, [field]: value }));
+  }
+
+  function parseBulkImportRows(text = bulkText) {
+    const lines = text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (lines.length < 2) {
+      setBulkRows([]);
+      setMessage("Paste a header row and at least one instrument row.");
+      return [];
+    }
+
+    const delimiter = lines[0].includes("\t") ? "\t" : ",";
+    const headers = lines[0].split(delimiter).map((header) => normalizeBulkHeader(header));
+    const rows = lines.slice(1, 51).map((line, index) => {
+      const cells = splitBulkLine(line, delimiter);
+      const valueFor = (key: string) => String(cells[headers.indexOf(key)] || "").trim();
+      const serial = valueFor("serial");
+      const serialNotUsed = !serial || /^(none|n\/a|na|no serial|not used)$/i.test(serial);
+      const photo = valueFor("photo");
+      const visibilityValue = valueFor("visibility").toLowerCase();
+      const conditionValue = valueFor("condition").toLowerCase();
+      const row: BulkImportRow = {
+        id: `bulk-${index}`,
+        name: valueFor("name"),
+        brand: valueFor("brand"),
+        model: valueFor("model"),
+        serial: serialNotUsed ? "" : serial,
+        year: valueFor("year"),
+        instrumentType: valueFor("type"),
+        condition: conditionValue === "new" ? "new" : "used",
+        location: valueFor("location"),
+        visibility: visibilityValue === "public" || visibilityValue === "unlisted" ? visibilityValue : "private",
+        photo,
+        summary: valueFor("summary"),
+        serialNotUsed,
+        error: ""
+      };
+
+      const errors = [
+        !row.brand ? "brand" : "",
+        !row.model ? "model" : "",
+        !row.year ? "year" : "",
+        !row.photo ? "photo" : "",
+        !row.serial && !row.serialNotUsed ? "serial/build ID" : ""
+      ].filter(Boolean);
+      row.error = errors.length ? `Missing ${errors.join(", ")}.` : "";
+      return row;
+    });
+
+    setBulkRows(rows);
+    setMessage(rows.length ? `${rows.length} bulk row${rows.length === 1 ? "" : "s"} ready for review.` : "No bulk rows found.");
+    return rows;
+  }
+
+  async function createBulkRecords() {
+    const rows = bulkRows.length ? bulkRows : parseBulkImportRows();
+    const validRows = rows.filter((row) => !row.error);
+    if (!validRows.length) {
+      setMessage("Fix the bulk rows before creating records.");
+      return;
+    }
+
+    setBulkSaving(true);
+    setMessage("");
+    let created = 0;
+    let failed = 0;
+
+    try {
+      const token = await getSupabaseAccessToken();
+      for (const row of validRows) {
+        const response = await fetch("/api/instruments", {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            name: row.name || [row.brand, row.model].filter(Boolean).join(" "),
+            brand: row.brand,
+            model: row.model,
+            serial: row.serial,
+            serialNotUsed: row.serialNotUsed,
+            year: row.year,
+            instrumentType: row.instrumentType,
+            condition: row.condition,
+            ownerName: String(user?.user_metadata?.display_name || user?.email || ""),
+            location: row.location,
+            visibility: row.visibility,
+            summary: row.summary,
+            heroImageDataUrl: row.photo,
+            photos: [row.photo],
+            showSerialPublic: true,
+            documents: [],
+            customFields: []
+          })
+        });
+        const payload = await response.json().catch(() => null) as { ok?: boolean; message?: string } | null;
+        if (response.ok && payload?.ok) {
+          created += 1;
+        } else {
+          failed += 1;
+        }
+      }
+
+      setMessage(`${created} record${created === 1 ? "" : "s"} created.${failed ? ` ${failed} failed.` : ""}`);
+      if (created) {
+        router.push("/dashboard");
+      }
+    } catch {
+      setMessage("Bulk import stopped. Check the rows and try again.");
+    } finally {
+      setBulkSaving(false);
+    }
   }
 
   async function addProfilePhotos(files: FileList | null) {
@@ -199,6 +353,11 @@ export default function CreatePage() {
         return;
       }
 
+      if (!form.heroImageDataUrl && !galleryImages.length) {
+        setMessage("Add at least one photo before creating a QRguitar record.");
+        return;
+      }
+
       if (
         typeof window !== "undefined" &&
         isRepeatedBrowserSubmission("qrguitar.lastCreateSubmission", createSubmissionFingerprint(form), window)
@@ -217,6 +376,8 @@ export default function CreatePage() {
           brand: form.brand,
           model: form.model,
           serial: form.serial,
+          serialNotUsed: form.serialNotUsed,
+          showSerialPublic: form.showSerialPublic,
           year: form.year,
           instrumentType: form.instrumentType,
           builder: form.builder,
@@ -312,10 +473,15 @@ export default function CreatePage() {
         <div className="shell split create-layout">
           <div>
             <div className="eyebrow">Create a QRguitar record</div>
-            <h2>Register an instrument and preview the public profile.</h2>
+            <h2>Start with one great instrument record.</h2>
             <p>
-                This creates a permanent QRguitar record for your signed-in account and keeps the QR link stable.
+                Add the core details, upload at least one real photo, and QRguitar will create a permanent record URL and QR code tied to your account.
               </p>
+              <div className="create-onboarding-strip" aria-label="Create record steps">
+                <span><strong>1</strong> Add identity</span>
+                <span><strong>2</strong> Upload photo</span>
+                <span><strong>3</strong> Save QR record</span>
+              </div>
               <div className="permanent-id">
                 <span>Permanent QRguitar ID</span>
                 <strong>{qrCode}</strong>
@@ -348,10 +514,59 @@ export default function CreatePage() {
                 <span className="eyebrow">Register basics</span>
                 <p>Just enough to create the permanent record. Everything else can be added after.</p>
               </div>
+              <details className="advanced-panel bulk-import-panel">
+                <summary>Bulk import for enrolled brands and shops</summary>
+                {bulkImportUnlocked ? (
+                  <div className="bulk-import-grid">
+                    <div className="field custom-wide">
+                      <label htmlFor="bulkImport">Paste tab or comma-separated inventory</label>
+                      <textarea
+                        id="bulkImport"
+                        rows={8}
+                        value={bulkText}
+                        onChange={(event) => setBulkText(event.target.value)}
+                        spellCheck={false}
+                      />
+                      <span>
+                        Include headers: brand, model, serial, year, type, condition, location, visibility, photo, summary.
+                        Each row needs a photo URL or data URL.
+                      </span>
+                    </div>
+                    <div className="bulk-import-actions">
+                      <button className="button secondary" type="button" onClick={() => parseBulkImportRows()}>
+                        Preview Rows
+                      </button>
+                      <button className="button" type="button" onClick={() => void createBulkRecords()} disabled={bulkSaving}>
+                        {bulkSaving ? "Creating..." : "Create Valid Rows"}
+                      </button>
+                    </div>
+                    {bulkRows.length ? (
+                      <div className="bulk-preview-list" aria-label="Bulk import preview">
+                        {bulkRows.slice(0, 8).map((row) => (
+                          <div className={row.error ? "bulk-preview-row has-error" : "bulk-preview-row"} key={row.id}>
+                            <strong>{row.brand || "Missing brand"} {row.model || "Missing model"}</strong>
+                            <span>{[row.year, row.serial || "No serial", row.visibility, row.photo ? "Photo ready" : "No photo"].filter(Boolean).join(" / ")}</span>
+                            {row.error ? <small>{row.error}</small> : <small>Ready</small>}
+                          </div>
+                        ))}
+                        {bulkRows.length > 8 ? <p className="fine-print">Showing 8 of {bulkRows.length} rows. Up to 50 rows can be imported at once during beta.</p> : null}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="bulk-import-locked">
+                    <strong>Start with one complete record first.</strong>
+                    <p>
+                      Upload one instrument with at least one photo to activate your QRguitar account workflow.
+                      Bulk import unlocks after that first record so brands and shops can add inventory with fewer mistakes.
+                    </p>
+                  </div>
+                )}
+              </details>
               <div className="form-grid">
                 <Field label="Make / brand" id="brand" value={form.brand} onChange={(value) => updateField("brand", value)} />
                 <Field label="Model" id="model" value={form.model} onChange={(value) => updateField("model", value)} />
-                <Field label="Serial number" id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} />
+                <Field label="Serial / build ID" id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} />
                 <Field label="Year" id="year" value={form.year} onChange={(value) => updateField("year", value)} />
                 <CategoryField
                   label="Type / category"
@@ -373,6 +588,33 @@ export default function CreatePage() {
                   </select>
                 </div>
               </div>
+              <div className="form-grid compact">
+                <label className="toggle-field">
+                  <input
+                    type="checkbox"
+                    checked={form.serialNotUsed}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        serialNotUsed: event.target.checked,
+                        serial: event.target.checked ? "" : current.serial
+                      }))
+                    }
+                  />
+                  This instrument does not use a serial/build ID
+                </label>
+                <label className="toggle-field">
+                  <input
+                    type="checkbox"
+                    checked={form.showSerialPublic}
+                    onChange={(event) => setForm((current) => ({ ...current, showSerialPublic: event.target.checked }))}
+                  />
+                  Show serial/build ID on public profile
+                </label>
+              </div>
+              <p className="fine-print">
+                Records without a serial/build ID can still be created, but QRguitar verification or authenticity confirmation requires prior QRguitar approval.
+              </p>
               <details className="advanced-panel">
                 <summary>Add Profile Basics</summary>
                 <div className="form-grid">
@@ -496,7 +738,7 @@ export default function CreatePage() {
                   multiple
                   onChange={(event) => void addProfilePhotos(event.target.files)}
                 />
-                <span>Upload up to 20 photos. Pick one as the main image for dashboard cards, catalog listings, and the public profile hero.</span>
+                <span>At least one photo is required. Upload up to 20 photos and pick one as the main image for cards, catalog listings, and the public profile.</span>
               </div>
               <div className="field photo-field">
                 <label htmlFor="profileDocuments">Documents</label>
@@ -888,5 +1130,49 @@ function CategoryField({
       </select>
     </div>
   );
+}
+
+function normalizeBulkHeader(value: string) {
+  const normalized = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+  if (normalized === "make" || normalized === "brandname") {
+    return "brand";
+  }
+  if (normalized === "serialnumber" || normalized === "serialbuildid" || normalized === "buildid") {
+    return "serial";
+  }
+  if (normalized === "instrumenttype" || normalized === "category") {
+    return "type";
+  }
+  if (normalized === "photo" || normalized === "photourl" || normalized === "image" || normalized === "imageurl" || normalized === "mainphoto") {
+    return "photo";
+  }
+  if (normalized === "description" || normalized === "notes") {
+    return "summary";
+  }
+  return normalized;
+}
+
+function splitBulkLine(line: string, delimiter: string) {
+  if (delimiter === "\t") {
+    return line.split("\t").map((cell) => cell.trim());
+  }
+
+  const cells: string[] = [];
+  let current = "";
+  let quoted = false;
+  for (const char of line) {
+    if (char === "\"") {
+      quoted = !quoted;
+      continue;
+    }
+    if (char === "," && !quoted) {
+      cells.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  cells.push(current.trim());
+  return cells;
 }
 

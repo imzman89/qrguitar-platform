@@ -3,6 +3,7 @@ type InstrumentValidationInput = {
   model: string;
   serial: string;
   year: string;
+  serialNotUsed?: boolean;
   summary?: string;
 };
 
@@ -13,9 +14,13 @@ export function validateInstrumentSubmission(input: InstrumentValidationInput, h
     return "Submission blocked.";
   }
 
-  const required = [input.brand, input.model, input.serial, input.year].map((value) => value.trim());
+  const required = [input.brand, input.model, input.year].map((value) => value.trim());
   if (required.some((value) => !value)) {
-    return "Make, model, serial number, and year are required.";
+    return "Make, model, and year are required.";
+  }
+
+  if (!input.serial.trim() && !input.serialNotUsed) {
+    return "Enter a serial/build ID, or mark that this instrument does not use one.";
   }
 
   if (required.some((value) => value.length > 80) || (input.summary || "").length > 2000) {
@@ -26,7 +31,7 @@ export function validateInstrumentSubmission(input: InstrumentValidationInput, h
     return "Make and model can only use normal letters, numbers, spaces, and basic punctuation.";
   }
 
-  if (!/^[a-zA-Z0-9._/-]+$/.test(input.serial)) {
+  if (input.serial.trim() && !/^[a-zA-Z0-9._/-]+$/.test(input.serial)) {
     return "Serial number can only use letters, numbers, dots, slashes, dashes, and underscores.";
   }
 
@@ -38,8 +43,8 @@ export function validateInstrumentSubmission(input: InstrumentValidationInput, h
 }
 
 export function createSubmissionFingerprint(input: InstrumentValidationInput) {
-  return [input.brand, input.model, input.serial, input.year, input.summary || ""]
-    .map((value) => value.trim().toLowerCase())
+  return [input.brand, input.model, input.serialNotUsed ? "serial-not-used" : input.serial, input.year, input.summary || ""]
+    .map((value) => String(value).trim().toLowerCase())
     .join("|");
 }
 

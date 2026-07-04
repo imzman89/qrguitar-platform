@@ -29,6 +29,7 @@ type CreateInstrumentRequest = {
   brand: string;
   model: string;
   serial: string;
+  serialNotUsed?: boolean;
   year: string;
   instrumentType?: string;
   builder?: string;
@@ -51,6 +52,7 @@ type CreateInstrumentRequest = {
   }>;
   customFields?: Array<{ label: string; value: string }>;
   accountPlan?: AccountPlan;
+  showSerialPublic?: boolean;
 };
 
 type UpdateInstrumentRequest = Omit<CreateInstrumentRequest, "accountPlan"> & {
@@ -62,6 +64,8 @@ type UpdateInstrumentRequest = Omit<CreateInstrumentRequest, "accountPlan"> & {
   authenticityStatus?: "confirmed" | "unconfirmed";
   showVerificationBadge?: boolean;
   showAuthenticityBadge?: boolean;
+  showSerialPublic?: boolean;
+  serialExceptionApproved?: boolean;
   internalVerificationNote?: string;
   publicVerificationNote?: string;
   internalAuthenticityNote?: string;
@@ -629,6 +633,8 @@ function mapInstrumentRow({
     authenticityStatus: trust?.authenticityStatus || "unconfirmed",
     showVerificationBadge: trust?.showVerificationBadge === false ? false : true,
     showAuthenticityBadge: trust?.showAuthenticityBadge === false ? false : true,
+    showSerialPublic: trust?.showSerialPublic === false ? false : true,
+    serialExceptionApproved: trust?.serialExceptionApproved === true,
     ...(exposeInternalTrust ? { internalVerificationNote: trust?.internalVerificationNote || "" } : {}),
     publicVerificationNote: trust?.publicVerificationNote || "",
     ...(exposeInternalTrust ? { internalAuthenticityNote: trust?.internalAuthenticityNote || "" } : {}),
@@ -736,6 +742,9 @@ async function loadTrustSettingsMap(supabase: ReturnType<typeof createServerSupa
 
 function stripAnonymousInstrumentFields(instrument: DemoInstrument) {
   const publicInstrument = { ...instrument };
+  if (publicInstrument.showSerialPublic === false) {
+    publicInstrument.serial = "";
+  }
   delete publicInstrument.ownerUserEmail;
   delete publicInstrument.safetyNote;
   return publicInstrument;
@@ -1084,6 +1093,7 @@ export async function POST(request: Request) {
     brand: String(body.brand || "").trim(),
     model: String(body.model || "").trim(),
     serial: String(body.serial || "").trim(),
+    serialNotUsed: body.serialNotUsed === true,
     year: String(body.year || "").trim(),
     instrumentType: String(body.instrumentType || "").trim(),
     builder: String(body.builder || "").trim(),
@@ -1098,8 +1108,8 @@ export async function POST(request: Request) {
     documents: Array.isArray(body.documents) ? body.documents.slice(0, 10) : []
   };
 
-  if (!input.brand || !input.model || !input.serial) {
-    return NextResponse.json({ ok: false, message: "Brand, model, and serial are required." }, { status: 400 });
+  if (!input.brand || !input.model || (!input.serial && !input.serialNotUsed)) {
+    return NextResponse.json({ ok: false, message: "Brand, model, and serial/build ID are required unless the instrument does not use one." }, { status: 400 });
   }
 
   const ownerUser = auth.user;
@@ -1153,6 +1163,13 @@ export async function POST(request: Request) {
   }
 
   const uploadedSources = Array.from(new Set([body.heroImageDataUrl || "", ...input.photos].filter(Boolean)));
+  if (uploadedSources.length < 1) {
+    return NextResponse.json(
+      { ok: false, message: "Add at least one photo before creating a QRguitar record." },
+      { status: 400 }
+    );
+  }
+
   const uploadedMediaPaths: string[] = [];
   const mediaUploadErrors: string[] = [];
   for (const [index, source] of uploadedSources.entries()) {
@@ -1160,6 +1177,8 @@ export async function POST(request: Request) {
       const uploadedPath = await uploadImageSource(supabase, ownerUser.id, qrCode, source, `media-${index + 1}`);
       if (uploadedPath) {
         uploadedMediaPaths.push(uploadedPath);
+      } else if (isRenderablePublicMediaSource(source) && !source.startsWith("blob:")) {
+        uploadedMediaPaths.push(source);
       }
     } catch {
       mediaUploadErrors.push(`Photo ${index + 1}`);
@@ -1177,7 +1196,7 @@ export async function POST(request: Request) {
     brand: input.brand,
     model: input.model,
     year: input.year || null,
-    serial_number: input.serial,
+    serial_number: input.serial || null,
     builder: input.builder || null,
     location: input.location || null,
     status: (isVerifiedPlan(resolvedAccountPlan) ? "verified" : "unverified") as "verified" | "unverified" | "transferred",
@@ -1278,6 +1297,24 @@ export async function POST(request: Request) {
     );
   }
 
+  if (body.showSerialPublic === false) {
+    const trustResult = await supabase.from("site_content").upsert(
+      {
+        content_key: recordTrustContentKey(insertedGuitar.qr_code),
+        content_value: mergeRecordTrustSettings({ showSerialPublic: false }),
+        updated_at: new Date().toISOString()
+      },
+      { onConflict: "content_key" }
+    );
+    if (trustResult.error) {
+      revalidatePublicRecordSurfaces(insertedGuitar.qr_code);
+      return noStoreJson(
+        { ok: true, qrCode: insertedGuitar.qr_code, permanentPath: insertedGuitar.permanent_path, message: "Saved. Serial privacy settings could not be saved." },
+        { status: 200 }
+      );
+    }
+  }
+
   revalidatePublicRecordSurfaces(insertedGuitar.qr_code);
   return noStoreJson(
     {
@@ -1324,7 +1361,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ ok: false, message: "Missing QRguitar ID." }, { status: 400 });
     }
 
-    const existing = await supabase.from("guitars").select("id,owner_id,status").eq("qr_code", qrCode).maybeSingle<GuitarRow>();
+    const existing = await supabase.from("guitars").select("id,owner_id,status,serial_number").eq("qr_code", qrCode).maybeSingle<GuitarRow>();
     if (existing.error || !existing.data) {
       return NextResponse.json({ ok: false, message: "Instrument record was not found." }, { status: 404 });
     }
@@ -1333,6 +1370,18 @@ export async function PATCH(request: Request) {
     const isAdmin = await canManageRecordVerification(supabase, auth.user);
     if (!isRecordOwner && !isAdmin) {
       return NextResponse.json({ ok: false, message: "Only the record owner or QRguitar admin can change badge display." }, { status: 403 });
+    }
+
+    const currentTrust = (await loadTrustSettingsMap(supabase, [qrCode])).get(qrCode) || defaultRecordTrustSettings;
+    const serialExceptionApproved = isAdmin && typeof body.serialExceptionApproved === "boolean"
+      ? body.serialExceptionApproved
+      : currentTrust.serialExceptionApproved;
+
+    if (!String(existing.data.serial_number || "").trim() && !serialExceptionApproved && isAdmin && (verificationStatus === "verified" || authenticityStatus === "confirmed")) {
+      return NextResponse.json(
+        { ok: false, message: "Records without a serial/build ID require a QRguitar serial exception before verification or authenticity confirmation." },
+        { status: 400 }
+      );
     }
 
     if (isAdmin) {
@@ -1346,12 +1395,13 @@ export async function PATCH(request: Request) {
       }
     }
 
-    const currentTrust = (await loadTrustSettingsMap(supabase, [qrCode])).get(qrCode) || defaultRecordTrustSettings;
     const trust = mergeRecordTrustSettings({
       ...currentTrust,
       authenticityStatus: isAdmin ? authenticityStatus : currentTrust.authenticityStatus,
       showVerificationBadge: typeof body.showVerificationBadge === "boolean" ? body.showVerificationBadge : currentTrust.showVerificationBadge,
       showAuthenticityBadge: typeof body.showAuthenticityBadge === "boolean" ? body.showAuthenticityBadge : currentTrust.showAuthenticityBadge,
+      showSerialPublic: typeof body.showSerialPublic === "boolean" ? body.showSerialPublic : currentTrust.showSerialPublic,
+      serialExceptionApproved,
       internalVerificationNote: isAdmin ? body.internalVerificationNote : currentTrust.internalVerificationNote,
       publicVerificationNote: isAdmin ? body.publicVerificationNote : currentTrust.publicVerificationNote,
       internalAuthenticityNote: isAdmin ? body.internalAuthenticityNote : currentTrust.internalAuthenticityNote,
@@ -1462,6 +1512,7 @@ export async function PATCH(request: Request) {
     brand: String(body.brand || "").trim(),
     model: String(body.model || "").trim(),
     serial: String(body.serial || "").trim(),
+    serialNotUsed: body.serialNotUsed === true,
     year: String(body.year || "").trim(),
     instrumentType: String(body.instrumentType || "").trim(),
     builder: String(body.builder || "").trim(),
@@ -1476,8 +1527,8 @@ export async function PATCH(request: Request) {
     documents: Array.isArray(body.documents) ? body.documents.slice(0, 10) : []
   };
 
-  if (!input.qrCode || !input.brand || !input.model || !input.serial) {
-    return NextResponse.json({ ok: false, message: "Missing required fields." }, { status: 400 });
+  if (!input.qrCode || !input.brand || !input.model || (!input.serial && !input.serialNotUsed)) {
+    return NextResponse.json({ ok: false, message: "Brand, model, and serial/build ID are required unless the instrument does not use one." }, { status: 400 });
   }
 
   const ownerUser = auth.user;
@@ -1522,10 +1573,18 @@ export async function PATCH(request: Request) {
 
   const existingMediaRows = (existingMediaResult.data || []) as GuitarMediaRow[];
   const updatedMediaSources = Array.from(new Set([body.heroImageDataUrl || "", ...input.photos].filter(Boolean)));
+  if (updatedMediaSources.length < 1) {
+    return NextResponse.json(
+      { ok: false, message: "Every QRguitar record needs at least one photo." },
+      { status: 400 }
+    );
+  }
+
   const heroCandidate = body.heroImageDataUrl || updatedMediaSources[0] || "";
   const uploadedHeroPath = heroCandidate ? await uploadImageSource(supabase, ownerUser.id, existing.data.id, heroCandidate, "hero") : null;
   const mappedHeroPath = heroCandidate ? await mapExistingMediaSource(supabase, existingMediaRows, heroCandidate) : "";
-  const heroImagePath = heroCandidate ? uploadedHeroPath || mappedHeroPath || currentHeroPath : null;
+  const externalHeroPath = heroCandidate && isRenderablePublicMediaSource(heroCandidate) && !heroCandidate.startsWith("blob:") ? heroCandidate : "";
+  const heroImagePath = heroCandidate ? uploadedHeroPath || mappedHeroPath || externalHeroPath || currentHeroPath : null;
   const { error: updateError } = await supabase
     .from("guitars")
     .update({
@@ -1533,7 +1592,7 @@ export async function PATCH(request: Request) {
       brand: input.brand,
       model: input.model,
       year: input.year || null,
-      serial_number: input.serial,
+      serial_number: input.serial || null,
       builder: input.builder || null,
       location: input.location || null,
       status: existing.data.status,
@@ -1560,8 +1619,10 @@ export async function PATCH(request: Request) {
     try {
       const uploadedPath = await uploadImageSource(supabase, ownerUser.id, existingGuitar.id, source, `media-${index + 1}`);
       const existingPath = uploadedPath || await mapExistingMediaSource(supabase, existingMediaRows, source);
-      if (existingPath && !persistedMediaPaths.includes(existingPath)) {
-        persistedMediaPaths.push(existingPath);
+      const externalPath = isRenderablePublicMediaSource(source) && !source.startsWith("blob:") ? source : "";
+      const nextPath = existingPath || externalPath;
+      if (nextPath && !persistedMediaPaths.includes(nextPath)) {
+        persistedMediaPaths.push(nextPath);
       }
     } catch {
       mediaUploadErrors.push(`Photo ${index + 1}`);

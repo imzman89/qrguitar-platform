@@ -46,6 +46,8 @@ export type DemoInstrument = {
   authenticityStatus?: RecordAuthenticityStatus;
   showVerificationBadge?: boolean;
   showAuthenticityBadge?: boolean;
+  showSerialPublic?: boolean;
+  serialExceptionApproved?: boolean;
   internalVerificationNote?: string;
   publicVerificationNote?: string;
   internalAuthenticityNote?: string;
@@ -1051,7 +1053,7 @@ export function instrumentDisplayName(instrument: Pick<DemoInstrument, "name" | 
   return brand || model || instrument.serial || "Untitled instrument";
 }
 
-export function instrumentSubtitle(instrument: Pick<DemoInstrument, "brand" | "model" | "serial" | "year" | "location" | "qrCode">) {
+export function instrumentSubtitle(instrument: Pick<DemoInstrument, "brand" | "model" | "serial" | "year" | "location" | "qrCode" | "showSerialPublic">) {
   const title = instrumentDisplayName({
     name: "",
     brand: instrument.brand,
@@ -1059,7 +1061,7 @@ export function instrumentSubtitle(instrument: Pick<DemoInstrument, "brand" | "m
     serial: instrument.serial
   }).toLowerCase();
   const brand = String(instrument.brand || "").trim();
-  const serial = String(instrument.serial || "").trim();
+  const serial = instrument.showSerialPublic === false ? "" : String(instrument.serial || "").trim();
   const qrCode = String(instrument.qrCode || "").trim();
   const location = formatRecordLocation({ location: instrument.location }) || "";
   const year = String(instrument.year || "").trim();
@@ -1188,6 +1190,8 @@ function normalizeDemoInstrument(instrument: DemoInstrument): DemoInstrument {
     creatorAccountType: instrument.creatorAccountType || "customer",
     packageIncludesFirstTransfer: instrument.packageIncludesFirstTransfer === true,
     verificationStatus: getInstrumentVerificationStatus(instrument),
+    showSerialPublic: instrument.showSerialPublic === false ? false : true,
+    serialExceptionApproved: instrument.serialExceptionApproved === true,
     qrStyle: hasLegacyDefaultQr ? defaultQrStyle : style,
     documentFiles
   };

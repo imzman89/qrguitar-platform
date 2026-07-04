@@ -16,6 +16,13 @@ type AccountPayload = {
     role: string;
     plan: string;
     accountStatus: string;
+    stats?: {
+      records: number;
+      publicRecords: number;
+      privateRecords: number;
+      unlistedRecords: number;
+      recordsWithPhotos: number;
+    };
   };
 };
 
@@ -26,7 +33,8 @@ export default function AccountPage() {
   const [role, setRole] = useState("");
   const [plan, setPlan] = useState("");
   const [accountStatus, setAccountStatus] = useState("");
-  const [status, setStatus] = useState("Loading account.");
+  const [stats, setStats] = useState({ records: 0, publicRecords: 0, privateRecords: 0, unlistedRecords: 0, recordsWithPhotos: 0 });
+  const [status, setStatus] = useState("");
   const [signedIn, setSignedIn] = useState(false);
   const [isWorking, setIsWorking] = useState(false);
 
@@ -65,6 +73,7 @@ export default function AccountPage() {
       setRole(payload.account.role);
       setPlan(payload.account.plan);
       setAccountStatus(payload.account.accountStatus);
+      setStats(payload.account.stats || { records: 0, publicRecords: 0, privateRecords: 0, unlistedRecords: 0, recordsWithPhotos: 0 });
       setStatus("");
     }
 
@@ -169,6 +178,25 @@ export default function AccountPage() {
               <Link href="/dashboard">Dashboard</Link>
               <Link href="/create">Create record</Link>
               <Link href="/catalog">Public catalog</Link>
+              <Link href="/contact">Support</Link>
+            </div>
+            <div className="account-summary-grid">
+              <div>
+                <strong>{stats.records}</strong>
+                <span>Total records</span>
+              </div>
+              <div>
+                <strong>{stats.publicRecords}</strong>
+                <span>Public</span>
+              </div>
+              <div>
+                <strong>{stats.privateRecords + stats.unlistedRecords}</strong>
+                <span>Private or unlisted</span>
+              </div>
+              <div>
+                <strong>{stats.recordsWithPhotos}/{stats.records}</strong>
+                <span>With photos</span>
+              </div>
             </div>
           </section>
 
@@ -234,6 +262,20 @@ export default function AccountPage() {
                 </div>
               </div>
               <p className="account-card-copy">Verification, commercial access, and manual review are handled by QRguitar during beta.</p>
+            </section>
+
+            <section className="card auth-card account-settings-card">
+              <div className="auth-card-head">
+                <span>Privacy</span>
+                <strong><ShieldCheck size={18} aria-hidden="true" /> Record controls</strong>
+              </div>
+              <p className="account-card-copy">
+                Each record controls public/private visibility, hidden proof documents, public service history, serial display, and QR downloads from its editor.
+              </p>
+              <div className="form-actions">
+                <Link className="button secondary" href="/dashboard">Manage records</Link>
+                <Link className="button secondary" href="/contact">Get support</Link>
+              </div>
             </section>
 
             {status ? <p className="form-message account-form-message">{status}</p> : null}

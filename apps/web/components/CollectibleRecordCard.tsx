@@ -95,7 +95,7 @@ export function CollectibleRecordCard({
 
           <div className="collectible-card-actions">
             <span className="collectible-card-cta">{ctaLabel} <ArrowRight size={14} /></span>
-            {secondaryHref && secondaryLabel ? <span className="collectible-card-secondary">{secondaryLabel}</span> : null}
+            {!secondaryHref && secondaryLabel ? <span className="collectible-card-secondary">{secondaryLabel}</span> : null}
           </div>
         </div>
       </Link>

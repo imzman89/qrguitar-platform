@@ -4,6 +4,8 @@ export type RecordTrustSettings = {
   authenticityStatus: AuthenticityStatus;
   showVerificationBadge: boolean;
   showAuthenticityBadge: boolean;
+  showSerialPublic: boolean;
+  serialExceptionApproved: boolean;
   internalVerificationNote: string;
   publicVerificationNote: string;
   internalAuthenticityNote: string;
@@ -14,6 +16,8 @@ export const defaultRecordTrustSettings: RecordTrustSettings = {
   authenticityStatus: "unconfirmed",
   showVerificationBadge: true,
   showAuthenticityBadge: true,
+  showSerialPublic: true,
+  serialExceptionApproved: false,
   internalVerificationNote: "",
   publicVerificationNote: "",
   internalAuthenticityNote: "",
@@ -31,6 +35,8 @@ export function mergeRecordTrustSettings(settings?: Partial<RecordTrustSettings>
     authenticityStatus: settings?.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed",
     showVerificationBadge: settings?.showVerificationBadge === false ? false : true,
     showAuthenticityBadge: settings?.showAuthenticityBadge === false ? false : true,
+    showSerialPublic: settings?.showSerialPublic === false ? false : true,
+    serialExceptionApproved: settings?.serialExceptionApproved === true,
     internalVerificationNote: String(settings?.internalVerificationNote || "").trim(),
     publicVerificationNote: String(settings?.publicVerificationNote || "").trim(),
     internalAuthenticityNote: String(settings?.internalAuthenticityNote || "").trim(),

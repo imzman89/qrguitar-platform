@@ -23,6 +23,7 @@ const emptyForm = {
   brand: "",
   model: "",
   serial: "",
+  serialNotUsed: false,
   year: "",
   instrumentType: "",
   builder: "",
@@ -95,6 +96,8 @@ export default function EditInstrumentPage() {
   const [authenticityStatus, setAuthenticityStatus] = useState<"confirmed" | "unconfirmed">("unconfirmed");
   const [showVerificationBadge, setShowVerificationBadge] = useState(true);
   const [showAuthenticityBadge, setShowAuthenticityBadge] = useState(true);
+  const [showSerialPublic, setShowSerialPublic] = useState(true);
+  const [serialExceptionApproved, setSerialExceptionApproved] = useState(false);
   const [internalVerificationNote, setInternalVerificationNote] = useState("");
   const [publicVerificationNote, setPublicVerificationNote] = useState("");
   const [internalAuthenticityNote, setInternalAuthenticityNote] = useState("");
@@ -146,6 +149,7 @@ export default function EditInstrumentPage() {
               brand: instrument.brand || "",
               model: instrument.model || "",
               serial: instrument.serial || "",
+              serialNotUsed: !String(instrument.serial || "").trim(),
               year: instrument.year || "",
               instrumentType: readManagedField(instrument, "Instrument type", instrument.instrumentType),
               builder: readManagedField(instrument, "Builder", instrument.builder),
@@ -170,6 +174,8 @@ export default function EditInstrumentPage() {
             setAuthenticityStatus(instrument.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed");
             setShowVerificationBadge(instrument.showVerificationBadge !== false);
             setShowAuthenticityBadge(instrument.showAuthenticityBadge !== false);
+            setShowSerialPublic(instrument.showSerialPublic !== false);
+            setSerialExceptionApproved(instrument.serialExceptionApproved === true);
             setInternalVerificationNote(instrument.internalVerificationNote || "");
             setPublicVerificationNote(instrument.publicVerificationNote || "");
             setInternalAuthenticityNote(instrument.internalAuthenticityNote || "");
@@ -431,6 +437,8 @@ export default function EditInstrumentPage() {
       brand: form.brand,
       model: form.model,
       serial: form.serial,
+      showSerialPublic,
+      serialExceptionApproved,
       year: form.year,
       instrumentType: form.instrumentType,
       builder: form.builder,
@@ -493,6 +501,12 @@ export default function EditInstrumentPage() {
     setMessage("");
 
     try {
+      if (!form.heroImageDataUrl && !galleryImages.length) {
+        setMessage("Every QRguitar record needs at least one photo.");
+        setSavingRecord(false);
+        return;
+      }
+
       const token = await getSupabaseAccessToken();
       const response = await fetch("/api/instruments", {
         method: "PATCH",
@@ -503,6 +517,7 @@ export default function EditInstrumentPage() {
           brand: form.brand,
           model: form.model,
           serial: form.serial,
+          serialNotUsed: form.serialNotUsed,
           year: form.year,
           instrumentType: form.instrumentType,
           builder: form.builder,
@@ -540,12 +555,10 @@ export default function EditInstrumentPage() {
         return;
       }
 
-      if (canManageVerification) {
-        const trustResult = await saveVerificationSettings(token || "");
-        if (!trustResult.ok) {
-          setMessage(`Trust settings failed: ${trustResult.message}`);
-          return;
-        }
+      const trustResult = await saveVerificationSettings(token || "");
+      if (!trustResult.ok) {
+        setMessage(`Trust settings failed: ${trustResult.message}`);
+        return;
       }
 
       const safetyResult = await saveSafetySettings(token || "");
@@ -572,6 +585,8 @@ export default function EditInstrumentPage() {
           authenticityStatus,
           showVerificationBadge,
           showAuthenticityBadge,
+          showSerialPublic,
+          serialExceptionApproved,
           internalVerificationNote,
           publicVerificationNote,
           internalAuthenticityNote,
@@ -620,6 +635,8 @@ export default function EditInstrumentPage() {
           authenticityStatus,
           showVerificationBadge,
           showAuthenticityBadge,
+          showSerialPublic,
+          serialExceptionApproved,
           internalVerificationNote,
           publicVerificationNote,
           internalAuthenticityNote,
@@ -633,6 +650,8 @@ export default function EditInstrumentPage() {
         authenticityStatus?: "confirmed" | "unconfirmed";
         showVerificationBadge?: boolean;
         showAuthenticityBadge?: boolean;
+        showSerialPublic?: boolean;
+        serialExceptionApproved?: boolean;
         internalVerificationNote?: string;
         publicVerificationNote?: string;
         internalAuthenticityNote?: string;
@@ -649,6 +668,8 @@ export default function EditInstrumentPage() {
       setAuthenticityStatus(nextAuthenticity);
       setShowVerificationBadge(payload.showVerificationBadge !== false);
       setShowAuthenticityBadge(payload.showAuthenticityBadge !== false);
+      setShowSerialPublic(payload.showSerialPublic !== false);
+      setSerialExceptionApproved(payload.serialExceptionApproved === true);
       setInternalVerificationNote(payload.internalVerificationNote || "");
       setPublicVerificationNote(payload.publicVerificationNote || "");
       setInternalAuthenticityNote(payload.internalAuthenticityNote || "");
@@ -659,6 +680,8 @@ export default function EditInstrumentPage() {
         authenticityStatus: nextAuthenticity,
         showVerificationBadge: payload.showVerificationBadge !== false,
         showAuthenticityBadge: payload.showAuthenticityBadge !== false,
+        showSerialPublic: payload.showSerialPublic !== false,
+        serialExceptionApproved: payload.serialExceptionApproved === true,
         internalVerificationNote: payload.internalVerificationNote || "",
         publicVerificationNote: payload.publicVerificationNote || "",
         internalAuthenticityNote: payload.internalAuthenticityNote || "",
@@ -786,6 +809,10 @@ export default function EditInstrumentPage() {
                         <option value="confirmed">Authenticity Confirmed</option>
                       </select>
                     </div>
+                    <label className="toggle-field custom-wide">
+                      <input type="checkbox" checked={serialExceptionApproved} onChange={(event) => setSerialExceptionApproved(event.target.checked)} />
+                      Approve verification/authenticity exception for a no-serial brand, retailer, or build
+                    </label>
                     <div className="field custom-wide">
                       <label htmlFor="internalVerificationNote">Internal verification note</label>
                       <textarea id="internalVerificationNote" rows={3} value={internalVerificationNote} onChange={(event) => setInternalVerificationNote(event.target.value)} />
@@ -879,7 +906,7 @@ export default function EditInstrumentPage() {
               <div className="form-grid">
                 <Field label="Make / brand" id="brand" value={form.brand} onChange={(value) => updateField("brand", value)} />
                 <Field label="Model" id="model" value={form.model} onChange={(value) => updateField("model", value)} />
-                <Field label="Serial number" id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} />
+                <Field label="Serial / build ID" id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} />
                 <Field label="Year" id="year" value={form.year} onChange={(value) => updateField("year", value)} />
                 <CategoryField
                   label="Type / category"
@@ -901,6 +928,29 @@ export default function EditInstrumentPage() {
                   </select>
                 </div>
               </div>
+              <div className="form-grid compact">
+                <label className="toggle-field">
+                  <input
+                    type="checkbox"
+                    checked={form.serialNotUsed}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        serialNotUsed: event.target.checked,
+                        serial: event.target.checked ? "" : current.serial
+                      }))
+                    }
+                  />
+                  This instrument does not use a serial/build ID
+                </label>
+                <label className="toggle-field">
+                  <input type="checkbox" checked={showSerialPublic} onChange={(event) => setShowSerialPublic(event.target.checked)} />
+                  Show serial/build ID on public profile
+                </label>
+              </div>
+              <p className="fine-print">
+                Hidden serials stay private on public pages. No-serial records require QRguitar approval before verification or authenticity confirmation.
+              </p>
               <details className="advanced-panel">
                 <summary>Add Profile Basics</summary>
                 <div className="form-grid">

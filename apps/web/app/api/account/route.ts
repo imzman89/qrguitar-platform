@@ -45,6 +45,14 @@ export async function GET(request: Request) {
     return json({ ok: false, message: profile.error.message || "Could not load account." }, { status: 500 });
   }
 
+  const records = await supabase
+    .from("guitars")
+    .select("visibility,hero_image_path")
+    .eq("owner_id", auth.user.id)
+    .is("owner_removed_at", null);
+
+  const recordRows = records.error ? [] : records.data || [];
+
   return json({
     ok: true,
     account: {
@@ -52,7 +60,14 @@ export async function GET(request: Request) {
       displayName: profile.data?.display_name || auth.user.user_metadata?.display_name || auth.user.email?.split("@")[0] || "",
       role: profile.data?.role || "user",
       plan: profile.data?.plan || "free",
-      accountStatus: profile.data?.account_status || "active"
+      accountStatus: profile.data?.account_status || "active",
+      stats: {
+        records: recordRows.length,
+        publicRecords: recordRows.filter((record) => record.visibility === "public").length,
+        privateRecords: recordRows.filter((record) => record.visibility === "private").length,
+        unlistedRecords: recordRows.filter((record) => record.visibility === "unlisted").length,
+        recordsWithPhotos: recordRows.filter((record) => Boolean(record.hero_image_path)).length
+      }
     }
   });
 }
