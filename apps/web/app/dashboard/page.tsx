@@ -8,6 +8,7 @@ import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import { QrDownload } from "../../components/QrDownload";
 import styles from "./dashboard-records.module.css";
+import { defaultSiteSettings, fetchPublishedSiteSettings } from "../../lib/site-settings";
 import {
   getAccountPlan,
   getDisplayName,
@@ -49,7 +50,16 @@ export default function DashboardPage() {
   const [loadingRecords, setLoadingRecords] = useState(true);
   const [authChecked, setAuthChecked] = useState(true);
   const [dashboardMessage, setDashboardMessage] = useState("");
+  const [dashboardCopy, setDashboardCopy] = useState(defaultSiteSettings.dashboard);
   const router = useRouter();
+
+  useEffect(() => {
+    void fetchPublishedSiteSettings().then((published) => {
+      if (published?.dashboard) {
+        setDashboardCopy(published.dashboard);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     const supabase = createBrowserSupabaseClient();
@@ -211,7 +221,7 @@ export default function DashboardPage() {
               <div className="dashboard-signin-icon"><ShieldCheck size={24} /></div>
               <div className="eyebrow">Dashboard</div>
               <h2>Sign in to manage your QRguitar records.</h2>
-              <p>Manage your records, photos, documents, visibility, and QR downloads from your dashboard.</p>
+              <p>{dashboardCopy.subtitle}</p>
               <div className="dashboard-signin-points">
                 <span>Private inventory</span>
                 <span>QR downloads</span>
@@ -246,7 +256,7 @@ export default function DashboardPage() {
               <div className="dashboard-signin-icon"><ShieldCheck size={24} /></div>
               <div className="eyebrow">Dashboard</div>
               <h2>Sign in to manage your QRguitar records.</h2>
-              <p>Manage your records, photos, documents, visibility, and QR downloads from your dashboard.</p>
+              <p>{dashboardCopy.subtitle}</p>
               <div className="dashboard-signin-points">
                 <span>Private inventory</span>
                 <span>QR downloads</span>
@@ -278,11 +288,11 @@ export default function DashboardPage() {
         <div className="shell">
           <div className="dashboard-hero">
             <div>
-              <div className="eyebrow">Owner dashboard</div>
+              <div className="eyebrow">{dashboardCopy.pageTitle}</div>
               <h2>{user ? `Welcome back, ${displayName}.` : "Manage records, QR codes, transfers, and public profiles."}</h2>
               <p>
                 {user
-                  ? `Signed in as ${user.email}. ${accountSummary}`
+                  ? `${dashboardCopy.subtitle} ${accountSummary}`
                   : "Create a record, manage QR downloads, and keep ownership history attached to the same instrument record."}
               </p>
             </div>
@@ -408,10 +418,10 @@ export default function DashboardPage() {
                 })
               ) : (
                 <div className="card auth-card">
-                  <h3>No instruments yet.</h3>
-                  <p>No instruments yet. Register your first instrument.</p>
+                  <h3>{dashboardCopy.emptyCollectionTitle}</h3>
+                  <p>{dashboardCopy.emptyCollectionBody}</p>
                   <Link className="button" href="/create">
-                    Register your first instrument
+                    {dashboardCopy.firstRecordCtaLabel}
                   </Link>
                 </div>
               )}
@@ -434,7 +444,8 @@ export default function DashboardPage() {
           <div className="split dashboard-split dashboard-owner-tools">
             <section className="card dashboard-health-card">
               <div className="icon"><BadgeCheck /></div>
-              <h3>Collection health</h3>
+              <h3>{dashboardCopy.collectionHealthTitle}</h3>
+              <p>{dashboardCopy.collectionHealthHelper}</p>
               <div className="dashboard-health-grid">
                 <div>
                   <strong>{recordsWithPhotos}/{instruments.length || 0}</strong>
@@ -454,13 +465,16 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div className="activity-list compact">
-                <Activity icon={<QrCode size={18} />} title="Permanent QR URLs" detail="Editing serials, specs, photos, or titles does not change the QRguitar link." />
-                <Activity icon={<ShieldCheck size={18} />} title="Visibility control" detail={`${publicRecords} public, ${privateRecords} private${unlistedRecords ? `, ${unlistedRecords} unlisted` : ""}.`} />
+                <Activity icon={<QrCode size={18} />} title={dashboardCopy.qrGuidanceTitle} detail={dashboardCopy.qrGuidanceBody} />
+                <Activity icon={<ShieldCheck size={18} />} title={dashboardCopy.privacyGuidanceTitle} detail={`${dashboardCopy.privacyGuidanceBody} Current: ${publicRecords} public, ${privateRecords} private${unlistedRecords ? `, ${unlistedRecords} unlisted` : ""}.`} />
+                <Activity icon={<Copy size={18} />} title={dashboardCopy.proofGuidanceTitle} detail={dashboardCopy.proofGuidanceBody} />
+                <Activity icon={<Settings2 size={18} />} title={dashboardCopy.serviceGuidanceTitle} detail={dashboardCopy.serviceGuidanceBody} />
               </div>
             </section>
             <section className="card dashboard-next-card">
               <div className="icon"><Settings2 /></div>
-              <h3>Next best actions</h3>
+              <h3>{dashboardCopy.nextActionsTitle}</h3>
+              <p>{dashboardCopy.nextActionsHelper}</p>
               <div className="dashboard-action-list">
                 <Link href="/create">
                   <strong>Add another record</strong>
@@ -471,12 +485,12 @@ export default function DashboardPage() {
                   <span>See what buyers and shops can view.</span>
                 </Link>
                 <a href="mailto:support@qrguitar.com?subject=QRguitar%20verification%20help">
-                  <strong>Request verification help</strong>
-                  <span>Manual review is available during beta.</span>
+                  <strong>{dashboardCopy.verificationGuidanceTitle}</strong>
+                  <span>{dashboardCopy.verificationGuidanceBody}</span>
                 </a>
                 <a href="mailto:support@qrguitar.com?subject=QRguitar%20ownership%20transfer%20help">
-                  <strong>Manual transfer help</strong>
-                  <span>Use support for edge cases while transfers mature.</span>
+                  <strong>{dashboardCopy.transferGuidanceTitle}</strong>
+                  <span>{dashboardCopy.transferGuidanceBody}</span>
                 </a>
               </div>
             </section>

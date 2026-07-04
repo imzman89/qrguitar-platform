@@ -10,7 +10,6 @@ import {
   botSettingsKey,
   defaultBotSettings,
   readBotSettings,
-  resetBotSettings,
   saveBotSettings,
   type EditableBotSettings
 } from "../../lib/bot-settings";
@@ -18,8 +17,7 @@ import {
   applyThemeSettings,
   defaultSiteSettings,
   fetchPublishedSiteSettings,
-  readSiteSettings,
-  resetSiteSettings,
+  mergeSiteSettings,
   saveSiteSettings,
   siteSettingsKey,
   type EditableSiteSettings
@@ -29,7 +27,7 @@ import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/s
 const editorGateKey = "qrguitar.siteEditorUnlocked";
 const ownerPasscodeKey = "qrguitar.ownerPasscode";
 const ownerPasscode = "admin";
-type EditorTab = "brand" | "hero" | "sections" | "colors" | "seo" | "bot" | "preview";
+type EditorTab = "brand" | "hero" | "sections" | "dashboard" | "colors" | "seo" | "bot" | "preview";
 
 const seoImageOptions = [
   { label: "White / orange social card", value: "/seo/qrguitar-og-v2.png" },
@@ -48,6 +46,7 @@ const tabs: Array<{ id: EditorTab; label: string }> = [
   { id: "brand", label: "Brand" },
   { id: "hero", label: "Hero" },
   { id: "sections", label: "Homepage Sections" },
+  { id: "dashboard", label: "Dashboard Copy" },
   { id: "colors", label: "Theme Colors" },
   { id: "seo", label: "SEO" },
   { id: "bot", label: "Bot Notes" },
@@ -70,6 +69,9 @@ export default function SiteEditorPage() {
   const [authChecked, setAuthChecked] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [publishedSettings, setPublishedSettings] = useState<EditableSiteSettings>(defaultSiteSettings);
+  const [localDraft, setLocalDraft] = useState<EditableSiteSettings | null>(null);
+  const [showDraftNotice, setShowDraftNotice] = useState(false);
 
   const activePasscodeHint = isOwnerPasscodeSet ? "custom owner passcode configured" : `default (${ownerPasscode})`;
   const editorStatusTitle = !authChecked
@@ -104,6 +106,10 @@ export default function SiteEditorPage() {
       value: settings.seo.favicon ? "Set" : "Missing"
     }
   ];
+  const hasUnsavedChanges = useMemo(
+    () => JSON.stringify(settings) !== JSON.stringify(publishedSettings),
+    [settings, publishedSettings]
+  );
 
   useEffect(() => {
     const supabase = createBrowserSupabaseClient();
@@ -170,25 +176,37 @@ export default function SiteEditorPage() {
 
     setIsOwnerPasscodeSet(Boolean(window.localStorage.getItem(ownerPasscodeKey)));
     setNewPasscode(storedPasscode);
-    const hasLocalDraft = Boolean(window.localStorage.getItem(siteSettingsKey));
-    const stored = readSiteSettings();
-    setSettings(stored);
     setBotSettings(readBotSettings());
-    applyThemeSettings(stored);
+    const rawDraft = window.localStorage.getItem(siteSettingsKey);
+    const draft = readLocalSiteDraft(rawDraft);
 
     void fetchPublishedSiteSettings().then((published) => {
-      if (published && !hasLocalDraft) {
-        setSettings(published);
-        applyThemeSettings(published);
-        setMessage("Published site settings loaded. Save to update every device.");
+      const nextPublished = published || defaultSiteSettings;
+      setPublishedSettings(nextPublished);
+      setSettings(nextPublished);
+      applyThemeSettings(nextPublished);
+
+      if (draft && JSON.stringify(draft) !== JSON.stringify(nextPublished)) {
+        setLocalDraft(draft);
+        setShowDraftNotice(true);
+        setMessage("Published settings loaded. A local draft exists on this device.");
         return;
       }
 
-      if (hasLocalDraft) {
-        setMessage("Local draft loaded. Click Save Changes to publish it across desktop and mobile.");
-      }
+      setLocalDraft(null);
+      setShowDraftNotice(false);
+      setMessage("Published site settings loaded.");
     });
   }, [authChecked, isAdminSession, isSignedIn]);
+
+  useEffect(() => {
+    if (!authChecked || !isSignedIn || !isUnlocked || !hasUnsavedChanges) {
+      return;
+    }
+
+    window.localStorage.setItem(siteSettingsKey, JSON.stringify(settings));
+    setLocalDraft(settings);
+  }, [authChecked, hasUnsavedChanges, isSignedIn, isUnlocked, settings]);
 
   const settingsJson = useMemo(() => JSON.stringify(settings, null, 2), [settings]);
 
@@ -232,6 +250,26 @@ export default function SiteEditorPage() {
     setPasscodeMessage("Passcode reset to default admin.");
   }
 
+  function continueLocalDraft() {
+    if (!localDraft) {
+      return;
+    }
+
+    setSettings(localDraft);
+    applyThemeSettings(localDraft);
+    setShowDraftNotice(false);
+    setMessage("Local draft loaded. Save Changes will publish it globally after the server confirms.");
+  }
+
+  function discardLocalDraft() {
+    window.localStorage.removeItem(siteSettingsKey);
+    setLocalDraft(null);
+    setShowDraftNotice(false);
+    setSettings(publishedSettings);
+    applyThemeSettings(publishedSettings);
+    setMessage("Local draft discarded. Published settings loaded.");
+  }
+
   function update<K extends keyof EditableSiteSettings>(section: K, value: EditableSiteSettings[K]) {
     const next = { ...settings, [section]: value };
     setSettings(next);
@@ -273,6 +311,11 @@ export default function SiteEditorPage() {
 
   function updateSeo(field: keyof EditableSiteSettings["seo"], value: string) {
     const next = { ...settings, seo: { ...settings.seo, [field]: value } };
+    setSettings(next);
+  }
+
+  function updateDashboard(field: keyof EditableSiteSettings["dashboard"], value: string) {
+    const next = { ...settings, dashboard: { ...settings.dashboard, [field]: value } };
     setSettings(next);
   }
 
@@ -374,7 +417,6 @@ export default function SiteEditorPage() {
     }
 
     setIsSaving(true);
-    saveSiteSettings(settings);
     saveBotSettings(botSettings);
     setMessage("Saving and publishing site settings...");
 
@@ -398,33 +440,27 @@ export default function SiteEditorPage() {
       const published = payload.settings || (await fetchPublishedSiteSettings());
       if (published) {
         setSettings(published);
+        setPublishedSettings(published);
+        setLocalDraft(null);
+        setShowDraftNotice(false);
+        saveSiteSettings(published);
         applyThemeSettings(published);
       }
 
       setMessage(payload.message || "Published globally.");
-    } catch {
-      setMessage("Saved locally, but publishing failed. Check your connection and try Save again.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Check your connection and try Save again.";
+      setMessage(`Save failed: ${message}`);
     } finally {
       setIsSaving(false);
     }
   }
 
   function onReset() {
-    const stored = readSiteSettings();
-    setSettings(stored);
+    setSettings(publishedSettings);
     setBotSettings(readBotSettings());
-    applyThemeSettings(stored);
-    setMessage("Unsaved changes reset to the last saved settings.");
-  }
-
-  function resetToDefaults() {
-    resetSiteSettings();
-    resetBotSettings();
-    const defaults = readSiteSettings();
-    setSettings(defaults);
-    setBotSettings(readBotSettings());
-    applyThemeSettings(defaults);
-    setMessage("Homepage and bot settings reset to QRguitar defaults.");
+    applyThemeSettings(publishedSettings);
+    setMessage("Unsaved changes reset to the published settings.");
   }
 
   async function copySettingsJson() {
@@ -531,6 +567,30 @@ export default function SiteEditorPage() {
                     </button>
                   ))}
                 </div>
+
+                {showDraftNotice ? (
+                  <section className="card editor-draft-notice">
+                    <div>
+                      <span className="mini-eyebrow">Local draft available</span>
+                      <h2>A local draft exists on this device.</h2>
+                      <p>Published settings are loaded now. Continue the local draft only if you want to publish those device-only edits.</p>
+                    </div>
+                    <div className="form-actions">
+                      <button className="button" type="button" onClick={continueLocalDraft}>
+                        Continue Editing Draft
+                      </button>
+                      <button className="button secondary" type="button" onClick={discardLocalDraft}>
+                        Discard Draft and Load Published
+                      </button>
+                    </div>
+                  </section>
+                ) : null}
+
+                {hasUnsavedChanges ? (
+                  <div className="admin-message">Unsaved changes. Save Changes publishes after the server confirms.</div>
+                ) : (
+                  <div className="admin-message">Published settings are in sync.</div>
+                )}
 
                 {activeTab === "brand" ? (
                   <section className="card editor-card">
@@ -839,6 +899,144 @@ export default function SiteEditorPage() {
                   </section>
                 ) : null}
 
+                {activeTab === "dashboard" ? (
+                  <section className="card editor-card">
+                    <EditorHeader
+                      label="Dashboard copy"
+                      title="Owner dashboard language"
+                      copy="Edit helpful owner-facing text only. Counts, buttons, records, and actions stay real."
+                    />
+                    <TextField
+                      label="Dashboard label"
+                      value={settings.dashboard.pageTitle}
+                      onChange={(value) => updateDashboard("pageTitle", value)}
+                    />
+                    <TextArea
+                      label="Dashboard subtitle"
+                      value={settings.dashboard.subtitle}
+                      onChange={(value) => updateDashboard("subtitle", value)}
+                      rows={3}
+                    />
+                    <div className="editor-section-grid">
+                      <TextField
+                        label="Empty collection title"
+                        value={settings.dashboard.emptyCollectionTitle}
+                        onChange={(value) => updateDashboard("emptyCollectionTitle", value)}
+                      />
+                      <TextField
+                        label="First record button"
+                        value={settings.dashboard.firstRecordCtaLabel}
+                        onChange={(value) => updateDashboard("firstRecordCtaLabel", value)}
+                      />
+                    </div>
+                    <TextArea
+                      label="Empty collection body"
+                      value={settings.dashboard.emptyCollectionBody}
+                      onChange={(value) => updateDashboard("emptyCollectionBody", value)}
+                      rows={2}
+                    />
+                    <div className="editor-section-grid">
+                      <TextField
+                        label="Collection health title"
+                        value={settings.dashboard.collectionHealthTitle}
+                        onChange={(value) => updateDashboard("collectionHealthTitle", value)}
+                      />
+                      <TextField
+                        label="Next actions title"
+                        value={settings.dashboard.nextActionsTitle}
+                        onChange={(value) => updateDashboard("nextActionsTitle", value)}
+                      />
+                    </div>
+                    <TextArea
+                      label="Collection health helper"
+                      value={settings.dashboard.collectionHealthHelper}
+                      onChange={(value) => updateDashboard("collectionHealthHelper", value)}
+                      rows={2}
+                    />
+                    <TextArea
+                      label="Next actions helper"
+                      value={settings.dashboard.nextActionsHelper}
+                      onChange={(value) => updateDashboard("nextActionsHelper", value)}
+                      rows={2}
+                    />
+                    <div className="editor-subsection">
+                      <h3>Dashboard guidance cards</h3>
+                      <div className="editor-section-grid">
+                        <TextField
+                          label="Proof/documents title"
+                          value={settings.dashboard.proofGuidanceTitle}
+                          onChange={(value) => updateDashboard("proofGuidanceTitle", value)}
+                        />
+                        <TextField
+                          label="Service history title"
+                          value={settings.dashboard.serviceGuidanceTitle}
+                          onChange={(value) => updateDashboard("serviceGuidanceTitle", value)}
+                        />
+                      </div>
+                      <TextArea
+                        label="Proof/documents body"
+                        value={settings.dashboard.proofGuidanceBody}
+                        onChange={(value) => updateDashboard("proofGuidanceBody", value)}
+                        rows={2}
+                      />
+                      <TextArea
+                        label="Service history body"
+                        value={settings.dashboard.serviceGuidanceBody}
+                        onChange={(value) => updateDashboard("serviceGuidanceBody", value)}
+                        rows={2}
+                      />
+                      <div className="editor-section-grid">
+                        <TextField
+                          label="QR/download title"
+                          value={settings.dashboard.qrGuidanceTitle}
+                          onChange={(value) => updateDashboard("qrGuidanceTitle", value)}
+                        />
+                        <TextField
+                          label="Privacy title"
+                          value={settings.dashboard.privacyGuidanceTitle}
+                          onChange={(value) => updateDashboard("privacyGuidanceTitle", value)}
+                        />
+                      </div>
+                      <TextArea
+                        label="QR/download body"
+                        value={settings.dashboard.qrGuidanceBody}
+                        onChange={(value) => updateDashboard("qrGuidanceBody", value)}
+                        rows={2}
+                      />
+                      <TextArea
+                        label="Privacy body"
+                        value={settings.dashboard.privacyGuidanceBody}
+                        onChange={(value) => updateDashboard("privacyGuidanceBody", value)}
+                        rows={2}
+                      />
+                      <div className="editor-section-grid">
+                        <TextField
+                          label="Transfer title"
+                          value={settings.dashboard.transferGuidanceTitle}
+                          onChange={(value) => updateDashboard("transferGuidanceTitle", value)}
+                        />
+                        <TextField
+                          label="Verification title"
+                          value={settings.dashboard.verificationGuidanceTitle}
+                          onChange={(value) => updateDashboard("verificationGuidanceTitle", value)}
+                        />
+                      </div>
+                      <TextArea
+                        label="Transfer body"
+                        value={settings.dashboard.transferGuidanceBody}
+                        onChange={(value) => updateDashboard("transferGuidanceBody", value)}
+                        rows={2}
+                      />
+                      <TextArea
+                        label="Verification body"
+                        value={settings.dashboard.verificationGuidanceBody}
+                        onChange={(value) => updateDashboard("verificationGuidanceBody", value)}
+                        rows={2}
+                      />
+                    </div>
+                  </section>
+                ) : null}
+
                 {activeTab === "colors" ? (
                   <section className="card editor-card">
                     <EditorHeader
@@ -993,8 +1191,8 @@ export default function SiteEditorPage() {
                   <section className="card editor-card">
                     <EditorHeader
                       label="Settings JSON"
-                      title="Current Published Settings JSON"
-                      copy="Backup and compare published settings. This is not a visual preview."
+                      title="Current Editor Settings JSON"
+                      copy="Backup and compare the values currently loaded in the editor. This is not a visual preview."
                     />
                     <textarea className="settings-json-preview" readOnly rows={16} value={settingsJson} />
                     <div className="preview-actions">
@@ -1051,9 +1249,6 @@ export default function SiteEditorPage() {
                   <button className="button secondary" type="button" onClick={onReset}>
                     <RotateCcw size={16} /> Reset Changes
                   </button>
-                  <button className="button secondary" type="button" onClick={resetToDefaults}>
-                    <RotateCcw size={16} /> Reset to defaults
-                  </button>
                   <a className="button secondary" href="/?fresh=editor">
                     <Eye size={16} /> View Live Homepage
                   </a>
@@ -1087,6 +1282,18 @@ export default function SiteEditorPage() {
       <Footer />
     </>
   );
+}
+
+function readLocalSiteDraft(rawDraft: string | null) {
+  if (!rawDraft) {
+    return null;
+  }
+
+  try {
+    return mergeSiteSettings(JSON.parse(rawDraft) as Partial<EditableSiteSettings>);
+  } catch {
+    return null;
+  }
 }
 
 function EditorHeader({ label, title, copy }: { label: string; title: string; copy: string }) {

@@ -14,7 +14,7 @@ import {
   type CustomProfileField,
   type QrStyle
 } from "../../lib/local-demo";
-import { defaultSiteSettings, readSiteSettings } from "../../lib/site-settings";
+import { defaultSiteSettings, fetchPublishedSiteSettings } from "../../lib/site-settings";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
 
 const documentTypeOptions = ["Receipt", "Invoice", "Appraisal", "Certificate", "Build Sheet", "Service Slip", "Insurance Photo", "Warranty", "Authenticity Evidence", "Other"];
@@ -110,10 +110,12 @@ export default function CreatePage() {
   useEffect(() => {
     const supabase = createBrowserSupabaseClient();
     let cancelled = false;
-    const syncCategoryOptions = () => setCategoryOptions(readSiteSettings().instrumentCategories);
 
-    syncCategoryOptions();
-    window.addEventListener("qrguitar:site-settings", syncCategoryOptions);
+    void fetchPublishedSiteSettings().then((published) => {
+      if (!cancelled && published?.instrumentCategories) {
+        setCategoryOptions(published.instrumentCategories);
+      }
+    });
 
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) {
@@ -153,7 +155,6 @@ export default function CreatePage() {
     return () => {
       cancelled = true;
       window.clearTimeout(timeout);
-      window.removeEventListener("qrguitar:site-settings", syncCategoryOptions);
     };
   }, []);
 

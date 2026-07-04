@@ -25,19 +25,6 @@ export function HomePageClient({
         setSettings(published);
       }
     });
-
-    function onSettings(event: Event) {
-      const detail = (event as CustomEvent<EditableSiteSettings>).detail;
-      if (detail) {
-        setSettings(detail);
-      }
-    }
-
-    window.addEventListener("qrguitar:site-settings", onSettings);
-
-    return () => {
-      window.removeEventListener("qrguitar:site-settings", onSettings);
-    };
   }, []);
 
   const copy = useMemo(() => {

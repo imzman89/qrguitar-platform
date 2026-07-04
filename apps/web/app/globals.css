@@ -2341,6 +2341,25 @@ select {
   gap: 18px;
 }
 
+.editor-draft-notice {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  border-color: rgba(240, 161, 43, .42);
+  background: linear-gradient(135deg, rgba(240, 161, 43, .1), rgba(248, 246, 242, .035));
+}
+
+.editor-draft-notice h2 {
+  margin: 4px 0 6px;
+  font-size: 22px;
+}
+
+.editor-draft-notice p {
+  margin: 0;
+  color: var(--muted);
+}
+
 .editor-card + .editor-card {
   margin-top: 22px;
 }
@@ -6290,6 +6309,10 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 
   .editor-tabs button {
     flex: 0 0 auto;
+  }
+
+  .editor-draft-notice {
+    grid-template-columns: 1fr;
   }
 
   .dashboard-buttons {

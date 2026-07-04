@@ -15,7 +15,7 @@ import {
   type QrStyle,
   type ServiceHistoryEntry
 } from "../../../lib/local-demo";
-import { defaultSiteSettings, readSiteSettings } from "../../../lib/site-settings";
+import { defaultSiteSettings, fetchPublishedSiteSettings } from "../../../lib/site-settings";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../../lib/supabase-browser";
 
 const emptyForm = {
@@ -116,10 +116,12 @@ export default function EditInstrumentPage() {
 
   useEffect(() => {
     let cancelled = false;
-    const syncCategoryOptions = () => setCategoryOptions(readSiteSettings().instrumentCategories);
 
-    syncCategoryOptions();
-    window.addEventListener("qrguitar:site-settings", syncCategoryOptions);
+    void fetchPublishedSiteSettings().then((published) => {
+      if (!cancelled && published?.instrumentCategories) {
+        setCategoryOptions(published.instrumentCategories);
+      }
+    });
 
     async function loadInstrument() {
       try {
@@ -209,7 +211,6 @@ export default function EditInstrumentPage() {
 
     return () => {
       cancelled = true;
-      window.removeEventListener("qrguitar:site-settings", syncCategoryOptions);
     };
   }, [code, router]);
 

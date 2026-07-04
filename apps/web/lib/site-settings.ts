@@ -65,6 +65,29 @@ export type EditableSiteSettings = {
     twitterHandle: string;
     robots: string;
   };
+  dashboard: {
+    pageTitle: string;
+    subtitle: string;
+    emptyCollectionTitle: string;
+    emptyCollectionBody: string;
+    firstRecordCtaLabel: string;
+    collectionHealthTitle: string;
+    collectionHealthHelper: string;
+    nextActionsTitle: string;
+    nextActionsHelper: string;
+    proofGuidanceTitle: string;
+    proofGuidanceBody: string;
+    serviceGuidanceTitle: string;
+    serviceGuidanceBody: string;
+    qrGuidanceTitle: string;
+    qrGuidanceBody: string;
+    privacyGuidanceTitle: string;
+    privacyGuidanceBody: string;
+    transferGuidanceTitle: string;
+    transferGuidanceBody: string;
+    verificationGuidanceTitle: string;
+    verificationGuidanceBody: string;
+  };
 };
 
 export const defaultSiteSettings: EditableSiteSettings = {
@@ -126,6 +149,29 @@ export const defaultSiteSettings: EditableSiteSettings = {
     canonicalUrl: "https://www.qrguitar.com",
     twitterHandle: "@qrguitar",
     robots: "index, follow"
+  },
+  dashboard: {
+    pageTitle: "Owner dashboard",
+    subtitle: "Manage records, photos, documents, visibility, and QR downloads from your dashboard.",
+    emptyCollectionTitle: "No instruments yet.",
+    emptyCollectionBody: "Register your first instrument to create a permanent QRguitar record.",
+    firstRecordCtaLabel: "Register your first instrument",
+    collectionHealthTitle: "Collection health",
+    collectionHealthHelper: "A quick read on how complete and public your records are.",
+    nextActionsTitle: "Next best actions",
+    nextActionsHelper: "Useful next steps based on your current collection.",
+    proofGuidanceTitle: "Proof and documents",
+    proofGuidanceBody: "Add receipts, build sheets, appraisals, and repair documents. Hidden documents stay private.",
+    serviceGuidanceTitle: "Service history",
+    serviceGuidanceBody: "Keep setup, repair, and inspection notes attached to the instrument record.",
+    qrGuidanceTitle: "Permanent QR URLs",
+    qrGuidanceBody: "Editing serials, specs, photos, or titles does not change the QRguitar link.",
+    privacyGuidanceTitle: "Visibility control",
+    privacyGuidanceBody: "Public records appear in the catalog. Private records stay off public pages.",
+    transferGuidanceTitle: "Ownership transfer",
+    transferGuidanceBody: "Use transfer tools for normal handoffs and support for edge cases during beta.",
+    verificationGuidanceTitle: "Verification and authenticity",
+    verificationGuidanceBody: "Manual verification and authenticity review are handled carefully during beta."
   }
 };
 
@@ -157,14 +203,14 @@ function normalizePricingCards(cards: PricingPlanInput[]) {
 }
 
 export function mergeSiteSettings(settings?: Partial<EditableSiteSettings> | null): EditableSiteSettings {
-  const hasSettings = Boolean(settings);
   const sections: Partial<EditableSiteSettings["sections"]> = settings?.sections || {};
+  const hasInstrumentCategories = Object.prototype.hasOwnProperty.call(settings || {}, "instrumentCategories");
   return {
     ...defaultSiteSettings,
     ...(settings || {}),
     instrumentCategories: Array.isArray(settings?.instrumentCategories)
       ? normalizeInstrumentCategories(settings.instrumentCategories, false)
-      : hasSettings ? [] : defaultSiteSettings.instrumentCategories,
+      : hasInstrumentCategories ? [] : defaultSiteSettings.instrumentCategories,
     colors: {
       ...defaultSiteSettings.colors,
       ...(settings?.colors || {})
@@ -193,6 +239,10 @@ export function mergeSiteSettings(settings?: Partial<EditableSiteSettings> | nul
     seo: {
       ...defaultSiteSettings.seo,
       ...(settings?.seo || {})
+    },
+    dashboard: {
+      ...defaultSiteSettings.dashboard,
+      ...(settings?.dashboard || {})
     }
   };
 }

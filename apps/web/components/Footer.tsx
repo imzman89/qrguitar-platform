@@ -18,21 +18,11 @@ export function Footer() {
       }
     });
     supabase.auth.getSession().then(({ data }) => setIsSignedIn(Boolean(data.session?.user)));
-
-    function onSettings(event: Event) {
-      const detail = (event as CustomEvent<EditableSiteSettings>).detail;
-      if (detail) {
-        setSettings(detail);
-      }
-    }
-
-    window.addEventListener("qrguitar:site-settings", onSettings);
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsSignedIn(Boolean(session?.user));
     });
 
     return () => {
-      window.removeEventListener("qrguitar:site-settings", onSettings);
       listener.subscription.unsubscribe();
     };
   }, []);
