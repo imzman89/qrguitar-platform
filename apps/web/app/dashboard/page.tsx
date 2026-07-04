@@ -375,17 +375,17 @@ export default function DashboardPage() {
                             <div className={styles.instrumentBadges}>
                               {instrument.showVerificationBadge !== false ? (
                                 <small className={verificationStatus === "verified" ? styles.badgeVerified : styles.badgeNeutral}>
-                                  {verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"}
+                                  <span>{verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"}</span>
                                 </small>
                               ) : null}
                               {instrument.showAuthenticityBadge !== false ? (
                                 <small className={authenticityStatus === "confirmed" ? styles.badgeAuthConfirmed : styles.badgeAuthUnconfirmed}>
-                                  {authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}
+                                  <span>{authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}</span>
                                 </small>
                               ) : null}
-                              {safetyStatus === "lost" ? <small className={styles.badgeSafety}>Reported Lost</small> : null}
-                              {safetyStatus === "stolen" ? <small className={styles.badgeSafety}>Reported Stolen</small> : null}
-                              <small>{category}</small>
+                              {safetyStatus === "lost" ? <small className={styles.badgeSafety}><span>Reported Lost</span></small> : null}
+                              {safetyStatus === "stolen" ? <small className={styles.badgeSafety}><span>Reported Stolen</span></small> : null}
+                              <small><span>{category}</span></small>
                             </div>
                           </div>
                           <div className={styles.instrumentMeta}>

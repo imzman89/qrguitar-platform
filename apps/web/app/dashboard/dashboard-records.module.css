@@ -151,48 +151,68 @@
 
 .instrumentBadges small,
 .instrumentInfo small {
+  --badge-text: rgba(238, 234, 224, .88);
+  --badge-fill: rgba(248, 246, 242, .055);
+  --badge-glow: rgba(248, 246, 242, .08);
   width: fit-content;
-  border: 1px solid rgba(240, 161, 43, .24);
+  max-width: 100%;
+  min-height: 25px;
+  border: 1px solid rgba(248, 246, 242, .12);
   border-radius: 999px;
-  padding: 5px 9px 4px;
-  color: var(--gold-2);
+  padding: 3px;
+  color: var(--badge-text);
   font-size: 10.5px;
   font-weight: 900;
   line-height: 1;
   letter-spacing: .02em;
   text-transform: uppercase;
-  background: linear-gradient(180deg, rgba(248, 246, 242, .06), rgba(248, 246, 242, .025));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .045);
+  background:
+    linear-gradient(180deg, rgba(248, 246, 242, .07), rgba(248, 246, 242, .025)),
+    rgba(4, 7, 9, .42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 8px 18px rgba(0, 0, 0, .14);
+}
+
+.instrumentBadges small span,
+.instrumentInfo small span {
+  min-height: 18px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 6px 2px;
+  color: var(--badge-text);
+  background: var(--badge-fill);
+  box-shadow: inset 0 0 0 1px var(--badge-glow);
+  white-space: normal;
 }
 
 .instrumentBadges small.badgeVerified {
-  color: #bcf7ce;
-  border-color: rgba(75, 218, 132, .55);
-  background: linear-gradient(135deg, rgba(45, 164, 91, .22), rgba(10, 33, 21, .66));
+  --badge-text: #d9ffe7;
+  --badge-fill: rgba(28, 139, 74, .52);
+  --badge-glow: rgba(126, 244, 167, .26);
 }
 
 .instrumentBadges small.badgeAuthConfirmed {
-  color: #d6f8b8;
-  border-color: rgba(133, 219, 95, .5);
-  background: linear-gradient(135deg, rgba(92, 168, 56, .2), rgba(22, 41, 14, .66));
+  --badge-text: #e8ffd1;
+  --badge-fill: rgba(88, 143, 48, .48);
+  --badge-glow: rgba(184, 245, 117, .24);
 }
 
 .instrumentBadges small.badgeAuthUnconfirmed {
-  color: #dcc7a3;
-  border-color: rgba(222, 185, 126, .22);
-  background: rgba(222, 185, 126, .055);
+  --badge-text: rgba(231, 211, 172, .92);
+  --badge-fill: rgba(124, 91, 42, .2);
+  --badge-glow: rgba(224, 177, 94, .16);
 }
 
 .instrumentBadges small.badgeSafety {
-  color: #ffd4cc;
-  border-color: rgba(255, 74, 58, .68);
-  background: linear-gradient(135deg, rgba(197, 36, 28, .34), rgba(38, 8, 8, .78));
+  --badge-text: #ffe1dc;
+  --badge-fill: rgba(165, 38, 30, .58);
+  --badge-glow: rgba(255, 119, 103, .26);
 }
 
 .instrumentBadges small.badgeNeutral {
-  color: var(--muted-strong);
-  border-color: rgba(248, 246, 242, .14);
-  background: rgba(248, 246, 242, .045);
+  --badge-text: rgba(235, 220, 194, .92);
+  --badge-fill: rgba(151, 119, 61, .2);
+  --badge-glow: rgba(238, 202, 132, .16);
 }
 
 .instrumentMeta {
@@ -324,10 +344,15 @@
 
 .instrumentActions > :global(.button) {
   width: 100%;
-  min-height: 32px;
+  min-height: 34px;
   padding: 8px 12px;
   font-size: 12px;
   white-space: nowrap;
+  border-color: rgba(248, 246, 242, .13);
+  background:
+    linear-gradient(180deg, rgba(248, 246, 242, .07), rgba(248, 246, 242, .028)),
+    rgba(2, 5, 6, .34);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
 }
 
 .transferPanel {

@@ -711,18 +711,18 @@ select {
 .collectible-card-eyebrow,
 .collectible-card-age,
 .collectible-card-code {
-  min-height: 26px;
-  border: 1px solid rgba(255, 255, 255, .14);
+  min-height: 24px;
+  border: 1px solid rgba(255, 255, 255, .1);
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 9px;
-  color: #ffe0a1;
-  background: rgba(2, 5, 6, .62);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, .26);
+  gap: 5px;
+  padding: 5px 8px 4px;
+  color: #f8e5b4;
+  background: rgba(5, 7, 8, .66);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, .22);
   backdrop-filter: blur(10px);
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 950;
   line-height: 1;
   text-transform: uppercase;
@@ -792,17 +792,23 @@ select {
 
 .record-badge,
 .collectible-card-facts span {
+  --badge-text: rgba(238, 234, 224, .88);
+  --badge-fill: rgba(248, 246, 242, .055);
+  --badge-glow: rgba(248, 246, 242, .08);
   width: fit-content;
-  min-height: 24px;
-  border: 1px solid rgba(248, 246, 242, .14);
+  max-width: 100%;
+  min-height: 25px;
+  border: 1px solid rgba(248, 246, 242, .12);
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 9px 4px;
-  color: var(--muted-strong);
-  background: linear-gradient(180deg, rgba(248, 246, 242, .06), rgba(248, 246, 242, .025));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .045);
+  gap: 4px;
+  padding: 3px;
+  color: var(--badge-text);
+  background:
+    linear-gradient(180deg, rgba(248, 246, 242, .07), rgba(248, 246, 242, .025)),
+    rgba(4, 7, 9, .42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 8px 18px rgba(0, 0, 0, .14);
   font-size: 10.5px;
   font-weight: 900;
   line-height: 1;
@@ -810,41 +816,59 @@ select {
   text-transform: uppercase;
 }
 
+.record-badge svg {
+  width: 13px;
+  height: 13px;
+  margin-left: 4px;
+  color: var(--badge-text);
+}
+
+.record-badge-text {
+  min-height: 18px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 6px 2px;
+  color: var(--badge-text);
+  background: var(--badge-fill);
+  box-shadow: inset 0 0 0 1px var(--badge-glow);
+  white-space: normal;
+}
+
 .record-badge--verified {
-  color: #d8ffe5;
-  border-color: rgba(87, 214, 133, .45);
-  background: linear-gradient(180deg, rgba(29, 123, 67, .34), rgba(11, 38, 24, .62));
-  box-shadow: inset 0 1px 0 rgba(207, 255, 224, .12), 0 0 0 1px rgba(12, 33, 22, .25);
+  --badge-text: #d9ffe7;
+  --badge-fill: rgba(28, 139, 74, .52);
+  --badge-glow: rgba(126, 244, 167, .26);
 }
 
 .record-badge--auth-confirmed {
-  color: #e4ffd0;
-  border-color: rgba(139, 210, 93, .42);
-  background: linear-gradient(180deg, rgba(76, 128, 48, .3), rgba(23, 44, 18, .62));
-  box-shadow: inset 0 1px 0 rgba(229, 255, 205, .11), 0 0 0 1px rgba(21, 42, 16, .25);
+  --badge-text: #e8ffd1;
+  --badge-fill: rgba(88, 143, 48, .48);
+  --badge-glow: rgba(184, 245, 117, .24);
 }
 
 .record-badge--unverified {
-  color: rgba(236, 224, 204, .86);
-  border-color: rgba(216, 188, 139, .2);
-  background: linear-gradient(180deg, rgba(216, 188, 139, .09), rgba(248, 246, 242, .025));
+  --badge-text: rgba(235, 220, 194, .92);
+  --badge-fill: rgba(151, 119, 61, .2);
+  --badge-glow: rgba(238, 202, 132, .16);
 }
 
 .record-badge--auth-unconfirmed {
-  color: rgba(225, 205, 168, .88);
-  border-color: rgba(222, 185, 126, .28);
-  background: linear-gradient(180deg, rgba(222, 185, 126, .1), rgba(74, 51, 20, .16));
+  --badge-text: rgba(231, 211, 172, .92);
+  --badge-fill: rgba(124, 91, 42, .2);
+  --badge-glow: rgba(224, 177, 94, .16);
 }
 
 .record-badge--safety {
-  color: #ffe3de;
-  border-color: rgba(255, 89, 74, .58);
-  background: linear-gradient(180deg, rgba(150, 32, 24, .42), rgba(47, 12, 11, .72));
-  box-shadow: inset 0 1px 0 rgba(255, 219, 212, .1), 0 0 0 1px rgba(56, 10, 8, .3);
+  --badge-text: #ffe1dc;
+  --badge-fill: rgba(165, 38, 30, .58);
+  --badge-glow: rgba(255, 119, 103, .26);
 }
 
 .record-badge--condition {
-  color: #d9e6ec;
+  --badge-text: #dbe8ed;
+  --badge-fill: rgba(111, 132, 142, .22);
+  --badge-glow: rgba(208, 226, 235, .12);
 }
 
 .collectible-card-facts {
@@ -860,19 +884,22 @@ select {
 .collectible-card-cta,
 .collectible-card-secondary,
 .collectible-card-secondary-link {
-  min-height: 34px;
-  border: 1px solid rgba(248, 246, 242, .14);
+  min-height: 36px;
+  border: 1px solid rgba(248, 246, 242, .12);
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
-  padding: 8px 11px;
-  color: var(--gold-2);
-  background: rgba(248, 246, 242, .035);
+  padding: 9px 13px;
+  color: #f4b44a;
+  background:
+    linear-gradient(180deg, rgba(248, 246, 242, .075), rgba(248, 246, 242, .028)),
+    rgba(2, 5, 6, .34);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .055);
   font-size: 11px;
   font-weight: 950;
-  letter-spacing: .04em;
+  letter-spacing: .025em;
   text-transform: uppercase;
 }
 
@@ -887,6 +914,19 @@ select {
   bottom: 20px;
   color: var(--muted-strong);
   text-decoration: none;
+}
+
+.collectible-card--latest .collectible-card-secondary-link {
+  bottom: 62px;
+}
+
+.collectible-card-cta:hover,
+.collectible-card-secondary-link:hover {
+  border-color: rgba(240, 161, 43, .34);
+  color: #ffd083;
+  background:
+    linear-gradient(180deg, rgba(240, 161, 43, .13), rgba(248, 246, 242, .035)),
+    rgba(2, 5, 6, .44);
 }
 
 .collectible-card-share {
@@ -4486,24 +4526,30 @@ select {
 }
 
 .verified-badge span {
+  --badge-text: #d9ffe7;
+  --badge-fill: rgba(28, 139, 74, .34);
+  --badge-glow: rgba(126, 244, 167, .22);
   min-height: 30px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid rgba(75, 218, 132, .52);
+  border: 1px solid rgba(248, 246, 242, .13);
   border-radius: 999px;
   padding: 6px 10px;
-  background: linear-gradient(135deg, rgba(45, 164, 91, .2), rgba(9, 28, 18, .68));
-  color: #bcf7ce;
+  background:
+    linear-gradient(180deg, var(--badge-fill), rgba(248, 246, 242, .025)),
+    rgba(4, 7, 9, .56);
+  box-shadow: inset 0 0 0 1px var(--badge-glow), inset 0 1px 0 rgba(255, 255, 255, .045);
+  color: var(--badge-text);
   font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
 }
 
 .verified-badge span + span {
-  border-color: rgba(133, 219, 95, .48);
-  background: linear-gradient(135deg, rgba(92, 168, 56, .18), rgba(22, 41, 14, .66));
-  color: #d6f8b8;
+  --badge-text: #e8ffd1;
+  --badge-fill: rgba(88, 143, 48, .3);
+  --badge-glow: rgba(184, 245, 117, .2);
 }
 
 .identity-card {
@@ -5308,13 +5354,18 @@ select {
 }
 
 .scan-tags span {
+  --badge-text: rgba(238, 234, 224, .9);
+  --badge-fill: rgba(248, 246, 242, .045);
+  --badge-glow: rgba(248, 246, 242, .08);
   flex: 0 0 auto;
-  border: 1px solid rgba(255, 255, 255, .13);
+  border: 1px solid rgba(255, 255, 255, .12);
   border-radius: 999px;
   padding: 9px 13px 8px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, .055), rgba(255, 255, 255, .025));
-  color: rgba(248, 246, 242, .9);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .045);
+  background:
+    linear-gradient(180deg, var(--badge-fill), rgba(255, 255, 255, .025)),
+    rgba(4, 7, 9, .42);
+  color: var(--badge-text);
+  box-shadow: inset 0 0 0 1px var(--badge-glow), inset 0 1px 0 rgba(255, 255, 255, .04);
   font-size: 12px;
   font-weight: 850;
   line-height: 1;
@@ -5322,27 +5373,27 @@ select {
 }
 
 .scan-tags .scan-tag--verified {
-  color: #d8ffe5;
-  border-color: rgba(87, 214, 133, .45);
-  background: linear-gradient(180deg, rgba(29, 123, 67, .34), rgba(11, 38, 24, .62));
+  --badge-text: #d9ffe7;
+  --badge-fill: rgba(28, 139, 74, .36);
+  --badge-glow: rgba(126, 244, 167, .22);
 }
 
 .scan-tags .scan-tag--auth-confirmed {
-  color: #e4ffd0;
-  border-color: rgba(139, 210, 93, .42);
-  background: linear-gradient(180deg, rgba(76, 128, 48, .3), rgba(23, 44, 18, .62));
+  --badge-text: #e8ffd1;
+  --badge-fill: rgba(88, 143, 48, .32);
+  --badge-glow: rgba(184, 245, 117, .2);
 }
 
 .scan-tags .scan-tag--auth-unconfirmed {
-  color: rgba(225, 205, 168, .88);
-  border-color: rgba(222, 185, 126, .28);
-  background: linear-gradient(180deg, rgba(222, 185, 126, .1), rgba(74, 51, 20, .16));
+  --badge-text: rgba(231, 211, 172, .92);
+  --badge-fill: rgba(124, 91, 42, .18);
+  --badge-glow: rgba(224, 177, 94, .14);
 }
 
 .scan-tags .scan-tag--safety {
-  color: #ffe3de;
-  border-color: rgba(255, 89, 74, .58);
-  background: linear-gradient(180deg, rgba(150, 32, 24, .42), rgba(47, 12, 11, .72));
+  --badge-text: #ffe1dc;
+  --badge-fill: rgba(165, 38, 30, .42);
+  --badge-glow: rgba(255, 119, 103, .22);
 }
 
 .scan-bottom-nav {
@@ -6166,6 +6217,11 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
     position: static;
     z-index: 2;
     margin: 0 18px 18px;
+  }
+
+  .collectible-card--latest .collectible-card-secondary-link {
+    position: static;
+    bottom: auto;
   }
 
   .catalog-card-media,

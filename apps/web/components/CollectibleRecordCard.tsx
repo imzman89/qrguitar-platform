@@ -70,19 +70,19 @@ export function CollectibleRecordCard({
           </div>
 
           <div className="record-badge-row" aria-label="Record status">
-            <span className="record-badge record-badge--condition">{condition === "new" ? "New" : "Used"}</span>
+            <span className="record-badge record-badge--condition"><span className="record-badge-text">{condition === "new" ? "New" : "Used"}</span></span>
             {record.showVerificationBadge !== false ? (
               <span className={`record-badge ${verificationStatus === "verified" ? "record-badge--verified" : "record-badge--unverified"}`}>
-                <ShieldCheck size={13} /> {verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"}
+                <ShieldCheck size={13} /> <span className="record-badge-text">{verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"}</span>
               </span>
             ) : null}
             {record.showAuthenticityBadge !== false ? (
               <span className={`record-badge ${authenticityStatus === "confirmed" ? "record-badge--auth-confirmed" : "record-badge--auth-unconfirmed"}`}>
-                <ShieldCheck size={13} /> {authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}
+                <ShieldCheck size={13} /> <span className="record-badge-text">{authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}</span>
               </span>
             ) : null}
             {safetyStatus !== "clear" ? (
-              <span className="record-badge record-badge--safety"><Siren size={13} /> Reported {safetyStatus === "lost" ? "Lost" : "Stolen"}</span>
+              <span className="record-badge record-badge--safety"><Siren size={13} /> <span className="record-badge-text">Reported {safetyStatus === "lost" ? "Lost" : "Stolen"}</span></span>
             ) : null}
           </div>
 
