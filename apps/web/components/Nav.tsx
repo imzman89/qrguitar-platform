@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { UserCircle } from "lucide-react";
+import { LogOut, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { BrandLogo } from "./BrandLogo";
 import { createBrowserSupabaseClient } from "../lib/supabase-browser";
@@ -9,6 +9,7 @@ import { createBrowserSupabaseClient } from "../lib/supabase-browser";
 export function Nav() {
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   async function logout() {
     const supabase = createBrowserSupabaseClient();
@@ -16,6 +17,7 @@ export function Nav() {
     window.localStorage.removeItem("qrguitar.siteEditorUnlocked");
     setIsSignedIn(false);
     setIsOpen(false);
+    setAccountMenuOpen(false);
   }
 
   useEffect(() => {
@@ -43,13 +45,21 @@ export function Nav() {
         <Link href="/catalog">Catalog</Link>
         <Link href="/create">Create</Link>
         {isSignedIn ? (
-          <>
-            <Link className="nav-account-link" href="/account" aria-label="Account">
-              <UserCircle size={18} aria-hidden="true" />
-              <span>Account</span>
-            </Link>
-            <button type="button" onClick={() => void logout()}>Logout</button>
-          </>
+          <div className="nav-account-menu">
+            <button
+              className="nav-account-button"
+              type="button"
+              aria-label="Account menu"
+              aria-expanded={accountMenuOpen}
+              onClick={() => setAccountMenuOpen((open) => !open)}
+            >
+              <UserRound size={17} aria-hidden="true" />
+            </button>
+            <div className={accountMenuOpen ? "nav-account-dropdown open" : "nav-account-dropdown"}>
+              <Link href="/account" onClick={() => setAccountMenuOpen(false)}>Account</Link>
+              <button type="button" onClick={() => void logout()}><LogOut size={14} /> Logout</button>
+            </div>
+          </div>
         ) : (
           <Link href="/login">Login</Link>
         )}

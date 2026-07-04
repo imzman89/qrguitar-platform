@@ -13,7 +13,7 @@ type RecordShareButtonProps = {
 const publicSiteUrl = "https://www.qrguitar.com";
 
 export function RecordShareButton({ code, title, className = "" }: RecordShareButtonProps) {
-  const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const [status, setStatus] = useState<"idle" | "copied" | "ready">("idle");
   const url = `${publicSiteUrl}/i/${encodeURIComponent(code)}`;
   const label = title || code;
 
@@ -30,14 +30,17 @@ export function RecordShareButton({ code, title, className = "" }: RecordShareBu
           text: `QRguitar record for ${label}`,
           url
         });
+        setStatus("copied");
+        window.setTimeout(() => setStatus("idle"), 1400);
+        return;
       }
 
       await copyUrl(url);
       setStatus("copied");
       window.setTimeout(() => setStatus("idle"), 1400);
     } catch {
-      setStatus("failed");
-      window.setTimeout(() => setStatus("idle"), 1600);
+      setStatus("ready");
+      window.setTimeout(() => setStatus("idle"), 3200);
     }
   }
 
@@ -46,7 +49,11 @@ export function RecordShareButton({ code, title, className = "" }: RecordShareBu
       <button className="record-share-button" type="button" aria-label="Share record" onClick={shareRecord}>
         <Share2 size={15} />
       </button>
-      {status !== "idle" ? <span className="record-share-feedback">{status === "copied" ? "Link copied" : "Copy failed"}</span> : null}
+      {status !== "idle" ? (
+        <span className="record-share-feedback">
+          {status === "copied" ? "Link copied" : <a href={url}>Open link</a>}
+        </span>
+      ) : null}
     </span>
   );
 }

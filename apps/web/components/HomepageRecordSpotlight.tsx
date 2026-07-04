@@ -1,8 +1,6 @@
-import { ArrowRight, Globe2 } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { instrumentDisplayName, type DemoInstrument } from "../lib/local-demo";
-import { formatRecordLocation } from "../lib/record-location";
+import { CollectibleRecordCard } from "./CollectibleRecordCard";
+import { type DemoInstrument } from "../lib/local-demo";
 
 type HomepageRecordSpotlightProps = {
   promotedQrCode?: string;
@@ -72,30 +70,12 @@ export function HomepageRecordSpotlight({ promotedQrCode = "" }: HomepageRecordS
   }
 
   return (
-    <article className="homepage-record-spotlight" aria-label="Secondary spotlight record">
-      <div
-        className="homepage-record-hero app-panel"
-        style={spotlightRecord?.heroImageDataUrl ? { backgroundImage: `url(${spotlightRecord.heroImageDataUrl})` } : undefined}
-      >
-        <div className="homepage-record-meta">
-          <span><Globe2 size={14} /> {promotedQrCode ? "Promoted spotlight" : "Latest public records"}</span>
-          <span>{spotlightRecord ? spotlightRecord.visibility === "private" ? "Private" : "Public" : "Ready"}</span>
-        </div>
-
-        <div className="homepage-record-body">
-          <h3>{instrumentDisplayName(spotlightRecord)}</h3>
-          <p>{spotlightRecord.brand} - {spotlightRecord.serial || spotlightRecord.model}</p>
-          <div className="homepage-record-facts">
-            <span>{spotlightRecord.qrCode}</span>
-            <span>{spotlightRecord.year || "Year unknown"}</span>
-            <span>{formatRecordLocation(spotlightRecord) || "Location private"}</span>
-          </div>
-          <Link className="button" href={spotlightRecord.permanentPath || `/i/${spotlightRecord.qrCode}`}>
-            Open record <ArrowRight size={16} />
-          </Link>
-        </div>
-      </div>
-    </article>
+    <CollectibleRecordCard
+      record={spotlightRecord}
+      variant="spotlight"
+      eyebrow={promotedQrCode ? "Promoted spotlight" : "More public records"}
+      ctaLabel="Open Record"
+    />
   );
 }
 

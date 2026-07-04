@@ -1,14 +1,12 @@
 "use client";
 
-import { ArrowRight, Globe2, QrCode } from "lucide-react";
+import { Globe2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { RecordShareButton } from "./RecordShareButton";
+import { CollectibleRecordCard } from "./CollectibleRecordCard";
 import {
-  instrumentDisplayName,
   type DemoInstrument
 } from "../lib/local-demo";
-import { formatRecordLocation } from "../lib/record-location";
 
 type InstrumentsResponse = {
   ok?: boolean;
@@ -93,58 +91,18 @@ export function LatestPublicRecord({ initialRecord = null }: { initialRecord?: D
     );
   }
 
-  const location = formatRecordLocation(latest) || "Location private";
-  const title = instrumentDisplayName(latest);
   const createdLabel = formatCreatedAt(latest.createdAt);
 
   return (
-    <article className="latest-record-card" aria-label="Latest public QRguitar record">
-      <div
-        className="latest-record-hero"
-        style={
-          latest.heroImageDataUrl
-            ? { backgroundImage: `linear-gradient(180deg, rgba(3,5,6,.05), rgba(3,5,6,.88)), url(${latest.heroImageDataUrl})` }
-            : undefined
-        }
-      >
-        <div className="latest-live-row">
-          <span><Globe2 size={14} /> Latest public record</span>
-          <span className="latest-live-actions">
-            <strong>{createdLabel}</strong>
-            <RecordShareButton code={latest.qrCode} title={title} />
-          </span>
-        </div>
-        <h2>{title}</h2>
-        <p>{latest.brand} - {latest.serial}</p>
-      </div>
-      <div className="latest-record-meta">
-        <div>
-          <span>QRguitar ID</span>
-          <strong>{latest.qrCode}</strong>
-        </div>
-        <div>
-          <span>Region</span>
-          <strong>{location}</strong>
-        </div>
-        <div>
-          <span>Year</span>
-          <strong>{latest.year || "Not listed"}</strong>
-        </div>
-        <div>
-          <span>Status</span>
-          <strong>Public</strong>
-        </div>
-      </div>
-      <div className="latest-record-actions">
-        <Link className="button" href={latest.permanentPath || `/i/${latest.qrCode}`}>
-          Open Record <ArrowRight size={16} />
-        </Link>
-        <Link className="button secondary" href="/catalog">
-          Browse Catalog
-        </Link>
-        <span><QrCode size={14} /> Updates from public records</span>
-      </div>
-    </article>
+    <CollectibleRecordCard
+      record={latest}
+      variant="latest"
+      eyebrow="Latest public record"
+      createdLabel={createdLabel}
+      ctaLabel="Open Record"
+      secondaryHref="/catalog"
+      secondaryLabel="Browse Catalog"
+    />
   );
 }
 

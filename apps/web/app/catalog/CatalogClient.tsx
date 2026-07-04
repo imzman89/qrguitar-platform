@@ -3,18 +3,12 @@
 import { Search, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { CollectibleRecordCard } from "../../components/CollectibleRecordCard";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
-import { RecordShareButton } from "../../components/RecordShareButton";
 import {
-  getInstrumentCondition,
-  getInstrumentVerificationStatus,
-  instrumentDisplayName,
-  instrumentSubtitle,
-  instrumentToProfileUrl,
   type DemoInstrument
 } from "../../lib/local-demo";
-import { formatRecordLocation } from "../../lib/record-location";
 
 export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrument[] }) {
   const [records, setRecords] = useState<DemoInstrument[]>(dedupeByCodeAndDate(initialRecords));
@@ -158,66 +152,9 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
 
           <section className="catalog-grid" aria-label="Public QRguitar records">
             {visibleRecords.length ? (
-              visibleRecords.map((record) => {
-                const verificationStatus = getInstrumentVerificationStatus(record);
-                const authenticityStatus = record.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed";
-                const condition = getInstrumentCondition(record);
-                const safetyStatus = record.safetyStatus === "lost" || record.safetyStatus === "stolen" ? record.safetyStatus : "clear";
-                const imageUrl = record.heroImageDataUrl || record.galleryImageDataUrls?.[0] || "";
-
-                return (
-                  <article
-                    className="catalog-card"
-                    key={record.qrCode}
-                    aria-label={`View ${instrumentDisplayName(record)} public profile`}
-                  >
-                    <Link className="catalog-card-main" href={instrumentToProfileUrl(record)}>
-                      <div className="catalog-card-media">
-                        {imageUrl ? (
-                          <img
-                            className="catalog-card-image"
-                            src={imageUrl}
-                            alt={`${instrumentDisplayName(record)} main image`}
-                          />
-                        ) : (
-                          <div className="catalog-card-image catalog-card-image--empty">
-                            <strong>{record.brand?.slice(0, 2).toUpperCase() || "QR"}</strong>
-                            <span>No public photo yet</span>
-                          </div>
-                        )}
-                        <span className="catalog-card-code">{record.qrCode}</span>
-                      </div>
-                      <div className="catalog-card-content">
-                        <span className="catalog-card-kicker">Permanent QRguitar record</span>
-                        <h3>{instrumentDisplayName(record)}</h3>
-                        <p className="catalog-meta-line">{instrumentSubtitle(record)}</p>
-                        <p className="catalog-card-summary">{record.summary || "Record details will appear as the owner adds photos, specs, and history."}</p>
-                        <div className="catalog-meta">
-                          <span className={`catalog-chip catalog-chip--${condition}`}>{condition === "new" ? "New" : "Used"}</span>
-                          {record.showVerificationBadge !== false ? (
-                            <span className={`catalog-chip ${verificationStatus === "verified" ? "catalog-chip--verified" : "catalog-chip--unverified"}`}>
-                              {verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"}
-                            </span>
-                          ) : null}
-                          {record.showAuthenticityBadge !== false ? (
-                            <span className={`catalog-chip ${authenticityStatus === "confirmed" ? "catalog-chip--verified" : "catalog-chip--unverified"}`}>
-                              {authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}
-                            </span>
-                          ) : null}
-                          {safetyStatus === "lost" ? <span className="catalog-chip catalog-chip--safety">Reported Lost</span> : null}
-                          {safetyStatus === "stolen" ? <span className="catalog-chip catalog-chip--safety">Reported Stolen</span> : null}
-                          <span>{record.year || "Year unknown"}</span>
-                          <span>{formatRecordLocation(record) || "Location unknown"}</span>
-                          <span>{record.galleryImageDataUrls?.length || (record.heroImageDataUrl ? 1 : 0)} photos</span>
-                          <span>{record.documentFiles?.filter((file) => file.visibility !== "hidden").length || 0} docs</span>
-                        </div>
-                        <span className="catalog-card-cta">View Record</span>
-                      </div>
-                    </Link>
-                    <RecordShareButton className="catalog-card-share" code={record.qrCode} title={instrumentDisplayName(record)} />
-                  </article>
-                );
-              })
+              visibleRecords.map((record) => (
+                <CollectibleRecordCard record={record} variant="catalog" eyebrow="Public record" key={record.qrCode} />
+              ))
             ) : (
               <div className="card catalog-empty">
                 <div className="eyebrow">No records found</div>

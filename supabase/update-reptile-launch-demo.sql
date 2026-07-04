@@ -1,5 +1,5 @@
 -- QRguitar launch-safe Reptile demo cleanup.
--- Safe to rerun. It only updates the guarded public launch demo record.
+-- WARNING: retired historical script. Do not run against production; QRG-PI260001 must remain removed unless manually recreated.
 
 with target as (
   select id

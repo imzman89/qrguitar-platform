@@ -327,7 +327,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     { label: "Media / Docs", value: `${galleryImages.length} photos / ${documentFiles.length} docs` },
     ...(showVerificationBadge ? [{ label: "Verification", value: isVerifiedRecord ? "Verified by QRguitar" : "Unverified" }] : []),
     ...(showAuthenticityBadge ? [{ label: "Authenticity", value: isAuthenticityConfirmed ? "Authenticity Confirmed" : "Authenticity Unconfirmed" }] : [])
-  ].filter((spec) => spec.value);
+  ].filter((spec) => hasMeaningfulPublicValue(spec.value));
 
   const stalePublicValues = new Set(["custom reptile finish", "custom offset", "alder", "maple neck, rosewood board"]);
 
@@ -374,8 +374,8 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           </div>
           <div className="scan-hero-info">
             <div className="builder-mark">
-              <strong>{instrument.brand || "QRguitar"}</strong>
-              <span>{instrument.model || instrument.instrumentType || "Instrument"}</span>
+              <span>{instrument.brand || "QRguitar"}</span>
+              <strong>{instrument.model || instrument.instrumentType || "Instrument record"}</strong>
             </div>
             <h1>{instrumentDisplayName(instrument)}</h1>
             <div className="verified-badge">
@@ -533,17 +533,70 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           {safetyStatus === "lost" ? <span className="scan-tag--safety">Reported Lost</span> : null}
           {safetyStatus === "stolen" ? <span className="scan-tag--safety">Reported Stolen</span> : null}
           {showVerificationBadge ? <span className={isVerifiedRecord ? "scan-tag--verified" : ""}>{isVerifiedRecord ? "Verified by QRguitar" : "Unverified"}</span> : null}
-          {showAuthenticityBadge ? <span className={isAuthenticityConfirmed ? "scan-tag--verified" : ""}>{isAuthenticityConfirmed ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}</span> : null}
+          {showAuthenticityBadge ? <span className={isAuthenticityConfirmed ? "scan-tag--auth-confirmed" : "scan-tag--auth-unconfirmed"}>{isAuthenticityConfirmed ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}</span> : null}
         </section>
 
         {activeMedia ? (
           <div className="media-overlay" role="dialog" aria-label="Media preview">
             <div className="media-overlay-backdrop" onClick={() => setActiveMedia(null)} />
-            <section className="media-overlay-content">
-              <button className="media-overlay-close" type="button" onClick={() => setActiveMedia(null)}>
-                <X size={14} /> Close
-              </button>
-              <img src={activeMedia} alt={`${instrumentDisplayName(instrument)} preview`} />
+            <section className="media-overlay-content media-gallery-lightbox">
+              <header className="media-gallery-header">
+                <strong>{instrumentDisplayName(instrument)}</strong>
+                <button className="media-overlay-close" type="button" onClick={() => setActiveMedia(null)}>
+                  <X size={14} /> Close
+                </button>
+              </header>
+              <div className="media-gallery-stage">
+                {galleryImages.length > 1 ? (
+                  <button
+                    className="media-gallery-nav media-gallery-nav--prev"
+                    type="button"
+                    aria-label="Previous photo"
+                    onClick={() => {
+                      const currentIndex = Math.max(0, galleryImages.indexOf(activeMedia));
+                      const nextIndex = currentIndex <= 0 ? galleryImages.length - 1 : currentIndex - 1;
+                      setActiveMedia(galleryImages[nextIndex]);
+                      setMediaIndex(nextIndex);
+                    }}
+                  >
+                    Previous
+                  </button>
+                ) : null}
+                <img src={activeMedia} alt={`${instrumentDisplayName(instrument)} preview`} />
+                {galleryImages.length > 1 ? (
+                  <button
+                    className="media-gallery-nav media-gallery-nav--next"
+                    type="button"
+                    aria-label="Next photo"
+                    onClick={() => {
+                      const currentIndex = Math.max(0, galleryImages.indexOf(activeMedia));
+                      const nextIndex = currentIndex >= galleryImages.length - 1 ? 0 : currentIndex + 1;
+                      setActiveMedia(galleryImages[nextIndex]);
+                      setMediaIndex(nextIndex);
+                    }}
+                  >
+                    Next
+                  </button>
+                ) : null}
+              </div>
+              {galleryImages.length > 1 ? (
+                <div className="media-gallery-strip" aria-label="Photo thumbnails">
+                  {galleryImages.map((imageUrl, index) => (
+                    <button
+                      className={imageUrl === activeMedia ? "active" : undefined}
+                      type="button"
+                      onClick={() => {
+                        setActiveMedia(imageUrl);
+                        setMediaIndex(index);
+                      }}
+                      aria-label={`Open photo ${index + 1}`}
+                      key={`${imageUrl}-lightbox-${index}`}
+                    >
+                      <img src={imageUrl} alt="" />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </section>
           </div>
         ) : null}
@@ -561,6 +614,11 @@ function publicOwnerDisplay(instrument: DemoInstrument) {
   }
 
   return owner;
+}
+
+function hasMeaningfulPublicValue(value?: string) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return Boolean(normalized && normalized !== "not listed" && normalized !== "unknown");
 }
 
 function ProfilePanel({
@@ -597,11 +655,13 @@ function ProfilePanel({
   serviceEvents: ServiceHistoryEntry[];
 }) {
   if (activeTab === "specs") {
+    const visibleSpecs = [...specs, ...optionalSpecs].filter((spec) => hasMeaningfulPublicValue(spec.value));
+
     return (
       <section className="scan-tab-panel">
         <PanelHeader icon={<SlidersHorizontal />} label="Specifications" title="Build details, setup notes, and serial info." />
         <div className="profile-data-grid">
-          {[...specs, ...optionalSpecs].map((spec) => (
+          {visibleSpecs.map((spec) => (
             <span key={spec.label}><strong>{spec.label}</strong>{spec.value || "Not listed"}</span>
           ))}
         </div>
@@ -790,7 +850,7 @@ function ProfilePanel({
         ) : null}
       </div>
       {instrument.brand ? (
-        <div className="maker-signature">
+        <div className="maker-signature maker-signature--text">
           <span>Brand</span>
           <strong>{instrument.brand}</strong>
           <em>{isVerifiedRecord ? "Verified by QRguitar" : "Unverified"}</em>

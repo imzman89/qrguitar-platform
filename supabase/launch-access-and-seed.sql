@@ -1,5 +1,5 @@
--- QRguitar launch access repair and demo seed.
--- Safe to run more than once in Supabase SQL Editor.
+-- QRguitar launch access repair and retired demo seed.
+-- WARNING: do not run this file against production. It contains retired QRG-PI260001 demo seed data.
 -- Does not drop/reset tables or disable RLS.
 
 create extension if not exists "pgcrypto";

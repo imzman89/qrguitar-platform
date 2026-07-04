@@ -1,6 +1,6 @@
 "use client";
 
-import { BadgeCheck, Copy, LogOut, Mail, QrCode, Repeat2, Settings2, ShieldCheck } from "lucide-react";
+import { BadgeCheck, Copy, Mail, QrCode, Repeat2, Settings2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -24,14 +24,14 @@ import { useRouter } from "next/navigation";
 
 const starterActions = [
   {
-    title: "Register instrument",
-    copy: "Create a profile, preview the public record, and generate the first QR link.",
+    title: "New record",
+    copy: "Register an instrument, add photos, and generate a permanent QRguitar link.",
     href: "/create",
     label: "Create Record"
   },
   {
-    title: "Browse public catalog",
-    copy: "See how public records look to buyers, shops, and future owners.",
+    title: "Public catalog",
+    copy: "Review how public records appear to buyers, shops, and future owners.",
     href: "/catalog",
     label: "Open Catalog"
   }
@@ -309,16 +309,6 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="dashboard-buttons">
-              {user ? (
-                <button className="button secondary" type="button" onClick={() => void logout()}>
-                  <LogOut size={17} />
-                  Logout
-                </button>
-              ) : (
-                <Link className="button secondary" href="/login">
-                  Login
-                </Link>
-              )}
               <Link className="button" href="/create">
                 Create Record
               </Link>
@@ -384,13 +374,17 @@ export default function DashboardPage() {
                             <span title={meta}>{meta}</span>
                             <div className={styles.instrumentBadges}>
                               {instrument.showVerificationBadge !== false ? (
-                                <small>{verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"}</small>
+                                <small className={verificationStatus === "verified" ? styles.badgeVerified : styles.badgeNeutral}>
+                                  {verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"}
+                                </small>
                               ) : null}
                               {instrument.showAuthenticityBadge !== false ? (
-                                <small>{authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}</small>
+                                <small className={authenticityStatus === "confirmed" ? styles.badgeAuthConfirmed : styles.badgeAuthUnconfirmed}>
+                                  {authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}
+                                </small>
                               ) : null}
-                              {safetyStatus === "lost" ? <small>Reported Lost</small> : null}
-                              {safetyStatus === "stolen" ? <small>Reported Stolen</small> : null}
+                              {safetyStatus === "lost" ? <small className={styles.badgeSafety}>Reported Lost</small> : null}
+                              {safetyStatus === "stolen" ? <small className={styles.badgeSafety}>Reported Stolen</small> : null}
                               <small>{category}</small>
                             </div>
                           </div>
@@ -459,7 +453,7 @@ export default function DashboardPage() {
       <div className="grid three dashboard-actions">
               {starterActions.map((action) => (
               <article className="card" key={action.title}>
-                <div className="icon">{action.title === "Register instrument" ? <QrCode /> : <Settings2 />}</div>
+                <div className="icon">{action.href === "/create" ? <QrCode /> : <Settings2 />}</div>
                 <h3>{action.title}</h3>
                 <p>{action.copy}</p>
                 <Link className="button secondary" href={action.href}>
@@ -502,7 +496,7 @@ export default function DashboardPage() {
               <div className="dashboard-action-list">
                 <Link href="/create">
                   <strong>Add another record</strong>
-                  <span>Register a guitar, amp, pedal, or build.</span>
+                  <span>Register another guitar, amp, pedal, or build.</span>
                 </Link>
                 <Link href="/catalog">
                   <strong>Review public catalog</strong>

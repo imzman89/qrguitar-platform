@@ -2,6 +2,7 @@
 -- Run this in Supabase SQL Editor.
 -- After this base schema, run supabase/security-rls.sql for launch RLS/storage hardening.
 -- Do not store or process card numbers here; payments must use Stripe Checkout or Stripe Customer Portal only.
+-- WARNING: historical scaffold data below includes retired demo records. Do not run this file against production.
 
 create extension if not exists "pgcrypto";
 

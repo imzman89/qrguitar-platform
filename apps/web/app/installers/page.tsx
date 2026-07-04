@@ -2,6 +2,15 @@ import { BadgeCheck, MapPin, Paintbrush, ShieldCheck, Wrench } from "lucide-reac
 import Link from "next/link";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "QRguitar installer network",
+  robots: {
+    index: false,
+    follow: false
+  }
+};
 
 const installerServices = [
   "Under-finish QR placement",
