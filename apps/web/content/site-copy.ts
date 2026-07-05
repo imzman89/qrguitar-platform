@@ -31,7 +31,7 @@ export const siteCopy = {
       "Create a digital identity for any guitar, amp, pedal, or custom build. Keep specs, service history, ownership records, warranty info, photos, documents, and sale details connected for life.",
     primaryCta: "Create a Record",
     secondaryCta: "Browse QRguitar Profiles",
-    trust: ["Unique QR for each instrument", "Specs, photos, repairs, and receipts", "Owner-transfer tools in beta"]
+    trust: ["Permanent QR identity", "Photos, specs, proof & history"]
   },
   workflow: {
     eyebrow: "How it works",

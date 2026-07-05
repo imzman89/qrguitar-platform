@@ -29,7 +29,7 @@ export function CollectibleRecordCard({
   variant = "catalog",
   eyebrow = "QRguitar Profile",
   createdLabel = "",
-  ctaLabel = "Open Profile",
+  ctaLabel = "Open Record",
   secondaryHref = "",
   secondaryLabel = ""
 }: CollectibleRecordCardProps) {
@@ -54,6 +54,7 @@ export function CollectibleRecordCard({
   const profileUrl = instrumentToProfileUrl(record);
   const showSecondaryAction = variant !== "latest" && secondaryHref && secondaryLabel;
   const showSecondaryText = variant !== "latest" && !secondaryHref && secondaryLabel;
+  const summary = cleanCardSummary(record.summary);
 
   return (
     <article className={`collectible-card collectible-card--${variant}`} aria-label={`Open ${title} QRguitar Profile`}>
@@ -84,7 +85,7 @@ export function CollectibleRecordCard({
           <div>
             <h3>{title}</h3>
             <p className="collectible-card-subtitle">{instrumentSubtitle(record)}</p>
-            {record.summary ? <p className="collectible-card-summary">{record.summary}</p> : null}
+            {summary ? <p className="collectible-card-summary">{summary}</p> : null}
           </div>
 
           <div className="record-badge-row" aria-label="Record status">
@@ -146,4 +147,21 @@ function safetyStatusLabel(status: "lost" | "stolen" | "recovered" | "clear") {
   }
 
   return "No Alert";
+}
+
+function cleanCardSummary(summary?: string | null) {
+  const value = String(summary || "").trim();
+  if (!value) {
+    return "";
+  }
+
+  if (/^QRguitar Profile with photos, specs, and instrument details\.?$/i.test(value)) {
+    return "";
+  }
+
+  if (/^Public QRguitar record\b/i.test(value) || /\bpublic record(s)?\b/i.test(value)) {
+    return "";
+  }
+
+  return value;
 }

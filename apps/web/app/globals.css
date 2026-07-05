@@ -287,19 +287,40 @@ select {
 }
 
 .trust-row {
-  margin-top: 22px;
+  margin-top: 20px;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 
 .trust-row span {
-  border: 1px solid var(--line);
+  border: 1px solid rgba(248, 246, 242, .09);
   border-radius: 999px;
-  padding: 8px 11px;
-  color: var(--muted);
-  font-size: 12px;
+  padding: 7px 11px 6px;
+  color: rgba(248, 246, 242, .72);
+  background: rgba(248, 246, 242, .022);
+  font-size: 11px;
   font-weight: 800;
+  line-height: 1;
+}
+
+.latest-record-message {
+  width: min(100%, 560px);
+  border: 1px solid rgba(248, 246, 242, .1);
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  color: rgba(248, 246, 242, .72);
+  background: rgba(17, 25, 30, .74);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, .2);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.latest-record-message svg {
+  color: var(--gold-2);
 }
 
 .latest-record-card {
@@ -631,7 +652,7 @@ select {
 }
 
 .collectible-card--latest .collectible-card-link {
-  grid-template-columns: minmax(260px, 48%) minmax(0, 1fr);
+  grid-template-columns: minmax(260px, 47%) minmax(0, 1fr);
 }
 
 .collectible-card-media {
@@ -644,7 +665,7 @@ select {
 }
 
 .collectible-card--latest .collectible-card-media {
-  min-height: 380px;
+  min-height: 330px;
 }
 
 .collectible-card-image {
@@ -752,7 +773,7 @@ select {
 .collectible-card--latest .collectible-card-content {
   grid-template-columns: 1fr;
   border-top: 0;
-  padding: 22px;
+  padding: 22px 22px 20px;
 }
 
 .collectible-card h3 {
@@ -765,8 +786,9 @@ select {
 }
 
 .collectible-card--latest h3 {
-  font-size: clamp(28px, 2.4vw, 36px);
-  max-width: 12ch;
+  max-width: 13.5ch;
+  font-size: clamp(26px, 2.05vw, 34px);
+  line-height: 1.03;
 }
 
 .collectible-card-subtitle,
@@ -6083,7 +6105,7 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   }
 
   .collectible-card--latest .collectible-card-link {
-    grid-template-columns: minmax(290px, 48%) minmax(0, 1fr);
+    grid-template-columns: minmax(280px, 47%) minmax(0, 1fr);
   }
 
   .grid.four {
@@ -6101,7 +6123,7 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   }
 
   .collectible-card--latest .collectible-card-media {
-    min-height: 360px;
+    min-height: 320px;
   }
 }
 
@@ -6241,7 +6263,7 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 
   .collectible-card-media,
   .collectible-card--latest .collectible-card-media {
-    min-height: 330px;
+    min-height: 300px;
   }
 
   .collectible-card-content {
@@ -6249,7 +6271,8 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   }
 
   .collectible-card--latest h3 {
-    font-size: clamp(28px, 7vw, 34px);
+    max-width: 14ch;
+    font-size: clamp(25px, 6.1vw, 32px);
   }
 
   .collectible-card-topline {

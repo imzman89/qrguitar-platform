@@ -90,7 +90,7 @@ export function HomePageClient({
                 </Link>
               </div>
               <div className="trust-row" aria-label="Platform highlights">
-                {copy.hero.trust.map((item) => (
+                {cleanHeroTrust(copy.hero.trust).map((item) => (
                   <span key={item}>{item}</span>
                 ))}
               </div>
@@ -178,6 +178,21 @@ export function HomePageClient({
       <Footer />
     </>
   );
+}
+
+function cleanHeroTrust(items: string[]) {
+  const stale = new Set([
+    "Unique QR for each instrument",
+    "Specs, photos, repairs, and receipts",
+    "Owner-transfer tools in beta"
+  ]);
+  const cleaned = items.map((item) => item.trim()).filter(Boolean).filter((item) => !stale.has(item));
+
+  if (!cleaned.length) {
+    return ["Permanent QR identity", "Photos, specs, proof & history"];
+  }
+
+  return cleaned.slice(0, 2);
 }
 
 function Card({ icon, title, copy }: { icon: ReactNode; title: string; copy: string }) {

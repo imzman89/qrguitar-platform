@@ -1,7 +1,6 @@
 "use client";
 
 import { Globe2 } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CollectibleRecordCard } from "./CollectibleRecordCard";
 import {
@@ -54,41 +53,18 @@ export function LatestPublicRecord({ initialRecord = null }: { initialRecord?: D
 
   if (!loaded) {
     return (
-      <article className="latest-record-card latest-record-card--skeleton" aria-label="Latest QRguitar Profile">
-        <div className="latest-record-hero">
-          <div className="latest-live-row">
-            <span><Globe2 size={14} /> Latest QRguitar Profile</span>
-          </div>
-          <div className="latest-skeleton-line latest-skeleton-line--title" aria-hidden="true" />
-          <div className="latest-skeleton-line latest-skeleton-line--copy" aria-hidden="true" />
-        </div>
-        <div className="latest-record-meta" aria-hidden="true">
-          {["id", "region", "year", "status"].map((item) => (
-            <div key={item}>
-              <span className="latest-skeleton-line latest-skeleton-line--label" />
-              <strong className="latest-skeleton-line latest-skeleton-line--value" />
-            </div>
-          ))}
-        </div>
-        <div className="latest-record-actions" aria-hidden="true">
-          <span className="latest-skeleton-line latest-skeleton-line--button" />
-          <span className="latest-skeleton-line latest-skeleton-line--button latest-skeleton-line--button-secondary" />
-        </div>
+      <article className="latest-record-message" aria-label="Latest QRguitar Profile">
+        <Globe2 size={14} />
+        <span>Loading latest QRguitar Profile...</span>
       </article>
     );
   }
 
   if (!latest) {
     return (
-      <article className="latest-record-card latest-record-card--empty" aria-label="No visible QRguitar Profiles yet">
-        <div className="latest-record-empty">
-          <span><Globe2 size={14} /> Latest QRguitar Profile</span>
-          <h2>No visible profiles yet.</h2>
-          <p>Create the first visible QRguitar Profile.</p>
-          <Link className="button" href="/create">
-            Create Record
-          </Link>
-        </div>
+      <article className="latest-record-message" aria-label="Latest QRguitar Profile">
+        <Globe2 size={14} />
+        <span>QRguitar Profiles are loading.</span>
       </article>
     );
   }
@@ -101,7 +77,7 @@ export function LatestPublicRecord({ initialRecord = null }: { initialRecord?: D
       variant="latest"
       eyebrow="Latest QRguitar Profile"
       createdLabel={createdLabel}
-      ctaLabel="Open Profile"
+      ctaLabel="Open Record"
     />
   );
 }
