@@ -1,7 +1,8 @@
 "use client";
 
-import { ArrowRight, Camera, FileText, Globe2, ShieldCheck, Siren } from "lucide-react";
+import { ArrowRight, Camera, ChevronLeft, ChevronRight, FileText, Globe2, ShieldCheck, Siren } from "lucide-react";
 import Link from "next/link";
+import { useMemo, useState, type MouseEvent } from "react";
 import {
   getInstrumentCondition,
   getInstrumentVerificationStatus,
@@ -32,23 +33,54 @@ export function CollectibleRecordCard({
   secondaryHref = "",
   secondaryLabel = ""
 }: CollectibleRecordCardProps) {
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const title = instrumentDisplayName(record);
-  const imageUrl = record.heroImageDataUrl || record.galleryImageDataUrls?.[0] || "";
+  const galleryImages = useMemo(() => {
+    const images = [record.heroImageDataUrl, ...(record.galleryImageDataUrls || [])]
+      .filter((image): image is string => Boolean(image));
+    return Array.from(new Set(images));
+  }, [record.galleryImageDataUrls, record.heroImageDataUrl]);
+  const imageUrl = galleryImages[activeImageIndex] || galleryImages[0] || "";
   const location = formatRecordLocation(record);
   const condition = getInstrumentCondition(record);
   const verificationStatus = getInstrumentVerificationStatus(record);
   const authenticityStatus = record.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed";
-  const safetyStatus = record.safetyStatus === "lost" || record.safetyStatus === "stolen" ? record.safetyStatus : "clear";
+  const safetyStatus = record.safetyStatus === "lost" || record.safetyStatus === "stolen" || record.safetyStatus === "recovered"
+    ? record.safetyStatus
+    : "clear";
   const photoCount = record.galleryImageDataUrls?.length || (record.heroImageDataUrl ? 1 : 0);
   const publicDocCount = record.documentFiles?.filter((file) => file.visibility !== "hidden").length || 0;
   const profileUrl = instrumentToProfileUrl(record);
+  const hasCarousel = galleryImages.length > 1;
+
+  function cycleImage(event: MouseEvent<HTMLButtonElement>, direction: "previous" | "next") {
+    event.preventDefault();
+    event.stopPropagation();
+    setActiveImageIndex((current) => {
+      if (!galleryImages.length) {
+        return 0;
+      }
+
+      if (direction === "previous") {
+        return current <= 0 ? galleryImages.length - 1 : current - 1;
+      }
+
+      return current >= galleryImages.length - 1 ? 0 : current + 1;
+    });
+  }
 
   return (
     <article className={`collectible-card collectible-card--${variant}`} aria-label={`Open ${title} QRguitar record`}>
       <Link className="collectible-card-link" href={profileUrl} aria-label={`Open ${title} profile`}>
         <div className="collectible-card-media">
           {imageUrl ? (
-            <img className="collectible-card-image" src={imageUrl} alt={`${title} main photo`} loading={variant === "latest" ? "eager" : "lazy"} />
+            <img
+              className="collectible-card-image"
+              src={imageUrl}
+              alt={`${title} main photo`}
+              loading={variant === "latest" ? "eager" : "lazy"}
+              decoding="async"
+            />
           ) : (
             <div className="collectible-card-empty-media">
               <span>QRguitar</span>
@@ -60,6 +92,11 @@ export function CollectibleRecordCard({
             {createdLabel ? <span className="collectible-card-age">{createdLabel}</span> : null}
           </div>
           <span className="collectible-card-code">{record.qrCode}</span>
+          {hasCarousel ? (
+            <span className="collectible-card-photo-count">
+              {activeImageIndex + 1}/{galleryImages.length}
+            </span>
+          ) : null}
         </div>
 
         <div className="collectible-card-content">
@@ -82,7 +119,9 @@ export function CollectibleRecordCard({
               </span>
             ) : null}
             {safetyStatus !== "clear" ? (
-              <span className="record-badge record-badge--safety"><Siren size={13} /> <span className="record-badge-text">Reported {safetyStatus === "lost" ? "Lost" : "Stolen"}</span></span>
+              <span className={`record-badge ${safetyStatus === "recovered" ? "record-badge--recovered" : "record-badge--safety"}`}>
+                <Siren size={13} /> <span className="record-badge-text">{safetyStatusLabel(safetyStatus)}</span>
+              </span>
             ) : null}
           </div>
 
@@ -100,7 +139,39 @@ export function CollectibleRecordCard({
         </div>
       </Link>
 
+      {hasCarousel ? (
+        <div className="collectible-card-carousel" aria-label={`${title} photos`}>
+          <button type="button" aria-label="Previous photo" onClick={(event) => cycleImage(event, "previous")}>
+            <ChevronLeft size={16} />
+          </button>
+          <button type="button" aria-label="Next photo" onClick={(event) => cycleImage(event, "next")}>
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      ) : null}
+
       <RecordShareButton className="collectible-card-share" code={record.qrCode} title={title} />
+      {secondaryHref && secondaryLabel ? (
+        <Link className="collectible-card-secondary-link" href={secondaryHref}>
+          {secondaryLabel}
+        </Link>
+      ) : null}
     </article>
   );
+}
+
+function safetyStatusLabel(status: "lost" | "stolen" | "recovered" | "clear") {
+  if (status === "lost") {
+    return "Reported Lost";
+  }
+
+  if (status === "stolen") {
+    return "Reported Stolen";
+  }
+
+  if (status === "recovered") {
+    return "Recovered";
+  }
+
+  return "No Alert";
 }

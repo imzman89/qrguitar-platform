@@ -56,7 +56,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function HomePage() {
   noStore();
   const [publicRecords, publishedSettings] = await Promise.all([getPublicInstruments(), loadPublishedSiteSettings()]);
-  const latestPublicRecord = publicRecords[0] || null;
+  const latestPublicRecord = publicRecords.find((record) => record.safetyStatus !== "lost" && record.safetyStatus !== "stolen") || null;
 
   return <HomePageClient initialLatestRecord={latestPublicRecord} initialSettings={publishedSettings} />;
 }

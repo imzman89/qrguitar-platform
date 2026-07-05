@@ -27,7 +27,7 @@ export function LatestPublicRecord({ initialRecord = null }: { initialRecord?: D
           headers: { "Cache-Control": "no-cache" }
         });
         const payload = (await response.json().catch(() => null)) as InstrumentsResponse | null;
-        const newestPublicRecord = payload?.ok && Array.isArray(payload.instruments) ? payload.instruments[0] || null : null;
+        const newestPublicRecord = payload?.ok && Array.isArray(payload.instruments) ? pickHomepageRecord(payload.instruments) : null;
 
         if (active) {
           setLatest(newestPublicRecord);
@@ -104,6 +104,14 @@ export function LatestPublicRecord({ initialRecord = null }: { initialRecord?: D
       secondaryLabel="Browse Catalog"
     />
   );
+}
+
+function pickHomepageRecord(records: DemoInstrument[]) {
+  return records.find((record) => isHomepageSafeRecord(record)) || null;
+}
+
+function isHomepageSafeRecord(record: DemoInstrument) {
+  return record.safetyStatus !== "lost" && record.safetyStatus !== "stolen";
 }
 
 function formatCreatedAt(value: string) {

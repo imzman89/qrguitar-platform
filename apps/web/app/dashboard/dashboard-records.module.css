@@ -152,32 +152,27 @@
 .instrumentBadges small,
 .instrumentInfo small {
   --badge-text: rgba(238, 234, 224, .82);
-  --badge-fill: rgba(248, 246, 242, .03);
-  --badge-glow: rgba(248, 246, 242, .07);
-  --badge-dot: rgba(248, 246, 242, .35);
   width: fit-content;
   max-width: 100%;
-  min-height: 25px;
-  border: 1px solid rgba(248, 246, 242, .105);
+  min-height: 23px;
+  border: 1px solid rgba(248, 246, 242, .09);
   border-radius: 999px;
-  padding: 3px;
+  padding: 5px 8px 4px;
   color: var(--badge-text);
   font-size: 10.5px;
   font-weight: 900;
   line-height: 1;
   letter-spacing: .02em;
   text-transform: uppercase;
-  background: rgba(4, 7, 9, .34);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .03), 0 6px 14px rgba(0, 0, 0, .1);
+  background: rgba(4, 7, 9, .24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .025);
 }
 
 .instrumentBadges small span,
 .instrumentInfo small span {
-  min-height: 18px;
-  border-radius: 999px;
   display: inline-flex;
   align-items: center;
-  padding: 3px 5px 2px;
+  padding: 0;
   color: var(--badge-text);
   background: transparent;
   box-shadow: none;
@@ -185,38 +180,23 @@
 }
 
 .instrumentBadges small.badgeVerified {
-  --badge-text: #a8d9ba;
-  --badge-fill: rgba(248, 246, 242, .03);
-  --badge-glow: rgba(248, 246, 242, .07);
-  --badge-dot: rgba(248, 246, 242, .35);
+  --badge-text: #8fd7a6;
 }
 
 .instrumentBadges small.badgeAuthConfirmed {
-  --badge-text: #c0d9a4;
-  --badge-fill: rgba(248, 246, 242, .03);
-  --badge-glow: rgba(248, 246, 242, .07);
-  --badge-dot: rgba(248, 246, 242, .35);
+  --badge-text: #b3cf82;
 }
 
 .instrumentBadges small.badgeAuthUnconfirmed {
   --badge-text: rgba(218, 194, 151, .9);
-  --badge-fill: rgba(124, 91, 42, .075);
-  --badge-glow: rgba(224, 177, 94, .1);
-  --badge-dot: rgba(207, 157, 78, .48);
 }
 
 .instrumentBadges small.badgeSafety {
-  --badge-text: #daa19c;
-  --badge-fill: rgba(248, 246, 242, .03);
-  --badge-glow: rgba(248, 246, 242, .07);
-  --badge-dot: rgba(248, 246, 242, .35);
+  --badge-text: #e19a92;
 }
 
 .instrumentBadges small.badgeNeutral {
   --badge-text: rgba(214, 202, 182, .88);
-  --badge-fill: rgba(151, 119, 61, .075);
-  --badge-glow: rgba(238, 202, 132, .1);
-  --badge-dot: rgba(214, 176, 106, .45);
 }
 
 .instrumentMeta {

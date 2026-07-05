@@ -50,13 +50,19 @@ export function HomepageRecordSpotlight({ promotedQrCode = "" }: HomepageRecordS
       return { featured: null as DemoInstrument | null };
     }
 
-    const latest = records[0];
+    const cleanRecords = records.filter(isHomepageSafeRecord);
+
+    if (!cleanRecords.length) {
+      return { featured: null as DemoInstrument | null };
+    }
+
+    const latest = cleanRecords[0];
     const promotedCode = normalizeCode(promotedQrCode);
     const promotedMatch = promotedCode
-      ? records.find((record) => normalizeCode(record.qrCode) === promotedCode)
+      ? cleanRecords.find((record) => normalizeCode(record.qrCode) === promotedCode)
       : null;
     const isPromotedLatest = !!promotedMatch && normalizeCode(promotedMatch.qrCode) === normalizeCode(latest.qrCode);
-    const featuredCandidate = promotedMatch && !isPromotedLatest ? promotedMatch : records[1] || null;
+    const featuredCandidate = promotedMatch && !isPromotedLatest ? promotedMatch : cleanRecords[1] || null;
 
     return {
       featured: featuredCandidate
@@ -79,7 +85,11 @@ export function HomepageRecordSpotlight({ promotedQrCode = "" }: HomepageRecordS
   );
 }
 
-  function parseCreatedAt(value: string) {
+function isHomepageSafeRecord(record: DemoInstrument) {
+  return record.safetyStatus !== "lost" && record.safetyStatus !== "stolen";
+}
+
+function parseCreatedAt(value: string) {
   const time = Date.parse(value || "");
   return Number.isFinite(time) ? time : 0;
 }

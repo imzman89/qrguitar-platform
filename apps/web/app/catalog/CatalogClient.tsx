@@ -7,14 +7,18 @@ import { CollectibleRecordCard } from "../../components/CollectibleRecordCard";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import {
+  getInstrumentVerificationStatus,
   type DemoInstrument
 } from "../../lib/local-demo";
+
+type ShowFilter = "All records" | "Verified" | "Authenticity confirmed" | "Safety alerts" | "Has photos" | "Has service history" | "Has proof documents";
 
 export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrument[] }) {
   const [records, setRecords] = useState<DemoInstrument[]>(dedupeByCodeAndDate(initialRecords));
   const [brand, setBrand] = useState("All brands");
+  const [showFilter, setShowFilter] = useState<ShowFilter>("All records");
   const [query, setQuery] = useState("");
-  const [sortMode, setSortMode] = useState<"Newest" | "Oldest">("Newest");
+  const [sortMode, setSortMode] = useState<"Newest" | "Oldest" | "Title" | "Year">("Newest");
 
   const loadRecords = useCallback(async () => {
     try {
@@ -58,10 +62,37 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
 
   const brands = useMemo(() => ["All brands", ...unique(records.map((record) => record.brand).filter(Boolean))], [records]);
 
-  const hasFilterOrSearch = brand !== "All brands" || query.trim().length > 0;
+  const hasFilterOrSearch = brand !== "All brands" || showFilter !== "All records" || query.trim().length > 0;
 
   const filtered = records
     .filter((record) => brand === "All brands" || record.brand === brand)
+    .filter((record) => {
+      if (showFilter === "Verified") {
+        return getInstrumentVerificationStatus(record) === "verified";
+      }
+
+      if (showFilter === "Authenticity confirmed") {
+        return record.authenticityStatus === "confirmed";
+      }
+
+      if (showFilter === "Safety alerts") {
+        return record.safetyStatus === "lost" || record.safetyStatus === "stolen";
+      }
+
+      if (showFilter === "Has photos") {
+        return Boolean(record.heroImageDataUrl || record.galleryImageDataUrls?.length);
+      }
+
+      if (showFilter === "Has service history") {
+        return Boolean(record.serviceEvents?.length);
+      }
+
+      if (showFilter === "Has proof documents") {
+        return Boolean(record.documentFiles?.some((file) => file.visibility !== "hidden"));
+      }
+
+      return true;
+    })
     .filter((record) => {
       const haystack = [record.qrCode, record.name, record.brand, record.model, record.serial, record.location, record.instrumentType].join(" ").toLowerCase();
       return haystack.includes(query.toLowerCase());
@@ -74,6 +105,14 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
 
     if (sortMode === "Oldest") {
       return Date.parse(a.createdAt || "") - Date.parse(b.createdAt || "");
+    }
+
+    if (sortMode === "Title") {
+      return (a.name || a.model || a.qrCode).localeCompare(b.name || b.model || b.qrCode);
+    }
+
+    if (sortMode === "Year") {
+      return Number(b.year || 0) - Number(a.year || 0);
     }
 
     return 0;
@@ -117,10 +156,24 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
               </select>
             </label>
             <label>
+              Show
+              <select value={showFilter} onChange={(event) => setShowFilter(event.target.value as ShowFilter)}>
+                <option>All records</option>
+                <option>Verified</option>
+                <option>Authenticity confirmed</option>
+                <option>Safety alerts</option>
+                <option>Has photos</option>
+                <option>Has service history</option>
+                <option>Has proof documents</option>
+              </select>
+            </label>
+            <label>
               Sort
               <select value={sortMode} onChange={(event) => setSortMode(event.target.value as typeof sortMode)}>
                 <option>Newest</option>
                 <option>Oldest</option>
+                <option>Title</option>
+                <option>Year</option>
               </select>
             </label>
           </section>
@@ -136,6 +189,7 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
                   type="button"
                   onClick={() => {
                     setBrand("All brands");
+                    setShowFilter("All records");
                     setQuery("");
                   }}
                 >
