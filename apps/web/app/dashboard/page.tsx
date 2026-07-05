@@ -32,7 +32,7 @@ const starterActions = [
   },
   {
     title: "Public catalog",
-    copy: "Review how public records appear to buyers, shops, and future owners.",
+    copy: "Review how visible QRguitar Profiles appear to buyers, shops, and future owners.",
     href: "/catalog",
     label: "Open Catalog"
   }
@@ -135,7 +135,7 @@ export default function DashboardPage() {
   const accountPlan = getAccountPlan(user);
   const displayName = useMemo(() => getDisplayName(user), [user?.name, user?.email, user?.role]);
   const accountSummary = accountPlan === "free" ? "Beta access." : `${accountPlan.charAt(0).toUpperCase()}${accountPlan.slice(1)} account.`;
-  const publicRecords = instruments.filter((instrument) => instrument.visibility !== "private").length;
+  const publicRecords = instruments.filter((instrument) => instrument.visibility === "public").length;
   const privateRecords = instruments.filter((instrument) => instrument.visibility === "private").length;
   const unlistedRecords = instruments.filter((instrument) => instrument.visibility === "unlisted").length;
   const recordsWithPhotos = instruments.filter((instrument) => instrument.heroImageDataUrl || instrument.galleryImageDataUrls?.length).length;
@@ -166,7 +166,7 @@ export default function DashboardPage() {
       { label: "Registered instruments", value: String(instruments.length) },
       { label: "Verified records", value: String(verifiedRecords) },
       { label: "Transfers pending", value: String(pendingTransfers) },
-      { label: "Public records", value: String(publicRecords) }
+      { label: "Catalog profiles", value: String(publicRecords) }
     ],
     [instruments, pendingTransfers, publicRecords, verifiedRecords]
   );
@@ -342,6 +342,8 @@ export default function DashboardPage() {
                   const title = dashboardRecordTitle(instrument);
                   const meta = dashboardRecordMeta(instrument, condition);
                   const category = instrument.instrumentType || "Instrument";
+                  const saleStatus = instrument.saleStatus === "for_sale" ? "For sale" : "";
+                  const originalityStatus = instrument.originalityStatus === "all_original" ? "All original" : instrument.originalityStatus === "modified" ? "Modified" : "";
 
                   return (
                     <article className={styles.instrumentRow} key={instrument.qrCode}>
@@ -370,6 +372,8 @@ export default function DashboardPage() {
                               ) : null}
                               {safetyStatus === "lost" ? <small className={styles.badgeSafety}><span>Reported Lost</span></small> : null}
                               {safetyStatus === "stolen" ? <small className={styles.badgeSafety}><span>Reported Stolen</span></small> : null}
+                              {saleStatus ? <small className={styles.badgeSale}><span>{saleStatus}</span></small> : null}
+                              {originalityStatus ? <small className={styles.badgeDisclosure}><span>{originalityStatus}</span></small> : null}
                               <small><span>{category}</span></small>
                             </div>
                           </div>
@@ -395,7 +399,7 @@ export default function DashboardPage() {
                             Edit Record
                           </Link>
                           <Link className="button secondary" href={instrumentToProfileUrl(instrument)}>
-                            View Record
+                            View Profile
                           </Link>
                           <button className="button secondary" type="button" onClick={() => void removeFromCollection(instrument)}>
                             Delete Record

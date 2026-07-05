@@ -45,6 +45,7 @@ type ServiceEventRow = {
   shop_name: string | null;
   location: string | null;
   is_public: boolean;
+  created_by_user_id?: string | null;
   created_at: string;
   updated_at: string | null;
 };
@@ -84,7 +85,16 @@ function cleanEventType(value: unknown) {
   return EVENT_TYPES.has(text) ? text : "Other";
 }
 
-function mapServiceEvent(row: ServiceEventRow, includePrivate = false) {
+function canManageServiceEvent(row: ServiceEventRow, userId: string, isAdmin: boolean) {
+  return Boolean(isAdmin || (row.created_by_user_id && row.created_by_user_id === userId));
+}
+
+function lockedServiceHistoryMessage() {
+  return "This service history belongs to a previous owner, shop, or QRguitar admin. Contact QRguitar admin to correct historical provenance.";
+}
+
+function mapServiceEvent(row: ServiceEventRow, includePrivate = false, userId = "", isAdmin = false) {
+  const canEdit = includePrivate ? canManageServiceEvent(row, userId, isAdmin) : false;
   return {
     id: row.id,
     serviceDate: row.event_date || "",
@@ -95,6 +105,7 @@ function mapServiceEvent(row: ServiceEventRow, includePrivate = false) {
     shopName: row.shop_name || "",
     location: row.location || "",
     isPublic: row.is_public === true,
+    ...(includePrivate ? { canEdit, lockedReason: canEdit ? "" : lockedServiceHistoryMessage() } : {}),
     createdAt: row.created_at,
     updatedAt: row.updated_at || undefined
   };
@@ -163,17 +174,21 @@ export async function GET(request: Request) {
   }
 
   let includePrivate = false;
+  let ownerUserId = "";
+  let ownerIsAdmin = false;
   if (scope === "owner") {
     const access = await requireOwnerOrAdmin(request, guitar, supabase);
     if (access.error) {
       return json({ ok: false, serviceEvents: [], message: access.error }, { status: access.user ? 403 : 401 });
     }
     includePrivate = true;
+    ownerUserId = access.user?.id || "";
+    ownerIsAdmin = access.isAdmin;
   }
 
   let query = supabase
     .from("guitar_timeline_events")
-    .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_at,updated_at")
+    .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_by_user_id,created_at,updated_at")
     .eq("guitar_id", guitar.id)
     .order("event_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
@@ -193,7 +208,7 @@ export async function GET(request: Request) {
 
   return json({
     ok: true,
-    serviceEvents: ((result.data || []) as ServiceEventRow[]).map((row) => mapServiceEvent(row, includePrivate))
+    serviceEvents: ((result.data || []) as ServiceEventRow[]).map((row) => mapServiceEvent(row, includePrivate, ownerUserId, ownerIsAdmin))
   });
 }
 
@@ -239,7 +254,7 @@ export async function POST(request: Request) {
       location: cleanText(body?.location, 200),
       is_public: body?.isPublic === true
     })
-    .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_at,updated_at")
+    .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_by_user_id,created_at,updated_at")
     .single<ServiceEventRow>();
 
   if (created.error || !created.data) {
@@ -251,7 +266,7 @@ export async function POST(request: Request) {
   }
 
   revalidateRecord(qrCode);
-  return json({ ok: true, serviceEvent: mapServiceEvent(created.data, true), message: "Service entry saved." });
+  return json({ ok: true, serviceEvent: mapServiceEvent(created.data, true, access.user.id, access.isAdmin), message: "Service entry saved." });
 }
 
 export async function PATCH(request: Request) {
@@ -280,6 +295,25 @@ export async function PATCH(request: Request) {
     }
   }
 
+  const existingEntry = await supabase
+    .from("guitar_timeline_events")
+    .select("id,guitar_id,created_by_user_id")
+    .eq("id", id)
+    .eq("guitar_id", guitar.id)
+    .maybeSingle<Pick<ServiceEventRow, "id" | "guitar_id" | "created_by_user_id">>();
+
+  if (existingEntry.error) {
+    return json({ ok: false, message: existingEntry.error.message || "Could not read service entry." }, { status: 500 });
+  }
+
+  if (!existingEntry.data) {
+    return json({ ok: false, message: "Service entry was not found." }, { status: 404 });
+  }
+
+  if (!access.isAdmin && existingEntry.data.created_by_user_id !== access.user?.id) {
+    return json({ ok: false, message: lockedServiceHistoryMessage() }, { status: 403 });
+  }
+
   const title = cleanText(body?.title, 180);
   if (!title) {
     return json({ ok: false, message: "Service title is required." }, { status: 400 });
@@ -300,7 +334,7 @@ export async function PATCH(request: Request) {
     })
     .eq("id", id)
     .eq("guitar_id", guitar.id)
-    .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_at,updated_at")
+    .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_by_user_id,created_at,updated_at")
     .single<ServiceEventRow>();
 
   if (update.error || !update.data) {
@@ -312,7 +346,7 @@ export async function PATCH(request: Request) {
   }
 
   revalidateRecord(qrCode);
-  return json({ ok: true, serviceEvent: mapServiceEvent(update.data, true), message: "Service entry updated." });
+  return json({ ok: true, serviceEvent: mapServiceEvent(update.data, true, access.user?.id || "", access.isAdmin), message: "Service entry updated." });
 }
 
 export async function DELETE(request: Request) {
@@ -339,6 +373,25 @@ export async function DELETE(request: Request) {
     if (!writeAccess.ok) {
       return json({ ok: false, message: writeAccess.message }, { status: writeAccess.status });
     }
+  }
+
+  const existingEntry = await supabase
+    .from("guitar_timeline_events")
+    .select("id,guitar_id,created_by_user_id")
+    .eq("id", id)
+    .eq("guitar_id", guitar.id)
+    .maybeSingle<Pick<ServiceEventRow, "id" | "guitar_id" | "created_by_user_id">>();
+
+  if (existingEntry.error) {
+    return json({ ok: false, message: existingEntry.error.message || "Could not read service entry." }, { status: 500 });
+  }
+
+  if (!existingEntry.data) {
+    return json({ ok: false, message: "Service entry was not found." }, { status: 404 });
+  }
+
+  if (!access.isAdmin && existingEntry.data.created_by_user_id !== access.user?.id) {
+    return json({ ok: false, message: lockedServiceHistoryMessage() }, { status: 403 });
   }
 
   const deleted = await supabase.from("guitar_timeline_events").delete().eq("id", id).eq("guitar_id", guitar.id);

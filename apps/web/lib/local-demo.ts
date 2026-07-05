@@ -24,6 +24,8 @@ type MagicCodeRecord = {
 };
 
 export type InstrumentCondition = "new" | "used";
+export type SaleStatus = "for_sale" | "not_for_sale";
+export type OriginalityStatus = "all_original" | "modified" | "unknown";
 export type CreatorAccountType = "customer" | "brand" | "shop" | "commercial";
 export type AccountPlan = "free" | "paid" | "brand" | "commercial";
 export type AccountVerificationStatus = "unverified" | "verified" | "flagged";
@@ -40,6 +42,8 @@ export type DemoInstrument = {
   serial: string;
   year: string;
   instrumentCondition?: InstrumentCondition;
+  saleStatus?: SaleStatus;
+  originalityStatus?: OriginalityStatus;
   creatorAccountType?: CreatorAccountType;
   packageIncludesFirstTransfer?: boolean;
   verificationStatus?: RecordVerificationStatus;
@@ -118,6 +122,8 @@ export type ServiceHistoryEntry = {
   shopName?: string;
   location?: string;
   isPublic: boolean;
+  canEdit?: boolean;
+  lockedReason?: string;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -158,7 +164,7 @@ export const defaultQrStyle: QrStyle = {
   foreground: "#f8f6f2",
   background: "#071014",
   includeLabel: true,
-  labelText: "Scan QRguitar record",
+  labelText: "Scan QRguitar Profile",
   shape: "classic"
 };
 

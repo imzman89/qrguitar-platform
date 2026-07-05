@@ -23,7 +23,7 @@ export default function PrivacyPage() {
             </p>
             <div className="legal-card">
               <h2>Public and private records</h2>
-              <p>Public records can be viewed by anyone with the QR code, catalog listing, or direct link.</p>
+              <p>Public QRguitar Profiles can be viewed by anyone with the QR code, catalog listing, or direct link.</p>
               <p>Private records and private documents are intended to be visible only to authorized users.</p>
             </div>
             <div className="legal-card">

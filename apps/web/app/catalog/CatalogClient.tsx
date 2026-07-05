@@ -7,16 +7,18 @@ import { CollectibleRecordCard } from "../../components/CollectibleRecordCard";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import {
+  getInstrumentCondition,
   getInstrumentVerificationStatus,
   type DemoInstrument
 } from "../../lib/local-demo";
 
-type ShowFilter = "All records" | "Verified" | "Authenticity confirmed" | "Safety alerts" | "Has photos" | "Has service history" | "Has proof documents";
+type ShowFilter = "All profiles" | "For sale" | "New" | "Used" | "Verified" | "Authenticity confirmed" | "All original" | "Modified" | "Safety alerts" | "Service history" | "Proof documents";
 
 export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrument[] }) {
   const [records, setRecords] = useState<DemoInstrument[]>(dedupeByCodeAndDate(initialRecords));
+  const [hasLoadedRecords, setHasLoadedRecords] = useState(initialRecords.length > 0);
   const [brand, setBrand] = useState("All brands");
-  const [showFilter, setShowFilter] = useState<ShowFilter>("All records");
+  const [showFilter, setShowFilter] = useState<ShowFilter>("All profiles");
   const [query, setQuery] = useState("");
   const [sortMode, setSortMode] = useState<"Newest" | "Oldest" | "Title" | "Year">("Newest");
 
@@ -34,6 +36,8 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
       setRecords(dedupeByCodeAndDate(payload.instruments));
     } catch {
       return;
+    } finally {
+      setHasLoadedRecords(true);
     }
   }, []);
 
@@ -62,7 +66,7 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
 
   const brands = useMemo(() => ["All brands", ...unique(records.map((record) => record.brand).filter(Boolean))], [records]);
 
-  const hasFilterOrSearch = brand !== "All brands" || showFilter !== "All records" || query.trim().length > 0;
+  const hasFilterOrSearch = brand !== "All brands" || showFilter !== "All profiles" || query.trim().length > 0;
 
   const filtered = records
     .filter((record) => brand === "All brands" || record.brand === brand)
@@ -79,22 +83,38 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
         return record.safetyStatus === "lost" || record.safetyStatus === "stolen";
       }
 
-      if (showFilter === "Has photos") {
-        return Boolean(record.heroImageDataUrl || record.galleryImageDataUrls?.length);
+      if (showFilter === "For sale") {
+        return record.saleStatus === "for_sale";
       }
 
-      if (showFilter === "Has service history") {
+      if (showFilter === "New") {
+        return getInstrumentCondition(record) === "new";
+      }
+
+      if (showFilter === "Used") {
+        return getInstrumentCondition(record) === "used";
+      }
+
+      if (showFilter === "All original") {
+        return record.originalityStatus === "all_original";
+      }
+
+      if (showFilter === "Modified") {
+        return record.originalityStatus === "modified";
+      }
+
+      if (showFilter === "Service history") {
         return Boolean(record.serviceEvents?.length);
       }
 
-      if (showFilter === "Has proof documents") {
+      if (showFilter === "Proof documents") {
         return Boolean(record.documentFiles?.some((file) => file.visibility !== "hidden"));
       }
 
       return true;
     })
     .filter((record) => {
-      const haystack = [record.qrCode, record.name, record.brand, record.model, record.serial, record.location, record.instrumentType].join(" ").toLowerCase();
+      const haystack = [record.qrCode, record.name, record.brand, record.model, record.serial, record.location, record.instrumentType, record.saleStatus, record.originalityStatus].join(" ").toLowerCase();
       return haystack.includes(query.toLowerCase());
     });
 
@@ -132,9 +152,9 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
         <div className="shell">
           <div className="dashboard-hero">
             <div>
-              <div className="eyebrow">Public catalog</div>
-              <h2>Browse public QRguitar records.</h2>
-              <p>Public profiles are discoverable by default. Owners can make a record private when privacy matters.</p>
+              <div className="eyebrow">The Catalog</div>
+              <h2>Browse QRguitar Profiles.</h2>
+              <p>Visible profiles are discoverable by default. Owners can make a profile private when privacy matters.</p>
             </div>
             <Link className="button" href="/create">
               Create Record
@@ -158,13 +178,17 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
             <label>
               Show
               <select value={showFilter} onChange={(event) => setShowFilter(event.target.value as ShowFilter)}>
-                <option>All records</option>
+                <option>All profiles</option>
+                <option>For sale</option>
+                <option>New</option>
+                <option>Used</option>
                 <option>Verified</option>
                 <option>Authenticity confirmed</option>
+                <option>All original</option>
+                <option>Modified</option>
                 <option>Safety alerts</option>
-                <option>Has photos</option>
-                <option>Has service history</option>
-                <option>Has proof documents</option>
+                <option>Service history</option>
+                <option>Proof documents</option>
               </select>
             </label>
             <label>
@@ -181,7 +205,7 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
           <section className="catalog-summary" aria-label="Catalog discovery highlights">
             <div className="catalog-toolbar">
               <p>
-                <strong>{visibleCount}</strong> of <strong>{totalCount}</strong> public records.
+                <strong>{visibleCount}</strong> of <strong>{totalCount}</strong> visible profiles.
               </p>
               {hasFilterOrSearch ? (
                 <button
@@ -189,7 +213,7 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
                   type="button"
                   onClick={() => {
                     setBrand("All brands");
-                    setShowFilter("All records");
+                    setShowFilter("All profiles");
                     setQuery("");
                   }}
                 >
@@ -200,19 +224,25 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
             </div>
             <div className="catalog-highlights">
               <span>{topBrands.slice(0, 2).join(" / ") || "Premium catalog"}</span>
-              <span>{totalCount} public {totalCount === 1 ? "record" : "records"}</span>
+              <span>{totalCount} visible {totalCount === 1 ? "profile" : "profiles"}</span>
             </div>
           </section>
 
-          <section className="catalog-grid" aria-label="Public QRguitar records">
-            {visibleRecords.length ? (
+          <section className="catalog-grid" aria-label="QRguitar Profiles">
+            {!hasLoadedRecords ? (
+              <div className="card catalog-empty">
+                <div className="eyebrow">Loading QRguitar Profiles</div>
+                <h3>Opening the catalog.</h3>
+                <p>Fetching the latest visible profiles now.</p>
+              </div>
+            ) : visibleRecords.length ? (
               visibleRecords.map((record) => (
-                <CollectibleRecordCard record={record} variant="catalog" eyebrow="Public record" key={record.qrCode} />
+                <CollectibleRecordCard record={record} variant="catalog" eyebrow="QRguitar Profile" key={record.qrCode} />
               ))
             ) : (
               <div className="card catalog-empty">
-                <div className="eyebrow">No records found</div>
-                <h3>No matching records in the catalog.</h3>
+                <div className="eyebrow">No profiles found</div>
+                <h3>No matching profiles in the catalog.</h3>
                 <p>Try clearing filters, changing status, or searching by serial, brand, model, or type.</p>
               </div>
             )}

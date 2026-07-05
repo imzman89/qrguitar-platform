@@ -46,7 +46,7 @@ Then test:
 - login works
 - dashboard opens
 - create record saves
-- public record page opens
+- QRguitar Profile opens
 
 ## 4. Vercel
 

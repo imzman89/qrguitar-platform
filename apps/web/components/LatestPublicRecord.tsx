@@ -30,10 +30,12 @@ export function LatestPublicRecord({ initialRecord = null }: { initialRecord?: D
         const newestPublicRecord = payload?.ok && Array.isArray(payload.instruments) ? pickHomepageRecord(payload.instruments) : null;
 
         if (active) {
-          setLatest(newestPublicRecord);
+          if (newestPublicRecord || !initialRecord) {
+            setLatest(newestPublicRecord);
+          }
         }
       } catch {
-        if (active) {
+        if (active && !initialRecord) {
           setLatest(null);
         }
       } finally {
@@ -52,10 +54,10 @@ export function LatestPublicRecord({ initialRecord = null }: { initialRecord?: D
 
   if (!loaded) {
     return (
-      <article className="latest-record-card latest-record-card--skeleton" aria-label="Latest public QRguitar record">
+      <article className="latest-record-card latest-record-card--skeleton" aria-label="Latest QRguitar Profile">
         <div className="latest-record-hero">
           <div className="latest-live-row">
-            <span><Globe2 size={14} /> Latest public record</span>
+            <span><Globe2 size={14} /> Latest QRguitar Profile</span>
           </div>
           <div className="latest-skeleton-line latest-skeleton-line--title" aria-hidden="true" />
           <div className="latest-skeleton-line latest-skeleton-line--copy" aria-hidden="true" />
@@ -78,11 +80,11 @@ export function LatestPublicRecord({ initialRecord = null }: { initialRecord?: D
 
   if (!latest) {
     return (
-      <article className="latest-record-card latest-record-card--empty" aria-label="No public QRguitar records yet">
+      <article className="latest-record-card latest-record-card--empty" aria-label="No visible QRguitar Profiles yet">
         <div className="latest-record-empty">
-          <span><Globe2 size={14} /> Latest public record</span>
-          <h2>No public records yet.</h2>
-          <p>Create the first public QRguitar record.</p>
+          <span><Globe2 size={14} /> Latest QRguitar Profile</span>
+          <h2>No visible profiles yet.</h2>
+          <p>Create the first visible QRguitar Profile.</p>
           <Link className="button" href="/create">
             Create Record
           </Link>
@@ -97,21 +99,15 @@ export function LatestPublicRecord({ initialRecord = null }: { initialRecord?: D
     <CollectibleRecordCard
       record={latest}
       variant="latest"
-      eyebrow="Latest public record"
+      eyebrow="Latest QRguitar Profile"
       createdLabel={createdLabel}
-      ctaLabel="Open Record"
-      secondaryHref="/catalog"
-      secondaryLabel="Browse Catalog"
+      ctaLabel="Open Profile"
     />
   );
 }
 
 function pickHomepageRecord(records: DemoInstrument[]) {
-  return records.find((record) => isHomepageSafeRecord(record)) || null;
-}
-
-function isHomepageSafeRecord(record: DemoInstrument) {
-  return record.safetyStatus !== "lost" && record.safetyStatus !== "stolen";
+  return records[0] || null;
 }
 
 function formatCreatedAt(value: string) {

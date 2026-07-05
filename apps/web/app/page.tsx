@@ -1,6 +1,8 @@
 import { HomePageClient } from "../components/HomePageClient";
+import type { DemoInstrument } from "../lib/local-demo";
 import { getPublicInstruments } from "../lib/public-instruments";
 import { loadPublishedSiteSettings } from "../lib/site-settings-server";
+import { defaultSiteSettings, type EditableSiteSettings } from "../lib/site-settings";
 import { absoluteSiteUrl } from "../lib/seo";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
@@ -8,8 +10,28 @@ import type { Metadata } from "next";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+function settingsWithFastFallback() {
+  return new Promise<EditableSiteSettings>((resolve) => {
+    const timeout = setTimeout(() => resolve(defaultSiteSettings), 2500);
+    loadPublishedSiteSettings()
+      .then((settings) => resolve(settings))
+      .catch(() => resolve(defaultSiteSettings))
+      .finally(() => clearTimeout(timeout));
+  });
+}
+
+function latestRecordWithFastFallback() {
+  return new Promise<DemoInstrument | null>((resolve) => {
+    const timeout = setTimeout(() => resolve(null), 5000);
+    getPublicInstruments()
+      .then((records) => resolve(records[0] || null))
+      .catch(() => resolve(null))
+      .finally(() => clearTimeout(timeout));
+  });
+}
+
 export async function generateMetadata(): Promise<Metadata> {
-  const publishedSettings = await loadPublishedSiteSettings();
+  const publishedSettings = await settingsWithFastFallback();
   const title = publishedSettings.seo.title || "QRguitar";
   const description = publishedSettings.seo.description || "Permanent QR records for guitars, amps, pedals, builders, shops, and collectors.";
   const canonical = publishedSettings.seo.canonicalUrl || "https://www.qrguitar.com";
@@ -55,8 +77,10 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function HomePage() {
   noStore();
-  const [publicRecords, publishedSettings] = await Promise.all([getPublicInstruments(), loadPublishedSiteSettings()]);
-  const latestPublicRecord = publicRecords.find((record) => record.safetyStatus !== "lost" && record.safetyStatus !== "stolen") || null;
+  const [publishedSettings, initialLatestRecord] = await Promise.all([
+    settingsWithFastFallback(),
+    latestRecordWithFastFallback()
+  ]);
 
-  return <HomePageClient initialLatestRecord={latestPublicRecord} initialSettings={publishedSettings} />;
+  return <HomePageClient initialLatestRecord={initialLatestRecord} initialSettings={publishedSettings} />;
 }

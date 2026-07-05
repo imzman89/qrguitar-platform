@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowRight, Camera, ChevronLeft, ChevronRight, FileText, Globe2, ShieldCheck, Siren } from "lucide-react";
+import { ArrowRight, Camera, FileText, Globe2, ShieldCheck, Siren } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState, type MouseEvent } from "react";
+import { useMemo } from "react";
 import {
   getInstrumentCondition,
   getInstrumentVerificationStatus,
@@ -27,22 +27,23 @@ type CollectibleRecordCardProps = {
 export function CollectibleRecordCard({
   record,
   variant = "catalog",
-  eyebrow = "Public record",
+  eyebrow = "QRguitar Profile",
   createdLabel = "",
-  ctaLabel = "View Record",
+  ctaLabel = "Open Profile",
   secondaryHref = "",
   secondaryLabel = ""
 }: CollectibleRecordCardProps) {
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const title = instrumentDisplayName(record);
   const galleryImages = useMemo(() => {
     const images = [record.heroImageDataUrl, ...(record.galleryImageDataUrls || [])]
       .filter((image): image is string => Boolean(image));
     return Array.from(new Set(images));
   }, [record.galleryImageDataUrls, record.heroImageDataUrl]);
-  const imageUrl = galleryImages[activeImageIndex] || galleryImages[0] || "";
+  const imageUrl = galleryImages[0] || "";
   const location = formatRecordLocation(record);
   const condition = getInstrumentCondition(record);
+  const saleStatus = record.saleStatus === "for_sale" ? "For sale" : "";
+  const originalityStatus = record.originalityStatus === "all_original" ? "All original" : record.originalityStatus === "modified" ? "Modified" : "";
   const verificationStatus = getInstrumentVerificationStatus(record);
   const authenticityStatus = record.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed";
   const safetyStatus = record.safetyStatus === "lost" || record.safetyStatus === "stolen" || record.safetyStatus === "recovered"
@@ -51,26 +52,11 @@ export function CollectibleRecordCard({
   const photoCount = record.galleryImageDataUrls?.length || (record.heroImageDataUrl ? 1 : 0);
   const publicDocCount = record.documentFiles?.filter((file) => file.visibility !== "hidden").length || 0;
   const profileUrl = instrumentToProfileUrl(record);
-  const hasCarousel = galleryImages.length > 1;
-
-  function cycleImage(event: MouseEvent<HTMLButtonElement>, direction: "previous" | "next") {
-    event.preventDefault();
-    event.stopPropagation();
-    setActiveImageIndex((current) => {
-      if (!galleryImages.length) {
-        return 0;
-      }
-
-      if (direction === "previous") {
-        return current <= 0 ? galleryImages.length - 1 : current - 1;
-      }
-
-      return current >= galleryImages.length - 1 ? 0 : current + 1;
-    });
-  }
+  const showSecondaryAction = variant !== "latest" && secondaryHref && secondaryLabel;
+  const showSecondaryText = variant !== "latest" && !secondaryHref && secondaryLabel;
 
   return (
-    <article className={`collectible-card collectible-card--${variant}`} aria-label={`Open ${title} QRguitar record`}>
+    <article className={`collectible-card collectible-card--${variant}`} aria-label={`Open ${title} QRguitar Profile`}>
       <Link className="collectible-card-link" href={profileUrl} aria-label={`Open ${title} profile`}>
         <div className="collectible-card-media">
           {imageUrl ? (
@@ -92,11 +78,6 @@ export function CollectibleRecordCard({
             {createdLabel ? <span className="collectible-card-age">{createdLabel}</span> : null}
           </div>
           <span className="collectible-card-code">{record.qrCode}</span>
-          {hasCarousel ? (
-            <span className="collectible-card-photo-count">
-              {activeImageIndex + 1}/{galleryImages.length}
-            </span>
-          ) : null}
         </div>
 
         <div className="collectible-card-content">
@@ -123,6 +104,8 @@ export function CollectibleRecordCard({
                 <Siren size={13} /> <span className="record-badge-text">{safetyStatusLabel(safetyStatus)}</span>
               </span>
             ) : null}
+            {saleStatus ? <span className="record-badge record-badge--sale"><span className="record-badge-text">{saleStatus}</span></span> : null}
+            {originalityStatus ? <span className="record-badge record-badge--disclosure"><span className="record-badge-text">{originalityStatus}</span></span> : null}
           </div>
 
           <div className="collectible-card-facts">
@@ -134,24 +117,13 @@ export function CollectibleRecordCard({
 
           <div className="collectible-card-actions">
             <span className="collectible-card-cta">{ctaLabel} <ArrowRight size={14} /></span>
-            {!secondaryHref && secondaryLabel ? <span className="collectible-card-secondary">{secondaryLabel}</span> : null}
+            {showSecondaryText ? <span className="collectible-card-secondary">{secondaryLabel}</span> : null}
           </div>
         </div>
       </Link>
 
-      {hasCarousel ? (
-        <div className="collectible-card-carousel" aria-label={`${title} photos`}>
-          <button type="button" aria-label="Previous photo" onClick={(event) => cycleImage(event, "previous")}>
-            <ChevronLeft size={16} />
-          </button>
-          <button type="button" aria-label="Next photo" onClick={(event) => cycleImage(event, "next")}>
-            <ChevronRight size={16} />
-          </button>
-        </div>
-      ) : null}
-
       <RecordShareButton className="collectible-card-share" code={record.qrCode} title={title} />
-      {secondaryHref && secondaryLabel ? (
+      {showSecondaryAction ? (
         <Link className="collectible-card-secondary-link" href={secondaryHref}>
           {secondaryLabel}
         </Link>

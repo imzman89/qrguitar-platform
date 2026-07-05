@@ -167,7 +167,7 @@ export const defaultSiteSettings: EditableSiteSettings = {
     qrGuidanceTitle: "Permanent QR URLs",
     qrGuidanceBody: "Editing serials, specs, photos, or titles does not change the QRguitar link.",
     privacyGuidanceTitle: "Visibility control",
-    privacyGuidanceBody: "Public records appear in the catalog. Private records stay off public pages.",
+    privacyGuidanceBody: "Public QRguitar Profiles appear in the catalog. Private profiles stay off public pages.",
     transferGuidanceTitle: "Ownership transfer",
     transferGuidanceBody: "Use transfer tools for normal handoffs and support for edge cases during beta.",
     verificationGuidanceTitle: "Verification and authenticity",
@@ -202,10 +202,49 @@ function normalizePricingCards(cards: PricingPlanInput[]) {
   ];
 }
 
+function normalizeProfileCopy(value: string) {
+  const stalePublic = "Public";
+  const stalePublicLower = "public";
+  const staleRecord = "Record";
+  const staleRecords = "Records";
+  const replacements: Array<[RegExp, string]> = [
+    [new RegExp(`\\bBrowse ${stalePublic} ${staleRecords}\\b`, "g"), "Browse QRguitar Profiles"],
+    [new RegExp(`\\bSee ${stalePublic} ${staleRecords}\\b`, "g"), "See QRguitar Profiles"],
+    [new RegExp(`\\b${stalePublic} QRguitar ${staleRecords}\\b`, "g"), "QRguitar Profiles"],
+    [new RegExp(`\\b${stalePublic} QRguitar ${staleRecord}\\b`, "g"), "QRguitar Profile"],
+    [new RegExp(`\\b${stalePublicLower} QRguitar ${staleRecords.toLowerCase()}\\b`, "g"), "QRguitar Profiles"],
+    [new RegExp(`\\b${stalePublicLower} QRguitar ${staleRecord.toLowerCase()}\\b`, "g"), "QRguitar Profile"],
+    [new RegExp(`\\b${stalePublic} ${staleRecords}\\b`, "g"), "QRguitar Profiles"],
+    [new RegExp(`\\b${stalePublic} ${staleRecord}\\b`, "g"), "QRguitar Profile"],
+    [new RegExp(`\\b${stalePublicLower} ${staleRecords.toLowerCase()}\\b`, "g"), "QRguitar Profiles"],
+    [new RegExp(`\\b${stalePublicLower} ${staleRecord.toLowerCase()}\\b`, "g"), "QRguitar Profile"]
+  ];
+
+  return replacements.reduce((copy, [pattern, replacement]) => copy.replace(pattern, replacement), value);
+}
+
+function normalizeCopyObject<T>(value: T): T {
+  if (typeof value === "string") {
+    return normalizeProfileCopy(value) as T;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeCopyObject(item)) as T;
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, normalizeCopyObject(item)])
+    ) as T;
+  }
+
+  return value;
+}
+
 export function mergeSiteSettings(settings?: Partial<EditableSiteSettings> | null): EditableSiteSettings {
   const sections: Partial<EditableSiteSettings["sections"]> = settings?.sections || {};
   const hasInstrumentCategories = Object.prototype.hasOwnProperty.call(settings || {}, "instrumentCategories");
-  return {
+  return normalizeCopyObject({
     ...defaultSiteSettings,
     ...(settings || {}),
     instrumentCategories: Array.isArray(settings?.instrumentCategories)
@@ -244,7 +283,7 @@ export function mergeSiteSettings(settings?: Partial<EditableSiteSettings> | nul
       ...defaultSiteSettings.dashboard,
       ...(settings?.dashboard || {})
     }
-  };
+  });
 }
 
 export function readSiteSettings() {

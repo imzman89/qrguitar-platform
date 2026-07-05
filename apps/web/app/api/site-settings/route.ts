@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { revalidatePath, unstable_noStore as noStore } from "next/cache";
-import { createServerSupabaseClient, getSupabaseEnvStatus } from "../../../lib/supabase-server";
+import { createServerSupabaseClient, createServerSupabaseClientWithTimeout, getSupabaseEnvStatus } from "../../../lib/supabase-server";
 import { defaultSiteSettings, mergeSiteSettings, publishedSiteSettingsKey, type EditableSiteSettings } from "../../../lib/site-settings";
 import { getAdminContext } from "../../../lib/admin-auth";
 
@@ -28,7 +28,7 @@ function noStoreJson<T>(body: T, init: ResponseInit = {}) {
 
 export async function GET() {
   noStore();
-  const supabase = createServerSupabaseClient();
+  const supabase = createServerSupabaseClientWithTimeout(3000);
   if (!supabase) {
     const status = getSupabaseEnvStatus();
     return noStoreJson({

@@ -79,8 +79,8 @@ export function HomepageRecordSpotlight({ promotedQrCode = "" }: HomepageRecordS
     <CollectibleRecordCard
       record={spotlightRecord}
       variant="spotlight"
-      eyebrow={promotedQrCode ? "Promoted spotlight" : "More public records"}
-      ctaLabel="Open Record"
+      eyebrow={promotedQrCode ? "Promoted spotlight" : "More QRguitar Profiles"}
+      ctaLabel="Open Profile"
     />
   );
 }

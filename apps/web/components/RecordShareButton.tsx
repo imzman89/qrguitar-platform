@@ -27,7 +27,7 @@ export function RecordShareButton({ code, title, className = "" }: RecordShareBu
       if (shouldUseNativeShare) {
         await navigator.share({
           title: label,
-          text: `QRguitar record for ${label}`,
+          text: `QRguitar Profile for ${label}`,
           url
         });
         setStatus("copied");
@@ -46,7 +46,7 @@ export function RecordShareButton({ code, title, className = "" }: RecordShareBu
 
   return (
     <span className={`record-share-wrap ${className}`.trim()}>
-      <button className="record-share-button" type="button" aria-label="Share record" onClick={shareRecord}>
+      <button className="record-share-button" type="button" aria-label="Share profile" onClick={shareRecord}>
         <Share2 size={15} />
       </button>
       {status !== "idle" ? (

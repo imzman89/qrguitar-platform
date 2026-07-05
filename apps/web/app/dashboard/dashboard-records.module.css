@@ -195,6 +195,14 @@
   --badge-text: #e19a92;
 }
 
+.instrumentBadges small.badgeSale {
+  --badge-text: #e2bd75;
+}
+
+.instrumentBadges small.badgeDisclosure {
+  --badge-text: #c8b79a;
+}
+
 .instrumentBadges small.badgeNeutral {
   --badge-text: rgba(214, 202, 182, .88);
 }

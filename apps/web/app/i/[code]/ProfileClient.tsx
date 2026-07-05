@@ -34,6 +34,7 @@ import { formatRecordLocation } from "../../../lib/record-location";
 import { createBrowserSupabaseClient } from "../../../lib/supabase-browser";
 
 type ProfileTab = "overview" | "specs" | "timeline" | "ownership" | "media" | "repairs" | "documents";
+const PROFILE_FETCH_TIMEOUT_MS = 28000;
 
 const profileTabs: Array<{ id: ProfileTab; label: string }> = [
   { id: "overview", label: "Overview" },
@@ -77,7 +78,9 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     setStored(initialInstrument);
 
     async function loadInstrument() {
-      const normalizedCode = String(code || "").trim().toUpperCase();
+      const pathCode =
+        typeof window !== "undefined" ? decodeURIComponent(window.location.pathname.split("/").filter(Boolean).pop() || "") : "";
+      const normalizedCode = String(code || pathCode || "").trim().toUpperCase();
 
       let settled = false;
 
@@ -103,28 +106,48 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
         if (!cancelled && !settled) {
           fallbackNow();
         }
-      }, 1800);
+      }, PROFILE_FETCH_TIMEOUT_MS);
 
       try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 1800);
+        let lastStatus = 0;
+        let foundInstrument: DemoInstrument | null = null;
 
-        const response = await fetch(`/api/instruments?code=${encodeURIComponent(normalizedCode)}`, {
-          cache: "no-store",
-          headers: { "Cache-Control": "no-cache" },
-          signal: controller.signal
-        });
-        const payload = (await response.json().catch(() => null)) as
-          | ({ ok?: boolean; instrument?: DemoInstrument; message?: string } | null)
-          | null;
+        for (let attempt = 0; attempt < 3 && !cancelled; attempt += 1) {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), PROFILE_FETCH_TIMEOUT_MS);
 
-        clearTimeout(timer);
+          try {
+            const response = await fetch(`/api/instruments?code=${encodeURIComponent(normalizedCode)}`, {
+              cache: "no-store",
+              headers: { "Cache-Control": "no-cache" },
+              signal: controller.signal
+            });
+            lastStatus = response.status;
+            const payload = (await response.json().catch(() => null)) as
+              | ({ ok?: boolean; instrument?: DemoInstrument; message?: string } | null)
+              | null;
+
+            if (response.ok && payload?.ok && payload.instrument) {
+              foundInstrument = payload.instrument;
+              break;
+            }
+
+            if (response.status === 404) {
+              break;
+            }
+          } finally {
+            clearTimeout(timer);
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, 750));
+        }
+
         clearTimeout(timeout);
 
         if (!cancelled) {
-          if (response.ok && payload?.ok && payload.instrument) {
-            markResolved(payload.instrument, true);
-          } else if (!settled) {
+          if (foundInstrument) {
+            markResolved(foundInstrument, true);
+          } else if (!settled || lastStatus === 404) {
             markResolved(null);
           }
         }
@@ -323,7 +346,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     { label: "Serial / Build ID", value: instrument.serial },
     { label: "Year", value: instrument.year || "Unknown" },
     ...(formattedLocation ? [{ label: "Location", value: formattedLocation }] : []),
-    { label: "Visibility", value: instrument.visibility === "private" ? "Private record" : instrument.visibility === "unlisted" ? "Unlisted record" : "Public record" },
+    { label: "Visibility", value: instrument.visibility === "private" ? "Private profile" : instrument.visibility === "unlisted" ? "Unlisted profile" : "Visible profile" },
     { label: "Media / Docs", value: `${galleryImages.length} photos / ${documentFiles.length} docs` },
     ...(showVerificationBadge ? [{ label: "Verification", value: isVerifiedRecord ? "Verified by QRguitar" : "Unverified" }] : []),
     ...(showAuthenticityBadge ? [{ label: "Authenticity", value: isAuthenticityConfirmed ? "Authenticity Confirmed" : "Authenticity Unconfirmed" }] : [])
@@ -333,6 +356,10 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
 
   const optionalSpecs = [
     { label: "Type", value: instrument.instrumentType },
+    { label: "Sale availability", value: instrument.saleStatus === "for_sale" ? "For sale" : "Not for sale" },
+    ...(instrument.originalityStatus && instrument.originalityStatus !== "unknown"
+      ? [{ label: "Originality", value: instrument.originalityStatus === "all_original" ? "All original" : "Modified" }]
+      : []),
     { label: "Finish", value: instrument.finish },
     { label: "Body", value: instrument.bodyWood },
     { label: "Neck", value: instrument.neckWood },
@@ -365,17 +392,33 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
         </div>
 
         <section className="scan-hero">
-          <div className="scan-hero-media">
+          <button
+            className="scan-hero-media"
+            type="button"
+            onClick={() => {
+              if (galleryImages.length) {
+                setMediaIndex(0);
+                setActiveMedia(galleryImages[0]);
+              }
+            }}
+            disabled={!galleryImages.length}
+            aria-label={galleryImages.length ? `Open ${instrumentDisplayName(instrument)} photo gallery` : undefined}
+          >
             {instrument.heroImageDataUrl ? (
               <img src={instrument.heroImageDataUrl} alt={`${instrumentDisplayName(instrument)} main photo`} />
             ) : (
               <div className="scan-hero-empty">No main photo yet</div>
             )}
-          </div>
+            {galleryImages.length ? (
+              <span className="scan-hero-photo-count">
+                {mediaIndex + 1}/{galleryImages.length}
+              </span>
+            ) : null}
+          </button>
           <div className="scan-hero-info">
             <div className="builder-mark">
               <span>{instrument.brand || "QRguitar"}</span>
-              <strong>{instrument.model || instrument.instrumentType || "Instrument record"}</strong>
+              <strong>{instrument.model || instrument.instrumentType || "QRguitar Profile"}</strong>
             </div>
             <h1>{instrumentDisplayName(instrument)}</h1>
             <div className="verified-badge">
@@ -527,7 +570,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
         />
 
         <section className="scan-tags" aria-label="Instrument badges">
-          <span>{instrument.visibility === "private" ? "Private" : "Public"}</span>
+          <span>{instrument.visibility === "private" ? "Private" : instrument.visibility === "unlisted" ? "Unlisted" : "Visible"}</span>
           <span>{instrument.instrumentCondition ? instrument.instrumentCondition.toUpperCase() : "USED"}</span>
           <span>{formattedLocation || "Registered"}</span>
           {safetyStatus === "lost" ? <span className="scan-tag--safety">Reported Lost</span> : null}
@@ -717,7 +760,7 @@ function ProfilePanel({
         <div className="ownership-grid">
           <span><strong>Current owner</strong>{instrument.owner || "Unclaimed"}</span>
           {instrument.builder ? <span><strong>Builder</strong>{instrument.builder}</span> : null}
-          <span><strong>Visibility</strong>{instrument.visibility === "private" ? "Private record" : "Public record"}</span>
+          <span><strong>Visibility</strong>{instrument.visibility === "private" ? "Private profile" : instrument.visibility === "unlisted" ? "Unlisted profile" : "Visible profile"}</span>
                 </div>
                 <EmptyPanel
                   title="Transfer tools live here."
@@ -833,7 +876,7 @@ function ProfilePanel({
     <section className="scan-tab-panel scan-overview">
       <div>
         <h2>About this instrument</h2>
-        <p>{instrument.summary || "This QRguitar record keeps the core facts, media, paperwork, and ownership history with the instrument."}</p>
+        <p>{instrument.summary || "This QRguitar Profile keeps the core facts, media, paperwork, and ownership history with the instrument."}</p>
         {optionalSpecs.length ? (
           <div className="public-spec-list">
             {optionalSpecs.map((spec) => (

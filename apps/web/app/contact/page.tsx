@@ -65,7 +65,7 @@ export default function ContactPage() {
             <div className="legal-card contact-checklist">
               <h2>What to include</h2>
               <ul>
-                <li>QRguitar ID or public record link, if you have one.</li>
+                <li>QRguitar ID or profile link, if you have one.</li>
                 <li>The account email you used to create the record.</li>
                 <li>Photos, receipts, service notes, or proof details relevant to the request.</li>
                 <li>A short note explaining what you need changed, reviewed, or fixed.</li>

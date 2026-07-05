@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import { buildPageMetadata } from "../../lib/seo";
 
 export const metadata: Metadata = buildPageMetadata(
-  "Browse Public Records",
-  "Browse public QRguitar records for instruments, amps, pedals, builders, shops, and collectors.",
+  "Browse QRguitar Profiles",
+  "Browse QRguitar Profiles for instruments, amps, pedals, builders, shops, and collectors.",
   "/catalog"
 );
 

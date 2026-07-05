@@ -1,7 +1,8 @@
-import { createServerSupabaseClient } from "./supabase-server";
+import { createPublicSupabaseClient } from "./supabase-server";
 import { defaultQrStyle, type DemoInstrument } from "./local-demo";
 import { mergeRecordTrustSettings, recordTrustContentKey, type RecordTrustSettings } from "./record-trust";
 import { unstable_noStore as noStore } from "next/cache";
+import { supabaseHttpsJson, supabaseSignedStorageUrl, supabaseStoragePublicUrl } from "./supabase-http";
 
 type GuitarRow = {
   id: string;
@@ -74,6 +75,8 @@ type SiteContentRow = {
   content_value: Partial<RecordTrustSettings> | null;
 };
 
+const PUBLIC_MEDIA_SIGNED_URL_TTL_SECONDS = 60 * 60 * 24;
+
 const stalePublicSpecValues = new Set([
   "alder",
   "maple neck, rosewood board"
@@ -95,7 +98,7 @@ function publicSummary(value?: string | null) {
   }
 
   if (/\b(buy now|checkout|check out the full listing|view listing)\b/i.test(summary)) {
-    return "Public QRguitar record with photos, specs, and instrument details.";
+    return "QRguitar Profile with photos, specs, and instrument details.";
   }
 
   return summary;
@@ -115,70 +118,70 @@ function publicUrlOrStoragePath(path?: string | null) {
 }
 
 async function resolveMediaSources(paths: string[]) {
-  const supabase = createServerSupabaseClient();
   const uniquePaths = Array.from(new Set(paths.filter(Boolean)));
-  if (!supabase) {
-    return uniquePaths.map(publicUrlOrStoragePath).filter(Boolean);
-  }
 
-  const resolved: string[] = [];
-  for (const path of uniquePaths) {
+  const resolved = await Promise.all(uniquePaths.map(async (path) => {
     const source = publicUrlOrStoragePath(path);
     if (!source) {
-      continue;
+      return "";
     }
 
     if (source === path && !source.startsWith("/")) {
-      const { data } = await supabase.storage.from("instrument-media").createSignedUrl(source, 60 * 60);
-      resolved.push(data?.signedUrl || source);
-      continue;
+      try {
+        const signed = await supabaseSignedStorageUrl("instrument-media", source, PUBLIC_MEDIA_SIGNED_URL_TTL_SECONDS);
+        if (signed) {
+          return signed;
+        }
+      } catch {
+        // Fall through to a public URL; media signing should not block public profile data.
+      }
+
+      return supabaseStoragePublicUrl("instrument-media", source);
     }
 
-    resolved.push(source);
-  }
+    return source;
+  }));
 
-  return resolved;
+  return resolved.filter(Boolean);
 }
 
 async function resolveDocumentSources(documents: DocumentRow[]) {
-  const supabase = createServerSupabaseClient();
+  const supabase = createPublicSupabaseClient();
   if (!supabase) {
     return [];
   }
 
-  const resolved: NonNullable<DemoInstrument["documentFiles"]> = [];
-  for (const document of documents.filter((item) => item.is_public)) {
+  const resolved = await Promise.all(documents.filter((item) => item.is_public).map(async (document) => {
     const source = publicUrlOrStoragePath(document.storage_path);
     if (!source) {
-      continue;
+      return null;
     }
 
     if (source === document.storage_path && !source.startsWith("/")) {
-      const { data } = await supabase.storage.from("instrument-documents").createSignedUrl(source, 60 * 15);
-      if (data?.signedUrl) {
-        resolved.push({
-          name: document.name,
-          url: data.signedUrl,
-          visibility: "public",
-          documentType: document.document_type || "",
-          publicDescription: document.public_description || "",
-          createdAt: document.created_at || ""
-        });
-      }
-      continue;
+      const publicUrl = supabase.storage.from("instrument-documents").getPublicUrl(source).data.publicUrl;
+      return publicUrl
+        ? {
+            name: document.name,
+            url: publicUrl,
+            visibility: "public",
+            documentType: document.document_type || "",
+            publicDescription: document.public_description || "",
+            createdAt: document.created_at || ""
+          }
+        : null;
     }
 
-    resolved.push({
+    return {
       name: document.name,
       url: source,
       visibility: "public",
       documentType: document.document_type || "",
       publicDescription: document.public_description || "",
       createdAt: document.created_at || ""
-    });
-  }
+    };
+  }));
 
-  return resolved;
+  return resolved.filter(Boolean) as NonNullable<DemoInstrument["documentFiles"]>;
 }
 
 function mapRecord({
@@ -265,17 +268,22 @@ function mapPublicServiceEvent(row: TimelineRow) {
 
 async function loadTrustSettingsMap(qrCodes: string[]) {
   const trustByCode = new Map<string, RecordTrustSettings>();
-  const supabase = createServerSupabaseClient();
-  if (!supabase || !qrCodes.length) {
+  if (!qrCodes.length) {
     return trustByCode;
   }
 
-  const result = await supabase.from("site_content").select("content_key,content_value").in("content_key", qrCodes.map(recordTrustContentKey));
-  if (result.error) {
+  const keyFilter = qrCodes.map((code) => `"${recordTrustContentKey(code)}"`).join(",");
+  let rows: SiteContentRow[];
+  try {
+    rows = await supabaseHttpsJson<SiteContentRow[]>(
+      `/rest/v1/site_content?select=content_key,content_value&content_key=in.(${keyFilter})`,
+      { serviceRole: true, timeoutMs: 4000 }
+    );
+  } catch {
     return trustByCode;
   }
 
-  for (const row of (result.data || []) as SiteContentRow[]) {
+  for (const row of rows) {
     const code = row.content_key.replace(/^record_trust:/, "").toUpperCase();
     trustByCode.set(code, mergeRecordTrustSettings(row.content_value));
   }
@@ -284,8 +292,7 @@ async function loadTrustSettingsMap(qrCodes: string[]) {
 }
 
 async function loadRelated(guitars: GuitarRow[]) {
-  const supabase = createServerSupabaseClient();
-  if (!supabase || !guitars.length) {
+  if (!guitars.length) {
     return {
       media: new Map<string, string[]>(),
       specs: new Map<string, SpecRow[]>(),
@@ -297,46 +304,31 @@ async function loadRelated(guitars: GuitarRow[]) {
 
   const ids = guitars.map((guitar) => guitar.id);
   const ownerIds = guitars.map((guitar) => guitar.owner_id).filter(Boolean) as string[];
-  const [mediaResult, specsResult, documentsResult, profilesResult, serviceEventsResult] = await Promise.all([
-    supabase.from("guitar_media").select("guitar_id,storage_path").in("guitar_id", ids),
-    supabase.from("guitar_specs").select("guitar_id,label,value").in("guitar_id", ids),
-    supabase.from("guitar_documents").select("guitar_id,name,storage_path,is_public,document_type,public_description,created_at").in("guitar_id", ids),
-    ownerIds.length ? supabase.from("profiles").select("id,display_name,account_status,hide_public_content").in("id", ownerIds) : Promise.resolve({ data: [], error: null }),
-    supabase
-      .from("guitar_timeline_events")
-      .select("id,guitar_id,event_date,event_type,title,description,shop_name,location,is_public,created_at,updated_at")
-      .in("guitar_id", ids)
-      .eq("is_public", true)
-      .order("event_date", { ascending: false, nullsFirst: false })
-      .order("created_at", { ascending: false })
+  const idFilter = ids.map(encodeURIComponent).join(",");
+  const ownerIdFilter = ownerIds.map(encodeURIComponent).join(",");
+  const [mediaRows, specRows, documentRows, profileRows, serviceEventRows] = await Promise.all([
+    supabaseHttpsJson<MediaRow[]>(`/rest/v1/guitar_media?select=guitar_id,storage_path&guitar_id=in.(${idFilter})`),
+    supabaseHttpsJson<SpecRow[]>(`/rest/v1/guitar_specs?select=guitar_id,label,value&guitar_id=in.(${idFilter})`),
+    supabaseHttpsJson<DocumentRow[]>(`/rest/v1/guitar_documents?select=guitar_id,name,storage_path,is_public,document_type,public_description,created_at&guitar_id=in.(${idFilter})`),
+    ownerIds.length
+      ? supabaseHttpsJson<ProfileRow[]>(`/rest/v1/profiles?select=id,display_name,account_status,hide_public_content&id=in.(${ownerIdFilter})`)
+      : Promise.resolve([]),
+    supabaseHttpsJson<TimelineRow[]>(`/rest/v1/guitar_timeline_events?select=id,guitar_id,event_date,event_type,title,description,shop_name,location,is_public,created_at,updated_at&guitar_id=in.(${idFilter})&is_public=eq.true&order=event_date.desc.nullslast,created_at.desc`)
+      .catch((error: Error) => (/column .* does not exist/i.test(error.message) ? [] : Promise.reject(error)))
   ]);
 
-  const serviceEventsColumnsMissing = serviceEventsResult.error && /column .* does not exist/i.test(serviceEventsResult.error.message);
-
-  let profileRows = (profilesResult.data || []) as ProfileRow[];
-  let profileError = profilesResult.error;
-  if (profileError && /column .* does not exist/i.test(profileError.message || "") && ownerIds.length) {
-    const fallbackProfiles = await supabase.from("profiles").select("id,display_name").in("id", ownerIds);
-    profileRows = (fallbackProfiles.data || []) as ProfileRow[];
-    profileError = fallbackProfiles.error;
-  }
-
-  if (mediaResult.error || specsResult.error || documentsResult.error || profileError || (serviceEventsResult.error && !serviceEventsColumnsMissing)) {
-    throw new Error(mediaResult.error?.message || specsResult.error?.message || documentsResult.error?.message || profilesResult.error?.message || serviceEventsResult.error?.message || "Could not load related instrument data.");
-  }
-
   const media = new Map<string, string[]>();
-  for (const row of (mediaResult.data || []) as MediaRow[]) {
+  for (const row of mediaRows) {
     media.set(row.guitar_id, [...(media.get(row.guitar_id) || []), row.storage_path]);
   }
 
   const specs = new Map<string, SpecRow[]>();
-  for (const row of (specsResult.data || []) as SpecRow[]) {
+  for (const row of specRows) {
     specs.set(row.guitar_id, [...(specs.get(row.guitar_id) || []), row]);
   }
 
   const documents = new Map<string, DocumentRow[]>();
-  for (const row of (documentsResult.data || []) as DocumentRow[]) {
+  for (const row of documentRows) {
     documents.set(row.guitar_id, [...(documents.get(row.guitar_id) || []), row]);
   }
 
@@ -346,10 +338,8 @@ async function loadRelated(guitars: GuitarRow[]) {
   }
 
   const serviceEvents = new Map<string, ReturnType<typeof mapPublicServiceEvent>[]>();
-  if (!serviceEventsColumnsMissing) {
-    for (const row of (serviceEventsResult.data || []) as TimelineRow[]) {
-      serviceEvents.set(row.guitar_id, [...(serviceEvents.get(row.guitar_id) || []), mapPublicServiceEvent(row)]);
-    }
+  for (const row of serviceEventRows) {
+    serviceEvents.set(row.guitar_id, [...(serviceEvents.get(row.guitar_id) || []), mapPublicServiceEvent(row)]);
   }
 
   return { media, specs, documents, profiles, serviceEvents };
@@ -357,30 +347,15 @@ async function loadRelated(guitars: GuitarRow[]) {
 
 export async function getPublicInstruments() {
   noStore();
-  const supabase = createServerSupabaseClient();
-  if (!supabase) {
-    return [];
-  }
-
-  const { data, error } = await supabase
-    .from("guitars")
-    .select("id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at")
-    .eq("visibility", "public")
-    .is("admin_archived_at", null)
-    .is("owner_removed_at", null)
-    .order("created_at", { ascending: false });
-
-  if (error || !data) {
-    throw new Error(error?.message || "Could not load public instruments.");
-  }
-
-  const guitars = data as GuitarRow[];
-  const related = await loadRelated(guitars);
+  const guitars = await supabaseHttpsJson<GuitarRow[]>("/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&visibility=eq.public&admin_archived_at=is.null&owner_removed_at=is.null&order=created_at.desc");
+  const [related, trustByCode] = await Promise.all([
+    loadRelated(guitars),
+    loadTrustSettingsMap(guitars.map((guitar) => guitar.qr_code))
+  ]);
   const visibleGuitars = guitars.filter((guitar) => {
     const profile = related.profiles.get(guitar.owner_id || "");
     return profile?.hide_public_content !== true && profile?.account_status !== "banned" && profile?.account_status !== "removed";
   });
-  const trustByCode = await loadTrustSettingsMap(visibleGuitars.map((guitar) => guitar.qr_code));
 
   return Promise.all(
     visibleGuitars.map(async (guitar) => {
@@ -403,26 +378,17 @@ export async function getPublicInstruments() {
 
 export async function getPublicInstrumentByCode(code: string) {
   noStore();
-  const supabase = createServerSupabaseClient();
-  if (!supabase) {
-    return null;
-  }
-
-  const { data, error } = await supabase
-    .from("guitars")
-    .select("id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at")
-    .eq("qr_code", code.toUpperCase())
-    .maybeSingle<GuitarRow>();
-
-  if (error) {
-    throw new Error(error.message);
-  }
+  const rows = await supabaseHttpsJson<GuitarRow[]>(`/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&qr_code=eq.${encodeURIComponent(code.toUpperCase())}&limit=1`);
+  const data = rows[0] || null;
 
   if (!data || data.visibility === "private" || data.admin_archived_at || data.owner_removed_at) {
     return null;
   }
 
-  const related = await loadRelated([data]);
+  const [related, trustByCode] = await Promise.all([
+    loadRelated([data]),
+    loadTrustSettingsMap([data.qr_code])
+  ]);
   const ownerProfile = related.profiles.get(data.owner_id || "");
   if (ownerProfile?.hide_public_content === true || ownerProfile?.account_status === "banned" || ownerProfile?.account_status === "removed") {
     return null;
@@ -431,7 +397,6 @@ export async function getPublicInstrumentByCode(code: string) {
   const media = await resolveMediaSources((related.media.get(data.id) || []).filter((storagePath) => storagePath !== heroStoragePath));
   const heroImagePath = heroStoragePath ? (await resolveMediaSources([heroStoragePath]))[0] : "";
   const documents = await resolveDocumentSources(related.documents.get(data.id) || []);
-  const trustByCode = await loadTrustSettingsMap([data.qr_code]);
 
   return mapRecord({
     guitar: { ...data, hero_image_path: heroImagePath || data.hero_image_path },

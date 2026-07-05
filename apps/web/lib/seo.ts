@@ -141,7 +141,7 @@ export function getRecordMetadataDescription(instrument: DemoInstrument) {
     return base ? `${base}. ${summary}` : summary;
   }
 
-  return base ? `${base}. Public QRguitar record.` : DEFAULT_DESCRIPTION;
+  return base ? `${base}. QRguitar Profile.` : DEFAULT_DESCRIPTION;
 }
 
 export function buildRecordMetadata(instrument: DemoInstrument): Metadata {
@@ -165,7 +165,7 @@ export function buildRecordMetadata(instrument: DemoInstrument): Metadata {
       images: [
         {
           url: image,
-          alt: `${title} QRguitar record photo`
+          alt: `${title} QRguitar Profile photo`
         }
       ]
     },

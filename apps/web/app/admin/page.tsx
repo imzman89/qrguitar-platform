@@ -1058,7 +1058,7 @@ export default function AdminPage() {
                 </div>
                 <div className="admin-row-actions">
                   {document.recordCode ? <Link href={`/edit/${document.recordCode}`}>Open Editor</Link> : null}
-                  {document.is_public && document.recordCode ? <Link href={`/i/${document.recordCode}`}>Public Record</Link> : null}
+                  {document.is_public && document.recordCode ? <Link href={`/i/${document.recordCode}`}>Open Profile</Link> : null}
                 </div>
               </div>
             )) : <p className="admin-empty">No proof documents match this view.</p>}
@@ -1087,7 +1087,7 @@ export default function AdminPage() {
                 </div>
                 <div className="admin-row-actions">
                   {event.recordCode ? <Link href={`/edit/${event.recordCode}`}>Open Editor</Link> : null}
-                  {event.is_public && event.recordCode ? <Link href={`/i/${event.recordCode}`}>Public Record</Link> : null}
+                  {event.is_public && event.recordCode ? <Link href={`/i/${event.recordCode}`}>Open Profile</Link> : null}
                 </div>
               </div>
             )) : <p className="admin-empty">No service entries match this view.</p>}

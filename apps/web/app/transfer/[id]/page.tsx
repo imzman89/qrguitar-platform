@@ -196,7 +196,7 @@ export default function TransferClaimPage() {
                 <h3>Ownership accepted.</h3>
                 <p>This record now belongs to the accepting account and keeps the same permanent QRguitar link.</p>
                 <Link className="button" href={profileHref}>
-                  View Record
+                  View Profile
                 </Link>
                 <button className="button secondary" type="button" onClick={() => void copyProfileLink()}>
                   <Copy size={16} />
@@ -212,7 +212,7 @@ export default function TransferClaimPage() {
                 <h3>This transfer was cancelled.</h3>
                 <p>The current owner needs to create a new claim link before this instrument can be handed off.</p>
                 <Link className="button" href={profileHref}>
-                  View Record
+                  View Profile
                 </Link>
               </>
             ) : !signedIn ? (
@@ -231,7 +231,7 @@ export default function TransferClaimPage() {
               <>
                 <div className="icon"><LogIn /></div>
                 <h3>Ready to accept.</h3>
-                <p>Accepting transfers ownership of this QRguitar record to your signed-in account. The public QR URL stays unchanged.</p>
+                <p>Accepting transfers ownership of this QRguitar Profile to your signed-in account. The permanent QR URL stays unchanged.</p>
                 <button className="button" type="button" onClick={() => void acceptTransfer()} disabled={accepting}>
                   {accepting ? "Accepting..." : "Accept Ownership"}
                 </button>

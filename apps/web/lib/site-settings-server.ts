@@ -1,5 +1,5 @@
 import { unstable_noStore as noStore } from "next/cache";
-import { createServerSupabaseClient } from "./supabase-server";
+import { createServerSupabaseClientWithTimeout } from "./supabase-server";
 import { defaultSiteSettings, mergeSiteSettings, publishedSiteSettingsKey, type EditableSiteSettings } from "./site-settings";
 
 type SiteContentRow = {
@@ -8,7 +8,7 @@ type SiteContentRow = {
 
 export async function loadPublishedSiteSettings() {
   noStore();
-  const supabase = createServerSupabaseClient();
+  const supabase = createServerSupabaseClientWithTimeout(3000);
   if (!supabase) {
     return defaultSiteSettings;
   }

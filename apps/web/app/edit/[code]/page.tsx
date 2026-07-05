@@ -30,6 +30,8 @@ const emptyForm = {
   finish: "",
   weight: "",
   instrumentCondition: "used",
+  saleStatus: "not_for_sale",
+  originalityStatus: "unknown",
   owner: "",
   ownerStatus: "",
   location: "",
@@ -40,11 +42,11 @@ const emptyForm = {
   visibility: "public"
 };
 
-const managedFieldLabels = new Set(["instrument type", "builder", "finish", "weight", "owner status", "specs notes", "service notes"]);
+const managedFieldLabels = new Set(["instrument type", "builder", "finish", "weight", "owner status", "specs notes", "service notes", "sale status", "originality"]);
 const serviceEventTypes = ["Setup", "Repair", "Modification", "Pickup Install", "Wiring", "Fretwork", "Inspection", "Appraisal/Review", "Cleaning", "Other"];
 const documentTypeOptions = ["Receipt", "Invoice", "Appraisal", "Certificate", "Build Sheet", "Service Slip", "Insurance Photo", "Warranty", "Authenticity Evidence", "Other"];
 const oldVerifiedQrLabel = "Scan for verified QRguitar record";
-const safeDefaultQrLabel = "Scan QRguitar record";
+const safeDefaultQrLabel = "Scan QRguitar Profile";
 const staleDraftValueParts = [
   ["QA", "Lost", "Test"],
   ["PRIVATE", "SAFETY", "NOTE", "SHOULD", "NOT", "LEAK"],
@@ -159,6 +161,8 @@ export default function EditInstrumentPage() {
               finish: readManagedField(instrument, "Finish", instrument.finish),
               weight: readManagedField(instrument, "Weight"),
               instrumentCondition: getInstrumentCondition(instrument),
+              saleStatus: instrument.saleStatus || "not_for_sale",
+              originalityStatus: instrument.originalityStatus || "unknown",
               owner: instrument.owner || "",
               ownerStatus: readManagedField(instrument, "Owner status"),
               location: instrument.location || "",
@@ -446,6 +450,8 @@ export default function EditInstrumentPage() {
       builder: form.builder,
       finish: form.finish,
       instrumentCondition: form.instrumentCondition === "new" ? "new" : "used",
+      saleStatus: form.saleStatus === "for_sale" ? "for_sale" : "not_for_sale",
+      originalityStatus: form.originalityStatus === "all_original" ? "all_original" : form.originalityStatus === "modified" ? "modified" : "unknown",
       owner: form.owner,
       location: form.location,
       summary: form.summary,
@@ -525,6 +531,8 @@ export default function EditInstrumentPage() {
           builder: form.builder,
           finish: form.finish,
           condition: form.instrumentCondition as "new" | "used",
+          saleStatus: form.saleStatus as "for_sale" | "not_for_sale",
+          originalityStatus: form.originalityStatus as "all_original" | "modified" | "unknown",
           ownerName: form.owner || "",
           location: form.location,
           visibility: form.visibility as "public" | "private" | "unlisted",
@@ -743,7 +751,7 @@ export default function EditInstrumentPage() {
       <main className="section create-page">
         <div className="shell split create-layout">
           <div>
-            <div className="eyebrow">Edit QRguitar record</div>
+            <div className="eyebrow">Edit QRguitar Profile</div>
             <h2>Edit the profile without changing the permanent QR link.</h2>
             <p>
               Update make, model, serial, optional nickname, specs, links, photos, and QR appearance. The QRguitar ID
@@ -929,6 +937,31 @@ export default function EditInstrumentPage() {
                     <option value="used">Used</option>
                   </select>
                 </div>
+                <div className="field">
+                  <label htmlFor="saleStatus">Sale availability</label>
+                  <select
+                    id="saleStatus"
+                    value={form.saleStatus}
+                    onChange={(event) => updateField("saleStatus", event.target.value)}
+                    required
+                  >
+                    <option value="not_for_sale">Not for sale</option>
+                    <option value="for_sale">For sale</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="originalityStatus">Originality</label>
+                  <select
+                    id="originalityStatus"
+                    value={form.originalityStatus}
+                    onChange={(event) => updateField("originalityStatus", event.target.value)}
+                    required
+                  >
+                    <option value="unknown">Not specified</option>
+                    <option value="all_original">All original</option>
+                    <option value="modified">Modified</option>
+                  </select>
+                </div>
               </div>
               <div className="form-grid compact">
                 <label className="toggle-field">
@@ -952,6 +985,9 @@ export default function EditInstrumentPage() {
               </div>
               <p className="fine-print">
                 Hidden serials stay private on public pages. No-serial records require QRguitar approval before verification or authenticity confirmation.
+              </p>
+              <p className="fine-print">
+                Originality is an owner-stated modification status for search and disclosure. It is not QRguitar authentication or verification.
               </p>
               <details className="advanced-panel">
                 <summary>Add Profile Basics</summary>
@@ -1223,7 +1259,7 @@ export default function EditInstrumentPage() {
                   </div>
                   <label className="toggle-field">
                     <input type="checkbox" checked={serviceForm.isPublic} onChange={(event) => updateServiceField("isPublic", event.target.checked)} />
-                    Show this service entry on the public record
+                    Show this service entry on the QRguitar Profile
                   </label>
                   <div className="form-actions">
                     <button className="button" type="button" onClick={() => void saveServiceEntry()} disabled={savingService}>
@@ -1245,14 +1281,18 @@ export default function EditInstrumentPage() {
                         <p>{[entry.eventType, entry.shopName, entry.location].filter(Boolean).join(" · ") || "Service entry"}</p>
                         {entry.publicDescription ? <p>{entry.publicDescription}</p> : null}
                         {entry.privateNotes ? <p className="fine-print">Private: {entry.privateNotes}</p> : null}
-                        <div className="form-actions">
-                          <button className="button secondary" type="button" onClick={() => editServiceEvent(entry)}>
-                            Edit Entry
-                          </button>
-                          <button className="button secondary" type="button" onClick={() => void deleteServiceEntry(entry)} disabled={savingService}>
-                            Delete Entry
-                          </button>
-                        </div>
+                        {entry.canEdit === false ? (
+                          <p className="fine-print">{entry.lockedReason || "Locked historical service entry. Contact QRguitar admin to correct provenance."}</p>
+                        ) : (
+                          <div className="form-actions">
+                            <button className="button secondary" type="button" onClick={() => editServiceEvent(entry)}>
+                              Edit Entry
+                            </button>
+                            <button className="button secondary" type="button" onClick={() => void deleteServiceEntry(entry)} disabled={savingService}>
+                              Delete Entry
+                            </button>
+                          </div>
+                        )}
                       </article>
                     ))}
                   </div>

@@ -37,6 +37,8 @@ type BulkImportRow = {
   year: string;
   instrumentType: string;
   condition: "new" | "used";
+  saleStatus: "for_sale" | "not_for_sale";
+  originalityStatus: "all_original" | "modified" | "unknown";
   location: string;
   visibility: "public" | "private" | "unlisted";
   photo: string;
@@ -45,9 +47,9 @@ type BulkImportRow = {
   error: string;
 };
 
-const bulkHeaders = ["brand", "model", "serial", "year", "type", "condition", "location", "visibility", "photo", "summary"];
+const bulkHeaders = ["brand", "model", "serial", "year", "type", "condition", "sale_status", "originality", "location", "visibility", "photo", "summary"];
 const bulkTemplate = `${bulkHeaders.join("\t")}
-Fender\tStratocaster\tABC123\t2005\tElectric Guitar\tused\tCranston, RI\tprivate\thttps://example.com/photo.jpg\tOwned since 2024`;
+Fender\tStratocaster\tABC123\t2005\tElectric Guitar\tused\tnot_for_sale\tall_original\tCranston, RI\tprivate\thttps://example.com/photo.jpg\tOwned since 2024`;
 
 export default function CreatePage() {
   const router = useRouter();
@@ -68,6 +70,8 @@ export default function CreatePage() {
     finish: "",
     weight: "",
     instrumentCondition: "used",
+    saleStatus: "not_for_sale",
+    originalityStatus: "unknown",
     owner: "",
     ownerStatus: "",
     location: "",
@@ -99,12 +103,14 @@ export default function CreatePage() {
     () =>
       [
         form.instrumentType.trim() ? { id: "preview-type", label: "Type", value: form.instrumentType.trim() } : null,
+        { id: "preview-sale-status", label: "Sale status", value: form.saleStatus === "for_sale" ? "For sale" : "Not for sale" },
+        { id: "preview-originality", label: "Originality", value: form.originalityStatus === "all_original" ? "All original" : form.originalityStatus === "modified" ? "Modified" : "Not specified" },
         form.finish.trim() ? { id: "preview-finish", label: "Finish", value: form.finish.trim() } : null,
         form.weight.trim() ? { id: "preview-weight", label: "Weight", value: form.weight.trim() } : null,
         form.ownerStatus.trim() ? { id: "preview-owner-status", label: "Owner status", value: form.ownerStatus.trim() } : null,
         ...customFields.filter((field) => field.label.trim() && field.value.trim())
       ].filter((field): field is CustomProfileField => Boolean(field)),
-    [customFields, form.finish, form.instrumentType, form.ownerStatus, form.weight]
+    [customFields, form.finish, form.instrumentType, form.originalityStatus, form.ownerStatus, form.saleStatus, form.weight]
   );
 
   useEffect(() => {
@@ -187,6 +193,8 @@ export default function CreatePage() {
       const photo = valueFor("photo");
       const visibilityValue = valueFor("visibility").toLowerCase();
       const conditionValue = valueFor("condition").toLowerCase();
+      const saleValue = valueFor("sale_status").toLowerCase().replace(/[\s-]+/g, "_");
+      const originalityValue = valueFor("originality").toLowerCase().replace(/[\s-]+/g, "_");
       const row: BulkImportRow = {
         id: `bulk-${index}`,
         name: valueFor("name"),
@@ -196,6 +204,8 @@ export default function CreatePage() {
         year: valueFor("year"),
         instrumentType: valueFor("type"),
         condition: conditionValue === "new" ? "new" : "used",
+        saleStatus: saleValue === "for_sale" ? "for_sale" : "not_for_sale",
+        originalityStatus: originalityValue === "all_original" ? "all_original" : originalityValue === "modified" ? "modified" : "unknown",
         location: valueFor("location"),
         visibility: visibilityValue === "public" || visibilityValue === "unlisted" ? visibilityValue : "private",
         photo,
@@ -248,6 +258,8 @@ export default function CreatePage() {
             year: row.year,
             instrumentType: row.instrumentType,
             condition: row.condition,
+            saleStatus: row.saleStatus,
+            originalityStatus: row.originalityStatus,
             ownerName: String(user?.user_metadata?.display_name || user?.email || ""),
             location: row.location,
             visibility: row.visibility,
@@ -384,6 +396,8 @@ export default function CreatePage() {
           builder: form.builder,
           finish: form.finish,
           condition: form.instrumentCondition as "new" | "used",
+          saleStatus: form.saleStatus as "for_sale" | "not_for_sale",
+          originalityStatus: form.originalityStatus as "all_original" | "modified" | "unknown",
           ownerName: form.owner || String(user.user_metadata?.display_name || user.email || ""),
           location: form.location,
           visibility: form.visibility as "public" | "private" | "unlisted",
@@ -529,7 +543,7 @@ export default function CreatePage() {
                         spellCheck={false}
                       />
                       <span>
-                        Include headers: brand, model, serial, year, type, condition, location, visibility, photo, summary.
+                        Include headers: brand, model, serial, year, type, condition, sale_status, originality, location, visibility, photo, summary.
                         Each row needs a photo URL or data URL.
                       </span>
                     </div>
@@ -588,6 +602,31 @@ export default function CreatePage() {
                     <option value="used">Used</option>
                   </select>
                 </div>
+                <div className="field">
+                  <label htmlFor="saleStatus">Sale availability</label>
+                  <select
+                    id="saleStatus"
+                    value={form.saleStatus}
+                    onChange={(event) => updateField("saleStatus", event.target.value)}
+                    required
+                  >
+                    <option value="not_for_sale">Not for sale</option>
+                    <option value="for_sale">For sale</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="originalityStatus">Originality</label>
+                  <select
+                    id="originalityStatus"
+                    value={form.originalityStatus}
+                    onChange={(event) => updateField("originalityStatus", event.target.value)}
+                    required
+                  >
+                    <option value="unknown">Not specified</option>
+                    <option value="all_original">All original</option>
+                    <option value="modified">Modified</option>
+                  </select>
+                </div>
               </div>
               <div className="form-grid compact">
                 <label className="toggle-field">
@@ -615,6 +654,9 @@ export default function CreatePage() {
               </div>
               <p className="fine-print">
                 Records without a serial/build ID can still be created, but QRguitar verification or authenticity confirmation requires prior QRguitar approval.
+              </p>
+              <p className="fine-print">
+                Originality is an owner-stated modification status for search and disclosure. It is not QRguitar authentication or verification.
               </p>
               <details className="advanced-panel">
                 <summary>Add Profile Basics</summary>
@@ -1143,6 +1185,12 @@ function normalizeBulkHeader(value: string) {
   }
   if (normalized === "instrumenttype" || normalized === "category") {
     return "type";
+  }
+  if (normalized === "salestatus" || normalized === "forsale" || normalized === "available" || normalized === "availability") {
+    return "sale_status";
+  }
+  if (normalized === "originalitystatus" || normalized === "original" || normalized === "mods" || normalized === "modificationstatus") {
+    return "originality";
   }
   if (normalized === "photo" || normalized === "photourl" || normalized === "image" || normalized === "imageurl" || normalized === "mainphoto") {
     return "photo";
