@@ -92,7 +92,7 @@ export type EditableSiteSettings = {
 
 export const defaultSiteSettings: EditableSiteSettings = {
   brandName: "QRguitar",
-  tagline: "Permanent records for guitars, amps, pedals, builders, shops, collectors, and future owners.",
+  tagline: "Permanent QRguitar Profiles for guitars, amps, pedals, builders, shops, collectors, and future owners.",
   instrumentCategories: [...defaultInstrumentCategories],
   colors: {
     background: "#070c10",
@@ -208,16 +208,18 @@ function normalizeProfileCopy(value: string) {
   const staleRecord = "Record";
   const staleRecords = "Records";
   const replacements: Array<[RegExp, string]> = [
-    [new RegExp(`\\bBrowse ${stalePublic} ${staleRecords}\\b`, "g"), "Browse QRguitar Profiles"],
-    [new RegExp(`\\bSee ${stalePublic} ${staleRecords}\\b`, "g"), "See QRguitar Profiles"],
-    [new RegExp(`\\b${stalePublic} QRguitar ${staleRecords}\\b`, "g"), "QRguitar Profiles"],
-    [new RegExp(`\\b${stalePublic} QRguitar ${staleRecord}\\b`, "g"), "QRguitar Profile"],
-    [new RegExp(`\\b${stalePublicLower} QRguitar ${staleRecords.toLowerCase()}\\b`, "g"), "QRguitar Profiles"],
-    [new RegExp(`\\b${stalePublicLower} QRguitar ${staleRecord.toLowerCase()}\\b`, "g"), "QRguitar Profile"],
-    [new RegExp(`\\b${stalePublic} ${staleRecords}\\b`, "g"), "QRguitar Profiles"],
-    [new RegExp(`\\b${stalePublic} ${staleRecord}\\b`, "g"), "QRguitar Profile"],
-    [new RegExp(`\\b${stalePublicLower} ${staleRecords.toLowerCase()}\\b`, "g"), "QRguitar Profiles"],
-    [new RegExp(`\\b${stalePublicLower} ${staleRecord.toLowerCase()}\\b`, "g"), "QRguitar Profile"]
+    [new RegExp(`\\bBrowse ${stalePublic} ${staleRecords}\\b`, "gi"), "Browse QRguitar Profiles"],
+    [new RegExp(`\\bSee ${stalePublic} ${staleRecords}\\b`, "gi"), "See QRguitar Profiles"],
+    [new RegExp(`\\b${stalePublic} QRguitar ${staleRecords}\\b`, "gi"), "QRguitar Profiles"],
+    [new RegExp(`\\b${stalePublic} QRguitar ${staleRecord}\\b`, "gi"), "QRguitar Profile"],
+    [new RegExp(`\\b${stalePublicLower} QRguitar ${staleRecords.toLowerCase()}\\b`, "gi"), "QRguitar Profiles"],
+    [new RegExp(`\\b${stalePublicLower} QRguitar ${staleRecord.toLowerCase()}\\b`, "gi"), "QRguitar Profile"],
+    [new RegExp(`\\b${stalePublic} ${staleRecords}\\b`, "gi"), "QRguitar Profiles"],
+    [new RegExp(`\\b${stalePublic} ${staleRecord}\\b`, "gi"), "QRguitar Profile"],
+    [new RegExp(`\\b${stalePublicLower} ${staleRecords.toLowerCase()}\\b`, "gi"), "QRguitar Profiles"],
+    [new RegExp(`\\b${stalePublicLower} ${staleRecord.toLowerCase()}\\b`, "gi"), "QRguitar Profile"],
+    [/\bpermanent records\b/gi, "permanent QRguitar Profiles"],
+    [/\bpermanent record\b/gi, "permanent QRguitar Profile"]
   ];
 
   return replacements.reduce((copy, [pattern, replacement]) => copy.replace(pattern, replacement), value);

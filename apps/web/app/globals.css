@@ -323,6 +323,221 @@ select {
   color: var(--gold-2);
 }
 
+.latest-profile-card {
+  position: relative;
+  width: min(100%, 580px);
+  overflow: hidden;
+  border: 1px solid rgba(248, 246, 242, .14);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(27, 38, 44, .96), rgba(12, 18, 22, .98));
+  box-shadow: 0 22px 68px rgba(0, 0, 0, .36);
+}
+
+.latest-profile-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(240, 161, 43, .22), transparent 22%, transparent 80%, rgba(248, 246, 242, .08));
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  padding: 1px;
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.latest-profile-card-link {
+  position: relative;
+  z-index: 2;
+  min-height: 100%;
+  display: grid;
+  grid-template-columns: minmax(260px, 48%) minmax(0, 1fr);
+  color: inherit;
+  text-decoration: none;
+}
+
+.latest-profile-card-media {
+  position: relative;
+  min-height: 330px;
+  overflow: hidden;
+  background: #070c10;
+}
+
+.latest-profile-card-image {
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  display: block;
+  object-fit: cover;
+  object-position: center 45%;
+  filter: saturate(1.02) contrast(1.02);
+}
+
+.latest-profile-card-media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(2, 5, 6, .28), transparent 42%, rgba(2, 5, 6, .78)),
+    linear-gradient(90deg, transparent 62%, rgba(7, 12, 16, .24));
+}
+
+.latest-profile-card-empty-media {
+  min-height: inherit;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  color: var(--muted);
+  background: radial-gradient(circle at 50% 20%, rgba(240, 161, 43, .12), transparent 38%), #081014;
+}
+
+.latest-profile-card-empty-media strong {
+  color: var(--gold-2);
+}
+
+.latest-profile-card-topline {
+  position: absolute;
+  z-index: 3;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding-right: 46px;
+}
+
+.latest-profile-card-eyebrow,
+.latest-profile-card-age,
+.latest-profile-card-code {
+  min-height: 19px;
+  border: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px 2px;
+  color: rgba(255, 223, 154, .92);
+  background: rgba(4, 6, 7, .56);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .24);
+  backdrop-filter: blur(12px);
+  font-size: 8px;
+  font-weight: 950;
+  line-height: 1;
+  text-transform: uppercase;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .76);
+}
+
+.latest-profile-card-code {
+  position: absolute;
+  z-index: 3;
+  left: 14px;
+  bottom: 14px;
+  color: var(--gold-2);
+  border: 1px solid rgba(240, 161, 43, .38);
+  background: rgba(4, 6, 7, .62);
+}
+
+.latest-profile-card-content {
+  min-width: 0;
+  padding: 24px 23px 22px;
+  display: grid;
+  align-content: center;
+  gap: 13px;
+}
+
+.latest-profile-card-heading h3 {
+  margin: 0;
+  max-width: 12ch;
+  font-size: clamp(28px, 2.35vw, 38px);
+  line-height: 1;
+  letter-spacing: 0;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
+.latest-profile-card-heading p,
+.latest-profile-card-summary {
+  margin: 8px 0 0;
+  color: rgba(248, 246, 242, .82);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.latest-profile-card-summary {
+  max-width: 30ch;
+  color: rgba(248, 246, 242, .72);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.latest-profile-card-badges {
+  gap: 7px;
+}
+
+.latest-profile-card-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+
+.latest-profile-card-facts span {
+  width: fit-content;
+  min-height: 23px;
+  border: 1px solid rgba(248, 246, 242, .09);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px 4px;
+  color: rgba(238, 234, 224, .82);
+  background: rgba(4, 7, 9, .24);
+  font-size: 10.5px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.latest-profile-card-cta {
+  width: fit-content;
+  min-height: 38px;
+  border: 1px solid rgba(240, 161, 43, .22);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 15px;
+  color: var(--gold-2);
+  background: rgba(240, 161, 43, .045);
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.latest-profile-card-share {
+  position: absolute !important;
+  z-index: 4;
+  top: 14px;
+  right: 14px;
+}
+
+.latest-profile-card-share .record-share-button {
+  width: 32px;
+  height: 32px;
+  border-color: rgba(248, 246, 242, .14);
+  background: rgba(4, 6, 7, .58);
+  backdrop-filter: blur(12px);
+}
+
 .latest-record-card {
   overflow: hidden;
   border: 1px solid rgba(248, 246, 242, .16);
@@ -6297,6 +6512,32 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
     padding-right: 0;
   }
 
+  .latest-profile-card {
+    width: min(100%, 620px);
+  }
+
+  .latest-profile-card-link {
+    grid-template-columns: 1fr;
+  }
+
+  .latest-profile-card-media {
+    min-height: 330px;
+  }
+
+  .latest-profile-card-content {
+    padding: 22px 18px 20px;
+  }
+
+  .latest-profile-card-heading h3 {
+    max-width: 12ch;
+    font-size: clamp(28px, 8.6vw, 38px);
+  }
+
+  .latest-profile-card-heading p,
+  .latest-profile-card-summary {
+    font-size: 15px;
+  }
+
   .collectible-card-secondary-link {
     position: static;
     z-index: 2;
@@ -6633,6 +6874,53 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 @media (max-width: 480px) {
   .shell {
     width: calc(100% - 34px);
+  }
+
+  .latest-profile-card {
+    border-radius: 14px;
+  }
+
+  .latest-profile-card-media {
+    min-height: 300px;
+  }
+
+  .latest-profile-card-topline {
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    padding-right: 42px;
+  }
+
+  .latest-profile-card-eyebrow,
+  .latest-profile-card-age,
+  .latest-profile-card-code {
+    min-height: 21px;
+    padding: 4px 7px 3px;
+    font-size: 8.5px;
+  }
+
+  .latest-profile-card-age {
+    display: none;
+  }
+
+  .latest-profile-card-code {
+    left: 10px;
+    bottom: 10px;
+  }
+
+  .latest-profile-card-share {
+    top: 10px;
+    right: 10px;
+  }
+
+  .latest-profile-card-heading h3 {
+    max-width: 100%;
+    font-size: 30px;
+  }
+
+  .latest-profile-card-content {
+    gap: 12px;
+    padding: 20px 16px 18px;
   }
 
   .hero h1 {

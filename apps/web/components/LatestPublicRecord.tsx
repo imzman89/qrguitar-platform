@@ -1,11 +1,18 @@
 "use client";
 
-import { Globe2 } from "lucide-react";
+import { ArrowRight, Camera, Globe2, ShieldCheck, Siren } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { CollectibleRecordCard } from "./CollectibleRecordCard";
 import {
+  getInstrumentCondition,
+  getInstrumentVerificationStatus,
+  instrumentDisplayName,
+  instrumentSubtitle,
+  instrumentToProfileUrl,
   type DemoInstrument
 } from "../lib/local-demo";
+import { formatRecordLocation } from "../lib/record-location";
+import { RecordShareButton } from "./RecordShareButton";
 
 type InstrumentsResponse = {
   ok?: boolean;
@@ -69,58 +76,103 @@ export function LatestPublicRecord({ initialRecord = null }: { initialRecord?: D
     );
   }
 
-  const createdLabel = formatCreatedAt(latest.createdAt);
-
-  return (
-    <CollectibleRecordCard
-      record={latest}
-      variant="latest"
-      eyebrow="Latest QRguitar Profile"
-      createdLabel={createdLabel}
-      ctaLabel="Open Record"
-    />
-  );
+  return <HomepageLatestProfileCard record={latest} />;
 }
 
 function pickHomepageRecord(records: DemoInstrument[]) {
   return records[0] || null;
 }
 
-function formatCreatedAt(value: string) {
-  const date = Date.parse(value);
+function HomepageLatestProfileCard({ record }: { record: DemoInstrument }) {
+  const title = instrumentDisplayName(record);
+  const profileUrl = instrumentToProfileUrl(record);
+  const imageUrl = record.heroImageDataUrl || record.galleryImageDataUrls?.find(Boolean) || "";
+  const location = formatRecordLocation(record);
+  const condition = getInstrumentCondition(record);
+  const verificationStatus = getInstrumentVerificationStatus(record);
+  const authenticityStatus = record.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed";
+  const safetyStatus = record.safetyStatus === "lost" || record.safetyStatus === "stolen" || record.safetyStatus === "recovered"
+    ? record.safetyStatus
+    : "clear";
+  const photoCount = Array.from(new Set([record.heroImageDataUrl, ...(record.galleryImageDataUrls || [])].filter(Boolean))).length;
 
-  if (!Number.isFinite(date)) {
-    return "Just now";
+  return (
+    <article className="latest-profile-card" aria-label={`Latest QRguitar Profile: ${title}`}>
+      <Link className="latest-profile-card-link" href={profileUrl} aria-label={`Open ${title} profile`}>
+        <div className="latest-profile-card-media">
+          {imageUrl ? (
+            <img
+              className="latest-profile-card-image"
+              src={imageUrl}
+              alt={`${title} main photo`}
+              loading="eager"
+              decoding="async"
+            />
+          ) : (
+            <div className="latest-profile-card-empty-media">
+              <strong>QRguitar</strong>
+              <span>No profile photo yet</span>
+            </div>
+          )}
+
+          <div className="latest-profile-card-topline">
+            <span className="latest-profile-card-eyebrow"><Globe2 size={12} /> Latest Profile</span>
+          </div>
+          <span className="latest-profile-card-code">{record.qrCode}</span>
+        </div>
+
+        <div className="latest-profile-card-content">
+          <div className="latest-profile-card-heading">
+            <h3>{title}</h3>
+            <p>{instrumentSubtitle(record)}</p>
+          </div>
+
+          <div className="record-badge-row latest-profile-card-badges" aria-label="Profile status">
+            {record.showVerificationBadge !== false ? (
+              <span className={`record-badge ${verificationStatus === "verified" ? "record-badge--verified" : "record-badge--unverified"}`}>
+                <ShieldCheck size={12} /> <span className="record-badge-text">{verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"}</span>
+              </span>
+            ) : null}
+            {record.showAuthenticityBadge !== false ? (
+              <span className={`record-badge ${authenticityStatus === "confirmed" ? "record-badge--auth-confirmed" : "record-badge--auth-unconfirmed"}`}>
+                <ShieldCheck size={12} /> <span className="record-badge-text">{authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}</span>
+              </span>
+            ) : null}
+            {safetyStatus !== "clear" ? (
+              <span className={`record-badge ${safetyStatus === "recovered" ? "record-badge--recovered" : "record-badge--safety"}`}>
+                <Siren size={12} /> <span className="record-badge-text">{safetyStatusLabel(safetyStatus)}</span>
+              </span>
+            ) : null}
+          </div>
+
+          <div className="latest-profile-card-facts">
+            <span>{condition === "new" ? "New" : "Used"}</span>
+            {record.year ? <span>{record.year}</span> : null}
+            {location ? <span>{location}</span> : null}
+            {photoCount ? <span><Camera size={12} /> {photoCount} photos</span> : null}
+          </div>
+
+          <span className="latest-profile-card-cta">Open Record <ArrowRight size={14} /></span>
+        </div>
+      </Link>
+
+      <RecordShareButton className="latest-profile-card-share" code={record.qrCode} title={title} />
+    </article>
+  );
+}
+
+function safetyStatusLabel(status: "lost" | "stolen" | "recovered" | "clear") {
+  if (status === "lost") {
+    return "Reported Lost";
   }
 
-  const minutes = Math.max(0, Math.round((Date.now() - date) / 60000));
-
-  if (minutes < 1) {
-    return "Just now";
+  if (status === "stolen") {
+    return "Reported Stolen";
   }
 
-  if (minutes < 60) {
-    return `${minutes}m ago`;
+  if (status === "recovered") {
+    return "Recovered";
   }
 
-  const hours = Math.floor(minutes / 60);
-
-  if (hours < 24) {
-    return `${hours}h ago`;
-  }
-
-  const days = Math.floor(hours / 24);
-
-  if (days < 30) {
-    return `${days} day${days === 1 ? "" : "s"} ago`;
-  }
-
-  const months = Math.floor(days / 30);
-
-  if (months < 12) {
-    return `${months} month${months === 1 ? "" : "s"} ago`;
-  }
-
-  const years = Math.floor(days / 365);
-  return `${years} year${years === 1 ? "" : "s"} ago`;
+  return "No Alert";
 }
