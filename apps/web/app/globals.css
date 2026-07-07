@@ -3996,6 +3996,10 @@ select {
   gap: 8px;
 }
 
+.qr-handout-button {
+  grid-column: 1 / -1;
+}
+
 .qr-editor-panel {
   display: grid;
   gap: 10px;

@@ -118,6 +118,141 @@ export function QrDownload({ code, label, qrStyle, onStyleChange }: QrDownloadPr
     updateStyle({ labelText: nextLabel });
   }
 
+  function printHandout() {
+    if (!dataUrl || typeof window === "undefined") {
+      return;
+    }
+
+    const printWindow = window.open("", "_blank", "noopener,noreferrer,width=760,height=920");
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    const safeTitle = escapeHtml(label || "QRguitar Profile");
+    const safeCode = escapeHtml(code);
+    const safeUrl = escapeHtml(profileUrl);
+    const safeQr = escapeHtml(dataUrl);
+
+    printWindow.document.write(`<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QRguitar handout - ${safeCode}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #f5f0df;
+      color: #071014;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .handout {
+      width: min(680px, calc(100vw - 32px));
+      border: 1px solid #d7c89f;
+      border-radius: 18px;
+      padding: 34px;
+      background: #fffaf0;
+      box-shadow: 0 22px 70px rgba(7, 16, 20, .18);
+    }
+    .brand {
+      margin-bottom: 22px;
+      font-size: 30px;
+      font-weight: 950;
+      letter-spacing: -.02em;
+    }
+    .brand span { color: #f0a12b; }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 34px;
+      line-height: 1.03;
+      letter-spacing: -.03em;
+    }
+    .code {
+      margin: 0 0 24px;
+      color: #86610f;
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: .02em;
+    }
+    .content {
+      display: grid;
+      grid-template-columns: 230px 1fr;
+      gap: 28px;
+      align-items: center;
+    }
+    .qr {
+      width: 230px;
+      border: 1px solid #e5d9b8;
+      border-radius: 14px;
+      padding: 12px;
+      background: #071014;
+    }
+    .qr img { width: 100%; display: block; }
+    .copy {
+      display: grid;
+      gap: 12px;
+      font-size: 18px;
+      line-height: 1.45;
+    }
+    .copy strong { font-size: 20px; }
+    .url {
+      overflow-wrap: anywhere;
+      border: 1px solid #e5d9b8;
+      border-radius: 12px;
+      padding: 12px;
+      background: #f7efd7;
+      font-size: 14px;
+      font-weight: 800;
+    }
+    .footer {
+      margin-top: 28px;
+      padding-top: 18px;
+      border-top: 1px solid #e5d9b8;
+      color: #6d6253;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    @media print {
+      body { background: white; }
+      .handout { width: 100%; box-shadow: none; }
+    }
+    @media (max-width: 620px) {
+      .content { grid-template-columns: 1fr; }
+      .qr { width: 100%; max-width: 260px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="handout">
+    <div class="brand">QR<span>guitar</span></div>
+    <h1>${safeTitle}</h1>
+    <p class="code">${safeCode}</p>
+    <section class="content">
+      <div class="qr"><img src="${safeQr}" alt="QR code for ${safeTitle}" /></div>
+      <div class="copy">
+        <strong>Scan to open this QRguitar Profile.</strong>
+        <span>This QR code stays tied to the instrument profile, photos, specs, service notes, and ownership tools.</span>
+        <div class="url">${safeUrl}</div>
+      </div>
+    </section>
+    <p class="footer">If this instrument was serviced or sold with this handout, keep this page with the instrument paperwork. Ownership transfer and claim tools may require the current owner to start the handoff.</p>
+  </main>
+  <script>
+    window.onload = () => {
+      window.focus();
+      window.print();
+    };
+  </script>
+</body>
+</html>`);
+    printWindow.document.close();
+  }
+
   return (
     <div
       className={`${isEditing ? "qr-download editing" : "qr-download"} ${isTransparent ? "transparent" : ""} ${style.includeLabel ? "has-label" : ""}`}
@@ -154,6 +289,9 @@ export function QrDownload({ code, label, qrStyle, onStyleChange }: QrDownloadPr
         )}
         <button className="button secondary qr-edit-button" type="button" onClick={() => setIsEditing((current) => !current)}>
           {isEditing ? "Close" : "Customize QR"}
+        </button>
+        <button className="button secondary qr-handout-button" type="button" onClick={printHandout} disabled={!dataUrl}>
+          Print Handout
         </button>
       </div>
 
@@ -252,6 +390,15 @@ export function QrDownload({ code, label, qrStyle, onStyleChange }: QrDownloadPr
       ) : null}
     </div>
   );
+}
+
+function escapeHtml(value: string) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function areQrStylesEqual(first: QrStyle, second: QrStyle) {

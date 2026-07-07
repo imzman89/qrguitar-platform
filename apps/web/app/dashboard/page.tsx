@@ -43,6 +43,34 @@ function mergeDashboardRecords(records: DemoInstrument[], user: DemoUser | null)
   return records;
 }
 
+function DashboardInstrumentThumb({ sources, title }: { sources: string[]; title: string }) {
+  const imageSources = useMemo(
+    () => Array.from(new Set(sources.map((source) => String(source || "").trim()).filter(Boolean))),
+    [sources]
+  );
+  const [imageIndex, setImageIndex] = useState(0);
+  const imageUrl = imageSources[imageIndex] || "";
+
+  useEffect(() => {
+    setImageIndex(0);
+  }, [imageSources.join("|")]);
+
+  return (
+    <div className={styles.instrumentThumb} aria-hidden="true">
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt=""
+          loading="lazy"
+          onError={() => setImageIndex((current) => current + 1)}
+        />
+      ) : (
+        <span>{title.slice(0, 2).toUpperCase() || "QR"}</span>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [user, setUser] = useState<DemoUser | null>(null);
   const [instruments, setInstruments] = useState<DemoInstrument[]>([]);
@@ -334,7 +362,7 @@ export default function DashboardPage() {
                   const totalDocs = instrument.documentFiles?.length || 0;
                   const publicDocs = instrument.documentFiles?.filter((file) => file.visibility !== "hidden").length || 0;
                   const hiddenDocs = Math.max(0, totalDocs - publicDocs);
-                  const imageUrl = instrument.heroImageDataUrl || instrument.galleryImageDataUrls?.[0] || "";
+                  const imageSources = [instrument.heroImageDataUrl || "", ...(instrument.galleryImageDataUrls || [])];
                   const condition = getInstrumentCondition(instrument);
                   const verificationStatus = getInstrumentVerificationStatus(instrument);
                   const authenticityStatus = instrument.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed";
@@ -352,9 +380,7 @@ export default function DashboardPage() {
                         href={instrumentToProfileUrl(instrument)}
                         aria-label={`Open ${title} profile`}
                       >
-                        <div className={styles.instrumentThumb} aria-hidden="true">
-                          {imageUrl ? <img src={imageUrl} alt="" loading="lazy" /> : <span>QR</span>}
-                        </div>
+                        <DashboardInstrumentThumb sources={imageSources} title={title} />
                         <div className={styles.instrumentDetails}>
                           <div className={styles.instrumentInfo}>
                             <strong>{title}</strong>
