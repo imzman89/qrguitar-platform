@@ -219,7 +219,7 @@ function PricingCard({
   features: string[];
 }) {
   const normalizedName = name.trim().toLowerCase();
-  const cta = normalizedName === "free public beta" ? "Create Free Record" : "Contact QRguitar";
+  const cta = normalizedName === "free public beta" ? "Create Free Profile" : "Contact QRguitar";
   const href =
     normalizedName === "free public beta"
       ? "/create"

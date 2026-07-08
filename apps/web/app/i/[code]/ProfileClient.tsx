@@ -1020,7 +1020,7 @@ function DocumentItem({ title, copy, onView, href }: { title: string; copy: stri
         </a>
       ) : (
         <button type="button" onClick={() => onView?.()} disabled={!onView} className={!onView ? "disabled" : undefined}>
-          {onView ? "View" : "Coming soon"}
+          {onView ? "View" : "Unavailable"}
         </button>
       )}
     </article>
