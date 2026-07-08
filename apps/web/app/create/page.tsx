@@ -63,7 +63,7 @@ export default function CreatePage() {
     model: "",
     serial: "",
     serialNotUsed: false,
-    showSerialPublic: true,
+    showSerialPublic: false,
     year: "",
     instrumentType: "",
     builder: "",
@@ -266,7 +266,7 @@ export default function CreatePage() {
             summary: row.summary,
             heroImageDataUrl: row.photo,
             photos: [row.photo],
-            showSerialPublic: true,
+            showSerialPublic: false,
             documents: [],
             customFields: []
           })

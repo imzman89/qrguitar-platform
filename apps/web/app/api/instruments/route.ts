@@ -658,7 +658,7 @@ function mapInstrumentRow({
     authenticityStatus: trust?.authenticityStatus || "unconfirmed",
     showVerificationBadge: trust?.showVerificationBadge === false ? false : true,
     showAuthenticityBadge: trust?.showAuthenticityBadge === false ? false : true,
-    showSerialPublic: trust?.showSerialPublic === false ? false : true,
+    showSerialPublic: trust?.showSerialPublic === true,
     serialExceptionApproved: trust?.serialExceptionApproved === true,
     ...(exposeInternalTrust ? { internalVerificationNote: trust?.internalVerificationNote || "" } : {}),
     publicVerificationNote: trust?.publicVerificationNote || "",
@@ -1486,11 +1486,11 @@ export async function POST(request: Request) {
     );
   }
 
-  if (body.showSerialPublic === false) {
+  if (typeof body.showSerialPublic === "boolean") {
     const trustResult = await supabase.from("site_content").upsert(
       {
         content_key: recordTrustContentKey(insertedGuitar.qr_code),
-        content_value: mergeRecordTrustSettings({ showSerialPublic: false }),
+        content_value: mergeRecordTrustSettings({ showSerialPublic: body.showSerialPublic === true }),
         updated_at: new Date().toISOString()
       },
       { onConflict: "content_key" }

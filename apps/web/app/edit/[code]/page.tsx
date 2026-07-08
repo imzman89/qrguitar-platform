@@ -99,7 +99,7 @@ export default function EditInstrumentPage() {
   const [authenticityStatus, setAuthenticityStatus] = useState<"confirmed" | "unconfirmed">("unconfirmed");
   const [showVerificationBadge, setShowVerificationBadge] = useState(true);
   const [showAuthenticityBadge, setShowAuthenticityBadge] = useState(true);
-  const [showSerialPublic, setShowSerialPublic] = useState(true);
+  const [showSerialPublic, setShowSerialPublic] = useState(false);
   const [serialExceptionApproved, setSerialExceptionApproved] = useState(false);
   const [internalVerificationNote, setInternalVerificationNote] = useState("");
   const [publicVerificationNote, setPublicVerificationNote] = useState("");
@@ -181,7 +181,7 @@ export default function EditInstrumentPage() {
             setAuthenticityStatus(instrument.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed");
             setShowVerificationBadge(instrument.showVerificationBadge !== false);
             setShowAuthenticityBadge(instrument.showAuthenticityBadge !== false);
-            setShowSerialPublic(instrument.showSerialPublic !== false);
+            setShowSerialPublic(instrument.showSerialPublic === true);
             setSerialExceptionApproved(instrument.serialExceptionApproved === true);
             setInternalVerificationNote(instrument.internalVerificationNote || "");
             setPublicVerificationNote(instrument.publicVerificationNote || "");
@@ -678,7 +678,7 @@ export default function EditInstrumentPage() {
       setAuthenticityStatus(nextAuthenticity);
       setShowVerificationBadge(payload.showVerificationBadge !== false);
       setShowAuthenticityBadge(payload.showAuthenticityBadge !== false);
-      setShowSerialPublic(payload.showSerialPublic !== false);
+      setShowSerialPublic(payload.showSerialPublic === true);
       setSerialExceptionApproved(payload.serialExceptionApproved === true);
       setInternalVerificationNote(payload.internalVerificationNote || "");
       setPublicVerificationNote(payload.publicVerificationNote || "");
@@ -690,7 +690,7 @@ export default function EditInstrumentPage() {
         authenticityStatus: nextAuthenticity,
         showVerificationBadge: payload.showVerificationBadge !== false,
         showAuthenticityBadge: payload.showAuthenticityBadge !== false,
-        showSerialPublic: payload.showSerialPublic !== false,
+        showSerialPublic: payload.showSerialPublic === true,
         serialExceptionApproved: payload.serialExceptionApproved === true,
         internalVerificationNote: payload.internalVerificationNote || "",
         publicVerificationNote: payload.publicVerificationNote || "",

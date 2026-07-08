@@ -1184,7 +1184,7 @@ function normalizeDemoInstrument(instrument: DemoInstrument): DemoInstrument {
     creatorAccountType: instrument.creatorAccountType || "customer",
     packageIncludesFirstTransfer: instrument.packageIncludesFirstTransfer === true,
     verificationStatus: getInstrumentVerificationStatus(instrument),
-    showSerialPublic: instrument.showSerialPublic === false ? false : true,
+    showSerialPublic: instrument.showSerialPublic === true,
     serialExceptionApproved: instrument.serialExceptionApproved === true,
     qrStyle: hasLegacyDefaultQr ? defaultQrStyle : style,
     documentFiles
