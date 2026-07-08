@@ -26,10 +26,10 @@ import {
 export const siteCopy = {
   hero: {
     eyebrow: "BUILT FOR BUILDERS, SHOPS, & COLLECTORS",
-    headline: "The Permanent Record for Every Instrument.",
+    headline: "The Permanent QRguitar Profile for Every Instrument.",
     body:
       "Create a digital identity for any guitar, amp, pedal, or custom build. Keep specs, service history, ownership records, warranty info, photos, documents, and sale details connected for life.",
-    primaryCta: "Create a Record",
+    primaryCta: "Create Profile",
     secondaryCta: "Browse QRguitar Profiles",
     trust: ["Permanent QR identity", "Photos, specs, proof & history"]
   },
@@ -41,7 +41,7 @@ export const siteCopy = {
     cards: [
       {
         icon: QrCode,
-        title: "Create the record",
+        title: "Create the profile",
         copy: "Add the make, model, serial number, year, photos, owner status, build notes, and anything already known about the instrument."
       },
       {
@@ -52,23 +52,23 @@ export const siteCopy = {
       {
         icon: BadgeCheck,
         title: "Update it for life",
-        copy: "Add setup notes, service records, fretwork, receipts, videos, warranty claims, sale notes, and manual owner-change notes as the years go on."
+        copy: "Add setup notes, service history, fretwork, receipts, videos, warranty claims, sale notes, and manual owner-change notes as the years go on."
       }
     ],
-    cta: "Create Your First Record"
+    cta: "Create Your First Profile"
   },
   customization: {
     eyebrow: "What each record holds",
     headline: "The details guitar people ask for, before they ask.",
     body:
-      "A QRguitar record can be as simple or as deep as the instrument needs. Start with the basics, then add the bench notes, proof, media, and history that make the piece easier to sell, service, insure, or pass on.",
+      "A QRguitar Profile can be as simple or as deep as the instrument needs. Start with the basics, then add the bench notes, proof, media, and history that make the piece easier to sell, service, insure, or pass on.",
     checks: [
       { icon: CheckCircle2, copy: "Serial number, year, weight, finish, neck shape, pickup set, wiring, and build specs" },
       { icon: CheckCircle2, copy: "Setup measurements, fretwork, repairs, mods, parts, service dates, and shop notes" },
       { icon: CheckCircle2, copy: "Receipts, warranty info, certificates, appraisals, case candy, manuals, and documents" },
       { icon: CheckCircle2, copy: "Photos, videos, sale notes, provenance, private notes, and beta owner-change support" }
     ],
-    cta: "Build a Record"
+    cta: "Build a Profile"
   },
   audiences: {
     eyebrow: "Built for guitar people",
@@ -78,7 +78,7 @@ export const siteCopy = {
       {
         icon: Wrench,
         title: "Builders",
-        copy: "Ship every build with a clean digital spec sheet, warranty record, photos, setup notes, and a record the customer can keep."
+        copy: "Ship every build with a clean digital spec sheet, warranty profile, photos, setup notes, and a QRguitar Profile the customer can keep."
       },
       {
         icon: Store,
@@ -102,7 +102,7 @@ export const siteCopy = {
     eyebrow: "Daily use",
     headline: "A QR code that earns its keep.",
     body:
-      "The code is not the product. The record is. The QR just makes the record easy to open when the instrument is in someone's hands.",
+      "The code is not the product. The profile is. The QR just makes the profile easy to open when the instrument is in someone's hands.",
     cards: [
       {
         icon: Store,
@@ -146,12 +146,12 @@ export const siteCopy = {
     eyebrow: "For businesses",
     headline: "When the records become part of how the shop runs.",
     body:
-      "Commercial tools are opening carefully because shops and brands need more: staff access, inventory views, warranty records, catalog pages, imports, owner-transfer support in beta, and help getting set up.",
+      "Commercial tools are opening carefully because shops and brands need more: staff access, inventory views, warranty profiles, catalog pages, imports, owner-transfer support in beta, and help getting set up.",
     cards: [
       {
         icon: Database,
         title: "Inventory",
-        copy: "Create records in batches, search serials, track locations, flag missing info, and keep shop inventory cleaner."
+        copy: "Create QRguitar Profiles in batches, search serials, track locations, flag missing info, and keep shop inventory cleaner."
       },
       {
         icon: Building2,
@@ -173,9 +173,9 @@ export const siteCopy = {
   },
   pricing: {
     eyebrow: "Public beta",
-    headline: "Create records free. Commercial setup starts at $99+.",
+    headline: "Create profiles free. Commercial setup starts at $99+.",
     body:
-      "During public beta, users can create instrument records without a hard paywall. Verification, QR hardware, install help, builder/shop onboarding, and commercial setup are available as paid services.",
+      "During public beta, users can create QRguitar Profiles without a hard paywall. Verification, QR hardware, install help, builder/shop onboarding, and commercial setup are available as paid services.",
     plans: [
       {
         name: "Free Public Beta",
@@ -204,7 +204,7 @@ export const siteCopy = {
     ],
     enterpriseTitle: "Commercial setup by request",
     enterpriseBody:
-      "Create records for free during beta. Paid help is handled manually by request."
+      "Create QRguitar Profiles for free during beta. Paid help is handled manually by request."
   },
   preview: {
     specsIcon: Layers3,

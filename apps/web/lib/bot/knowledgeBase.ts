@@ -34,7 +34,7 @@ const entries: KnowledgeEntry[] = [
     topic: "about",
     triggers: ["what is qrguitar", "what does qrguitar do", "why qrguitar", "how does this work", "how does this all work", "how does it work", "how it works", "what can you do", "serial number"],
     answer:
-      "QRguitar gives a guitar, amp, pedal, or instrument a permanent digital record tied to one QRguitar ID. A serial number identifies a thing; a QRguitar record keeps the story with it: specs, photos, repairs, documents, ownership notes, and sale or transfer history.",
+      "QRguitar gives a guitar, amp, pedal, or instrument a permanent QRguitar Profile tied to one QRguitar ID. A serial number identifies a thing; a QRguitar Profile keeps the story with it: specs, photos, repairs, documents, ownership notes, and sale or transfer history.",
     evidence: ["QRguitar product scope", "Permanent record workflow"],
     nextSteps: ["Create a record with make, model, serial, condition, photos, and visibility.", "Add proof over time instead of trying to finish everything on day one."]
   },
@@ -42,7 +42,7 @@ const entries: KnowledgeEntry[] = [
     topic: "pricing",
     triggers: ["cost", "price", "pricing", "plan", "free", "beta", "paid help"],
     answer:
-      "QRguitar records are free during public beta: $0 for up to 25 records with photos, specs, documents, visibility settings, and QR downloads. Free records do not include a verified badge. Verified badge upgrades can be requested later for important records. Commercial / Brand Setup starts at $99+ for builders, retailers, repair shops, brands, onboarding, bulk setup, QR hardware, verification support, and business rollout help. There is no public checkout live yet.",
+      "QRguitar Profiles are free during public beta: $0 for up to 25 profiles with photos, specs, documents, visibility settings, and QR downloads. Free profiles do not include a verified badge. Verified badge upgrades can be requested later for important profiles. Commercial / Brand Setup starts at $99+ for builders, retailers, repair shops, brands, onboarding, bulk setup, QR hardware, verification support, and business rollout help. There is no public checkout live yet.",
     evidence: ["QRguitar launch pricing model"],
     nextSteps: ["Create a free beta record to test the system.", "Email support@qrguitar.com for commercial setup, verification help, QR installs, hardware, or builder/shop onboarding."]
   },
@@ -66,7 +66,7 @@ const entries: KnowledgeEntry[] = [
     topic: "qr",
     triggers: ["download qr", "print qr", "qr code", "neck plate", "hang tag", "case card"],
     answer:
-      "A QRguitar QR should point to the permanent record URL. Use it on a hang tag, case card, sales listing, repair intake form, certificate, shipping paperwork, or neck plate. Paid/verified records should be used for printable production QR work.",
+      "A QRguitar QR should point to the permanent profile URL. Use it on a hang tag, case card, sales listing, repair intake form, certificate, shipping paperwork, or neck plate. Paid/verified profiles should be used for printable production QR work.",
     evidence: ["QR workflow"],
     nextSteps: ["Use a high-contrast QR style.", "Test scan before printing.", "Keep the permanent QRguitar ID unchanged."]
   },
@@ -92,7 +92,7 @@ const entries: KnowledgeEntry[] = [
     answer:
       "Builders can ship each instrument with a clean digital spec sheet, setup notes, photos, warranty details, and transfer-ready ownership record. It gives the next owner a better starting point than a paper card in a case.",
     evidence: ["Builder workflow"],
-    nextSteps: ["Create records at final setup.", "Add warranty terms and builder contact links.", "Attach final photos and setup measurements."]
+    nextSteps: ["Create QRguitar Profiles at final setup.", "Add warranty terms and builder contact links.", "Attach final photos and setup measurements."]
   },
   {
     topic: "collectors",
@@ -132,7 +132,7 @@ const entries: KnowledgeEntry[] = [
     answer:
       "Cranston Guitars is part of the QRguitar world as a local shop context in Cranston, Rhode Island. For shop-specific help, contact support@qrguitar.com or use the profile/shop links when they are available.",
     evidence: ["QRguitar local shop context"],
-    nextSteps: ["Use QRguitar records for shop inventory, service notes, and owner-transfer support while the tools are in beta.", `Email ${supportEmail} for direct support.`]
+    nextSteps: ["Use QRguitar Profiles for shop inventory, service notes, and owner-transfer support while the tools are in beta.", `Email ${supportEmail} for direct support.`]
   },
   {
     topic: "proper-instruments",

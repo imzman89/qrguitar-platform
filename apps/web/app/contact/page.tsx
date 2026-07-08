@@ -40,9 +40,9 @@ export default function ContactPage() {
             <div className="contact-hero">
               <div>
                 <div className="eyebrow">Support</div>
-                <h1>QRguitar help, records, and verification support.</h1>
+                <h1>QRguitar help, Profiles, and verification support.</h1>
                 <p>
-                  Get help with account access, permanent records, QR downloads, hidden documents, service history,
+                  Get help with account access, permanent QRguitar Profiles, QR downloads, hidden documents, service history,
                   lost/stolen alerts, transfers, and manual beta verification review.
                 </p>
               </div>

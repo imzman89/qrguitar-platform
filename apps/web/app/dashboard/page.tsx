@@ -28,7 +28,7 @@ const starterActions = [
     title: "New record",
     copy: "Register an instrument, add photos, and generate a permanent QRguitar link.",
     href: "/create",
-    label: "Create Record"
+    label: "Create Profile"
   },
   {
     title: "Public catalog",
@@ -248,7 +248,7 @@ export default function DashboardPage() {
             <section className="card auth-card sign-in-required-card dashboard-signin-card">
               <div className="dashboard-signin-icon"><ShieldCheck size={24} /></div>
               <div className="eyebrow">Dashboard</div>
-              <h2>Sign in to manage your QRguitar records.</h2>
+              <h2>Sign in to manage your QRguitar Profiles.</h2>
               <p>{dashboardCopy.subtitle}</p>
               <div className="dashboard-signin-points">
                 <span>Private inventory</span>
@@ -283,7 +283,7 @@ export default function DashboardPage() {
             <section className="card auth-card sign-in-required-card dashboard-signin-card">
               <div className="dashboard-signin-icon"><ShieldCheck size={24} /></div>
               <div className="eyebrow">Dashboard</div>
-              <h2>Sign in to manage your QRguitar records.</h2>
+              <h2>Sign in to manage your QRguitar Profiles.</h2>
               <p>{dashboardCopy.subtitle}</p>
               <div className="dashboard-signin-points">
                 <span>Private inventory</span>
@@ -326,7 +326,7 @@ export default function DashboardPage() {
             </div>
             <div className="dashboard-buttons">
               <Link className="button" href="/create">
-                Create Record
+                Create Profile
               </Link>
             </div>
           </div>
@@ -345,7 +345,7 @@ export default function DashboardPage() {
             <div className={styles.tableHeader}>
               <div>
                 <div className="eyebrow">Your instruments</div>
-                <h3>Saved QRguitar records</h3>
+                <h3>Saved QRguitar Profiles</h3>
               </div>
               <Link className="button secondary" href="/create">
                 Add Guitar

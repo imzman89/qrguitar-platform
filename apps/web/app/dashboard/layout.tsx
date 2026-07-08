@@ -4,7 +4,7 @@ import { buildPageMetadata } from "../../lib/seo";
 
 export const metadata: Metadata = buildPageMetadata(
   "QRguitar Dashboard",
-  "Manage your saved QRguitar records.",
+  "Manage your saved QRguitar Profiles.",
   "/dashboard"
 );
 

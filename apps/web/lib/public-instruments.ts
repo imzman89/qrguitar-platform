@@ -201,8 +201,9 @@ function mapRecord({
   ownerName?: string;
   trust?: RecordTrustSettings;
 }): DemoInstrument {
+  const managedSpecLabels = new Set(["condition", "type", "finish", "sale status", "originality"]);
   const customFields = specs
-    .filter((spec) => !["condition", "type", "finish"].includes(spec.label.toLowerCase()))
+    .filter((spec) => !managedSpecLabels.has(spec.label.trim().toLowerCase()))
     .map((spec, index) => ({ id: `${guitar.id}-spec-${index}`, label: spec.label, value: cleanPublicSpecValue(spec.value) }))
     .filter((spec) => spec.label.trim() && spec.value);
   const condition = specs.find((spec) => spec.label.toLowerCase() === "condition")?.value.toLowerCase() === "new" ? "new" : "used";

@@ -892,7 +892,7 @@ export default function AdminPage() {
           <div className="admin-section-head">
             <div>
               <h2>Records</h2>
-              <p>Open, edit, archive, restore, and filter QRguitar records without changing permanent QR URLs.</p>
+              <p>Open, edit, archive, restore, and filter QRguitar Profiles without changing permanent QR URLs.</p>
             </div>
           </div>
           {filterControls("records")}

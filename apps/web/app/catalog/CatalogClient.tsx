@@ -157,7 +157,7 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
               <p>Visible profiles are discoverable by default. Owners can make a profile private when privacy matters.</p>
             </div>
             <Link className="button" href="/create">
-              Create Record
+              Create Profile
             </Link>
           </div>
 

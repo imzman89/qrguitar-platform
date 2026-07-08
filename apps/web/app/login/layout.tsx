@@ -4,7 +4,7 @@ import { buildPageMetadata } from "../../lib/seo";
 
 export const metadata: Metadata = buildPageMetadata(
   "Sign in to QRguitar",
-  "Sign in to manage your QRguitar records.",
+  "Sign in to manage your QRguitar Profiles.",
   "/login"
 );
 

@@ -69,7 +69,7 @@ export const serialPatterns: Record<string, SerialGuidance> = {
   "proper instruments": {
     maker: "Proper Instruments",
     clues: ["Builder paperwork", "Neck carve and route notes", "Case candy and finish consistency"],
-    serialClues: ["Use builder records as primary serial evidence"],
+    serialClues: ["Use builder documentation as primary serial evidence"],
     caveats: ["Keep receipts, setup notes, and transfer documents tied to one timeline."]
   }
 };

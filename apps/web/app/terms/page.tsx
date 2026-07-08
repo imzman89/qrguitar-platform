@@ -4,7 +4,7 @@ import { Nav } from "../../components/Nav";
 
 export const metadata: Metadata = {
   title: "Terms | QRguitar",
-  description: "Public beta terms for using QRguitar instrument records."
+  description: "Public beta terms for using QRguitar instrument profiles."
 };
 
 export default function TermsPage() {
@@ -17,7 +17,7 @@ export default function TermsPage() {
             <div className="eyebrow">Terms</div>
             <h1>QRguitar is in public beta.</h1>
             <p>
-              QRguitar provides permanent instrument records for guitars, amps, pedals, builders, shops, collectors,
+              QRguitar provides permanent instrument profiles for guitars, amps, pedals, builders, shops, collectors,
               and future owners. Public beta features may change as the platform improves.
             </p>
             <div className="legal-card">

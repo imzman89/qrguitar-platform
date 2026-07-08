@@ -204,7 +204,7 @@ function supabaseUnavailableResponse(action: "read" | "write") {
   const status = getSupabaseEnvStatus();
   const missing = status.missing.length ? status.missing.join(", ") : "Supabase server configuration";
   const message = isProductionRuntime()
-    ? "QRguitar records are temporarily unavailable."
+    ? "QRguitar Profiles are temporarily unavailable."
     : `Supabase is not configured for ${action}. Missing: ${missing}. Add the values to apps/web/.env.local locally and Vercel Environment Variables in production.`;
 
   return noStoreJson(
@@ -215,7 +215,7 @@ function supabaseUnavailableResponse(action: "read" | "write") {
 
 function supabaseReadErrorResponse(message: string) {
   const safeMessage = isProductionRuntime()
-    ? "QRguitar records are temporarily unavailable."
+    ? "QRguitar Profiles are temporarily unavailable."
     : `Supabase read failed: ${message}`;
 
   return noStoreJson(
@@ -228,7 +228,7 @@ function supabaseWriteUnavailableResponse() {
   const status = getSupabaseEnvStatus();
   const missing = status.missing.length ? status.missing.join(", ") : "Supabase server configuration";
   const message = isProductionRuntime()
-    ? "QRguitar records are temporarily unavailable."
+    ? "QRguitar Profiles are temporarily unavailable."
     : `Supabase is not configured for write. Missing: ${missing}. Add the values to apps/web/.env.local locally and Vercel Environment Variables in production.`;
 
   return noStoreJson({ ok: false, message } satisfies SupabaseCreateResponse, { status: 503 });

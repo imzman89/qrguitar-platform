@@ -142,8 +142,8 @@ export const defaultSiteSettings: EditableSiteSettings = {
   },
   seo: {
     title: "QRguitar",
-    description: "Permanent QR records for guitars, amps, pedals, builders, shops, and collectors.",
-    keywords: "guitar inventory, guitar authentication, guitar service records, instrument ownership, QRguitar, luthier records",
+    description: "Permanent QRguitar Profiles for guitars, amps, pedals, builders, shops, and collectors.",
+    keywords: "guitar inventory, guitar authentication, guitar service profiles, instrument ownership, QRguitar, luthier profiles",
     image: "/seo/qrguitar-og-v2.png",
     favicon: "/qrguitar-logo-white-orange.svg",
     canonicalUrl: "https://www.qrguitar.com",
@@ -154,7 +154,7 @@ export const defaultSiteSettings: EditableSiteSettings = {
     pageTitle: "Owner dashboard",
     subtitle: "Manage records, photos, documents, visibility, and QR downloads from your dashboard.",
     emptyCollectionTitle: "No instruments yet.",
-    emptyCollectionBody: "Register your first instrument to create a permanent QRguitar record.",
+    emptyCollectionBody: "Register your first instrument to create a permanent QRguitar Profile.",
     firstRecordCtaLabel: "Register your first instrument",
     collectionHealthTitle: "Collection health",
     collectionHealthHelper: "A quick read on how complete and public your records are.",
@@ -208,6 +208,20 @@ function normalizeProfileCopy(value: string) {
   const staleRecord = "Record";
   const staleRecords = "Records";
   const replacements: Array<[RegExp, string]> = [
+    [/\bCreate a Record\b/g, "Create Profile"],
+    [/\bCreate Record\b/g, "Create Profile"],
+    [/\bCreate Your First Record\b/g, "Create Your First Profile"],
+    [/\bBuild a Record\b/g, "Build a Profile"],
+    [/\bCreate the record\b/g, "Create the profile"],
+    [/\bCreate records\b/g, "Create QRguitar Profiles"],
+    [/\bcreate records\b/g, "create QRguitar Profiles"],
+    [/\bCreate record\b/g, "Create profile"],
+    [/\bcreate record\b/g, "create profile"],
+    [/\brecord is built\b/gi, "profile is built"],
+    [/\bevery QRguitar record\b/gi, "every QRguitar Profile"],
+    [/\bA QRguitar record\b/g, "A QRguitar Profile"],
+    [/\bQRguitar record\b/g, "QRguitar Profile"],
+    [/\bQRguitar records\b/g, "QRguitar Profiles"],
     [new RegExp(`\\bBrowse ${stalePublic} ${staleRecords}\\b`, "gi"), "Browse QRguitar Profiles"],
     [new RegExp(`\\bSee ${stalePublic} ${staleRecords}\\b`, "gi"), "See QRguitar Profiles"],
     [new RegExp(`\\b${stalePublic} QRguitar ${staleRecords}\\b`, "gi"), "QRguitar Profiles"],
@@ -219,7 +233,12 @@ function normalizeProfileCopy(value: string) {
     [new RegExp(`\\b${stalePublicLower} ${staleRecords.toLowerCase()}\\b`, "gi"), "QRguitar Profiles"],
     [new RegExp(`\\b${stalePublicLower} ${staleRecord.toLowerCase()}\\b`, "gi"), "QRguitar Profile"],
     [/\bpermanent records\b/gi, "permanent QRguitar Profiles"],
-    [/\bpermanent record\b/gi, "permanent QRguitar Profile"]
+    [/\bpermanent record\b/gi, "permanent QRguitar Profile"],
+    [/\binstrument records\b/gi, "instrument profiles"],
+    [/\bguitar records\b/gi, "guitar profiles"],
+    [/\bbuilder records\b/gi, "builder profiles"],
+    [/\bwarranty records\b/gi, "warranty profiles"],
+    [/\bservice records\b/gi, "service profiles"]
   ];
 
   return replacements.reduce((copy, [pattern, replacement]) => copy.replace(pattern, replacement), value);

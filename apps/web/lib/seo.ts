@@ -4,7 +4,7 @@ import { instrumentDisplayName, type DemoInstrument } from "./local-demo";
 export const SITE_URL = "https://www.qrguitar.com";
 export const DEFAULT_OG_IMAGE = "/seo/qrguitar-og-v2.png";
 export const DEFAULT_DESCRIPTION =
-  "Permanent QR records for guitars, amps, pedals, builders, shops, and collectors.";
+  "Permanent QRguitar Profiles for guitars, amps, pedals, builders, shops, and collectors.";
 
 export function absoluteSiteUrl(pathOrUrl: string) {
   if (!pathOrUrl) {
@@ -31,11 +31,11 @@ export function buildDefaultMetadata(): Metadata {
     description: DEFAULT_DESCRIPTION,
     keywords: [
       "QRguitar",
-      "guitar records",
-      "instrument records",
+      "guitar profiles",
+      "instrument profiles",
       "guitar inventory",
       "instrument ownership",
-      "builder records"
+      "builder profiles"
     ],
     alternates: {
       canonical: SITE_URL

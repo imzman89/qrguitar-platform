@@ -487,20 +487,20 @@ export default function CreatePage() {
       <main className="section create-page">
         <div className="shell split create-layout">
           <div>
-            <div className="eyebrow">Create a QRguitar record</div>
-            <h2>Start with one great instrument record.</h2>
+            <div className="eyebrow">Create a QRguitar Profile</div>
+            <h2>Start with one great instrument profile.</h2>
             <p>
-                Add the core details, upload at least one real photo, and QRguitar will create a permanent record URL and QR code tied to your account.
+                Add the core details, upload at least one real photo, and QRguitar will create a permanent QRguitar Profile URL and QR code tied to your account.
               </p>
               <div className="create-onboarding-strip" aria-label="Create record steps">
                 <span><strong>1</strong> Add identity</span>
                 <span><strong>2</strong> Upload photo</span>
-                <span><strong>3</strong> Save QR record</span>
+                <span><strong>3</strong> Save QR profile</span>
               </div>
               <div className="permanent-id">
                 <span>Permanent QRguitar ID</span>
                 <strong>{qrCode}</strong>
-                <small>This ID is separate from the serial number and locks forever when the record is created.</small>
+                <small>This ID is separate from the serial number and locks forever when the profile is created.</small>
               </div>
               <div className="privacy-toggle" aria-label="Profile visibility">
                 <div>
@@ -527,7 +527,7 @@ export default function CreatePage() {
               />
               <div className="form-section-heading">
                 <span className="eyebrow">Register basics</span>
-                <p>Just enough to create the permanent record. Everything else can be added after.</p>
+                <p>Just enough to create the permanent QRguitar Profile. Everything else can be added after.</p>
               </div>
               <details className="advanced-panel bulk-import-panel">
                 <summary>Bulk import for enrolled brands and shops</summary>
@@ -986,7 +986,7 @@ export default function CreatePage() {
           <section className="card auth-card">
             <div className="eyebrow">Create instrument</div>
             <h2>Sign in to create your first QRguitar record.</h2>
-            <p>Create records from your account so the QR, photos, documents, and ownership stay tied to the right owner.</p>
+            <p>Create QRguitar Profiles from your account so the QR, photos, documents, and ownership stay tied to the right owner.</p>
             <div className="form-actions">
               <Link className="button" href={`/login?next=${encodeURIComponent("/create")}`}>
                 Sign in

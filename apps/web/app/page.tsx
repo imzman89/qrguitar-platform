@@ -31,13 +31,13 @@ function latestRecordWithFastFallback() {
         }
 
         getPublicInstruments()
-          .then((records) => resolve(records[0] || null))
+          .then((records) => resolve(sanitizeLatestRecord(records[0] || null)))
           .catch(() => resolve(null))
           .finally(() => clearTimeout(timeout));
       })
       .catch(() => {
         getPublicInstruments()
-          .then((records) => resolve(records[0] || null))
+          .then((records) => resolve(sanitizeLatestRecord(records[0] || null)))
           .catch(() => resolve(null))
           .finally(() => clearTimeout(timeout));
       })
@@ -56,13 +56,22 @@ async function fetchLatestRecordFromPublicApi() {
   }
 
   const payload = (await response.json().catch(() => null)) as { ok?: boolean; instruments?: DemoInstrument[] } | null;
-  return payload?.ok && Array.isArray(payload.instruments) ? payload.instruments[0] || null : null;
+  return payload?.ok && Array.isArray(payload.instruments) ? sanitizeLatestRecord(payload.instruments[0] || null) : null;
+}
+
+function sanitizeLatestRecord(record: DemoInstrument | null) {
+  if (!record) {
+    return null;
+  }
+
+  const { saleStatus: _saleStatus, originalityStatus: _originalityStatus, ...presentationRecord } = record;
+  return presentationRecord as DemoInstrument;
 }
 
 export async function generateMetadata(): Promise<Metadata> {
   const publishedSettings = await settingsWithFastFallback();
   const title = publishedSettings.seo.title || "QRguitar";
-  const description = publishedSettings.seo.description || "Permanent QR records for guitars, amps, pedals, builders, shops, and collectors.";
+  const description = publishedSettings.seo.description || "Permanent QRguitar Profiles for guitars, amps, pedals, builders, shops, and collectors.";
   const canonical = publishedSettings.seo.canonicalUrl || "https://www.qrguitar.com";
   const image = absoluteSiteUrl(publishedSettings.seo.image || "/seo/qrguitar-og-v2.png");
   const favicon = absoluteSiteUrl(publishedSettings.seo.favicon || "/qrguitar-logo-white-orange.svg");

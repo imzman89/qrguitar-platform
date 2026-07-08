@@ -4,7 +4,7 @@ import { Nav } from "../../components/Nav";
 
 export const metadata: Metadata = {
   title: "Privacy | QRguitar",
-  description: "Public beta privacy notes for QRguitar records, private documents, and instrument data."
+  description: "Public beta privacy notes for QRguitar Profiles, private documents, and instrument data."
 };
 
 export default function PrivacyPage() {
