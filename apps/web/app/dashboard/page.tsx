@@ -49,20 +49,34 @@ function DashboardInstrumentThumb({ sources, title }: { sources: string[]; title
     [sources]
   );
   const [imageIndex, setImageIndex] = useState(0);
+  const [failedAllImages, setFailedAllImages] = useState(false);
   const imageUrl = imageSources[imageIndex] || "";
 
   useEffect(() => {
     setImageIndex(0);
+    setFailedAllImages(false);
   }, [imageSources.join("|")]);
 
   return (
     <div className={styles.instrumentThumb} aria-hidden="true">
-      {imageUrl ? (
+      {imageUrl && !failedAllImages ? (
         <img
+          key={imageUrl}
           src={imageUrl}
           alt=""
           loading="lazy"
-          onError={() => setImageIndex((current) => current + 1)}
+          referrerPolicy="no-referrer"
+          onError={() => {
+            setImageIndex((current) => {
+              const next = current + 1;
+              if (next >= imageSources.length) {
+                setFailedAllImages(true);
+                return current;
+              }
+
+              return next;
+            });
+          }}
         />
       ) : (
         <span>{title.slice(0, 2).toUpperCase() || "QR"}</span>
@@ -417,6 +431,18 @@ export default function DashboardPage() {
                             code={instrument.qrCode}
                             label={title}
                             qrStyle={instrument.qrStyle}
+                            handout={{
+                              photoUrl: imageSources.find(Boolean) || "",
+                              brand: instrument.brand,
+                              model: instrument.model,
+                              year: instrument.year,
+                              location: instrument.location,
+                              serial: instrument.serial,
+                              showSerial: instrument.showSerialPublic !== false,
+                              verification: instrument.showVerificationBadge === false ? "" : verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified",
+                              authenticity: instrument.showAuthenticityBadge === false ? "" : authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed",
+                              safety: safetyStatus === "lost" ? "Reported Lost" : safetyStatus === "stolen" ? "Reported Stolen" : ""
+                            }}
                             onStyleChange={(qrStyle) => setInstruments((current) => current.map((item) => item.qrCode === instrument.qrCode ? { ...item, qrStyle } : item))}
                           />
                         </div>

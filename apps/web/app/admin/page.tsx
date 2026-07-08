@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
+import { defaultSiteSettings, mergeSiteSettings, normalizeBrandLogoKey, type EditableSiteSettings } from "../../lib/site-settings";
 import { getSupabaseAccessToken } from "../../lib/supabase-browser";
 
 type OverviewPayload = {
@@ -150,6 +151,7 @@ type SectionId =
   | "transfers"
   | "proof"
   | "service"
+  | "brand-logos"
   | "access"
   | "audit";
 
@@ -200,6 +202,7 @@ const sections: Array<{ id: SectionId; label: string }> = [
   { id: "transfers", label: "Transfers" },
   { id: "proof", label: "Proof Vault" },
   { id: "service", label: "Service History" },
+  { id: "brand-logos", label: "Brand Logos" },
   { id: "access", label: "Admin Access" },
   { id: "audit", label: "Audit Log" }
 ];
@@ -320,6 +323,9 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [adminAuthorized, setAdminAuthorized] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAdminAction | null>(null);
+  const [siteSettings, setSiteSettings] = useState<EditableSiteSettings>(defaultSiteSettings);
+  const [brandLogoBrand, setBrandLogoBrand] = useState("");
+  const [brandLogoUrl, setBrandLogoUrl] = useState("");
 
   const tokenPromise = useMemo(() => getSupabaseAccessToken(), []);
 
@@ -380,6 +386,61 @@ export default function AdminPage() {
   useEffect(() => {
     loadAdmin();
   }, [loadAdmin]);
+
+  async function loadSiteSettings() {
+    const response = await fetch("/api/site-settings", { cache: "no-store" });
+    const payload = await response.json().catch(() => ({}));
+    if (payload.settings) {
+      setSiteSettings(mergeSiteSettings(payload.settings));
+    }
+  }
+
+  useEffect(() => {
+    void loadSiteSettings();
+  }, []);
+
+  async function saveBrandLogoMapping(nextLogos: Record<string, string>) {
+    const token = await tokenPromise;
+    if (!token) {
+      setMessage("Sign in required.");
+      return;
+    }
+
+    setBusy("brand-logo");
+    const nextSettings = mergeSiteSettings({ ...siteSettings, brandLogos: nextLogos });
+    const response = await fetch("/api/site-settings", {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ settings: nextSettings })
+    });
+    const payload = await response.json().catch(() => ({}));
+    setBusy("");
+    setMessage(payload.message || (response.ok ? "Brand logo settings saved." : "Brand logo settings failed."));
+    if (response.ok && payload.settings) {
+      setSiteSettings(mergeSiteSettings(payload.settings));
+    }
+  }
+
+  function saveCurrentBrandLogo() {
+    const key = normalizeBrandLogoKey(brandLogoBrand);
+    const url = brandLogoUrl.trim();
+    if (!key || !/^(https?:\/\/|\/)/i.test(url)) {
+      setMessage("Enter a brand name and a valid logo URL.");
+      return;
+    }
+
+    void saveBrandLogoMapping({ ...siteSettings.brandLogos, [key]: url });
+  }
+
+  function removeCurrentBrandLogo(brand: string) {
+    const key = normalizeBrandLogoKey(brand);
+    const next = { ...siteSettings.brandLogos };
+    delete next[key];
+    void saveBrandLogoMapping(next);
+  }
 
   function beginUserAction(user: AdminUser, action: string, extra: Record<string, unknown> = {}, options: { includeNote?: boolean; confirm?: boolean; title?: string } = {}) {
     if (!options.includeNote && !options.confirm) {
@@ -580,6 +641,10 @@ export default function AdminPage() {
   }, [adminSearch, sortKey, userFilter, users]);
 
   const records = recordsPayload?.records || [];
+  const usedBrands = useMemo(
+    () => Array.from(new Set(records.map((record) => record.brand).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [records]
+  );
   const filteredRecords = useMemo(() => {
     const search = normalize(adminSearch);
     let list = records.filter((record) => {
@@ -1091,6 +1156,59 @@ export default function AdminPage() {
                 </div>
               </div>
             )) : <p className="admin-empty">No service entries match this view.</p>}
+          </div>
+        </section>
+      );
+    }
+
+    if (activeSection === "brand-logos") {
+      const savedEntries = Object.entries(siteSettings.brandLogos || {});
+      return (
+        <section className="card admin-panel-card">
+          <div className="admin-section-head">
+            <div>
+              <h2>Brand Logos</h2>
+              <p>Manage official brand logo URLs. User uploads never become brand logos.</p>
+            </div>
+          </div>
+          <div className="admin-filter-row">
+            <input
+              list="admin-used-brands"
+              value={brandLogoBrand}
+              onChange={(event) => setBrandLogoBrand(event.target.value)}
+              placeholder="Brand name, such as Fender"
+            />
+            <input
+              value={brandLogoUrl}
+              onChange={(event) => setBrandLogoUrl(event.target.value)}
+              placeholder="Transparent logo URL"
+            />
+            <button type="button" disabled={busy === "brand-logo"} onClick={saveCurrentBrandLogo}>
+              Save Logo
+            </button>
+          </div>
+          <datalist id="admin-used-brands">
+            {usedBrands.map((brand) => <option value={brand} key={brand} />)}
+          </datalist>
+          {brandLogoUrl ? (
+            <div className="admin-logo-preview">
+              <span>Preview</span>
+              <img src={brandLogoUrl} alt="" />
+            </div>
+          ) : null}
+          <div className="admin-table">
+            {savedEntries.length ? savedEntries.map(([brandKey, logoUrl]) => (
+              <div className="admin-row" key={brandKey}>
+                <div>
+                  <strong>{brandKey}</strong>
+                  <small>{logoUrl}</small>
+                </div>
+                <div className="admin-row-actions">
+                  <button type="button" onClick={() => { setBrandLogoBrand(brandKey); setBrandLogoUrl(logoUrl); }}>Edit</button>
+                  <button type="button" disabled={busy === "brand-logo"} onClick={() => removeCurrentBrandLogo(brandKey)}>Remove Logo</button>
+                </div>
+              </div>
+            )) : <p className="admin-empty">No official brand logos saved yet. Profiles will show brand text only.</p>}
           </div>
         </section>
       );

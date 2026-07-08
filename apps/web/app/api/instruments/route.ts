@@ -457,11 +457,12 @@ async function resolveImageSource(
   supabase: NonNullable<ReturnType<typeof createServerSupabaseClient>>,
   source: string
 ) {
+  void supabase;
   if (!source || source.startsWith("http://") || source.startsWith("https://") || source.startsWith("data:")) {
     return source;
   }
 
-  return supabase.storage.from(MEDIA_BUCKET).getPublicUrl(source).data.publicUrl || source;
+  return resolvePublicMediaUrl(source);
 }
 
 function isRenderablePublicMediaSource(source: string) {

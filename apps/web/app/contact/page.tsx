@@ -15,7 +15,7 @@ export default function ContactPage() {
       href: "mailto:support@qrguitar.com?subject=QRguitar%20account%20help"
     },
     {
-      title: "Record or QR help",
+      title: "Profile or QR help",
       copy: "Permanent QRguitar IDs, photo uploads, QR downloads, public/private visibility, and profile edits.",
       href: "mailto:support@qrguitar.com?subject=QRguitar%20record%20or%20QR%20help"
     },
@@ -28,6 +28,16 @@ export default function ContactPage() {
       title: "Lost, stolen, or transfer help",
       copy: "Safety alerts, ownership transfer questions, claim links, and edge cases that need manual support.",
       href: "mailto:support@qrguitar.com?subject=QRguitar%20safety%20or%20transfer%20help"
+    },
+    {
+      title: "Shop, builder, or brand onboarding",
+      copy: "Bulk profile planning, brand logo requests, QR installs, handouts, and commercial setup questions.",
+      href: "mailto:support@qrguitar.com?subject=QRguitar%20shop%20brand%20or%20builder%20help"
+    },
+    {
+      title: "Proof documents",
+      copy: "Questions about public documents, private proof files, receipts, appraisals, and what should stay hidden.",
+      href: "mailto:support@qrguitar.com?subject=QRguitar%20proof%20document%20help"
     }
   ];
 
@@ -40,7 +50,7 @@ export default function ContactPage() {
             <div className="contact-hero">
               <div>
                 <div className="eyebrow">Support</div>
-                <h1>QRguitar help, Profiles, and verification support.</h1>
+                <h1>Support for QRguitar Profiles.</h1>
                 <p>
                   Get help with account access, permanent QRguitar Profiles, QR downloads, hidden documents, service history,
                   lost/stolen alerts, transfers, and manual beta verification review.
@@ -49,7 +59,7 @@ export default function ContactPage() {
               <div className="contact-direct-card">
                 <span>Public support inbox</span>
                 <a className="button" href="mailto:support@qrguitar.com">support@qrguitar.com</a>
-                <small>Include your QRguitar ID when the question is about a specific record.</small>
+                <small>Use the email attached to your QRguitar account and include the QRguitar ID when the question is about a specific profile.</small>
               </div>
             </div>
 
@@ -66,7 +76,7 @@ export default function ContactPage() {
               <h2>What to include</h2>
               <ul>
                 <li>QRguitar ID or profile link, if you have one.</li>
-                <li>The account email you used to create the record.</li>
+                <li>The account email you used to create the profile.</li>
                 <li>Photos, receipts, service notes, or proof details relevant to the request.</li>
                 <li>A short note explaining what you need changed, reviewed, or fixed.</li>
               </ul>

@@ -153,8 +153,8 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
           <div className="dashboard-hero">
             <div>
               <div className="eyebrow">The Catalog</div>
-              <h2>Browse QRguitar Profiles.</h2>
-              <p>Visible profiles are discoverable by default. Owners can make a profile private when privacy matters.</p>
+              <h2>Browse QRguitar.</h2>
+              <p>Search visible instruments by brand, model, year, condition, verification, originality, safety status, service history, proof documents, and sale status.</p>
             </div>
             <Link className="button" href="/create">
               Create Profile

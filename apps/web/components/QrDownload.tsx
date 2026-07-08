@@ -10,6 +10,18 @@ type QrDownloadProps = {
   label: string;
   qrStyle?: QrStyle;
   onStyleChange?: (style: QrStyle) => void;
+  handout?: {
+    photoUrl?: string;
+    brand?: string;
+    model?: string;
+    year?: string;
+    location?: string;
+    serial?: string;
+    showSerial?: boolean;
+    verification?: string;
+    authenticity?: string;
+    safety?: string;
+  };
 };
 
 type LabelLines = {
@@ -24,7 +36,7 @@ const qrPresets: Array<{ label: string; style: Pick<QrStyle, "foreground" | "bac
   { label: "Print", helper: "Black QR on white", style: { foreground: "#071014", background: "#f8f6f2", shape: "classic" } }
 ];
 
-export function QrDownload({ code, label, qrStyle, onStyleChange }: QrDownloadProps) {
+export function QrDownload({ code, label, qrStyle, onStyleChange, handout }: QrDownloadProps) {
   const [dataUrl, setDataUrl] = useState("");
   const [style, setStyle] = useState<QrStyle>(qrStyle ?? defaultQrStyle);
   const [labelInput, setLabelInput] = useState("");
@@ -133,6 +145,21 @@ export function QrDownload({ code, label, qrStyle, onStyleChange }: QrDownloadPr
     const safeCode = escapeHtml(code);
     const safeUrl = escapeHtml(profileUrl);
     const safeQr = escapeHtml(dataUrl);
+    const safePhoto = handout?.photoUrl ? escapeHtml(handout.photoUrl) : "";
+    const facts = [
+      handout?.brand,
+      handout?.model,
+      handout?.year,
+      handout?.location
+    ].map((item) => String(item || "").trim()).filter(Boolean);
+    const badges = [
+      handout?.verification,
+      handout?.authenticity,
+      handout?.safety
+    ].map((item) => String(item || "").trim()).filter(Boolean);
+    const safeFacts = facts.map((item) => `<span>${escapeHtml(item)}</span>`).join("");
+    const safeBadges = badges.map((item) => `<span>${escapeHtml(item)}</span>`).join("");
+    const safeSerial = handout?.showSerial && handout.serial ? escapeHtml(handout.serial) : "";
 
     printWindow.document.write(`<!doctype html>
 <html>
@@ -152,41 +179,93 @@ export function QrDownload({ code, label, qrStyle, onStyleChange }: QrDownloadPr
       font-family: Arial, Helvetica, sans-serif;
     }
     .handout {
-      width: min(680px, calc(100vw - 32px));
-      border: 1px solid #d7c89f;
-      border-radius: 18px;
-      padding: 34px;
-      background: #fffaf0;
-      box-shadow: 0 22px 70px rgba(7, 16, 20, .18);
+      width: min(760px, calc(100vw - 28px));
+      border: 1px solid #d2b169;
+      border-radius: 22px;
+      overflow: hidden;
+      background: #071014;
+      color: #f8f6f2;
+      box-shadow: 0 28px 80px rgba(7, 16, 20, .28);
     }
     .brand {
-      margin-bottom: 22px;
+      padding: 26px 30px 0;
       font-size: 30px;
       font-weight: 950;
       letter-spacing: -.02em;
     }
     .brand span { color: #f0a12b; }
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(260px, .95fr);
+      gap: 0;
+      padding: 22px 30px 30px;
+    }
+    .photo {
+      min-height: 330px;
+      border: 1px solid rgba(248, 246, 242, .16);
+      border-radius: 18px 0 0 18px;
+      overflow: hidden;
+      background: #11191e;
+    }
+    .photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .photo.empty {
+      display: grid;
+      place-items: center;
+      color: #d2b169;
+      font-weight: 900;
+    }
+    .info {
+      min-height: 330px;
+      border: 1px solid rgba(248, 246, 242, .16);
+      border-left: 0;
+      border-radius: 0 18px 18px 0;
+      padding: 28px;
+      display: grid;
+      align-content: center;
+      gap: 18px;
+      background: linear-gradient(180deg, rgba(248,246,242,.06), rgba(248,246,242,.015)), #121b20;
+    }
     h1 {
-      margin: 0 0 8px;
-      font-size: 34px;
+      margin: 0;
+      font-size: 42px;
       line-height: 1.03;
       letter-spacing: -.03em;
     }
     .code {
-      margin: 0 0 24px;
-      color: #86610f;
+      margin: 0;
+      color: #f0a12b;
       font-size: 15px;
       font-weight: 900;
       letter-spacing: .02em;
     }
+    .facts, .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+    .facts span, .badges span {
+      border: 1px solid rgba(248, 246, 242, .18);
+      border-radius: 999px;
+      padding: 6px 9px;
+      font-size: 12px;
+      font-weight: 850;
+      color: #efe6ce;
+      background: rgba(248, 246, 242, .04);
+    }
     .content {
       display: grid;
-      grid-template-columns: 230px 1fr;
+      grid-template-columns: 210px 1fr;
       gap: 28px;
       align-items: center;
+      margin: 0 30px 30px;
+      padding: 22px;
+      border: 1px solid rgba(248, 246, 242, .13);
+      border-radius: 18px;
+      background: #f8f6f2;
+      color: #071014;
     }
     .qr {
-      width: 230px;
+      width: 210px;
       border: 1px solid #e5d9b8;
       border-radius: 14px;
       padding: 12px;
@@ -210,10 +289,9 @@ export function QrDownload({ code, label, qrStyle, onStyleChange }: QrDownloadPr
       font-weight: 800;
     }
     .footer {
-      margin-top: 28px;
-      padding-top: 18px;
-      border-top: 1px solid #e5d9b8;
-      color: #6d6253;
+      margin: 0;
+      padding: 0 30px 28px;
+      color: rgba(248, 246, 242, .68);
       font-size: 13px;
       line-height: 1.45;
     }
@@ -222,7 +300,9 @@ export function QrDownload({ code, label, qrStyle, onStyleChange }: QrDownloadPr
       .handout { width: 100%; box-shadow: none; }
     }
     @media (max-width: 620px) {
-      .content { grid-template-columns: 1fr; }
+      .hero, .content { grid-template-columns: 1fr; }
+      .photo, .info { border-radius: 16px; border: 1px solid rgba(248, 246, 242, .16); }
+      .info { border-top: 0; }
       .qr { width: 100%; max-width: 260px; }
     }
   </style>
@@ -230,8 +310,16 @@ export function QrDownload({ code, label, qrStyle, onStyleChange }: QrDownloadPr
 <body>
   <main class="handout">
     <div class="brand">QR<span>guitar</span></div>
-    <h1>${safeTitle}</h1>
-    <p class="code">${safeCode}</p>
+    <section class="hero">
+      <div class="photo ${safePhoto ? "" : "empty"}">${safePhoto ? `<img src="${safePhoto}" alt="${safeTitle} photo" />` : "QRguitar Profile"}</div>
+      <div class="info">
+        <p class="code">${safeCode}</p>
+        <h1>${safeTitle}</h1>
+        ${safeFacts ? `<div class="facts">${safeFacts}</div>` : ""}
+        ${safeSerial ? `<div class="facts"><span>Serial / Build ID: ${safeSerial}</span></div>` : ""}
+        ${safeBadges ? `<div class="badges">${safeBadges}</div>` : ""}
+      </div>
+    </section>
     <section class="content">
       <div class="qr"><img src="${safeQr}" alt="QR code for ${safeTitle}" /></div>
       <div class="copy">

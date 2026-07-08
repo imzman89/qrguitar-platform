@@ -31,6 +31,7 @@ import {
   type ServiceHistoryEntry
 } from "../../../lib/local-demo";
 import { formatRecordLocation } from "../../../lib/record-location";
+import { fetchPublishedSiteSettings, normalizeBrandLogoKey } from "../../../lib/site-settings";
 import { createBrowserSupabaseClient } from "../../../lib/supabase-browser";
 
 type ProfileTab = "overview" | "specs" | "timeline" | "ownership" | "media" | "repairs" | "documents";
@@ -57,6 +58,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
   const [mediaIndex, setMediaIndex] = useState(0);
   const [activeMedia, setActiveMedia] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
+  const [brandLogos, setBrandLogos] = useState<Record<string, string>>({});
   const code = codeParam || initialInstrument?.qrCode || "";
   const queryTab = searchParams.get("tab");
   const [currentUserEmail, setCurrentUserEmail] = useState("");
@@ -290,6 +292,49 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     }
   }, [queryTab]);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublishedSiteSettings().then((settings) => {
+      if (!cancelled) {
+        setBrandLogos(settings?.brandLogos || {});
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!activeMedia) {
+      return;
+    }
+
+    function movePhoto(direction: 1 | -1) {
+      const currentIndex = Math.max(0, galleryImages.indexOf(activeMedia || ""));
+      const nextIndex = direction > 0
+        ? (currentIndex >= galleryImages.length - 1 ? 0 : currentIndex + 1)
+        : (currentIndex <= 0 ? galleryImages.length - 1 : currentIndex - 1);
+      setActiveMedia(galleryImages[nextIndex]);
+      setMediaIndex(nextIndex);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setActiveMedia(null);
+      }
+      if (event.key === "ArrowRight" && galleryImages.length > 1) {
+        movePhoto(1);
+      }
+      if (event.key === "ArrowLeft" && galleryImages.length > 1) {
+        movePhoto(-1);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeMedia, galleryImages]);
+
   if (!resolved) {
     return (
       <main className="scan-profile">
@@ -343,7 +388,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
   const specs = [
     { label: "Instrument ID", value: instrument.qrCode },
     { label: "Make / Model", value: [instrument.brand, instrument.model].filter(Boolean).join(" ") },
-    { label: "Serial / Build ID", value: instrument.serial },
+    { label: "Serial / Build ID", value: instrument.serial || (instrument.serialExceptionApproved ? "No serial/build ID used" : "") },
     { label: "Year", value: instrument.year || "Unknown" },
     ...(formattedLocation ? [{ label: "Location", value: formattedLocation }] : []),
     { label: "Visibility", value: instrument.visibility === "private" ? "Private profile" : instrument.visibility === "unlisted" ? "Unlisted profile" : "Visible profile" },
@@ -379,6 +424,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     { label: "Shop", href: instrument.shopUrl },
     ...(instrument.customLinks || []).map((link) => ({ label: link.label, href: link.url }))
   ].filter((link) => link.href);
+  const officialBrandLogoUrl = instrument.brand ? brandLogos[normalizeBrandLogoKey(instrument.brand)] || "" : "";
 
   return (
     <main className="scan-profile">
@@ -557,6 +603,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           specs={specs}
           optionalSpecs={optionalSpecs}
           profileLinks={profileLinks}
+          officialBrandLogoUrl={officialBrandLogoUrl}
           galleryImages={galleryImages}
           documentFiles={documentFiles}
           mediaIndex={mediaIndex}
@@ -585,6 +632,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
             <section className="media-overlay-content media-gallery-lightbox">
               <header className="media-gallery-header">
                 <strong>{instrumentDisplayName(instrument)}</strong>
+                <span>{Math.max(1, galleryImages.indexOf(activeMedia) + 1)} / {galleryImages.length}</span>
                 <button className="media-overlay-close" type="button" onClick={() => setActiveMedia(null)}>
                   <X size={14} /> Close
                 </button>
@@ -672,6 +720,7 @@ function ProfilePanel({
   profileLinks,
   galleryImages,
   documentFiles,
+  officialBrandLogoUrl,
   mediaIndex,
   onPickMedia,
   onOpenMedia,
@@ -688,6 +737,7 @@ function ProfilePanel({
   profileLinks: Array<{ label: string; href?: string }>;
   galleryImages: string[];
   documentFiles: Array<{ name: string; url: string; documentType?: string; publicDescription?: string }>;
+  officialBrandLogoUrl: string;
   mediaIndex: number;
   onPickMedia: (index: number) => void;
   onOpenMedia: (imageUrl: string) => void;
@@ -893,8 +943,8 @@ function ProfilePanel({
         ) : null}
       </div>
       {instrument.brand ? (
-        <div className="maker-signature maker-signature--text">
-          <span>Brand</span>
+        <div className={`maker-signature ${officialBrandLogoUrl ? "maker-signature--logo" : "maker-signature--text"}`}>
+          {officialBrandLogoUrl ? <img src={officialBrandLogoUrl} alt={`${instrument.brand} official logo`} /> : <span>Brand</span>}
           <strong>{instrument.brand}</strong>
           <em>{isVerifiedRecord ? "Verified by QRguitar" : "Unverified"}</em>
         </div>

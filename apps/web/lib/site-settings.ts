@@ -18,6 +18,7 @@ export type EditableSiteSettings = {
   brandName: string;
   tagline: string;
   instrumentCategories: string[];
+  brandLogos: Record<string, string>;
   colors: {
     background: string;
     panel: string;
@@ -94,6 +95,7 @@ export const defaultSiteSettings: EditableSiteSettings = {
   brandName: "QRguitar",
   tagline: "Permanent QRguitar Profiles for guitars, amps, pedals, builders, shops, collectors, and future owners.",
   instrumentCategories: [...defaultInstrumentCategories],
+  brandLogos: {},
   colors: {
     background: "#070c10",
     panel: "#11191e",
@@ -268,6 +270,7 @@ export function mergeSiteSettings(settings?: Partial<EditableSiteSettings> | nul
   return normalizeCopyObject({
     ...defaultSiteSettings,
     ...(settings || {}),
+    brandLogos: normalizeBrandLogos(settings?.brandLogos),
     instrumentCategories: Array.isArray(settings?.instrumentCategories)
       ? normalizeInstrumentCategories(settings.instrumentCategories, false)
       : hasInstrumentCategories ? [] : defaultSiteSettings.instrumentCategories,
@@ -305,6 +308,23 @@ export function mergeSiteSettings(settings?: Partial<EditableSiteSettings> | nul
       ...(settings?.dashboard || {})
     }
   });
+}
+
+export function normalizeBrandLogoKey(value?: string | null) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export function normalizeBrandLogos(value?: Record<string, string> | null) {
+  const entries = Object.entries(value || {})
+    .map(([brand, url]) => [normalizeBrandLogoKey(brand), String(url || "").trim()] as const)
+    .filter(([brand, url]) => brand && /^(https?:\/\/|\/)/i.test(url));
+
+  return Object.fromEntries(entries);
 }
 
 export function readSiteSettings() {

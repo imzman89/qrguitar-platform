@@ -817,6 +817,8 @@ select {
 
 .collectible-card {
   position: relative;
+  width: 100%;
+  max-width: 100%;
   overflow: hidden;
   border: 1px solid rgba(248, 246, 242, .12);
   border-radius: 16px;
@@ -855,6 +857,7 @@ select {
 .collectible-card-link {
   position: relative;
   z-index: 2;
+  width: 100%;
   min-height: 100%;
   display: grid;
   color: inherit;
@@ -872,6 +875,8 @@ select {
 
 .collectible-card-media {
   position: relative;
+  width: 100%;
+  height: 340px;
   min-height: 340px;
   overflow: hidden;
   background:
@@ -880,13 +885,13 @@ select {
 }
 
 .collectible-card--latest .collectible-card-media {
+  height: 330px;
   min-height: 330px;
 }
 
 .collectible-card-image {
   width: 100%;
   height: 100%;
-  min-height: inherit;
   display: block;
   object-fit: cover;
   object-position: center 45%;
@@ -5098,6 +5103,7 @@ select {
   display: grid;
   place-items: center;
   padding: 22px;
+  overflow: hidden;
 }
 
 .media-overlay-backdrop {
@@ -5125,7 +5131,7 @@ select {
 }
 
 .media-gallery-lightbox {
-  width: min(1040px, calc(100vw - 28px));
+  width: min(980px, calc(100vw - 28px));
   max-height: calc(100dvh - 28px);
   border: 1px solid rgba(248, 246, 242, .14);
   border-radius: 16px;
@@ -5139,9 +5145,9 @@ select {
 .media-gallery-header {
   padding: 12px 14px;
   border-bottom: 1px solid rgba(248, 246, 242, .08);
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
 }
 
@@ -5151,18 +5157,28 @@ select {
   white-space: nowrap;
 }
 
+.media-gallery-header span {
+  border: 1px solid rgba(248, 246, 242, .12);
+  border-radius: 999px;
+  padding: 4px 8px 3px;
+  color: rgba(248, 246, 242, .76);
+  background: rgba(248, 246, 242, .04);
+  font-size: 11px;
+  font-weight: 900;
+}
+
 .media-gallery-stage {
   position: relative;
-  min-height: min(66vh, 640px);
+  min-height: min(62vh, 600px);
   display: grid;
   place-items: center;
-  padding: 14px;
+  padding: 12px 64px;
   background: radial-gradient(circle at 50% 30%, rgba(240, 161, 43, .08), transparent 42%), #030506;
 }
 
 .media-gallery-stage img {
   width: 100%;
-  height: min(66vh, 640px);
+  height: min(62vh, 600px);
   max-height: none;
   border: 0;
   border-radius: 12px;
@@ -5183,7 +5199,7 @@ select {
   place-items: center;
   overflow: hidden;
   color: transparent;
-  background: rgba(2, 5, 6, .72);
+  background: rgba(2, 5, 6, .78);
   backdrop-filter: blur(10px);
 }
 
@@ -5578,6 +5594,20 @@ select {
   color: var(--text);
   text-align: left;
   background: rgba(248, 246, 242, .035);
+}
+
+.maker-signature--logo {
+  min-width: 180px;
+  align-items: center;
+  justify-items: center;
+  text-align: center;
+}
+
+.maker-signature--logo img {
+  max-width: 150px;
+  max-height: 72px;
+  object-fit: contain;
+  display: block;
 }
 
 .maker-signature strong {
@@ -6482,6 +6512,7 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 
   .collectible-card-media,
   .collectible-card--latest .collectible-card-media {
+    height: 300px;
     min-height: 300px;
   }
 
@@ -6947,6 +6978,59 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
     min-height: 360px;
   }
 
+  .media-overlay {
+    padding: 10px;
+  }
+
+  .media-gallery-lightbox {
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 20px);
+    border-radius: 13px;
+  }
+
+  .media-gallery-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .media-gallery-header span {
+    grid-column: 1;
+    width: fit-content;
+  }
+
+  .media-gallery-stage {
+    min-height: min(58vh, 470px);
+    padding: 10px 44px;
+  }
+
+  .media-gallery-stage img {
+    height: min(58vh, 470px);
+    border-radius: 10px;
+  }
+
+  .media-gallery-nav {
+    width: 34px;
+    height: 34px;
+  }
+
+  .media-gallery-nav--prev {
+    left: 8px;
+  }
+
+  .media-gallery-nav--next {
+    right: 8px;
+  }
+
+  .media-gallery-strip {
+    padding: 8px;
+  }
+
+  .media-gallery-strip button {
+    flex-basis: 56px;
+    height: 44px;
+  }
+
   .scan-hero-info {
     padding: 22px 17px 24px;
   }
@@ -7245,6 +7329,33 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.admin-logo-preview {
+  width: fit-content;
+  max-width: 100%;
+  margin: 2px 0;
+  border: 1px solid rgba(248, 246, 242, .13);
+  border-radius: 12px;
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+  background: #070c10;
+}
+
+.admin-logo-preview span {
+  color: var(--gold-2);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.admin-logo-preview img {
+  max-width: 220px;
+  max-height: 90px;
+  object-fit: contain;
+  display: block;
 }
 
 .admin-modal-backdrop {

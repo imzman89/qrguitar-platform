@@ -8,6 +8,29 @@ export const metadata: Metadata = {
 };
 
 export default function TermsPage() {
+  const sections = [
+    {
+      title: "Your content and responsibility",
+      copy: "You are responsible for the photos, specs, serial/build information, notes, documents, and links you add. Do not upload content you do not have permission to store or share."
+    },
+    {
+      title: "Permanent QR concept",
+      copy: "QRguitar is designed so the QRguitar ID and /i/[code] profile URL stay with the instrument as details are edited. QRguitar cannot guarantee eternal hosting by every third-party provider, network, phone, browser, or storage service."
+    },
+    {
+      title: "Verification and authenticity",
+      copy: "Verification and authenticity review are based on available evidence at the time of review. They are not an appraisal, insurance guarantee, fraud-proof certificate, guarantee of future condition, or guarantee against undisclosed modifications."
+    },
+    {
+      title: "Safety and transfers",
+      copy: "Lost/stolen reports must be truthful. Ownership transfers must be started and accepted by people with proper authorization. Abuse, fraud, impersonation, or infringing uploads may result in account restrictions."
+    },
+    {
+      title: "Beta and future paid features",
+      copy: "QRguitar is in public beta. Features, limits, and paid services may change. No checkout or payment flow is live unless it is clearly presented inside the product at the time you use it."
+    }
+  ];
+
   return (
     <>
       <Nav />
@@ -17,27 +40,15 @@ export default function TermsPage() {
             <div className="eyebrow">Terms</div>
             <h1>QRguitar is in public beta.</h1>
             <p>
-              QRguitar provides permanent instrument profiles for guitars, amps, pedals, builders, shops, collectors,
-              and future owners. Public beta features may change as the platform improves.
+              QRguitar provides QR-linked instrument profiles for guitars, basses, amps, pedals, builders, shops,
+              collectors, and future owners. These terms explain the practical rules for using the beta.
             </p>
-            <div className="legal-card">
-              <h2>User content</h2>
-              <p>Users are responsible for uploaded content and should not upload content they do not have the right to store or share.</p>
-            </div>
-            <div className="legal-card">
-              <h2>Verification and authenticity</h2>
-              <p>
-                Verification and authenticity review are based on available evidence. They are not guarantees of future
-                condition, future ownership, market value, or future originality.
-              </p>
-            </div>
-            <div className="legal-card">
-              <h2>Safety status</h2>
-              <p>
-                Lost and stolen reports are user-submitted and informational. QRguitar is not an insurance provider,
-                appraisal guarantee, or law enforcement system.
-              </p>
-            </div>
+            {sections.map((section) => (
+              <div className="legal-card" key={section.title}>
+                <h2>{section.title}</h2>
+                <p>{section.copy}</p>
+              </div>
+            ))}
             <div className="legal-card">
               <h2>Support</h2>
               <p>Questions can be sent to <a href="mailto:support@qrguitar.com">support@qrguitar.com</a>.</p>
