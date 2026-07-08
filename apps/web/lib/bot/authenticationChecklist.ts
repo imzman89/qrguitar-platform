@@ -13,7 +13,7 @@ export function buildAuthenticationChecklist(instrument: DemoInstrument | null):
   if (!instrument) {
     return {
       answer:
-        "No QRguitar record is attached. Open the bot from an instrument page first, or paste the minimum record details so I can check it.",
+        "No QRguitar Profile is attached. Open the bot from an instrument page first, or paste the minimum profile details so I can check it.",
       confidence: "low",
       evidenceUsed: ["General QRguitar authentication workflow only"],
       missingEvidence: ["Instrument brand", "Model", "Serial", "Year", "Ownership timeline", "Photos", "Receipts or transfer records"],

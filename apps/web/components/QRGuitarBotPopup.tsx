@@ -84,7 +84,7 @@ export function QRGuitarBotPopup() {
         role: "assistant",
         copy: shouldClearScope
           ? `Ask about ${shouldClearScope.name || shouldClearScope.brand || "this instrument"}: proof, pricing, repairs, transfers, or listing prep.`
-          : "The Guitar Expert and Assistant. Ask about a guitar, amp, pedal, price, serial, repair, listing, QRguitar record, or account issue."
+          : "The Guitar Expert and Assistant. Ask about a guitar, amp, pedal, price, serial, repair, listing, QRguitar Profile, or account issue."
       }
     ]);
   }, [instrument?.qrCode, instrument?.name]);

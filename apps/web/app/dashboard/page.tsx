@@ -652,7 +652,7 @@ function TransferPanel({
         <div className="transfer-copy">
           <span className="mini-eyebrow">Ownership transfer beta</span>
           <strong>Email a claim link to the next owner.</strong>
-          <p>The recipient signs in with the email below, opens the claim link, and accepts the same permanent QRguitar record.</p>
+          <p>The recipient signs in with the email below, opens the claim link, and accepts the same permanent QRguitar Profile.</p>
         </div>
         <div className="transfer-form">
           <label>

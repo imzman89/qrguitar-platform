@@ -79,7 +79,7 @@ export default function InstallersPage() {
             <div className="section-header">
               <div className="eyebrow">How it works</div>
               <h2>A trusted path from QR code to permanent install.</h2>
-              <p>Owners can start with a normal QRguitar record, then find a vetted shop if they want a permanent physical installation later.</p>
+              <p>Owners can start with a normal QRguitar Profile, then find a vetted shop if they want a permanent physical installation later.</p>
             </div>
             <div className="grid three">
               {vettingSteps.map((step, index) => (

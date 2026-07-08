@@ -996,7 +996,7 @@ export default function AdminPage() {
               return (
                 <div className="admin-row" key={transfer.id}>
                   <div>
-                    <strong>{transfer.recordTitle || "QRguitar record"}</strong>
+                    <strong>{transfer.recordTitle || "QRguitar Profile"}</strong>
                     <span className="admin-user-summary">
                       <span className={`admin-chip admin-chip--transfer-${normalize(transfer.status)}`}>{transfer.status || "unknown"}</span>
                       <span>{transfer.recordCode || transfer.guitar_id}</span>

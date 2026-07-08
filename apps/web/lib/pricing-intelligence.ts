@@ -148,7 +148,7 @@ function confidenceForCompSet(instrument: DemoInstrument, soldComps: ComparableS
 function buildEvidenceFound(instrument: DemoInstrument, soldComps: ComparableSale[]) {
   return [
     instrument.serial ? `Serial recorded: ${instrument.serial}` : "",
-    instrument.verificationStatus === "verified" ? "QRguitar record marked verified" : "",
+    instrument.verificationStatus === "verified" ? "QRguitar Profile marked verified" : "",
     instrument.galleryImageDataUrls?.length ? `${instrument.galleryImageDataUrls.length} profile photos attached` : "",
     instrument.customFields?.length ? "Build/spec fields are present" : "",
     soldComps.length ? `${soldComps.length} sold/manual comparable records available` : ""

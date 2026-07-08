@@ -49,7 +49,7 @@ type BulkImportRow = {
 
 const bulkHeaders = ["brand", "model", "serial", "year", "type", "condition", "sale_status", "originality", "location", "visibility", "photo", "summary"];
 const bulkTemplate = `${bulkHeaders.join("\t")}
-Fender\tStratocaster\tABC123\t2005\tElectric Guitar\tused\tnot_for_sale\tall_original\tCranston, RI\tprivate\thttps://example.com/photo.jpg\tOwned since 2024`;
+Fender\tStratocaster\tABC123\t2005\tElectric Guitar\tused\tNot for sale\tAll original\tCranston, RI\tprivate\thttps://example.com/photo.jpg\tOwned since 2024`;
 
 export default function CreatePage() {
   const router = useRouter();
@@ -367,7 +367,7 @@ export default function CreatePage() {
       }
 
       if (!form.heroImageDataUrl && !galleryImages.length) {
-        setMessage("Add at least one photo before creating a QRguitar record.");
+        setMessage("Add at least one photo before creating a QRguitar Profile.");
         return;
       }
 
@@ -380,7 +380,7 @@ export default function CreatePage() {
       }
 
       if (!user?.email) {
-        setMessage("Sign in required to create records.");
+        setMessage("Sign in required to create QRguitar Profiles.");
         return;
       }
 
@@ -492,7 +492,7 @@ export default function CreatePage() {
             <p>
                 Add the core details, upload at least one real photo, and QRguitar will create a permanent QRguitar Profile URL and QR code tied to your account.
               </p>
-              <div className="create-onboarding-strip" aria-label="Create record steps">
+              <div className="create-onboarding-strip" aria-label="Create profile steps">
                 <span><strong>1</strong> Add identity</span>
                 <span><strong>2</strong> Upload photo</span>
                 <span><strong>3</strong> Save QR profile</span>
@@ -985,7 +985,7 @@ export default function CreatePage() {
         <div className="shell">
           <section className="card auth-card">
             <div className="eyebrow">Create instrument</div>
-            <h2>Sign in to create your first QRguitar record.</h2>
+            <h2>Sign in to create your first QRguitar Profile.</h2>
             <p>Create QRguitar Profiles from your account so the QR, photos, documents, and ownership stay tied to the right owner.</p>
             <div className="form-actions">
               <Link className="button" href={`/login?next=${encodeURIComponent("/create")}`}>

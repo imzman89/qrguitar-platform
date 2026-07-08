@@ -85,7 +85,7 @@ export function buildSupportPrompt(message: string, instrument: DemoInstrument |
       answer: knowledge.answer,
       confidence: "medium",
       evidenceUsed: knowledge.evidenceUsed,
-      missingEvidence: instrument ? [] : ["No specific QRguitar record is attached."],
+      missingEvidence: instrument ? [] : ["No specific QRguitar Profile is attached."],
       suggestedNextSteps: knowledge.suggestedNextSteps,
       warnings: ["I will not expose private records, hidden documents, or private owner details."]
     };

@@ -19,7 +19,7 @@ export const quickActions = [
 ];
 
 export const botKnowledgePolicy = [
-  "Use the linked QRguitar record first.",
+  "Use the linked QRguitar Profile first.",
   "Use member-provided photos/docs second.",
   "Use general gear knowledge only for guidance, not final proof.",
   "Never confirm authenticity without evidence. Use confidence and missing proof.",

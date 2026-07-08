@@ -4,7 +4,7 @@ import { buildPageMetadata } from "../../lib/seo";
 
 export const metadata: Metadata = buildPageMetadata(
   "Create a QRguitar Record",
-  "Create a permanent QRguitar record for your instrument, amp, pedal, or brand asset.",
+  "Create a permanent QRguitar Profile for your instrument, amp, pedal, or brand asset.",
   "/create"
 );
 

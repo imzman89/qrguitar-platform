@@ -1351,7 +1351,7 @@ export async function POST(request: Request) {
   const uploadedSources = Array.from(new Set([body.heroImageDataUrl || "", ...input.photos].filter(Boolean)));
   if (uploadedSources.length < 1) {
     return NextResponse.json(
-      { ok: false, message: "Add at least one photo before creating a QRguitar record." },
+      { ok: false, message: "Add at least one photo before creating a QRguitar Profile." },
       { status: 400 }
     );
   }
@@ -1620,7 +1620,7 @@ export async function PATCH(request: Request) {
 
   if (body.action === "restore_to_collection") {
     return NextResponse.json(
-      { ok: false, message: "Deleted records cannot be restored. Create a new QRguitar record instead." },
+      { ok: false, message: "Deleted profiles cannot be restored. Create a new QRguitar Profile instead." },
       { status: 410 }
     );
   }
@@ -1767,7 +1767,7 @@ export async function PATCH(request: Request) {
   const updatedMediaSources = Array.from(new Set([body.heroImageDataUrl || "", ...input.photos].filter(Boolean)));
   if (updatedMediaSources.length < 1) {
     return NextResponse.json(
-      { ok: false, message: "Every QRguitar record needs at least one photo." },
+      { ok: false, message: "Every QRguitar Profile needs at least one photo." },
       { status: 400 }
     );
   }

@@ -45,7 +45,7 @@ const emptyForm = {
 const managedFieldLabels = new Set(["instrument type", "builder", "finish", "weight", "owner status", "specs notes", "service notes", "sale status", "originality"]);
 const serviceEventTypes = ["Setup", "Repair", "Modification", "Pickup Install", "Wiring", "Fretwork", "Inspection", "Appraisal/Review", "Cleaning", "Other"];
 const documentTypeOptions = ["Receipt", "Invoice", "Appraisal", "Certificate", "Build Sheet", "Service Slip", "Insurance Photo", "Warranty", "Authenticity Evidence", "Other"];
-const oldVerifiedQrLabel = "Scan for verified QRguitar record";
+const oldVerifiedQrLabel = "Scan for verified QRguitar Profile";
 const safeDefaultQrLabel = "Scan QRguitar Profile";
 const staleDraftValueParts = [
   ["QA", "Lost", "Test"],
@@ -510,7 +510,7 @@ export default function EditInstrumentPage() {
 
     try {
       if (!form.heroImageDataUrl && !galleryImages.length) {
-        setMessage("Every QRguitar record needs at least one photo.");
+        setMessage("Every QRguitar Profile needs at least one photo.");
         setSavingRecord(false);
         return;
       }
@@ -911,7 +911,7 @@ export default function EditInstrumentPage() {
               />
               <div className="form-section-heading">
                 <span className="eyebrow">Core identity</span>
-                <p>Make/model/serial are the main identity. Add anything else only when it helps the record.</p>
+                <p>Make/model/serial are the main identity. Add anything else only when it helps the profile.</p>
               </div>
               <div className="form-grid">
                 <Field label="Make / brand" id="brand" value={form.brand} onChange={(value) => updateField("brand", value)} />
@@ -1384,7 +1384,7 @@ export default function EditInstrumentPage() {
                 ? "Checking your Supabase session now."
                 : forbidden
                   ? message || "Only the record owner can edit this record."
-                  : message || "Sign in with the account that owns this QRguitar record."}
+                  : message || "Sign in with the account that owns this QRguitar Profile."}
             </p>
             {forbidden ? (
               <Link className="button" href="/dashboard">
