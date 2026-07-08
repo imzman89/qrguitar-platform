@@ -500,7 +500,7 @@ export default function CreatePage() {
               <div className="permanent-id">
                 <span>Permanent QRguitar ID</span>
                 <strong>{qrCode}</strong>
-                <small>The QRguitar ID is permanent and generated automatically. Serial/build ID is the manufacturer or builder identifier when one exists.</small>
+                <small>The QRguitar ID is permanent and generated automatically. Serial / Build ID is the manufacturer or builder identifier when one exists.</small>
               </div>
               <div className="privacy-toggle" aria-label="Profile visibility">
                 <div>

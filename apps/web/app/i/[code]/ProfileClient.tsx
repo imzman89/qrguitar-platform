@@ -386,7 +386,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
   }
 
   const specs = [
-    { label: "Instrument ID", value: instrument.qrCode },
+    { label: "QRguitar ID / Instrument ID", value: instrument.qrCode },
     { label: "Make / Model", value: [instrument.brand, instrument.model].filter(Boolean).join(" ") },
     { label: "Serial / Build ID", value: instrument.serial || (instrument.serialExceptionApproved ? "No serial/build ID used" : "") },
     { label: "Year", value: instrument.year || "Unknown" },

@@ -10,18 +10,6 @@ type QrDownloadProps = {
   label: string;
   qrStyle?: QrStyle;
   onStyleChange?: (style: QrStyle) => void;
-  handout?: {
-    photoUrl?: string;
-    brand?: string;
-    model?: string;
-    year?: string;
-    location?: string;
-    serial?: string;
-    showSerial?: boolean;
-    verification?: string;
-    authenticity?: string;
-    safety?: string;
-  };
 };
 
 type LabelLines = {
@@ -36,7 +24,7 @@ const qrPresets: Array<{ label: string; style: Pick<QrStyle, "foreground" | "bac
   { label: "Print", helper: "Black QR on white", style: { foreground: "#071014", background: "#f8f6f2", shape: "classic" } }
 ];
 
-export function QrDownload({ code, label, qrStyle, onStyleChange, handout }: QrDownloadProps) {
+export function QrDownload({ code, label, qrStyle, onStyleChange }: QrDownloadProps) {
   const [dataUrl, setDataUrl] = useState("");
   const [style, setStyle] = useState<QrStyle>(qrStyle ?? defaultQrStyle);
   const [labelInput, setLabelInput] = useState("");
@@ -130,217 +118,6 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, handout }: QrD
     updateStyle({ labelText: nextLabel });
   }
 
-  function printHandout() {
-    if (!dataUrl || typeof window === "undefined") {
-      return;
-    }
-
-    const printWindow = window.open("", "_blank", "noopener,noreferrer,width=760,height=920");
-    if (!printWindow) {
-      window.print();
-      return;
-    }
-
-    const safeTitle = escapeHtml(label || "QRguitar Profile");
-    const safeCode = escapeHtml(code);
-    const safeUrl = escapeHtml(profileUrl);
-    const safeQr = escapeHtml(dataUrl);
-    const safePhoto = handout?.photoUrl ? escapeHtml(handout.photoUrl) : "";
-    const facts = [
-      handout?.brand,
-      handout?.model,
-      handout?.year,
-      handout?.location
-    ].map((item) => String(item || "").trim()).filter(Boolean);
-    const badges = [
-      handout?.verification,
-      handout?.authenticity,
-      handout?.safety
-    ].map((item) => String(item || "").trim()).filter(Boolean);
-    const safeFacts = facts.map((item) => `<span>${escapeHtml(item)}</span>`).join("");
-    const safeBadges = badges.map((item) => `<span>${escapeHtml(item)}</span>`).join("");
-    const safeSerial = handout?.showSerial && handout.serial ? escapeHtml(handout.serial) : "";
-
-    printWindow.document.write(`<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>QRguitar handout - ${safeCode}</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      background: #f5f0df;
-      color: #071014;
-      font-family: Arial, Helvetica, sans-serif;
-    }
-    .handout {
-      width: min(760px, calc(100vw - 28px));
-      border: 1px solid #d2b169;
-      border-radius: 22px;
-      overflow: hidden;
-      background: #071014;
-      color: #f8f6f2;
-      box-shadow: 0 28px 80px rgba(7, 16, 20, .28);
-    }
-    .brand {
-      padding: 26px 30px 0;
-      font-size: 30px;
-      font-weight: 950;
-      letter-spacing: -.02em;
-    }
-    .brand span { color: #f0a12b; }
-    .hero {
-      display: grid;
-      grid-template-columns: minmax(0, 1.05fr) minmax(260px, .95fr);
-      gap: 0;
-      padding: 22px 30px 30px;
-    }
-    .photo {
-      min-height: 330px;
-      border: 1px solid rgba(248, 246, 242, .16);
-      border-radius: 18px 0 0 18px;
-      overflow: hidden;
-      background: #11191e;
-    }
-    .photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .photo.empty {
-      display: grid;
-      place-items: center;
-      color: #d2b169;
-      font-weight: 900;
-    }
-    .info {
-      min-height: 330px;
-      border: 1px solid rgba(248, 246, 242, .16);
-      border-left: 0;
-      border-radius: 0 18px 18px 0;
-      padding: 28px;
-      display: grid;
-      align-content: center;
-      gap: 18px;
-      background: linear-gradient(180deg, rgba(248,246,242,.06), rgba(248,246,242,.015)), #121b20;
-    }
-    h1 {
-      margin: 0;
-      font-size: 42px;
-      line-height: 1.03;
-      letter-spacing: -.03em;
-    }
-    .code {
-      margin: 0;
-      color: #f0a12b;
-      font-size: 15px;
-      font-weight: 900;
-      letter-spacing: .02em;
-    }
-    .facts, .badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 7px;
-    }
-    .facts span, .badges span {
-      border: 1px solid rgba(248, 246, 242, .18);
-      border-radius: 999px;
-      padding: 6px 9px;
-      font-size: 12px;
-      font-weight: 850;
-      color: #efe6ce;
-      background: rgba(248, 246, 242, .04);
-    }
-    .content {
-      display: grid;
-      grid-template-columns: 210px 1fr;
-      gap: 28px;
-      align-items: center;
-      margin: 0 30px 30px;
-      padding: 22px;
-      border: 1px solid rgba(248, 246, 242, .13);
-      border-radius: 18px;
-      background: #f8f6f2;
-      color: #071014;
-    }
-    .qr {
-      width: 210px;
-      border: 1px solid #e5d9b8;
-      border-radius: 14px;
-      padding: 12px;
-      background: #071014;
-    }
-    .qr img { width: 100%; display: block; }
-    .copy {
-      display: grid;
-      gap: 12px;
-      font-size: 18px;
-      line-height: 1.45;
-    }
-    .copy strong { font-size: 20px; }
-    .url {
-      overflow-wrap: anywhere;
-      border: 1px solid #e5d9b8;
-      border-radius: 12px;
-      padding: 12px;
-      background: #f7efd7;
-      font-size: 14px;
-      font-weight: 800;
-    }
-    .footer {
-      margin: 0;
-      padding: 0 30px 28px;
-      color: rgba(248, 246, 242, .68);
-      font-size: 13px;
-      line-height: 1.45;
-    }
-    @media print {
-      body { background: white; }
-      .handout { width: 100%; box-shadow: none; }
-    }
-    @media (max-width: 620px) {
-      .hero, .content { grid-template-columns: 1fr; }
-      .photo, .info { border-radius: 16px; border: 1px solid rgba(248, 246, 242, .16); }
-      .info { border-top: 0; }
-      .qr { width: 100%; max-width: 260px; }
-    }
-  </style>
-</head>
-<body>
-  <main class="handout">
-    <div class="brand">QR<span>guitar</span></div>
-    <section class="hero">
-      <div class="photo ${safePhoto ? "" : "empty"}">${safePhoto ? `<img src="${safePhoto}" alt="${safeTitle} photo" />` : "QRguitar Profile"}</div>
-      <div class="info">
-        <p class="code">${safeCode}</p>
-        <h1>${safeTitle}</h1>
-        ${safeFacts ? `<div class="facts">${safeFacts}</div>` : ""}
-        ${safeSerial ? `<div class="facts"><span>Serial / Build ID: ${safeSerial}</span></div>` : ""}
-        ${safeBadges ? `<div class="badges">${safeBadges}</div>` : ""}
-      </div>
-    </section>
-    <section class="content">
-      <div class="qr"><img src="${safeQr}" alt="QR code for ${safeTitle}" /></div>
-      <div class="copy">
-        <strong>Scan to open this QRguitar Profile.</strong>
-        <span>This QR code stays tied to the instrument profile, photos, specs, service notes, and ownership tools.</span>
-        <div class="url">${safeUrl}</div>
-      </div>
-    </section>
-    <p class="footer">If this instrument was serviced or sold with this handout, keep this page with the instrument paperwork. Ownership transfer and claim tools may require the current owner to start the handoff.</p>
-  </main>
-  <script>
-    window.onload = () => {
-      window.focus();
-      window.print();
-    };
-  </script>
-</body>
-</html>`);
-    printWindow.document.close();
-  }
-
   return (
     <div
       className={`${isEditing ? "qr-download editing" : "qr-download"} ${isTransparent ? "transparent" : ""} ${style.includeLabel ? "has-label" : ""}`}
@@ -378,9 +155,9 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, handout }: QrD
         <button className="button secondary qr-edit-button" type="button" onClick={() => setIsEditing((current) => !current)}>
           {isEditing ? "Close" : "Customize QR"}
         </button>
-        <button className="button secondary qr-handout-button" type="button" onClick={printHandout} disabled={!dataUrl}>
+        <a className="button secondary qr-handout-button" href={`/handout/${encodeURIComponent(code)}`} target="_blank" rel="noreferrer">
           Print Handout
-        </button>
+        </a>
       </div>
 
       {isEditing ? (
@@ -478,15 +255,6 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, handout }: QrD
       ) : null}
     </div>
   );
-}
-
-function escapeHtml(value: string) {
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 function areQrStylesEqual(first: QrStyle, second: QrStyle) {

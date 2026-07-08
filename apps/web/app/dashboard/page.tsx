@@ -431,18 +431,6 @@ export default function DashboardPage() {
                             code={instrument.qrCode}
                             label={title}
                             qrStyle={instrument.qrStyle}
-                            handout={{
-                              photoUrl: imageSources.find(Boolean) || "",
-                              brand: instrument.brand,
-                              model: instrument.model,
-                              year: instrument.year,
-                              location: instrument.location,
-                              serial: instrument.serial,
-                              showSerial: instrument.showSerialPublic !== false,
-                              verification: instrument.showVerificationBadge === false ? "" : verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified",
-                              authenticity: instrument.showAuthenticityBadge === false ? "" : authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed",
-                              safety: safetyStatus === "lost" ? "Reported Lost" : safetyStatus === "stolen" ? "Reported Stolen" : ""
-                            }}
                             onStyleChange={(qrStyle) => setInstruments((current) => current.map((item) => item.qrCode === instrument.qrCode ? { ...item, qrStyle } : item))}
                           />
                         </div>
