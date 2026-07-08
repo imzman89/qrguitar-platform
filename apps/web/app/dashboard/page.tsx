@@ -814,9 +814,10 @@ function latestTransferForInstrument(transfers: DemoTransfer[], qrCode: string) 
 function dashboardRecordMeta(instrument: DemoInstrument, condition: "new" | "used") {
   return [
     instrument.brand,
-    instrument.serial || instrument.qrCode,
     instrument.year,
-    condition === "new" ? "New" : "Used"
+    condition === "new" ? "New" : "Used",
+    `QRguitar ID / Instrument ID: ${instrument.qrCode}`,
+    instrument.serial ? `Serial / Build ID: ${instrument.serial}` : ""
   ].filter(Boolean).join(" • ");
 }
 

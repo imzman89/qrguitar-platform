@@ -1057,19 +1057,10 @@ export function instrumentDisplayName(instrument: Pick<DemoInstrument, "name" | 
 }
 
 export function instrumentSubtitle(instrument: Pick<DemoInstrument, "brand" | "model" | "serial" | "year" | "location" | "qrCode" | "showSerialPublic">) {
-  const title = instrumentDisplayName({
-    name: "",
-    brand: instrument.brand,
-    model: instrument.model,
-    serial: instrument.serial
-  }).toLowerCase();
   const brand = String(instrument.brand || "").trim();
-  const serial = instrument.showSerialPublic === false ? "" : String(instrument.serial || "").trim();
-  const qrCode = String(instrument.qrCode || "").trim();
   const location = formatRecordLocation({ location: instrument.location }) || "";
   const year = String(instrument.year || "").trim();
-  const pieces = [brand && !title.startsWith(brand.toLowerCase()) ? brand : brand, serial || qrCode, year && location ? `${year} • ${location}` : year || location].filter(Boolean);
-  return pieces.slice(0, 3).join(" • ");
+  return [brand, year, location].filter(Boolean).join(" • ");
 }
 
 export function getAccountPlan(user?: Pick<DemoUser, "plan" | "email"> | null): AccountPlan {
