@@ -281,7 +281,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                       {photoUrl ? <img src={photoUrl} alt={`${title} main photo`} /> : <span>No photo available</span>}
                     </div>
                     <div className="print-kit-info">
-                      <p className="print-kit-id-label">QRguitar ID / Instrument ID</p>
+                      <p className="print-kit-id-label">QRguitar ID</p>
                       <strong className="print-kit-id">{code}</strong>
                       <h2>{title}</h2>
                       {primaryFacts.length ? (
@@ -290,7 +290,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                       {renderBadges(mode === "shop")}
                       <div className="print-kit-fact-grid">
                         {detailFacts.map((item) => <span key={item}>{item}</span>)}
-                        {serialDisplay ? <span>Serial / Build ID: {serialDisplay}</span> : null}
+                        {serialDisplay ? <span>Instrument ID / Serial: {serialDisplay}</span> : null}
                       </div>
                     </div>
                   </section>

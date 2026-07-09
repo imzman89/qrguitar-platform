@@ -760,7 +760,7 @@ export default function EditInstrumentPage() {
               <div className="permanent-id">
                 <span>Locked permanent QRguitar ID</span>
                 <strong>{original?.qrCode || code}</strong>
-                <small>The QRguitar ID is permanent and generated automatically. Serial / Build ID is the manufacturer or builder identifier when one exists.</small>
+                <small>The QRguitar ID is the permanent profile code. Instrument ID / Serial is the manufacturer or builder identifier when one exists.</small>
               </div>
               <div className="privacy-toggle" aria-label="Profile visibility">
                 <div>
@@ -916,7 +916,7 @@ export default function EditInstrumentPage() {
               <div className="form-grid">
                 <Field label="Make / brand" id="brand" value={form.brand} onChange={(value) => updateField("brand", value)} />
                 <Field label="Model" id="model" value={form.model} onChange={(value) => updateField("model", value)} />
-                <Field label="Serial / build ID" id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} />
+                <Field label="Instrument ID / serial" id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} />
                 <Field label="Year" id="year" value={form.year} onChange={(value) => updateField("year", value)} />
                 <CategoryField
                   label="Type / category"

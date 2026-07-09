@@ -386,9 +386,9 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
   }
 
   const specs = [
-    { label: "QRguitar ID / Instrument ID", value: instrument.qrCode },
+    { label: "QRguitar ID", value: instrument.qrCode },
     { label: "Make / Model", value: [instrument.brand, instrument.model].filter(Boolean).join(" ") },
-    { label: "Serial / Build ID", value: instrument.serial || (instrument.serialExceptionApproved ? "No serial/build ID used" : "") },
+    { label: "Instrument ID / Serial", value: instrument.serial || (instrument.serialExceptionApproved ? "No serial/build ID used" : "") },
     { label: "Year", value: instrument.year || "Unknown" },
     ...(formattedLocation ? [{ label: "Location", value: formattedLocation }] : []),
     { label: "Visibility", value: instrument.visibility === "private" ? "Private profile" : instrument.visibility === "unlisted" ? "Unlisted profile" : "Visible profile" },

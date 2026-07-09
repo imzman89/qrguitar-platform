@@ -816,8 +816,8 @@ function dashboardRecordMeta(instrument: DemoInstrument, condition: "new" | "use
     instrument.brand,
     instrument.year,
     condition === "new" ? "New" : "Used",
-    `QRguitar ID / Instrument ID: ${instrument.qrCode}`,
-    instrument.serial ? `Serial / Build ID: ${instrument.serial}` : ""
+    `QRguitar ID: ${instrument.qrCode}`,
+    instrument.serial ? `Instrument ID / Serial: ${instrument.serial}` : ""
   ].filter(Boolean).join(" • ");
 }
 
