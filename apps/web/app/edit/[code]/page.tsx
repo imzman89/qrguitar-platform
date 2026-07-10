@@ -17,6 +17,7 @@ import {
 } from "../../../lib/local-demo";
 import { defaultSiteSettings, fetchPublishedSiteSettings } from "../../../lib/site-settings";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../../lib/supabase-browser";
+import { qrCodeFromSerial } from "../../../lib/qrguitar-id";
 
 const emptyForm = {
   name: "",
@@ -565,19 +566,20 @@ export default function EditInstrumentPage() {
         return;
       }
 
-      const trustResult = await saveVerificationSettings(token || "");
+      const savedQrCode = payload.qrCode || original?.qrCode || code;
+      const trustResult = await saveVerificationSettings(token || "", savedQrCode);
       if (!trustResult.ok) {
         setMessage(`Trust settings failed: ${trustResult.message}`);
         return;
       }
 
-      const safetyResult = await saveSafetySettings(token || "");
+      const safetyResult = await saveSafetySettings(token || "", savedQrCode);
       if (!safetyResult.ok) {
         setMessage(`Safety status failed: ${safetyResult.message}`);
         return;
       }
 
-      const freshRecord = await fetch(`/api/instruments?scope=mine&code=${encodeURIComponent(original?.qrCode || code)}`, {
+      const freshRecord = await fetch(`/api/instruments?scope=mine&code=${encodeURIComponent(savedQrCode)}`, {
         cache: "no-store",
         headers: {
           "Cache-Control": "no-cache",
@@ -609,7 +611,7 @@ export default function EditInstrumentPage() {
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("qrguitar:catalog-updated"));
       }
-      await fetch(`/api/instruments?code=${encodeURIComponent(original?.qrCode || code)}`, {
+      await fetch(`/api/instruments?code=${encodeURIComponent(savedQrCode)}`, {
         cache: "no-store",
         headers: { "Cache-Control": "no-cache" }
       }).catch(() => null);
@@ -621,7 +623,12 @@ export default function EditInstrumentPage() {
       }
 
       setOriginal(savedInstrument);
-      setMessage("Saved. The permanent QRguitar ID and URL stayed the same.");
+      setMessage(savedQrCode !== (original?.qrCode || code)
+        ? `Saved as ${savedQrCode}. Previous QR links still open this profile.`
+        : "Saved.");
+      if (savedQrCode !== code) {
+        router.replace(`/edit/${savedQrCode}`);
+      }
     } catch {
       setMessage("Record details failed: check your connection and file sizes, then try again.");
     } finally {
@@ -629,7 +636,7 @@ export default function EditInstrumentPage() {
     }
   }
 
-  async function saveVerificationSettings(token: string) {
+  async function saveVerificationSettings(token: string, recordQrCode = original?.qrCode || code) {
     if (!original) {
       return { ok: false, message: "Record was not loaded." };
     }
@@ -639,7 +646,7 @@ export default function EditInstrumentPage() {
         method: "PATCH",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          qrCode: original.qrCode || code,
+          qrCode: recordQrCode,
           verificationOnly: true,
           verificationStatus,
           authenticityStatus,
@@ -703,7 +710,7 @@ export default function EditInstrumentPage() {
     }
   }
 
-  async function saveSafetySettings(token: string) {
+  async function saveSafetySettings(token: string, recordQrCode = original?.qrCode || code) {
     if (!original) {
       return { ok: false, message: "Record was not loaded." };
     }
@@ -714,7 +721,7 @@ export default function EditInstrumentPage() {
         method: "PATCH",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          qrCode: original.qrCode || code,
+          qrCode: recordQrCode,
           safetyStatus,
           publicSafetyNote,
           safetyNote
@@ -752,15 +759,15 @@ export default function EditInstrumentPage() {
         <div className="shell split create-layout">
           <div>
             <div className="eyebrow">Edit QRguitar Profile</div>
-            <h2>Edit the profile without changing the permanent QR link.</h2>
+            <h2>Edit the profile while preserving every printed QR link.</h2>
             <p>
-              Update make, model, serial, optional nickname, specs, links, photos, and QR appearance. The QRguitar ID
-              stays locked so printed codes never break.
+              Update make, model, serial, optional nickname, specs, links, photos, and QR appearance. A serial-based
+              QRguitar ID updates with the Instrument ID / Serial, while previous links continue to work.
             </p>
               <div className="permanent-id">
-                <span>Locked permanent QRguitar ID</span>
-                <strong>{original?.qrCode || code}</strong>
-                <small>The QRguitar ID is the permanent profile code. Instrument ID / Serial is the manufacturer or builder identifier when one exists.</small>
+                <span>QRguitar ID</span>
+                <strong>{qrCodeFromSerial(form.serial) || original?.qrCode || code}</strong>
+                <small>When an Instrument ID / Serial exists, the QRguitar ID uses the format QRG-SERIAL. Previous QR links remain active after corrections.</small>
               </div>
               <div className="privacy-toggle" aria-label="Profile visibility">
                 <div>

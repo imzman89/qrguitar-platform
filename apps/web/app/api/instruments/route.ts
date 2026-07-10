@@ -7,6 +7,7 @@ import { supabaseHttpsJson, supabaseSignedStorageUrl, supabaseStoragePublicUrl }
 import { defaultQrStyle, type DemoInstrument, type QrStyle } from "../../../lib/local-demo";
 import { defaultRecordTrustSettings, mergeRecordTrustSettings, recordTrustContentKey, type RecordTrustSettings } from "../../../lib/record-trust";
 import { assertAccountCanWrite, logAdminAuditEvent } from "../../../lib/admin-auth";
+import { qrCodeFromSerial } from "../../../lib/qrguitar-id";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -253,6 +254,26 @@ function normalizeLookupEmail(value: string) {
 
 function makeNewPermanentQrCode() {
   return `QRG-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`;
+}
+
+async function resolveRedirectedQrCode(code: string) {
+  const normalizedCode = String(code || "").trim().toUpperCase();
+  if (!normalizedCode) {
+    return "";
+  }
+
+  const redirects = await restGet<Array<{ guitar_id: string }>>(
+    `qr_redirects?select=guitar_id&old_path=eq.${encodeURIComponent(`/i/${normalizedCode}`)}&active=eq.true&limit=1`
+  );
+  const guitarId = redirects[0]?.guitar_id;
+  if (!guitarId) {
+    return normalizedCode;
+  }
+
+  const guitars = await restGet<Array<{ qr_code: string }>>(
+    `guitars?select=qr_code&id=eq.${encodeURIComponent(guitarId)}&limit=1`
+  );
+  return guitars[0]?.qr_code?.toUpperCase() || normalizedCode;
 }
 
 function mapPlan(plan: AccountPlan): SupabasePlan {
@@ -1217,7 +1238,8 @@ export async function GET(request: Request) {
   }
 
   if (code) {
-    const publicLookup = await loadPublicRecordsFast(code).catch((error: Error) => ({
+    const resolvedCode = await resolveRedirectedQrCode(code).catch(() => code.toUpperCase());
+    const publicLookup = await loadPublicRecordsFast(resolvedCode).catch((error: Error) => ({
       records: [] as DemoInstrument[],
       error: error.message || "Could not load public instrument."
     }));
@@ -1337,16 +1359,24 @@ export async function POST(request: Request) {
     );
   }
 
-  // New records get a permanent QRguitar ID independent of the serial/build ID.
-  // Existing legacy IDs like QRG-E985125 and QRG-05068283 remain unchanged forever.
-  let qrCode = makeNewPermanentQrCode();
-  for (let attempt = 0; attempt < 24; attempt += 1) {
-    const { count } = await supabase.from("guitars").select("id", { count: "exact", head: true }).eq("qr_code", qrCode);
-    if (!count) {
-      break;
+  const serialQrCode = qrCodeFromSerial(input.serial);
+  let qrCode = serialQrCode || makeNewPermanentQrCode();
+  if (serialQrCode) {
+    const duplicate = await supabase.from("guitars").select("id", { count: "exact", head: true }).eq("qr_code", qrCode);
+    if (duplicate.error) {
+      return NextResponse.json({ ok: false, message: "Could not verify the instrument ID." }, { status: 500 });
     }
-
-    qrCode = makeNewPermanentQrCode();
+    if (duplicate.count) {
+      return NextResponse.json({ ok: false, message: "That Instrument ID / Serial is already registered." }, { status: 409 });
+    }
+  } else {
+    for (let attempt = 0; attempt < 24; attempt += 1) {
+      const { count } = await supabase.from("guitars").select("id", { count: "exact", head: true }).eq("qr_code", qrCode);
+      if (!count) {
+        break;
+      }
+      qrCode = makeNewPermanentQrCode();
+    }
   }
 
   const uploadedSources = Array.from(new Set([body.heroImageDataUrl || "", ...input.photos].filter(Boolean)));
@@ -1725,13 +1755,32 @@ export async function PATCH(request: Request) {
   }
 
   const ownerUser = auth.user;
-  const existing = await supabase.from("guitars").select("id,owner_id,status,hero_image_path").eq("qr_code", input.qrCode).maybeSingle<GuitarRow>();
+  const existing = await supabase.from("guitars").select("id,owner_id,status,hero_image_path,serial_number").eq("qr_code", input.qrCode).maybeSingle<GuitarRow>();
   if (existing.error || !existing.data) {
     return NextResponse.json({ ok: false, message: "Instrument record was not found." }, { status: 404 });
   }
 
   if (existing.data.owner_id !== ownerUser.id) {
     return NextResponse.json({ ok: false, message: "Only the owner can edit this record." }, { status: 403 });
+  }
+
+  const nextQrCode = qrCodeFromSerial(input.serial) || input.qrCode;
+  if (nextQrCode !== input.qrCode) {
+    const duplicate = await supabase.from("guitars").select("id").eq("qr_code", nextQrCode).maybeSingle<{ id: string }>();
+    if (duplicate.error) {
+      return NextResponse.json({ ok: false, message: "Could not verify the updated Instrument ID / Serial." }, { status: 500 });
+    }
+    if (duplicate.data && duplicate.data.id !== existing.data.id) {
+      return NextResponse.json({ ok: false, message: "That Instrument ID / Serial is already registered." }, { status: 409 });
+    }
+
+    const redirectResult = await supabase.from("qr_redirects").upsert(
+      { guitar_id: existing.data.id, old_path: `/i/${input.qrCode}`, active: true },
+      { onConflict: "old_path" }
+    );
+    if (redirectResult.error) {
+      return NextResponse.json({ ok: false, message: "The previous QR link could not be secured before updating this Instrument ID / Serial." }, { status: 500 });
+    }
   }
 
   const currentProfile = await supabase.from("profiles").select("plan,role").eq("id", ownerUser.id).maybeSingle<{ plan?: SupabasePlan; role?: string }>();
@@ -1792,6 +1841,8 @@ export async function PATCH(request: Request) {
       visibility: input.visibility,
       summary: input.summary || "",
       hero_image_path: heroImagePath,
+      qr_code: nextQrCode,
+      permanent_path: `/i/${nextQrCode}`,
       updated_at: new Date().toISOString()
     })
     .eq("qr_code", input.qrCode)
@@ -1799,6 +1850,21 @@ export async function PATCH(request: Request) {
 
   if (updateError) {
     return NextResponse.json({ ok: false, message: updateError.message || "Could not update record." }, { status: 500 });
+  }
+
+  if (nextQrCode !== input.qrCode) {
+    const oldTrustKey = recordTrustContentKey(input.qrCode);
+    const newTrustKey = recordTrustContentKey(nextQrCode);
+    const trustRow = await supabase.from("site_content").select("content_value").eq("content_key", oldTrustKey).maybeSingle<{ content_value: Record<string, unknown> }>();
+    if (trustRow.data?.content_value) {
+      await supabase.from("site_content").upsert({
+        content_key: newTrustKey,
+        content_value: trustRow.data.content_value,
+        updated_by: ownerUser.id,
+        updated_at: new Date().toISOString()
+      }, { onConflict: "content_key" });
+      await supabase.from("site_content").delete().eq("content_key", oldTrustKey);
+    }
   }
 
   const existingGuitar = existing.data;
@@ -1833,8 +1899,8 @@ export async function PATCH(request: Request) {
 
     const mediaInsert = await supabase.from("guitar_media").insert(mediaPayload);
     if (mediaInsert.error) {
-      revalidatePublicRecordSurfaces(input.qrCode);
-      return noStoreJson({ ok: true, qrCode: input.qrCode, permanentPath: `/i/${input.qrCode}`, message: "Saved. Media placeholders could not be refreshed." }, { status: 200 });
+      revalidatePublicRecordSurfaces(nextQrCode);
+      return noStoreJson({ ok: true, qrCode: nextQrCode, permanentPath: `/i/${nextQrCode}`, message: "Saved. Media placeholders could not be refreshed." }, { status: 200 });
     }
   }
 
@@ -1900,8 +1966,8 @@ export async function PATCH(request: Request) {
     }));
     const documentInsert = await supabase.from("guitar_documents").insert(documentPayload);
     if (documentInsert.error) {
-      revalidatePublicRecordSurfaces(input.qrCode);
-      return noStoreJson({ ok: true, qrCode: input.qrCode, permanentPath: `/i/${input.qrCode}`, message: "Saved. Document files could not be refreshed." }, { status: 200 });
+      revalidatePublicRecordSurfaces(nextQrCode);
+      return noStoreJson({ ok: true, qrCode: nextQrCode, permanentPath: `/i/${nextQrCode}`, message: "Saved. Document files could not be refreshed." }, { status: 200 });
     }
   }
 
@@ -1923,15 +1989,16 @@ export async function PATCH(request: Request) {
   ];
   const specInsert = await supabase.from("guitar_specs").insert(specRows);
   if (specInsert.error) {
-    revalidatePublicRecordSurfaces(input.qrCode);
-    return noStoreJson({ ok: true, qrCode: input.qrCode, permanentPath: `/i/${input.qrCode}`, message: "Saved. Condition details could not be refreshed." }, { status: 200 });
+    revalidatePublicRecordSurfaces(nextQrCode);
+    return noStoreJson({ ok: true, qrCode: nextQrCode, permanentPath: `/i/${nextQrCode}`, message: "Saved. Condition details could not be refreshed." }, { status: 200 });
   }
 
   revalidatePublicRecordSurfaces(input.qrCode);
+  revalidatePublicRecordSurfaces(nextQrCode);
   return noStoreJson({
     ok: true,
-    qrCode: input.qrCode,
-    permanentPath: `/i/${input.qrCode}`,
+    qrCode: nextQrCode,
+    permanentPath: `/i/${nextQrCode}`,
     message: mediaUploadErrors.length ? `${mediaUploadErrors.join(", ")} could not be uploaded. The record was saved.` : undefined
   }, { status: 200 });
 }

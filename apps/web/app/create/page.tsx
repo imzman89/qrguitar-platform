@@ -16,6 +16,7 @@ import {
 } from "../../lib/local-demo";
 import { defaultSiteSettings, fetchPublishedSiteSettings } from "../../lib/site-settings";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
+import { qrCodeFromSerial } from "../../lib/qrguitar-id";
 
 const documentTypeOptions = ["Receipt", "Invoice", "Appraisal", "Certificate", "Build Sheet", "Service Slip", "Insurance Photo", "Warranty", "Authenticity Evidence", "Other"];
 type DocumentDraft = {
@@ -98,6 +99,15 @@ export default function CreatePage() {
   }, [qrCode]);
 
   const bulkImportUnlocked = accountRecordCount > 0;
+
+  useEffect(() => {
+    const serialCode = qrCodeFromSerial(form.serial);
+    if (serialCode) {
+      setQrCode(serialCode);
+    } else if (form.serialNotUsed) {
+      setQrCode(generatePermanentQrCode(getDemoInstruments().map((instrument) => instrument.qrCode), ""));
+    }
+  }, [form.serial, form.serialNotUsed]);
 
   const previewFields = useMemo<CustomProfileField[]>(
     () =>
@@ -500,7 +510,7 @@ export default function CreatePage() {
               <div className="permanent-id">
                 <span>Permanent QRguitar ID</span>
                 <strong>{qrCode}</strong>
-                <small>The QRguitar ID is the permanent profile code. Instrument ID / Serial is the manufacturer or builder identifier when one exists.</small>
+                <small>When an Instrument ID / Serial exists, the QRguitar ID uses the format QRG-SERIAL. No-serial instruments receive a generated ID.</small>
               </div>
               <div className="privacy-toggle" aria-label="Profile visibility">
                 <div>

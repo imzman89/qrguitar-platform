@@ -379,7 +379,15 @@ export async function getPublicInstruments() {
 
 export async function getPublicInstrumentByCode(code: string) {
   noStore();
-  const rows = await supabaseHttpsJson<GuitarRow[]>(`/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&qr_code=eq.${encodeURIComponent(code.toUpperCase())}&limit=1`);
+  const normalizedCode = code.toUpperCase();
+  let rows = await supabaseHttpsJson<GuitarRow[]>(`/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&qr_code=eq.${encodeURIComponent(normalizedCode)}&limit=1`);
+  if (!rows.length) {
+    const redirects = await supabaseHttpsJson<Array<{ guitar_id: string }>>(`/rest/v1/qr_redirects?select=guitar_id&old_path=eq.${encodeURIComponent(`/i/${normalizedCode}`)}&active=eq.true&limit=1`);
+    const guitarId = redirects[0]?.guitar_id;
+    if (guitarId) {
+      rows = await supabaseHttpsJson<GuitarRow[]>(`/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&id=eq.${encodeURIComponent(guitarId)}&limit=1`);
+    }
+  }
   const data = rows[0] || null;
 
   if (!data || data.visibility === "private" || data.admin_archived_at || data.owner_removed_at) {

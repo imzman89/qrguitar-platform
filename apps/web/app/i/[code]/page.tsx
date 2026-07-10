@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { ProfileClient } from "./ProfileClient";
 import { getPublicInstrumentByCode } from "../../../lib/public-instruments";
 
@@ -31,6 +31,9 @@ export default async function PublicProfilePage({ params }: { params: { code: st
   }
 
   const instrument = await getPublicInstrumentByCode(code);
+  if (instrument && instrument.qrCode.toUpperCase() !== code) {
+    permanentRedirect(instrument.permanentPath || `/i/${instrument.qrCode}`);
+  }
 
   return <ProfileClient code={code} initialInstrument={instrument} />;
 }
