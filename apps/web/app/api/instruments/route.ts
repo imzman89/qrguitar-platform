@@ -16,6 +16,7 @@ export const fetchCache = "force-no-store";
 const MEDIA_BUCKET = "instrument-media";
 const DOCUMENT_BUCKET = "instrument-documents";
 const PUBLIC_MEDIA_SIGNED_URL_TTL_SECONDS = 60 * 60 * 24;
+const ALLOWED_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const ALLOWED_DOCUMENT_MIME_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
 const NO_STORE_HEADERS = {
   "Cache-Control": "no-store, no-cache, must-revalidate"
@@ -288,7 +289,7 @@ function mapPlan(plan: AccountPlan): SupabasePlan {
   return "single";
 }
 
-function isVerifiedPlan(plan: AccountPlan) {
+function hasExpandedPlanAccess(plan: AccountPlan) {
   return plan === "paid" || plan === "brand" || plan === "commercial";
 }
 
@@ -424,8 +425,8 @@ async function uploadImageSource(
     return null;
   }
 
-  if (!ALLOWED_DOCUMENT_MIME_TYPES.has(parsed.mimeType)) {
-    throw new Error("Only PDF, JPG, PNG, and WEBP proof files are supported.");
+  if (!ALLOWED_IMAGE_MIME_TYPES.has(parsed.mimeType)) {
+    throw new Error("Only JPG, PNG, and WEBP instrument photos are supported.");
   }
 
   const objectPath = `${ownerId}/${guitarId}/${prefix}-${randomUUID()}.${documentExtensionForMimeType(parsed.mimeType)}`;
@@ -1352,7 +1353,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "Could not verify user record limit." }, { status: 500 });
   }
 
-  if (!isVerifiedPlan(resolvedAccountPlan) && instrumentCount >= 25) {
+  if (!hasExpandedPlanAccess(resolvedAccountPlan) && instrumentCount >= 25) {
     return NextResponse.json(
       { ok: false, message: "Free public beta accounts can create up to 25 records. Contact QRguitar for commercial setup or bulk onboarding." },
       { status: 402 }
@@ -1416,7 +1417,7 @@ export async function POST(request: Request) {
     serial_number: input.serial || null,
     builder: input.builder || null,
     location: input.location || null,
-    status: (isVerifiedPlan(resolvedAccountPlan) ? "verified" : "unverified") as "verified" | "unverified" | "transferred",
+    status: "unverified" as const,
     visibility: input.visibility as "public" | "unlisted" | "private",
     summary: input.summary || "",
     hero_image_path: heroImagePath

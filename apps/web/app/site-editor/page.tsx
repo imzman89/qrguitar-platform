@@ -7,13 +7,6 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import {
-  botSettingsKey,
-  defaultBotSettings,
-  readBotSettings,
-  saveBotSettings,
-  type EditableBotSettings
-} from "../../lib/bot-settings";
-import {
   applyThemeSettings,
   defaultSiteSettings,
   fetchPublishedSiteSettings,
@@ -24,10 +17,7 @@ import {
 } from "../../lib/site-settings";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
 
-const editorGateKey = "qrguitar.siteEditorUnlocked";
-const ownerPasscodeKey = "qrguitar.ownerPasscode";
-const ownerPasscode = "admin";
-type EditorTab = "brand" | "hero" | "sections" | "dashboard" | "colors" | "seo" | "bot" | "preview";
+type EditorTab = "brand" | "hero" | "sections" | "dashboard" | "colors" | "seo" | "preview";
 
 const seoImageOptions = [
   { label: "White / orange social card", value: "/seo/qrguitar-og-v2.png" },
@@ -49,22 +39,16 @@ const tabs: Array<{ id: EditorTab; label: string }> = [
   { id: "dashboard", label: "Dashboard Copy" },
   { id: "colors", label: "Theme Colors" },
   { id: "seo", label: "SEO" },
-  { id: "bot", label: "Bot Notes" },
   { id: "preview", label: "Settings JSON" }
 ];
 
 export default function SiteEditorPage() {
   const router = useRouter();
   const [settings, setSettings] = useState<EditableSiteSettings>(defaultSiteSettings);
-  const [botSettings, setBotSettings] = useState<EditableBotSettings>(defaultBotSettings);
   const [message, setMessage] = useState("Ready to edit.");
   const [activeTab, setActiveTab] = useState<EditorTab>("hero");
-  const [passcode, setPasscode] = useState("");
-  const [newPasscode, setNewPasscode] = useState(ownerPasscode);
-  const [passcodeMessage, setPasscodeMessage] = useState("");
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isAdminSession, setIsAdminSession] = useState(false);
-  const [isOwnerPasscodeSet, setIsOwnerPasscodeSet] = useState(false);
   const [copyError, setCopyError] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
@@ -73,21 +57,20 @@ export default function SiteEditorPage() {
   const [localDraft, setLocalDraft] = useState<EditableSiteSettings | null>(null);
   const [showDraftNotice, setShowDraftNotice] = useState(false);
 
-  const activePasscodeHint = isOwnerPasscodeSet ? "custom owner passcode configured" : `default (${ownerPasscode})`;
   const editorStatusTitle = !authChecked
     ? "Checking owner access."
     : !isSignedIn
       ? "Sign in required."
       : isUnlocked
         ? message
-        : "Owner passcode required.";
+        : "Admin access required.";
   const editorStatusBody = !authChecked
     ? "Confirming your QRguitar session before editor tools load."
     : !isSignedIn
       ? "Sign in with the owner account before changing live site settings."
       : isUnlocked
         ? "Save publishes changes across desktop, mobile, and public visitors."
-        : "Unlock the protected editor before changing published site settings.";
+        : "Sign in with an authorized admin account to change published site settings.";
   const seoChecks = [
     {
       label: "Title",
@@ -125,7 +108,6 @@ export default function SiteEditorPage() {
       setAuthChecked(true);
 
       if (!hasSession) {
-        window.localStorage.removeItem(editorGateKey);
         setIsAdminSession(false);
         router.replace(`/login?next=${encodeURIComponent("/site-editor")}&reason=session-expired`);
         return;
@@ -140,8 +122,11 @@ export default function SiteEditorPage() {
         if (response.ok && !cancelled) {
           setIsAdminSession(true);
           setIsUnlocked(true);
-          window.localStorage.setItem(editorGateKey, "true");
           setMessage("Admin session verified. Editor unlocked.");
+        } else if (!cancelled) {
+          setIsAdminSession(false);
+          setIsUnlocked(false);
+          setMessage("This account does not have site editor access.");
         }
       });
     });
@@ -152,7 +137,6 @@ export default function SiteEditorPage() {
       setAuthChecked(true);
 
       if (!hasSession) {
-        window.localStorage.removeItem(editorGateKey);
         setIsUnlocked(false);
         setIsAdminSession(false);
       }
@@ -169,14 +153,9 @@ export default function SiteEditorPage() {
       return;
     }
 
-    const storedPasscode = window.localStorage.getItem(ownerPasscodeKey) || ownerPasscode;
     if (!isAdminSession) {
-      setIsUnlocked(window.localStorage.getItem(editorGateKey) === "true");
+      return;
     }
-
-    setIsOwnerPasscodeSet(Boolean(window.localStorage.getItem(ownerPasscodeKey)));
-    setNewPasscode(storedPasscode);
-    setBotSettings(readBotSettings());
     const rawDraft = window.localStorage.getItem(siteSettingsKey);
     const draft = readLocalSiteDraft(rawDraft);
 
@@ -209,46 +188,6 @@ export default function SiteEditorPage() {
   }, [authChecked, hasUnsavedChanges, isSignedIn, isUnlocked, settings]);
 
   const settingsJson = useMemo(() => JSON.stringify(settings, null, 2), [settings]);
-
-  function unlockEditor(event: FormEvent) {
-    event.preventDefault();
-    const expectedPasscode = window.localStorage.getItem(ownerPasscodeKey) || ownerPasscode;
-
-    if (passcode.trim() !== expectedPasscode) {
-      setMessage("Wrong owner passcode.");
-      return;
-    }
-
-    window.localStorage.setItem(editorGateKey, "true");
-    setIsUnlocked(true);
-    setMessage("Owner editor unlocked on this browser.");
-    setPasscode("");
-  }
-
-  function lockEditor() {
-    window.localStorage.removeItem(editorGateKey);
-    setIsUnlocked(false);
-    setMessage("Owner editor locked on this browser.");
-  }
-
-  function setEditorPasscode() {
-    const cleaned = newPasscode.trim();
-    if (!cleaned) {
-      setPasscodeMessage("Passcode cannot be empty.");
-      return;
-    }
-
-    window.localStorage.setItem(ownerPasscodeKey, cleaned);
-    setIsOwnerPasscodeSet(true);
-    setPasscodeMessage("Owner passcode updated.");
-  }
-
-  function resetEditorPasscode() {
-    window.localStorage.removeItem(ownerPasscodeKey);
-    setIsOwnerPasscodeSet(false);
-    setNewPasscode(ownerPasscode);
-    setPasscodeMessage("Passcode reset to default admin.");
-  }
 
   function continueLocalDraft() {
     if (!localDraft) {
@@ -317,10 +256,6 @@ export default function SiteEditorPage() {
   function updateDashboard(field: keyof EditableSiteSettings["dashboard"], value: string) {
     const next = { ...settings, dashboard: { ...settings.dashboard, [field]: value } };
     setSettings(next);
-  }
-
-  function updateBotSetting(field: keyof EditableBotSettings, value: string) {
-    setBotSettings((current) => ({ ...current, [field]: value }));
   }
 
   function updateSectionCard(
@@ -417,7 +352,6 @@ export default function SiteEditorPage() {
     }
 
     setIsSaving(true);
-    saveBotSettings(botSettings);
     setMessage("Saving and publishing site settings...");
 
     try {
@@ -458,7 +392,6 @@ export default function SiteEditorPage() {
 
   function onReset() {
     setSettings(publishedSettings);
-    setBotSettings(readBotSettings());
     applyThemeSettings(publishedSettings);
     setMessage("Unsaved changes reset to the published settings.");
   }
@@ -521,35 +454,15 @@ export default function SiteEditorPage() {
           ) : null}
 
           {authChecked && isSignedIn && !isUnlocked ? (
-            <form className="card owner-gate" onSubmit={unlockEditor}>
+            <section className="card owner-gate">
               <LockKeyhole size={34} />
               <div>
-                <span className="mini-eyebrow">Protected local tool</span>
-                <h2>Enter owner passcode.</h2>
-                <p>This is a temporary local gate for MVP testing, not full authentication.</p>
-                <small className="owner-passcode-note">Passcode in use: {activePasscodeHint}</small>
+                <span className="mini-eyebrow">Admin access required</span>
+                <h2>This account cannot open the site editor.</h2>
+                <p>Use an authorized QRguitar admin account to manage published site settings.</p>
               </div>
-              <label className="field">
-                <span>Passcode</span>
-                <input
-                  type="password"
-                  value={passcode}
-                  onChange={(event) => setPasscode(event.target.value)}
-                  placeholder="Owner passcode"
-                />
-              </label>
-              <div className="editor-lock-actions">
-                <button className="button" type="submit">
-                  Unlock Editor
-                </button>
-                <button className="button secondary" type="button" onClick={() => setPasscode("")}>
-                  Clear
-                </button>
-                <button className="button secondary" type="button" onClick={resetEditorPasscode}>
-                  Reset to admin
-                </button>
-              </div>
-            </form>
+              <Link className="button" href="/account">Account</Link>
+            </section>
           ) : null}
 
           {authChecked && isSignedIn && isUnlocked ? (
@@ -1159,34 +1072,6 @@ export default function SiteEditorPage() {
                   </section>
                 ) : null}
 
-                {activeTab === "bot" ? (
-                  <section className="card editor-card">
-                    <EditorHeader
-                      label="Bot Notes"
-                      title="Assistant notes"
-                      copy="Notes saved for future assistant behavior. This does not retrain or change the live bot by itself."
-                    />
-                    <TextArea
-                      label="Knowledge notes"
-                      value={botSettings.knowledgeNotes}
-                      onChange={(value) => updateBotSetting("knowledgeNotes", value)}
-                      rows={10}
-                    />
-                    <TextArea
-                      label="Update notes"
-                      value={botSettings.updateNotes}
-                      onChange={(value) => updateBotSetting("updateNotes", value)}
-                      rows={4}
-                    />
-                    <TextArea
-                      label="Scope rules"
-                      value={botSettings.scopeRules}
-                      onChange={(value) => updateBotSetting("scopeRules", value)}
-                      rows={4}
-                    />
-                  </section>
-                ) : null}
-
                 {activeTab === "preview" ? (
                   <section className="card editor-card">
                     <EditorHeader
@@ -1210,11 +1095,8 @@ export default function SiteEditorPage() {
             <aside className="editor-preview">
                 <div className="editor-status card">
                   <span className="mini-eyebrow">Owner session</span>
-                  <strong>Browser unlocked</strong>
-                  <span>You can preview and edit without affecting other users until you click Save.</span>
-                  <button className="button secondary" type="button" onClick={lockEditor}>
-                    <LockKeyhole size={14} /> Lock owner session
-                  </button>
+                  <strong>Admin access verified</strong>
+                  <span>Edits remain private to this browser until you click Save Changes.</span>
                 </div>
                 <div className="editor-preview-panel">
                   <span className="eyebrow">{settings.hero.eyebrow}</span>
@@ -1256,24 +1138,7 @@ export default function SiteEditorPage() {
                     <Clipboard size={16} /> Copy Current Settings JSON
                   </button>
                 </div>
-                <div className="editor-save-bar owner-access-card">
-                  <span className="mini-eyebrow">Owner access</span>
-                  <div className="field">
-                    <span>Site editor passcode</span>
-                    <input value={newPasscode} onChange={(event) => setNewPasscode(event.target.value)} />
-                  </div>
-                  <div className="owner-access-actions">
-                    <button className="button secondary" type="button" onClick={setEditorPasscode}>
-                      Save passcode
-                    </button>
-                    <button className="button secondary" type="button" onClick={resetEditorPasscode}>
-                      Reset to admin
-                    </button>
-                  </div>
-                  <small className="editor-local-note">{passcodeMessage || activePasscodeHint}</small>
-                </div>
-                <small className="editor-local-note">Local key: {siteSettingsKey}</small>
-                <small className="editor-local-note">Bot key: {botSettingsKey}</small>
+                <small className="editor-local-note">Unsaved changes are backed up in this browser until they are published or discarded.</small>
               </aside>
             </div>
           ) : null}

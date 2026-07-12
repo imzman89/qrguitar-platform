@@ -25,10 +25,10 @@ import {
 
 export const siteCopy = {
   hero: {
-    eyebrow: "BUILT FOR BUILDERS, SHOPS, & COLLECTORS",
-    headline: "The Permanent QRguitar Profile for Every Instrument.",
+    eyebrow: "ONE PROFILE FOR THE LIFE OF THE INSTRUMENT",
+    headline: "Keep its identity, proof, and history together.",
     body:
-      "Create a digital identity for any guitar, amp, pedal, or custom build. Keep specs, service history, ownership records, warranty info, photos, documents, and sale details connected for life.",
+      "Create one QRguitar Profile for photos, specs, service history, proof, ownership, and lost or stolen alerts. Its permanent QR link stays the same through every update and every owner.",
     primaryCta: "Create Profile",
     secondaryCta: "Browse QRguitar Profiles",
     trust: ["Permanent QR identity", "Photos, specs, proof & history"]
@@ -58,7 +58,7 @@ export const siteCopy = {
     cta: "Create Your First Profile"
   },
   customization: {
-    eyebrow: "What each record holds",
+    eyebrow: "What each profile holds",
     headline: "The details guitar people ask for, before they ask.",
     body:
       "A QRguitar Profile can be as simple or as deep as the instrument needs. Start with the basics, then add the bench notes, proof, media, and history that make the piece easier to sell, service, insure, or pass on.",
@@ -180,9 +180,9 @@ export const siteCopy = {
       {
         name: "Free Public Beta",
         price: "$0",
-        copy: "Create up to 25 records during public beta. Add photos, specs, documents, notes, visibility settings, and QR downloads without a hard paywall.",
+        copy: "Create up to 25 profiles during public beta. Add photos, specs, documents, notes, visibility settings, and QR downloads without a hard paywall.",
         features: [
-          "Up to 25 records during beta",
+          "Up to 25 profiles during beta",
           "Public, private, or unlisted",
           "No verified badge included",
           "Verify important records later",

@@ -404,18 +404,10 @@ export async function PATCH(request: Request) {
     return json({ ok: false, message: "Could not prepare recipient profile." }, { status: 500 });
   }
 
-  const guitarUpdate = await supabase
-    .from("guitars")
-    .update({ owner_id: auth.user.id, updated_at: new Date().toISOString() })
-    .eq("id", transfer.guitar_id);
-
-  if (guitarUpdate.error) {
-    return json({ ok: false, message: guitarUpdate.error.message || "Could not update owner." }, { status: 500 });
-  }
-
+  const acceptedAt = new Date().toISOString();
   const transferUpdate = await supabase
     .from("ownership_transfers")
-    .update({ status: "accepted", accepted_by: auth.user.id, accepted_at: new Date().toISOString() })
+    .update({ status: "accepted", accepted_by: auth.user.id, accepted_at: acceptedAt })
     .eq("id", id)
     .eq("status", "sent")
     .select("id,guitar_id,from_owner_id,to_email,to_name,status,accepted_by,accepted_at,created_at,fee_cents")
@@ -423,6 +415,28 @@ export async function PATCH(request: Request) {
 
   if (transferUpdate.error || !transferUpdate.data) {
     return json({ ok: false, message: transferUpdate.error?.message || "Could not accept transfer." }, { status: 500 });
+  }
+
+  const guitarUpdate = await supabase
+    .from("guitars")
+    .update({ owner_id: auth.user.id, updated_at: acceptedAt })
+    .eq("id", transfer.guitar_id)
+    .eq("owner_id", transfer.from_owner_id)
+    .select("id")
+    .maybeSingle<{ id: string }>();
+
+  if (guitarUpdate.error || !guitarUpdate.data) {
+    await supabase
+      .from("ownership_transfers")
+      .update({ status: "sent", accepted_by: null, accepted_at: null })
+      .eq("id", id)
+      .eq("status", "accepted")
+      .eq("accepted_by", auth.user.id);
+
+    return json(
+      { ok: false, message: guitarUpdate.error?.message || "The owner changed before this transfer could be completed." },
+      { status: 409 }
+    );
   }
 
   return json({

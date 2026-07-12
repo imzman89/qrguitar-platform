@@ -23,40 +23,11 @@ function settingsWithFastFallback() {
 function latestRecordWithFastFallback() {
   return new Promise<DemoInstrument | null>((resolve) => {
     const timeout = setTimeout(() => resolve(null), 5000);
-    fetchLatestRecordFromPublicApi()
-      .then((record) => {
-        if (record) {
-          resolve(record);
-          return;
-        }
-
-        getPublicInstruments()
-          .then((records) => resolve(sanitizeLatestRecord(records[0] || null)))
-          .catch(() => resolve(null))
-          .finally(() => clearTimeout(timeout));
-      })
-      .catch(() => {
-        getPublicInstruments()
-          .then((records) => resolve(sanitizeLatestRecord(records[0] || null)))
-          .catch(() => resolve(null))
-          .finally(() => clearTimeout(timeout));
-      })
+    getPublicInstruments()
+      .then((records) => resolve(sanitizeLatestRecord(records[0] || null)))
+      .catch(() => resolve(null))
       .finally(() => clearTimeout(timeout));
   });
-}
-
-async function fetchLatestRecordFromPublicApi() {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://127.0.0.1:3003";
-  const response = await fetch(`${siteUrl.replace(/\/$/, "")}/api/instruments`, {
-    cache: "no-store",
-    headers: { "Cache-Control": "no-cache" }
-  });
-  if (!response.ok) {
-    return null;
-  }
-
-  const payload = (await response.json().catch(() => null)) as { ok?: boolean; instruments?: DemoInstrument[] } | null;
-  return payload?.ok && Array.isArray(payload.instruments) ? sanitizeLatestRecord(payload.instruments[0] || null) : null;
 }
 
 function sanitizeLatestRecord(record: DemoInstrument | null) {

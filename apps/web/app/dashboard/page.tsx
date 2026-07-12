@@ -399,22 +399,22 @@ export default function DashboardPage() {
                           <div className={styles.instrumentInfo}>
                             <strong>{title}</strong>
                             <span title={meta}>{meta}</span>
-                            <div className={styles.instrumentBadges}>
+                            <div className="record-badge-row" aria-label="Profile status">
                               {instrument.showVerificationBadge !== false ? (
-                                <small className={verificationStatus === "verified" ? styles.badgeVerified : styles.badgeNeutral}>
-                                  <span>{verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"}</span>
+                                <small className={`record-badge ${verificationStatus === "verified" ? "record-badge--verified" : "record-badge--unverified"}`}>
+                                  <span className="record-badge-text">{verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"}</span>
                                 </small>
                               ) : null}
                               {instrument.showAuthenticityBadge !== false ? (
-                                <small className={authenticityStatus === "confirmed" ? styles.badgeAuthConfirmed : styles.badgeAuthUnconfirmed}>
-                                  <span>{authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}</span>
+                                <small className={`record-badge ${authenticityStatus === "confirmed" ? "record-badge--auth-confirmed" : "record-badge--auth-unconfirmed"}`}>
+                                  <span className="record-badge-text">{authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}</span>
                                 </small>
                               ) : null}
-                              {safetyStatus === "lost" ? <small className={styles.badgeSafety}><span>Reported Lost</span></small> : null}
-                              {safetyStatus === "stolen" ? <small className={styles.badgeSafety}><span>Reported Stolen</span></small> : null}
-                              {saleStatus ? <small className={styles.badgeSale}><span>{saleStatus}</span></small> : null}
-                              {originalityStatus ? <small className={styles.badgeDisclosure}><span>{originalityStatus}</span></small> : null}
-                              <small><span>{category}</span></small>
+                              {safetyStatus === "lost" ? <small className="record-badge record-badge--safety"><span className="record-badge-text">Reported Lost</span></small> : null}
+                              {safetyStatus === "stolen" ? <small className="record-badge record-badge--safety"><span className="record-badge-text">Reported Stolen</span></small> : null}
+                              {saleStatus ? <small className="record-badge record-badge--sale"><span className="record-badge-text">{saleStatus}</span></small> : null}
+                              {originalityStatus ? <small className="record-badge record-badge--disclosure"><span className="record-badge-text">{originalityStatus}</span></small> : null}
+                              <small className="record-badge record-badge--disclosure"><span className="record-badge-text">{category}</span></small>
                             </div>
                           </div>
                           <div className={styles.instrumentMeta}>

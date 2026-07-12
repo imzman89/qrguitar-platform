@@ -168,7 +168,7 @@ export default function AccountPage() {
           <section className="account-hero-copy">
             <div className="eyebrow">Account</div>
             <h1>Your QRguitar account.</h1>
-            <p>Keep your owner profile clean so records, transfers, and private dashboard tools stay tied to the right account.</p>
+            <p>Keep your profile, collection, transfers, and private tools tied to the right account.</p>
             <div className="mini-chip-row">
               <span>{accountStatus || "active"}</span>
               <span>{plan || "free"}</span>
@@ -176,14 +176,14 @@ export default function AccountPage() {
             </div>
             <div className="account-quick-links">
               <Link href="/dashboard">Dashboard</Link>
-              <Link href="/create">Create record</Link>
-              <Link href="/catalog">Public catalog</Link>
+              <Link href="/create">Create profile</Link>
+              <Link href="/catalog">Browse profiles</Link>
               <Link href="/contact">Support</Link>
             </div>
             <div className="account-summary-grid">
               <div>
                 <strong>{stats.records}</strong>
-                <span>Total records</span>
+                <span>Total profiles</span>
               </div>
               <div>
                 <strong>{stats.publicRecords}</strong>
@@ -270,10 +270,10 @@ export default function AccountPage() {
                 <strong><ShieldCheck size={18} aria-hidden="true" /> Record controls</strong>
               </div>
               <p className="account-card-copy">
-                Each record controls public/private visibility, hidden proof documents, public service history, serial display, and QR downloads from its editor.
+                Each profile controls visibility, hidden proof documents, service history, serial display, and QR downloads from its editor.
               </p>
               <div className="form-actions">
-                <Link className="button secondary" href="/dashboard">Manage records</Link>
+                <Link className="button secondary" href="/dashboard">Manage profiles</Link>
                 <Link className="button secondary" href="/contact">Get support</Link>
               </div>
             </section>

@@ -11,6 +11,13 @@ type BotRequest = {
 };
 
 export async function POST(request: Request) {
+  if (process.env.QRGUITAR_BOT_ENABLED !== "true") {
+    return NextResponse.json(
+      { ok: false, message: "QRguitar Bot is not available during launch." },
+      { status: 503 }
+    );
+  }
+
   let body: BotRequest;
 
   try {

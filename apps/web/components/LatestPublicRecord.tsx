@@ -11,7 +11,6 @@ import {
   instrumentToProfileUrl,
   type DemoInstrument
 } from "../lib/local-demo";
-import { formatRecordLocation } from "../lib/record-location";
 import { RecordShareButton } from "./RecordShareButton";
 
 type InstrumentsResponse = {
@@ -87,7 +86,6 @@ function HomepageLatestProfileCard({ record }: { record: DemoInstrument }) {
   const title = instrumentDisplayName(record);
   const profileUrl = instrumentToProfileUrl(record);
   const imageUrl = record.heroImageDataUrl || record.galleryImageDataUrls?.find(Boolean) || "";
-  const location = formatRecordLocation(record);
   const condition = getInstrumentCondition(record);
   const verificationStatus = getInstrumentVerificationStatus(record);
   const authenticityStatus = record.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed";
@@ -147,8 +145,6 @@ function HomepageLatestProfileCard({ record }: { record: DemoInstrument }) {
 
           <div className="latest-profile-card-facts">
             <span>{condition === "new" ? "New" : "Used"}</span>
-            {record.year ? <span>{record.year}</span> : null}
-            {location ? <span>{location}</span> : null}
             {photoCount ? <span><Camera size={12} /> {photoCount} photos</span> : null}
           </div>
 

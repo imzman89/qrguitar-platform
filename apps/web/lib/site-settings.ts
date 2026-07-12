@@ -205,11 +205,40 @@ function normalizePricingCards(cards: PricingPlanInput[]) {
 }
 
 function normalizeProfileCopy(value: string) {
+  const trimmedValue = value.trim();
+  if (trimmedValue === "Every instrument deserves a permanent QRguitar Profile.") {
+    return siteCopy.hero.headline;
+  }
+  if (
+    trimmedValue.startsWith("Imagine your guitar hanging on the wall at a local shop.") &&
+    trimmedValue.includes("largest living database of guitars and music gear on the planet")
+  ) {
+    return siteCopy.workflow.body;
+  }
+
   const stalePublic = "Public";
   const stalePublicLower = "public";
   const staleRecord = "Record";
   const staleRecords = "Records";
   const replacements: Array<[RegExp, string]> = [
+    [
+      /Every instrument deserves a permanent QRguitar Profile\./g,
+      siteCopy.hero.headline
+    ],
+    [
+      /^QRguitar creates a lifetime digital identity for guitars, amps, pedals, and custom builds\. Add photos, specs, serial numbers, service history, documents, ownership transfers, lost\/stolen alerts, and a permanent QR code that stays with the instrument wherever it goes\.$/,
+      siteCopy.hero.body
+    ],
+    [
+      /^Imagine your guitar hanging on the wall at a local shop\.[\s\S]*largest living database of guitars and music gear on the planet\.$/,
+      siteCopy.workflow.body
+    ],
+    [/^Simple enough for one guitar\. Essential for an entire brand\.$/, siteCopy.workflow.headline],
+    [/^What each record holds$/i, siteCopy.customization.eyebrow],
+    [/\bCreate up to 25 records during public beta\b/gi, "Create up to 25 profiles during public beta"],
+    [/\bUp to 25 records during beta\b/gi, "Up to 25 profiles during beta"],
+    [/\bBulk record setup\b/gi, "Bulk profile setup"],
+    [/\ba record the customer can keep\b/gi, "a QRguitar Profile the customer can keep"],
     [/\bCreate a Record\b/g, "Create Profile"],
     [/\bCreate Record\b/g, "Create Profile"],
     [/\bCreate Your First Record\b/g, "Create Your First Profile"],

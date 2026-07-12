@@ -11,7 +11,6 @@ import {
   instrumentToProfileUrl,
   type DemoInstrument
 } from "../lib/local-demo";
-import { formatRecordLocation } from "../lib/record-location";
 import { RecordShareButton } from "./RecordShareButton";
 
 type CollectibleRecordCardProps = {
@@ -40,7 +39,6 @@ export function CollectibleRecordCard({
     return Array.from(new Set(images));
   }, [record.galleryImageDataUrls, record.heroImageDataUrl]);
   const imageUrl = galleryImages[0] || "";
-  const location = formatRecordLocation(record);
   const condition = getInstrumentCondition(record);
   const saleStatus = record.saleStatus === "for_sale" ? "For sale" : "";
   const originalityStatus = record.originalityStatus === "all_original" ? "All original" : record.originalityStatus === "modified" ? "Modified" : "";
@@ -110,10 +108,8 @@ export function CollectibleRecordCard({
           </div>
 
           <div className="collectible-card-facts">
-            {record.year ? <span>{record.year}</span> : null}
-            {location ? <span>{location}</span> : null}
             <span><Camera size={13} /> {photoCount} photos</span>
-            <span><FileText size={13} /> {publicDocCount} docs</span>
+            {publicDocCount ? <span><FileText size={13} /> {publicDocCount} docs</span> : null}
           </div>
 
           <div className="collectible-card-actions">
