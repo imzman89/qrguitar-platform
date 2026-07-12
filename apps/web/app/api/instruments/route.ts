@@ -5,6 +5,7 @@ import { revalidatePath, unstable_noStore as noStore } from "next/cache";
 import { createServerSupabaseClient, createServerSupabaseClientWithTimeout, getAuthenticatedUser, getSupabaseEnvStatus } from "../../../lib/supabase-server";
 import { supabaseHttpsJson, supabaseSignedStorageUrl, supabaseStoragePublicUrl } from "../../../lib/supabase-http";
 import { defaultQrStyle, type DemoInstrument, type QrStyle } from "../../../lib/local-demo";
+import { establishedInstrumentBrands, instrumentBrandKey } from "../../../lib/instrument-brands";
 import { defaultRecordTrustSettings, mergeRecordTrustSettings, recordTrustContentKey, type RecordTrustSettings } from "../../../lib/record-trust";
 import { assertAccountCanWrite, logAdminAuditEvent } from "../../../lib/admin-auth";
 import { qrCodeFromSerial } from "../../../lib/qrguitar-id";
@@ -131,6 +132,10 @@ type GuitarRow = {
 type GuitarMediaRow = {
   guitar_id: string;
   storage_path: string;
+};
+
+type TransferCountRow = {
+  guitar_id: string;
 };
 
 type GuitarDocumentRow = {
@@ -637,7 +642,8 @@ function mapInstrumentRow({
   ownerEmail,
   ownerName,
   trust,
-  exposeInternalTrust = false
+  exposeInternalTrust = false,
+  ownershipTransferCount = 0
 }: {
   guitar: GuitarRow;
   media: GuitarMediaRow[];
@@ -646,6 +652,7 @@ function mapInstrumentRow({
   ownerName?: string;
   trust?: RecordTrustSettings;
   exposeInternalTrust?: boolean;
+  ownershipTransferCount?: number;
 }): DemoInstrument {
   const customFields = specs
     .filter((spec) => {
@@ -703,6 +710,7 @@ function mapInstrumentRow({
     galleryImageDataUrls,
     customFields,
     customLinks: [],
+    ownershipTransferCount,
     qrStyle: defaultQrStyle as QrStyle,
     createdAt: guitar.created_at
   };
@@ -765,6 +773,35 @@ async function loadServiceEventsByGuitar(
   }
 
   return eventsByGuitar;
+}
+
+async function loadAcceptedTransferCounts(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  guitarIds: string[]
+) {
+  const counts = new Map<string, number>();
+  const uniqueIds = Array.from(new Set(guitarIds.filter(Boolean)));
+  if (!supabase || !uniqueIds.length) {
+    return counts;
+  }
+
+  const result = await supabase
+    .from("ownership_transfers")
+    .select("guitar_id")
+    .in("guitar_id", uniqueIds)
+    .eq("status", "accepted");
+
+  if (result.error) {
+    return counts;
+  }
+
+  for (const row of (result.data || []) as TransferCountRow[]) {
+    if (row.guitar_id) {
+      counts.set(row.guitar_id, (counts.get(row.guitar_id) || 0) + 1);
+    }
+  }
+
+  return counts;
 }
 
 async function loadTrustSettingsMap(_supabase: ReturnType<typeof createServerSupabaseClient>, qrCodes: string[]) {
@@ -931,10 +968,11 @@ async function loadPublicRecordsFast(code?: string): Promise<LoadRecordsResult> 
   const ownerIdFilter = ownerIds.map((id) => encodeURIComponent(id)).join(",");
 
   const trustClient = createServerSupabaseClientWithTimeout(2000);
-  const [trustByCode, mediaRows, profileRows] = await Promise.all([
+  const [trustByCode, mediaRows, profileRows, transferCounts] = await Promise.all([
     settleWithin(loadTrustSettingsMap(trustClient, guitars.map((item) => item.qr_code)), new Map<string, RecordTrustSettings>(), 2000),
     guitarIds.length ? restGet<GuitarMediaRow[]>(`guitar_media?select=guitar_id,storage_path&guitar_id=in.(${guitarIdFilter})`).catch(() => []) : Promise.resolve([]),
-    ownerIds.length ? restGet<ProfileRow[]>(`profiles?select=id,display_name,account_status,hide_public_content&id=in.(${ownerIdFilter})`).catch(() => []) : Promise.resolve([])
+    ownerIds.length ? restGet<ProfileRow[]>(`profiles?select=id,display_name,account_status,hide_public_content&id=in.(${ownerIdFilter})`).catch(() => []) : Promise.resolve([]),
+    settleWithin(loadAcceptedTransferCounts(trustClient, guitarIds), new Map<string, number>(), 2000)
   ]);
 
   const mediaByGuitar = new Map<string, GuitarMediaRow[]>();
@@ -972,7 +1010,8 @@ async function loadPublicRecordsFast(code?: string): Promise<LoadRecordsResult> 
         specs: [],
         ownerEmail: "",
         ownerName: profilesById.get(guitar.owner_id || "")?.display_name || guitar.builder || "",
-        trust: trustByCode.get(guitar.qr_code.toUpperCase()) || { ...defaultRecordTrustSettings, showSerialPublic: false }
+        trust: trustByCode.get(guitar.qr_code.toUpperCase()) || { ...defaultRecordTrustSettings, showSerialPublic: false },
+        ownershipTransferCount: transferCounts.get(guitar.id) || 0
       });
       instrument.documentFiles = [];
       instrument.serviceEvents = [];
@@ -1017,7 +1056,7 @@ async function loadRecordsForUser(supabase: ReturnType<typeof createServerSupaba
   } catch {
     serviceEventsByGuitar = new Map();
   }
-  const [mediaResult, specsResult, documentsResult] = await Promise.all([
+  const [mediaResult, specsResult, documentsResult, transferCounts] = await Promise.all([
     guitarIds.length
       ? supabase.from("guitar_media").select("guitar_id,storage_path").in("guitar_id", guitarIds)
       : Promise.resolve({ data: [], error: null }),
@@ -1026,7 +1065,8 @@ async function loadRecordsForUser(supabase: ReturnType<typeof createServerSupaba
       : Promise.resolve({ data: [], error: null }),
     guitarIds.length
       ? supabase.from("guitar_documents").select("guitar_id,name,storage_path,is_public,document_type,public_description,private_notes,created_at,updated_at").in("guitar_id", guitarIds)
-      : Promise.resolve({ data: [], error: null })
+      : Promise.resolve({ data: [], error: null }),
+    loadAcceptedTransferCounts(supabase, guitarIds)
   ]);
 
   const relatedError = mediaResult.error || specsResult.error || documentsResult.error;
@@ -1083,7 +1123,8 @@ async function loadRecordsForUser(supabase: ReturnType<typeof createServerSupaba
           ownerEmail: owner.email || "",
           ownerName: profile.data?.display_name || owner.user_metadata?.display_name || owner.email || "",
           trust: trustByCode.get((guitar as GuitarRow).qr_code.toUpperCase()),
-          exposeInternalTrust: true
+          exposeInternalTrust: true,
+          ownershipTransferCount: transferCounts.get(guitar.id) || 0
         });
         instrument.documentFiles = documents;
         instrument.serviceEvents = serviceEventsByGuitar.get(guitar.id) || [];
@@ -1124,14 +1165,15 @@ async function loadPublicRecords(supabase: ReturnType<typeof createServerSupabas
 
   const guitarIds = guitars.data.map((item) => item.id);
   const trustSupabase = createServerSupabaseClientWithTimeout(1500);
-  const [trustByCode, mediaResult, profilesResult] = await Promise.all([
+  const [trustByCode, mediaResult, profilesResult, transferCounts] = await Promise.all([
     settleWithin(loadTrustSettingsMap(trustSupabase, guitars.data.map((item) => item.qr_code)), new Map<string, RecordTrustSettings>(), 1500),
     guitarIds.length
       ? supabase.from("guitar_media").select("guitar_id,storage_path").in("guitar_id", guitarIds)
       : Promise.resolve({ data: [], error: null }),
     guitarIds.length
       ? supabase.from("profiles").select("id,display_name,account_status,hide_public_content").in("id", guitars.data.map((item) => item.owner_id).filter(Boolean) as string[])
-      : Promise.resolve({ data: [], error: null })
+      : Promise.resolve({ data: [], error: null }),
+    loadAcceptedTransferCounts(supabase, guitarIds)
   ]);
 
   let profileRows = (profilesResult.data || []) as ProfileRow[];
@@ -1184,7 +1226,8 @@ async function loadPublicRecords(supabase: ReturnType<typeof createServerSupabas
           specs: [],
           ownerEmail: "",
           ownerName: profilesById.get(guitar.owner_id || "")?.display_name || guitar.builder || "",
-          trust: trustByCode.get((guitar as GuitarRow).qr_code.toUpperCase())
+          trust: trustByCode.get((guitar as GuitarRow).qr_code.toUpperCase()),
+          ownershipTransferCount: transferCounts.get(guitar.id) || 0
         });
         instrument.documentFiles = [];
         instrument.serviceEvents = [];
@@ -1272,15 +1315,8 @@ export async function GET(request: Request) {
   );
 }
 
-const establishedInstrumentBrands = [
-  "Charvel", "Collings", "Dean", "Epiphone", "ESP", "Fender", "G&L", "Gibson", "Godin", "Gretsch",
-  "Guild", "Hagstrom", "Heritage", "Ibanez", "Jackson", "Kramer", "LTD", "Martin", "Music Man",
-  "Paul Reed Smith", "PRS", "Reverend", "Rickenbacker", "Schecter", "Seagull", "Squier",
-  "Sterling by Music Man", "Suhr", "Taylor", "Tom Anderson", "Washburn", "Yamaha"
-];
-
 function brandKey(value: string) {
-  return value.normalize("NFKD").replace(/[^a-z0-9]+/gi, "").toLowerCase();
+  return instrumentBrandKey(value);
 }
 
 function brandDistance(first: string, second: string) {
@@ -1306,7 +1342,7 @@ async function resolveCanonicalBrand(
   const value = rawBrand.trim().replace(/\s+/g, " ");
   if (!value) return { brand: "", suggestion: "" };
 
-  const knownBrands = new Map(establishedInstrumentBrands.map((brand) => [brandKey(brand), brand]));
+  const knownBrands = new Map<string, string>(establishedInstrumentBrands.map((brand) => [brandKey(brand), brand]));
   const existing = await supabase.from("guitars").select("brand").not("brand", "is", null).limit(5000);
   if (!existing.error) {
     for (const row of (existing.data || []) as Array<{ brand?: string | null }>) {

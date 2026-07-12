@@ -18,6 +18,7 @@ import {
 import { defaultSiteSettings, fetchPublishedSiteSettings } from "../../../lib/site-settings";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../../lib/supabase-browser";
 import { qrCodeFromSerial } from "../../../lib/qrguitar-id";
+import { canonicalInstrumentBrand, establishedInstrumentBrands } from "../../../lib/instrument-brands";
 
 const emptyForm = {
   name: "",
@@ -921,7 +922,15 @@ export default function EditInstrumentPage() {
                 <p>Make/model/serial are the main identity. Add anything else only when it helps the profile.</p>
               </div>
               <div className="form-grid">
-                <Field label="Make / brand" id="brand" value={form.brand} onChange={(value) => updateField("brand", value)} />
+                <Field
+                  label="Make / brand"
+                  id="brand"
+                  value={form.brand}
+                  list="qrguitar-known-brands"
+                  placeholder="Start typing a brand"
+                  onChange={(value) => updateField("brand", value)}
+                  onBlur={(value) => updateField("brand", canonicalInstrumentBrand(value) || value.trim())}
+                />
                 <Field label="Model" id="model" value={form.model} onChange={(value) => updateField("model", value)} />
                 <Field label="Serial / Build ID" id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} />
                 <Field label="Year" id="year" value={form.year} onChange={(value) => updateField("year", value)} />
@@ -970,6 +979,9 @@ export default function EditInstrumentPage() {
                   </select>
                 </div>
               </div>
+              <datalist id="qrguitar-known-brands">
+                {establishedInstrumentBrands.map((brand) => <option value={brand} key={brand} />)}
+              </datalist>
               <div className="form-grid compact">
                 <label className="toggle-field">
                   <input
@@ -1604,17 +1616,31 @@ function Field({
   label,
   id,
   value,
-  onChange
+  onChange,
+  placeholder,
+  list,
+  onBlur
 }: {
   label: string;
   id: string;
   value: string;
   onChange: (value: string) => void;
+  placeholder?: string;
+  list?: string;
+  onBlur?: (value: string) => void;
 }) {
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
-      <input id={id} name={id} value={value} onChange={(event) => onChange(event.target.value)} />
+      <input
+        id={id}
+        name={id}
+        value={value}
+        placeholder={placeholder}
+        list={list}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={(event) => onBlur?.(event.target.value)}
+      />
     </div>
   );
 }

@@ -23,7 +23,6 @@ import { useEffect, useMemo, useState } from "react";
 import { BrandLogo } from "../../../components/BrandLogo";
 import { RecordShareButton } from "../../../components/RecordShareButton";
 import {
-  getDemoTransfers,
   getInstrumentVerificationStatus,
   type DemoTransfer,
   instrumentDisplayName,
@@ -32,7 +31,7 @@ import {
 } from "../../../lib/local-demo";
 import { formatRecordLocation } from "../../../lib/record-location";
 import { fetchPublishedSiteSettings, normalizeBrandLogoKey } from "../../../lib/site-settings";
-import { createBrowserSupabaseClient } from "../../../lib/supabase-browser";
+import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../../lib/supabase-browser";
 
 type ProfileTab = "overview" | "specs" | "timeline" | "ownership" | "media" | "repairs" | "documents";
 const PROFILE_FETCH_TIMEOUT_MS = 28000;
@@ -92,11 +91,6 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
         }
         settled = true;
         setStored(nextRecord);
-        setTransfers(
-          nextRecord
-            ? getDemoTransfers().filter((transfer) => transfer.guitarQrCode.toUpperCase() === nextRecord.qrCode.toUpperCase())
-            : []
-        );
         setResolved(true);
       };
 
@@ -170,13 +164,60 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
 
   useEffect(() => {
     const supabase = createBrowserSupabaseClient();
-    supabase.auth.getSession().then(({ data }) => setCurrentUserEmail(data.session?.user.email?.toLowerCase() || ""));
+    let cancelled = false;
+
+    async function loadOwnerContext() {
+      const { data } = await supabase.auth.getSession();
+      const session = data.session;
+      if (cancelled) return;
+
+      setCurrentUserEmail(session?.user.email?.toLowerCase() || "");
+      if (!session) {
+        setTransfers([]);
+        return;
+      }
+
+      const token = session.access_token || await getSupabaseAccessToken();
+      if (!token || cancelled) return;
+
+      const [recordResponse, transferResponse] = await Promise.all([
+        fetch(`/api/instruments?scope=mine&code=${encodeURIComponent(code)}`, {
+          cache: "no-store",
+          headers: { authorization: `Bearer ${token}` }
+        }),
+        fetch("/api/transfers?scope=mine", {
+          cache: "no-store",
+          headers: { authorization: `Bearer ${token}` }
+        })
+      ]);
+
+      const recordPayload = (await recordResponse.json().catch(() => null)) as { ok?: boolean; instruments?: DemoInstrument[] } | null;
+      const transferPayload = (await transferResponse.json().catch(() => null)) as { ok?: boolean; transfers?: DemoTransfer[] } | null;
+
+      if (cancelled) return;
+      const ownerInstrument = recordPayload?.instruments?.[0];
+      if (recordResponse.ok && recordPayload?.ok && ownerInstrument) {
+        setStored(ownerInstrument);
+      }
+      setTransfers((transferResponse.ok && transferPayload?.ok ? transferPayload.transfers || [] : [])
+        .filter((transfer) => transfer.guitarQrCode.toUpperCase() === code.toUpperCase()));
+    }
+
+    void loadOwnerContext();
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setCurrentUserEmail(session?.user.email?.toLowerCase() || "");
+      if (!session) {
+        setTransfers([]);
+        return;
+      }
+      void loadOwnerContext();
     });
 
-    return () => listener.subscription.unsubscribe();
-  }, []);
+    return () => {
+      cancelled = true;
+      listener.subscription.unsubscribe();
+    };
+  }, [code]);
 
   const instrument = useMemo<DemoInstrument | null>(() => {
     if (stored) {
@@ -247,7 +288,9 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
   const showAuthenticityBadge = instrument?.showAuthenticityBadge !== false;
   const safetyStatus = instrument?.safetyStatus === "lost" || instrument?.safetyStatus === "stolen" ? instrument.safetyStatus : "clear";
   const formattedLocation = instrument ? formatRecordLocation(instrument) : "";
-  const transferMessage = "Owner-transfer tools are in beta. Contact support for manual help.";
+  const transferMessage = canEdit
+    ? "Use your dashboard to send a secure transfer email. The recipient signs in with that email and accepts the claim; this QRguitar ID stays with the instrument."
+    : "Ownership can change without changing the permanent QRguitar ID tied to this instrument.";
   const latestTransfers = instrument
     ? [...transfers]
       .filter((transfer) => transfer.guitarQrCode.toUpperCase() === instrument.qrCode.toUpperCase())
@@ -569,8 +612,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
               label="Ownership Tools"
               active={activeTab === "ownership"}
               onClick={() => {
-                switchTab("ownership");
-                setActionNotice("transfer");
+                router.push("/dashboard");
               }}
             />
           ) : null}
@@ -778,6 +820,7 @@ function ProfilePanel({
     const createdDate = formatProfileDate(instrument.createdAt);
     const transferDate = latestTransfer ? formatProfileDate(latestTransfer.createdAt) : null;
     const publicServiceEvents = serviceEvents.filter((entry) => entry.isPublic);
+    const ownershipTransferCount = Math.max(0, Number(instrument.ownershipTransferCount || 0));
 
     return (
       <section className="scan-tab-panel">
@@ -807,6 +850,13 @@ function ProfilePanel({
               }
             />
           ) : null}
+          {ownershipTransferCount > 0 && !latestTransfer ? (
+            <TimelineItem
+              date="Recorded"
+              title={`${ownershipTransferCount} ownership transfer${ownershipTransferCount === 1 ? "" : "s"} recorded`}
+              copy="QRguitar keeps the permanent profile with the instrument while prior-owner details stay private."
+            />
+          ) : null}
           {!publicServiceEvents.length ? (
             <TimelineItem date="Ongoing" title="No public service history yet." copy="Setups, repairs, inspections, and maintenance can be added by the owner or admin." />
           ) : null}
@@ -816,16 +866,18 @@ function ProfilePanel({
   }
 
   if (activeTab === "ownership") {
+    const ownershipTransferCount = Math.max(0, Number(instrument.ownershipTransferCount || 0));
     return (
       <section className="scan-tab-panel">
         <PanelHeader icon={<Repeat2 />} label="Ownership" title="Brand, retailer, owner, and future buyer stay connected around the same instrument." />
         <div className="ownership-grid">
           <span><strong>Current owner</strong>{instrument.owner || "Unclaimed"}</span>
           {instrument.builder ? <span><strong>Builder</strong>{instrument.builder}</span> : null}
+          <span><strong>Recorded transfers</strong>{ownershipTransferCount || "None yet"}</span>
           <span><strong>Visibility</strong>{instrument.visibility === "private" ? "Private profile" : instrument.visibility === "unlisted" ? "Unlisted profile" : "Visible profile"}</span>
                 </div>
                 <EmptyPanel
-                  title="Transfer tools live here."
+                  title="Ownership transfer"
                   copy={transferMessage}
                 />
       </section>

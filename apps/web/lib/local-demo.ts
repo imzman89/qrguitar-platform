@@ -83,6 +83,7 @@ export type DemoInstrument = {
   customLinks?: CustomProfileLink[];
   documentFiles?: CustomDocumentFile[];
   serviceEvents?: ServiceHistoryEntry[];
+  ownershipTransferCount?: number;
   heroImageDataUrl?: string;
   galleryImageDataUrls?: string[];
   qrStyle: QrStyle;
