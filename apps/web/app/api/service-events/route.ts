@@ -329,7 +329,7 @@ export async function PATCH(request: Request) {
     return json({ ok: false, message: "Service title is required." }, { status: 400 });
   }
 
-  const update = await supabase
+  let updateQuery = supabase
     .from("guitar_timeline_events")
     .update({
       event_date: cleanDate(body?.serviceDate),
@@ -343,7 +343,13 @@ export async function PATCH(request: Request) {
       updated_at: new Date().toISOString()
     })
     .eq("id", id)
-    .eq("guitar_id", guitar.id)
+    .eq("guitar_id", guitar.id);
+
+  if (!access.isAdmin) {
+    updateQuery = updateQuery.eq("created_by_user_id", access.user?.id || "");
+  }
+
+  const update = await updateQuery
     .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_by_user_id,created_at,updated_at")
     .single<ServiceEventRow>();
 
@@ -409,7 +415,11 @@ export async function DELETE(request: Request) {
     return json({ ok: false, message: lockedServiceHistoryMessage() }, { status: 403 });
   }
 
-  const deleted = await supabase.from("guitar_timeline_events").delete().eq("id", id).eq("guitar_id", guitar.id);
+  let deleteQuery = supabase.from("guitar_timeline_events").delete().eq("id", id).eq("guitar_id", guitar.id);
+  if (!access.isAdmin) {
+    deleteQuery = deleteQuery.eq("created_by_user_id", access.user?.id || "");
+  }
+  const deleted = await deleteQuery;
   if (deleted.error) {
     return json({ ok: false, message: deleted.error.message || "Could not delete service entry." }, { status: 500 });
   }
