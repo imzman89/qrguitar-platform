@@ -1066,7 +1066,7 @@ export default function SiteEditorPage() {
                     </div>
                     <div className="seo-checklist">
                       <span><Search size={15} /> Say what QRguitar does in plain words: permanent QRguitar Profiles, photos, specs, documents, service history, ownership, and QR codes.</span>
-                      <span><Search size={15} /> Include real guitar-world phrases customers search for, such as guitar inventory, service profiles, warranty profiles, builders, shops, and collectors.</span>
+                      <span><Search size={15} /> Include real guitar-world phrases customers search for, such as guitar inventory, service history, warranty profiles, builders, shops, and collectors.</span>
                       <span><Search size={15} /> Use location terms only when they are true, such as Rhode Island guitar repair, Cranston guitar shop, or US builder profiles.</span>
                     </div>
                   </section>

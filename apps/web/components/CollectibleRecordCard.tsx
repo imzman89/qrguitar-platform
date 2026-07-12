@@ -28,7 +28,7 @@ export function CollectibleRecordCard({
   variant = "catalog",
   eyebrow = "QRguitar Profile",
   createdLabel = "",
-  ctaLabel = "Open Record",
+  ctaLabel = "Open Profile",
   secondaryHref = "",
   secondaryLabel = ""
 }: CollectibleRecordCardProps) {
@@ -108,7 +108,7 @@ export function CollectibleRecordCard({
           </div>
 
           <div className="collectible-card-facts">
-            <span><Camera size={13} /> {photoCount} photos</span>
+            <span><Camera size={13} /> {photoCount} {photoCount === 1 ? "photo" : "photos"}</span>
             {publicDocCount ? <span><FileText size={13} /> {publicDocCount} docs</span> : null}
           </div>
 

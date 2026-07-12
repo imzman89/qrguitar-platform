@@ -236,7 +236,7 @@ export default function TransferClaimPage() {
                   {accepting ? "Accepting..." : "Accept Ownership"}
                 </button>
                 <Link className="button secondary" href={profileHref}>
-                  Preview Record First
+                  Preview Profile First
                 </Link>
               </>
             )}

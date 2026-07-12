@@ -145,7 +145,7 @@ export const defaultSiteSettings: EditableSiteSettings = {
   seo: {
     title: "QRguitar",
     description: "Permanent QRguitar Profiles for guitars, amps, pedals, builders, shops, and collectors.",
-    keywords: "guitar inventory, guitar authentication, guitar service profiles, instrument ownership, QRguitar, luthier profiles",
+    keywords: "guitar inventory, guitar authentication, guitar service history, instrument ownership, QRguitar, luthier profiles",
     image: "/seo/qrguitar-og-v2.png",
     favicon: "/qrguitar-logo-white-orange.svg",
     canonicalUrl: "https://www.qrguitar.com",
@@ -269,7 +269,9 @@ function normalizeProfileCopy(value: string) {
     [/\bguitar records\b/gi, "guitar profiles"],
     [/\bbuilder records\b/gi, "builder profiles"],
     [/\bwarranty records\b/gi, "warranty profiles"],
-    [/\bservice records\b/gi, "service profiles"]
+    [/\bVerify important records later\b/gi, "Verify important profiles later"],
+    [/\bservice records\b/gi, "service history"],
+    [/\bservice profiles\b/gi, "service history"]
   ];
 
   return replacements.reduce((copy, [pattern, replacement]) => copy.replace(pattern, replacement), value);

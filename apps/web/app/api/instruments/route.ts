@@ -810,12 +810,14 @@ async function settleWithin<T>(promise: Promise<T>, fallback: T, timeoutMs: numb
 }
 
 function stripAnonymousInstrumentFields(instrument: DemoInstrument) {
-  const publicInstrument = { ...instrument };
+  const {
+    ownerUserEmail: _ownerUserEmail,
+    safetyNote: _safetyNote,
+    ...publicInstrument
+  } = instrument;
   if (publicInstrument.showSerialPublic === false) {
     publicInstrument.serial = "";
   }
-  delete publicInstrument.ownerUserEmail;
-  delete publicInstrument.safetyNote;
   return publicInstrument;
 }
 

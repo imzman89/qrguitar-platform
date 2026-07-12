@@ -185,7 +185,7 @@ export const siteCopy = {
           "Up to 25 profiles during beta",
           "Public, private, or unlisted",
           "No verified badge included",
-          "Verify important records later",
+          "Verify important profiles later",
           "Photos, specs, documents, and notes",
         ]
       },

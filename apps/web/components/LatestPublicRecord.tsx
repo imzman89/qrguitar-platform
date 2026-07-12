@@ -145,10 +145,10 @@ function HomepageLatestProfileCard({ record }: { record: DemoInstrument }) {
 
           <div className="latest-profile-card-facts">
             <span>{condition === "new" ? "New" : "Used"}</span>
-            {photoCount ? <span><Camera size={12} /> {photoCount} photos</span> : null}
+            {photoCount ? <span><Camera size={12} /> {photoCount} {photoCount === 1 ? "photo" : "photos"}</span> : null}
           </div>
 
-          <span className="latest-profile-card-cta">Open Record <ArrowRight size={14} /></span>
+          <span className="latest-profile-card-cta">Open Profile <ArrowRight size={14} /></span>
         </div>
       </Link>
 

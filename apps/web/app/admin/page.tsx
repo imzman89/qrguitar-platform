@@ -1072,7 +1072,7 @@ export default function AdminPage() {
                     {transfer.status === "sent" && transfer.claimPath ? <small>Claim link is active until the transfer is accepted or cancelled.</small> : null}
                   </div>
                   <div className="admin-row-actions">
-                    {transfer.recordCode ? <Link href={`/edit/${transfer.recordCode}`}>Edit Record</Link> : null}
+                    {transfer.recordCode ? <Link href={`/edit/${transfer.recordCode}`}>Edit Profile</Link> : null}
                     {hasPublicPage ? (
                       <Link href={`/i/${transfer.recordCode}`}>Open Public Page</Link>
                     ) : (

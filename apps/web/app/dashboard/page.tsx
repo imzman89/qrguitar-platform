@@ -418,7 +418,10 @@ export default function DashboardPage() {
                             </div>
                           </div>
                           <div className={styles.instrumentMeta}>
-                            <span>{instrument.galleryImageDataUrls?.length || (instrument.heroImageDataUrl ? 1 : 0)} photos</span>
+                            {(() => {
+                              const photoCount = instrument.galleryImageDataUrls?.length || (instrument.heroImageDataUrl ? 1 : 0);
+                              return <span>{photoCount} {photoCount === 1 ? "photo" : "photos"}</span>;
+                            })()}
                             <span>{instrument.serviceEvents?.length ? `${instrument.serviceEvents.length} service ${instrument.serviceEvents.length === 1 ? "entry" : "entries"}` : "No service history yet"}</span>
                             <span>{totalDocs ? `${publicDocs} public docs${hiddenDocs ? `, ${hiddenDocs} hidden` : ""}` : "No documents yet"}</span>
                             <span>{instrument.visibility === "private" ? "Private" : instrument.visibility === "unlisted" ? "Unlisted" : "Public"}</span>
@@ -436,7 +439,7 @@ export default function DashboardPage() {
                         </div>
                         <div className={styles.instrumentActions}>
                           <Link className="button secondary" href={`/edit/${instrument.qrCode}`}>
-                            Edit Record
+                            Edit Profile
                           </Link>
                           <Link className="button secondary" href={instrumentToProfileUrl(instrument)}>
                             View Profile
