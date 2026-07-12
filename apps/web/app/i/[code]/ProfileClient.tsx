@@ -498,10 +498,10 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
             <strong>{safetyStatus === "lost" ? "Reported Lost" : "Reported Stolen"}</strong>
             <p>
               {safetyStatus === "lost"
-                ? "This instrument has been marked lost by the current record owner."
-                : "This instrument has been marked stolen by the current record owner."}
+                ? "This instrument has been marked lost by the current owner."
+                : "This instrument has been marked stolen by the current owner."}
             </p>
-            {instrument.publicSafetyNote ? <p>{instrument.publicSafetyNote}</p> : null}
+            {isDistinctSafetyNote(instrument.publicSafetyNote, safetyStatus) ? <p>{instrument.publicSafetyNote}</p> : null}
           </section>
         ) : null}
 
@@ -511,7 +511,15 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
               <span>Profile identity</span>
               <strong>Permanent instrument reference</strong>
             </div>
+            <span className="identity-media-summary">
+              {[
+                galleryImages.length ? `${galleryImages.length} ${galleryImages.length === 1 ? "photo" : "photos"}` : "",
+                documentFiles.length ? `${documentFiles.length} ${documentFiles.length === 1 ? "document" : "documents"}` : ""
+              ].filter(Boolean).join(" / ")}
+            </span>
+            {false ? (
             <span>{galleryImages.length} {galleryImages.length === 1 ? "photo" : "photos"} · {documentFiles.length} {documentFiles.length === 1 ? "document" : "documents"}</span>
+            ) : null}
           </header>
           <div className="identity-grid">
             {specs.map((spec) => (
@@ -587,7 +595,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
               {actionNotice === "owner" ? (
                 <>
                   <span className="scan-action-icon"><ShieldCheck size={16} /> Owner/admin access required</span>
-                  <p>Only the owner or admin can edit this record right now. Sign in as a record owner to make changes.</p>
+                  <p>Only the owner or admin can edit this profile. Sign in as the profile owner to make changes.</p>
                 </>
               ) : null}
             </div>
@@ -773,9 +781,9 @@ function ProfilePanel({
 
     return (
       <section className="scan-tab-panel">
-        <PanelHeader icon={<Clock3 />} label="Timeline" title="The record stays useful as the instrument moves through the world." />
+        <PanelHeader icon={<Clock3 />} label="Timeline" title="The profile stays useful as the instrument moves through the world." />
         <div className="timeline-list">
-          <TimelineItem date={createdDate} title="Record created" copy={`${instrument.brand} attached this instrument identity for ${instrumentDisplayName(instrument)}.`} />
+          <TimelineItem date={createdDate} title="Profile created" copy={`${instrument.brand} attached this instrument identity for ${instrumentDisplayName(instrument)}.`} />
           {publicServiceEvents.map((entry) => (
             <TimelineItem
               date={formatProfileDate(entry.serviceDate || entry.createdAt)}
@@ -929,8 +937,12 @@ function ProfilePanel({
   return (
     <section className="scan-tab-panel scan-overview">
       <div>
-        <h2>About this instrument</h2>
-        <p>{instrument.summary || "This QRguitar Profile keeps the core facts, media, paperwork, and ownership history with the instrument."}</p>
+        {meaningfulProfileSummary(instrument.summary) ? (
+          <>
+            <h2>About this instrument</h2>
+            <p>{meaningfulProfileSummary(instrument.summary)}</p>
+          </>
+        ) : null}
         {optionalSpecs.length ? (
           <div className="public-spec-list">
             {optionalSpecs.map((spec) => (
@@ -955,6 +967,22 @@ function ProfilePanel({
       ) : null}
     </section>
   );
+}
+
+function meaningfulProfileSummary(summary?: string | null) {
+  const value = String(summary || "").trim();
+  if (!value || /^QRguitar Profile with photos, specs, and instrument details\.?$/i.test(value)) {
+    return "";
+  }
+  return value;
+}
+
+function isDistinctSafetyNote(note: string | undefined, status: string) {
+  const value = String(note || "").trim();
+  if (!value) return false;
+  const normalized = value.toLowerCase().replace(/[.!]+$/g, "");
+  return normalized !== `this instrument has been reported ${status}` &&
+    normalized !== `this instrument has been marked ${status} by the current owner`;
 }
 
 function PanelHeader({ icon, label, title }: { icon: ReactNode; label: string; title: string }) {

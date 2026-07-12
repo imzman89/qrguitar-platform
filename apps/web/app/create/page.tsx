@@ -510,7 +510,7 @@ export default function CreatePage() {
               <div className="permanent-id">
                 <span>Permanent QRguitar ID</span>
                 <strong>{qrCode}</strong>
-                <small>When a Serial / Build ID exists, the QRguitar ID uses the format QRG-SERIAL. No-serial instruments receive a generated ID.</small>
+                <small>When a Serial / Build ID exists, the QRguitar ID uses the format QRG-SERIAL. If no serial is used, QRguitar assigns a permanent generated identity instead.</small>
               </div>
               <div className="privacy-toggle" aria-label="Profile visibility">
                 <div>
@@ -659,11 +659,11 @@ export default function CreatePage() {
                     checked={form.showSerialPublic}
                     onChange={(event) => setForm((current) => ({ ...current, showSerialPublic: event.target.checked }))}
                   />
-                  Show serial/build ID on public profile
+                  Show serial/build ID on visible profile
                 </label>
               </div>
               <p className="fine-print">
-                Records without a serial/build ID can still be created, but QRguitar verification or authenticity confirmation requires prior QRguitar approval.
+                You can hide the serial from a visible profile at any time from the profile editor. Profiles without a serial/build ID can still be created, but verification or authenticity confirmation requires prior QRguitar approval.
               </p>
               <p className="fine-print">
                 Originality is an owner-stated modification status for search and disclosure. It is not QRguitar authentication or verification.

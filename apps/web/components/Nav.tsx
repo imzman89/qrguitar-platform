@@ -44,6 +44,7 @@ export function Nav() {
         <Link href="/dashboard">Dashboard</Link>
         <Link href="/catalog">Catalog</Link>
         <Link href="/create">Create</Link>
+        <Link href="/how-it-works">How It Works</Link>
         {isSignedIn ? (
           <div className="nav-account-menu">
             <button

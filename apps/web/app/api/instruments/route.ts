@@ -1272,6 +1272,71 @@ export async function GET(request: Request) {
   );
 }
 
+const establishedInstrumentBrands = [
+  "Charvel", "Collings", "Dean", "Epiphone", "ESP", "Fender", "G&L", "Gibson", "Godin", "Gretsch",
+  "Guild", "Hagstrom", "Heritage", "Ibanez", "Jackson", "Kramer", "LTD", "Martin", "Music Man",
+  "Paul Reed Smith", "PRS", "Reverend", "Rickenbacker", "Schecter", "Seagull", "Squier",
+  "Sterling by Music Man", "Suhr", "Taylor", "Tom Anderson", "Washburn", "Yamaha"
+];
+
+function brandKey(value: string) {
+  return value.normalize("NFKD").replace(/[^a-z0-9]+/gi, "").toLowerCase();
+}
+
+function brandDistance(first: string, second: string) {
+  const previous = Array.from({ length: second.length + 1 }, (_, index) => index);
+  for (let firstIndex = 1; firstIndex <= first.length; firstIndex += 1) {
+    const current = [firstIndex];
+    for (let secondIndex = 1; secondIndex <= second.length; secondIndex += 1) {
+      current[secondIndex] = Math.min(
+        current[secondIndex - 1] + 1,
+        previous[secondIndex] + 1,
+        previous[secondIndex - 1] + (first[firstIndex - 1] === second[secondIndex - 1] ? 0 : 1)
+      );
+    }
+    previous.splice(0, previous.length, ...current);
+  }
+  return previous[second.length];
+}
+
+async function resolveCanonicalBrand(
+  supabase: NonNullable<ReturnType<typeof createServerSupabaseClient>>,
+  rawBrand: string
+) {
+  const value = rawBrand.trim().replace(/\s+/g, " ");
+  if (!value) return { brand: "", suggestion: "" };
+
+  const knownBrands = new Map(establishedInstrumentBrands.map((brand) => [brandKey(brand), brand]));
+  const existing = await supabase.from("guitars").select("brand").not("brand", "is", null).limit(5000);
+  if (!existing.error) {
+    for (const row of (existing.data || []) as Array<{ brand?: string | null }>) {
+      const brand = String(row.brand || "").trim();
+      if (brand) knownBrands.set(brandKey(brand), brand);
+    }
+  }
+
+  const key = brandKey(value);
+  const exact = knownBrands.get(key);
+  if (exact) return { brand: exact, suggestion: "" };
+
+  let closest = "";
+  let closestDistance = Number.POSITIVE_INFINITY;
+  for (const [knownKey, knownBrand] of knownBrands) {
+    const distance = brandDistance(key, knownKey);
+    if (distance < closestDistance) {
+      closest = knownBrand;
+      closestDistance = distance;
+    }
+  }
+
+  const typoThreshold = Math.max(key.length, brandKey(closest).length) >= 7 ? 2 : 1;
+  if (closest && closestDistance <= typoThreshold) {
+    return { brand: value, suggestion: closest };
+  }
+
+  return { brand: value, suggestion: "" };
+}
+
 export async function POST(request: Request) {
   noStore();
   const supabase = createServerSupabaseClient();
@@ -1319,6 +1384,15 @@ export async function POST(request: Request) {
     photos: Array.isArray(body.photos) ? body.photos.slice(0, 20) : [],
     documents: Array.isArray(body.documents) ? body.documents.slice(0, 10) : []
   };
+
+  const brandResolution = await resolveCanonicalBrand(supabase, input.brand);
+  if (brandResolution.suggestion) {
+    return NextResponse.json(
+      { ok: false, message: `That brand looks like ${brandResolution.suggestion}. Choose the existing brand spelling to keep the Catalog clean.` },
+      { status: 409 }
+    );
+  }
+  input.brand = brandResolution.brand;
 
   if (!input.brand || !input.model || (!input.serial && !input.serialNotUsed)) {
     return NextResponse.json({ ok: false, message: "Brand, model, and serial/build ID are required unless the instrument does not use one." }, { status: 400 });
@@ -1591,7 +1665,7 @@ export async function PATCH(request: Request) {
     const isRecordOwner = existing.data.owner_id === auth.user.id;
     const isAdmin = await canManageRecordVerification(supabase, auth.user);
     if (!isRecordOwner && !isAdmin) {
-      return NextResponse.json({ ok: false, message: "Only the record owner or QRguitar admin can change badge display." }, { status: 403 });
+      return NextResponse.json({ ok: false, message: "Only the profile owner or QRguitar admin can change badge display." }, { status: 403 });
     }
 
     const currentTrust = (await loadTrustSettingsMap(supabase, [qrCode])).get(qrCode) || defaultRecordTrustSettings;
@@ -1752,6 +1826,15 @@ export async function PATCH(request: Request) {
     photos: Array.isArray(body.photos) ? body.photos.slice(0, 20) : [],
     documents: Array.isArray(body.documents) ? body.documents.slice(0, 10) : []
   };
+
+  const brandResolution = await resolveCanonicalBrand(supabase, input.brand);
+  if (brandResolution.suggestion) {
+    return NextResponse.json(
+      { ok: false, message: `That brand looks like ${brandResolution.suggestion}. Choose the existing brand spelling to keep the Catalog clean.` },
+      { status: 409 }
+    );
+  }
+  input.brand = brandResolution.brand;
 
   if (!input.qrCode || !input.brand || !input.model || (!input.serial && !input.serialNotUsed)) {
     return NextResponse.json({ ok: false, message: "Brand, model, and serial/build ID are required unless the instrument does not use one." }, { status: 400 });

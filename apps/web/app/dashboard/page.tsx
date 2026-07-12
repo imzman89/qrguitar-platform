@@ -25,7 +25,7 @@ import { useRouter } from "next/navigation";
 
 const starterActions = [
   {
-    title: "New record",
+    title: "New profile",
     copy: "Register an instrument, add photos, and generate a permanent QRguitar link.",
     href: "/create",
     label: "Create Profile"
@@ -331,7 +331,7 @@ export default function DashboardPage() {
           <div className="dashboard-hero">
             <div>
               <div className="eyebrow">{dashboardCopy.pageTitle}</div>
-              <h2>{user ? `Welcome back, ${displayName}.` : "Manage records, QR codes, transfers, and public profiles."}</h2>
+              <h2>{user ? `Welcome back, ${displayName}.` : "Manage profiles, QR codes, transfers, and visibility."}</h2>
               <p>
                 {user
                   ? `${dashboardCopy.subtitle} ${accountSummary}`
@@ -496,7 +496,7 @@ export default function DashboardPage() {
               <div className="dashboard-health-grid">
                 <div>
                   <strong>{recordsWithPhotos}/{instruments.length || 0}</strong>
-                  <span>Records with photos</span>
+                  <span>Profiles with photos</span>
                 </div>
                 <div>
                   <strong>{publicRecords}</strong>
@@ -524,12 +524,16 @@ export default function DashboardPage() {
               <p>{dashboardCopy.nextActionsHelper}</p>
               <div className="dashboard-action-list">
                 <Link href="/create">
-                  <strong>Add another record</strong>
+                  <strong>Add another profile</strong>
                   <span>Register another guitar, amp, pedal, or build.</span>
                 </Link>
                 <Link href="/catalog">
-                  <strong>Review public catalog</strong>
+                  <strong>Review the catalog</strong>
                   <span>See what buyers and shops can view.</span>
+                </Link>
+                <Link href="/how-it-works#identity-privacy">
+                  <strong>Review identity and privacy</strong>
+                  <span>Learn how QRguitar IDs, serial visibility, and profile privacy work.</span>
                 </Link>
                 <a href="mailto:support@qrguitar.com?subject=QRguitar%20verification%20help">
                   <strong>{dashboardCopy.verificationGuidanceTitle}</strong>

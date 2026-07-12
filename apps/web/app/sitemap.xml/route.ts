@@ -25,6 +25,7 @@ export async function GET() {
     urlEntry("/", today, "weekly", "1.0"),
     urlEntry("/catalog", today, "weekly", "0.8"),
     urlEntry("/create", today, "monthly", "0.65"),
+    urlEntry("/how-it-works", today, "monthly", "0.7"),
     urlEntry("/privacy", today, "yearly", "0.4"),
     urlEntry("/terms", today, "yearly", "0.4"),
     urlEntry("/contact", today, "yearly", "0.4"),

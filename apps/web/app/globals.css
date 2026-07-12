@@ -8150,3 +8150,160 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
     overflow-wrap: anywhere;
   }
 }
+.product-guide-hero {
+  padding-top: clamp(76px, 9vw, 126px);
+}
+
+.product-guide-hero-inner,
+.product-guide-split,
+.product-guide-cta-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr);
+  gap: clamp(42px, 7vw, 96px);
+  align-items: center;
+}
+
+.product-guide-hero h1 {
+  max-width: 760px;
+  margin: 16px 0 20px;
+  font-size: clamp(42px, 6vw, 78px);
+  line-height: .98;
+}
+
+.product-guide-hero p,
+.product-guide-identity p {
+  max-width: 720px;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.65;
+}
+
+.product-guide-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.product-guide-actions .button,
+.product-guide-cta .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+
+.product-guide-principles,
+.product-guide-visibility {
+  display: grid;
+  border-block: 1px solid var(--line);
+}
+
+.product-guide-principles > div,
+.product-guide-visibility > div {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 4px 14px;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.product-guide-principles > div:last-child,
+.product-guide-visibility > div:last-child {
+  border-bottom: 0;
+}
+
+.product-guide-principles svg,
+.product-guide-visibility svg,
+.product-guide-use-grid > article > span {
+  color: var(--gold-2);
+}
+
+.product-guide-principles strong,
+.product-guide-visibility strong {
+  font-size: 17px;
+}
+
+.product-guide-principles span,
+.product-guide-visibility span {
+  grid-column: 2;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.product-guide-flow,
+.product-guide-uses {
+  border-block: 1px solid var(--line);
+  background: rgba(255, 255, 255, .018);
+}
+
+.product-guide-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin: 42px 0 0;
+  padding: 0;
+  list-style: none;
+  border-block: 1px solid var(--line);
+}
+
+.product-guide-steps li {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 14px;
+  padding: 26px 22px;
+  border-right: 1px solid var(--line);
+}
+
+.product-guide-steps li:last-child { border-right: 0; }
+.product-guide-steps li > span { color: var(--gold-2); font-weight: 900; }
+.product-guide-steps h3 { margin: 0 0 9px; font-size: 18px; }
+.product-guide-steps p,
+.product-guide-use-grid p { margin: 0; color: var(--muted); line-height: 1.55; }
+
+.product-guide-identity h2,
+.product-guide-uses h2,
+.product-guide-cta h2 { max-width: 760px; margin: 12px 0 22px; }
+
+.product-guide-use-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 38px;
+  border: 1px solid var(--line);
+}
+
+.product-guide-use-grid article {
+  padding: 28px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.product-guide-use-grid article:nth-child(2n) { border-right: 0; }
+.product-guide-use-grid article:nth-last-child(-n + 2) { border-bottom: 0; }
+.product-guide-use-grid h3 { margin: 14px 0 10px; }
+.product-guide-note { max-width: 860px; margin: 24px 0 0; color: var(--muted); }
+.product-guide-cta-inner { grid-template-columns: 1fr auto; }
+
+@media (max-width: 820px) {
+  .product-guide-hero-inner,
+  .product-guide-split,
+  .product-guide-cta-inner { grid-template-columns: 1fr; gap: 34px; }
+  .product-guide-steps { grid-template-columns: 1fr 1fr; }
+  .product-guide-steps li:nth-child(2) { border-right: 0; }
+  .product-guide-steps li:nth-child(-n + 2) { border-bottom: 1px solid var(--line); }
+  .product-guide-cta .button { width: fit-content; }
+}
+
+@media (max-width: 520px) {
+  .product-guide-hero h1 { font-size: 43px; }
+  .product-guide-actions .button { width: 100%; }
+  .product-guide-steps,
+  .product-guide-use-grid { grid-template-columns: 1fr; }
+  .product-guide-steps li,
+  .product-guide-use-grid article { border-right: 0; border-bottom: 1px solid var(--line); }
+  .product-guide-steps li:last-child,
+  .product-guide-use-grid article:last-child { border-bottom: 0; }
+}
+.identity-card-header > span:not(.identity-media-summary) {
+  display: none;
+}

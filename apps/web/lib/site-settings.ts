@@ -154,7 +154,7 @@ export const defaultSiteSettings: EditableSiteSettings = {
   },
   dashboard: {
     pageTitle: "Owner dashboard",
-    subtitle: "Manage records, photos, documents, visibility, and QR downloads from your dashboard.",
+    subtitle: "Manage profiles, photos, documents, visibility, and QR downloads from your dashboard.",
     emptyCollectionTitle: "No instruments yet.",
     emptyCollectionBody: "Register your first instrument to create a permanent QRguitar Profile.",
     firstRecordCtaLabel: "Register your first instrument",

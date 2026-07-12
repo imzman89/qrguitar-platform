@@ -12,7 +12,7 @@ import {
   type DemoInstrument
 } from "../../lib/local-demo";
 
-type ShowFilter = "All profiles" | "For sale" | "New" | "Used" | "Verified" | "Authenticity confirmed" | "All original" | "Modified" | "Safety alerts" | "Service history" | "Proof documents";
+type ShowFilter = "All profiles" | "For sale" | "Not for sale" | "New" | "Used" | "Verified" | "Unverified" | "Authenticity confirmed" | "Authenticity unconfirmed" | "All original" | "Modified" | "Safety alerts" | "Service history";
 
 export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrument[] }) {
   const [records, setRecords] = useState<DemoInstrument[]>(dedupeByCodeAndDate(initialRecords));
@@ -75,8 +75,16 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
         return getInstrumentVerificationStatus(record) === "verified";
       }
 
+      if (showFilter === "Unverified") {
+        return getInstrumentVerificationStatus(record) !== "verified";
+      }
+
       if (showFilter === "Authenticity confirmed") {
         return record.authenticityStatus === "confirmed";
+      }
+
+      if (showFilter === "Authenticity unconfirmed") {
+        return record.authenticityStatus !== "confirmed";
       }
 
       if (showFilter === "Safety alerts") {
@@ -85,6 +93,10 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
 
       if (showFilter === "For sale") {
         return record.saleStatus === "for_sale";
+      }
+
+      if (showFilter === "Not for sale") {
+        return record.saleStatus !== "for_sale";
       }
 
       if (showFilter === "New") {
@@ -105,10 +117,6 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
 
       if (showFilter === "Service history") {
         return Boolean(record.serviceEvents?.length);
-      }
-
-      if (showFilter === "Proof documents") {
-        return Boolean(record.documentFiles?.some((file) => file.visibility !== "hidden"));
       }
 
       return true;
@@ -176,19 +184,31 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
               </select>
             </label>
             <label>
-              Show
+              Filter
               <select value={showFilter} onChange={(event) => setShowFilter(event.target.value as ShowFilter)}>
                 <option>All profiles</option>
-                <option>For sale</option>
-                <option>New</option>
-                <option>Used</option>
-                <option>Verified</option>
-                <option>Authenticity confirmed</option>
-                <option>All original</option>
-                <option>Modified</option>
-                <option>Safety alerts</option>
-                <option>Service history</option>
-                <option>Proof documents</option>
+                <optgroup label="Availability">
+                  <option>For sale</option>
+                  <option>Not for sale</option>
+                </optgroup>
+                <optgroup label="Condition">
+                  <option>New</option>
+                  <option>Used</option>
+                </optgroup>
+                <optgroup label="Trust">
+                  <option>Verified</option>
+                  <option>Unverified</option>
+                  <option>Authenticity confirmed</option>
+                  <option>Authenticity unconfirmed</option>
+                </optgroup>
+                <optgroup label="Originality">
+                  <option>All original</option>
+                  <option>Modified</option>
+                </optgroup>
+                <optgroup label="History">
+                  <option>Safety alerts</option>
+                  <option>Service history</option>
+                </optgroup>
               </select>
             </label>
             <label>
@@ -237,7 +257,7 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
               </div>
             ) : visibleRecords.length ? (
               visibleRecords.map((record) => (
-                <CollectibleRecordCard record={record} variant="catalog" eyebrow="QRguitar Profile" key={record.qrCode} />
+                <CollectibleRecordCard record={record} variant="catalog" key={record.qrCode} />
               ))
             ) : (
               <div className="card catalog-empty">

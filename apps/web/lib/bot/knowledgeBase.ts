@@ -35,7 +35,7 @@ const entries: KnowledgeEntry[] = [
     triggers: ["what is qrguitar", "what does qrguitar do", "why qrguitar", "how does this work", "how does this all work", "how does it work", "how it works", "what can you do", "serial number"],
     answer:
       "QRguitar gives a guitar, amp, pedal, or instrument a permanent QRguitar Profile tied to one QRguitar ID. A serial number identifies a thing; a QRguitar Profile keeps the story with it: specs, photos, repairs, documents, ownership notes, and sale or transfer history.",
-    evidence: ["QRguitar product scope", "Permanent record workflow"],
+    evidence: ["QRguitar product scope", "Permanent profile workflow"],
     nextSteps: ["Create a record with make, model, serial, condition, photos, and visibility.", "Add proof over time instead of trying to finish everything on day one."]
   },
   {

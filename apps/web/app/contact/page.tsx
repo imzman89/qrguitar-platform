@@ -3,7 +3,7 @@ import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 
 export const metadata: Metadata = {
-  title: "Contact | QRguitar",
+  title: "Contact",
   description: "Contact QRguitar support for public beta help."
 };
 
@@ -35,9 +35,9 @@ export default function ContactPage() {
       href: "mailto:support@qrguitar.com?subject=QRguitar%20shop%20brand%20or%20builder%20help"
     },
     {
-      title: "Proof documents",
-      copy: "Questions about public documents, private proof files, receipts, appraisals, and what should stay hidden.",
-      href: "mailto:support@qrguitar.com?subject=QRguitar%20proof%20document%20help"
+      title: "Documents and privacy",
+      copy: "Questions about visible documents, private files, receipts, appraisals, and what should stay hidden.",
+      href: "mailto:support@qrguitar.com?subject=QRguitar%20document%20privacy%20help"
     }
   ];
 

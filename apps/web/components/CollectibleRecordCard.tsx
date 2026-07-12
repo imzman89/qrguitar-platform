@@ -26,7 +26,7 @@ type CollectibleRecordCardProps = {
 export function CollectibleRecordCard({
   record,
   variant = "catalog",
-  eyebrow = "QRguitar Profile",
+  eyebrow = "",
   createdLabel = "",
   ctaLabel = "Open Profile",
   secondaryHref = "",
@@ -73,7 +73,7 @@ export function CollectibleRecordCard({
             </div>
           )}
           <div className="collectible-card-topline">
-            <span className="collectible-card-eyebrow"><Globe2 size={13} /> {eyebrow}</span>
+            {eyebrow ? <span className="collectible-card-eyebrow"><Globe2 size={13} /> {eyebrow}</span> : null}
             {createdLabel ? <span className="collectible-card-age">{createdLabel}</span> : null}
           </div>
           <span className="collectible-card-code">{record.qrCode}</span>

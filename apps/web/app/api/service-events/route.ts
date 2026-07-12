@@ -142,7 +142,7 @@ async function requireOwnerOrAdmin(request: Request, guitar: GuitarRow, supabase
 
   const isAdmin = await canAdminister(supabase, auth.user);
   if (guitar.owner_id !== auth.user.id && !isAdmin) {
-    return { user: auth.user, isAdmin, error: "Only the record owner or QRguitar admin can manage service history." };
+    return { user: auth.user, isAdmin, error: "Only the profile owner or QRguitar admin can manage service history." };
   }
 
   return { user: auth.user, isAdmin, error: "" };

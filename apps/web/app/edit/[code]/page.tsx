@@ -891,7 +891,7 @@ export default function EditInstrumentPage() {
                         rows={3}
                         value={publicSafetyNote}
                         onChange={(event) => setPublicSafetyNote(event.target.value)}
-                        placeholder={safetyStatus === "lost" ? "Reported Lost: This instrument has been marked lost by the current record owner." : safetyStatus === "stolen" ? "Reported Stolen: This instrument has been marked stolen by the current record owner." : "Recovered status note."}
+                        placeholder={safetyStatus === "lost" ? "Reported Lost: This instrument has been marked lost by the current owner." : safetyStatus === "stolen" ? "Reported Stolen: This instrument has been marked stolen by the current owner." : "Recovered status note."}
                       />
                     </div>
                   )}
@@ -1390,7 +1390,7 @@ export default function EditInstrumentPage() {
               {!ready
                 ? "Checking your Supabase session now."
                 : forbidden
-                  ? message || "Only the record owner can edit this record."
+                  ? message || "Only the profile owner can edit this profile."
                   : message || "Sign in with the account that owns this QRguitar Profile."}
             </p>
             {forbidden ? (

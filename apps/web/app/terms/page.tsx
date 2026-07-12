@@ -3,7 +3,7 @@ import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 
 export const metadata: Metadata = {
-  title: "Terms | QRguitar",
+  title: "Terms",
   description: "Public beta terms for using QRguitar instrument profiles."
 };
 
