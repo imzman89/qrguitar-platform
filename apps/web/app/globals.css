@@ -4019,14 +4019,14 @@ select {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 18px;
-  align-items: end;
-  margin-bottom: 18px;
+  align-items: center;
+  margin-bottom: 14px;
 }
 
 .print-kit-toolbar h1 {
-  margin: 4px 0 6px;
-  font-size: clamp(34px, 6vw, 64px);
-  line-height: .92;
+  margin: 4px 0 5px;
+  font-size: clamp(32px, 4.5vw, 48px);
+  line-height: .98;
   letter-spacing: 0;
 }
 
@@ -4034,6 +4034,20 @@ select {
   max-width: 620px;
   margin: 0;
   color: rgba(248, 246, 242, .72);
+}
+
+.print-kit-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 18px;
+  color: rgba(248, 246, 242, .72);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.print-kit-back-link:hover {
+  color: #f8f6f2;
 }
 
 .print-kit-toolbar-actions {
@@ -4044,20 +4058,20 @@ select {
 }
 
 .print-mode-toggle {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 14px;
-  padding: 6px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 5px;
   border: 1px solid rgba(248, 246, 242, .1);
-  border-radius: 999px;
+  border-radius: 12px;
   background: rgba(248, 246, 242, .035);
 }
 
 .print-mode-toggle button {
   min-height: 36px;
   border: 0;
-  border-radius: 999px;
+  border-radius: 8px;
   padding: 8px 14px;
   color: rgba(248, 246, 242, .72);
   background: transparent;
@@ -4067,7 +4081,15 @@ select {
 
 .print-mode-toggle button.active {
   color: #071014;
-  background: var(--paper);
+  background: #f8f6f2;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .18);
+}
+
+.print-mode-description {
+  grid-column: 1 / -1;
+  margin: 3px 7px 2px;
+  color: rgba(248, 246, 242, .62);
+  font-size: 12px;
 }
 
 .print-kit-warning {
@@ -4132,7 +4154,7 @@ select {
   text-align: right;
 }
 
-.print-kit-header span,
+.print-kit-header > div:last-child span,
 .print-label-card p {
   color: rgba(248, 246, 242, .68);
   font-size: 11px;
@@ -4273,8 +4295,7 @@ select {
   color: rgba(7, 16, 20, .72);
 }
 
-.print-kit-qr-panel strong,
-.print-label-card span {
+.print-kit-qr-panel strong {
   overflow-wrap: anywhere;
   color: #071014;
 }
@@ -4320,41 +4341,58 @@ select {
 }
 
 .print-kit--label {
-  max-width: 520px;
+  max-width: 430px;
   margin-inline: auto;
+  border-radius: 16px;
 }
 
 .print-label-card {
   display: grid;
-  grid-template-columns: 190px minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: 138px minmax(0, 1fr);
+  gap: 14px;
   align-items: center;
-  margin: 24px;
-  padding: 18px;
-  border-radius: 18px;
+  margin: 12px;
+  padding: 12px;
+  border-radius: 12px;
   color: #071014;
   background: #f8f6f2;
 }
 
 .print-label-qr {
-  padding: 9px;
-  border-radius: 14px;
+  padding: 7px;
+  border-radius: 10px;
   background: #071014;
+}
+
+.print-label-info {
+  min-width: 0;
+}
+
+.print-label-wordmark {
+  margin-bottom: 13px;
+  color: #071014;
+  font-size: 15px;
+  font-weight: 950;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.print-label-wordmark span {
+  color: #c87500;
 }
 
 .print-label-card p,
 .print-label-card h2,
-.print-label-card strong,
-.print-label-card span {
+.print-label-card strong {
   display: block;
   margin: 0;
   color: #071014;
 }
 
 .print-label-card h2 {
-  margin: 7px 0;
-  font-size: 26px;
-  line-height: 1;
+  margin: 5px 0 7px;
+  font-size: 20px;
+  line-height: 1.05;
 }
 
 @media (max-width: 720px) {
@@ -4363,7 +4401,23 @@ select {
   }
 
   .print-kit-toolbar-actions {
-    justify-content: start;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    justify-content: stretch;
+  }
+
+  .print-kit-toolbar-actions .button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .print-kit-back-link {
+    margin-bottom: 14px;
+  }
+
+  .print-mode-toggle button {
+    padding-inline: 8px;
+    font-size: 12px;
   }
 
   .print-kit-header,
@@ -4378,8 +4432,7 @@ select {
 
   .print-kit-profile,
   .print-kit--shop .print-kit-profile,
-  .print-kit-qr-panel,
-  .print-label-card {
+  .print-kit-qr-panel {
     grid-template-columns: 1fr;
   }
 
@@ -4389,10 +4442,25 @@ select {
   }
 
   .print-kit-qr-code,
-  .print-kit--shop .print-kit-qr-code,
-  .print-label-qr {
+  .print-kit--shop .print-kit-qr-code {
     width: 100%;
     max-width: 220px;
+  }
+
+  .print-label-card {
+    grid-template-columns: 118px minmax(0, 1fr);
+    gap: 12px;
+    margin: 8px;
+    padding: 10px;
+  }
+
+  .print-label-wordmark {
+    margin-bottom: 9px;
+    font-size: 14px;
+  }
+
+  .print-label-card h2 {
+    font-size: 18px;
   }
 }
 
@@ -4440,6 +4508,13 @@ select {
 
   .print-kit--full {
     min-height: 9.85in;
+  }
+
+  .print-kit--label {
+    width: 4in;
+    max-width: 4in;
+    margin: 0 auto;
+    border-radius: 0;
   }
 }
 

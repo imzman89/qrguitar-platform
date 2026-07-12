@@ -26,9 +26,17 @@ type HandoutPayload = {
 type PrintMode = "full" | "shop" | "label";
 
 const modeLabels: Record<PrintMode, string> = {
-  full: "Full Page",
-  shop: "Shop Card",
+  full: "Profile Sheet",
+  shop: "Counter Card",
   label: "QR Label"
+};
+
+const modeOrder: PrintMode[] = ["shop", "full", "label"];
+
+const modeDescriptions: Record<PrintMode, string> = {
+  full: "A full-page profile for the owner or instrument paperwork.",
+  shop: "A compact display card for a counter, case, or service handoff.",
+  label: "A small scan label for a case, tag, or package."
 };
 
 function humanizeStatus(value?: string) {
@@ -71,7 +79,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState("");
-  const [mode, setMode] = useState<PrintMode>("full");
+  const [mode, setMode] = useState<PrintMode>("shop");
   const canonicalCode = instrument?.qrCode || code;
   const profileUrl = `https://www.qrguitar.com/i/${encodeURIComponent(canonicalCode)}`;
 
@@ -213,15 +221,15 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
         <div className="shell handout-shell">
           <div className="print-kit-toolbar no-print">
             <div>
-              <div className="eyebrow">Selected profile print kit</div>
-              <h1>QRguitar Print Kit</h1>
-              <p>{instrument ? title : "Prepare one selected QRguitar Profile for a customer handout, shop card, or QR label."}</p>
+              <Link className="print-kit-back-link" href="/dashboard">
+                <ArrowLeft size={15} />
+                Dashboard
+              </Link>
+              <div className="eyebrow">Print kit</div>
+              <h1>Print this profile.</h1>
+              <p>Choose a format, check the preview, then print.</p>
             </div>
             <div className="print-kit-toolbar-actions">
-              <Link className="button secondary" href="/dashboard">
-                <ArrowLeft size={16} />
-                Back to Dashboard
-              </Link>
               <Link className="button secondary" href={`/i/${encodeURIComponent(canonicalCode)}`} target="_blank">
                 <ExternalLink size={16} />
                 Open Profile
@@ -235,11 +243,18 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
 
           {instrument ? (
             <div className="print-mode-toggle no-print" aria-label="Print format">
-              {(Object.keys(modeLabels) as PrintMode[]).map((key) => (
-                <button key={key} type="button" className={mode === key ? "active" : ""} onClick={() => setMode(key)}>
+              {modeOrder.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={mode === key ? "active" : ""}
+                  aria-pressed={mode === key}
+                  onClick={() => setMode(key)}
+                >
                   {modeLabels[key]}
                 </button>
               ))}
+              <p className="print-mode-description">{modeDescriptions[mode]}</p>
             </div>
           ) : null}
 
@@ -263,24 +278,26 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
             </section>
           ) : (
             <article className={`print-kit print-kit--${mode}`} aria-label={`Printable QRguitar Profile for ${title}`}>
-              <header className="print-kit-header">
-                <div className="print-kit-wordmark">QR<span>guitar</span></div>
-                <div>
-                  <span>Permanent QRguitar Profile</span>
-                  <strong>{canonicalCode}</strong>
-                </div>
-              </header>
+              {mode !== "label" ? (
+                <header className="print-kit-header">
+                  <div className="print-kit-wordmark">QR<span>guitar</span></div>
+                  <div>
+                    <span>Permanent QRguitar Profile</span>
+                    <strong>{canonicalCode}</strong>
+                  </div>
+                </header>
+              ) : null}
 
               {mode === "label" ? (
                 <section className="print-label-card">
                   <div className="print-label-qr">
                     {qrDataUrl ? <img src={qrDataUrl} alt={`QR code for ${title}`} /> : <QrCode />}
                   </div>
-                  <div>
-                    <p>Scan QRguitar Profile</p>
+                  <div className="print-label-info">
+                    <div className="print-label-wordmark">QR<span>guitar</span></div>
+                    <p>Scan to view profile</p>
                     <h2>{title}</h2>
                     <strong>{canonicalCode}</strong>
-                    <span>{profileUrl}</span>
                   </div>
                 </section>
               ) : (
@@ -317,10 +334,12 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                 </>
               )}
 
-              <footer className="print-kit-footer">
-                <span>Permanent QRguitar Profile at qrguitar.com</span>
-                <strong>Keep this with the instrument paperwork.</strong>
-              </footer>
+              {mode !== "label" ? (
+                <footer className="print-kit-footer">
+                  <span>Permanent QRguitar Profile at qrguitar.com</span>
+                  <strong>Keep this with the instrument paperwork.</strong>
+                </footer>
+              ) : null}
             </article>
           )}
         </div>
