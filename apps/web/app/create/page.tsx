@@ -9,14 +9,12 @@ import { Nav } from "../../components/Nav";
 import { createSubmissionFingerprint, isRepeatedBrowserSubmission, validateInstrumentSubmission } from "../../lib/security";
 import {
   defaultQrStyle,
-  generatePermanentQrCode,
-  getDemoInstruments,
   type CustomProfileField,
   type QrStyle
 } from "../../lib/local-demo";
 import { defaultSiteSettings, fetchPublishedSiteSettings } from "../../lib/site-settings";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
-import { qrCodeFromSerial } from "../../lib/qrguitar-id";
+import { makePreviewQrCode, qrCodeFromSerial } from "../../lib/qrguitar-id";
 import { canonicalInstrumentBrand, establishedInstrumentBrands } from "../../lib/instrument-brands";
 
 const documentTypeOptions = ["Receipt", "Invoice", "Appraisal", "Certificate", "Build Sheet", "Service Slip", "Insurance Photo", "Warranty", "Authenticity Evidence", "Other"];
@@ -87,7 +85,7 @@ export default function CreatePage() {
   const [customLinks, setCustomLinks] = useState([{ id: "link-1", label: "Website", url: "" }]);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [documents, setDocuments] = useState<DocumentDraft[]>([]);
-  const [qrCode, setQrCode] = useState(() => generatePermanentQrCode(getDemoInstruments().map((instrument) => instrument.qrCode), ""));
+  const [qrCode, setQrCode] = useState(makePreviewQrCode);
   const [qrStyle, setQrStyle] = useState<QrStyle>(defaultQrStyle);
   const [categoryOptions, setCategoryOptions] = useState(defaultSiteSettings.instrumentCategories);
   const [accountRecordCount, setAccountRecordCount] = useState(0);
@@ -106,7 +104,7 @@ export default function CreatePage() {
     if (serialCode) {
       setQrCode(serialCode);
     } else if (form.serialNotUsed) {
-      setQrCode(generatePermanentQrCode(getDemoInstruments().map((instrument) => instrument.qrCode), ""));
+      setQrCode(makePreviewQrCode());
     }
   }, [form.serial, form.serialNotUsed]);
 
