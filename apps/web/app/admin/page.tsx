@@ -302,7 +302,7 @@ function actionLabel(action: string) {
 }
 
 function fileSizeLabel(value?: number | null) {
-  if (!value) return "Size not listed";
+  if (!value) return "Size unavailable";
   if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
@@ -1067,7 +1067,7 @@ export default function AdminPage() {
                       <span>{transfer.recordCode || transfer.guitar_id}</span>
                       <span>{transfer.recordVisibility || "no public page"}</span>
                     </span>
-                    <small>From {transfer.fromOwnerEmail || "unknown owner"} - To {transfer.to_email || transfer.acceptedByEmail || "not listed"}</small>
+                    <small>From {transfer.fromOwnerEmail || "unknown owner"} - To {transfer.to_email || transfer.acceptedByEmail || "Unavailable"}</small>
                     <small>Created {formatDate(transfer.created_at)} - Accepted {formatDate(transfer.accepted_at)}</small>
                     {transfer.status === "sent" && transfer.claimPath ? <small>Claim link is active until the transfer is accepted or cancelled.</small> : null}
                   </div>

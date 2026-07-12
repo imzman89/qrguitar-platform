@@ -88,7 +88,6 @@ export function isOutOfScope(message: string) {
     "under finish",
     "finish",
     "cranston",
-    "proper instruments",
     "proper passive",
     "photos",
     "media",

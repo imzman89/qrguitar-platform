@@ -1368,7 +1368,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, message: "Could not verify the instrument ID." }, { status: 500 });
     }
     if (duplicate.count) {
-      return NextResponse.json({ ok: false, message: "That Instrument ID / Serial is already registered." }, { status: 409 });
+      return NextResponse.json({ ok: false, message: "That Serial / Build ID is already registered." }, { status: 409 });
     }
   } else {
     for (let attempt = 0; attempt < 24; attempt += 1) {
@@ -1769,10 +1769,10 @@ export async function PATCH(request: Request) {
   if (nextQrCode !== input.qrCode) {
     const duplicate = await supabase.from("guitars").select("id").eq("qr_code", nextQrCode).maybeSingle<{ id: string }>();
     if (duplicate.error) {
-      return NextResponse.json({ ok: false, message: "Could not verify the updated Instrument ID / Serial." }, { status: 500 });
+      return NextResponse.json({ ok: false, message: "Could not verify the updated Serial / Build ID." }, { status: 500 });
     }
     if (duplicate.data && duplicate.data.id !== existing.data.id) {
-      return NextResponse.json({ ok: false, message: "That Instrument ID / Serial is already registered." }, { status: 409 });
+      return NextResponse.json({ ok: false, message: "That Serial / Build ID is already registered." }, { status: 409 });
     }
 
     const redirectResult = await supabase.from("qr_redirects").upsert(
@@ -1780,7 +1780,7 @@ export async function PATCH(request: Request) {
       { onConflict: "old_path" }
     );
     if (redirectResult.error) {
-      return NextResponse.json({ ok: false, message: "The previous QR link could not be secured before updating this Instrument ID / Serial." }, { status: 500 });
+      return NextResponse.json({ ok: false, message: "The previous QR link could not be secured before updating this Serial / Build ID." }, { status: 500 });
     }
   }
 

@@ -386,9 +386,9 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
   }
 
   const specs = [
-    { label: "QRguitar ID", value: instrument.qrCode },
+    { label: "QRguitar ID / Instrument ID", value: instrument.qrCode },
     { label: "Make / Model", value: [instrument.brand, instrument.model].filter(Boolean).join(" ") },
-    { label: "Instrument ID / Serial", value: instrument.serial || (instrument.serialExceptionApproved ? "No serial/build ID used" : "") },
+    { label: "Serial / Build ID", value: instrument.serial || (instrument.serialExceptionApproved ? "No serial/build ID used" : "") },
     { label: "Year", value: instrument.year },
     ...(formattedLocation ? [{ label: "Location", value: formattedLocation }] : [])
   ].filter((spec) => hasMeaningfulPublicValue(spec.value));
@@ -408,7 +408,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
       : null
   ].filter((item): item is { label: string; note: string } => Boolean(item));
 
-  const stalePublicValues = new Set(["custom reptile finish", "custom offset", "alder", "maple neck, rosewood board"]);
+  const stalePublicValues = new Set(["custom offset", "alder", "maple neck, rosewood board"]);
 
   const optionalSpecs = [
     { label: "Type", value: instrument.instrumentType },

@@ -510,7 +510,7 @@ export default function CreatePage() {
               <div className="permanent-id">
                 <span>Permanent QRguitar ID</span>
                 <strong>{qrCode}</strong>
-                <small>When an Instrument ID / Serial exists, the QRguitar ID uses the format QRG-SERIAL. No-serial instruments receive a generated ID.</small>
+                <small>When a Serial / Build ID exists, the QRguitar ID uses the format QRG-SERIAL. No-serial instruments receive a generated ID.</small>
               </div>
               <div className="privacy-toggle" aria-label="Profile visibility">
                 <div>
@@ -591,7 +591,7 @@ export default function CreatePage() {
               <div className="form-grid">
                 <Field label="Make / brand" id="brand" value={form.brand} onChange={(value) => updateField("brand", value)} />
                 <Field label="Model" id="model" value={form.model} onChange={(value) => updateField("model", value)} />
-                <Field label="Instrument ID / serial" id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} />
+                <Field label="Serial / Build ID" id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} />
                 <Field label="Year" id="year" value={form.year} onChange={(value) => updateField("year", value)} />
                 <CategoryField
                   label="Type / category"

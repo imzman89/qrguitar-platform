@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, ExternalLink, FileText, Printer, QrCode, ShieldCheck, Siren } from "lucide-react";
 import QRCode from "qrcode";
 import type { ReactNode } from "react";
@@ -65,12 +66,14 @@ function Badge({ children, tone = "neutral", icon }: { children: ReactNode; tone
 
 export default function HandoutPage({ params }: { params: { code: string } }) {
   const code = String(params.code || "").trim().toUpperCase();
+  const router = useRouter();
   const [instrument, setInstrument] = useState<DemoInstrument | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [mode, setMode] = useState<PrintMode>("full");
-  const profileUrl = `https://www.qrguitar.com/i/${encodeURIComponent(code)}`;
+  const canonicalCode = instrument?.qrCode || code;
+  const profileUrl = `https://www.qrguitar.com/i/${encodeURIComponent(canonicalCode)}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -86,6 +89,9 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
       const publicPayload = (await publicResponse.json().catch(() => null)) as HandoutPayload | null;
       if (!cancelled && publicResponse.ok && publicPayload?.ok && publicPayload.instrument) {
         setInstrument(publicPayload.instrument);
+        if (publicPayload.instrument.qrCode && publicPayload.instrument.qrCode !== code) {
+          router.replace(`/handout/${encodeURIComponent(publicPayload.instrument.qrCode)}`);
+        }
         setLoading(false);
         return;
       }
@@ -110,6 +116,9 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
       const ownerPayload = (await ownerResponse.json().catch(() => null)) as HandoutPayload | null;
       if (!cancelled && ownerResponse.ok && ownerPayload?.ok && ownerPayload.instrument) {
         setInstrument(ownerPayload.instrument);
+        if (ownerPayload.instrument.qrCode && ownerPayload.instrument.qrCode !== code) {
+          router.replace(`/handout/${encodeURIComponent(ownerPayload.instrument.qrCode)}`);
+        }
         setLoading(false);
         return;
       }
@@ -126,7 +135,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
     return () => {
       cancelled = true;
     };
-  }, [code]);
+  }, [code, router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -213,7 +222,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                 <ArrowLeft size={16} />
                 Back to Dashboard
               </Link>
-              <Link className="button secondary" href={`/i/${encodeURIComponent(code)}`} target="_blank">
+              <Link className="button secondary" href={`/i/${encodeURIComponent(canonicalCode)}`} target="_blank">
                 <ExternalLink size={16} />
                 Open Profile
               </Link>
@@ -258,7 +267,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                 <div className="print-kit-wordmark">QR<span>guitar</span></div>
                 <div>
                   <span>Permanent QRguitar Profile</span>
-                  <strong>{code}</strong>
+                  <strong>{canonicalCode}</strong>
                 </div>
               </header>
 
@@ -270,7 +279,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                   <div>
                     <p>Scan QRguitar Profile</p>
                     <h2>{title}</h2>
-                    <strong>{code}</strong>
+                    <strong>{canonicalCode}</strong>
                     <span>{profileUrl}</span>
                   </div>
                 </section>
@@ -281,8 +290,8 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                       {photoUrl ? <img src={photoUrl} alt={`${title} main photo`} /> : <span>No photo available</span>}
                     </div>
                     <div className="print-kit-info">
-                      <p className="print-kit-id-label">QRguitar ID</p>
-                      <strong className="print-kit-id">{code}</strong>
+                      <p className="print-kit-id-label">QRguitar ID / Instrument ID</p>
+                      <strong className="print-kit-id">{canonicalCode}</strong>
                       <h2>{title}</h2>
                       {primaryFacts.length ? (
                         <p className="print-kit-primary-facts">{primaryFacts.join(" / ")}</p>
@@ -290,7 +299,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                       {renderBadges(mode === "shop")}
                       <div className="print-kit-fact-grid">
                         {detailFacts.map((item) => <span key={item}>{item}</span>)}
-                        {serialDisplay ? <span>Instrument ID / Serial: {serialDisplay}</span> : null}
+                        {serialDisplay ? <span>Serial / Build ID: {serialDisplay}</span> : null}
                       </div>
                     </div>
                   </section>

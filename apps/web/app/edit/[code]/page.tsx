@@ -762,12 +762,12 @@ export default function EditInstrumentPage() {
             <h2>Edit the profile while preserving every printed QR link.</h2>
             <p>
               Update make, model, serial, optional nickname, specs, links, photos, and QR appearance. A serial-based
-              QRguitar ID updates with the Instrument ID / Serial, while previous links continue to work.
+              QRguitar ID updates with the Serial / Build ID, while previous links continue to work.
             </p>
               <div className="permanent-id">
                 <span>QRguitar ID</span>
                 <strong>{qrCodeFromSerial(form.serial) || original?.qrCode || code}</strong>
-                <small>When an Instrument ID / Serial exists, the QRguitar ID uses the format QRG-SERIAL. Previous QR links remain active after corrections.</small>
+                <small>When a Serial / Build ID exists, the QRguitar ID uses the format QRG-SERIAL. Previous QR links remain active after corrections.</small>
               </div>
               <div className="privacy-toggle" aria-label="Profile visibility">
                 <div>
@@ -923,7 +923,7 @@ export default function EditInstrumentPage() {
               <div className="form-grid">
                 <Field label="Make / brand" id="brand" value={form.brand} onChange={(value) => updateField("brand", value)} />
                 <Field label="Model" id="model" value={form.model} onChange={(value) => updateField("model", value)} />
-                <Field label="Instrument ID / serial" id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} />
+                <Field label="Serial / Build ID" id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} />
                 <Field label="Year" id="year" value={form.year} onChange={(value) => updateField("year", value)} />
                 <CategoryField
                   label="Type / category"
@@ -1283,7 +1283,7 @@ export default function EditInstrumentPage() {
                   <div className="timeline-list">
                     {serviceEvents.map((entry) => (
                       <article className="timeline-item" key={entry.id}>
-                        <span>{entry.serviceDate || "Date not listed"} · {entry.isPublic ? "Public" : "Private"}</span>
+                        <span>{entry.serviceDate || "Date unavailable"} · {entry.isPublic ? "Public" : "Private"}</span>
                         <h3>{entry.title}</h3>
                         <p>{[entry.eventType, entry.shopName, entry.location].filter(Boolean).join(" · ") || "Service entry"}</p>
                         {entry.publicDescription ? <p>{entry.publicDescription}</p> : null}

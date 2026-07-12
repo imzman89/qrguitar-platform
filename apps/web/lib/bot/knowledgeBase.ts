@@ -135,14 +135,6 @@ const entries: KnowledgeEntry[] = [
     nextSteps: ["Use QRguitar Profiles for shop inventory, service notes, and owner-transfer support while the tools are in beta.", `Email ${supportEmail} for direct support.`]
   },
   {
-    topic: "proper-instruments",
-    triggers: ["proper instruments", "proper build"],
-    answer:
-      "Proper Instruments records should lean on builder proof: build specs, serial, finish, pickups, setup notes, final photos, warranty notes, and ownership history.",
-    evidence: ["Proper Instruments context"],
-    nextSteps: ["Keep builder specs public.", "Keep receipts or internal notes hidden unless they should be shared."]
-  },
-  {
     topic: "proper-passive",
     triggers: ["proper passive", "pickup", "pickups"],
     answer:

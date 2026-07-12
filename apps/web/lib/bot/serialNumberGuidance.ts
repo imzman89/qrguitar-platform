@@ -65,12 +65,6 @@ export const serialPatterns: Record<string, SerialGuidance> = {
     clues: ["Series-specific hardware", "Headstock logo details", "Series-specific bridge and pickups"],
     serialClues: ["Serial format changes heavily by series/factory", "Use photo evidence for era and build clues"],
     caveats: ["Series-level differences can shift resale context", "Ask for seller proof before claiming anything."]
-  },
-  "proper instruments": {
-    maker: "Proper Instruments",
-    clues: ["Builder paperwork", "Neck carve and route notes", "Case candy and finish consistency"],
-    serialClues: ["Use builder documentation as primary serial evidence"],
-    caveats: ["Keep receipts, setup notes, and transfer documents tied to one timeline."]
   }
 };
 
