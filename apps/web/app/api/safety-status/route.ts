@@ -105,6 +105,11 @@ export async function PATCH(request: Request) {
     return json({ ok: false, message: "Supabase is not configured." }, { status: 500 });
   }
 
+  const auth = await getAuthenticatedUser(request);
+  if (!auth.user) {
+    return json({ ok: false, message: auth.error || "Sign in required." }, { status: 401 });
+  }
+
   const body = (await request.json().catch(() => null)) as
     | { qrCode?: string; safetyStatus?: string; publicSafetyNote?: string; safetyNote?: string }
     | null;

@@ -218,6 +218,11 @@ export async function POST(request: Request) {
     return json({ ok: false, message: "Supabase is not configured." }, { status: 500 });
   }
 
+  const auth = await getAuthenticatedUser(request);
+  if (!auth.user) {
+    return json({ ok: false, message: auth.error || "Sign in required." }, { status: 401 });
+  }
+
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   const qrCode = cleanText(body?.qrCode, 80).toUpperCase();
   const guitar = qrCode ? await loadGuitarByCode(supabase, qrCode) : null;
@@ -273,6 +278,11 @@ export async function PATCH(request: Request) {
   const supabase = createServerSupabaseClient();
   if (!supabase) {
     return json({ ok: false, message: "Supabase is not configured." }, { status: 500 });
+  }
+
+  const auth = await getAuthenticatedUser(request);
+  if (!auth.user) {
+    return json({ ok: false, message: auth.error || "Sign in required." }, { status: 401 });
   }
 
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
@@ -353,6 +363,11 @@ export async function DELETE(request: Request) {
   const supabase = createServerSupabaseClient();
   if (!supabase) {
     return json({ ok: false, message: "Supabase is not configured." }, { status: 500 });
+  }
+
+  const auth = await getAuthenticatedUser(request);
+  if (!auth.user) {
+    return json({ ok: false, message: auth.error || "Sign in required." }, { status: 401 });
   }
 
   const url = new URL(request.url);
