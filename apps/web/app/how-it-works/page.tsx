@@ -51,7 +51,7 @@ export default function HowItWorksPage() {
             </div>
             <ol className="product-guide-steps">
               {steps.map(([number, title, copy]) => (
-                <li key={number}><span>{number}</span><div><h3>{title}</h3><p>{copy}</p></div></li>
+                <li key={number}><span aria-hidden="true">{number}</span><div><h3>{title}</h3><p>{copy}</p></div></li>
               ))}
             </ol>
           </div>

@@ -159,7 +159,7 @@ export default function LoginPage() {
                 ? "Create an account so your records, QR links, photos, documents, and ownership tools stay tied to you."
                 : mode === "reset"
                   ? "Enter your account email and QRguitar will send a secure password reset link."
-                : "Sign in to manage your private records, create QRguitar IDs, and edit your instruments."}
+                : "Sign in to manage your private profiles, create QRguitar IDs, and edit your instruments."}
             </p>
             <div className="auth-tabs" role="tablist" aria-label="Account mode">
               <button className={mode === "login" ? "active" : ""} type="button" onClick={() => switchMode("login")}>

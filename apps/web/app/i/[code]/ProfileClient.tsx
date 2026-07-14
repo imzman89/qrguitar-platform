@@ -560,9 +560,6 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
                 documentFiles.length ? `${documentFiles.length} ${documentFiles.length === 1 ? "document" : "documents"}` : ""
               ].filter(Boolean).join(" / ")}
             </span>
-            {false ? (
-            <span>{galleryImages.length} {galleryImages.length === 1 ? "photo" : "photos"} · {documentFiles.length} {documentFiles.length === 1 ? "document" : "documents"}</span>
-            ) : null}
           </header>
           <div className="identity-grid">
             {specs.map((spec) => (

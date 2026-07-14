@@ -50,11 +50,11 @@ export default function InstallersPage() {
                 qualified luthiers and repair benches for permanent, finish-safe QR placement.
               </p>
               <div className="hero-actions">
-                <Link className="button" href="#apply">
-                  Apply as a Shop
+                <Link className="button" href="mailto:support@qrguitar.com?subject=QRguitar%20Installer%20Network%20Application">
+                  Contact QRguitar
                 </Link>
                 <Link className="button secondary" href="#finder">
-                  Find an Installer
+                  Directory Status
                 </Link>
               </div>
             </div>
@@ -133,7 +133,7 @@ export default function InstallersPage() {
             </div>
             <div className="installer-apply-panel">
               <h3>Early partner intake</h3>
-              <p>For now, collect these details from shops before the real application form is connected:</p>
+              <p>Email these details to start a manual beta review:</p>
               <ul>
                 <li>Business name, address, website, and contact email</li>
                 <li>Finish/refinish experience and example work</li>

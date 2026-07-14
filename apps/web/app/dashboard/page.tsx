@@ -335,7 +335,7 @@ export default function DashboardPage() {
               <p>
                 {user
                   ? `${dashboardCopy.subtitle} ${accountSummary}`
-                  : "Create a record, manage QR downloads, and keep ownership history attached to the same instrument record."}
+                  : "Create a profile, manage QR downloads, and keep ownership history attached to the same QRguitar Profile."}
               </p>
             </div>
             <div className="dashboard-buttons">

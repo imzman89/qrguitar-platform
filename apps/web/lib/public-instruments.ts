@@ -3,6 +3,7 @@ import { defaultQrStyle, type DemoInstrument } from "./local-demo";
 import { mergeRecordTrustSettings, recordTrustContentKey, type RecordTrustSettings } from "./record-trust";
 import { unstable_noStore as noStore } from "next/cache";
 import { supabaseHttpsJson, supabaseSignedStorageUrl, supabaseStoragePublicUrl } from "./supabase-http";
+import { isEligiblePublicProfile, isRetiredPublicProfileCode, normalizePublicProfileCode } from "./public-profile-eligibility";
 
 type GuitarRow = {
   id: string;
@@ -355,7 +356,10 @@ export async function getPublicInstruments() {
   ]);
   const visibleGuitars = guitars.filter((guitar) => {
     const profile = related.profiles.get(guitar.owner_id || "");
-    return profile?.hide_public_content !== true && profile?.account_status !== "banned" && profile?.account_status !== "removed";
+    return isEligiblePublicProfile(guitar)
+      && profile?.hide_public_content !== true
+      && profile?.account_status !== "banned"
+      && profile?.account_status !== "removed";
   });
 
   return Promise.all(
@@ -379,7 +383,10 @@ export async function getPublicInstruments() {
 
 export async function getPublicInstrumentByCode(code: string) {
   noStore();
-  const normalizedCode = code.toUpperCase();
+  const normalizedCode = normalizePublicProfileCode(code);
+  if (!normalizedCode || isRetiredPublicProfileCode(normalizedCode)) {
+    return null;
+  }
   let rows = await supabaseHttpsJson<GuitarRow[]>(`/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&qr_code=eq.${encodeURIComponent(normalizedCode)}&limit=1`);
   if (!rows.length) {
     const redirects = await supabaseHttpsJson<Array<{ guitar_id: string }>>(`/rest/v1/qr_redirects?select=guitar_id&old_path=eq.${encodeURIComponent(`/i/${normalizedCode}`)}&active=eq.true&limit=1`);
@@ -390,7 +397,7 @@ export async function getPublicInstrumentByCode(code: string) {
   }
   const data = rows[0] || null;
 
-  if (!data || data.visibility === "private" || data.admin_archived_at || data.owner_removed_at) {
+  if (!data || !isEligiblePublicProfile(data, { allowUnlisted: true })) {
     return null;
   }
 

@@ -813,7 +813,7 @@ export default function CreatePage() {
                   multiple
                   onChange={(event) => void addDocuments(event.target.files)}
                 />
-                <span>Store receipts, invoices, build sheets, service slips, appraisal notes, and authenticity evidence with the instrument record. Up to 10 files.</span>
+                <span>Store receipts, invoices, build sheets, service slips, appraisal notes, and authenticity evidence with the QRguitar Profile. Up to 10 files.</span>
               </div>
               {documents.length ? (
                 <section className="photo-manager proof-vault" aria-label="Proof Vault document manager">

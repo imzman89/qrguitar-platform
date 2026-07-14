@@ -2,20 +2,19 @@ import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { ProfileClient } from "./ProfileClient";
 import { getPublicInstrumentByCode } from "../../../lib/public-instruments";
+import { isRetiredPublicProfileCode, normalizePublicProfileCode } from "../../../lib/public-profile-eligibility";
 import { buildRecordJsonLd, buildRecordMetadata } from "../../../lib/seo";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const retiredProfileCodes = new Set(["QRG-PI260001", "QRG-0001"]);
-
 function normalizeCode(codeParam: string) {
-  return String(codeParam || "").trim().toUpperCase();
+  return normalizePublicProfileCode(codeParam);
 }
 
 export async function generateMetadata({ params }: { params: { code: string } }): Promise<Metadata> {
   const code = normalizeCode(params.code);
-  if (!code || retiredProfileCodes.has(code)) {
+  if (!code || isRetiredPublicProfileCode(code)) {
     return {
       title: "QRguitar Profile Not Found",
       robots: { index: false, follow: false }
@@ -35,7 +34,7 @@ export async function generateMetadata({ params }: { params: { code: string } })
 
 export default async function PublicProfilePage({ params }: { params: { code: string } }) {
   const code = normalizeCode(params.code);
-  if (!code || retiredProfileCodes.has(code)) {
+  if (!code || isRetiredPublicProfileCode(code)) {
     notFound();
   }
 

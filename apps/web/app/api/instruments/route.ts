@@ -9,6 +9,7 @@ import { establishedInstrumentBrands, instrumentBrandKey } from "../../../lib/in
 import { defaultRecordTrustSettings, mergeRecordTrustSettings, recordTrustContentKey, type RecordTrustSettings } from "../../../lib/record-trust";
 import { assertAccountCanWrite, logAdminAuditEvent } from "../../../lib/admin-auth";
 import { qrCodeFromSerial } from "../../../lib/qrguitar-id";
+import { isEligiblePublicProfile, isRetiredPublicProfileCode, normalizePublicProfileCode } from "../../../lib/public-profile-eligibility";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -849,12 +850,22 @@ async function settleWithin<T>(promise: Promise<T>, fallback: T, timeoutMs: numb
 function stripAnonymousInstrumentFields(instrument: DemoInstrument) {
   const {
     ownerUserEmail: _ownerUserEmail,
+    internalVerificationNote: _internalVerificationNote,
+    internalAuthenticityNote: _internalAuthenticityNote,
     safetyNote: _safetyNote,
+    collectionRemovedAt: _collectionRemovedAt,
+    collectionRemovedReason: _collectionRemovedReason,
     ...publicInstrument
   } = instrument;
   if (publicInstrument.showSerialPublic === false) {
     publicInstrument.serial = "";
   }
+  publicInstrument.documentFiles = (publicInstrument.documentFiles || [])
+    .filter((document) => document.visibility === "public")
+    .map(({ privateNotes: _privateNotes, ...document }) => document);
+  publicInstrument.serviceEvents = (publicInstrument.serviceEvents || [])
+    .filter((event) => event.isPublic === true)
+    .map(({ privateNotes: _privateNotes, canEdit: _canEdit, lockedReason: _lockedReason, ...event }) => event);
   return publicInstrument;
 }
 
@@ -947,7 +958,6 @@ async function restGet<T>(path: string, timeoutMs = 7000, attempts = 2) {
 async function loadPublicRecordsFast(code?: string): Promise<LoadRecordsResult> {
   const guitarParams = new URLSearchParams({
     select: "*",
-    visibility: "eq.public",
     admin_archived_at: "is.null",
     owner_removed_at: "is.null",
     order: "created_at.desc"
@@ -955,6 +965,8 @@ async function loadPublicRecordsFast(code?: string): Promise<LoadRecordsResult> 
 
   if (code) {
     guitarParams.set("qr_code", `eq.${code.toUpperCase()}`);
+  } else {
+    guitarParams.set("visibility", "eq.public");
   }
 
   const guitars = await restGet<GuitarRow[]>(`guitars?${guitarParams.toString()}`);
@@ -987,7 +999,10 @@ async function loadPublicRecordsFast(code?: string): Promise<LoadRecordsResult> 
 
   const visibleGuitars = guitars.filter((guitar) => {
     const profile = profilesById.get(guitar.owner_id || "");
-    return profile?.hide_public_content !== true && profile?.account_status !== "banned" && profile?.account_status !== "removed";
+    return isEligiblePublicProfile(guitar, { allowUnlisted: Boolean(code) })
+      && profile?.hide_public_content !== true
+      && profile?.account_status !== "banned"
+      && profile?.account_status !== "removed";
   });
   const mediaUrlByPath = await resolvePublicMediaUrlMap(
     visibleGuitars.flatMap((guitar) => [
@@ -1144,13 +1159,14 @@ async function loadPublicRecords(supabase: ReturnType<typeof createServerSupabas
   let query = supabase
     .from("guitars")
     .select("*")
-    .eq("visibility", "public")
     .is("admin_archived_at", null)
     .is("owner_removed_at", null)
     .order("created_at", { ascending: false });
 
   if (code) {
     query = query.eq("qr_code", code.toUpperCase());
+  } else {
+    query = query.eq("visibility", "public");
   }
 
   const guitars = await query;
@@ -1205,7 +1221,10 @@ async function loadPublicRecords(supabase: ReturnType<typeof createServerSupabas
 
   const visibleGuitars = guitars.data.filter((guitar) => {
     const profile = profilesById.get((guitar as GuitarRow).owner_id || "");
-    return profile?.hide_public_content !== true && profile?.account_status !== "banned" && profile?.account_status !== "removed";
+    return isEligiblePublicProfile(guitar as GuitarRow, { allowUnlisted: Boolean(code) })
+      && profile?.hide_public_content !== true
+      && profile?.account_status !== "banned"
+      && profile?.account_status !== "removed";
   });
 
   return {
@@ -1284,7 +1303,14 @@ export async function GET(request: Request) {
   }
 
   if (code) {
-    const resolvedCode = await resolveRedirectedQrCode(code).catch(() => code.toUpperCase());
+    const requestedCode = normalizePublicProfileCode(code);
+    if (!requestedCode || isRetiredPublicProfileCode(requestedCode)) {
+      return noStoreJson({ ok: false, message: "Instrument not found." } satisfies SupabaseReadResponse, { status: 404 });
+    }
+    const resolvedCode = await resolveRedirectedQrCode(requestedCode).catch(() => requestedCode);
+    if (isRetiredPublicProfileCode(resolvedCode)) {
+      return noStoreJson({ ok: false, message: "Instrument not found." } satisfies SupabaseReadResponse, { status: 404 });
+    }
     const publicLookup = await loadPublicRecordsFast(resolvedCode).catch((error: Error) => ({
       records: [] as DemoInstrument[],
       error: error.message || "Could not load public instrument."

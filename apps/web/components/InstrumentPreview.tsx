@@ -51,7 +51,7 @@ export function InstrumentPreview({
           <strong>{qrCode}</strong>
         </div>
         <h3>{title}</h3>
-        <p>{[brand, model].filter(Boolean).join(" - ") || "Instrument record"}</p>
+        <p>{[brand, model].filter(Boolean).join(" - ") || "QRguitar Profile"}</p>
       </div>
 
       <div className="preview-identity-grid">

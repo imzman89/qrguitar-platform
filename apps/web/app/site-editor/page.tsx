@@ -428,17 +428,6 @@ export default function SiteEditorPage() {
             </div>
           </div>
 
-          {!authChecked ? (
-            <section className="card owner-gate">
-              <LockKeyhole size={34} />
-              <div>
-                <span className="mini-eyebrow">Checking session</span>
-                <h2>Checking owner access.</h2>
-                <p>Confirming your QRguitar session before loading editor controls.</p>
-              </div>
-            </section>
-          ) : null}
-
           {authChecked && !isSignedIn ? (
             <section className="card owner-gate">
               <LockKeyhole size={34} />
