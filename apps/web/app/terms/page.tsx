@@ -11,7 +11,7 @@ export default function TermsPage() {
   const sections = [
     {
       title: "Your content and responsibility",
-      copy: "You are responsible for the photos, specs, serial/build information, notes, documents, and links you add. Do not upload content you do not have permission to store or share."
+      copy: "You are responsible for the photos, specs, Serial Number and instrument information, notes, documents, and links you add. Do not upload content you do not have permission to store or share."
     },
     {
       title: "Permanent QR concept",

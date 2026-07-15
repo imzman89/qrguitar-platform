@@ -8441,6 +8441,7 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 }
 
 .product-guide-steps {
+  counter-reset: none;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0;
@@ -8449,6 +8450,8 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   list-style: none;
   border-block: 1px solid var(--line);
 }
+
+.product-guide-steps li::marker { content: ""; }
 
 .product-guide-steps li {
   display: grid;

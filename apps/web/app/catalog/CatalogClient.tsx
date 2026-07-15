@@ -218,7 +218,7 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
             <div>
               <div className="eyebrow">The Catalog</div>
               <h2>Browse QRguitar Profiles.</h2>
-              <p>Find instruments by brand, model, year, condition, verification, originality, safety status, service history, proof, or Availability.</p>
+              <p>Find Profiles by brand, model, year, condition, availability, verification, authenticity, originality, safety status, or service history.</p>
             </div>
             <Link className="button" href="/create">
               Create Profile

@@ -21,7 +21,7 @@ export default function ContactPage() {
     },
     {
       title: "Verification review",
-      copy: "Manual beta review for specs, provenance, documents, serial/build IDs, and authenticity evidence.",
+      copy: "Manual beta review for specs, provenance, documents, Serial Numbers, and authenticity evidence.",
       href: "mailto:support@qrguitar.com?subject=QRguitar%20verification%20review"
     },
     {

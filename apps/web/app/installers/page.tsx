@@ -1,4 +1,4 @@
-import { BadgeCheck, MapPin, Paintbrush, ShieldCheck, Wrench } from "lucide-react";
+import { Paintbrush, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
@@ -44,17 +44,14 @@ export default function InstallersPage() {
           <div className="shell installer-hero-grid">
             <div>
               <div className="eyebrow">QRguitar installer network</div>
-              <h1>Find vetted shops that can install a QR code under finish.</h1>
+              <h1>Help shape the QRguitar installer network.</h1>
               <p>
-                QRguitar should work in the real world. This network helps owners, builders, and shops connect with
-                qualified luthiers and repair benches for permanent, finish-safe QR placement.
+                QRguitar is reviewing early partners for permanent, finish-safe QR placement. Public installer search is
+                not live yet; shops and owners can contact QRguitar for manual beta guidance.
               </p>
               <div className="hero-actions">
                 <Link className="button" href="mailto:support@qrguitar.com?subject=QRguitar%20Installer%20Network%20Application">
                   Contact QRguitar
-                </Link>
-                <Link className="button secondary" href="#finder">
-                  Directory Status
                 </Link>
               </div>
             </div>
@@ -79,7 +76,7 @@ export default function InstallersPage() {
             <div className="section-header">
               <div className="eyebrow">How it works</div>
               <h2>A trusted path from QR code to permanent install.</h2>
-              <p>Owners can start with a normal QRguitar Profile, then find a vetted shop if they want a permanent physical installation later.</p>
+              <p>Owners can start with a QRguitar Profile now. Physical installation support is handled manually during beta.</p>
             </div>
             <div className="grid three">
               {vettingSteps.map((step, index) => (
@@ -89,34 +86,6 @@ export default function InstallersPage() {
                   <p>{step.copy}</p>
                 </article>
               ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="section" id="finder">
-          <div className="shell split">
-            <div>
-              <div className="eyebrow">Public finder</div>
-              <h2>Browse vetted installers by region, service, and shop type.</h2>
-              <p>
-                Approved installers will appear here after QRguitar reviews the shop, service area, finish experience,
-                and installation process. No shop is listed until it has been accepted.
-              </p>
-              <div className="check-list">
-                <div className="check-item"><MapPin size={18} /><span>Search by city, state, or region</span></div>
-                <div className="check-item"><Wrench size={18} /><span>Filter by finish, repair, builder, or retail services</span></div>
-                <div className="check-item"><BadgeCheck size={18} /><span>Show vetted and founding installer badges</span></div>
-              </div>
-            </div>
-            <div className="installer-directory">
-              <article className="installer-card">
-                <div>
-                  <span className="status-pill">Directory opening soon</span>
-                  <h3>No vetted installers listed yet</h3>
-                  <p>QRguitar is accepting early shop applications before public installer listings go live.</p>
-                </div>
-                <strong>Interested shops can apply below.</strong>
-              </article>
             </div>
           </div>
         </section>

@@ -65,7 +65,7 @@ export default function SiteEditorPage() {
         ? message
         : "Admin access required.";
   const editorStatusBody = !authChecked
-    ? "Confirming your QRguitar session before editor tools load."
+    ? ""
     : !isSignedIn
       ? "Sign in with the owner account before changing live site settings."
       : isUnlocked
@@ -424,7 +424,7 @@ export default function SiteEditorPage() {
             <div className="editor-status card">
               <SlidersHorizontal size={28} />
               <strong>{editorStatusTitle}</strong>
-              <span>{editorStatusBody}</span>
+              {editorStatusBody ? <span>{editorStatusBody}</span> : null}
             </div>
           </div>
 

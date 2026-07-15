@@ -6,6 +6,7 @@ import { isEligiblePublicProfile, isRetiredPublicProfileCode, normalizePublicPro
 import {
   availabilityFromSpecs,
   getServiceHistoryEntries,
+  isLegacyServiceField,
   isManagedInstrumentSpec,
   originalityFromSpecs,
   sanitizePublicInstrument
@@ -243,17 +244,18 @@ function mapRecord({
   ownerName?: string;
   trust?: RecordTrustSettings;
 }): DemoInstrument {
-  const customFields = specs
-    .filter((spec) => !isManagedInstrumentSpec(spec.label) && spec.label.trim().toLowerCase() !== "service notes")
+  const profileFields = specs
+    .filter((spec) => !isManagedInstrumentSpec(spec.label))
     .map((spec, index) => ({ id: `${guitar.id}-spec-${index}`, label: spec.label, value: cleanPublicSpecValue(spec.value) }))
     .filter((spec) => spec.label.trim() && spec.value);
+  const customFields = profileFields.filter((field) => !isLegacyServiceField(field));
   const condition = specs.find((spec) => spec.label.toLowerCase() === "condition")?.value.toLowerCase() === "new" ? "new" : "used";
   const type = cleanPublicSpecValue(specs.find((spec) => spec.label.toLowerCase() === "type")?.value);
   const finish = cleanPublicSpecValue(specs.find((spec) => spec.label.toLowerCase() === "finish")?.value);
   const hero = publicUrlOrStoragePath(guitar.hero_image_path) || media[0] || "";
   const gallery = Array.from(new Set([hero, ...media].filter(isRenderablePublicMediaSource)));
 
-  return {
+  const instrument: DemoInstrument = {
     qrCode: guitar.qr_code.toUpperCase(),
     permanentPath: guitar.permanent_path || `/i/${guitar.qr_code.toUpperCase()}`,
     name: guitar.name || "",
@@ -291,11 +293,18 @@ function mapRecord({
     customLinks: [],
     documentFiles: documents,
     timelineEvents: serviceEvents || [],
-    serviceEvents: getServiceHistoryEntries({ timelineEvents: serviceEvents || [] }),
+    serviceEvents: [],
     externalMedia: externalMedia || [],
     qrStyle: defaultQrStyle,
     createdAt: guitar.created_at || new Date().toISOString()
   };
+  instrument.serviceEvents = getServiceHistoryEntries({
+    timelineEvents: serviceEvents || [],
+    serviceEvents: [],
+    customFields: profileFields,
+    createdAt: instrument.createdAt
+  });
+  return instrument;
 }
 
 function mapPublicServiceEvent(row: TimelineRow) {

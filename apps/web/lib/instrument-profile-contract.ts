@@ -81,8 +81,39 @@ export function getTimelineEvents(instrument: Pick<DemoInstrument, "timelineEven
   });
 }
 
-export function getServiceHistoryEntries(instrument: Pick<DemoInstrument, "timelineEvents" | "serviceEvents">) {
-  return getTimelineEvents(instrument).filter(isServiceHistoryEvent);
+export function isLegacyServiceField(field: InstrumentSpecLike) {
+  const label = field.label.trim().toLowerCase();
+  const value = field.value.trim();
+  if (!value) return false;
+  if (label === "service notes" || label === "service note" || label === "setup notes" || label === "repair notes") return true;
+  return label === "specs notes" && /\b(setup|service|repair|restor|inspection|fretwork|electronics)\b/i.test(value);
+}
+
+export function getServiceHistoryEntries(
+  instrument: Pick<DemoInstrument, "timelineEvents" | "serviceEvents" | "customFields" | "createdAt">
+) {
+  const structured = getTimelineEvents(instrument).filter(isServiceHistoryEvent);
+  const existingText = new Set(structured.flatMap((event) => [event.title, event.publicDescription || ""])
+    .map((value) => value.trim().toLowerCase()).filter(Boolean));
+  const legacy = (instrument.customFields || []).filter(isLegacyServiceField).filter((field) => {
+    const value = field.value.trim().toLowerCase();
+    return !existingText.has(value);
+  }).map((field): ServiceHistoryEntry => {
+    const value = field.value.trim();
+    const category = /\bsetup\b/i.test(value) ? "Setup" : /\brepair\b/i.test(value) ? "Repair" : "Service";
+    return {
+      id: `legacy-service-${field.id}`,
+      datePrecision: "unknown",
+      category,
+      eventType: category.toLowerCase(),
+      title: `${category} note`,
+      publicDescription: value,
+      isPublic: true,
+      isSystem: false,
+      createdAt: instrument.createdAt
+    };
+  });
+  return [...structured, ...legacy];
 }
 
 export function getProfilePhotoUrls(instrument: Pick<DemoInstrument, "heroImageDataUrl" | "galleryImageDataUrls">) {

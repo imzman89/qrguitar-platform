@@ -12,9 +12,10 @@ export default function ResetPasswordPage() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [status, setStatus] = useState("Checking reset link.");
+  const [status, setStatus] = useState("");
   const [isWorking, setIsWorking] = useState(false);
   const [hasSession, setHasSession] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [safeNext, setSafeNext] = useState("/dashboard");
 
   useEffect(() => {
@@ -24,6 +25,7 @@ export default function ResetPasswordPage() {
     supabase.auth.getSession().then(({ data }) => {
       const ready = Boolean(data.session?.user);
       setHasSession(ready);
+      setAuthChecked(true);
       setStatus(ready ? "" : "Open the password reset link from your email to continue.");
     });
 
@@ -82,7 +84,7 @@ export default function ResetPasswordPage() {
           <section className="card auth-card">
             <div className="auth-card-head">
               <span>Password reset</span>
-              <strong>{hasSession ? "Enter a new password." : "Reset link required."}</strong>
+              <strong>{!authChecked ? "Checking reset link." : hasSession ? "Enter a new password." : "Reset link required."}</strong>
             </div>
 
             <div className="field">
@@ -94,7 +96,7 @@ export default function ResetPasswordPage() {
                 onChange={(event) => setPassword(event.target.value)}
                 autoComplete="new-password"
                 placeholder="At least 8 characters"
-                disabled={!hasSession}
+                disabled={!authChecked || !hasSession}
               />
             </div>
 
@@ -107,12 +109,12 @@ export default function ResetPasswordPage() {
                 onChange={(event) => setConfirmPassword(event.target.value)}
                 autoComplete="new-password"
                 placeholder="Re-enter new password"
-                disabled={!hasSession}
+                disabled={!authChecked || !hasSession}
               />
             </div>
 
             <div className="form-actions">
-              <button className="button" type="button" onClick={savePassword} disabled={isWorking || !hasSession}>
+              <button className="button" type="button" onClick={savePassword} disabled={isWorking || !authChecked || !hasSession}>
                 {isWorking ? "Saving..." : "Save new password"}
               </button>
               <Link className="button secondary" href="/login">

@@ -11,15 +11,15 @@ export default function PrivacyPage() {
   const sections = [
     {
       title: "What a QRguitar Profile can contain",
-      copy: "A profile can include photos, brand, model, year, serial/build ID, specs, service history, ownership-transfer status, lost/stolen safety status, public documents, and private proof documents the owner chooses to store."
+      copy: "A Profile can include photos, brand, model, year, Serial Number, instrument information, service history, ownership-transfer status, lost/stolen safety status, public documents, and private proof documents the owner chooses to store."
     },
     {
       title: "Visibility choices",
       copy: "Visible profiles can appear in the catalog and can be opened by QR code or direct link. Private profiles stay out of public browsing. Unlisted profiles stay out of the catalog but can be opened by direct link when enabled."
     },
     {
-      title: "Serial and proof privacy",
-      copy: "Owners can hide a serial/build ID from public display. Hidden serials, private notes, private proof files, and private document paths are not meant to appear in public profile pages, public API responses, search metadata, or catalog cards."
+      title: "Serial Number and document privacy",
+      copy: "Owners can hide a Serial Number from public display. Hidden Serial Numbers, private notes, private files, and private document paths do not appear on public Profile pages, public API responses, search metadata, or Catalog cards."
     },
     {
       title: "Documents and safety status",

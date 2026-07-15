@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test:retired-profile": "node scripts/assert-retired-profile.mjs"
+    "test:retired-profile": "node scripts/assert-retired-profile.mjs",
+    "test:launch": "node scripts/assert-launch-readiness.mjs"
   },
   "dependencies": {
     "@qrguitar/shared": "*",
