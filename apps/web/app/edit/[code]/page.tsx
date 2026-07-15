@@ -908,16 +908,29 @@ export default function EditInstrumentPage() {
               </div>
               <div className="privacy-toggle" aria-label="Profile visibility">
                 <div>
-                  <strong>{form.visibility === "public" ? "Public catalog" : "Private link only"}</strong>
-                  <span>{form.visibility === "public" ? "Shows on the live homepage feed and catalog." : "Hidden from public browsing. The permanent QR link still works."}</span>
+                  <strong>
+                    {form.visibility === "public"
+                      ? "Public catalog"
+                      : form.visibility === "unlisted"
+                        ? "Unlisted direct link"
+                        : "Private owner only"}
+                  </strong>
+                  <span>
+                    {form.visibility === "public"
+                      ? "Shows on the live homepage feed and catalog."
+                      : form.visibility === "unlisted"
+                        ? "Hidden from browsing, but anyone with the permanent link can view it."
+                        : "Hidden from public browsing and direct public access."}
+                  </span>
                 </div>
-                <button
-                  className="button secondary"
-                  type="button"
-                  onClick={() => updateField("visibility", form.visibility === "public" ? "private" : "public")}
-                >
-                  {form.visibility === "public" ? "Make Private" : "Make Public"}
-                </button>
+                <label className="field visibility-field">
+                  <span>Visibility</span>
+                  <select value={form.visibility} onChange={(event) => updateField("visibility", event.target.value)}>
+                    <option value="public">Public</option>
+                    <option value="private">Private</option>
+                    <option value="unlisted">Unlisted</option>
+                  </select>
+                </label>
               </div>
               <section className="card verification-card" aria-label="Trust and verification">
                 <div>

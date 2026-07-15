@@ -212,7 +212,7 @@ export default function DashboardPage() {
       { label: "Visible in Catalog", value: String(publicRecords) },
       { label: "Private / Unlisted", value: String(privateRecords + unlistedRecords) },
       { label: "Needs Attention", value: String(needsAttention) },
-      { label: "Safety Alerts", value: String(activeSafetyAlerts) },
+      { label: "Reported Lost / Stolen", value: String(activeSafetyAlerts) },
       { label: "Pending Handoffs", value: String(pendingTransfers) }
     ],
     [activeSafetyAlerts, instruments.length, needsAttention, pendingTransfers, privateRecords, publicRecords, unlistedRecords]
