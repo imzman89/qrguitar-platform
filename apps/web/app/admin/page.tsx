@@ -130,6 +130,27 @@ type RecordsPayload = {
   transfers?: AdminTransfer[];
 };
 
+type AdminOwnershipClaim = {
+  id: string;
+  claimType: string;
+  status: string;
+  qrCode: string;
+  profileTitle: string;
+  acquisitionDetails: string;
+  ownershipDeclaration: string;
+  evidenceCount: number;
+  evidence?: Array<{
+    id: string;
+    type: string;
+    fileName: string;
+    note: string;
+    url: string;
+    createdAt: string;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type AuditEvent = {
   id: string;
   actor_email?: string;
@@ -149,6 +170,7 @@ type SectionId =
   | "trust"
   | "safety"
   | "transfers"
+  | "claims"
   | "proof"
   | "service"
   | "brand-logos"
@@ -200,6 +222,7 @@ const sections: Array<{ id: SectionId; label: string }> = [
   { id: "trust", label: "Trust" },
   { id: "safety", label: "Safety" },
   { id: "transfers", label: "Transfers" },
+  { id: "claims", label: "Ownership Claims" },
   { id: "proof", label: "Proof Vault" },
   { id: "service", label: "Service History" },
   { id: "brand-logos", label: "Brand Logos" },
@@ -313,6 +336,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [recordsPayload, setRecordsPayload] = useState<RecordsPayload | null>(null);
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
+  const [ownershipClaims, setOwnershipClaims] = useState<AdminOwnershipClaim[]>([]);
   const [userFilter, setUserFilter] = useState("");
   const [recordFilter, setRecordFilter] = useState("");
   const [transferFilter, setTransferFilter] = useState("");
@@ -360,24 +384,27 @@ export default function AdminPage() {
     }
 
     const headers = { Authorization: `Bearer ${token}` };
-    const [overviewResponse, usersResponse, recordsResponse, auditResponse] = await Promise.all([
+    const [overviewResponse, usersResponse, recordsResponse, auditResponse, claimsResponse] = await Promise.all([
       fetch("/api/admin/overview", { headers, cache: "no-store" }),
       fetch("/api/admin/users", { headers, cache: "no-store" }),
       fetch("/api/admin/records", { headers, cache: "no-store" }),
-      fetch("/api/admin/audit", { headers, cache: "no-store" })
+      fetch("/api/admin/audit", { headers, cache: "no-store" }),
+      fetch("/api/ownership-claims", { headers, cache: "no-store" })
     ]);
 
-    const [overviewJson, usersJson, recordsJson, auditJson] = await Promise.all([
+    const [overviewJson, usersJson, recordsJson, auditJson, claimsJson] = await Promise.all([
       overviewResponse.json().catch(() => ({})),
       usersResponse.json().catch(() => ({})),
       recordsResponse.json().catch(() => ({})),
-      auditResponse.json().catch(() => ({}))
+      auditResponse.json().catch(() => ({})),
+      claimsResponse.json().catch(() => ({}))
     ]);
 
     setOverview(overviewJson);
     setUsers(usersJson.users || []);
     setRecordsPayload(recordsJson);
     setAuditEvents(auditJson.auditEvents || []);
+    setOwnershipClaims(claimsJson.claims || []);
     setAdminAuthorized(overviewResponse.ok && usersResponse.ok && recordsResponse.ok && auditResponse.ok);
     setMessage(overviewJson.message || usersJson.message || recordsJson.message || auditJson.message || overviewJson.migrationNotice || usersJson.migrationNotice || "");
     setLoading(false);
@@ -560,6 +587,26 @@ export default function AdminPage() {
     if (response.ok) {
       await loadAdmin();
     }
+  }
+
+  async function updateOwnershipClaim(claim: AdminOwnershipClaim, action: "approve" | "deny") {
+    const token = await tokenPromise;
+    if (!token) {
+      setMessage("Sign in required.");
+      return;
+    }
+    const note = window.prompt(action === "approve" ? "Optional approval note" : "Reason for denial");
+    if (note === null) return;
+    setBusy(`${action}:${claim.id}`);
+    const response = await fetch("/api/ownership-claims", {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ id: claim.id, action, note })
+    });
+    const payload = await response.json().catch(() => ({}));
+    setBusy("");
+    setMessage(payload.message || (response.ok ? "Ownership request updated." : "Ownership request update failed."));
+    if (response.ok) await loadAdmin();
   }
 
   async function copyTransferClaimLink(transfer: AdminTransfer) {
@@ -1103,6 +1150,54 @@ export default function AdminPage() {
       );
     }
 
+    if (activeSection === "claims") {
+      return (
+        <section className="card admin-panel-card">
+          <div className="admin-section-head">
+            <div>
+              <h2>Ownership Claims</h2>
+              <p>Review proof-based ownership requests. Evidence remains private and serial matches never transfer ownership automatically.</p>
+            </div>
+          </div>
+          <div className="admin-table">
+            {ownershipClaims.length ? ownershipClaims.map((claim) => (
+              <div className="admin-row" key={claim.id}>
+                <div>
+                  <strong>{claim.profileTitle}</strong>
+                  <span className="admin-user-summary">
+                    <span className={`admin-chip admin-chip--transfer-${normalize(claim.status)}`}>{claim.status.replaceAll("_", " ")}</span>
+                    <span>{claim.qrCode || "Protected Profile"}</span>
+                    <span>{claim.evidenceCount} private evidence {claim.evidenceCount === 1 ? "file" : "files"}</span>
+                  </span>
+                  <small>{claim.acquisitionDetails}</small>
+                  <small>Declaration: {claim.ownershipDeclaration}</small>
+                  <small>Submitted {formatDate(claim.createdAt)}</small>
+                  {claim.evidence?.length ? (
+                    <div className="admin-claim-evidence">
+                      {claim.evidence.map((item) => (
+                        <a key={item.id} href={item.url} target="_blank" rel="noreferrer">
+                          Review {item.fileName} ({item.type.replaceAll("_", " ")})
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="admin-row-actions">
+                  {claim.qrCode ? <Link href={`/edit/${claim.qrCode}`}>Review Profile</Link> : null}
+                  {claim.status === "awaiting_owner" || claim.status === "admin_review" ? (
+                    <>
+                      <button type="button" disabled={busy === `approve:${claim.id}`} onClick={() => void updateOwnershipClaim(claim, "approve")}>Approve</button>
+                      <button type="button" disabled={busy === `deny:${claim.id}`} onClick={() => void updateOwnershipClaim(claim, "deny")}>Deny</button>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            )) : <p className="admin-empty">No ownership claims require review.</p>}
+          </div>
+        </section>
+      );
+    }
+
     if (activeSection === "proof") {
       return (
         <section className="card admin-panel-card">
@@ -1299,7 +1394,7 @@ export default function AdminPage() {
             <div>
               <div className="eyebrow">Owner admin</div>
               <h1>QRguitar admin panel.</h1>
-              <p>Manage users, records, trust controls, safety alerts, transfers, proof documents, service history, site settings, and audit events.</p>
+              <p>Manage users, Profiles, trust controls, safety alerts, transfers, proof documents, service history, site settings, and audit events.</p>
             </div>
             {adminAuthorized ? <Link className="button secondary" href="/admin/site-editor">Site Editor</Link> : null}
           </div>

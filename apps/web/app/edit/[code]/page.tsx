@@ -12,6 +12,7 @@ import {
   getInstrumentCondition,
   instrumentToProfileUrl,
   type DemoInstrument,
+  type ExternalMediaItem,
   type QrStyle,
   type ServiceHistoryEntry
 } from "../../../lib/local-demo";
@@ -45,7 +46,7 @@ const emptyForm = {
 };
 
 const managedFieldLabels = new Set(["instrument type", "builder", "finish", "weight", "owner status", "specs notes", "service notes", "sale status", "originality"]);
-const serviceEventTypes = ["Setup", "Repair", "Modification", "Pickup Install", "Wiring", "Fretwork", "Inspection", "Appraisal/Review", "Cleaning", "Other"];
+const serviceEventTypes = ["Ownership", "Purchase", "Sale", "Service", "Setup", "Repair", "Modification", "Restoration", "Inspection", "Appraisal", "Verification", "Safety", "Media", "Documentation", "Other"];
 const documentTypeOptions = ["Receipt", "Invoice", "Appraisal", "Certificate", "Build Sheet", "Service Slip", "Insurance Photo", "Warranty", "Authenticity Evidence", "Other"];
 const oldVerifiedQrLabel = "Scan for verified QRguitar Profile";
 const safeDefaultQrLabel = "Scan QRguitar Profile";
@@ -66,12 +67,17 @@ type DocumentDraft = {
   dataUrl: string;
   visibility: "public" | "hidden";
   documentType: string;
+  issuerSource: string;
+  documentDate: string;
+  description: string;
   publicDescription: string;
   privateNotes: string;
   createdAt?: string;
 };
 const emptyServiceForm = {
   serviceDate: "",
+  datePrecision: "day",
+  category: "Setup",
   eventType: "Setup",
   title: "",
   publicDescription: "",
@@ -80,6 +86,7 @@ const emptyServiceForm = {
   location: "",
   isPublic: false
 };
+const emptyMediaForm = { url: "", title: "", caption: "", isPublic: true };
 
 export default function EditInstrumentPage() {
   const params = useParams<{ code: string }>();
@@ -117,6 +124,9 @@ export default function EditInstrumentPage() {
   const [serviceForm, setServiceForm] = useState(emptyServiceForm);
   const [editingServiceId, setEditingServiceId] = useState("");
   const [savingService, setSavingService] = useState(false);
+  const [externalMedia, setExternalMedia] = useState<ExternalMediaItem[]>([]);
+  const [mediaForm, setMediaForm] = useState(emptyMediaForm);
+  const [savingMedia, setSavingMedia] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -196,6 +206,7 @@ export default function EditInstrumentPage() {
             setServiceEvents(instrument.serviceEvents || []);
             setReady(true);
             void refreshServiceEvents(instrument.qrCode);
+            void refreshExternalMedia(instrument.qrCode);
           }
           return;
         }
@@ -234,6 +245,99 @@ export default function EditInstrumentPage() {
 
   function updateServiceField(field: keyof typeof serviceForm, value: string | boolean) {
     setServiceForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function refreshExternalMedia(qrCode: string) {
+    const token = await getSupabaseAccessToken();
+    const response = await fetch(`/api/external-media?scope=owner&code=${encodeURIComponent(qrCode)}`, {
+      cache: "no-store",
+      headers: { authorization: `Bearer ${token}` }
+    });
+    const payload = await response.json().catch(() => null) as { ok?: boolean; mediaItems?: ExternalMediaItem[] } | null;
+    if (response.ok && payload?.ok) setExternalMedia(payload.mediaItems || []);
+  }
+
+  async function addExternalMedia() {
+    if (!original) return;
+    if (!mediaForm.url.trim() || !mediaForm.title.trim()) {
+      setMessage("Media URL and title are required.");
+      return;
+    }
+    setSavingMedia(true);
+    setMessage("");
+    try {
+      const token = await getSupabaseAccessToken();
+      const response = await fetch("/api/external-media", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ qrCode: original.qrCode, ...mediaForm, sortOrder: externalMedia.length })
+      });
+      const payload = await response.json().catch(() => null) as { ok?: boolean; mediaItem?: ExternalMediaItem; message?: string } | null;
+      if (!response.ok || !payload?.ok || !payload.mediaItem) {
+        setMessage(payload?.message || "Could not add media.");
+        return;
+      }
+      setExternalMedia((current) => [...current, payload.mediaItem as ExternalMediaItem]);
+      setMediaForm(emptyMediaForm);
+      setMessage(payload.message || "Media added.");
+    } finally {
+      setSavingMedia(false);
+    }
+  }
+
+  async function removeExternalMedia(item: ExternalMediaItem) {
+    if (!original || !window.confirm(`Remove ${item.title}?`)) return;
+    setSavingMedia(true);
+    try {
+      const token = await getSupabaseAccessToken();
+      const response = await fetch(`/api/external-media?code=${encodeURIComponent(original.qrCode)}&id=${encodeURIComponent(item.id)}`, {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${token}` }
+      });
+      const payload = await response.json().catch(() => null) as { ok?: boolean; message?: string } | null;
+      if (!response.ok || !payload?.ok) {
+        setMessage(payload?.message || "Could not remove media.");
+        return;
+      }
+      setExternalMedia((current) => current.filter((entry) => entry.id !== item.id));
+      setMessage("Media removed.");
+    } finally {
+      setSavingMedia(false);
+    }
+  }
+
+  async function updateExternalMedia(item: ExternalMediaItem, changes: Partial<Pick<ExternalMediaItem, "isPublic" | "sortOrder">>) {
+    if (!original) return;
+    setSavingMedia(true);
+    setMessage("");
+    try {
+      const token = await getSupabaseAccessToken();
+      const response = await fetch("/api/external-media", {
+        method: "PATCH",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ qrCode: original.qrCode, id: item.id, ...changes })
+      });
+      const payload = await response.json().catch(() => null) as { ok?: boolean; mediaItem?: ExternalMediaItem; message?: string } | null;
+      if (!response.ok || !payload?.ok || !payload.mediaItem) {
+        setMessage(payload?.message || "Could not update media.");
+        return;
+      }
+      setExternalMedia((current) => current.map((entry) => entry.id === item.id ? payload.mediaItem as ExternalMediaItem : entry).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)));
+      setMessage(payload.message || "Media updated.");
+    } finally {
+      setSavingMedia(false);
+    }
+  }
+
+  async function moveExternalMedia(item: ExternalMediaItem, direction: -1 | 1) {
+    const index = externalMedia.findIndex((entry) => entry.id === item.id);
+    const target = externalMedia[index + direction];
+    if (index < 0 || !target) return;
+    const currentOrder = item.sortOrder ?? index;
+    const targetOrder = target.sortOrder ?? index + direction;
+    await updateExternalMedia(item, { sortOrder: targetOrder });
+    await updateExternalMedia(target, { sortOrder: currentOrder });
+    await refreshExternalMedia(original?.qrCode || "");
   }
 
   function normalizeQrStyle(style?: QrStyle): QrStyle {
@@ -285,7 +389,9 @@ export default function EditInstrumentPage() {
     setEditingServiceId(entry.id);
     setServiceForm({
       serviceDate: entry.serviceDate || "",
-      eventType: entry.eventType || "Other",
+      datePrecision: entry.datePrecision || (entry.serviceDate ? "day" : "unknown"),
+      category: entry.category || entry.eventType || "Other",
+      eventType: entry.category || entry.eventType || "Other",
       title: entry.title || "",
       publicDescription: entry.publicDescription || "",
       privateNotes: entry.privateNotes || "",
@@ -410,6 +516,9 @@ export default function EditInstrumentPage() {
         dataUrl: await fileToDataUrl(file),
         visibility: "hidden" as const,
         documentType: "Receipt",
+        issuerSource: "",
+        documentDate: "",
+        description: "",
         publicDescription: "",
         privateNotes: ""
       }))
@@ -473,6 +582,9 @@ export default function EditInstrumentPage() {
         url: document.dataUrl,
         visibility: document.visibility,
         documentType: document.documentType,
+        issuerSource: document.issuerSource,
+        documentDate: document.documentDate,
+        description: document.description,
         publicDescription: document.publicDescription,
         privateNotes: document.privateNotes,
         createdAt: document.createdAt
@@ -762,13 +874,13 @@ export default function EditInstrumentPage() {
             <div className="eyebrow">Edit QRguitar Profile</div>
             <h2>Edit the profile while preserving every printed QR link.</h2>
             <p>
-              Update make, model, serial, optional nickname, specs, links, photos, and QR appearance. A serial-based
-              QRguitar ID updates with the Serial / Build ID, while previous links continue to work.
+              Update make, model, serial number, optional nickname, specs, links, photos, and QR appearance.
+              Admin-approved Serial Number corrections update the QRguitar ID while preserving previous QR links.
             </p>
               <div className="permanent-id">
                 <span>QRguitar ID</span>
                 <strong>{qrCodeFromSerial(form.serial) || original?.qrCode || code}</strong>
-                <small>When a Serial / Build ID exists, the QRguitar ID uses the format QRG-SERIAL. Previous QR links remain active after corrections.</small>
+                <small>When a Serial Number exists, the QRguitar ID uses the format QRG-SERIAL. Previous QR links remain active after approved corrections.</small>
               </div>
               <div className="privacy-toggle" aria-label="Profile visibility">
                 <div>
@@ -790,7 +902,7 @@ export default function EditInstrumentPage() {
                   <p>
                     {verificationStatus === "verified"
                       ? "This record is verified by QRguitar."
-                      : "Verified records are available with paid QRguitar verification. Paid verification is handled manually during beta."}
+                      : "Verified Profiles are available with paid QRguitar verification. Paid verification is handled manually during beta."}
                   </p>
                   <p>
                     {authenticityStatus === "confirmed"
@@ -932,7 +1044,7 @@ export default function EditInstrumentPage() {
                   onBlur={(value) => updateField("brand", canonicalInstrumentBrand(value) || value.trim())}
                 />
                 <Field label="Model" id="model" value={form.model} onChange={(value) => updateField("model", value)} />
-                <Field label="Serial / Build ID" id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} />
+                <Field label="Serial Number" id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} />
                 <Field label="Year" id="year" value={form.year} onChange={(value) => updateField("year", value)} />
                 <CategoryField
                   label="Type / category"
@@ -954,15 +1066,15 @@ export default function EditInstrumentPage() {
                   </select>
                 </div>
                 <div className="field">
-                  <label htmlFor="saleStatus">Sale availability</label>
+                  <label htmlFor="saleStatus">Availability</label>
                   <select
                     id="saleStatus"
                     value={form.saleStatus}
                     onChange={(event) => updateField("saleStatus", event.target.value)}
                     required
                   >
-                    <option value="not_for_sale">Not for sale</option>
-                    <option value="for_sale">For sale</option>
+                    <option value="not_for_sale">Not for Sale</option>
+                    <option value="for_sale">For Sale</option>
                   </select>
                 </div>
                 <div className="field">
@@ -1181,6 +1293,20 @@ export default function EditInstrumentPage() {
                             </select>
                           </div>
                         </div>
+                        <div className="form-grid compact">
+                          <div className="field">
+                            <label htmlFor={`${document.id}-issuer`}>Issuer or source</label>
+                            <input id={`${document.id}-issuer`} value={document.issuerSource} onChange={(event) => setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, issuerSource: event.target.value } : item))} placeholder="Dealer, shop, builder, or owner" />
+                          </div>
+                          <div className="field">
+                            <label htmlFor={`${document.id}-date`}>Document date</label>
+                            <input id={`${document.id}-date`} type="date" value={document.documentDate} onChange={(event) => setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, documentDate: event.target.value } : item))} />
+                          </div>
+                        </div>
+                        <div className="field">
+                          <label htmlFor={`${document.id}-description`}>Description</label>
+                          <textarea id={`${document.id}-description`} value={document.description} onChange={(event) => setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, description: event.target.value } : item))} placeholder="What this document establishes or contains." />
+                        </div>
                         <div className="field">
                           <label htmlFor={`${document.id}-public-description`}>Public description</label>
                           <textarea
@@ -1239,20 +1365,84 @@ export default function EditInstrumentPage() {
                 onSelectMain={selectMainPhoto}
                 onRemove={removePhoto}
               />
-              <section className="qr-customizer" aria-label="Service history">
+              <section className="qr-customizer" aria-label="External media">
                 <div>
-                  <span className="eyebrow">Service history</span>
-                  <h3>Service History Timeline</h3>
-                  <p>Service history helps keep setups, repairs, modifications, inspections, and ownership records organized over the life of the instrument.</p>
+                  <span className="eyebrow">Media links</span>
+                  <h3>Add Video or Audio</h3>
+                  <p>Add a YouTube, Vimeo, SoundCloud, Bandcamp, or other safe HTTPS media link. QRguitar never accepts custom embed code.</p>
+                </div>
+                <div className="qr-controls">
+                  <div className="field custom-wide">
+                    <label htmlFor="externalMediaUrl">Media URL</label>
+                    <input id="externalMediaUrl" type="url" value={mediaForm.url} onChange={(event) => setMediaForm((current) => ({ ...current, url: event.target.value }))} placeholder="https://..." />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="externalMediaTitle">Title</label>
+                    <input id="externalMediaTitle" value={mediaForm.title} onChange={(event) => setMediaForm((current) => ({ ...current, title: event.target.value }))} placeholder="Clean demo" />
+                  </div>
+                  <div className="field custom-wide">
+                    <label htmlFor="externalMediaCaption">Caption</label>
+                    <textarea id="externalMediaCaption" rows={2} value={mediaForm.caption} onChange={(event) => setMediaForm((current) => ({ ...current, caption: event.target.value }))} />
+                  </div>
+                  <label className="toggle-field">
+                    <input type="checkbox" checked={mediaForm.isPublic} onChange={(event) => setMediaForm((current) => ({ ...current, isPublic: event.target.checked }))} />
+                    Show this media on the QRguitar Profile
+                  </label>
+                  <button className="button" type="button" onClick={() => void addExternalMedia()} disabled={savingMedia}>
+                    {savingMedia ? "Saving..." : "Add Media"}
+                  </button>
+                </div>
+                {externalMedia.length ? (
+                  <div className="timeline-list">
+                    {externalMedia.map((item, index) => (
+                      <article className="timeline-item" key={item.id}>
+                        <span>{item.provider} / {item.isPublic ? "Public" : "Private"}</span>
+                        <h3>{item.title}</h3>
+                        {item.caption ? <p>{item.caption}</p> : null}
+                        <a href={item.canonicalUrl} target="_blank" rel="noreferrer">Preview link</a>
+                        <div className="form-actions">
+                          <button className="button secondary" type="button" onClick={() => void updateExternalMedia(item, { isPublic: !item.isPublic })} disabled={savingMedia}>{item.isPublic ? "Make Private" : "Show Publicly"}</button>
+                          <button className="button secondary" type="button" onClick={() => void moveExternalMedia(item, -1)} disabled={savingMedia || index === 0} aria-label={`Move ${item.title} up`}>Move Up</button>
+                          <button className="button secondary" type="button" onClick={() => void moveExternalMedia(item, 1)} disabled={savingMedia || index === externalMedia.length - 1} aria-label={`Move ${item.title} down`}>Move Down</button>
+                          <button className="button secondary" type="button" onClick={() => void removeExternalMedia(item)} disabled={savingMedia}>Remove</button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : null}
+              </section>
+              <section className="qr-customizer" aria-label="Timeline and service history">
+                <div>
+                  <span className="eyebrow">Instrument history</span>
+                  <h3>Timeline &amp; Service History</h3>
+                  <p>Add the history you know - purchases, ownership, service, modifications, restoration, and important milestones.</p>
                 </div>
                 <div className="qr-controls">
                   <div className="field">
-                    <label htmlFor="serviceDate">Date</label>
-                    <input id="serviceDate" type="date" value={serviceForm.serviceDate} onChange={(event) => updateServiceField("serviceDate", event.target.value)} />
+                    <label htmlFor="servicePrecision">Date precision</label>
+                    <select id="servicePrecision" value={serviceForm.datePrecision} onChange={(event) => updateServiceField("datePrecision", event.target.value)}>
+                      <option value="day">Exact day</option>
+                      <option value="month">Month and year</option>
+                      <option value="year">Year only</option>
+                      <option value="unknown">Unknown date</option>
+                    </select>
                   </div>
+                  {serviceForm.datePrecision !== "unknown" ? (
+                    <div className="field">
+                      <label htmlFor="serviceDate">Date</label>
+                      <input
+                        id="serviceDate"
+                        type={serviceForm.datePrecision === "year" ? "number" : serviceForm.datePrecision === "month" ? "month" : "date"}
+                        min={serviceForm.datePrecision === "year" ? "1000" : undefined}
+                        max={serviceForm.datePrecision === "year" ? "9999" : undefined}
+                        value={serviceForm.serviceDate}
+                        onChange={(event) => updateServiceField("serviceDate", event.target.value)}
+                      />
+                    </div>
+                  ) : null}
                   <div className="field">
-                    <label htmlFor="serviceType">Type</label>
-                    <select id="serviceType" value={serviceForm.eventType} onChange={(event) => updateServiceField("eventType", event.target.value)}>
+                    <label htmlFor="serviceType">Category</label>
+                    <select id="serviceType" value={serviceForm.category} onChange={(event) => updateServiceField("category", event.target.value)}>
                       {serviceEventTypes.map((type) => <option value={type} key={type}>{type}</option>)}
                     </select>
                   </div>
@@ -1282,7 +1472,7 @@ export default function EditInstrumentPage() {
                   </label>
                   <div className="form-actions">
                     <button className="button" type="button" onClick={() => void saveServiceEntry()} disabled={savingService}>
-                      {savingService ? "Saving..." : editingServiceId ? "Update Service Entry" : "Add to Service History"}
+                      {savingService ? "Saving..." : editingServiceId ? "Update Timeline Entry" : "Add Timeline Entry"}
                     </button>
                     {editingServiceId ? (
                       <button className="button secondary" type="button" onClick={resetServiceForm}>
@@ -1317,8 +1507,8 @@ export default function EditInstrumentPage() {
                   </div>
                 ) : (
                   <div className="photo-manager empty">
-                    <strong>No service history yet</strong>
-                    <span>Add setups, repairs, modifications, inspections, cleaning, and maintenance notes here.</span>
+                    <strong>No timeline entries yet</strong>
+                    <span>Add known ownership, purchases, service, repairs, modifications, restoration, and milestones.</span>
                   </div>
                 )}
               </section>
@@ -1598,6 +1788,9 @@ function normalizeDocumentFiles(instrument: DemoInstrument) {
     dataUrl: file.url,
     visibility: file.visibility === "public" ? "public" as const : "hidden" as const,
     documentType: file.documentType || "Other",
+    issuerSource: file.issuerSource || "",
+    documentDate: file.documentDate || "",
+    description: file.description || "",
     publicDescription: file.publicDescription || "",
     privateNotes: file.privateNotes || "",
     createdAt: file.createdAt || ""

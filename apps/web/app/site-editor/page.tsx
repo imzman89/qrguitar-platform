@@ -806,7 +806,7 @@ export default function SiteEditorPage() {
                     <EditorHeader
                       label="Dashboard copy"
                       title="Owner dashboard language"
-                      copy="Edit helpful owner-facing text only. Counts, buttons, records, and actions stay real."
+                      copy="Edit helpful owner-facing text only. Counts, buttons, Profiles, and actions stay real."
                     />
                     <TextField
                       label="Dashboard label"

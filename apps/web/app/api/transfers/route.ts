@@ -404,44 +404,24 @@ export async function PATCH(request: Request) {
     return json({ ok: false, message: "Could not prepare recipient profile." }, { status: 500 });
   }
 
-  const acceptedAt = new Date().toISOString();
-  const transferUpdate = await supabase
-    .from("ownership_transfers")
-    .update({ status: "accepted", accepted_by: auth.user.id, accepted_at: acceptedAt })
-    .eq("id", id)
-    .eq("status", "sent")
-    .select("id,guitar_id,from_owner_id,to_email,to_name,status,accepted_by,accepted_at,created_at,fee_cents")
-    .single<TransferRow>();
+  const completion = await supabase.rpc("complete_ownership_transfer", {
+    p_transfer_id: id,
+    p_new_owner_id: auth.user.id
+  });
 
-  if (transferUpdate.error || !transferUpdate.data) {
-    return json({ ok: false, message: transferUpdate.error?.message || "Could not accept transfer." }, { status: 500 });
+  if (completion.error) {
+    const status = /owner changed|no longer available/i.test(completion.error.message || "") ? 409 : 500;
+    return json({ ok: false, message: completion.error.message || "Could not accept transfer." }, { status });
   }
 
-  const guitarUpdate = await supabase
-    .from("guitars")
-    .update({ owner_id: auth.user.id, updated_at: acceptedAt })
-    .eq("id", transfer.guitar_id)
-    .eq("owner_id", transfer.from_owner_id)
-    .select("id")
-    .maybeSingle<{ id: string }>();
-
-  if (guitarUpdate.error || !guitarUpdate.data) {
-    await supabase
-      .from("ownership_transfers")
-      .update({ status: "sent", accepted_by: null, accepted_at: null })
-      .eq("id", id)
-      .eq("status", "accepted")
-      .eq("accepted_by", auth.user.id);
-
-    return json(
-      { ok: false, message: guitarUpdate.error?.message || "The owner changed before this transfer could be completed." },
-      { status: 409 }
-    );
+  const completedTransfer = await loadTransferById(supabase, id);
+  if (!completedTransfer) {
+    return json({ ok: false, message: "Transfer completed but could not be reloaded." }, { status: 500 });
   }
 
   return json({
     ok: true,
-    transfer: mapTransfer(transferUpdate.data, guitar ? { ...guitar, owner_id: auth.user.id } : null, true),
+    transfer: mapTransfer(completedTransfer, guitar ? { ...guitar, owner_id: auth.user.id } : null, true),
     permanentPath: guitar?.permanent_path || `/i/${guitar?.qr_code || ""}`,
     message: "Ownership accepted. The permanent QRguitar URL stayed the same."
   });

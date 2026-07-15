@@ -156,7 +156,7 @@ export default function LoginPage() {
             <h1>{mode === "register" ? "Create your QRguitar account." : mode === "reset" ? "Reset your QRguitar password." : "Sign in to QRguitar."}</h1>
             <p>
               {mode === "register"
-                ? "Create an account so your records, QR links, photos, documents, and ownership tools stay tied to you."
+                ? "Create an account so your Profiles, QR links, photos, documents, and ownership tools stay tied to you."
                 : mode === "reset"
                   ? "Enter your account email and QRguitar will send a secure password reset link."
                 : "Sign in to manage your private profiles, create QRguitar IDs, and edit your instruments."}

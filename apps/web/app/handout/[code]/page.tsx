@@ -41,8 +41,8 @@ const modeDescriptions: Record<PrintMode, string> = {
 
 function humanizeStatus(value?: string) {
   const normalized = String(value || "").trim().toLowerCase();
-  if (normalized === "for_sale") return "For sale";
-  if (normalized === "not_for_sale") return "Not for sale";
+  if (normalized === "for_sale") return "For Sale";
+  if (normalized === "not_for_sale") return "Not for Sale";
   if (normalized === "all_original") return "All original";
   if (normalized === "modified") return "Modified";
   if (normalized === "new") return "New";
@@ -182,7 +182,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
   const serialDisplay = instrument?.showSerialPublic === true && instrument?.serial
     ? instrument.serial
     : instrument?.serialExceptionApproved
-      ? "No serial/build ID used"
+      ? "No serial number"
       : "";
   const photoCount = galleryImages.length;
   const docCount = instrument ? publicDocumentCount(instrument) : 0;
@@ -307,7 +307,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                       {photoUrl ? <img src={photoUrl} alt={`${title} main photo`} /> : <span>No photo available</span>}
                     </div>
                     <div className="print-kit-info">
-                      <p className="print-kit-id-label">QRguitar ID / Instrument ID</p>
+                      <p className="print-kit-id-label">QRguitar ID</p>
                       <strong className="print-kit-id">{canonicalCode}</strong>
                       <h2>{title}</h2>
                       {primaryFacts.length ? (
@@ -316,7 +316,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                       {renderBadges(mode === "shop")}
                       <div className="print-kit-fact-grid">
                         {detailFacts.map((item) => <span key={item}>{item}</span>)}
-                        {serialDisplay ? <span>Serial / Build ID: {serialDisplay}</span> : null}
+                        {serialDisplay ? <span>Serial Number: {serialDisplay}</span> : null}
                       </div>
                     </div>
                   </section>

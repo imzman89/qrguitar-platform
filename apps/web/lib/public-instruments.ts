@@ -1,9 +1,14 @@
-import { createPublicSupabaseClient } from "./supabase-server";
 import { defaultQrStyle, type DemoInstrument } from "./local-demo";
 import { mergeRecordTrustSettings, recordTrustContentKey, type RecordTrustSettings } from "./record-trust";
 import { unstable_noStore as noStore } from "next/cache";
 import { supabaseHttpsJson, supabaseSignedStorageUrl, supabaseStoragePublicUrl } from "./supabase-http";
 import { isEligiblePublicProfile, isRetiredPublicProfileCode, normalizePublicProfileCode } from "./public-profile-eligibility";
+import {
+  availabilityFromSpecs,
+  isManagedInstrumentSpec,
+  originalityFromSpecs,
+  sanitizePublicInstrument
+} from "./instrument-profile-contract";
 
 type GuitarRow = {
   id: string;
@@ -15,6 +20,7 @@ type GuitarRow = {
   model: string | null;
   year: string | null;
   serial_number: string | null;
+  no_serial_used?: boolean | null;
   builder: string | null;
   location: string | null;
   status: string | null;
@@ -47,6 +53,12 @@ type DocumentRow = {
   is_public: boolean;
   document_type?: string | null;
   public_description?: string | null;
+  issuer_source?: string | null;
+  document_date?: string | null;
+  description?: string | null;
+  file_size_bytes?: number | null;
+  related_timeline_event_id?: string | null;
+  related_service_event_id?: string | null;
   created_at?: string | null;
 };
 
@@ -62,6 +74,25 @@ type TimelineRow = {
   is_public: boolean | null;
   created_at: string;
   updated_at: string | null;
+  date_precision?: "day" | "month" | "year" | "unknown" | null;
+  category?: string | null;
+  is_system?: boolean | null;
+  related_document_id?: string | null;
+  related_media_id?: string | null;
+};
+
+type ExternalMediaRow = {
+  id: string;
+  guitar_id: string;
+  provider: "youtube" | "vimeo" | "audio" | "link";
+  canonical_url: string;
+  provider_id: string | null;
+  title: string;
+  caption: string;
+  thumbnail_url: string | null;
+  is_public: boolean;
+  sort_order: number;
+  created_at: string;
 };
 
 type ProfileRow = {
@@ -147,11 +178,6 @@ async function resolveMediaSources(paths: string[]) {
 }
 
 async function resolveDocumentSources(documents: DocumentRow[]) {
-  const supabase = createPublicSupabaseClient();
-  if (!supabase) {
-    return [];
-  }
-
   const resolved = await Promise.all(documents.filter((item) => item.is_public).map(async (document) => {
     const source = publicUrlOrStoragePath(document.storage_path);
     if (!source) {
@@ -159,14 +185,20 @@ async function resolveDocumentSources(documents: DocumentRow[]) {
     }
 
     if (source === document.storage_path && !source.startsWith("/")) {
-      const publicUrl = supabase.storage.from("instrument-documents").getPublicUrl(source).data.publicUrl;
-      return publicUrl
+      const signedUrl = await supabaseSignedStorageUrl("instrument-documents", source, 60 * 15).catch(() => "");
+      return signedUrl
         ? {
             name: document.name,
-            url: publicUrl,
+            url: signedUrl,
             visibility: "public",
             documentType: document.document_type || "",
             publicDescription: document.public_description || "",
+            issuerSource: document.issuer_source || "",
+            documentDate: document.document_date || "",
+            description: document.description || "",
+            fileSizeBytes: document.file_size_bytes || undefined,
+            relatedTimelineEventId: document.related_timeline_event_id || undefined,
+            relatedServiceEventId: document.related_service_event_id || undefined,
             createdAt: document.created_at || ""
           }
         : null;
@@ -178,6 +210,12 @@ async function resolveDocumentSources(documents: DocumentRow[]) {
       visibility: "public",
       documentType: document.document_type || "",
       publicDescription: document.public_description || "",
+      issuerSource: document.issuer_source || "",
+      documentDate: document.document_date || "",
+      description: document.description || "",
+      fileSizeBytes: document.file_size_bytes || undefined,
+      relatedTimelineEventId: document.related_timeline_event_id || undefined,
+      relatedServiceEventId: document.related_service_event_id || undefined,
       createdAt: document.created_at || ""
     };
   }));
@@ -191,6 +229,7 @@ function mapRecord({
   specs,
   documents,
   serviceEvents,
+  externalMedia,
   ownerName,
   trust
 }: {
@@ -199,12 +238,12 @@ function mapRecord({
   specs: SpecRow[];
   documents: NonNullable<DemoInstrument["documentFiles"]>;
   serviceEvents?: NonNullable<DemoInstrument["serviceEvents"]>;
+  externalMedia?: NonNullable<DemoInstrument["externalMedia"]>;
   ownerName?: string;
   trust?: RecordTrustSettings;
 }): DemoInstrument {
-  const managedSpecLabels = new Set(["condition", "type", "finish", "sale status", "originality"]);
   const customFields = specs
-    .filter((spec) => !managedSpecLabels.has(spec.label.trim().toLowerCase()))
+    .filter((spec) => !isManagedInstrumentSpec(spec.label) && spec.label.trim().toLowerCase() !== "service notes")
     .map((spec, index) => ({ id: `${guitar.id}-spec-${index}`, label: spec.label, value: cleanPublicSpecValue(spec.value) }))
     .filter((spec) => spec.label.trim() && spec.value);
   const condition = specs.find((spec) => spec.label.toLowerCase() === "condition")?.value.toLowerCase() === "new" ? "new" : "used";
@@ -220,8 +259,11 @@ function mapRecord({
     brand: guitar.brand || "",
     model: guitar.model || "",
     serial: trust?.showSerialPublic === true ? guitar.serial_number || "" : "",
+    serialNotUsed: guitar.no_serial_used === true,
     year: guitar.year || "",
     instrumentCondition: condition,
+    saleStatus: availabilityFromSpecs(specs),
+    originalityStatus: originalityFromSpecs(specs),
     creatorAccountType: "customer",
     packageIncludesFirstTransfer: false,
     verificationStatus: guitar.status === "verified" ? "verified" : "unverified",
@@ -248,6 +290,7 @@ function mapRecord({
     customLinks: [],
     documentFiles: documents,
     serviceEvents: serviceEvents || [],
+    externalMedia: externalMedia || [],
     qrStyle: defaultQrStyle,
     createdAt: guitar.created_at || new Date().toISOString()
   };
@@ -257,12 +300,17 @@ function mapPublicServiceEvent(row: TimelineRow) {
   return {
     id: row.id,
     serviceDate: row.event_date || "",
+    datePrecision: row.date_precision || (row.event_date ? "day" : "unknown"),
+    category: row.category || row.event_type || "Other",
     eventType: row.event_type || "",
     title: row.title || "Service entry",
     publicDescription: row.description || "",
     shopName: row.shop_name || "",
     location: row.location || "",
     isPublic: row.is_public === true,
+    isSystem: row.is_system === true,
+    relatedDocumentId: row.related_document_id || undefined,
+    relatedMediaId: row.related_media_id || undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at || undefined
   };
@@ -300,7 +348,8 @@ async function loadRelated(guitars: GuitarRow[]) {
       specs: new Map<string, SpecRow[]>(),
       documents: new Map<string, DocumentRow[]>(),
       profiles: new Map<string, ProfileRow>(),
-      serviceEvents: new Map<string, ReturnType<typeof mapPublicServiceEvent>[]>()
+      serviceEvents: new Map<string, ReturnType<typeof mapPublicServiceEvent>[]>(),
+      externalMedia: new Map<string, ExternalMediaRow[]>()
     };
   }
 
@@ -308,15 +357,23 @@ async function loadRelated(guitars: GuitarRow[]) {
   const ownerIds = guitars.map((guitar) => guitar.owner_id).filter(Boolean) as string[];
   const idFilter = ids.map(encodeURIComponent).join(",");
   const ownerIdFilter = ownerIds.map(encodeURIComponent).join(",");
-  const [mediaRows, specRows, documentRows, profileRows, serviceEventRows] = await Promise.all([
+  const [mediaRows, specRows, documentRows, profileRows, serviceEventRows, externalMediaRows] = await Promise.all([
     supabaseHttpsJson<MediaRow[]>(`/rest/v1/guitar_media?select=guitar_id,storage_path&guitar_id=in.(${idFilter})`),
     supabaseHttpsJson<SpecRow[]>(`/rest/v1/guitar_specs?select=guitar_id,label,value&guitar_id=in.(${idFilter})`),
-    supabaseHttpsJson<DocumentRow[]>(`/rest/v1/guitar_documents?select=guitar_id,name,storage_path,is_public,document_type,public_description,created_at&guitar_id=in.(${idFilter})`),
+    supabaseHttpsJson<DocumentRow[]>(`/rest/v1/guitar_documents?select=guitar_id,name,storage_path,is_public,document_type,public_description,issuer_source,document_date,description,file_size_bytes,related_timeline_event_id,related_service_event_id,created_at&guitar_id=in.(${idFilter})`),
     ownerIds.length
       ? supabaseHttpsJson<ProfileRow[]>(`/rest/v1/profiles?select=id,display_name,account_status,hide_public_content&id=in.(${ownerIdFilter})`)
       : Promise.resolve([]),
-    supabaseHttpsJson<TimelineRow[]>(`/rest/v1/guitar_timeline_events?select=id,guitar_id,event_date,event_type,title,description,shop_name,location,is_public,created_at,updated_at&guitar_id=in.(${idFilter})&is_public=eq.true&order=event_date.desc.nullslast,created_at.desc`)
-      .catch((error: Error) => (/column .* does not exist/i.test(error.message) ? [] : Promise.reject(error)))
+    supabaseHttpsJson<TimelineRow[]>(`/rest/v1/guitar_timeline_events?select=id,guitar_id,event_date,event_type,title,description,shop_name,location,is_public,created_at,updated_at,date_precision,category,is_system,related_document_id,related_media_id&guitar_id=in.(${idFilter})&is_public=eq.true&order=event_date.desc.nullslast,created_at.desc`)
+      .catch(async (error: Error) => {
+        if (!/column .* does not exist/i.test(error.message)) throw error;
+        return supabaseHttpsJson<TimelineRow[]>(`/rest/v1/guitar_timeline_events?select=id,guitar_id,event_date,event_type,title,description,shop_name,location,is_public,created_at,updated_at&guitar_id=in.(${idFilter})&is_public=eq.true&order=event_date.desc.nullslast,created_at.desc`);
+      }),
+    supabaseHttpsJson<ExternalMediaRow[]>(`/rest/v1/guitar_external_media?select=id,guitar_id,provider,canonical_url,provider_id,title,caption,thumbnail_url,is_public,sort_order,created_at&guitar_id=in.(${idFilter})&is_public=eq.true&order=sort_order.asc,created_at.asc`)
+      .catch((error: Error) => {
+        if (/does not exist/i.test(error.message)) return [];
+        throw error;
+      })
   ]);
 
   const media = new Map<string, string[]>();
@@ -344,12 +401,17 @@ async function loadRelated(guitars: GuitarRow[]) {
     serviceEvents.set(row.guitar_id, [...(serviceEvents.get(row.guitar_id) || []), mapPublicServiceEvent(row)]);
   }
 
-  return { media, specs, documents, profiles, serviceEvents };
+  const externalMedia = new Map<string, ExternalMediaRow[]>();
+  for (const row of externalMediaRows) {
+    externalMedia.set(row.guitar_id, [...(externalMedia.get(row.guitar_id) || []), row]);
+  }
+
+  return { media, specs, documents, profiles, serviceEvents, externalMedia };
 }
 
 export async function getPublicInstruments() {
   noStore();
-  const guitars = await supabaseHttpsJson<GuitarRow[]>("/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&visibility=eq.public&admin_archived_at=is.null&owner_removed_at=is.null&order=created_at.desc");
+  const guitars = await supabaseHttpsJson<GuitarRow[]>("/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,no_serial_used,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&visibility=eq.public&admin_archived_at=is.null&owner_removed_at=is.null&order=created_at.desc");
   const [related, trustByCode] = await Promise.all([
     loadRelated(guitars),
     loadTrustSettingsMap(guitars.map((guitar) => guitar.qr_code))
@@ -368,15 +430,27 @@ export async function getPublicInstruments() {
       const media = await resolveMediaSources((related.media.get(guitar.id) || []).filter((storagePath) => storagePath !== heroStoragePath));
       const heroImagePath = heroStoragePath ? (await resolveMediaSources([heroStoragePath]))[0] : "";
       const documents = await resolveDocumentSources(related.documents.get(guitar.id) || []);
-      return mapRecord({
+      return sanitizePublicInstrument(mapRecord({
         guitar: { ...guitar, hero_image_path: heroImagePath || guitar.hero_image_path },
         media,
         documents,
         serviceEvents: related.serviceEvents.get(guitar.id) || [],
+        externalMedia: (related.externalMedia.get(guitar.id) || []).map((item) => ({
+          id: item.id,
+          provider: item.provider,
+          canonicalUrl: item.canonical_url,
+          providerId: item.provider_id || undefined,
+          title: item.title,
+          caption: item.caption,
+          thumbnailUrl: item.thumbnail_url || undefined,
+          isPublic: true,
+          sortOrder: item.sort_order,
+          createdAt: item.created_at
+        })),
         specs: related.specs.get(guitar.id) || [],
         ownerName: related.profiles.get(guitar.owner_id || "")?.display_name || guitar.builder || "",
         trust: trustByCode.get(guitar.qr_code.toUpperCase())
-      });
+      }));
     })
   );
 }
@@ -387,12 +461,12 @@ export async function getPublicInstrumentByCode(code: string) {
   if (!normalizedCode || isRetiredPublicProfileCode(normalizedCode)) {
     return null;
   }
-  let rows = await supabaseHttpsJson<GuitarRow[]>(`/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&qr_code=eq.${encodeURIComponent(normalizedCode)}&limit=1`);
+  let rows = await supabaseHttpsJson<GuitarRow[]>(`/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,no_serial_used,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&qr_code=eq.${encodeURIComponent(normalizedCode)}&limit=1`);
   if (!rows.length) {
     const redirects = await supabaseHttpsJson<Array<{ guitar_id: string }>>(`/rest/v1/qr_redirects?select=guitar_id&old_path=eq.${encodeURIComponent(`/i/${normalizedCode}`)}&active=eq.true&limit=1`);
     const guitarId = redirects[0]?.guitar_id;
     if (guitarId) {
-      rows = await supabaseHttpsJson<GuitarRow[]>(`/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&id=eq.${encodeURIComponent(guitarId)}&limit=1`);
+      rows = await supabaseHttpsJson<GuitarRow[]>(`/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,no_serial_used,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&id=eq.${encodeURIComponent(guitarId)}&limit=1`);
     }
   }
   const data = rows[0] || null;
@@ -414,13 +488,25 @@ export async function getPublicInstrumentByCode(code: string) {
   const heroImagePath = heroStoragePath ? (await resolveMediaSources([heroStoragePath]))[0] : "";
   const documents = await resolveDocumentSources(related.documents.get(data.id) || []);
 
-  return mapRecord({
+  return sanitizePublicInstrument(mapRecord({
     guitar: { ...data, hero_image_path: heroImagePath || data.hero_image_path },
     media,
     documents,
     serviceEvents: related.serviceEvents.get(data.id) || [],
+    externalMedia: (related.externalMedia.get(data.id) || []).map((item) => ({
+      id: item.id,
+      provider: item.provider,
+      canonicalUrl: item.canonical_url,
+      providerId: item.provider_id || undefined,
+      title: item.title,
+      caption: item.caption,
+      thumbnailUrl: item.thumbnail_url || undefined,
+      isPublic: true,
+      sortOrder: item.sort_order,
+      createdAt: item.created_at
+    })),
     specs: related.specs.get(data.id) || [],
     ownerName: related.profiles.get(data.owner_id || "")?.display_name || data.builder || "Unclaimed",
     trust: trustByCode.get(data.qr_code.toUpperCase())
-  });
+  }));
 }

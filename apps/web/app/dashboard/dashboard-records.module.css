@@ -143,6 +143,30 @@
   font-size: 13px;
 }
 
+.dashboardIdentity {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  color: rgba(248, 246, 242, .78);
+  font-size: 12px;
+}
+
+.dashboardIdentity span {
+  width: auto;
+  overflow: visible;
+  color: inherit;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.dashboardIdentity b {
+  margin-right: 4px;
+  color: var(--gold-2);
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
 .instrumentBadges {
   display: flex;
   flex-wrap: wrap;

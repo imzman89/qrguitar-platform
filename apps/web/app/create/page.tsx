@@ -24,6 +24,9 @@ type DocumentDraft = {
   dataUrl: string;
   visibility: "public" | "hidden";
   documentType: string;
+  issuerSource: string;
+  documentDate: string;
+  description: string;
   publicDescription: string;
   privateNotes: string;
 };
@@ -49,7 +52,7 @@ type BulkImportRow = {
 
 const bulkHeaders = ["brand", "model", "serial", "year", "type", "condition", "sale_status", "originality", "location", "visibility", "photo", "summary"];
 const bulkTemplate = `${bulkHeaders.join("\t")}
-Fender\tStratocaster\tABC123\t2005\tElectric Guitar\tused\tNot for sale\tAll original\tCranston, RI\tprivate\thttps://example.com/photo.jpg\tOwned since 2024`;
+Fender\tStratocaster\tABC123\t2005\tElectric Guitar\tused\tNot for Sale\tAll original\tCranston, RI\tprivate\thttps://example.com/photo.jpg\tOwned since 2024`;
 
 export default function CreatePage() {
   const router = useRouter();
@@ -112,7 +115,7 @@ export default function CreatePage() {
     () =>
       [
         form.instrumentType.trim() ? { id: "preview-type", label: "Type", value: form.instrumentType.trim() } : null,
-        { id: "preview-sale-status", label: "Sale status", value: form.saleStatus === "for_sale" ? "For sale" : "Not for sale" },
+        { id: "preview-sale-status", label: "Availability", value: form.saleStatus === "for_sale" ? "For Sale" : "Not for Sale" },
         { id: "preview-originality", label: "Originality", value: form.originalityStatus === "all_original" ? "All original" : form.originalityStatus === "modified" ? "Modified" : "Not specified" },
         form.finish.trim() ? { id: "preview-finish", label: "Finish", value: form.finish.trim() } : null,
         form.weight.trim() ? { id: "preview-weight", label: "Weight", value: form.weight.trim() } : null,
@@ -243,7 +246,7 @@ export default function CreatePage() {
     const rows = bulkRows.length ? bulkRows : parseBulkImportRows();
     const validRows = rows.filter((row) => !row.error);
     if (!validRows.length) {
-      setMessage("Fix the bulk rows before creating records.");
+      setMessage("Fix the bulk rows before creating Profiles.");
       return;
     }
 
@@ -336,6 +339,9 @@ export default function CreatePage() {
         dataUrl: await fileToDataUrl(file),
         visibility: "hidden" as const,
         documentType: "Receipt",
+        issuerSource: "",
+        documentDate: "",
+        description: "",
         publicDescription: "",
         privateNotes: ""
       }))
@@ -418,6 +424,9 @@ export default function CreatePage() {
             dataUrl: document.dataUrl,
             visibility: document.visibility,
             documentType: document.documentType,
+            issuerSource: document.issuerSource,
+            documentDate: document.documentDate,
+            description: document.description,
             publicDescription: document.publicDescription,
             privateNotes: document.privateNotes
           })),
@@ -442,7 +451,7 @@ export default function CreatePage() {
 
       if (!response.ok || !result?.ok) {
         if (response.status === 402) {
-          setMessage(result?.message || "Free public beta accounts can create up to 25 records. Contact QRguitar for commercial setup.");
+          setMessage(result?.message || "Free public beta accounts can create up to 25 Profiles. Contact QRguitar for commercial setup.");
           return;
         }
         setMessage(result?.message || "Could not save this record to Supabase.");
@@ -509,20 +518,21 @@ export default function CreatePage() {
               <div className="permanent-id">
                 <span>Permanent QRguitar ID</span>
                 <strong>{qrCode}</strong>
-                <small>When a Serial / Build ID exists, the QRguitar ID uses the format QRG-SERIAL. If no serial is used, QRguitar assigns a permanent generated identity instead.</small>
+                <small>When a Serial Number exists, the QRguitar ID uses the format QRG-SERIAL. If no serial is used, QRguitar assigns a permanent generated ID instead. Visible Profiles can hide the separate Serial Number from the public page.</small>
               </div>
               <div className="privacy-toggle" aria-label="Profile visibility">
                 <div>
-                  <strong>{form.visibility === "public" ? "Public catalog" : "Private link only"}</strong>
-                  <span>{form.visibility === "public" ? "Shows on the live homepage feed and catalog." : "Hidden from public browsing. The permanent QR link still works."}</span>
+                  <strong>{form.visibility === "public" ? "Visible profile" : form.visibility === "unlisted" ? "Unlisted profile" : "Private profile"}</strong>
+                  <span>{form.visibility === "public" ? "Discoverable in the Catalog and available by direct link." : form.visibility === "unlisted" ? "Hidden from the Catalog but available to people with the direct link." : "Available only to the signed-in owner and authorized QRguitar admins."}</span>
                 </div>
-                <button
-                  className="button secondary"
-                  type="button"
-                  onClick={() => updateField("visibility", form.visibility === "public" ? "private" : "public")}
-                >
-                  {form.visibility === "public" ? "Make Private" : "Make Public"}
-                </button>
+                <label className="field visibility-select" htmlFor="profileVisibility">
+                  <span>Visibility</span>
+                  <select id="profileVisibility" value={form.visibility} onChange={(event) => updateField("visibility", event.target.value)}>
+                    <option value="public">Visible</option>
+                    <option value="private">Private</option>
+                    <option value="unlisted">Unlisted</option>
+                  </select>
+                </label>
               </div>
             <form className="card form">
               <input
@@ -598,7 +608,7 @@ export default function CreatePage() {
                   onBlur={(value) => updateField("brand", canonicalInstrumentBrand(value) || value.trim())}
                 />
                 <Field label="Model" id="model" value={form.model} onChange={(value) => updateField("model", value)} />
-                <Field label="Serial / Build ID" id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} />
+                <Field label="Serial Number" id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} />
                 <Field label="Year" id="year" value={form.year} onChange={(value) => updateField("year", value)} />
                 <CategoryField
                   label="Type / category"
@@ -620,15 +630,15 @@ export default function CreatePage() {
                   </select>
                 </div>
                 <div className="field">
-                  <label htmlFor="saleStatus">Sale availability</label>
+                  <label htmlFor="saleStatus">Availability</label>
                   <select
                     id="saleStatus"
                     value={form.saleStatus}
                     onChange={(event) => updateField("saleStatus", event.target.value)}
                     required
                   >
-                    <option value="not_for_sale">Not for sale</option>
-                    <option value="for_sale">For sale</option>
+                    <option value="not_for_sale">Not for Sale</option>
+                    <option value="for_sale">For Sale</option>
                   </select>
                 </div>
                 <div className="field">
@@ -853,6 +863,20 @@ export default function CreatePage() {
                               {documentTypeOptions.map((type) => <option value={type} key={type}>{type}</option>)}
                             </select>
                           </div>
+                        </div>
+                        <div className="form-grid compact">
+                          <div className="field">
+                            <label htmlFor={`${document.id}-issuer`}>Issuer or source</label>
+                            <input id={`${document.id}-issuer`} value={document.issuerSource} onChange={(event) => setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, issuerSource: event.target.value } : item))} placeholder="Dealer, shop, builder, or owner" />
+                          </div>
+                          <div className="field">
+                            <label htmlFor={`${document.id}-date`}>Document date</label>
+                            <input id={`${document.id}-date`} type="date" value={document.documentDate} onChange={(event) => setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, documentDate: event.target.value } : item))} />
+                          </div>
+                        </div>
+                        <div className="field">
+                          <label htmlFor={`${document.id}-description`}>Description</label>
+                          <textarea id={`${document.id}-description`} value={document.description} onChange={(event) => setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, description: event.target.value } : item))} placeholder="What this document establishes or contains." />
                         </div>
                         <div className="field">
                           <label htmlFor={`${document.id}-public-description`}>Public description</label>

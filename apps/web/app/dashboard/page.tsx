@@ -170,7 +170,6 @@ export default function DashboardPage() {
   }, [user?.email]);
 
   const instrumentCodes = useMemo(() => new Set(instruments.map((instrument) => instrument.qrCode.toUpperCase())), [instruments]);
-  const verifiedRecords = instruments.filter((instrument) => getInstrumentVerificationStatus(instrument) === "verified").length;
   const pendingTransfers = transfers.filter(
     (transfer) => transfer.status === "sent" && instrumentCodes.has(transfer.guitarQrCode.toUpperCase())
   ).length;
@@ -182,6 +181,14 @@ export default function DashboardPage() {
   const unlistedRecords = instruments.filter((instrument) => instrument.visibility === "unlisted").length;
   const recordsWithPhotos = instruments.filter((instrument) => instrument.heroImageDataUrl || instrument.galleryImageDataUrls?.length).length;
   const hiddenDocumentCount = instruments.reduce((total, instrument) => total + (instrument.documentFiles?.filter((file) => file.visibility === "hidden").length || 0), 0);
+  const activeSafetyAlerts = instruments.filter((instrument) => instrument.safetyStatus === "lost" || instrument.safetyStatus === "stolen").length;
+  const needsAttention = instruments.filter((instrument) => {
+    const photoCount = instrument.galleryImageDataUrls?.length || (instrument.heroImageDataUrl ? 1 : 0);
+    const hasHistory = Boolean(instrument.serviceEvents?.length);
+    const hasDescription = Boolean(instrument.summary?.trim());
+    const hasIdentity = Boolean(instrument.serial?.trim()) || instrument.serialNotUsed === true;
+    return photoCount < 2 || !hasHistory || !hasDescription || !hasIdentity;
+  }).length;
 
   function refreshInstruments() {
     if (!user?.email) {
@@ -205,12 +212,14 @@ export default function DashboardPage() {
 
   const stats = useMemo(
     () => [
-      { label: "Registered instruments", value: String(instruments.length) },
-      { label: "Verified records", value: String(verifiedRecords) },
-      { label: "Transfers pending", value: String(pendingTransfers) },
-      { label: "Catalog profiles", value: String(publicRecords) }
+      { label: "Total Profiles", value: String(instruments.length) },
+      { label: "Visible in Catalog", value: String(publicRecords) },
+      { label: "Private / Unlisted", value: String(privateRecords + unlistedRecords) },
+      { label: "Needs Attention", value: String(needsAttention) },
+      { label: "Safety Alerts", value: String(activeSafetyAlerts) },
+      { label: "Pending Handoffs", value: String(pendingTransfers) }
     ],
-    [instruments, pendingTransfers, publicRecords, verifiedRecords]
+    [activeSafetyAlerts, instruments.length, needsAttention, pendingTransfers, privateRecords, publicRecords, unlistedRecords]
   );
 
   async function logout() {
@@ -224,11 +233,11 @@ export default function DashboardPage() {
   async function removeFromCollection(instrument: DemoInstrument) {
     const allowed = getInstrumentVerificationStatus(instrument) !== "verified" && instrument.authenticityStatus !== "confirmed";
     if (!allowed) {
-      setDashboardMessage("Verified and authenticity-confirmed records are preserved for provenance. Transfer ownership or contact QRguitar admin for permanent removal.");
+      setDashboardMessage("Verified and authenticity-confirmed Profiles are preserved for provenance. Transfer ownership or contact QRguitar support for permanent removal.");
       return;
     }
 
-    const confirmed = window.confirm("Permanently delete this record from your QRguitar dashboard? This cannot be undone. The QRguitar ID stays reserved, but the record will be removed from your active account and hidden from public view.");
+    const confirmed = window.confirm("Permanently delete this QRguitar Profile? This cannot be undone. The QRguitar ID stays reserved, but the Profile will be removed from your active account and hidden from public view.");
     if (!confirmed) {
       return;
     }
@@ -247,7 +256,7 @@ export default function DashboardPage() {
       })
     });
     const payload = await response.json().catch(() => ({}));
-    setDashboardMessage(payload.message || (response.ok ? "Record permanently deleted from your dashboard." : "Could not delete this record."));
+    setDashboardMessage(payload.message || (response.ok ? "Profile permanently deleted from your dashboard." : "Could not delete this Profile."));
     if (response.ok) {
       refreshInstruments();
     }
@@ -368,8 +377,8 @@ export default function DashboardPage() {
             <div className={styles.instrumentList}>
               {loadingRecords ? (
                 <div className="card auth-card">
-                  <h3>Loading your records...</h3>
-                  <p>Pulling your saved records now.</p>
+                  <h3>Loading your Profiles...</h3>
+                  <p>Pulling your saved Profiles now.</p>
                 </div>
               ) : instruments.length ? (
                 instruments.map((instrument) => {
@@ -384,7 +393,7 @@ export default function DashboardPage() {
                   const title = dashboardRecordTitle(instrument);
                   const meta = dashboardRecordMeta(instrument, condition);
                   const category = instrument.instrumentType || "Instrument";
-                  const saleStatus = instrument.saleStatus === "for_sale" ? "For sale" : "";
+                  const saleStatus = instrument.saleStatus === "for_sale" ? "For Sale" : "";
                   const originalityStatus = instrument.originalityStatus === "all_original" ? "All original" : instrument.originalityStatus === "modified" ? "Modified" : "";
 
                   return (
@@ -399,6 +408,10 @@ export default function DashboardPage() {
                           <div className={styles.instrumentInfo}>
                             <strong>{title}</strong>
                             <span title={meta}>{meta}</span>
+                            <div className={styles.dashboardIdentity} aria-label="Profile identity">
+                              <span><b>QRguitar ID</b> {instrument.qrCode}</span>
+                              <span><b>Serial Number</b> {instrument.serial || "No serial number"}</span>
+                            </div>
                             <div className="record-badge-row" aria-label="Profile status">
                               {instrument.showVerificationBadge !== false ? (
                                 <small className={`record-badge ${verificationStatus === "verified" ? "record-badge--verified" : "record-badge--unverified"}`}>
@@ -445,7 +458,7 @@ export default function DashboardPage() {
                             View Profile
                           </Link>
                           <button className="button secondary" type="button" onClick={() => void removeFromCollection(instrument)}>
-                            Delete Record
+                            Remove Profile
                           </button>
                         </div>
                       </div>
@@ -822,9 +835,7 @@ function dashboardRecordMeta(instrument: DemoInstrument, condition: "new" | "use
   return [
     instrument.brand,
     instrument.year,
-    condition === "new" ? "New" : "Used",
-    `QRguitar ID / Instrument ID: ${instrument.qrCode}`,
-    instrument.serial ? `Serial / Build ID: ${instrument.serial}` : ""
+    condition === "new" ? "New" : "Used"
   ].filter(Boolean).join(" • ");
 }
 

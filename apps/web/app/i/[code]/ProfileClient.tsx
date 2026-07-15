@@ -21,10 +21,12 @@ import QRCode from "qrcode";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { BrandLogo } from "../../../components/BrandLogo";
+import { buildProfileIdentityFields, ProfileIdentity } from "../../../components/ProfileIdentity";
 import { RecordShareButton } from "../../../components/RecordShareButton";
 import {
   getInstrumentVerificationStatus,
   type DemoTransfer,
+  type ExternalMediaItem,
   instrumentDisplayName,
   type DemoInstrument,
   type ServiceHistoryEntry
@@ -259,7 +261,8 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           : [],
         serviceEvents: stored.serviceEvents && stored.serviceEvents.length
           ? stored.serviceEvents
-          : []
+          : [],
+        externalMedia: stored.externalMedia && stored.externalMedia.length ? stored.externalMedia : []
       };
     }
 
@@ -282,6 +285,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
       return file.visibility === "public";
     })
     : [];
+  const externalMedia = instrument ? (instrument.externalMedia || []).filter((item) => item.isPublic) : [];
   const isVerifiedRecord = instrument ? getInstrumentVerificationStatus(instrument) === "verified" : false;
   const isAuthenticityConfirmed = instrument?.authenticityStatus === "confirmed";
   const showVerificationBadge = instrument?.showVerificationBadge !== false;
@@ -428,14 +432,6 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     }
   }
 
-  const specs = [
-    { label: "QRguitar ID / Instrument ID", value: instrument.qrCode },
-    { label: "Make / Model", value: [instrument.brand, instrument.model].filter(Boolean).join(" ") },
-    { label: "Serial / Build ID", value: instrument.serial || (instrument.serialExceptionApproved ? "No serial/build ID used" : "") },
-    { label: "Year", value: instrument.year },
-    ...(formattedLocation ? [{ label: "Location", value: formattedLocation }] : [])
-  ].filter((spec) => hasMeaningfulPublicValue(spec.value));
-
   const trustItems = [
     showVerificationBadge && isVerifiedRecord
       ? {
@@ -452,10 +448,21 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
   ].filter((item): item is { label: string; note: string } => Boolean(item));
 
   const stalePublicValues = new Set(["custom offset", "alder", "maple neck, rosewood board"]);
+  const identityValues = {
+    qrGuitarId: instrument.qrCode,
+    brand: instrument.brand,
+    model: instrument.model,
+    serialNumber: instrument.serial,
+    showSerial: Boolean(instrument.serial),
+    noSerialNumber: instrument.serialExceptionApproved && !instrument.serial,
+    year: instrument.year,
+    location: formattedLocation,
+    type: instrument.instrumentType,
+    availability: instrument.saleStatus === "for_sale" ? "For Sale" : "Not for Sale"
+  };
+  const specs = buildProfileIdentityFields(identityValues);
 
   const optionalSpecs = [
-    { label: "Type", value: instrument.instrumentType },
-    { label: "Sale availability", value: instrument.saleStatus === "for_sale" ? "For sale" : "Not for sale" },
     ...(instrument.originalityStatus && instrument.originalityStatus !== "unknown"
       ? [{ label: "Originality", value: instrument.originalityStatus === "all_original" ? "All original" : "Modified" }]
       : []),
@@ -548,24 +555,13 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           </section>
         ) : null}
 
-        <section className="identity-card">
-          <header className="identity-card-header">
-            <div>
-              <span>Profile identity</span>
-              <strong>Permanent instrument reference</strong>
-            </div>
-            <span className="identity-media-summary">
-              {[
-                galleryImages.length ? `${galleryImages.length} ${galleryImages.length === 1 ? "photo" : "photos"}` : "",
-                documentFiles.length ? `${documentFiles.length} ${documentFiles.length === 1 ? "document" : "documents"}` : ""
-              ].filter(Boolean).join(" / ")}
-            </span>
-          </header>
-          <div className="identity-grid">
-            {specs.map((spec) => (
-              <Meta label={spec.label} value={spec.value} key={spec.label} />
-            ))}
-          </div>
+        <ProfileIdentity
+          values={identityValues}
+          mediaSummary={[
+            galleryImages.length ? `${galleryImages.length} ${galleryImages.length === 1 ? "photo" : "photos"}` : "",
+            documentFiles.length ? `${documentFiles.length} ${documentFiles.length === 1 ? "document" : "documents"}` : ""
+          ].filter(Boolean).join(" / ")}
+        >
           {trustItems.length ? (
             <div className="profile-trust-summary" aria-label="Trust review">
               {trustItems.map((item) => (
@@ -590,7 +586,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           {shareNotice === "failed" ? (
             <small className="scan-copy-notice">Copy failed. You can copy the URL from your browser bar.</small>
           ) : null}
-        </section>
+        </ProfileIdentity>
 
         {canEdit ? (
         <section className="scan-actions" aria-label="Owner profile actions">
@@ -628,7 +624,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
               {actionNotice === "documents" ? (
                 <>
                   <span className="scan-action-icon"><FileText size={16} /> Documents and proof</span>
-                  <p>Public files appear here for buyers and shops. The owner controls which records stay private and which files are visible.</p>
+                  <p>Public files appear here for buyers and shops. The owner controls which files stay private and which are visible.</p>
                 </>
               ) : null}
               {actionNotice === "owner" ? (
@@ -666,6 +662,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           profileLinks={profileLinks}
           officialBrandLogoUrl={officialBrandLogoUrl}
           galleryImages={galleryImages}
+          externalMedia={externalMedia}
           documentFiles={documentFiles}
           mediaIndex={mediaIndex}
           onPickMedia={setMediaIndex}
@@ -770,6 +767,7 @@ function ProfilePanel({
   optionalSpecs,
   profileLinks,
   galleryImages,
+  externalMedia,
   documentFiles,
   officialBrandLogoUrl,
   mediaIndex,
@@ -787,7 +785,8 @@ function ProfilePanel({
   optionalSpecs: Array<{ label: string; value?: string }>;
   profileLinks: Array<{ label: string; href?: string }>;
   galleryImages: string[];
-  documentFiles: Array<{ name: string; url: string; documentType?: string; publicDescription?: string }>;
+  externalMedia: ExternalMediaItem[];
+  documentFiles: Array<{ name: string; url: string; documentType?: string; issuerSource?: string; documentDate?: string; description?: string; publicDescription?: string }>;
   officialBrandLogoUrl: string;
   mediaIndex: number;
   onPickMedia: (index: number) => void;
@@ -817,19 +816,22 @@ function ProfilePanel({
     const createdDate = formatProfileDate(instrument.createdAt);
     const transferDate = latestTransfer ? formatProfileDate(latestTransfer.createdAt) : null;
     const publicServiceEvents = serviceEvents.filter((entry) => entry.isPublic);
+    const hasProfileCreatedEvent = publicServiceEvents.some((entry) => entry.isSystem && entry.title === "QRguitar Profile created");
     const ownershipTransferCount = Math.max(0, Number(instrument.ownershipTransferCount || 0));
 
     return (
       <section className="scan-tab-panel">
         <PanelHeader icon={<Clock3 />} label="Timeline" title="The profile stays useful as the instrument moves through the world." />
         <div className="timeline-list">
-          <TimelineItem date={createdDate} title="Profile created" copy={`${instrument.brand} attached this instrument identity for ${instrumentDisplayName(instrument)}.`} />
+          {!hasProfileCreatedEvent ? (
+            <TimelineItem date={createdDate} title="QRguitar Profile created" copy="A permanent QRguitar Profile was created for this instrument." />
+          ) : null}
           {publicServiceEvents.map((entry) => (
             <TimelineItem
-              date={formatProfileDate(entry.serviceDate || entry.createdAt)}
+              date={formatTimelineEntryDate(entry)}
               title={entry.title}
               copy={[
-                entry.eventType,
+                entry.category || entry.eventType,
                 entry.publicDescription,
                 [entry.shopName, entry.location].filter(Boolean).join(" · ")
               ].filter(Boolean).join(" · ")}
@@ -855,7 +857,7 @@ function ProfilePanel({
             />
           ) : null}
           {!publicServiceEvents.length ? (
-            <TimelineItem date="Ongoing" title="No public service history yet." copy="Setups, repairs, inspections, and maintenance can be added by the owner or admin." />
+            <TimelineItem date="Add history" title="The known history starts here." copy="Owners can add purchases, ownership, service, modifications, restoration, and important milestones." />
           ) : null}
         </div>
       </section>
@@ -925,6 +927,31 @@ function ProfilePanel({
             <span>Use the dashboard tool to add photos and documents.</span>
           </div>
         )}
+        {externalMedia.length ? (
+          <div className="external-media-grid">
+            {externalMedia.map((item) => {
+              const embedUrl = externalMediaEmbedUrl(item);
+              return (
+                <article className="external-media-card" key={item.id}>
+                  {embedUrl ? (
+                    <iframe
+                      src={embedUrl}
+                      title={item.title}
+                      loading="lazy"
+                      allow="accelerometer; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : null}
+                  <div>
+                    <strong>{item.title}</strong>
+                    {item.caption ? <p>{item.caption}</p> : null}
+                    {!embedUrl ? <a href={item.canonicalUrl} target="_blank" rel="noreferrer">Open media</a> : null}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : null}
       </section>
     );
   }
@@ -963,7 +990,12 @@ function ProfilePanel({
               <DocumentItem
                 key={`${file.name}-${index}`}
                 title={file.name}
-                copy={[file.documentType, file.publicDescription || "Tap to open the file."].filter(Boolean).join(" - ")}
+                copy={[
+                  file.documentType,
+                  file.issuerSource ? `Source: ${file.issuerSource}` : "",
+                  file.documentDate ? `Dated ${formatDocumentDate(file.documentDate)}` : "",
+                  file.description || file.publicDescription || "Tap to open the file."
+                ].filter(Boolean).join(" - ")}
                 href={file.url}
               />
             ))}
@@ -1110,6 +1142,43 @@ function formatProfileDate(value?: string) {
   }
 
   return `${parsed.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+}
+
+function formatDocumentDate(value: string) {
+  const parsed = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(parsed);
+}
+
+function formatTimelineEntryDate(entry: ServiceHistoryEntry) {
+  if (entry.datePrecision === "unknown" || !entry.serviceDate) {
+    return entry.createdAt && entry.isSystem ? formatProfileDate(entry.createdAt) : "Date unknown";
+  }
+
+  if (entry.datePrecision === "year") {
+    return entry.serviceDate.slice(0, 4);
+  }
+
+  const parsed = new Date(`${entry.serviceDate}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return entry.serviceDate;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: entry.datePrecision === "month" ? "long" : "short",
+    year: "numeric",
+    ...(entry.datePrecision === "day" ? { day: "numeric" } : {})
+  }).format(parsed);
+}
+
+function externalMediaEmbedUrl(item: ExternalMediaItem) {
+  if (item.provider === "youtube" && item.providerId) {
+    return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(item.providerId)}`;
+  }
+  if (item.provider === "vimeo" && item.providerId) {
+    return `https://player.vimeo.com/video/${encodeURIComponent(item.providerId)}`;
+  }
+  return "";
 }
 
 function Meta({ label, value }: { label: string; value: string }) {

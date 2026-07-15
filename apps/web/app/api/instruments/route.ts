@@ -10,6 +10,15 @@ import { defaultRecordTrustSettings, mergeRecordTrustSettings, recordTrustConten
 import { assertAccountCanWrite, logAdminAuditEvent } from "../../../lib/admin-auth";
 import { qrCodeFromSerial } from "../../../lib/qrguitar-id";
 import { isEligiblePublicProfile, isRetiredPublicProfileCode, normalizePublicProfileCode } from "../../../lib/public-profile-eligibility";
+import { getPublicInstrumentByCode, getPublicInstruments } from "../../../lib/public-instruments";
+import {
+  availabilityFromSpecs,
+  isManagedInstrumentSpec,
+  normalizeSerialBuildId,
+  originalityFromSpecs,
+  sanitizePublicInstrument,
+  specValue
+} from "../../../lib/instrument-profile-contract";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -55,6 +64,9 @@ type CreateInstrumentRequest = {
     documentType?: string;
     publicDescription?: string;
     privateNotes?: string;
+    issuerSource?: string;
+    documentDate?: string;
+    description?: string;
   }>;
   customFields?: Array<{ label: string; value: string }>;
   accountPlan?: AccountPlan;
@@ -110,6 +122,7 @@ type GuitarRow = {
   model: string | null;
   year: string | null;
   serial_number: string | null;
+  no_serial_used?: boolean | null;
   builder: string | null;
   location: string | null;
   status: string;
@@ -147,6 +160,12 @@ type GuitarDocumentRow = {
   document_type?: string | null;
   public_description?: string | null;
   private_notes?: string | null;
+  issuer_source?: string | null;
+  document_date?: string | null;
+  description?: string | null;
+  file_size_bytes?: number | null;
+  related_timeline_event_id?: string | null;
+  related_service_event_id?: string | null;
   updated_at?: string | null;
   created_at?: string | null;
 };
@@ -170,6 +189,11 @@ type GuitarTimelineRow = {
   is_public?: boolean | null;
   created_at: string;
   updated_at?: string | null;
+  date_precision?: "day" | "month" | "year" | "unknown" | null;
+  category?: string | null;
+  is_system?: boolean | null;
+  related_document_id?: string | null;
+  related_media_id?: string | null;
 };
 
 type ProfileRow = {
@@ -333,6 +357,19 @@ async function canManageRecordVerification(supabase: ReturnType<typeof createSer
 
   const profile = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle<{ role?: string | null }>();
   return profile.data?.role === "admin" || profile.data?.role === "owner";
+}
+
+async function canApproveSerialCorrection(supabase: ReturnType<typeof createServerSupabaseClient>, user: User) {
+  if (readAdminEmailList().includes(normalizeLookupEmail(user.email || ""))) {
+    return true;
+  }
+
+  if (!supabase) {
+    return false;
+  }
+
+  const profile = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle<{ role?: string | null }>();
+  return profile.data?.role === "admin";
 }
 
 function coerceAccountPlan(value: string): AccountPlan {
@@ -614,26 +651,12 @@ function instrumentConditionFromSpec(specs: GuitarSpecRow[]) {
   return condition === "new" ? "new" : "used";
 }
 
-function specValue(specs: GuitarSpecRow[], label: string) {
-  return specs.find((spec) => spec.label.trim().toLowerCase() === label.toLowerCase())?.value?.trim() || "";
-}
-
 function saleStatusFromSpec(specs: GuitarSpecRow[]) {
-  const value = specValue(specs, "Sale status").toLowerCase().replace(/[\s-]+/g, "_");
-  return value === "for_sale" ? "for_sale" : "not_for_sale";
+  return availabilityFromSpecs(specs);
 }
 
 function originalityStatusFromSpec(specs: GuitarSpecRow[]) {
-  const value = specValue(specs, "Originality").toLowerCase().replace(/[\s-]+/g, "_");
-  if (value === "all_original") {
-    return "all_original";
-  }
-
-  if (value === "modified") {
-    return "modified";
-  }
-
-  return "unknown";
+  return originalityFromSpecs(specs);
 }
 
 function mapInstrumentRow({
@@ -657,8 +680,7 @@ function mapInstrumentRow({
 }): DemoInstrument {
   const customFields = specs
     .filter((spec) => {
-      const label = spec.label.trim().toLowerCase();
-      return spec.label.trim() && !["condition", "type", "finish", "sale status", "originality"].includes(label);
+      return spec.label.trim() && !isManagedInstrumentSpec(spec.label);
     })
     .map((spec, index) => ({
       id: `${guitar.id}-spec-${index}`,
@@ -677,7 +699,8 @@ function mapInstrumentRow({
     name: guitar.name || [guitar.brand, guitar.model].filter(Boolean).join(" ") || guitar.qr_code,
     brand: guitar.brand || "",
     model: guitar.model || "",
-    serial: guitar.serial_number || "",
+    serial: exposeInternalTrust || trust?.showSerialPublic === true ? guitar.serial_number || "" : "",
+    serialNotUsed: guitar.no_serial_used === true,
     year: guitar.year || "",
     instrumentCondition: instrumentConditionFromSpec(specs),
     saleStatus: saleStatusFromSpec(specs),
@@ -721,6 +744,8 @@ function mapServiceEvent(row: GuitarTimelineRow, includePrivate = false) {
   return {
     id: row.id,
     serviceDate: row.event_date || "",
+    datePrecision: row.date_precision || (row.event_date ? "day" : "unknown"),
+    category: row.category || row.event_type || "Other",
     eventType: row.event_type || "",
     title: row.title || "Service entry",
     publicDescription: row.description || "",
@@ -728,6 +753,9 @@ function mapServiceEvent(row: GuitarTimelineRow, includePrivate = false) {
     shopName: row.shop_name || "",
     location: row.location || "",
     isPublic: row.is_public === true,
+    isSystem: row.is_system === true,
+    relatedDocumentId: row.related_document_id || undefined,
+    relatedMediaId: row.related_media_id || undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at || undefined
   };
@@ -747,7 +775,7 @@ async function loadServiceEventsByGuitar(
 
   let query = supabase
     .from("guitar_timeline_events")
-    .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_at,updated_at")
+    .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_at,updated_at,date_precision,category,is_system,related_document_id,related_media_id")
     .in("guitar_id", uniqueIds)
     .order("event_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
@@ -760,6 +788,18 @@ async function loadServiceEventsByGuitar(
 
   if (result.error) {
     if (/column .* does not exist/i.test(result.error.message)) {
+      const legacyResult = await supabase
+        .from("guitar_timeline_events")
+        .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_at,updated_at")
+        .in("guitar_id", uniqueIds)
+        .order("event_date", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false });
+      if (legacyResult.error) return eventsByGuitar;
+      for (const item of legacyResult.data || []) {
+        const row = item as GuitarTimelineRow;
+        if (!includePrivate && row.is_public !== true) continue;
+        eventsByGuitar.set(row.guitar_id, [...(eventsByGuitar.get(row.guitar_id) || []), mapServiceEvent(row, includePrivate)]);
+      }
       return eventsByGuitar;
     }
 
@@ -848,25 +888,7 @@ async function settleWithin<T>(promise: Promise<T>, fallback: T, timeoutMs: numb
 }
 
 function stripAnonymousInstrumentFields(instrument: DemoInstrument) {
-  const {
-    ownerUserEmail: _ownerUserEmail,
-    internalVerificationNote: _internalVerificationNote,
-    internalAuthenticityNote: _internalAuthenticityNote,
-    safetyNote: _safetyNote,
-    collectionRemovedAt: _collectionRemovedAt,
-    collectionRemovedReason: _collectionRemovedReason,
-    ...publicInstrument
-  } = instrument;
-  if (publicInstrument.showSerialPublic === false) {
-    publicInstrument.serial = "";
-  }
-  publicInstrument.documentFiles = (publicInstrument.documentFiles || [])
-    .filter((document) => document.visibility === "public")
-    .map(({ privateNotes: _privateNotes, ...document }) => document);
-  publicInstrument.serviceEvents = (publicInstrument.serviceEvents || [])
-    .filter((event) => event.isPublic === true)
-    .map(({ privateNotes: _privateNotes, canEdit: _canEdit, lockedReason: _lockedReason, ...event }) => event);
-  return publicInstrument;
+  return sanitizePublicInstrument(instrument);
 }
 
 function publicStorageUrl(bucket: string, storagePath?: string | null) {
@@ -1311,15 +1333,7 @@ export async function GET(request: Request) {
     if (isRetiredPublicProfileCode(resolvedCode)) {
       return noStoreJson({ ok: false, message: "Instrument not found." } satisfies SupabaseReadResponse, { status: 404 });
     }
-    const publicLookup = await loadPublicRecordsFast(resolvedCode).catch((error: Error) => ({
-      records: [] as DemoInstrument[],
-      error: error.message || "Could not load public instrument."
-    }));
-    if (publicLookup.error) {
-      return supabaseReadErrorResponse(publicLookup.error);
-    }
-
-    const instrument = publicLookup.records[0] || null;
+    const instrument = await getPublicInstrumentByCode(resolvedCode).catch(() => null);
     if (!instrument) {
       return noStoreJson({ ok: false, message: "Instrument not found." } satisfies SupabaseReadResponse, { status: 404 });
     }
@@ -1327,16 +1341,12 @@ export async function GET(request: Request) {
     return noStoreJson({ ok: true, instrument: stripAnonymousInstrumentFields(instrument) } satisfies SupabaseReadResponse, { status: 200 });
   }
 
-  const publicResult = await loadPublicRecordsFast().catch((error: Error) => ({
-    records: [] as DemoInstrument[],
-    error: error.message || "Could not load public instruments."
-  }));
-  if (publicResult.error) {
-    return supabaseReadErrorResponse(publicResult.error);
-  }
+  const publicRecords = await getPublicInstruments().catch((error: Error) => {
+    throw new Error(error.message || "Could not load public instruments.");
+  });
 
   return noStoreJson(
-    { ok: true, instruments: publicResult.records, count: publicResult.records.length } satisfies SupabaseReadResponse,
+    { ok: true, instruments: publicRecords.map(sanitizePublicInstrument), count: publicRecords.length } satisfies SupabaseReadResponse,
     { status: 200 }
   );
 }
@@ -1359,6 +1369,28 @@ function brandDistance(first: string, second: string) {
     previous.splice(0, previous.length, ...current);
   }
   return previous[second.length];
+}
+
+async function findGuitarByExactSerial(
+  supabase: NonNullable<ReturnType<typeof createServerSupabaseClient>>,
+  serial: string
+) {
+  const normalized = normalizeSerialBuildId(serial);
+  if (normalized.length < 4) return null;
+
+  const alias = await supabase
+    .from("guitar_serial_aliases")
+    .select("guitar_id")
+    .eq("serial_normalized", normalized)
+    .maybeSingle<{ guitar_id: string }>();
+  if (!alias.error && alias.data?.guitar_id) return alias.data.guitar_id;
+  if (alias.error && !/does not exist|schema cache/i.test(alias.error.message)) {
+    throw new Error(alias.error.message);
+  }
+
+  const legacy = await supabase.from("guitars").select("id,serial_number").not("serial_number", "is", null).limit(5000);
+  if (legacy.error) throw new Error(legacy.error.message);
+  return (legacy.data || []).find((row) => normalizeSerialBuildId(String(row.serial_number || "")) === normalized)?.id || null;
 }
 
 async function resolveCanonicalBrand(
@@ -1483,17 +1515,17 @@ export async function POST(request: Request) {
 
   const existingProfileCount = await supabase.from("guitars").select("*", { count: "exact", head: true }).eq("owner_id", ownerUser.id);
   if (existingProfileCount.error) {
-    return NextResponse.json({ ok: false, message: "Could not verify user record limit." }, { status: 500 });
+    return NextResponse.json({ ok: false, message: "Could not verify the Profile limit." }, { status: 500 });
   }
 
   const instrumentCount = existingProfileCount.count ?? 0;
   if (instrumentCount < 0) {
-    return NextResponse.json({ ok: false, message: "Could not verify user record limit." }, { status: 500 });
+    return NextResponse.json({ ok: false, message: "Could not verify the Profile limit." }, { status: 500 });
   }
 
   if (!hasExpandedPlanAccess(resolvedAccountPlan) && instrumentCount >= 25) {
     return NextResponse.json(
-      { ok: false, message: "Free public beta accounts can create up to 25 records. Contact QRguitar for commercial setup or bulk onboarding." },
+      { ok: false, message: "Free public beta accounts can create up to 25 Profiles. Contact QRguitar for commercial setup or bulk onboarding." },
       { status: 402 }
     );
   }
@@ -1501,12 +1533,16 @@ export async function POST(request: Request) {
   const serialQrCode = qrCodeFromSerial(input.serial);
   let qrCode = serialQrCode || makeNewPermanentQrCode();
   if (serialQrCode) {
-    const duplicate = await supabase.from("guitars").select("id", { count: "exact", head: true }).eq("qr_code", qrCode);
-    if (duplicate.error) {
-      return NextResponse.json({ ok: false, message: "Could not verify the instrument ID." }, { status: 500 });
+    const duplicateId = await findGuitarByExactSerial(supabase, input.serial).catch(() => "lookup-error");
+    if (duplicateId === "lookup-error") {
+      return NextResponse.json({ ok: false, message: "Could not verify the Serial Number." }, { status: 500 });
     }
-    if (duplicate.count) {
-      return NextResponse.json({ ok: false, message: "That Serial / Build ID is already registered." }, { status: 409 });
+    if (duplicateId) {
+      return NextResponse.json({
+        ok: false,
+        message: "Existing QRguitar Profile found - transfer or ownership claim required.",
+        existingProfileFound: true
+      }, { status: 409 });
     }
   } else {
     for (let attempt = 0; attempt < 24; attempt += 1) {
@@ -1553,6 +1589,7 @@ export async function POST(request: Request) {
     model: input.model,
     year: input.year || null,
     serial_number: input.serial || null,
+    no_serial_used: input.serialNotUsed,
     builder: input.builder || null,
     location: input.location || null,
     status: "unverified" as const,
@@ -1592,7 +1629,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const uploadedDocuments: Array<{ name: string; storagePath: string; isPublic: boolean; documentType: string; publicDescription: string; privateNotes: string }> = [];
+  const uploadedDocuments: Array<{ name: string; storagePath: string; isPublic: boolean; documentType: string; publicDescription: string; privateNotes: string; issuerSource: string; documentDate: string; description: string }> = [];
   for (const [index, document] of (body.documents || []).entries()) {
     const uploadedPath = await uploadDocumentSource(supabase, ownerUser.id, insertedGuitar.id, document.dataUrl, `document-${index + 1}`);
     if (uploadedPath) {
@@ -1602,7 +1639,10 @@ export async function POST(request: Request) {
         isPublic: document.visibility === "public",
         documentType: cleanDocumentText(document.documentType, 80) || "Other",
         publicDescription: cleanDocumentText(document.publicDescription, 1000),
-        privateNotes: cleanDocumentText(document.privateNotes, 2000)
+        privateNotes: cleanDocumentText(document.privateNotes, 2000),
+        issuerSource: cleanDocumentText(document.issuerSource, 200),
+        documentDate: cleanDocumentText(document.documentDate, 10),
+        description: cleanDocumentText(document.description, 1000)
       });
     }
   }
@@ -1617,7 +1657,10 @@ export async function POST(request: Request) {
       file_name: document.name.slice(0, 255),
       document_type: document.documentType,
       public_description: document.publicDescription || null,
-      private_notes: document.privateNotes || null
+      private_notes: document.privateNotes || null,
+      issuer_source: document.issuerSource || null,
+      document_date: /^\d{4}-\d{2}-\d{2}$/.test(document.documentDate) ? document.documentDate : null,
+      description: document.description || null
     }));
 
     const documentInsert = await supabase.from("guitar_documents").insert(documentPayload);
@@ -1634,7 +1677,7 @@ export async function POST(request: Request) {
     { guitar_id: insertedGuitar.id, label: "Condition", value: input.condition, sort_order: 1 },
     ...(input.instrumentType ? [{ guitar_id: insertedGuitar.id, label: "Type", value: input.instrumentType, sort_order: 2 }] : []),
     ...(input.finish ? [{ guitar_id: insertedGuitar.id, label: "Finish", value: input.finish, sort_order: 3 }] : []),
-    { guitar_id: insertedGuitar.id, label: "Sale status", value: input.saleStatus, sort_order: 4 },
+    { guitar_id: insertedGuitar.id, label: "Availability", value: input.saleStatus, sort_order: 4 },
     { guitar_id: insertedGuitar.id, label: "Originality", value: input.originalityStatus, sort_order: 5 },
     ...(body.customFields || [])
       .filter((field) => String(field.label || "").trim() && String(field.value || "").trim())
@@ -1820,7 +1863,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json(
         {
           ok: false,
-          message: "Verified and authenticity-confirmed records are preserved for provenance. Transfer ownership or contact QRguitar admin for permanent removal."
+          message: "Verified and authenticity-confirmed Profiles are preserved for provenance. Transfer ownership or contact QRguitar support for permanent removal."
         },
         { status: 403 }
       );
@@ -1899,7 +1942,7 @@ export async function PATCH(request: Request) {
   input.brand = brandResolution.brand;
 
   if (!input.qrCode || !input.brand || !input.model || (!input.serial && !input.serialNotUsed)) {
-    return NextResponse.json({ ok: false, message: "Brand, model, and serial/build ID are required unless the instrument does not use one." }, { status: 400 });
+    return NextResponse.json({ ok: false, message: "Brand, model, and Serial Number are required unless the instrument does not use one." }, { status: 400 });
   }
 
   const ownerUser = auth.user;
@@ -1912,22 +1955,50 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: false, message: "Only the owner can edit this record." }, { status: 403 });
   }
 
-  const nextQrCode = qrCodeFromSerial(input.serial) || input.qrCode;
-  if (nextQrCode !== input.qrCode) {
-    const duplicate = await supabase.from("guitars").select("id").eq("qr_code", nextQrCode).maybeSingle<{ id: string }>();
-    if (duplicate.error) {
-      return NextResponse.json({ ok: false, message: "Could not verify the updated Serial / Build ID." }, { status: 500 });
+  const currentSerialNormalized = normalizeSerialBuildId(existing.data.serial_number || "");
+  const nextSerialNormalized = normalizeSerialBuildId(input.serial || "");
+  const serialCorrectionChangesIdentity = Boolean(nextSerialNormalized) && nextSerialNormalized !== currentSerialNormalized;
+  const serialCorrectionApproved = serialCorrectionChangesIdentity
+    ? await canApproveSerialCorrection(supabase, auth.user)
+    : true;
+
+  if (serialCorrectionChangesIdentity && !serialCorrectionApproved) {
+    return NextResponse.json(
+      { ok: false, message: "Serial Number corrections require QRguitar admin approval so printed QR links and ownership history stay intact." },
+      { status: 403 }
+    );
+  }
+
+  const nextQrCode = serialCorrectionChangesIdentity ? qrCodeFromSerial(input.serial) || input.qrCode : input.qrCode;
+  if (input.serial) {
+    const duplicateId = await findGuitarByExactSerial(supabase, input.serial).catch(() => "lookup-error");
+    if (duplicateId === "lookup-error") {
+      return NextResponse.json({ ok: false, message: "Could not verify the updated Serial Number." }, { status: 500 });
     }
-    if (duplicate.data && duplicate.data.id !== existing.data.id) {
-      return NextResponse.json({ ok: false, message: "That Serial / Build ID is already registered." }, { status: 409 });
+    if (duplicateId && duplicateId !== existing.data.id) {
+      return NextResponse.json({ ok: false, message: "That Serial Number belongs to another QRguitar Profile." }, { status: 409 });
+    }
+  }
+
+  if (nextQrCode !== input.qrCode) {
+    const duplicateQrCode = await supabase
+      .from("guitars")
+      .select("id")
+      .eq("qr_code", nextQrCode)
+      .neq("id", existing.data.id)
+      .maybeSingle<{ id: string }>();
+    if (duplicateQrCode.error) {
+      return NextResponse.json({ ok: false, message: "Could not verify the updated QRguitar ID." }, { status: 500 });
+    }
+    if (duplicateQrCode.data?.id) {
+      return NextResponse.json({ ok: false, message: "That QRguitar ID already belongs to another Profile." }, { status: 409 });
     }
 
-    const redirectResult = await supabase.from("qr_redirects").upsert(
-      { guitar_id: existing.data.id, old_path: `/i/${input.qrCode}`, active: true },
-      { onConflict: "old_path" }
-    );
-    if (redirectResult.error) {
-      return NextResponse.json({ ok: false, message: "The previous QR link could not be secured before updating this Serial / Build ID." }, { status: 500 });
+    const redirectInsert = await supabase
+      .from("qr_redirects")
+      .upsert({ guitar_id: existing.data.id, old_path: `/i/${input.qrCode}`, active: true }, { onConflict: "old_path" });
+    if (redirectInsert.error) {
+      return NextResponse.json({ ok: false, message: "Could not preserve the former QR link." }, { status: 500 });
     }
   }
 
@@ -1978,19 +2049,20 @@ export async function PATCH(request: Request) {
   const { error: updateError } = await supabase
     .from("guitars")
     .update({
+      qr_code: nextQrCode,
+      permanent_path: `/i/${nextQrCode}`,
       name: input.name || `${input.brand} ${input.model}`.trim(),
       brand: input.brand,
       model: input.model,
       year: input.year || null,
       serial_number: input.serial || null,
+      no_serial_used: input.serialNotUsed,
       builder: input.builder || null,
       location: input.location || null,
       status: existing.data.status,
       visibility: input.visibility,
       summary: input.summary || "",
       hero_image_path: heroImagePath,
-      qr_code: nextQrCode,
-      permanent_path: `/i/${nextQrCode}`,
       updated_at: new Date().toISOString()
     })
     .eq("qr_code", input.qrCode)
@@ -2002,18 +2074,34 @@ export async function PATCH(request: Request) {
 
   if (nextQrCode !== input.qrCode) {
     const oldTrustKey = recordTrustContentKey(input.qrCode);
-    const newTrustKey = recordTrustContentKey(nextQrCode);
-    const trustRow = await supabase.from("site_content").select("content_value").eq("content_key", oldTrustKey).maybeSingle<{ content_value: Record<string, unknown> }>();
-    if (trustRow.data?.content_value) {
+    const nextTrustKey = recordTrustContentKey(nextQrCode);
+    const oldTrust = await supabase
+      .from("site_content")
+      .select("content_value,updated_by")
+      .eq("content_key", oldTrustKey)
+      .maybeSingle<{ content_value?: Record<string, unknown>; updated_by?: string | null }>();
+    if (!oldTrust.error && oldTrust.data?.content_value) {
       await supabase.from("site_content").upsert({
-        content_key: newTrustKey,
-        content_value: trustRow.data.content_value,
-        updated_by: ownerUser.id,
+        content_key: nextTrustKey,
+        content_value: oldTrust.data.content_value,
+        updated_by: oldTrust.data.updated_by || ownerUser.id,
         updated_at: new Date().toISOString()
-      }, { onConflict: "content_key" });
+      });
       await supabase.from("site_content").delete().eq("content_key", oldTrustKey);
     }
+
+    await logAdminAuditEvent(supabase, {
+      actorUserId: ownerUser.id,
+      actorEmail: ownerUser.email || "",
+      action: "serial_correction_qrguitar_id_changed",
+      targetType: "guitar",
+      targetId: nextQrCode,
+      targetUserId: ownerUser.id,
+      reason: "Approved Serial Number correction",
+      metadata: { oldQrCode: input.qrCode, nextQrCode, serialNumber: input.serial }
+    });
   }
+
 
   const existingGuitar = existing.data;
   if (!existingGuitar) {
@@ -2054,16 +2142,19 @@ export async function PATCH(request: Request) {
 
   const existingDocumentsResult = await supabase
     .from("guitar_documents")
-    .select("guitar_id,name,storage_path,is_public,document_type,public_description,private_notes,created_at,updated_at")
+    .select("guitar_id,name,storage_path,is_public,document_type,public_description,private_notes,issuer_source,document_date,description,file_size_bytes,related_timeline_event_id,related_service_event_id,created_at,updated_at")
     .eq("guitar_id", existingGuitar.id);
   const existingDocuments = ((existingDocumentsResult.data || []) as GuitarDocumentRow[]);
-  const uploadedDocuments: Array<{ name: string; storagePath: string; isPublic: boolean; documentType: string; publicDescription: string; privateNotes: string }> = [];
+  const uploadedDocuments: Array<{ name: string; storagePath: string; isPublic: boolean; documentType: string; publicDescription: string; privateNotes: string; issuerSource: string; documentDate: string; description: string }> = [];
   for (const [index, document] of (body.documents || []).entries()) {
     const uploadedPath = await uploadDocumentSource(supabase, ownerUser.id, existingGuitar.id, document.dataUrl, `document-${index + 1}`);
     const metadata = {
       documentType: cleanDocumentText(document.documentType, 80) || "Other",
       publicDescription: cleanDocumentText(document.publicDescription, 1000),
-      privateNotes: cleanDocumentText(document.privateNotes, 2000)
+      privateNotes: cleanDocumentText(document.privateNotes, 2000),
+      issuerSource: cleanDocumentText(document.issuerSource, 200),
+      documentDate: cleanDocumentText(document.documentDate, 10),
+      description: cleanDocumentText(document.description, 1000)
     };
     if (uploadedPath) {
       uploadedDocuments.push({
@@ -2110,6 +2201,9 @@ export async function PATCH(request: Request) {
       document_type: document.documentType,
       public_description: document.publicDescription || null,
       private_notes: document.privateNotes || null,
+      issuer_source: document.issuerSource || null,
+      document_date: /^\d{4}-\d{2}-\d{2}$/.test(document.documentDate) ? document.documentDate : null,
+      description: document.description || null,
       updated_at: new Date().toISOString()
     }));
     const documentInsert = await supabase.from("guitar_documents").insert(documentPayload);
@@ -2124,7 +2218,7 @@ export async function PATCH(request: Request) {
     { guitar_id: existingGuitar.id, label: "Condition", value: input.condition, sort_order: 1 },
     ...(input.instrumentType ? [{ guitar_id: existingGuitar.id, label: "Type", value: input.instrumentType, sort_order: 2 }] : []),
     ...(input.finish ? [{ guitar_id: existingGuitar.id, label: "Finish", value: input.finish, sort_order: 3 }] : []),
-    { guitar_id: existingGuitar.id, label: "Sale status", value: input.saleStatus, sort_order: 4 },
+    { guitar_id: existingGuitar.id, label: "Availability", value: input.saleStatus, sort_order: 4 },
     { guitar_id: existingGuitar.id, label: "Originality", value: input.originalityStatus, sort_order: 5 },
     ...(body.customFields || [])
       .filter((field) => String(field.label || "").trim() && String(field.value || "").trim())

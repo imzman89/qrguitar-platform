@@ -12,7 +12,7 @@ import {
   type DemoInstrument
 } from "../../lib/local-demo";
 
-type ShowFilter = "All profiles" | "For sale" | "Not for sale" | "New" | "Used" | "Verified" | "Unverified" | "Authenticity confirmed" | "Authenticity unconfirmed" | "All original" | "Modified" | "Safety alerts" | "Service history";
+type ShowFilter = "All profiles" | "For Sale" | "Not for Sale" | "New" | "Used" | "Verified" | "Unverified" | "Authenticity confirmed" | "Authenticity unconfirmed" | "All original" | "Modified" | "Safety alerts" | "Service history";
 
 export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrument[] }) {
   const [records, setRecords] = useState<DemoInstrument[]>(dedupeByCodeAndDate(initialRecords));
@@ -20,6 +20,10 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
   const [brand, setBrand] = useState("All brands");
   const [showFilter, setShowFilter] = useState<ShowFilter>("All profiles");
   const [query, setQuery] = useState("");
+  const [exactMatchCode, setExactMatchCode] = useState("");
+  const [serialLookupMessage, setSerialLookupMessage] = useState("");
+  const [protectedSerialMatch, setProtectedSerialMatch] = useState(false);
+  const [serialLookupBusy, setSerialLookupBusy] = useState(false);
   const [sortMode, setSortMode] = useState<"Newest" | "Oldest" | "Title" | "Year">("Newest");
 
   const loadRecords = useCallback(async () => {
@@ -69,8 +73,13 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
   const hasFilterOrSearch = brand !== "All brands" || showFilter !== "All profiles" || query.trim().length > 0;
 
   const filtered = records
-    .filter((record) => brand === "All brands" || record.brand === brand)
+    .filter((record) => !exactMatchCode || record.qrCode === exactMatchCode)
+    .filter((record) => Boolean(exactMatchCode) || brand === "All brands" || record.brand === brand)
     .filter((record) => {
+      if (exactMatchCode) {
+        return true;
+      }
+
       if (showFilter === "Verified") {
         return getInstrumentVerificationStatus(record) === "verified";
       }
@@ -91,11 +100,11 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
         return record.safetyStatus === "lost" || record.safetyStatus === "stolen";
       }
 
-      if (showFilter === "For sale") {
+      if (showFilter === "For Sale") {
         return record.saleStatus === "for_sale";
       }
 
-      if (showFilter === "Not for sale") {
+      if (showFilter === "Not for Sale") {
         return record.saleStatus !== "for_sale";
       }
 
@@ -122,6 +131,9 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
       return true;
     })
     .filter((record) => {
+      if (exactMatchCode) {
+        return true;
+      }
       const haystack = [record.qrCode, record.name, record.brand, record.model, record.serial, record.location, record.instrumentType, record.saleStatus, record.originalityStatus].join(" ").toLowerCase();
       return haystack.includes(query.toLowerCase());
     });
@@ -153,6 +165,49 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
     return unique(records.map((record) => record.brand).filter(Boolean));
   }, [records]);
 
+  async function searchExactSerial() {
+    const serial = query.trim();
+    if (serial.length < 4) {
+      setSerialLookupMessage("Enter at least four letters or numbers for an exact serial lookup.");
+      return;
+    }
+
+    setSerialLookupBusy(true);
+    setSerialLookupMessage("");
+    setProtectedSerialMatch(false);
+    setExactMatchCode("");
+    try {
+      const response = await fetch("/api/instruments/serial-lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ serial })
+      });
+      const payload = await response.json().catch(() => null) as {
+        ok?: boolean;
+        match?: "public" | "protected" | "none";
+        message?: string;
+        instrument?: DemoInstrument;
+      } | null;
+
+      if (!response.ok || !payload?.ok) {
+        setSerialLookupMessage(payload?.message || "Exact serial lookup is temporarily unavailable.");
+        return;
+      }
+      if (payload.match === "public" && payload.instrument) {
+        setRecords((current) => dedupeByCodeAndDate([payload.instrument as DemoInstrument, ...current]));
+        setExactMatchCode(payload.instrument.qrCode);
+        setSerialLookupMessage("Exact serial match found. The serial remains hidden when the owner has chosen privacy.");
+        return;
+      }
+      setProtectedSerialMatch(payload.match === "protected");
+      setSerialLookupMessage(payload.message || "No QRguitar Profile matches that exact serial.");
+    } catch {
+      setSerialLookupMessage("Exact serial lookup is temporarily unavailable.");
+    } finally {
+      setSerialLookupBusy(false);
+    }
+  }
+
   return (
     <>
       <Nav />
@@ -162,7 +217,7 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
             <div>
               <div className="eyebrow">The Catalog</div>
               <h2>Browse QRguitar Profiles.</h2>
-              <p>Find instruments by brand, model, year, condition, verification, originality, safety status, service history, proof, or sale availability.</p>
+              <p>Find instruments by brand, model, year, condition, verification, originality, safety status, service history, proof, or Availability.</p>
             </div>
             <Link className="button" href="/create">
               Create Profile
@@ -171,10 +226,35 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
 
           <section className="catalog-filters" aria-label="Catalog filters">
             <label className="catalog-search">
-              Search
+              Search profiles
               <span>
                 <Search size={16} />
-                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Serial, model, brand..." />
+                <input
+                  value={query}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setExactMatchCode("");
+                    setSerialLookupMessage("");
+                    setProtectedSerialMatch(false);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void searchExactSerial();
+                    }
+                  }}
+                  placeholder="Brand, model, or exact serial"
+                />
+                <button
+                  type="button"
+                  className="catalog-exact-search"
+                  onClick={() => void searchExactSerial()}
+                  disabled={serialLookupBusy}
+                  aria-label="Find exact serial"
+                  title="Find exact serial"
+                >
+                  <Search size={16} />
+                </button>
               </span>
             </label>
             <label>
@@ -188,8 +268,8 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
               <select value={showFilter} onChange={(event) => setShowFilter(event.target.value as ShowFilter)}>
                 <option>All profiles</option>
                 <optgroup label="Availability">
-                  <option>For sale</option>
-                  <option>Not for sale</option>
+                  <option>For Sale</option>
+                  <option>Not for Sale</option>
                 </optgroup>
                 <optgroup label="Condition">
                   <option>New</option>
@@ -222,6 +302,13 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
             </label>
           </section>
 
+          {serialLookupMessage ? (
+            <div className={exactMatchCode ? "catalog-lookup-result is-match" : "catalog-lookup-result"} role="status">
+              <span>{serialLookupMessage}</span>
+              {protectedSerialMatch ? <Link className="button secondary" href="/ownership-claim">Request ownership</Link> : null}
+            </div>
+          ) : null}
+
           <section className="catalog-summary" aria-label="Catalog discovery highlights">
             <div className="catalog-toolbar">
               <p>
@@ -235,6 +322,9 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
                     setBrand("All brands");
                     setShowFilter("All profiles");
                     setQuery("");
+                    setExactMatchCode("");
+                    setSerialLookupMessage("");
+                    setProtectedSerialMatch(false);
                   }}
                 >
                   <SlidersHorizontal size={14} />

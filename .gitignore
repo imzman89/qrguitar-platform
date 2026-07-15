@@ -10,6 +10,7 @@ apps/web/.env.*
 !apps/web/.env.example
 
 .vercel/
+supabase/.temp/
 .turbo/
 .expo/
 dist/

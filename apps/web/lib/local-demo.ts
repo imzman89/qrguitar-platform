@@ -40,6 +40,7 @@ export type DemoInstrument = {
   brand: string;
   model: string;
   serial: string;
+  serialNotUsed?: boolean;
   year: string;
   instrumentCondition?: InstrumentCondition;
   saleStatus?: SaleStatus;
@@ -83,6 +84,7 @@ export type DemoInstrument = {
   customLinks?: CustomProfileLink[];
   documentFiles?: CustomDocumentFile[];
   serviceEvents?: ServiceHistoryEntry[];
+  externalMedia?: ExternalMediaItem[];
   ownershipTransferCount?: number;
   heroImageDataUrl?: string;
   galleryImageDataUrls?: string[];
@@ -109,6 +111,12 @@ export type CustomDocumentFile = {
   documentType?: string;
   publicDescription?: string;
   privateNotes?: string;
+  issuerSource?: string;
+  documentDate?: string;
+  description?: string;
+  fileSizeBytes?: number;
+  relatedTimelineEventId?: string;
+  relatedServiceEventId?: string;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -116,6 +124,8 @@ export type CustomDocumentFile = {
 export type ServiceHistoryEntry = {
   id: string;
   serviceDate?: string;
+  datePrecision?: "day" | "month" | "year" | "unknown";
+  category?: string;
   eventType?: string;
   title: string;
   publicDescription?: string;
@@ -123,10 +133,26 @@ export type ServiceHistoryEntry = {
   shopName?: string;
   location?: string;
   isPublic: boolean;
+  isSystem?: boolean;
+  relatedDocumentId?: string;
+  relatedMediaId?: string;
   canEdit?: boolean;
   lockedReason?: string;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type ExternalMediaItem = {
+  id: string;
+  provider: "youtube" | "vimeo" | "audio" | "link";
+  canonicalUrl: string;
+  providerId?: string;
+  title: string;
+  caption?: string;
+  thumbnailUrl?: string;
+  isPublic: boolean;
+  sortOrder?: number;
+  createdAt?: string;
 };
 
 export type DemoTransfer = {

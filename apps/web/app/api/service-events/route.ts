@@ -13,15 +13,20 @@ const NO_STORE_HEADERS = {
 };
 
 const EVENT_TYPES = new Set([
+  "Ownership",
+  "Purchase",
+  "Sale",
+  "Service",
   "Setup",
   "Repair",
   "Modification",
-  "Pickup Install",
-  "Wiring",
-  "Fretwork",
+  "Restoration",
   "Inspection",
-  "Appraisal/Review",
-  "Cleaning",
+  "Appraisal",
+  "Verification",
+  "Safety",
+  "Media",
+  "Documentation",
   "Other"
 ]);
 
@@ -48,6 +53,11 @@ type ServiceEventRow = {
   created_by_user_id?: string | null;
   created_at: string;
   updated_at: string | null;
+  date_precision?: "day" | "month" | "year" | "unknown" | null;
+  category?: string | null;
+  is_system?: boolean | null;
+  related_document_id?: string | null;
+  related_media_id?: string | null;
 };
 
 function json<T>(body: T, init: ResponseInit = {}) {
@@ -75,9 +85,17 @@ function cleanText(value: unknown, maxLength = 2000) {
   return String(value || "").trim().slice(0, maxLength);
 }
 
-function cleanDate(value: unknown) {
+function cleanDate(value: unknown, precision: string) {
   const text = cleanText(value, 20);
+  if (precision === "unknown") return null;
+  if (precision === "year" && /^\d{4}$/.test(text)) return `${text}-01-01`;
+  if (precision === "month" && /^\d{4}-\d{2}$/.test(text)) return `${text}-01`;
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
+}
+
+function cleanDatePrecision(value: unknown) {
+  const precision = cleanText(value, 20);
+  return precision === "month" || precision === "year" || precision === "unknown" ? precision : "day";
 }
 
 function cleanEventType(value: unknown) {
@@ -86,7 +104,7 @@ function cleanEventType(value: unknown) {
 }
 
 function canManageServiceEvent(row: ServiceEventRow, userId: string, isAdmin: boolean) {
-  return Boolean(isAdmin || (row.created_by_user_id && row.created_by_user_id === userId));
+  return Boolean(isAdmin || (row.is_system !== true && row.created_by_user_id && row.created_by_user_id === userId));
 }
 
 function lockedServiceHistoryMessage() {
@@ -98,6 +116,8 @@ function mapServiceEvent(row: ServiceEventRow, includePrivate = false, userId = 
   return {
     id: row.id,
     serviceDate: row.event_date || "",
+    datePrecision: row.date_precision || (row.event_date ? "day" : "unknown"),
+    category: row.category || row.event_type || "Other",
     eventType: row.event_type || "",
     title: row.title,
     publicDescription: row.description || "",
@@ -105,6 +125,9 @@ function mapServiceEvent(row: ServiceEventRow, includePrivate = false, userId = 
     shopName: row.shop_name || "",
     location: row.location || "",
     isPublic: row.is_public === true,
+    isSystem: row.is_system === true,
+    relatedDocumentId: row.related_document_id || undefined,
+    relatedMediaId: row.related_media_id || undefined,
     ...(includePrivate ? { canEdit, lockedReason: canEdit ? "" : lockedServiceHistoryMessage() } : {}),
     createdAt: row.created_at,
     updatedAt: row.updated_at || undefined
@@ -188,7 +211,7 @@ export async function GET(request: Request) {
 
   let query = supabase
     .from("guitar_timeline_events")
-    .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_by_user_id,created_at,updated_at")
+    .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_by_user_id,created_at,updated_at,date_precision,category,is_system,related_document_id,related_media_id")
     .eq("guitar_id", guitar.id)
     .order("event_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
@@ -245,13 +268,17 @@ export async function POST(request: Request) {
     return json({ ok: false, message: "Service title is required." }, { status: 400 });
   }
 
+  const datePrecision = cleanDatePrecision(body?.datePrecision);
+  const category = cleanEventType(body?.category || body?.eventType);
   const created = await supabase
     .from("guitar_timeline_events")
     .insert({
       guitar_id: guitar.id,
       created_by_user_id: access.user.id,
-      event_date: cleanDate(body?.serviceDate),
-      event_type: cleanEventType(body?.eventType),
+      event_date: cleanDate(body?.serviceDate, datePrecision),
+      date_precision: datePrecision,
+      category,
+      event_type: category,
       title,
       description: cleanText(body?.publicDescription, 4000),
       private_notes: cleanText(body?.privateNotes, 4000),
@@ -259,7 +286,7 @@ export async function POST(request: Request) {
       location: cleanText(body?.location, 200),
       is_public: body?.isPublic === true
     })
-    .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_by_user_id,created_at,updated_at")
+    .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_by_user_id,created_at,updated_at,date_precision,category,is_system,related_document_id,related_media_id")
     .single<ServiceEventRow>();
 
   if (created.error || !created.data) {
@@ -329,11 +356,15 @@ export async function PATCH(request: Request) {
     return json({ ok: false, message: "Service title is required." }, { status: 400 });
   }
 
+  const datePrecision = cleanDatePrecision(body?.datePrecision);
+  const category = cleanEventType(body?.category || body?.eventType);
   let updateQuery = supabase
     .from("guitar_timeline_events")
     .update({
-      event_date: cleanDate(body?.serviceDate),
-      event_type: cleanEventType(body?.eventType),
+      event_date: cleanDate(body?.serviceDate, datePrecision),
+      date_precision: datePrecision,
+      category,
+      event_type: category,
       title,
       description: cleanText(body?.publicDescription, 4000),
       private_notes: cleanText(body?.privateNotes, 4000),
@@ -350,7 +381,7 @@ export async function PATCH(request: Request) {
   }
 
   const update = await updateQuery
-    .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_by_user_id,created_at,updated_at")
+    .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_by_user_id,created_at,updated_at,date_precision,category,is_system,related_document_id,related_media_id")
     .single<ServiceEventRow>();
 
   if (update.error || !update.data) {

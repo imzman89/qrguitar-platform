@@ -40,7 +40,7 @@ export function CollectibleRecordCard({
   }, [record.galleryImageDataUrls, record.heroImageDataUrl]);
   const imageUrl = galleryImages[0] || "";
   const condition = getInstrumentCondition(record);
-  const saleStatus = record.saleStatus === "for_sale" ? "For sale" : "";
+  const saleStatus = record.saleStatus === "for_sale" ? "For Sale" : "";
   const originalityStatus = record.originalityStatus === "all_original" ? "All original" : record.originalityStatus === "modified" ? "Modified" : "";
   const verificationStatus = getInstrumentVerificationStatus(record);
   const authenticityStatus = record.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed";
@@ -86,7 +86,7 @@ export function CollectibleRecordCard({
             {summary ? <p className="collectible-card-summary">{summary}</p> : null}
           </div>
 
-          <div className="record-badge-row" aria-label="Record status">
+          <div className="record-badge-row" aria-label="Profile status">
             <span className="record-badge record-badge--condition"><span className="record-badge-text">{condition === "new" ? "New" : "Used"}</span></span>
             {record.showVerificationBadge !== false ? (
               <span className={`record-badge ${verificationStatus === "verified" ? "record-badge--verified" : "record-badge--unverified"}`}>
