@@ -343,7 +343,7 @@ async function loadTrustSettingsMap(qrCodes: string[]) {
   return trustByCode;
 }
 
-async function loadRelated(guitars: GuitarRow[]) {
+async function loadRelated(guitars: GuitarRow[], serviceRole = false) {
   if (!guitars.length) {
     return {
       media: new Map<string, string[]>(),
@@ -360,18 +360,18 @@ async function loadRelated(guitars: GuitarRow[]) {
   const idFilter = ids.map(encodeURIComponent).join(",");
   const ownerIdFilter = ownerIds.map(encodeURIComponent).join(",");
   const [mediaRows, specRows, documentRows, profileRows, serviceEventRows, externalMediaRows] = await Promise.all([
-    supabaseHttpsJson<MediaRow[]>(`/rest/v1/guitar_media?select=guitar_id,storage_path&guitar_id=in.(${idFilter})`),
-    supabaseHttpsJson<SpecRow[]>(`/rest/v1/guitar_specs?select=guitar_id,label,value&guitar_id=in.(${idFilter})`),
-    supabaseHttpsJson<DocumentRow[]>(`/rest/v1/guitar_documents?select=guitar_id,name,storage_path,is_public,document_type,public_description,issuer_source,document_date,description,file_size_bytes,related_timeline_event_id,related_service_event_id,created_at&guitar_id=in.(${idFilter})`),
+    supabaseHttpsJson<MediaRow[]>(`/rest/v1/guitar_media?select=guitar_id,storage_path&guitar_id=in.(${idFilter})`, { serviceRole }),
+    supabaseHttpsJson<SpecRow[]>(`/rest/v1/guitar_specs?select=guitar_id,label,value&guitar_id=in.(${idFilter})`, { serviceRole }),
+    supabaseHttpsJson<DocumentRow[]>(`/rest/v1/guitar_documents?select=guitar_id,name,storage_path,is_public,document_type,public_description,issuer_source,document_date,description,file_size_bytes,related_timeline_event_id,related_service_event_id,created_at&guitar_id=in.(${idFilter})`, { serviceRole }),
     ownerIds.length
-      ? supabaseHttpsJson<ProfileRow[]>(`/rest/v1/profiles?select=id,display_name,account_status,hide_public_content&id=in.(${ownerIdFilter})`)
+      ? supabaseHttpsJson<ProfileRow[]>(`/rest/v1/profiles?select=id,display_name,account_status,hide_public_content&id=in.(${ownerIdFilter})`, { serviceRole })
       : Promise.resolve([]),
-    supabaseHttpsJson<TimelineRow[]>(`/rest/v1/guitar_timeline_events?select=id,guitar_id,event_date,event_type,title,description,shop_name,location,is_public,created_at,updated_at,date_precision,category,is_system,related_document_id,related_media_id&guitar_id=in.(${idFilter})&is_public=eq.true&order=event_date.desc.nullslast,created_at.desc`)
+    supabaseHttpsJson<TimelineRow[]>(`/rest/v1/guitar_timeline_events?select=id,guitar_id,event_date,event_type,title,description,shop_name,location,is_public,created_at,updated_at,date_precision,category,is_system,related_document_id,related_media_id&guitar_id=in.(${idFilter})&is_public=eq.true&order=event_date.desc.nullslast,created_at.desc`, { serviceRole })
       .catch(async (error: Error) => {
         if (!/column .* does not exist/i.test(error.message)) throw error;
-        return supabaseHttpsJson<TimelineRow[]>(`/rest/v1/guitar_timeline_events?select=id,guitar_id,event_date,event_type,title,description,shop_name,location,is_public,created_at,updated_at&guitar_id=in.(${idFilter})&is_public=eq.true&order=event_date.desc.nullslast,created_at.desc`);
+        return supabaseHttpsJson<TimelineRow[]>(`/rest/v1/guitar_timeline_events?select=id,guitar_id,event_date,event_type,title,description,shop_name,location,is_public,created_at,updated_at&guitar_id=in.(${idFilter})&is_public=eq.true&order=event_date.desc.nullslast,created_at.desc`, { serviceRole });
       }),
-    supabaseHttpsJson<ExternalMediaRow[]>(`/rest/v1/guitar_external_media?select=id,guitar_id,provider,canonical_url,provider_id,title,caption,thumbnail_url,is_public,sort_order,created_at&guitar_id=in.(${idFilter})&is_public=eq.true&order=sort_order.asc,created_at.asc`)
+    supabaseHttpsJson<ExternalMediaRow[]>(`/rest/v1/guitar_external_media?select=id,guitar_id,provider,canonical_url,provider_id,title,caption,thumbnail_url,is_public,sort_order,created_at&guitar_id=in.(${idFilter})&is_public=eq.true&order=sort_order.asc,created_at.asc`, { serviceRole })
       .catch((error: Error) => {
         if (/does not exist/i.test(error.message)) return [];
         throw error;
@@ -463,12 +463,12 @@ export async function getPublicInstrumentByCode(code: string) {
   if (!normalizedCode || isRetiredPublicProfileCode(normalizedCode)) {
     return null;
   }
-  let rows = await supabaseHttpsJson<GuitarRow[]>(`/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,no_serial_used,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&qr_code=eq.${encodeURIComponent(normalizedCode)}&limit=1`);
+  let rows = await supabaseHttpsJson<GuitarRow[]>(`/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,no_serial_used,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&qr_code=eq.${encodeURIComponent(normalizedCode)}&limit=1`, { serviceRole: true });
   if (!rows.length) {
-    const redirects = await supabaseHttpsJson<Array<{ guitar_id: string }>>(`/rest/v1/qr_redirects?select=guitar_id&old_path=eq.${encodeURIComponent(`/i/${normalizedCode}`)}&active=eq.true&limit=1`);
+    const redirects = await supabaseHttpsJson<Array<{ guitar_id: string }>>(`/rest/v1/qr_redirects?select=guitar_id&old_path=eq.${encodeURIComponent(`/i/${normalizedCode}`)}&active=eq.true&limit=1`, { serviceRole: true });
     const guitarId = redirects[0]?.guitar_id;
     if (guitarId) {
-      rows = await supabaseHttpsJson<GuitarRow[]>(`/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,no_serial_used,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&id=eq.${encodeURIComponent(guitarId)}&limit=1`);
+      rows = await supabaseHttpsJson<GuitarRow[]>(`/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,no_serial_used,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&id=eq.${encodeURIComponent(guitarId)}&limit=1`, { serviceRole: true });
     }
   }
   const data = rows[0] || null;
@@ -478,7 +478,7 @@ export async function getPublicInstrumentByCode(code: string) {
   }
 
   const [related, trustByCode] = await Promise.all([
-    loadRelated([data]),
+    loadRelated([data], true),
     loadTrustSettingsMap([data.qr_code])
   ]);
   const ownerProfile = related.profiles.get(data.owner_id || "");
