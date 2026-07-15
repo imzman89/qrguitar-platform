@@ -12,6 +12,7 @@ import {
   type DemoInstrument
 } from "../lib/local-demo";
 import { RecordShareButton } from "./RecordShareButton";
+import { getProfilePhotoUrls, getPublicDocumentCount } from "../lib/instrument-profile-contract";
 
 type CollectibleRecordCardProps = {
   record: DemoInstrument;
@@ -41,14 +42,14 @@ export function CollectibleRecordCard({
   const imageUrl = galleryImages[0] || "";
   const condition = getInstrumentCondition(record);
   const saleStatus = record.saleStatus === "for_sale" ? "For Sale" : "";
-  const originalityStatus = record.originalityStatus === "all_original" ? "All original" : record.originalityStatus === "modified" ? "Modified" : "";
+  const originalityStatus = record.originalityStatus === "all_original" ? "All Original" : record.originalityStatus === "modified" ? "Modified" : "";
   const verificationStatus = getInstrumentVerificationStatus(record);
   const authenticityStatus = record.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed";
   const safetyStatus = record.safetyStatus === "lost" || record.safetyStatus === "stolen" || record.safetyStatus === "recovered"
     ? record.safetyStatus
     : "clear";
-  const photoCount = record.galleryImageDataUrls?.length || (record.heroImageDataUrl ? 1 : 0);
-  const publicDocCount = record.documentFiles?.filter((file) => file.visibility !== "hidden").length || 0;
+  const photoCount = getProfilePhotoUrls(record).length;
+  const publicDocCount = getPublicDocumentCount(record);
   const profileUrl = instrumentToProfileUrl(record);
   const showSecondaryAction = variant !== "latest" && secondaryHref && secondaryLabel;
   const showSecondaryText = variant !== "latest" && !secondaryHref && secondaryLabel;

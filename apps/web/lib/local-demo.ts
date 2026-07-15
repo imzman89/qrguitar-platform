@@ -83,6 +83,7 @@ export type DemoInstrument = {
   customFields?: CustomProfileField[];
   customLinks?: CustomProfileLink[];
   documentFiles?: CustomDocumentFile[];
+  timelineEvents?: ServiceHistoryEntry[];
   serviceEvents?: ServiceHistoryEntry[];
   externalMedia?: ExternalMediaItem[];
   ownershipTransferCount?: number;

@@ -11,8 +11,9 @@ import {
   getInstrumentVerificationStatus,
   type DemoInstrument
 } from "../../lib/local-demo";
+import { getServiceHistoryEntries } from "../../lib/instrument-profile-contract";
 
-type ShowFilter = "All profiles" | "For Sale" | "Not for Sale" | "New" | "Used" | "Verified" | "Unverified" | "Authenticity confirmed" | "Authenticity unconfirmed" | "All original" | "Modified" | "Safety alerts" | "Service history";
+type ShowFilter = "All profiles" | "For Sale" | "Not for Sale" | "New" | "Used" | "Verified" | "Unverified" | "Authenticity Confirmed" | "Authenticity Unconfirmed" | "All Original" | "Modified" | "Safety Alerts" | "Service History";
 
 export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrument[] }) {
   const [records, setRecords] = useState<DemoInstrument[]>(dedupeByCodeAndDate(initialRecords));
@@ -88,15 +89,15 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
         return getInstrumentVerificationStatus(record) !== "verified";
       }
 
-      if (showFilter === "Authenticity confirmed") {
+      if (showFilter === "Authenticity Confirmed") {
         return record.authenticityStatus === "confirmed";
       }
 
-      if (showFilter === "Authenticity unconfirmed") {
+      if (showFilter === "Authenticity Unconfirmed") {
         return record.authenticityStatus !== "confirmed";
       }
 
-      if (showFilter === "Safety alerts") {
+      if (showFilter === "Safety Alerts") {
         return record.safetyStatus === "lost" || record.safetyStatus === "stolen";
       }
 
@@ -116,7 +117,7 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
         return getInstrumentCondition(record) === "used";
       }
 
-      if (showFilter === "All original") {
+      if (showFilter === "All Original") {
         return record.originalityStatus === "all_original";
       }
 
@@ -124,8 +125,8 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
         return record.originalityStatus === "modified";
       }
 
-      if (showFilter === "Service history") {
-        return Boolean(record.serviceEvents?.length);
+      if (showFilter === "Service History") {
+        return getServiceHistoryEntries(record).length > 0;
       }
 
       return true;
@@ -134,7 +135,7 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
       if (exactMatchCode) {
         return true;
       }
-      const haystack = [record.qrCode, record.name, record.brand, record.model, record.serial, record.location, record.instrumentType, record.saleStatus, record.originalityStatus].join(" ").toLowerCase();
+      const haystack = [record.qrCode, record.name, record.brand, record.model, record.location, record.instrumentType, record.saleStatus, record.originalityStatus].join(" ").toLowerCase();
       return haystack.includes(query.toLowerCase());
     });
 
@@ -278,16 +279,16 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
                 <optgroup label="Trust">
                   <option>Verified</option>
                   <option>Unverified</option>
-                  <option>Authenticity confirmed</option>
-                  <option>Authenticity unconfirmed</option>
+                  <option>Authenticity Confirmed</option>
+                  <option>Authenticity Unconfirmed</option>
                 </optgroup>
                 <optgroup label="Originality">
-                  <option>All original</option>
+                  <option>All Original</option>
                   <option>Modified</option>
                 </optgroup>
                 <optgroup label="History">
-                  <option>Safety alerts</option>
-                  <option>Service history</option>
+                  <option>Safety Alerts</option>
+                  <option>Service History</option>
                 </optgroup>
               </select>
             </label>

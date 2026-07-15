@@ -371,6 +371,17 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
 }
 
+.dashboardShare {
+  position: relative;
+  display: block;
+}
+
+.dashboardShare :global(.record-share-button) {
+  width: 100%;
+  min-height: 34px;
+  border-radius: 7px;
+}
+
 .transferPanel {
   grid-area: transfer;
   border: 1px solid rgba(200, 154, 69, .18);

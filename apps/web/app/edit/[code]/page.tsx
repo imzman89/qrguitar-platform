@@ -47,7 +47,22 @@ const emptyForm = {
 
 const managedFieldLabels = new Set(["instrument type", "builder", "finish", "weight", "owner status", "specs notes", "service notes", "sale status", "originality"]);
 const serviceEventTypes = ["Ownership", "Purchase", "Sale", "Service", "Setup", "Repair", "Modification", "Restoration", "Inspection", "Appraisal", "Verification", "Safety", "Media", "Documentation", "Other"];
-const documentTypeOptions = ["Receipt", "Invoice", "Appraisal", "Certificate", "Build Sheet", "Service Slip", "Insurance Photo", "Warranty", "Authenticity Evidence", "Other"];
+const documentTypeOptions = [
+  "Receipt",
+  "Bill of Sale",
+  "Dealer Invoice",
+  "Appraisal",
+  "Certificate",
+  "Warranty",
+  "Build Sheet",
+  "Service Invoice",
+  "Repair Documentation",
+  "Insurance",
+  "Manual",
+  "Original Case Candy",
+  "Ownership Proof",
+  "Other"
+];
 const oldVerifiedQrLabel = "Scan for verified QRguitar Profile";
 const safeDefaultQrLabel = "Scan QRguitar Profile";
 const staleDraftValueParts = [
@@ -72,6 +87,8 @@ type DocumentDraft = {
   description: string;
   publicDescription: string;
   privateNotes: string;
+  relatedTimelineEventId: string;
+  relatedServiceEventId: string;
   createdAt?: string;
 };
 const emptyServiceForm = {
@@ -520,7 +537,9 @@ export default function EditInstrumentPage() {
         documentDate: "",
         description: "",
         publicDescription: "",
-        privateNotes: ""
+        privateNotes: "",
+        relatedTimelineEventId: "",
+        relatedServiceEventId: ""
       }))
     );
 
@@ -658,8 +677,13 @@ export default function EditInstrumentPage() {
             dataUrl: document.dataUrl,
             visibility: document.visibility,
             documentType: document.documentType,
+            issuerSource: document.issuerSource,
+            documentDate: document.documentDate,
+            description: document.description,
             publicDescription: document.publicDescription,
-            privateNotes: document.privateNotes
+            privateNotes: document.privateNotes,
+            relatedTimelineEventId: document.relatedTimelineEventId,
+            relatedServiceEventId: document.relatedServiceEventId
           })),
           customFields: [
             form.weight.trim() ? { label: "Weight", value: form.weight.trim() } : null,
@@ -1085,8 +1109,8 @@ export default function EditInstrumentPage() {
                     onChange={(event) => updateField("originalityStatus", event.target.value)}
                     required
                   >
-                    <option value="unknown">Not specified</option>
-                    <option value="all_original">All original</option>
+                    <option value="unknown">Not Specified</option>
+                    <option value="all_original">All Original</option>
                     <option value="modified">Modified</option>
                   </select>
                 </div>
@@ -1306,6 +1330,25 @@ export default function EditInstrumentPage() {
                         <div className="field">
                           <label htmlFor={`${document.id}-description`}>Description</label>
                           <textarea id={`${document.id}-description`} value={document.description} onChange={(event) => setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, description: event.target.value } : item))} placeholder="What this document establishes or contains." />
+                        </div>
+                        <div className="field">
+                          <label htmlFor={`${document.id}-timeline`}>Related Timeline entry</label>
+                          <select
+                            id={`${document.id}-timeline`}
+                            value={document.relatedTimelineEventId}
+                            onChange={(event) => {
+                              const relatedId = event.target.value;
+                              const isServiceEntry = serviceEvents.some((entry) => entry.id === relatedId);
+                              setDocuments((current) => current.map((item) => item.id === document.id
+                                ? { ...item, relatedTimelineEventId: relatedId, relatedServiceEventId: isServiceEntry ? relatedId : "" }
+                                : item));
+                            }}
+                          >
+                            <option value="">Not linked</option>
+                            {(original?.timelineEvents || serviceEvents).map((entry) => (
+                              <option value={entry.id} key={entry.id}>{entry.title}</option>
+                            ))}
+                          </select>
                         </div>
                         <div className="field">
                           <label htmlFor={`${document.id}-public-description`}>Public description</label>
@@ -1793,6 +1836,8 @@ function normalizeDocumentFiles(instrument: DemoInstrument) {
     description: file.description || "",
     publicDescription: file.publicDescription || "",
     privateNotes: file.privateNotes || "",
+    relatedTimelineEventId: file.relatedTimelineEventId || "",
+    relatedServiceEventId: file.relatedServiceEventId || "",
     createdAt: file.createdAt || ""
   }));
 }

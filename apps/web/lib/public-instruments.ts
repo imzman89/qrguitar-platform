@@ -5,6 +5,7 @@ import { supabaseHttpsJson, supabaseSignedStorageUrl, supabaseStoragePublicUrl }
 import { isEligiblePublicProfile, isRetiredPublicProfileCode, normalizePublicProfileCode } from "./public-profile-eligibility";
 import {
   availabilityFromSpecs,
+  getServiceHistoryEntries,
   isManagedInstrumentSpec,
   originalityFromSpecs,
   sanitizePublicInstrument
@@ -289,7 +290,8 @@ function mapRecord({
     customFields,
     customLinks: [],
     documentFiles: documents,
-    serviceEvents: serviceEvents || [],
+    timelineEvents: serviceEvents || [],
+    serviceEvents: getServiceHistoryEntries({ timelineEvents: serviceEvents || [] }),
     externalMedia: externalMedia || [],
     qrStyle: defaultQrStyle,
     createdAt: guitar.created_at || new Date().toISOString()

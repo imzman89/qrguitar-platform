@@ -19,7 +19,7 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BrandLogo } from "../../../components/BrandLogo";
 import { buildProfileIdentityFields, ProfileIdentity } from "../../../components/ProfileIdentity";
 import { RecordShareButton } from "../../../components/RecordShareButton";
@@ -34,6 +34,7 @@ import {
 import { formatRecordLocation } from "../../../lib/record-location";
 import { fetchPublishedSiteSettings, normalizeBrandLogoKey } from "../../../lib/site-settings";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../../lib/supabase-browser";
+import { getTimelineEvents } from "../../../lib/instrument-profile-contract";
 
 type ProfileTab = "overview" | "specs" | "timeline" | "ownership" | "media" | "repairs" | "documents";
 const PROFILE_FETCH_TIMEOUT_MS = 28000;
@@ -58,6 +59,9 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
   const [actionNotice, setActionNotice] = useState<"transfer" | "documents" | "owner" | null>(null);
   const [mediaIndex, setMediaIndex] = useState(0);
   const [activeMedia, setActiveMedia] = useState<string | null>(null);
+  const galleryDialogRef = useRef<HTMLElement | null>(null);
+  const galleryTriggerRef = useRef<HTMLElement | null>(null);
+  const galleryTouchStartX = useRef<number | null>(null);
   const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
   const [brandLogos, setBrandLogos] = useState<Record<string, string>>({});
   const code = codeParam || initialInstrument?.qrCode || "";
@@ -259,6 +263,9 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
         documentFiles: stored.documentFiles && stored.documentFiles.length
           ? stored.documentFiles
           : [],
+        timelineEvents: stored.timelineEvents && stored.timelineEvents.length
+          ? stored.timelineEvents
+          : stored.serviceEvents || [],
         serviceEvents: stored.serviceEvents && stored.serviceEvents.length
           ? stored.serviceEvents
           : [],
@@ -357,6 +364,16 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
       return;
     }
 
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    galleryDialogRef.current?.focus();
+
+    const currentIndex = Math.max(0, galleryImages.indexOf(activeMedia));
+    [galleryImages[currentIndex - 1], galleryImages[currentIndex + 1]].filter(Boolean).forEach((source) => {
+      const image = new window.Image();
+      image.src = source;
+    });
+
     function movePhoto(direction: 1 | -1) {
       const currentIndex = Math.max(0, galleryImages.indexOf(activeMedia || ""));
       const nextIndex = direction > 0
@@ -376,11 +393,35 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
       if (event.key === "ArrowLeft" && galleryImages.length > 1) {
         movePhoto(-1);
       }
+      if (event.key === "Tab" && galleryDialogRef.current) {
+        const focusable = Array.from(
+          galleryDialogRef.current.querySelectorAll<HTMLElement>("button:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])")
+        );
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
     }
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      galleryTriggerRef.current?.focus();
+    };
   }, [activeMedia, galleryImages]);
+
+  function openGallery(imageUrl: string) {
+    galleryTriggerRef.current = document.activeElement as HTMLElement | null;
+    setActiveMedia(imageUrl);
+  }
 
   if (!resolved) {
     return (
@@ -464,7 +505,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
 
   const optionalSpecs = [
     ...(instrument.originalityStatus && instrument.originalityStatus !== "unknown"
-      ? [{ label: "Originality", value: instrument.originalityStatus === "all_original" ? "All original" : "Modified" }]
+      ? [{ label: "Originality", value: instrument.originalityStatus === "all_original" ? "All Original" : "Modified" }]
       : []),
     { label: "Finish", value: instrument.finish },
     { label: "Body", value: instrument.bodyWood },
@@ -505,7 +546,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
             onClick={() => {
               if (galleryImages.length) {
                 setMediaIndex(0);
-                setActiveMedia(galleryImages[0]);
+                openGallery(galleryImages[0]);
               }
             }}
             disabled={!galleryImages.length}
@@ -666,18 +707,38 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           documentFiles={documentFiles}
           mediaIndex={mediaIndex}
           onPickMedia={setMediaIndex}
-          onOpenMedia={setActiveMedia}
+          onOpenMedia={openGallery}
           onDocumentView={() => setActionNotice("documents")}
           transferMessage={transferMessage}
           latestTransfer={latestTransfer}
           isVerifiedRecord={isVerifiedRecord}
-          serviceEvents={instrument.serviceEvents || []}
+          timelineEvents={getTimelineEvents(instrument)}
         />
 
         {activeMedia ? (
-          <div className="media-overlay" role="dialog" aria-label="Media preview">
+          <div className="media-overlay">
             <div className="media-overlay-backdrop" onClick={() => setActiveMedia(null)} />
-            <section className="media-overlay-content media-gallery-lightbox">
+            <section
+              className="media-overlay-content media-gallery-lightbox"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Media preview"
+              tabIndex={-1}
+              ref={galleryDialogRef}
+              onTouchStart={(event) => { galleryTouchStartX.current = event.changedTouches[0]?.clientX ?? null; }}
+              onTouchEnd={(event) => {
+                const start = galleryTouchStartX.current;
+                const end = event.changedTouches[0]?.clientX;
+                galleryTouchStartX.current = null;
+                if (start == null || end == null || Math.abs(end - start) < 48 || galleryImages.length < 2) return;
+                const currentIndex = Math.max(0, galleryImages.indexOf(activeMedia));
+                const nextIndex = end < start
+                  ? (currentIndex >= galleryImages.length - 1 ? 0 : currentIndex + 1)
+                  : (currentIndex <= 0 ? galleryImages.length - 1 : currentIndex - 1);
+                setActiveMedia(galleryImages[nextIndex]);
+                setMediaIndex(nextIndex);
+              }}
+            >
               <header className="media-gallery-header">
                 <strong>{instrumentDisplayName(instrument)}</strong>
                 <span>{Math.max(1, galleryImages.indexOf(activeMedia) + 1)} / {galleryImages.length}</span>
@@ -777,7 +838,7 @@ function ProfilePanel({
   transferMessage,
   latestTransfer,
   isVerifiedRecord,
-  serviceEvents
+  timelineEvents
 }: {
   activeTab: ProfileTab;
   instrument: DemoInstrument;
@@ -795,7 +856,7 @@ function ProfilePanel({
   transferMessage: string;
   latestTransfer?: DemoTransfer;
   isVerifiedRecord: boolean;
-  serviceEvents: ServiceHistoryEntry[];
+  timelineEvents: ServiceHistoryEntry[];
 }) {
   if (activeTab === "specs") {
     const visibleSpecs = [...specs, ...optionalSpecs].filter((spec) => hasMeaningfulPublicValue(spec.value));
@@ -815,8 +876,8 @@ function ProfilePanel({
   if (activeTab === "timeline") {
     const createdDate = formatProfileDate(instrument.createdAt);
     const transferDate = latestTransfer ? formatProfileDate(latestTransfer.createdAt) : null;
-    const publicServiceEvents = serviceEvents.filter((entry) => entry.isPublic);
-    const hasProfileCreatedEvent = publicServiceEvents.some((entry) => entry.isSystem && entry.title === "QRguitar Profile created");
+    const publicTimelineEvents = timelineEvents.filter((entry) => entry.isPublic);
+    const hasProfileCreatedEvent = publicTimelineEvents.some((entry) => entry.isSystem && entry.title === "QRguitar Profile created");
     const ownershipTransferCount = Math.max(0, Number(instrument.ownershipTransferCount || 0));
 
     return (
@@ -826,7 +887,7 @@ function ProfilePanel({
           {!hasProfileCreatedEvent ? (
             <TimelineItem date={createdDate} title="QRguitar Profile created" copy="A permanent QRguitar Profile was created for this instrument." />
           ) : null}
-          {publicServiceEvents.map((entry) => (
+          {publicTimelineEvents.map((entry) => (
             <TimelineItem
               date={formatTimelineEntryDate(entry)}
               title={entry.title}
@@ -856,7 +917,7 @@ function ProfilePanel({
               copy="QRguitar keeps the permanent profile with the instrument while prior-owner details stay private."
             />
           ) : null}
-          {!publicServiceEvents.length ? (
+          {!publicTimelineEvents.some((entry) => !entry.isSystem) ? (
             <TimelineItem date="Add history" title="The known history starts here." copy="Owners can add purchases, ownership, service, modifications, restoration, and important milestones." />
           ) : null}
         </div>

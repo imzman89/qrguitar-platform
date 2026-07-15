@@ -16,6 +16,7 @@ import {
 } from "../../../lib/local-demo";
 import { formatRecordLocation } from "../../../lib/record-location";
 import { getSupabaseAccessToken } from "../../../lib/supabase-browser";
+import { getServiceHistoryEntries } from "../../../lib/instrument-profile-contract";
 
 type HandoutPayload = {
   ok?: boolean;
@@ -43,7 +44,7 @@ function humanizeStatus(value?: string) {
   const normalized = String(value || "").trim().toLowerCase();
   if (normalized === "for_sale") return "For Sale";
   if (normalized === "not_for_sale") return "Not for Sale";
-  if (normalized === "all_original") return "All original";
+  if (normalized === "all_original") return "All Original";
   if (normalized === "modified") return "Modified";
   if (normalized === "new") return "New";
   if (normalized === "used") return "Used";
@@ -60,7 +61,7 @@ function publicDocumentCount(instrument: DemoInstrument) {
 }
 
 function publicServiceCount(instrument: DemoInstrument) {
-  return (instrument.serviceEvents || []).filter((event) => event.isPublic !== false).length;
+  return getServiceHistoryEntries(instrument).filter((event) => event.isPublic !== false).length;
 }
 
 function Badge({ children, tone = "neutral", icon }: { children: ReactNode; tone?: "verified" | "auth" | "safety" | "neutral"; icon?: ReactNode }) {

@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import { QrDownload } from "../../components/QrDownload";
+import { RecordShareButton } from "../../components/RecordShareButton";
 import styles from "./dashboard-records.module.css";
 import { defaultSiteSettings, fetchPublishedSiteSettings } from "../../lib/site-settings";
 import {
@@ -22,6 +23,7 @@ import {
 } from "../../lib/local-demo";
 import { clearQrGuitarSessionState, createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
 import { useRouter } from "next/navigation";
+import { getProfileCompleteness, getProfilePhotoUrls, getServiceHistoryEntries } from "../../lib/instrument-profile-contract";
 
 const starterActions = [
   {
@@ -182,13 +184,7 @@ export default function DashboardPage() {
   const recordsWithPhotos = instruments.filter((instrument) => instrument.heroImageDataUrl || instrument.galleryImageDataUrls?.length).length;
   const hiddenDocumentCount = instruments.reduce((total, instrument) => total + (instrument.documentFiles?.filter((file) => file.visibility === "hidden").length || 0), 0);
   const activeSafetyAlerts = instruments.filter((instrument) => instrument.safetyStatus === "lost" || instrument.safetyStatus === "stolen").length;
-  const needsAttention = instruments.filter((instrument) => {
-    const photoCount = instrument.galleryImageDataUrls?.length || (instrument.heroImageDataUrl ? 1 : 0);
-    const hasHistory = Boolean(instrument.serviceEvents?.length);
-    const hasDescription = Boolean(instrument.summary?.trim());
-    const hasIdentity = Boolean(instrument.serial?.trim()) || instrument.serialNotUsed === true;
-    return photoCount < 2 || !hasHistory || !hasDescription || !hasIdentity;
-  }).length;
+  const needsAttention = instruments.filter((instrument) => getProfileCompleteness(instrument).percent < 100).length;
 
   function refreshInstruments() {
     if (!user?.email) {
@@ -385,7 +381,9 @@ export default function DashboardPage() {
                   const totalDocs = instrument.documentFiles?.length || 0;
                   const publicDocs = instrument.documentFiles?.filter((file) => file.visibility !== "hidden").length || 0;
                   const hiddenDocs = Math.max(0, totalDocs - publicDocs);
-                  const imageSources = [instrument.heroImageDataUrl || "", ...(instrument.galleryImageDataUrls || [])];
+                  const imageSources = getProfilePhotoUrls(instrument);
+                  const serviceEntries = getServiceHistoryEntries(instrument);
+                  const completeness = getProfileCompleteness(instrument);
                   const condition = getInstrumentCondition(instrument);
                   const verificationStatus = getInstrumentVerificationStatus(instrument);
                   const authenticityStatus = instrument.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed";
@@ -394,7 +392,7 @@ export default function DashboardPage() {
                   const meta = dashboardRecordMeta(instrument, condition);
                   const category = instrument.instrumentType || "Instrument";
                   const saleStatus = instrument.saleStatus === "for_sale" ? "For Sale" : "";
-                  const originalityStatus = instrument.originalityStatus === "all_original" ? "All original" : instrument.originalityStatus === "modified" ? "Modified" : "";
+                  const originalityStatus = instrument.originalityStatus === "all_original" ? "All Original" : instrument.originalityStatus === "modified" ? "Modified" : "";
 
                   return (
                     <article className={styles.instrumentRow} key={instrument.qrCode}>
@@ -431,13 +429,11 @@ export default function DashboardPage() {
                             </div>
                           </div>
                           <div className={styles.instrumentMeta}>
-                            {(() => {
-                              const photoCount = instrument.galleryImageDataUrls?.length || (instrument.heroImageDataUrl ? 1 : 0);
-                              return <span>{photoCount} {photoCount === 1 ? "photo" : "photos"}</span>;
-                            })()}
-                            <span>{instrument.serviceEvents?.length ? `${instrument.serviceEvents.length} service ${instrument.serviceEvents.length === 1 ? "entry" : "entries"}` : "No service history yet"}</span>
+                            <span>{imageSources.length} {imageSources.length === 1 ? "photo" : "photos"}</span>
+                            <span>{serviceEntries.length ? `${serviceEntries.length} service ${serviceEntries.length === 1 ? "entry" : "entries"}` : "No service history yet"}</span>
                             <span>{totalDocs ? `${publicDocs} public docs${hiddenDocs ? `, ${hiddenDocs} hidden` : ""}` : "No documents yet"}</span>
                             <span>{instrument.visibility === "private" ? "Private" : instrument.visibility === "unlisted" ? "Unlisted" : "Public"}</span>
+                            <span>{completeness.percent}% complete</span>
                           </div>
                         </div>
                       </Link>
@@ -457,6 +453,10 @@ export default function DashboardPage() {
                           <Link className="button secondary" href={instrumentToProfileUrl(instrument)}>
                             View Profile
                           </Link>
+                          <Link className="button secondary" href={`/handout/${instrument.qrCode}`}>
+                            Print Kit
+                          </Link>
+                          <RecordShareButton className={styles.dashboardShare} code={instrument.qrCode} title={title} />
                           <button className="button secondary" type="button" onClick={() => void removeFromCollection(instrument)}>
                             Remove Profile
                           </button>

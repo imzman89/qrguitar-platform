@@ -13,6 +13,7 @@ import { isEligiblePublicProfile, isRetiredPublicProfileCode, normalizePublicPro
 import { getPublicInstrumentByCode, getPublicInstruments } from "../../../lib/public-instruments";
 import {
   availabilityFromSpecs,
+  getServiceHistoryEntries,
   isManagedInstrumentSpec,
   normalizeSerialBuildId,
   originalityFromSpecs,
@@ -67,6 +68,8 @@ type CreateInstrumentRequest = {
     issuerSource?: string;
     documentDate?: string;
     description?: string;
+    relatedTimelineEventId?: string;
+    relatedServiceEventId?: string;
   }>;
   customFields?: Array<{ label: string; value: string }>;
   accountPlan?: AccountPlan;
@@ -638,8 +641,16 @@ async function resolveDocumentSources(
       url: await resolveDocumentSource(supabase, document.storage_path),
       visibility: document.is_public ? "public" as const : "hidden" as const,
       documentType: document.document_type || "",
+      issuerSource: document.issuer_source || "",
+      documentDate: document.document_date || "",
+      description: document.description || "",
+      fileSizeBytes: document.file_size_bytes || undefined,
       publicDescription: document.public_description || "",
       ...(includePrivate ? { privateNotes: document.private_notes || "" } : {}),
+      ...(includePrivate ? {
+        relatedTimelineEventId: document.related_timeline_event_id || "",
+        relatedServiceEventId: document.related_service_event_id || ""
+      } : {}),
       createdAt: document.created_at || "",
       updatedAt: document.updated_at || ""
     }))
@@ -1164,7 +1175,8 @@ async function loadRecordsForUser(supabase: ReturnType<typeof createServerSupaba
           ownershipTransferCount: transferCounts.get(guitar.id) || 0
         });
         instrument.documentFiles = documents;
-        instrument.serviceEvents = serviceEventsByGuitar.get(guitar.id) || [];
+        instrument.timelineEvents = serviceEventsByGuitar.get(guitar.id) || [];
+        instrument.serviceEvents = getServiceHistoryEntries(instrument);
         return instrument;
       })
     ),
@@ -1629,7 +1641,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const uploadedDocuments: Array<{ name: string; storagePath: string; isPublic: boolean; documentType: string; publicDescription: string; privateNotes: string; issuerSource: string; documentDate: string; description: string }> = [];
+  const uploadedDocuments: Array<{ name: string; storagePath: string; isPublic: boolean; documentType: string; publicDescription: string; privateNotes: string; issuerSource: string; documentDate: string; description: string; relatedTimelineEventId: string; relatedServiceEventId: string }> = [];
   for (const [index, document] of (body.documents || []).entries()) {
     const uploadedPath = await uploadDocumentSource(supabase, ownerUser.id, insertedGuitar.id, document.dataUrl, `document-${index + 1}`);
     if (uploadedPath) {
@@ -1642,7 +1654,9 @@ export async function POST(request: Request) {
         privateNotes: cleanDocumentText(document.privateNotes, 2000),
         issuerSource: cleanDocumentText(document.issuerSource, 200),
         documentDate: cleanDocumentText(document.documentDate, 10),
-        description: cleanDocumentText(document.description, 1000)
+        description: cleanDocumentText(document.description, 1000),
+        relatedTimelineEventId: cleanDocumentText(document.relatedTimelineEventId, 80),
+        relatedServiceEventId: cleanDocumentText(document.relatedServiceEventId, 80)
       });
     }
   }
@@ -1660,7 +1674,9 @@ export async function POST(request: Request) {
       private_notes: document.privateNotes || null,
       issuer_source: document.issuerSource || null,
       document_date: /^\d{4}-\d{2}-\d{2}$/.test(document.documentDate) ? document.documentDate : null,
-      description: document.description || null
+      description: document.description || null,
+      related_timeline_event_id: document.relatedTimelineEventId || null,
+      related_service_event_id: document.relatedServiceEventId || null
     }));
 
     const documentInsert = await supabase.from("guitar_documents").insert(documentPayload);
@@ -2145,7 +2161,7 @@ export async function PATCH(request: Request) {
     .select("guitar_id,name,storage_path,is_public,document_type,public_description,private_notes,issuer_source,document_date,description,file_size_bytes,related_timeline_event_id,related_service_event_id,created_at,updated_at")
     .eq("guitar_id", existingGuitar.id);
   const existingDocuments = ((existingDocumentsResult.data || []) as GuitarDocumentRow[]);
-  const uploadedDocuments: Array<{ name: string; storagePath: string; isPublic: boolean; documentType: string; publicDescription: string; privateNotes: string; issuerSource: string; documentDate: string; description: string }> = [];
+  const uploadedDocuments: Array<{ name: string; storagePath: string; isPublic: boolean; documentType: string; publicDescription: string; privateNotes: string; issuerSource: string; documentDate: string; description: string; relatedTimelineEventId: string; relatedServiceEventId: string }> = [];
   for (const [index, document] of (body.documents || []).entries()) {
     const uploadedPath = await uploadDocumentSource(supabase, ownerUser.id, existingGuitar.id, document.dataUrl, `document-${index + 1}`);
     const metadata = {
@@ -2154,7 +2170,9 @@ export async function PATCH(request: Request) {
       privateNotes: cleanDocumentText(document.privateNotes, 2000),
       issuerSource: cleanDocumentText(document.issuerSource, 200),
       documentDate: cleanDocumentText(document.documentDate, 10),
-      description: cleanDocumentText(document.description, 1000)
+      description: cleanDocumentText(document.description, 1000),
+      relatedTimelineEventId: cleanDocumentText(document.relatedTimelineEventId, 80),
+      relatedServiceEventId: cleanDocumentText(document.relatedServiceEventId, 80)
     };
     if (uploadedPath) {
       uploadedDocuments.push({
@@ -2204,6 +2222,8 @@ export async function PATCH(request: Request) {
       issuer_source: document.issuerSource || null,
       document_date: /^\d{4}-\d{2}-\d{2}$/.test(document.documentDate) ? document.documentDate : null,
       description: document.description || null,
+      related_timeline_event_id: document.relatedTimelineEventId || null,
+      related_service_event_id: document.relatedServiceEventId || null,
       updated_at: new Date().toISOString()
     }));
     const documentInsert = await supabase.from("guitar_documents").insert(documentPayload);

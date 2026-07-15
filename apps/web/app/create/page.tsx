@@ -17,7 +17,22 @@ import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/s
 import { makePreviewQrCode, qrCodeFromSerial } from "../../lib/qrguitar-id";
 import { canonicalInstrumentBrand, establishedInstrumentBrands } from "../../lib/instrument-brands";
 
-const documentTypeOptions = ["Receipt", "Invoice", "Appraisal", "Certificate", "Build Sheet", "Service Slip", "Insurance Photo", "Warranty", "Authenticity Evidence", "Other"];
+const documentTypeOptions = [
+  "Receipt",
+  "Bill of Sale",
+  "Dealer Invoice",
+  "Appraisal",
+  "Certificate",
+  "Warranty",
+  "Build Sheet",
+  "Service Invoice",
+  "Repair Documentation",
+  "Insurance",
+  "Manual",
+  "Original Case Candy",
+  "Ownership Proof",
+  "Other"
+];
 type DocumentDraft = {
   id: string;
   name: string;
@@ -48,11 +63,13 @@ type BulkImportRow = {
   summary: string;
   serialNotUsed: boolean;
   error: string;
+  result?: "ready" | "created" | "failed";
+  resultMessage?: string;
 };
 
 const bulkHeaders = ["brand", "model", "serial", "year", "type", "condition", "sale_status", "originality", "location", "visibility", "photo", "summary"];
 const bulkTemplate = `${bulkHeaders.join("\t")}
-Fender\tStratocaster\tABC123\t2005\tElectric Guitar\tused\tNot for Sale\tAll original\tCranston, RI\tprivate\thttps://example.com/photo.jpg\tOwned since 2024`;
+Fender\tStratocaster\tABC123\t2005\tElectric Guitar\tused\tNot for Sale\tAll Original\tCranston, RI\tprivate\thttps://example.com/photo.jpg\tOwned since 2024`;
 
 export default function CreatePage() {
   const router = useRouter();
@@ -116,7 +133,7 @@ export default function CreatePage() {
       [
         form.instrumentType.trim() ? { id: "preview-type", label: "Type", value: form.instrumentType.trim() } : null,
         { id: "preview-sale-status", label: "Availability", value: form.saleStatus === "for_sale" ? "For Sale" : "Not for Sale" },
-        { id: "preview-originality", label: "Originality", value: form.originalityStatus === "all_original" ? "All original" : form.originalityStatus === "modified" ? "Modified" : "Not specified" },
+        { id: "preview-originality", label: "Originality", value: form.originalityStatus === "all_original" ? "All Original" : form.originalityStatus === "modified" ? "Modified" : "Not Specified" },
         form.finish.trim() ? { id: "preview-finish", label: "Finish", value: form.finish.trim() } : null,
         form.weight.trim() ? { id: "preview-weight", label: "Weight", value: form.weight.trim() } : null,
         form.ownerStatus.trim() ? { id: "preview-owner-status", label: "Owner status", value: form.ownerStatus.trim() } : null,
@@ -223,7 +240,9 @@ export default function CreatePage() {
         photo,
         summary: valueFor("summary"),
         serialNotUsed,
-        error: ""
+        error: "",
+        result: "ready",
+        resultMessage: ""
       };
 
       const errors = [
@@ -254,6 +273,7 @@ export default function CreatePage() {
     setMessage("");
     let created = 0;
     let failed = 0;
+    const results = new Map<string, Pick<BulkImportRow, "result" | "resultMessage">>();
 
     try {
       const token = await getSupabaseAccessToken();
@@ -286,15 +306,15 @@ export default function CreatePage() {
         const payload = await response.json().catch(() => null) as { ok?: boolean; message?: string } | null;
         if (response.ok && payload?.ok) {
           created += 1;
+          results.set(row.id, { result: "created", resultMessage: "Profile created" });
         } else {
           failed += 1;
+          results.set(row.id, { result: "failed", resultMessage: payload?.message || "Could not create this Profile" });
         }
       }
 
+      setBulkRows((current) => current.map((row) => ({ ...row, ...(results.get(row.id) || {}) })));
       setMessage(`${created} record${created === 1 ? "" : "s"} created.${failed ? ` ${failed} failed.` : ""}`);
-      if (created) {
-        router.push("/dashboard");
-      }
     } catch {
       setMessage("Bulk import stopped. Check the rows and try again.");
     } finally {
@@ -577,10 +597,10 @@ export default function CreatePage() {
                     {bulkRows.length ? (
                       <div className="bulk-preview-list" aria-label="Bulk import preview">
                         {bulkRows.slice(0, 8).map((row) => (
-                          <div className={row.error ? "bulk-preview-row has-error" : "bulk-preview-row"} key={row.id}>
+                          <div className={row.error || row.result === "failed" ? "bulk-preview-row has-error" : "bulk-preview-row"} key={row.id}>
                             <strong>{row.brand || "Missing brand"} {row.model || "Missing model"}</strong>
                             <span>{[row.year, row.serial || "No serial", row.visibility, row.photo ? "Photo ready" : "No photo"].filter(Boolean).join(" / ")}</span>
-                            {row.error ? <small>{row.error}</small> : <small>Ready</small>}
+                            {row.error ? <small>{row.error}</small> : <small>{row.resultMessage || "Ready"}</small>}
                           </div>
                         ))}
                         {bulkRows.length > 8 ? <p className="fine-print">Showing 8 of {bulkRows.length} rows. Up to 50 rows can be imported at once during beta.</p> : null}
@@ -649,8 +669,8 @@ export default function CreatePage() {
                     onChange={(event) => updateField("originalityStatus", event.target.value)}
                     required
                   >
-                    <option value="unknown">Not specified</option>
-                    <option value="all_original">All original</option>
+                    <option value="unknown">Not Specified</option>
+                    <option value="all_original">All Original</option>
                     <option value="modified">Modified</option>
                   </select>
                 </div>

@@ -43,6 +43,7 @@ function rateLimited(key: string) {
 
 export async function POST(request: Request) {
   if (rateLimited(requestKey(request))) {
+    console.warn("QRguitar serial lookup throttled.");
     return response({ ok: false, message: "Too many serial lookups. Try again in a few minutes." }, 429);
   }
 

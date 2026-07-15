@@ -1,4 +1,4 @@
-import type { DemoInstrument, OriginalityStatus, SaleStatus } from "./local-demo";
+import type { DemoInstrument, OriginalityStatus, SaleStatus, ServiceHistoryEntry } from "./local-demo";
 
 export type InstrumentSpecLike = { label: string; value: string };
 
@@ -54,6 +54,63 @@ export function originalityLabel(value?: OriginalityStatus) {
   return "Not Specified";
 }
 
+const SERVICE_HISTORY_CATEGORIES = new Set([
+  "service",
+  "setup",
+  "repair",
+  "modification",
+  "restoration",
+  "inspection",
+  "appraisal"
+]);
+
+export function isServiceHistoryEvent(event: Pick<ServiceHistoryEntry, "category" | "eventType" | "isSystem">) {
+  if (event.isSystem) return false;
+  const category = String(event.category || event.eventType || "").trim().toLowerCase();
+  return SERVICE_HISTORY_CATEGORIES.has(category);
+}
+
+export function getTimelineEvents(instrument: Pick<DemoInstrument, "timelineEvents" | "serviceEvents">) {
+  const events = [...(instrument.timelineEvents || []), ...(instrument.serviceEvents || [])];
+  const seen = new Set<string>();
+  return events.filter((event) => {
+    const key = event.id || [event.title, event.serviceDate, event.createdAt].join("|");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function getServiceHistoryEntries(instrument: Pick<DemoInstrument, "timelineEvents" | "serviceEvents">) {
+  return getTimelineEvents(instrument).filter(isServiceHistoryEvent);
+}
+
+export function getProfilePhotoUrls(instrument: Pick<DemoInstrument, "heroImageDataUrl" | "galleryImageDataUrls">) {
+  return Array.from(new Set([
+    instrument.heroImageDataUrl,
+    ...(instrument.galleryImageDataUrls || [])
+  ].filter((value): value is string => Boolean(value))));
+}
+
+export function getPublicDocumentCount(instrument: Pick<DemoInstrument, "documentFiles">) {
+  return (instrument.documentFiles || []).filter((document) => document.visibility === "public").length;
+}
+
+export function getProfileCompleteness(instrument: DemoInstrument) {
+  const checks = {
+    identity: Boolean(instrument.serial?.trim()) || instrument.serialNotUsed === true,
+    photo: getProfilePhotoUrls(instrument).length > 0,
+    description: Boolean(instrument.summary?.trim()),
+    history: getTimelineEvents(instrument).some((event) => !event.isSystem),
+    availability: instrument.saleStatus === "for_sale" || instrument.saleStatus === "not_for_sale",
+    originality: instrument.originalityStatus === "all_original" || instrument.originalityStatus === "modified" || instrument.originalityStatus === "unknown",
+    visibility: instrument.visibility === "public" || instrument.visibility === "private" || instrument.visibility === "unlisted"
+  };
+  const completed = Object.values(checks).filter(Boolean).length;
+  const total = Object.keys(checks).length;
+  return { checks, completed, total, percent: Math.round((completed / total) * 100) };
+}
+
 export function sanitizePublicInstrument(instrument: DemoInstrument): DemoInstrument {
   const {
     ownerUserEmail: _ownerUserEmail,
@@ -73,9 +130,11 @@ export function sanitizePublicInstrument(instrument: DemoInstrument): DemoInstru
     .filter((document) => document.visibility === "public")
     .map(({ privateNotes: _privateNotes, ...document }) => document);
 
-  publicInstrument.serviceEvents = (publicInstrument.serviceEvents || [])
+  publicInstrument.timelineEvents = getTimelineEvents(publicInstrument)
     .filter((event) => event.isPublic === true)
     .map(({ privateNotes: _privateNotes, canEdit: _canEdit, lockedReason: _lockedReason, ...event }) => event);
+
+  publicInstrument.serviceEvents = publicInstrument.timelineEvents.filter(isServiceHistoryEvent);
 
   publicInstrument.externalMedia = (publicInstrument.externalMedia || []).filter((item) => item.isPublic === true);
 
