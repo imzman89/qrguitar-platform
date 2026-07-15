@@ -8,11 +8,12 @@ type RecordShareButtonProps = {
   code: string;
   title: string;
   className?: string;
+  showLabel?: boolean;
 };
 
 const publicSiteUrl = "https://www.qrguitar.com";
 
-export function RecordShareButton({ code, title, className = "" }: RecordShareButtonProps) {
+export function RecordShareButton({ code, title, className = "", showLabel = false }: RecordShareButtonProps) {
   const [status, setStatus] = useState<"idle" | "copied" | "ready">("idle");
   const url = `${publicSiteUrl}/i/${encodeURIComponent(code)}`;
   const label = title || code;
@@ -46,8 +47,9 @@ export function RecordShareButton({ code, title, className = "" }: RecordShareBu
 
   return (
     <span className={`record-share-wrap ${className}`.trim()}>
-      <button className="record-share-button" type="button" aria-label="Share profile" onClick={shareRecord}>
+      <button className="record-share-button" type="button" aria-label="Share Profile" onClick={shareRecord}>
         <Share2 size={15} />
+        {showLabel ? <span>Share Profile</span> : null}
       </button>
       {status !== "idle" ? (
         <span className="record-share-feedback">

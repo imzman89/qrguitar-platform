@@ -22,6 +22,7 @@ import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BrandLogo } from "../../../components/BrandLogo";
 import { buildProfileIdentityFields, ProfileIdentity } from "../../../components/ProfileIdentity";
+import { ProfileStatusBadges } from "../../../components/ProfileStatusBadges";
 import { RecordShareButton } from "../../../components/RecordShareButton";
 import {
   getInstrumentVerificationStatus,
@@ -418,6 +419,12 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     };
   }, [activeMedia, galleryImages]);
 
+  useEffect(() => {
+    if (!activeMedia) return;
+    const activeThumbnail = galleryDialogRef.current?.querySelector<HTMLElement>(".media-gallery-strip .active");
+    activeThumbnail?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [activeMedia]);
+
   function openGallery(imageUrl: string) {
     galleryTriggerRef.current = document.activeElement as HTMLElement | null;
     setActiveMedia(imageUrl);
@@ -569,18 +576,15 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
               <strong>{instrument.model || instrument.instrumentType || "QRguitar Profile"}</strong>
             </div>
             <h1>{instrumentDisplayName(instrument)}</h1>
-            <div className="record-badge-row profile-hero-badges" aria-label="Profile status">
-              {showVerificationBadge ? (
-                <span className={`record-badge ${isVerifiedRecord ? "record-badge--verified" : "record-badge--unverified"}`}>
-                  <ShieldCheck size={13} /> <span className="record-badge-text">{isVerifiedRecord ? "Verified by QRguitar" : "Unverified"}</span>
-                </span>
-              ) : null}
-              {showAuthenticityBadge ? (
-                <span className={`record-badge ${isAuthenticityConfirmed ? "record-badge--auth-confirmed" : "record-badge--auth-unconfirmed"}`}>
-                  <ShieldCheck size={13} /> <span className="record-badge-text">{isAuthenticityConfirmed ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}</span>
-                </span>
-              ) : null}
-            </div>
+            <ProfileStatusBadges
+              record={{
+                ...instrument,
+                showVerificationBadge,
+                showAuthenticityBadge
+              }}
+              includeCondition={false}
+              className="profile-hero-badges"
+            />
           </div>
         </section>
 

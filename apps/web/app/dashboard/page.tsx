@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
+import { ProfileStatusBadges } from "../../components/ProfileStatusBadges";
 import { QrDownload } from "../../components/QrDownload";
 import { RecordShareButton } from "../../components/RecordShareButton";
 import styles from "./dashboard-records.module.css";
@@ -24,6 +25,8 @@ import {
 import { clearQrGuitarSessionState, createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
 import { useRouter } from "next/navigation";
 import { getProfileCompleteness, getProfilePhotoUrls, getServiceHistoryEntries } from "../../lib/instrument-profile-contract";
+
+type DashboardFilter = "all" | "public" | "private" | "attention" | "safety" | "transfers";
 
 const starterActions = [
   {
@@ -95,6 +98,7 @@ export default function DashboardPage() {
   const [authChecked, setAuthChecked] = useState(true);
   const [dashboardMessage, setDashboardMessage] = useState("");
   const [dashboardCopy, setDashboardCopy] = useState(defaultSiteSettings.dashboard);
+  const [activeFilter, setActiveFilter] = useState<DashboardFilter>("all");
   const router = useRouter();
 
   useEffect(() => {
@@ -185,6 +189,20 @@ export default function DashboardPage() {
   const hiddenDocumentCount = instruments.reduce((total, instrument) => total + (instrument.documentFiles?.filter((file) => file.visibility === "hidden").length || 0), 0);
   const activeSafetyAlerts = instruments.filter((instrument) => instrument.safetyStatus === "lost" || instrument.safetyStatus === "stolen").length;
   const needsAttention = instruments.filter((instrument) => getProfileCompleteness(instrument).percent < 100).length;
+  const verifiedRecords = instruments.filter((instrument) => getInstrumentVerificationStatus(instrument) === "verified").length;
+  const authenticityConfirmedRecords = instruments.filter((instrument) => instrument.authenticityStatus === "confirmed").length;
+  const chronologicalInstruments = useMemo(
+    () => [...instruments].sort((first, second) => Date.parse(first.createdAt || "") - Date.parse(second.createdAt || "")),
+    [instruments]
+  );
+  const profileNumbers = useMemo(
+    () => new Map(chronologicalInstruments.map((instrument, index) => [instrument.qrCode, index + 1])),
+    [chronologicalInstruments]
+  );
+  const displayedInstruments = useMemo(
+    () => chronologicalInstruments.filter((instrument) => matchesDashboardFilter(instrument, activeFilter, transfers)),
+    [activeFilter, chronologicalInstruments, transfers]
+  );
 
   function refreshInstruments() {
     if (!user?.email) {
@@ -208,12 +226,12 @@ export default function DashboardPage() {
 
   const stats = useMemo(
     () => [
-      { label: "Total Profiles", value: String(instruments.length) },
-      { label: "Visible in Catalog", value: String(publicRecords) },
-      { label: "Private / Unlisted", value: String(privateRecords + unlistedRecords) },
-      { label: "Needs Attention", value: String(needsAttention) },
-      { label: "Reported Lost / Stolen", value: String(activeSafetyAlerts) },
-      { label: "Pending Handoffs", value: String(pendingTransfers) }
+      { label: "Total Profiles", value: String(instruments.length), filter: "all" as const, helper: "Every active Profile" },
+      { label: "Visible in Catalog", value: String(publicRecords), filter: "public" as const, helper: "Discoverable Profiles" },
+      { label: "Private / Unlisted", value: String(privateRecords + unlistedRecords), filter: "private" as const, helper: "Limited visibility" },
+      { label: "Needs Attention", value: String(needsAttention), filter: "attention" as const, helper: "Missing useful details" },
+      { label: "Reported Lost / Stolen", value: String(activeSafetyAlerts), filter: "safety" as const, helper: "Active safety notices" },
+      { label: "Pending Transfers / Claims", value: String(pendingTransfers), filter: "transfers" as const, helper: "Awaiting completion" }
     ],
     [activeSafetyAlerts, instruments.length, needsAttention, pendingTransfers, privateRecords, publicRecords, unlistedRecords]
   );
@@ -351,13 +369,25 @@ export default function DashboardPage() {
           </div>
           {dashboardMessage ? <div className="admin-message">{dashboardMessage}</div> : null}
 
-          <div className="stats-grid">
+          <div className="stats-grid dashboard-metric-grid" aria-label="Collection overview">
             {stats.map((stat) => (
-              <article className="stat-card" key={stat.label}>
-                <h3>{stat.value}</h3>
-                <p>{stat.label}</p>
-              </article>
+              <button
+                className={`stat-card dashboard-metric ${activeFilter === stat.filter ? "is-active" : ""}`}
+                type="button"
+                key={stat.label}
+                aria-pressed={activeFilter === stat.filter}
+                onClick={() => setActiveFilter(stat.filter)}
+              >
+                <strong>{stat.value}</strong>
+                <span>{stat.label}</span>
+                <small>{stat.helper}</small>
+              </button>
             ))}
+          </div>
+          <div className="dashboard-trust-summary" aria-label="Trust summary">
+            <span><b>{verifiedRecords}</b> Verified</span>
+            <span><b>{authenticityConfirmedRecords}</b> Authenticity Confirmed</span>
+            {activeFilter !== "all" ? <button type="button" onClick={() => setActiveFilter("all")}>Clear filter</button> : null}
           </div>
 
           <section className={`card ${styles.instrumentTable}`}>
@@ -376,8 +406,8 @@ export default function DashboardPage() {
                   <h3>Loading your Profiles...</h3>
                   <p>Pulling your saved Profiles now.</p>
                 </div>
-              ) : instruments.length ? (
-                instruments.map((instrument) => {
+              ) : displayedInstruments.length ? (
+                displayedInstruments.map((instrument) => {
                   const totalDocs = instrument.documentFiles?.length || 0;
                   const publicDocs = instrument.documentFiles?.filter((file) => file.visibility !== "hidden").length || 0;
                   const hiddenDocs = Math.max(0, totalDocs - publicDocs);
@@ -385,14 +415,10 @@ export default function DashboardPage() {
                   const serviceEntries = getServiceHistoryEntries(instrument);
                   const completeness = getProfileCompleteness(instrument);
                   const condition = getInstrumentCondition(instrument);
-                  const verificationStatus = getInstrumentVerificationStatus(instrument);
-                  const authenticityStatus = instrument.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed";
-                  const safetyStatus = instrument.safetyStatus === "lost" || instrument.safetyStatus === "stolen" ? instrument.safetyStatus : "clear";
                   const title = dashboardRecordTitle(instrument);
                   const meta = dashboardRecordMeta(instrument, condition);
-                  const category = instrument.instrumentType || "Instrument";
-                  const saleStatus = instrument.saleStatus === "for_sale" ? "For Sale" : "";
-                  const originalityStatus = instrument.originalityStatus === "all_original" ? "All Original" : instrument.originalityStatus === "modified" ? "Modified" : "";
+                  const profileNumber = profileNumbers.get(instrument.qrCode) || 1;
+                  const missingItems = getMissingProfileItems(instrument);
 
                   return (
                     <article className={styles.instrumentRow} key={instrument.qrCode}>
@@ -404,37 +430,27 @@ export default function DashboardPage() {
                         <DashboardInstrumentThumb sources={imageSources} title={title} />
                         <div className={styles.instrumentDetails}>
                           <div className={styles.instrumentInfo}>
+                            <span className={styles.profileNumber}>Profile {String(profileNumber).padStart(2, "0")}</span>
                             <strong>{title}</strong>
                             <span title={meta}>{meta}</span>
                             <div className={styles.dashboardIdentity} aria-label="Profile identity">
                               <span><b>QRguitar ID</b> {instrument.qrCode}</span>
                               <span><b>Serial Number</b> {instrument.serial || "No serial number"}</span>
                             </div>
-                            <div className="record-badge-row" aria-label="Profile status">
-                              {instrument.showVerificationBadge !== false ? (
-                                <small className={`record-badge ${verificationStatus === "verified" ? "record-badge--verified" : "record-badge--unverified"}`}>
-                                  <span className="record-badge-text">{verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"}</span>
-                                </small>
-                              ) : null}
-                              {instrument.showAuthenticityBadge !== false ? (
-                                <small className={`record-badge ${authenticityStatus === "confirmed" ? "record-badge--auth-confirmed" : "record-badge--auth-unconfirmed"}`}>
-                                  <span className="record-badge-text">{authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}</span>
-                                </small>
-                              ) : null}
-                              {safetyStatus === "lost" ? <small className="record-badge record-badge--safety"><span className="record-badge-text">Reported Lost</span></small> : null}
-                              {safetyStatus === "stolen" ? <small className="record-badge record-badge--safety"><span className="record-badge-text">Reported Stolen</span></small> : null}
-                              {saleStatus ? <small className="record-badge record-badge--sale"><span className="record-badge-text">{saleStatus}</span></small> : null}
-                              {originalityStatus ? <small className="record-badge record-badge--disclosure"><span className="record-badge-text">{originalityStatus}</span></small> : null}
-                              <small className="record-badge record-badge--disclosure"><span className="record-badge-text">{category}</span></small>
-                            </div>
+                            <ProfileStatusBadges record={instrument} includeCategory />
                           </div>
                           <div className={styles.instrumentMeta}>
-                            <span>{imageSources.length} {imageSources.length === 1 ? "photo" : "photos"}</span>
-                            <span>{serviceEntries.length ? `${serviceEntries.length} service ${serviceEntries.length === 1 ? "entry" : "entries"}` : "No service history yet"}</span>
-                            <span>{totalDocs ? `${publicDocs} public docs${hiddenDocs ? `, ${hiddenDocs} hidden` : ""}` : "No documents yet"}</span>
-                            <span>{instrument.visibility === "private" ? "Private" : instrument.visibility === "unlisted" ? "Unlisted" : "Public"}</span>
+                            {imageSources.length ? <span>{imageSources.length} {imageSources.length === 1 ? "photo" : "photos"}</span> : null}
+                            {serviceEntries.length ? <span>{serviceEntries.length} service {serviceEntries.length === 1 ? "entry" : "entries"}</span> : null}
+                            {totalDocs ? <span>{publicDocs} public {publicDocs === 1 ? "document" : "documents"}{hiddenDocs ? `, ${hiddenDocs} private` : ""}</span> : null}
+                            <span>{instrument.visibility === "private" ? "Private" : instrument.visibility === "unlisted" ? "Unlisted" : "Visible"}</span>
                             <span>{completeness.percent}% complete</span>
                           </div>
+                          {missingItems.length ? (
+                            <div className={styles.completenessNote}>
+                              <b>Next:</b> {missingItems.slice(0, 3).join(", ")}
+                            </div>
+                          ) : null}
                         </div>
                       </Link>
                       <div className={styles.qrActionColumn}>
@@ -446,21 +462,23 @@ export default function DashboardPage() {
                             onStyleChange={(qrStyle) => setInstruments((current) => current.map((item) => item.qrCode === instrument.qrCode ? { ...item, qrStyle } : item))}
                           />
                         </div>
-                        <div className={styles.instrumentActions}>
-                          <Link className="button secondary" href={`/edit/${instrument.qrCode}`}>
-                            Edit Profile
-                          </Link>
-                          <Link className="button secondary" href={instrumentToProfileUrl(instrument)}>
-                            View Profile
-                          </Link>
-                          <Link className="button secondary" href={`/handout/${instrument.qrCode}`}>
-                            Print Kit
-                          </Link>
-                          <RecordShareButton className={styles.dashboardShare} code={instrument.qrCode} title={title} />
-                          <button className="button secondary" type="button" onClick={() => void removeFromCollection(instrument)}>
-                            Remove Profile
-                          </button>
+                        <div className={styles.actionGroup}>
+                          <span>Profile</span>
+                          <div className={styles.instrumentActions}>
+                            <Link className="button secondary" href={`/edit/${instrument.qrCode}`}>Edit Profile</Link>
+                            <Link className="button secondary" href={instrumentToProfileUrl(instrument)}>View Profile</Link>
+                          </div>
                         </div>
+                        <div className={styles.actionGroup}>
+                          <span>More</span>
+                          <div className={styles.instrumentActions}>
+                            <Link className="button secondary" href={`/handout/${instrument.qrCode}`}>Print Kit</Link>
+                            <RecordShareButton className={styles.dashboardShare} code={instrument.qrCode} title={title} showLabel />
+                          </div>
+                        </div>
+                        <button className={`button secondary ${styles.dangerAction}`} type="button" onClick={() => void removeFromCollection(instrument)}>
+                          Remove Profile
+                        </button>
                       </div>
                       <TransferPanel
                         className={styles.transferPanel}
@@ -478,11 +496,13 @@ export default function DashboardPage() {
                 })
               ) : (
                 <div className="card auth-card">
-                  <h3>{dashboardCopy.emptyCollectionTitle}</h3>
-                  <p>{dashboardCopy.emptyCollectionBody}</p>
-                  <Link className="button" href="/create">
-                    {dashboardCopy.firstRecordCtaLabel}
-                  </Link>
+                  <h3>{instruments.length ? "No Profiles match this filter." : dashboardCopy.emptyCollectionTitle}</h3>
+                  <p>{instruments.length ? "Choose another collection metric or clear the filter." : dashboardCopy.emptyCollectionBody}</p>
+                  {instruments.length ? (
+                    <button className="button" type="button" onClick={() => setActiveFilter("all")}>Show All Profiles</button>
+                  ) : (
+                    <Link className="button" href="/create">{dashboardCopy.firstRecordCtaLabel}</Link>
+                  )}
                 </div>
               )}
             </div>
@@ -593,7 +613,7 @@ function TransferPanel({
     typeof window !== "undefined" && latestTransfer ? `${window.location.origin}${latestTransfer.claimPath}` : "";
   const visibleClaimUrl = claimUrl || lastCreatedClaimUrl;
   const hasPendingTransfer = latestTransfer?.status === "sent";
-  const transferStatus = latestTransfer ? transferStatusLabel(latestTransfer) : "No transfer is pending.";
+  const transferStatus = latestTransfer ? transferStatusLabel(latestTransfer) : "Start a secure handoff";
 
   async function copyClaimLink() {
     if (!visibleClaimUrl) {
@@ -677,14 +697,14 @@ function TransferPanel({
   }
 
   return (
-    <details className={className}>
+    <details className={className} data-pending={hasPendingTransfer ? "true" : "false"}>
       <summary>
-        <span>Ownership transfer beta</span>
+        <span>Transfer Ownership</span>
         <strong>{transferStatus}</strong>
       </summary>
       <div className={bodyClassName}>
         <div className="transfer-copy">
-          <span className="mini-eyebrow">Ownership transfer beta</span>
+          <span className="mini-eyebrow">Ownership handoff</span>
           <strong>Email a claim link to the next owner.</strong>
           <p>The recipient signs in with the email below, opens the claim link, and accepts the same permanent QRguitar Profile.</p>
         </div>
@@ -765,6 +785,32 @@ function TransferPanel({
       </div>
     </details>
   );
+}
+
+function matchesDashboardFilter(instrument: DemoInstrument, filter: DashboardFilter, transfers: DemoTransfer[]) {
+  if (filter === "public") return instrument.visibility === "public";
+  if (filter === "private") return instrument.visibility === "private" || instrument.visibility === "unlisted";
+  if (filter === "attention") return getProfileCompleteness(instrument).percent < 100;
+  if (filter === "safety") return instrument.safetyStatus === "lost" || instrument.safetyStatus === "stolen";
+  if (filter === "transfers") {
+    return transfers.some((transfer) =>
+      transfer.status === "sent" && transfer.guitarQrCode.toUpperCase() === instrument.qrCode.toUpperCase()
+    );
+  }
+  return true;
+}
+
+function getMissingProfileItems(instrument: DemoInstrument) {
+  const checks = getProfileCompleteness(instrument).checks;
+  return [
+    !checks.photo ? "add a photo" : "",
+    !checks.description ? "add a story" : "",
+    !checks.history ? "add history" : "",
+    !checks.identity ? "complete identity" : "",
+    !checks.availability ? "set availability" : "",
+    !checks.originality ? "set originality" : "",
+    !checks.visibility ? "set visibility" : ""
+  ].filter(Boolean);
 }
 
 function dashboardRecordTitle(instrument: DemoInstrument) {

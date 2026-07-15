@@ -1,18 +1,17 @@
 "use client";
 
-import { ArrowRight, Camera, FileText, Globe2, ShieldCheck, Siren } from "lucide-react";
+import { ArrowRight, Camera, FileText, Globe2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 import {
-  getInstrumentCondition,
-  getInstrumentVerificationStatus,
   instrumentDisplayName,
   instrumentSubtitle,
   instrumentToProfileUrl,
   type DemoInstrument
 } from "../lib/local-demo";
-import { RecordShareButton } from "./RecordShareButton";
 import { getProfilePhotoUrls, getPublicDocumentCount } from "../lib/instrument-profile-contract";
+import { ProfileStatusBadges } from "./ProfileStatusBadges";
+import { RecordShareButton } from "./RecordShareButton";
 
 type CollectibleRecordCardProps = {
   record: DemoInstrument;
@@ -40,14 +39,6 @@ export function CollectibleRecordCard({
     return Array.from(new Set(images));
   }, [record.galleryImageDataUrls, record.heroImageDataUrl]);
   const imageUrl = galleryImages[0] || "";
-  const condition = getInstrumentCondition(record);
-  const saleStatus = record.saleStatus === "for_sale" ? "For Sale" : "";
-  const originalityStatus = record.originalityStatus === "all_original" ? "All Original" : record.originalityStatus === "modified" ? "Modified" : "";
-  const verificationStatus = getInstrumentVerificationStatus(record);
-  const authenticityStatus = record.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed";
-  const safetyStatus = record.safetyStatus === "lost" || record.safetyStatus === "stolen" || record.safetyStatus === "recovered"
-    ? record.safetyStatus
-    : "clear";
   const photoCount = getProfilePhotoUrls(record).length;
   const publicDocCount = getPublicDocumentCount(record);
   const profileUrl = instrumentToProfileUrl(record);
@@ -57,7 +48,7 @@ export function CollectibleRecordCard({
 
   return (
     <article className={`collectible-card collectible-card--${variant}`} aria-label={`Open ${title} QRguitar Profile`}>
-      <Link className="collectible-card-link" href={profileUrl} aria-label={`Open ${title} profile`}>
+      <Link className="collectible-card-link" href={profileUrl} aria-label={`Open ${title} Profile`}>
         <div className="collectible-card-media">
           {imageUrl ? (
             <img
@@ -70,7 +61,7 @@ export function CollectibleRecordCard({
           ) : (
             <div className="collectible-card-empty-media">
               <span>QRguitar</span>
-              <strong>No public photo yet</strong>
+              <strong>No visible photo</strong>
             </div>
           )}
           <div className="collectible-card-topline">
@@ -87,30 +78,11 @@ export function CollectibleRecordCard({
             {summary ? <p className="collectible-card-summary">{summary}</p> : null}
           </div>
 
-          <div className="record-badge-row" aria-label="Profile status">
-            <span className="record-badge record-badge--condition"><span className="record-badge-text">{condition === "new" ? "New" : "Used"}</span></span>
-            {record.showVerificationBadge !== false ? (
-              <span className={`record-badge ${verificationStatus === "verified" ? "record-badge--verified" : "record-badge--unverified"}`}>
-                <ShieldCheck size={13} /> <span className="record-badge-text">{verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"}</span>
-              </span>
-            ) : null}
-            {record.showAuthenticityBadge !== false ? (
-              <span className={`record-badge ${authenticityStatus === "confirmed" ? "record-badge--auth-confirmed" : "record-badge--auth-unconfirmed"}`}>
-                <ShieldCheck size={13} /> <span className="record-badge-text">{authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}</span>
-              </span>
-            ) : null}
-            {safetyStatus !== "clear" ? (
-              <span className={`record-badge ${safetyStatus === "recovered" ? "record-badge--recovered" : "record-badge--safety"}`}>
-                <Siren size={13} /> <span className="record-badge-text">{safetyStatusLabel(safetyStatus)}</span>
-              </span>
-            ) : null}
-            {saleStatus ? <span className="record-badge record-badge--sale"><span className="record-badge-text">{saleStatus}</span></span> : null}
-            {originalityStatus ? <span className="record-badge record-badge--disclosure"><span className="record-badge-text">{originalityStatus}</span></span> : null}
-          </div>
+          <ProfileStatusBadges record={record} />
 
-          <div className="collectible-card-facts">
-            <span><Camera size={13} /> {photoCount} {photoCount === 1 ? "photo" : "photos"}</span>
-            {publicDocCount ? <span><FileText size={13} /> {publicDocCount} docs</span> : null}
+          <div className="collectible-card-facts" aria-label="Profile contents">
+            {photoCount ? <span><Camera size={13} /> {photoCount} {photoCount === 1 ? "photo" : "photos"}</span> : null}
+            {publicDocCount ? <span><FileText size={13} /> {publicDocCount} {publicDocCount === 1 ? "document" : "documents"}</span> : null}
           </div>
 
           <div className="collectible-card-actions">
@@ -130,35 +102,10 @@ export function CollectibleRecordCard({
   );
 }
 
-function safetyStatusLabel(status: "lost" | "stolen" | "recovered" | "clear") {
-  if (status === "lost") {
-    return "Reported Lost";
-  }
-
-  if (status === "stolen") {
-    return "Reported Stolen";
-  }
-
-  if (status === "recovered") {
-    return "Recovered";
-  }
-
-  return "No Alert";
-}
-
 function cleanCardSummary(summary?: string | null) {
   const value = String(summary || "").trim();
-  if (!value) {
-    return "";
-  }
-
-  if (/^QRguitar Profile with photos, specs, and instrument details\.?$/i.test(value)) {
-    return "";
-  }
-
-  if (/^Public QRguitar record\b/i.test(value) || /\bpublic record(s)?\b/i.test(value)) {
-    return "";
-  }
-
+  if (!value) return "";
+  if (/^QRguitar Profile with photos, specs, and instrument details\.?$/i.test(value)) return "";
+  if (/^Public QRguitar record\b/i.test(value) || /\bpublic record(s)?\b/i.test(value)) return "";
   return value;
 }
