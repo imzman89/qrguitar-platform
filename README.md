@@ -50,7 +50,7 @@ http://127.0.0.1:3003
 From PowerShell/Command Prompt:
 
 ```bash
-cd "C:\\Users\\mrgar\\Documents\\Codex\\2026-06-22\\i-need-you-to-finish-and\\work\\qrguitar-platform"
+cd "C:\\Users\\mrgar\\Documents\\Codex\\2026-06-22\\i-need-you-to-finish-and\\work\\qrguitar-platform-recovered"
 
 # 1) Make sure the build is clean
 npm run typecheck --workspace @qrguitar/web
