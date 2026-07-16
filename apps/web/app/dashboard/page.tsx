@@ -1,9 +1,9 @@
 "use client";
 
-import { BadgeCheck, Copy, Mail, QrCode, Repeat2, Settings2, ShieldCheck } from "lucide-react";
+import { Copy, Mail, Repeat2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { BulkProfileImport } from "../../components/BulkProfileImport";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import { ProfileStatusBadges } from "../../components/ProfileStatusBadges";
@@ -22,26 +22,10 @@ import {
   type DemoTransfer,
   type DemoUser
 } from "../../lib/local-demo";
-import { clearQrGuitarSessionState, createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
-import { useRouter } from "next/navigation";
-import { getProfileCompleteness, getProfilePhotoUrls, getServiceHistoryEntries } from "../../lib/instrument-profile-contract";
+import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
+import { getProfilePhotoUrls, getServiceHistoryEntries } from "../../lib/instrument-profile-contract";
 
-type DashboardFilter = "all" | "public" | "private" | "attention" | "safety" | "transfers";
-
-const starterActions = [
-  {
-    title: "New profile",
-    copy: "Register an instrument, add photos, and generate a permanent QRguitar link.",
-    href: "/create",
-    label: "Create Profile"
-  },
-  {
-    title: "Public catalog",
-    copy: "Review how visible QRguitar Profiles appear to buyers, shops, and future owners.",
-    href: "/catalog",
-    label: "Open Catalog"
-  }
-];
+type DashboardFilter = "all" | "public" | "private" | "transfers";
 
 function mergeDashboardRecords(records: DemoInstrument[], user: DemoUser | null) {
   void user;
@@ -99,7 +83,6 @@ export default function DashboardPage() {
   const [dashboardMessage, setDashboardMessage] = useState("");
   const [dashboardCopy, setDashboardCopy] = useState(defaultSiteSettings.dashboard);
   const [activeFilter, setActiveFilter] = useState<DashboardFilter>("all");
-  const router = useRouter();
 
   useEffect(() => {
     void fetchPublishedSiteSettings().then((published) => {
@@ -185,10 +168,7 @@ export default function DashboardPage() {
   const publicRecords = instruments.filter((instrument) => instrument.visibility === "public").length;
   const privateRecords = instruments.filter((instrument) => instrument.visibility === "private").length;
   const unlistedRecords = instruments.filter((instrument) => instrument.visibility === "unlisted").length;
-  const recordsWithPhotos = instruments.filter((instrument) => instrument.heroImageDataUrl || instrument.galleryImageDataUrls?.length).length;
-  const hiddenDocumentCount = instruments.reduce((total, instrument) => total + (instrument.documentFiles?.filter((file) => file.visibility === "hidden").length || 0), 0);
-  const activeSafetyAlerts = instruments.filter((instrument) => instrument.safetyStatus === "lost" || instrument.safetyStatus === "stolen").length;
-  const needsAttention = instruments.filter((instrument) => getProfileCompleteness(instrument).percent < 100).length;
+
   const verifiedRecords = instruments.filter((instrument) => getInstrumentVerificationStatus(instrument) === "verified").length;
   const authenticityConfirmedRecords = instruments.filter((instrument) => instrument.authenticityStatus === "confirmed").length;
   const chronologicalInstruments = useMemo(
@@ -229,19 +209,41 @@ export default function DashboardPage() {
       { label: "Total Profiles", value: String(instruments.length), filter: "all" as const, helper: "Every active Profile" },
       { label: "Visible in Catalog", value: String(publicRecords), filter: "public" as const, helper: "Discoverable Profiles" },
       { label: "Private / Unlisted", value: String(privateRecords + unlistedRecords), filter: "private" as const, helper: "Limited visibility" },
-      { label: "Needs Attention", value: String(needsAttention), filter: "attention" as const, helper: "Missing useful details" },
-      { label: "Reported Lost / Stolen", value: String(activeSafetyAlerts), filter: "safety" as const, helper: "Active safety notices" },
+
       { label: "Pending Transfers / Claims", value: String(pendingTransfers), filter: "transfers" as const, helper: "Awaiting completion" }
     ],
-    [activeSafetyAlerts, instruments.length, needsAttention, pendingTransfers, privateRecords, publicRecords, unlistedRecords]
+    [instruments.length, pendingTransfers, privateRecords, publicRecords, unlistedRecords]
   );
 
-  async function logout() {
-    const supabase = createBrowserSupabaseClient();
-    await supabase.auth.signOut();
-    clearQrGuitarSessionState();
-    setUser(null);
-    router.replace("/login?next=%2Fdashboard");
+  async function updateSerialVisibility(instrument: DemoInstrument, showSerialPublic: boolean) {
+    if (!instrument.serial) {
+      setDashboardMessage("This Profile does not have a Serial Number to display.");
+      return;
+    }
+
+    const token = await getSupabaseAccessToken();
+    const response = await fetch("/api/instruments", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: "Bearer " + token
+      },
+      body: JSON.stringify({
+        qrCode: instrument.qrCode,
+        verificationOnly: true,
+        verificationStatus: getInstrumentVerificationStatus(instrument),
+        authenticityStatus: instrument.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed",
+        showSerialPublic
+      })
+    });
+    const payload = await response.json().catch(() => null) as { ok?: boolean; message?: string } | null;
+    if (!response.ok || !payload?.ok) {
+      setDashboardMessage(payload?.message || "Could not update Serial Number visibility.");
+      return;
+    }
+
+    setInstruments((current) => current.map((item) => item.qrCode === instrument.qrCode ? { ...item, showSerialPublic } : item));
+    setDashboardMessage(showSerialPublic ? "Serial Number is now shown on the visible Profile." : "Serial Number is now hidden from the visible Profile.");
   }
 
   async function removeFromCollection(instrument: DemoInstrument) {
@@ -413,12 +415,10 @@ export default function DashboardPage() {
                   const hiddenDocs = Math.max(0, totalDocs - publicDocs);
                   const imageSources = getProfilePhotoUrls(instrument);
                   const serviceEntries = getServiceHistoryEntries(instrument);
-                  const completeness = getProfileCompleteness(instrument);
                   const condition = getInstrumentCondition(instrument);
                   const title = dashboardRecordTitle(instrument);
                   const meta = dashboardRecordMeta(instrument, condition);
                   const profileNumber = profileNumbers.get(instrument.qrCode) || 1;
-                  const missingItems = getMissingProfileItems(instrument);
 
                   return (
                     <article className={styles.instrumentRow} key={instrument.qrCode}>
@@ -446,13 +446,7 @@ export default function DashboardPage() {
                             {serviceEntries.length ? <span>{serviceEntries.length} service {serviceEntries.length === 1 ? "entry" : "entries"}</span> : null}
                             {totalDocs ? <span>{publicDocs} public {publicDocs === 1 ? "document" : "documents"}{hiddenDocs ? `, ${hiddenDocs} private` : ""}</span> : null}
                             <span>{instrument.visibility === "private" ? "Private" : instrument.visibility === "unlisted" ? "Unlisted" : "Visible"}</span>
-                            <span>{completeness.percent}% complete</span>
                           </div>
-                          {missingItems.length ? (
-                            <div className={styles.completenessNote}>
-                              <b>Next:</b> {missingItems.slice(0, 3).join(", ")}
-                            </div>
-                          ) : null}
                         </div>
                       </Link>
                       <div className={styles.qrActionColumn}>
@@ -467,6 +461,11 @@ export default function DashboardPage() {
                         <div className={styles.instrumentActions}>
                           <Link className="button secondary" href={`/edit/${instrument.qrCode}`}>Edit Profile</Link>
                           <Link className="button secondary" href={instrumentToProfileUrl(instrument)}>View Profile</Link>
+                          {instrument.serial ? (
+                            <button className="button secondary" type="button" onClick={() => void updateSerialVisibility(instrument, !instrument.showSerialPublic)}>
+                              {instrument.showSerialPublic ? "Hide Serial Publicly" : "Show Serial Publicly"}
+                            </button>
+                          ) : null}
                           <RecordShareButton className={styles.dashboardShare} code={instrument.qrCode} title={title} showLabel />
                         </div>
                         <button className={`button secondary ${styles.dangerAction}`} type="button" onClick={() => void removeFromCollection(instrument)}>
@@ -501,77 +500,7 @@ export default function DashboardPage() {
             </div>
           </section>
 
-      <div className="grid three dashboard-actions">
-              {starterActions.map((action) => (
-              <article className="card" key={action.title}>
-                <div className="icon">{action.href === "/create" ? <QrCode /> : <Settings2 />}</div>
-                <h3>{action.title}</h3>
-                <p>{action.copy}</p>
-                <Link className="button secondary" href={action.href}>
-                  {action.label}
-                </Link>
-              </article>
-            ))}
-          </div>
-
-          <div className="split dashboard-split dashboard-owner-tools">
-            <section className="card dashboard-health-card">
-              <div className="icon"><BadgeCheck /></div>
-              <h3>{dashboardCopy.collectionHealthTitle}</h3>
-              <p>{dashboardCopy.collectionHealthHelper}</p>
-              <div className="dashboard-health-grid">
-                <div>
-                  <strong>{recordsWithPhotos}/{instruments.length || 0}</strong>
-                  <span>Profiles with photos</span>
-                </div>
-                <div>
-                  <strong>{publicRecords}</strong>
-                  <span>Public</span>
-                </div>
-                <div>
-                  <strong>{privateRecords}</strong>
-                  <span>Private</span>
-                </div>
-                <div>
-                  <strong>{hiddenDocumentCount}</strong>
-                  <span>Hidden docs</span>
-                </div>
-              </div>
-              <div className="activity-list compact">
-                <Activity icon={<QrCode size={18} />} title={dashboardCopy.qrGuidanceTitle} detail={dashboardCopy.qrGuidanceBody} />
-                <Activity icon={<ShieldCheck size={18} />} title={dashboardCopy.privacyGuidanceTitle} detail={`${dashboardCopy.privacyGuidanceBody} Current: ${publicRecords} public, ${privateRecords} private${unlistedRecords ? `, ${unlistedRecords} unlisted` : ""}.`} />
-                <Activity icon={<Copy size={18} />} title={dashboardCopy.proofGuidanceTitle} detail={dashboardCopy.proofGuidanceBody} />
-                <Activity icon={<Settings2 size={18} />} title={dashboardCopy.serviceGuidanceTitle} detail={dashboardCopy.serviceGuidanceBody} />
-              </div>
-            </section>
-            <section className="card dashboard-next-card">
-              <div className="icon"><Settings2 /></div>
-              <h3>{dashboardCopy.nextActionsTitle}</h3>
-              <p>{dashboardCopy.nextActionsHelper}</p>
-              <div className="dashboard-action-list">
-                <Link href="/create">
-                  <strong>Add another profile</strong>
-                  <span>Register another guitar, amp, pedal, or build.</span>
-                </Link>
-                <Link href="/catalog">
-                  <strong>Review the catalog</strong>
-                  <span>See what buyers and shops can view.</span>
-                </Link>
-                <Link href="/how-it-works#identity-privacy">
-                  <strong>Review identity and privacy</strong>
-                  <span>Learn how QRguitar IDs, serial visibility, and profile privacy work.</span>
-                </Link>
-                <a href="mailto:support@qrguitar.com?subject=QRguitar%20verification%20help">
-                  <strong>{dashboardCopy.verificationGuidanceTitle}</strong>
-                  <span>{dashboardCopy.verificationGuidanceBody}</span>
-                </a>
-                <a href="mailto:support@qrguitar.com?subject=QRguitar%20ownership%20transfer%20help">
-                  <strong>{dashboardCopy.transferGuidanceTitle}</strong>
-                  <span>{dashboardCopy.transferGuidanceBody}</span>
-                </a>
-              </div>
-            </section>
-          </div>
+          {instruments.length ? <BulkProfileImport ownerName={displayName} onComplete={refreshInstruments} /> : null}
         </div>
       </main>
       <Footer />
@@ -783,27 +712,13 @@ function TransferPanel({
 function matchesDashboardFilter(instrument: DemoInstrument, filter: DashboardFilter, transfers: DemoTransfer[]) {
   if (filter === "public") return instrument.visibility === "public";
   if (filter === "private") return instrument.visibility === "private" || instrument.visibility === "unlisted";
-  if (filter === "attention") return getProfileCompleteness(instrument).percent < 100;
-  if (filter === "safety") return instrument.safetyStatus === "lost" || instrument.safetyStatus === "stolen";
+
   if (filter === "transfers") {
     return transfers.some((transfer) =>
       transfer.status === "sent" && transfer.guitarQrCode.toUpperCase() === instrument.qrCode.toUpperCase()
     );
   }
   return true;
-}
-
-function getMissingProfileItems(instrument: DemoInstrument) {
-  const checks = getProfileCompleteness(instrument).checks;
-  return [
-    !checks.photo ? "add a photo" : "",
-    !checks.description ? "add a story" : "",
-    !checks.history ? "add history" : "",
-    !checks.identity ? "complete identity" : "",
-    !checks.availability ? "set availability" : "",
-    !checks.originality ? "set originality" : "",
-    !checks.visibility ? "set visibility" : ""
-  ].filter(Boolean);
 }
 
 function dashboardRecordTitle(instrument: DemoInstrument) {
@@ -875,23 +790,11 @@ function dashboardRecordMeta(instrument: DemoInstrument, condition: "new" | "use
     instrument.brand,
     instrument.year,
     condition === "new" ? "New" : "Used"
-  ].filter(Boolean).join(" • ");
+  ].filter(Boolean).join(" / ");
 }
 
 function sameText(first: string, second: string) {
   return first.trim().toLowerCase() === second.trim().toLowerCase();
-}
-
-function Activity({ icon, title, detail }: { icon: ReactNode; title: string; detail: string }) {
-  return (
-    <div className="activity-item">
-      <span>{icon}</span>
-      <div>
-        <strong>{title}</strong>
-        <p>{detail}</p>
-      </div>
-    </div>
-  );
 }
 
 function mapSupabaseUser(user: { email?: string; user_metadata?: Record<string, unknown> }): DemoUser {

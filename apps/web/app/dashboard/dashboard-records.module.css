@@ -456,16 +456,6 @@
   pointer-events: none;
 }
 
-.completenessNote {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-.completenessNote b {
-  color: var(--gold-2);
-}
-
 .dangerAction {
   color: #e7a09a !important;
   border-color: rgba(196, 76, 65, .2) !important;

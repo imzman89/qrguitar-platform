@@ -35,7 +35,9 @@ export function mergeRecordTrustSettings(settings?: Partial<RecordTrustSettings>
     authenticityStatus: settings?.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed",
     showVerificationBadge: settings?.showVerificationBadge === false ? false : true,
     showAuthenticityBadge: settings?.showAuthenticityBadge === false ? false : true,
-    showSerialPublic: settings?.showSerialPublic === true,
+    // Legacy trust rows predate this preference. Preserve their original public
+    // serial display while continuing to honor every explicit hide choice.
+    showSerialPublic: settings != null && settings.showSerialPublic !== false,
     serialExceptionApproved: settings?.serialExceptionApproved === true,
     internalVerificationNote: String(settings?.internalVerificationNote || "").trim(),
     publicVerificationNote: String(settings?.publicVerificationNote || "").trim(),

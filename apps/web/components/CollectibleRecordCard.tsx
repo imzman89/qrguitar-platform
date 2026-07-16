@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Camera, FileText, Globe2 } from "lucide-react";
+import { ArrowRight, Camera, FileText, Globe2, Hash } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 import {
@@ -41,10 +41,11 @@ export function CollectibleRecordCard({
   const imageUrl = galleryImages[0] || "";
   const photoCount = getProfilePhotoUrls(record).length;
   const publicDocCount = getPublicDocumentCount(record);
+  const publicSerial = record.showSerialPublic === true ? String(record.serial || "").trim() : "";
   const profileUrl = instrumentToProfileUrl(record);
   const showSecondaryAction = variant !== "latest" && secondaryHref && secondaryLabel;
   const showSecondaryText = variant !== "latest" && !secondaryHref && secondaryLabel;
-  const summary = cleanCardSummary(record.summary);
+  const summary = variant === "latest" ? "" : cleanCardSummary(record.summary);
 
   return (
     <article className={`collectible-card collectible-card--${variant}`} aria-label={`Open ${title} QRguitar Profile`}>
@@ -81,6 +82,7 @@ export function CollectibleRecordCard({
           <ProfileStatusBadges record={record} />
 
           <div className="collectible-card-facts" aria-label="Profile contents">
+            {publicSerial ? <span><Hash size={13} /> Serial {publicSerial}</span> : null}
             {photoCount ? <span><Camera size={13} /> {photoCount} {photoCount === 1 ? "photo" : "photos"}</span> : null}
             {publicDocCount ? <span><FileText size={13} /> {publicDocCount} {publicDocCount === 1 ? "document" : "documents"}</span> : null}
           </div>

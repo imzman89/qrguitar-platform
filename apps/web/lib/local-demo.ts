@@ -1029,17 +1029,26 @@ export function generatePermanentQrCode(existingCodes: string[] = [], serialNumb
     return `QRG-${serialCode}`;
   }
 
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const code = `QRG-${randomCodeBody()}`;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const code = `QRG-${randomSixDigitCode()}`;
 
     if (!taken.has(code)) {
       return code;
     }
   }
 
-  return `QRG-${Date.now().toString(36).toUpperCase()}`;
+  return `QRG-${String(Date.now() % 1_000_000).padStart(6, "0")}`;
 }
 
+function randomSixDigitCode() {
+  if (typeof window !== "undefined" && window.crypto) {
+    const values = new Uint32Array(1);
+    window.crypto.getRandomValues(values);
+    return String(values[0] % 1_000_000).padStart(6, "0");
+  }
+
+  return String(Math.floor(Math.random() * 1_000_000)).padStart(6, "0");
+}
 function randomCodeBody() {
   if (typeof window !== "undefined" && window.crypto) {
     const bytes = new Uint8Array(5);

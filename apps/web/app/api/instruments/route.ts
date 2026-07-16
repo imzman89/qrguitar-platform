@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import type { User } from "@supabase/supabase-js";
 import { revalidatePath, unstable_noStore as noStore } from "next/cache";
 import { createServerSupabaseClient, createServerSupabaseClientWithTimeout, getAuthenticatedUser, getSupabaseEnvStatus } from "../../../lib/supabase-server";
@@ -287,7 +287,7 @@ function normalizeLookupEmail(value: string) {
 }
 
 function makeNewPermanentQrCode() {
-  return `QRG-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`;
+  return `QRG-${String(randomInt(0, 1_000_000)).padStart(6, "0")}`;
 }
 
 async function resolveRedirectedQrCode(code: string) {
@@ -1557,12 +1557,20 @@ export async function POST(request: Request) {
       }, { status: 409 });
     }
   } else {
-    for (let attempt = 0; attempt < 24; attempt += 1) {
-      const { count } = await supabase.from("guitars").select("id", { count: "exact", head: true }).eq("qr_code", qrCode);
+    let uniqueCodeFound = false;
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const { count, error } = await supabase.from("guitars").select("id", { count: "exact", head: true }).eq("qr_code", qrCode);
+      if (error) {
+        return NextResponse.json({ ok: false, message: "Could not reserve a QRguitar ID." }, { status: 500 });
+      }
       if (!count) {
+        uniqueCodeFound = true;
         break;
       }
       qrCode = makeNewPermanentQrCode();
+    }
+    if (!uniqueCodeFound) {
+      return NextResponse.json({ ok: false, message: "Could not reserve a unique QRguitar ID. Please try again." }, { status: 503 });
     }
   }
 
@@ -1714,22 +1722,21 @@ export async function POST(request: Request) {
     );
   }
 
-  if (typeof body.showSerialPublic === "boolean") {
-    const trustResult = await supabase.from("site_content").upsert(
-      {
-        content_key: recordTrustContentKey(insertedGuitar.qr_code),
-        content_value: mergeRecordTrustSettings({ showSerialPublic: body.showSerialPublic === true }),
-        updated_at: new Date().toISOString()
-      },
-      { onConflict: "content_key" }
+  const showSerialPublic = Boolean(input.serial) && body.showSerialPublic !== false;
+  const trustResult = await supabase.from("site_content").upsert(
+    {
+      content_key: recordTrustContentKey(insertedGuitar.qr_code),
+      content_value: mergeRecordTrustSettings({ showSerialPublic }),
+      updated_at: new Date().toISOString()
+    },
+    { onConflict: "content_key" }
+  );
+  if (trustResult.error) {
+    revalidatePublicRecordSurfaces(insertedGuitar.qr_code);
+    return noStoreJson(
+      { ok: true, qrCode: insertedGuitar.qr_code, permanentPath: insertedGuitar.permanent_path, message: "Saved. Serial privacy settings could not be saved." },
+      { status: 200 }
     );
-    if (trustResult.error) {
-      revalidatePublicRecordSurfaces(insertedGuitar.qr_code);
-      return noStoreJson(
-        { ok: true, qrCode: insertedGuitar.qr_code, permanentPath: insertedGuitar.permanent_path, message: "Saved. Serial privacy settings could not be saved." },
-        { status: 200 }
-      );
-    }
   }
 
   revalidatePublicRecordSurfaces(insertedGuitar.qr_code);

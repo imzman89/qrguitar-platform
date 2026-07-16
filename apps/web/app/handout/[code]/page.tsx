@@ -24,22 +24,19 @@ type HandoutPayload = {
   message?: string;
 };
 
-type PrintMode = "full" | "shop" | "label";
+type PrintMode = "handout" | "label";
 
 const modeLabels: Record<PrintMode, string> = {
-  full: "Profile Sheet",
-  shop: "Counter Card",
+  handout: "Customer Handout",
   label: "QR Label"
 };
 
-const modeOrder: PrintMode[] = ["shop", "full", "label"];
+const modeOrder: PrintMode[] = ["handout", "label"];
 
 const modeDescriptions: Record<PrintMode, string> = {
-  full: "A full-page profile for the owner or instrument paperwork.",
-  shop: "A compact display card for a counter, case, or service handoff.",
-  label: "A small scan label for a case, tag, or package."
+  handout: "A one-page Profile summary for an owner, buyer, or service customer.",
+  label: "A compact label for an instrument case, hang tag, or paperwork."
 };
-
 function humanizeStatus(value?: string) {
   const normalized = String(value || "").trim().toLowerCase();
   if (normalized === "for_sale") return "For Sale";
@@ -80,7 +77,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState("");
-  const [mode, setMode] = useState<PrintMode>("shop");
+  const [mode, setMode] = useState<PrintMode>("handout");
   const canonicalCode = instrument?.qrCode || code;
   const profileUrl = `https://www.qrguitar.com/i/${encodeURIComponent(canonicalCode)}`;
 
@@ -140,7 +137,6 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
     }
 
     void loadHandoutProfile();
-
     return () => {
       cancelled = true;
     };
@@ -154,7 +150,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
       width: 720,
       color: {
         dark: "#071014",
-        light: "#f8f6f2"
+        light: "#ffffff"
       }
     }).then((url) => {
       if (!cancelled) {
@@ -180,22 +176,25 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
   const saleStatus = humanizeStatus(instrument?.saleStatus);
   const originalityStatus = humanizeStatus(instrument?.originalityStatus);
   const safety = instrument?.safetyStatus === "lost" || instrument?.safetyStatus === "stolen" || instrument?.safetyStatus === "recovered" ? instrument.safetyStatus : "";
-  const serialDisplay = instrument?.showSerialPublic === true && instrument?.serial
-    ? instrument.serial
-    : instrument?.serialExceptionApproved
-      ? "No serial number"
-      : "";
+  const serialDisplay = instrument?.showSerialPublic === true && instrument?.serial ? instrument.serial : "";
   const photoCount = galleryImages.length;
   const docCount = instrument ? publicDocumentCount(instrument) : 0;
   const serviceCount = instrument ? publicServiceCount(instrument) : 0;
   const primaryFacts = instrument ? [instrument.brand, instrument.model, instrument.year, location].filter(Boolean) : [];
-  const detailFacts = [condition, saleStatus, originalityStatus, photoCount ? `${photoCount} photo${photoCount === 1 ? "" : "s"}` : "", docCount ? `${docCount} public doc${docCount === 1 ? "" : "s"}` : "", serviceCount ? `${serviceCount} service entr${serviceCount === 1 ? "y" : "ies"}` : ""].filter(Boolean);
+  const detailFacts = [
+    condition,
+    saleStatus,
+    originalityStatus,
+    photoCount ? `${photoCount} photo${photoCount === 1 ? "" : "s"}` : "",
+    docCount ? `${docCount} public document${docCount === 1 ? "" : "s"}` : "",
+    serviceCount ? `${serviceCount} service entr${serviceCount === 1 ? "y" : "ies"}` : ""
+  ].filter(Boolean);
   const isPrivate = instrument?.visibility === "private";
 
-  function renderBadges(compact = false) {
+  function renderBadges() {
     if (!instrument) return null;
     return (
-      <div className={compact ? "print-kit-badges compact" : "print-kit-badges"}>
+      <div className="print-kit-badges">
         {instrument.showVerificationBadge !== false ? (
           <Badge tone={verification === "verified" ? "verified" : "neutral"} icon={<ShieldCheck size={12} />}>
             {verification === "verified" ? "Verified by QRguitar" : "Unverified"}
@@ -226,9 +225,9 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                 <ArrowLeft size={15} />
                 Dashboard
               </Link>
-              <div className="eyebrow">Print kit</div>
-              <h1>Print this profile.</h1>
-              <p>Choose a format, check the preview, then print.</p>
+              <div className="eyebrow">QRguitar Print Kit</div>
+              <h1>Print the right piece.</h1>
+              <p>Use the handout for a customer or owner. Use the label for a case, tag, or paperwork.</p>
             </div>
             <div className="print-kit-toolbar-actions">
               <Link className="button secondary" href={`/i/${encodeURIComponent(canonicalCode)}`} target="_blank">
@@ -237,7 +236,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
               </Link>
               <button className="button" type="button" onClick={() => window.print()} disabled={!instrument || !qrDataUrl}>
                 <Printer size={16} />
-                Print
+                Print {mode === "handout" ? "Handout" : "Label"}
               </button>
             </div>
           </div>
@@ -261,86 +260,98 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
 
           {isPrivate ? (
             <div className="print-kit-warning no-print">
-              This profile is private. The QR link will not be publicly viewable until you make it public.
+              This Profile is private. Its QR code will open only for an authorized account until visibility changes.
             </div>
           ) : null}
 
           {loading ? (
             <section className="card handout-status">
               <QrCode />
-              <h2>Loading QRguitar Profile...</h2>
-              <p>Preparing the selected print kit.</p>
+              <h2>Preparing Print Kit...</h2>
             </section>
           ) : !instrument ? (
             <section className="card handout-status">
               <FileText />
-              <h2>Handout unavailable.</h2>
+              <h2>Print Kit unavailable.</h2>
               <p>{message || "This QRguitar Profile could not be loaded."}</p>
             </section>
+          ) : mode === "label" ? (
+            <article className="print-kit print-kit--label" aria-label={`Printable QR label for ${title}`}>
+              <section className="print-label-card">
+                <div className="print-label-qr">
+                  {qrDataUrl ? <img src={qrDataUrl} alt={`QR code for ${title}`} /> : <QrCode />}
+                </div>
+                <div className="print-label-info">
+                  <div className="print-label-wordmark">QR<span>guitar</span></div>
+                  <p>Scan Profile</p>
+                  <h2>{title}</h2>
+                  <strong>{canonicalCode}</strong>
+                  <small>{profileUrl}</small>
+                </div>
+              </section>
+            </article>
           ) : (
-            <article className={`print-kit print-kit--${mode}`} aria-label={`Printable QRguitar Profile for ${title}`}>
-              {mode !== "label" ? (
-                <header className="print-kit-header">
-                  <div className="print-kit-wordmark">QR<span>guitar</span></div>
-                  <div>
-                    <span>Permanent QRguitar Profile</span>
-                    <strong>{canonicalCode}</strong>
-                  </div>
-                </header>
-              ) : null}
+            <article className="print-kit print-kit--handout" aria-label={`Printable QRguitar handout for ${title}`}>
+              <header className="print-kit-header">
+                <div className="print-kit-wordmark">QR<span>guitar</span></div>
+                <div>
+                  <span>Instrument Profile Handout</span>
+                  <strong>{canonicalCode}</strong>
+                </div>
+              </header>
 
-              {mode === "label" ? (
-                <section className="print-label-card">
-                  <div className="print-label-qr">
-                    {qrDataUrl ? <img src={qrDataUrl} alt={`QR code for ${title}`} /> : <QrCode />}
-                  </div>
-                  <div className="print-label-info">
-                    <div className="print-label-wordmark">QR<span>guitar</span></div>
-                    <p>Scan to view profile</p>
-                    <h2>{title}</h2>
-                    <strong>{canonicalCode}</strong>
-                  </div>
-                </section>
-              ) : (
-                <>
-                  <section className="print-kit-profile">
-                    <div className="print-kit-photo">
-                      {photoUrl ? <img src={photoUrl} alt={`${title} main photo`} /> : <span>No photo available</span>}
+              <section className="print-kit-profile">
+                <div className="print-kit-photo">
+                  {photoUrl ? (
+                    <img
+                      src={photoUrl}
+                      alt={`${title} main photo`}
+                      loading="eager"
+                      decoding="sync"
+                      fetchPriority="high"
+                    />
+                  ) : (
+                    <span>No photo available</span>
+                  )}
+                </div>
+                <div className="print-kit-info">
+                  <p className="print-kit-id-label">Permanent QRguitar Profile</p>
+                  <h2>{title}</h2>
+                  {primaryFacts.length ? <p className="print-kit-primary-facts">{primaryFacts.join(" / ")}</p> : null}
+                  {renderBadges()}
+                  <dl className="print-kit-details">
+                    <div><dt>QRguitar ID</dt><dd>{canonicalCode}</dd></div>
+                    {serialDisplay ? <div><dt>Serial / Build ID</dt><dd>{serialDisplay}</dd></div> : null}
+                  </dl>
+                  {detailFacts.length ? (
+                    <div className="print-kit-fact-grid">
+                      {detailFacts.map((item) => <span key={item}>{item}</span>)}
                     </div>
-                    <div className="print-kit-info">
-                      <p className="print-kit-id-label">QRguitar ID</p>
-                      <strong className="print-kit-id">{canonicalCode}</strong>
-                      <h2>{title}</h2>
-                      {primaryFacts.length ? (
-                        <p className="print-kit-primary-facts">{primaryFacts.join(" / ")}</p>
-                      ) : null}
-                      {renderBadges(mode === "shop")}
-                      <div className="print-kit-fact-grid">
-                        {detailFacts.map((item) => <span key={item}>{item}</span>)}
-                        {serialDisplay ? <span>Serial Number: {serialDisplay}</span> : null}
-                      </div>
-                    </div>
-                  </section>
+                  ) : null}
+                </div>
+              </section>
 
-                  <section className="print-kit-qr-panel">
-                    <div className="print-kit-qr-code">
-                      {qrDataUrl ? <img src={qrDataUrl} alt={`QR code for ${title}`} /> : <QrCode />}
-                    </div>
-                    <div>
-                      <h3>Scan to open this QRguitar Profile.</h3>
-                      <p>This QR code opens the permanent profile URL for this instrument.</p>
-                      <strong>{profileUrl}</strong>
-                    </div>
-                  </section>
-                </>
-              )}
+              <section className="print-kit-qr-panel">
+                <div className="print-kit-qr-code">
+                  {qrDataUrl ? <img src={qrDataUrl} alt={`QR code for ${title}`} /> : <QrCode />}
+                </div>
+                <div>
+                  <p className="print-kit-scan-label">Scan this code</p>
+                  <h3>Open the permanent Profile.</h3>
+                  <p>Photos, identity, service history, documents, and future ownership updates stay connected to this QRguitar ID.</p>
+                  <strong>{profileUrl}</strong>
+                </div>
+              </section>
 
-              {mode !== "label" ? (
-                <footer className="print-kit-footer">
-                  <span>Permanent QRguitar Profile at qrguitar.com</span>
-                  <strong>Keep this with the instrument paperwork.</strong>
-                </footer>
-              ) : null}
+              <section className="print-kit-handoff">
+                <strong>Receiving this instrument?</strong>
+                <p>Use the secure ownership handoff sent by the current owner. The Profile URL and QR code stay the same after transfer.</p>
+              </section>
+
+              <footer className="print-kit-footer">
+                <span>Keep this sheet with the instrument paperwork.</span>
+                <strong>qrguitar.com</strong>
+              </footer>
             </article>
           )}
         </div>

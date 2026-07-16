@@ -47,31 +47,6 @@ type DocumentDraft = {
   privateNotes: string;
 };
 
-type BulkImportRow = {
-  id: string;
-  name: string;
-  brand: string;
-  model: string;
-  serial: string;
-  year: string;
-  instrumentType: string;
-  condition: "new" | "used";
-  saleStatus: "for_sale" | "not_for_sale";
-  originalityStatus: "all_original" | "modified" | "unknown";
-  location: string;
-  visibility: "public" | "private" | "unlisted";
-  photo: string;
-  summary: string;
-  serialNotUsed: boolean;
-  error: string;
-  result?: "ready" | "created" | "failed";
-  resultMessage?: string;
-};
-
-const bulkHeaders = ["brand", "model", "serial", "year", "type", "condition", "sale_status", "originality", "location", "visibility", "photo", "summary"];
-const bulkTemplate = `${bulkHeaders.join("\t")}
-Fender\tStratocaster\tABC123\t2005\tElectric Guitar\tused\tNot for Sale\tAll Original\tCranston, RI\tprivate\thttps://example.com/photo.jpg\tOwned since 2024`;
-
 export default function CreatePage() {
   const router = useRouter();
   const [message, setMessage] = useState("");
@@ -113,11 +88,6 @@ export default function CreatePage() {
   const [qrCode, setQrCode] = useState(makePreviewQrCode);
   const [qrStyle, setQrStyle] = useState<QrStyle>(defaultQrStyle);
   const [categoryOptions, setCategoryOptions] = useState(defaultSiteSettings.instrumentCategories);
-  const [accountRecordCount, setAccountRecordCount] = useState(0);
-  const [bulkText, setBulkText] = useState(bulkTemplate);
-  const [bulkRows, setBulkRows] = useState<BulkImportRow[]>([]);
-const [bulkSaving, setBulkSaving] = useState(false);
-  const [currentStep, setCurrentStep] = useState(1);
   const [createdCode, setCreatedCode] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
 
@@ -125,7 +95,6 @@ const [bulkSaving, setBulkSaving] = useState(false);
     return `/i/${qrCode}`;
   }, [qrCode]);
 
-  const bulkImportUnlocked = accountRecordCount > 0;
 
   useEffect(() => {
     const serialCode = qrCodeFromSerial(form.serial);
@@ -174,19 +143,6 @@ const [bulkSaving, setBulkSaving] = useState(false);
           ...current,
           owner: current.owner || String(sessionUser.user_metadata?.display_name || sessionUser.email?.split("@")[0] || "")
         }));
-        void getSupabaseAccessToken().then(async (token) => {
-          if (!token || cancelled) {
-            return;
-          }
-          const response = await fetch("/api/account", {
-            cache: "no-store",
-            headers: { authorization: `Bearer ${token}` }
-          });
-          const payload = await response.json().catch(() => null) as { ok?: boolean; account?: { stats?: { records?: number } } } | null;
-          if (!cancelled && response.ok && payload?.ok) {
-            setAccountRecordCount(payload.account?.stats?.records || 0);
-          }
-        });
       }
       setAuthChecked(true);
     });
@@ -204,133 +160,19 @@ const [bulkSaving, setBulkSaving] = useState(false);
   }, []);
 
   function updateField(field: keyof typeof form, value: string) {
-    setForm((current) => ({ ...current, [field]: value }));
+    setForm((current) => {
+      if (field === "serial") {
+        const firstSerialEntry = !current.serial.trim() && Boolean(value.trim());
+        return { ...current, serial: value, showSerialPublic: value.trim() ? (firstSerialEntry ? true : current.showSerialPublic) : false };
+      }
+      return { ...current, [field]: value };
+    });
   }
 
   function updateQrStyle(field: keyof QrStyle, value: string | boolean) {
     setQrStyle((current) => ({ ...current, [field]: value }));
   }
 
-  function parseBulkImportRows(text = bulkText) {
-    const lines = text
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean);
-    if (lines.length < 2) {
-      setBulkRows([]);
-      setMessage("Paste a header row and at least one instrument row.");
-      return [];
-    }
-
-    const delimiter = lines[0].includes("\t") ? "\t" : ",";
-    const headers = lines[0].split(delimiter).map((header) => normalizeBulkHeader(header));
-    const rows = lines.slice(1, 51).map((line, index) => {
-      const cells = splitBulkLine(line, delimiter);
-      const valueFor = (key: string) => String(cells[headers.indexOf(key)] || "").trim();
-      const serial = valueFor("serial");
-      const serialNotUsed = !serial || /^(none|n\/a|na|no serial|not used)$/i.test(serial);
-      const photo = valueFor("photo");
-      const visibilityValue = valueFor("visibility").toLowerCase();
-      const conditionValue = valueFor("condition").toLowerCase();
-      const saleValue = valueFor("sale_status").toLowerCase().replace(/[\s-]+/g, "_");
-      const originalityValue = valueFor("originality").toLowerCase().replace(/[\s-]+/g, "_");
-      const row: BulkImportRow = {
-        id: `bulk-${index}`,
-        name: valueFor("name"),
-        brand: valueFor("brand"),
-        model: valueFor("model"),
-        serial: serialNotUsed ? "" : serial,
-        year: valueFor("year"),
-        instrumentType: valueFor("type"),
-        condition: conditionValue === "new" ? "new" : "used",
-        saleStatus: saleValue === "for_sale" ? "for_sale" : "not_for_sale",
-        originalityStatus: originalityValue === "all_original" ? "all_original" : originalityValue === "modified" ? "modified" : "unknown",
-        location: valueFor("location"),
-        visibility: visibilityValue === "public" || visibilityValue === "unlisted" ? visibilityValue : "private",
-        photo,
-        summary: valueFor("summary"),
-        serialNotUsed,
-        error: "",
-        result: "ready",
-        resultMessage: ""
-      };
-
-      const errors = [
-        !row.brand ? "brand" : "",
-        !row.model ? "model" : "",
-        !row.year ? "year" : "",
-        !row.photo ? "photo" : "",
-        !row.serial && !row.serialNotUsed ? "serial/build ID" : ""
-      ].filter(Boolean);
-      row.error = errors.length ? `Missing ${errors.join(", ")}.` : "";
-      return row;
-    });
-
-    setBulkRows(rows);
-    setMessage(rows.length ? `${rows.length} bulk row${rows.length === 1 ? "" : "s"} ready for review.` : "No bulk rows found.");
-    return rows;
-  }
-
-  async function createBulkRecords() {
-    const rows = bulkRows.length ? bulkRows : parseBulkImportRows();
-    const validRows = rows.filter((row) => !row.error);
-    if (!validRows.length) {
-      setMessage("Fix the bulk rows before creating Profiles.");
-      return;
-    }
-
-    setBulkSaving(true);
-    setMessage("");
-    let created = 0;
-    let failed = 0;
-    const results = new Map<string, Pick<BulkImportRow, "result" | "resultMessage">>();
-
-    try {
-      const token = await getSupabaseAccessToken();
-      for (const row of validRows) {
-        const response = await fetch("/api/instruments", {
-          method: "POST",
-          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            name: row.name || [row.brand, row.model].filter(Boolean).join(" "),
-            brand: row.brand,
-            model: row.model,
-            serial: row.serial,
-            serialNotUsed: row.serialNotUsed,
-            year: row.year,
-            instrumentType: row.instrumentType,
-            condition: row.condition,
-            saleStatus: row.saleStatus,
-            originalityStatus: row.originalityStatus,
-            ownerName: String(user?.user_metadata?.display_name || user?.email || ""),
-            location: row.location,
-            visibility: row.visibility,
-            summary: row.summary,
-            heroImageDataUrl: row.photo,
-            photos: [row.photo],
-            showSerialPublic: false,
-            documents: [],
-            customFields: []
-          })
-        });
-        const payload = await response.json().catch(() => null) as { ok?: boolean; message?: string } | null;
-        if (response.ok && payload?.ok) {
-          created += 1;
-          results.set(row.id, { result: "created", resultMessage: "Profile created" });
-        } else {
-          failed += 1;
-          results.set(row.id, { result: "failed", resultMessage: payload?.message || "Could not create this Profile" });
-        }
-      }
-
-      setBulkRows((current) => current.map((row) => ({ ...row, ...(results.get(row.id) || {}) })));
-      setMessage(`${created} record${created === 1 ? "" : "s"} created.${failed ? ` ${failed} failed.` : ""}`);
-    } catch {
-      setMessage("Bulk import stopped. Check the rows and try again.");
-    } finally {
-      setBulkSaving(false);
-    }
-  }
 
   async function addProfilePhotos(files: FileList | null) {
     if (!files?.length) {
@@ -538,29 +380,6 @@ const [bulkSaving, setBulkSaving] = useState(false);
     void createRecordAndRedirect(true);
   }
 
-  function continueWizard() {
-    if (currentStep === 1) {
-      if (!form.brand.trim() || !form.model.trim()) {
-        setMessage("Add the Brand and Model before continuing.");
-        return;
-      }
-      if (!form.serial.trim() && !form.serialNotUsed) {
-        setMessage("Add the Serial Number or confirm that this instrument has no serial number.");
-        return;
-      }
-      if (!form.instrumentType.trim()) {
-        setMessage("Choose an instrument type before continuing.");
-        return;
-      }
-      if (!form.heroImageDataUrl && !galleryImages.length) {
-        setMessage("Add at least one real instrument photo before continuing.");
-        return;
-      }
-    }
-    setMessage("");
-    setCurrentStep((step) => Math.min(4, step + 1));
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
 
   return authChecked && user ? (
     <>
@@ -598,60 +417,15 @@ const [bulkSaving, setBulkSaving] = useState(false);
             </div>
           </header>
 
-          <details className="advanced-panel bulk-import-panel create-bulk-panel">
-            <summary>Bulk import for enrolled brands and shops</summary>
-            {bulkImportUnlocked ? (
-              <div className="bulk-import-grid">
-                <div className="field custom-wide">
-                  <label htmlFor="bulkImport">Paste tab or comma-separated inventory</label>
-                  <textarea id="bulkImport" rows={8} value={bulkText} onChange={(event) => setBulkText(event.target.value)} spellCheck={false} />
-                  <span>Use up to 50 rows. Every row requires a real photo URL and follows the same Serial Number and duplicate checks as a single Profile.</span>
-                </div>
-                <div className="bulk-import-actions">
-                  <button className="button secondary" type="button" onClick={() => navigator.clipboard?.writeText(bulkTemplate)}>Copy template</button>
-                  <button className="button secondary" type="button" onClick={() => parseBulkImportRows()}>Preview rows</button>
-                  <button className="button" type="button" onClick={() => void createBulkRecords()} disabled={bulkSaving}>{bulkSaving ? "Creating..." : "Create valid Profiles"}</button>
-                </div>
-                {bulkRows.length ? (
-                  <div className="bulk-preview-list" aria-label="Bulk import preview">
-                    {bulkRows.slice(0, 8).map((row) => (
-                      <div className={row.error || row.result === "failed" ? "bulk-preview-row has-error" : "bulk-preview-row"} key={row.id}>
-                        <strong>{row.brand || "Missing brand"} {row.model || "Missing model"}</strong>
-                        <span>{[row.year, row.serial || "No serial", row.visibility, row.photo ? "Photo ready" : "Photo missing"].filter(Boolean).join(" / ")}</span>
-                        <small>{row.error || row.resultMessage || "Ready"}</small>
-                      </div>
-                    ))}
-                    {bulkRows.length > 8 ? <p className="fine-print">Showing 8 of {bulkRows.length} rows. Up to 50 can be imported at once.</p> : null}
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <div className="bulk-import-locked">
-                <strong>Create one complete Profile first.</strong>
-                <p>Bulk import unlocks after your first instrument is saved with a real photo, helping shops and brands establish a clean account before adding inventory at scale.</p>
-              </div>
-            )}
-          </details>
-
-          <nav className="create-stepper" aria-label="Profile creation progress">
-            {["Instrument", "Ownership & privacy", "Details", "Review"].map((label, index) => {
-              const step = index + 1;
-              return (
-                <button className={currentStep === step ? "active" : currentStep > step ? "complete" : ""} type="button" onClick={() => setCurrentStep(step)} aria-current={currentStep === step ? "step" : undefined} key={label}>
-                  <span>{step}</span><strong>{label}</strong>
-                </button>
-              );
-            })}
-          </nav>
 
           <div className="create-wizard-layout">
             <form className="card form create-wizard-form" onSubmit={(event) => event.preventDefault()}>
               <input aria-hidden="true" autoComplete="off" name="company" style={{ display: "none" }} tabIndex={-1} value={honeypot} onChange={(event) => setHoneypot(event.target.value)} />
               <datalist id="qrguitar-known-brands">{establishedInstrumentBrands.map((brand) => <option value={brand} key={brand} />)}</datalist>
 
-              {currentStep === 1 ? (
+
                 <section className="create-step-panel" aria-labelledby="create-step-one">
-                  <div className="form-section-heading"><span className="eyebrow">Step 1 of 4</span><h2 id="create-step-one">Instrument identity</h2><p>Start with the facts that identify the instrument and the photo people will recognize.</p></div>
+                  <div className="form-section-heading"><span className="eyebrow">Required</span><h2 id="create-step-one">Instrument and photo</h2><p>Start with the facts that identify the instrument and the photo people will recognize.</p></div>
                   <div className="form-grid">
                     <Field label="Brand / Make" id="brand" value={form.brand} list="qrguitar-known-brands" placeholder="Start typing a brand" onChange={(value) => updateField("brand", value)} onBlur={(value) => updateField("brand", canonicalInstrumentBrand(value) || value.trim())} />
                     <Field label="Model" id="model" value={form.model} onChange={(value) => updateField("model", value)} />
@@ -660,7 +434,7 @@ const [bulkSaving, setBulkSaving] = useState(false);
                     <CategoryField label="Instrument type" id="instrumentType" value={form.instrumentType} options={categoryOptions} onChange={(value) => updateField("instrumentType", value)} />
                   </div>
                   <label className="toggle-field create-inline-toggle">
-                    <input type="checkbox" checked={form.serialNotUsed} onChange={(event) => setForm((current) => ({ ...current, serialNotUsed: event.target.checked, serial: event.target.checked ? "" : current.serial }))} />
+                    <input type="checkbox" checked={form.serialNotUsed} onChange={(event) => setForm((current) => ({ ...current, serialNotUsed: event.target.checked, serial: event.target.checked ? "" : current.serial, showSerialPublic: event.target.checked ? false : current.showSerialPublic }))} />
                     This instrument has no Serial Number
                   </label>
                   <p className="fine-print">If no Serial Number exists, QRguitar assigns a secure generated ID. Verification without a Serial Number requires prior QRguitar approval.</p>
@@ -671,16 +445,15 @@ const [bulkSaving, setBulkSaving] = useState(false);
                   </label>
                   <PhotoManager images={galleryImages} mainImage={form.heroImageDataUrl} onSelectMain={selectMainPhoto} onRemove={removePhoto} onMove={movePhoto} />
                 </section>
-              ) : null}
 
-              {currentStep === 2 ? (
+
                 <section className="create-step-panel" aria-labelledby="create-step-two">
-                  <div className="form-section-heading"><span className="eyebrow">Step 2 of 4</span><h2 id="create-step-two">Ownership and privacy</h2><p>Describe your relationship to the instrument and choose who can view the Profile.</p></div>
+                  <div className="form-section-heading"><span className="eyebrow">Visibility</span><h2 id="create-step-two">Owner context and privacy</h2><p>Choose where the Profile appears and add optional ownership context.</p></div>
                   <div className="form-grid">
                     <div className="field">
-                      <label htmlFor="ownerStatus">Your relationship</label>
+                      <label htmlFor="ownerStatus">How this instrument is connected to you (optional)</label>
                       <select id="ownerStatus" value={form.ownerStatus} onChange={(event) => updateField("ownerStatus", event.target.value)}>
-                        <option value="">Select relationship</option>
+                        <option value="">Not specified</option>
                         <option value="Original owner">Original owner</option>
                         <option value="Store inventory">Store inventory</option>
                         <option value="Subsequent owner">Subsequent owner</option>
@@ -703,11 +476,10 @@ const [bulkSaving, setBulkSaving] = useState(false);
                   </label>
                   <p className="fine-print">The signed-in owner and authorized admin retain the Serial Number even when its separate public field is hidden.</p>
                 </section>
-              ) : null}
 
-              {currentStep === 3 ? (
+
                 <section className="create-step-panel" aria-labelledby="create-step-three">
-                  <div className="form-section-heading"><span className="eyebrow">Step 3 of 4</span><h2 id="create-step-three">Instrument details</h2><p>Add what is useful now. History, service, media, and documents can continue growing after creation.</p></div>
+                  <div className="form-section-heading"><span className="eyebrow">Optional details</span><h2 id="create-step-three">Instrument details</h2><p>Add what is useful now. History, service, media, and documents can continue growing after creation.</p></div>
                   <div className="form-grid">
                     <Field label="Display title / nickname" id="name" value={form.name} onChange={(value) => updateField("name", value)} placeholder="Defaults to Brand + Model" />
                     <div className="field"><label htmlFor="instrumentCondition">Condition</label><select id="instrumentCondition" value={form.instrumentCondition} onChange={(event) => updateField("instrumentCondition", event.target.value)}><option value="new">New</option><option value="used">Used</option></select></div>
@@ -740,11 +512,10 @@ const [bulkSaving, setBulkSaving] = useState(false);
                   </details>
                   <p className="fine-print">Originality describes disclosed modification status. It does not mean QRguitar verification or authenticity confirmation.</p>
                 </section>
-              ) : null}
 
-              {currentStep === 4 ? (
+
                 <section className="create-step-panel" aria-labelledby="create-step-four">
-                  <div className="form-section-heading"><span className="eyebrow">Step 4 of 4</span><h2 id="create-step-four">Review and create</h2><p>Confirm the identity, photo, visibility, and ownership details before creating the permanent Profile.</p></div>
+                  <div className="form-section-heading"><span className="eyebrow">Review</span><h2 id="create-step-four">Confirm and create</h2><p>Confirm the identity, photo, visibility, and ownership details before creating the permanent Profile.</p></div>
                   <div className="create-review-grid">
                     <div><span>QRguitar ID</span><strong>{qrCode}</strong></div>
                     <div><span>Serial Number</span><strong>{form.serial || "No serial number"}</strong></div>
@@ -753,16 +524,14 @@ const [bulkSaving, setBulkSaving] = useState(false);
                     <div><span>Originality</span><strong>{form.originalityStatus === "all_original" ? "All Original" : form.originalityStatus === "modified" ? "Modified" : "Not Specified"}</strong></div>
                     <div><span>Ownership</span><strong>{form.ownerStatus || "Not specified"}</strong></div>
                   </div>
-                  <div className="create-review-preview"><InstrumentPreview qrCode={qrCode} name={form.name} brand={form.brand} model={form.model} serial={form.serial} year={form.year} owner={form.owner} location={form.location} summary={form.summary} heroImageDataUrl={form.heroImageDataUrl} customFields={previewFields} customLinks={customLinks} /></div>
                   <details className="advanced-panel"><summary>Customize downloaded QR</summary><section className="qr-customizer" aria-label="QR code customization"><div><h3>QR appearance</h3><p>Keep strong contrast so stickers, tags, plates, and paperwork remain scannable.</p></div><div className="qr-controls"><ColorField label="QR color" value={qrStyle.foreground} onChange={(value) => updateQrStyle("foreground", value)} /><ColorField label="Background" value={qrStyle.background} onChange={(value) => updateQrStyle("background", value)} /><div className="field"><label htmlFor="qrLabel">Label</label><input id="qrLabel" value={qrStyle.labelText} onChange={(event) => updateQrStyle("labelText", event.target.value)} /></div><div className="field"><label htmlFor="qrShape">Style</label><select id="qrShape" value={qrStyle.shape} onChange={(event) => updateQrStyle("shape", event.target.value)}><option value="classic">Classic print</option><option value="soft">Soft premium</option></select></div><label className="toggle-field"><input type="checkbox" checked={qrStyle.includeLabel} onChange={(event) => updateQrStyle("includeLabel", event.target.checked)} />Include label on downloaded QR</label></div></section></details>
                   <p className="create-permanent-note"><QrCode aria-hidden="true" /> This QRguitar ID and Profile URL remain permanent. Editing the title, specifications, photos, or Serial Number later does not replace this identity.</p>
                 </section>
-              ) : null}
 
               {message ? <p className="form-message" role="status">{message}</p> : null}
               <div className="create-wizard-actions">
-                {currentStep > 1 ? <button className="button secondary" type="button" onClick={() => { setMessage(""); setCurrentStep((step) => Math.max(1, step - 1)); }}>Back</button> : <Link className="button secondary" href="/dashboard">Cancel</Link>}
-                {currentStep < 4 ? <button className="button" type="button" onClick={continueWizard}>Continue</button> : <button className="button" type="button" onClick={saveDraft} disabled={savingProfile}>{savingProfile ? "Creating Profile..." : "Create QRguitar Profile"}</button>}
+                <Link className="button secondary" href="/dashboard">Cancel</Link>
+                <button className="button" type="button" onClick={saveDraft} disabled={savingProfile}>{savingProfile ? "Creating Profile..." : "Create QRguitar Profile"}</button>
               </div>
             </form>
 
