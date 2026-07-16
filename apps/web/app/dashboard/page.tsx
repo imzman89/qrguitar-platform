@@ -422,6 +422,9 @@ export default function DashboardPage() {
 
                   return (
                     <article className={styles.instrumentRow} key={instrument.qrCode}>
+                      <span className={styles.profileNumber} aria-label={`Collection profile ${profileNumber}`}>
+                        {String(profileNumber).padStart(2, "0")}
+                      </span>
                       <Link
                         className={styles.instrumentBodyLink}
                         href={instrumentToProfileUrl(instrument)}
@@ -430,7 +433,6 @@ export default function DashboardPage() {
                         <DashboardInstrumentThumb sources={imageSources} title={title} />
                         <div className={styles.instrumentDetails}>
                           <div className={styles.instrumentInfo}>
-                            <span className={styles.profileNumber}>Profile {String(profileNumber).padStart(2, "0")}</span>
                             <strong>{title}</strong>
                             <span title={meta}>{meta}</span>
                             <div className={styles.dashboardIdentity} aria-label="Profile identity">
@@ -462,19 +464,10 @@ export default function DashboardPage() {
                             onStyleChange={(qrStyle) => setInstruments((current) => current.map((item) => item.qrCode === instrument.qrCode ? { ...item, qrStyle } : item))}
                           />
                         </div>
-                        <div className={styles.actionGroup}>
-                          <span>Profile</span>
-                          <div className={styles.instrumentActions}>
-                            <Link className="button secondary" href={`/edit/${instrument.qrCode}`}>Edit Profile</Link>
-                            <Link className="button secondary" href={instrumentToProfileUrl(instrument)}>View Profile</Link>
-                          </div>
-                        </div>
-                        <div className={styles.actionGroup}>
-                          <span>More</span>
-                          <div className={styles.instrumentActions}>
-                            <Link className="button secondary" href={`/handout/${instrument.qrCode}`}>Print Kit</Link>
-                            <RecordShareButton className={styles.dashboardShare} code={instrument.qrCode} title={title} showLabel />
-                          </div>
+                        <div className={styles.instrumentActions}>
+                          <Link className="button secondary" href={`/edit/${instrument.qrCode}`}>Edit Profile</Link>
+                          <Link className="button secondary" href={instrumentToProfileUrl(instrument)}>View Profile</Link>
+                          <RecordShareButton className={styles.dashboardShare} code={instrument.qrCode} title={title} showLabel />
                         </div>
                         <button className={`button secondary ${styles.dangerAction}`} type="button" onClick={() => void removeFromCollection(instrument)}>
                           Remove Profile

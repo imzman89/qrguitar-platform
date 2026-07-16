@@ -8619,8 +8619,27 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 }
 
 .product-guide-example .collectible-card {
-  width: min(100%, 520px);
+  width: min(100%, 580px);
   margin-inline: auto;
+}
+
+.product-guide-hero-inner {
+  grid-template-columns: minmax(0, 1fr) minmax(520px, .92fr);
+  gap: clamp(40px, 5vw, 72px);
+}
+
+.product-guide-example .collectible-card--spotlight .collectible-card-link {
+  grid-template-columns: minmax(250px, 50%) minmax(0, 1fr);
+}
+
+@media (max-width: 1120px) {
+  .product-guide-hero-inner {
+    grid-template-columns: 1fr;
+  }
+
+  .product-guide-example {
+    justify-self: stretch;
+  }
 }
 
 .product-guide-capability-grid {
