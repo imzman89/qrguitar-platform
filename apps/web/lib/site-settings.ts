@@ -477,7 +477,12 @@ export function applySeoSettings(settings: EditableSiteSettings) {
 
   const canonicalUrl = settings.seo.canonicalUrl || "https://www.qrguitar.com";
   const seoImage = toAbsolutePublicUrl(settings.seo.image || "/seo/qrguitar-og-v2.png", canonicalUrl);
-  const favicon = toAbsolutePublicUrl(settings.seo.favicon || "/qrguitar-logo-white-orange.svg", canonicalUrl);
+  const faviconSetting = settings.seo.favicon || "/qrguitar-logo-white-orange.svg";
+  const favicon = /^https?:\/\//i.test(faviconSetting)
+    ? faviconSetting
+    : faviconSetting.startsWith("/")
+      ? faviconSetting
+      : `/${faviconSetting}`;
 
   document.title = settings.seo.title;
   setMetaTag("description", settings.seo.description);

@@ -421,11 +421,13 @@ export default function SiteEditorPage() {
               <h1>QRguitar site editor.</h1>
               <p>Owner controls for published homepage copy, brand text, SEO, and theme colors. This stays hidden from normal public navigation.</p>
             </div>
-            <div className="editor-status card">
-              <SlidersHorizontal size={28} />
-              <strong>{editorStatusTitle}</strong>
-              {editorStatusBody ? <span>{editorStatusBody}</span> : null}
-            </div>
+            {!authChecked || (isSignedIn && isUnlocked) ? (
+              <div className="editor-status card">
+                <SlidersHorizontal size={28} />
+                <strong>{editorStatusTitle}</strong>
+                {editorStatusBody ? <span>{editorStatusBody}</span> : null}
+              </div>
+            ) : null}
           </div>
 
           {authChecked && !isSignedIn ? (

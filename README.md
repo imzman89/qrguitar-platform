@@ -33,10 +33,10 @@ Payments are not active in this MVP. When payments are added, QRguitar must use 
 npm install
 ```
 
-7. Run the web app:
+7. Build, verify, and run the canonical production-style local review app:
 
 ```bash
-npm run dev:web
+npm run local:qa --workspace @qrguitar/web
 ```
 
 8. Open:
@@ -84,17 +84,19 @@ Double-click that file from the project root and it will:
 
 If Vercel ever asks you to sign in on this computer, do that once and then the same button can be used again for later pushes.
 
-For local work, run:
+For owner review, run:
 
 ```text
 start-local.cmd
 ```
 
-That opens QRguitar at:
+That builds and typechecks before opening the sole approved local review origin:
 
 ```text
 http://127.0.0.1:3003
 ```
+
+`localhost` and alternate ports are not interchangeable with this origin because browser sessions, local drafts, and caches are origin-specific. Use `127.0.0.1:3003` for all owner review. The launcher refuses to replace an unrelated process already using port 3003 and records the active PID and build identity under `%LOCALAPPDATA%\QRguitar\local-qa\state.json`.
 
 Optional environment variables to set in Vercel:
 

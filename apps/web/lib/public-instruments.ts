@@ -9,6 +9,7 @@ import {
   isLegacyServiceField,
   isManagedInstrumentSpec,
   originalityFromSpecs,
+  profileLinksFromSpecs,
   sanitizePublicInstrument
 } from "./instrument-profile-contract";
 
@@ -290,7 +291,7 @@ function mapRecord({
     heroImageDataUrl: hero,
     galleryImageDataUrls: gallery,
     customFields,
-    customLinks: [],
+    customLinks: profileLinksFromSpecs(specs),
     documentFiles: documents,
     timelineEvents: serviceEvents || [],
     serviceEvents: [],

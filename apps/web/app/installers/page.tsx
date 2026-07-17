@@ -30,8 +30,8 @@ const vettingSteps = [
     copy: "QRguitar reviews the shop, confirms the real business, and labels qualified partners as vetted installers."
   },
   {
-    title: "Install",
-    copy: "Owners can find a nearby shop to place the QR code under finish or document a repair-linked installation."
+    title: "Coordinate",
+    copy: "During the early partner program, QRguitar connects approved shops and owners manually for installation or repair-linked documentation."
   }
 ];
 

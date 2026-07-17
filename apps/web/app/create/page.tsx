@@ -1,18 +1,13 @@
 "use client";
 
-import { QrCode } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { InstrumentPreview } from "../../components/InstrumentPreview";
 import { Nav } from "../../components/Nav";
-import { createSubmissionFingerprint, isRepeatedBrowserSubmission, validateInstrumentSubmission } from "../../lib/security";
-import {
-  defaultQrStyle,
-  type CustomProfileField,
-  type QrStyle
-} from "../../lib/local-demo";
+import { PhotoOrganizer, type PhotoOrganizerStatus } from "../../components/PhotoOrganizer";
+import { type CustomProfileField } from "../../lib/local-demo";
 import { defaultSiteSettings, fetchPublishedSiteSettings } from "../../lib/site-settings";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
 import { makePreviewQrCode, qrCodeFromSerial } from "../../lib/qrguitar-id";
@@ -45,13 +40,36 @@ type DocumentDraft = {
   description: string;
   publicDescription: string;
   privateNotes: string;
+  storagePath?: string;
+  uploadState?: PhotoOrganizerStatus["state"];
+  uploadMessage?: string;
 };
+
+type CreateErrorResponse = {
+  ok?: boolean;
+  qrCode?: string;
+  permanentPath?: string;
+  message?: string;
+  code?: string;
+  fieldErrors?: Record<string, string>;
+  retryable?: boolean;
+  cleanupUploads?: boolean;
+  existingProfileFound?: boolean;
+  existingProfileHref?: string;
+  claimHref?: string;
+};
+
+type StagedPhoto = PhotoOrganizerStatus & { storagePath?: string };
+
+function makeClientKey() {
+  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 export default function CreatePage() {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [honeypot, setHoneypot] = useState("");
-  const [authChecked, setAuthChecked] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
   const [user, setUser] = useState<{ email?: string; user_metadata?: Record<string, unknown> } | null>(null);
   const [form, setForm] = useState({
     name: "",
@@ -78,15 +96,26 @@ export default function CreatePage() {
     heroImageDataUrl: "",
     summary: "",
     specsNotes: "",
-    serviceNotes: "",
+    serviceDate: "",
+    serviceType: "Setup",
+    serviceTitle: "",
+    servicePublicDescription: "",
+    servicePrivateNotes: "",
+    serviceIsPublic: false,
     visibility: "public"
   });
   const [customFields, setCustomFields] = useState<{ id: string; label: string; value: string }[]>([]);
-  const [customLinks, setCustomLinks] = useState([{ id: "link-1", label: "Website", url: "" }]);
+  const [customLinks, setCustomLinks] = useState([{ id: "link-1", label: "", url: "" }]);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [documents, setDocuments] = useState<DocumentDraft[]>([]);
+  const [photoUploads, setPhotoUploads] = useState<Record<string, StagedPhoto>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [lastErrorRetryable, setLastErrorRetryable] = useState(false);
+  const [existingProfileHref, setExistingProfileHref] = useState("");
+  const [claimHref, setClaimHref] = useState("");
+  const [uploadId] = useState(makeClientKey);
+  const [idempotencyKey] = useState(makeClientKey);
   const [qrCode, setQrCode] = useState(makePreviewQrCode);
-  const [qrStyle, setQrStyle] = useState<QrStyle>(defaultQrStyle);
   const [categoryOptions, setCategoryOptions] = useState(defaultSiteSettings.instrumentCategories);
   const [createdCode, setCreatedCode] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
@@ -169,11 +198,6 @@ export default function CreatePage() {
     });
   }
 
-  function updateQrStyle(field: keyof QrStyle, value: string | boolean) {
-    setQrStyle((current) => ({ ...current, [field]: value }));
-  }
-
-
   async function addProfilePhotos(files: FileList | null) {
     if (!files?.length) {
       return;
@@ -181,6 +205,7 @@ export default function CreatePage() {
 
     const remainingSlots = Math.max(0, 20 - galleryImages.length);
     const selectedFiles = Array.from(files).slice(0, remainingSlots);
+    const omittedCount = Math.max(0, files.length - selectedFiles.length);
     const validation = validateImageFiles(selectedFiles);
     if (!validation.files.length) {
       setMessage(validation.message);
@@ -189,12 +214,18 @@ export default function CreatePage() {
 
     const dataUrls = await Promise.all(validation.files.map(fileToCompressedDataUrl));
 
+    setPhotoUploads((current) => {
+      const next = { ...current };
+      dataUrls.forEach((dataUrl) => { next[dataUrl] = { state: "ready" }; });
+      return next;
+    });
+
     setGalleryImages((current) => {
       const next = [...current, ...dataUrls].slice(0, 20);
       setForm((formCurrent) => ({ ...formCurrent, heroImageDataUrl: formCurrent.heroImageDataUrl || next[0] || "" }));
       return next;
     });
-    setMessage(`${dataUrls.length} photo${dataUrls.length === 1 ? "" : "s"} added. Choose any photo as the main image.${validation.message ? ` ${validation.message}` : ""}`);
+    setMessage(`${dataUrls.length} photo${dataUrls.length === 1 ? "" : "s"} added. Choose any photo as the main image.${omittedCount ? ` ${omittedCount} photo${omittedCount === 1 ? " was" : "s were"} not added because each Profile supports up to 20.` : ""}${validation.message ? ` ${validation.message}` : ""}`);
   }
 
   async function addDocuments(files: FileList | null) {
@@ -228,6 +259,7 @@ export default function CreatePage() {
   }
 
   function removePhoto(imageUrl: string) {
+    const stagedPath = photoUploads[imageUrl]?.storagePath;
     setGalleryImages((current) => {
       const next = current.filter((item) => item !== imageUrl);
       setForm((formCurrent) => ({
@@ -236,46 +268,123 @@ export default function CreatePage() {
       }));
       return next;
     });
+    setPhotoUploads((current) => {
+      const next = { ...current };
+      delete next[imageUrl];
+      return next;
+    });
+    if (stagedPath) void cleanupStagedPaths([stagedPath]);
   }
 
-  function movePhoto(imageUrl: string, direction: -1 | 1) {
+  function movePhoto(fromIndex: number, toIndex: number) {
     setGalleryImages((current) => {
-      const index = current.indexOf(imageUrl);
-      const nextIndex = index + direction;
-      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return current;
+      if (fromIndex < 0 || toIndex < 0 || fromIndex >= current.length || toIndex >= current.length || fromIndex === toIndex) return current;
       const next = [...current];
-      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
       return next;
     });
   }
 
-  async function createRecordAndRedirect(showProfile = false) {
-    type SaveResult = {
-      ok?: boolean;
-      qrCode?: string;
-      permanentPath?: string;
-      message?: string;
-    };
+  async function cleanupStagedPaths(paths: string[]) {
+    if (!paths.length) return;
+    const token = await getSupabaseAccessToken();
+    await fetch("/api/instruments/uploads", {
+      method: "DELETE",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: JSON.stringify({ uploadId, paths })
+    }).catch(() => null);
+  }
 
+  async function uploadStagedFile(kind: "image" | "document", dataUrl: string, index: number) {
+    const token = await getSupabaseAccessToken();
+    const response = await fetch("/api/instruments/uploads", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: JSON.stringify({ uploadId, kind, dataUrl, index })
+    });
+    const result = await response.json().catch(() => null) as { ok?: boolean; storagePath?: string; message?: string; code?: string } | null;
+    if (!response.ok || !result?.ok || !result.storagePath) {
+      throw new Error(result?.message || (response.status === 401 ? "Your session expired. Sign in again, then retry." : "Upload failed. Retry this file."));
+    }
+    return result.storagePath;
+  }
+
+  async function uploadWithConcurrency<T>(items: T[], worker: (item: T, index: number) => Promise<void>, concurrency = 3) {
+    let cursor = 0;
+    async function run() {
+      while (cursor < items.length) {
+        const index = cursor++;
+        await worker(items[index], index);
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, run));
+  }
+
+  async function stageSelectedFiles() {
+    const photoPaths = galleryImages.map((imageUrl) => photoUploads[imageUrl]?.storagePath || "");
+    const failedPhotos: string[] = [];
+    await uploadWithConcurrency(galleryImages, async (imageUrl, index) => {
+      if (photoPaths[index]) return;
+      setPhotoUploads((current) => ({ ...current, [imageUrl]: { ...current[imageUrl], state: "uploading", progress: 15 } }));
+      try {
+        const storagePath = await uploadStagedFile("image", imageUrl, index);
+        photoPaths[index] = storagePath;
+        setPhotoUploads((current) => ({ ...current, [imageUrl]: { state: "uploaded", progress: 100, storagePath } }));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Upload failed. Retry this photo.";
+        failedPhotos.push(imageUrl);
+        setPhotoUploads((current) => ({ ...current, [imageUrl]: { state: "error", message } }));
+      }
+    });
+
+    const documentPaths = documents.map((document) => document.storagePath || "");
+    const failedDocuments: string[] = [];
+    await uploadWithConcurrency(documents, async (document, index) => {
+      if (documentPaths[index]) return;
+      setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, uploadState: "uploading", uploadMessage: "Uploading" } : item));
+      try {
+        const storagePath = await uploadStagedFile("document", document.dataUrl, index);
+        documentPaths[index] = storagePath;
+        setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, storagePath, uploadState: "uploaded", uploadMessage: "Uploaded" } : item));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Upload failed. Retry this document.";
+        failedDocuments.push(document.id);
+        setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, uploadState: "error", uploadMessage: message } : item));
+      }
+    });
+
+    if (failedPhotos.length || failedDocuments.length) {
+      throw new Error("Some files could not be uploaded. Retry the files marked in red; successful uploads are preserved.");
+    }
+    return { photoPaths, documentPaths };
+  }
+
+  function clearStagedPathsAfterServerCleanup() {
+    setPhotoUploads((current) => Object.fromEntries(Object.entries(current).map(([key]) => [key, { state: "ready" }])));
+    setDocuments((current) => current.map((document) => ({ ...document, storagePath: undefined, uploadState: "ready", uploadMessage: undefined })));
+  }
+
+  async function createRecordAndRedirect(showProfile = false) {
     if (savingProfile) return;
 
     try {
-      const validationMessage = validateInstrumentSubmission(form, honeypot);
-      if (validationMessage) {
-        setMessage(validationMessage);
-        return;
+      const nextFieldErrors: Record<string, string> = {};
+      if (honeypot.trim()) nextFieldErrors.form = "Submission blocked.";
+      if (!form.brand.trim()) nextFieldErrors.brand = "Choose the instrument brand.";
+      if (!form.model.trim()) nextFieldErrors.model = "Enter the model or build name.";
+      if (!form.instrumentType.trim()) nextFieldErrors.instrumentType = "Choose the instrument type.";
+      if (!form.serial.trim() && !form.serialNotUsed) nextFieldErrors.serial = "Enter the Serial Number or confirm that this instrument has no serial.";
+      if (!galleryImages.length) nextFieldErrors.photos = "Add at least one clear instrument photo.";
+      if (galleryImages.length > 20) nextFieldErrors.photos = "Choose no more than 20 photos.";
+      if (form.acquisitionDate && !/^\d{4}-\d{2}-\d{2}$/.test(form.acquisitionDate)) nextFieldErrors.acquisitionDate = "Choose a valid acquisition date.";
+      if (customLinks.some((link) => (link.label.trim() || link.url.trim()) && (!link.label.trim() || !/^https:\/\//i.test(link.url.trim())))) {
+        nextFieldErrors.customLinks = "Add both a label and a secure https:// URL, or remove the incomplete link.";
       }
-
-      if (!form.heroImageDataUrl && !galleryImages.length) {
-        setMessage("Add at least one photo before creating a QRguitar Profile.");
-        return;
-      }
-
-      if (
-        typeof window !== "undefined" &&
-        isRepeatedBrowserSubmission("qrguitar.lastCreateSubmission", createSubmissionFingerprint(form), window)
-      ) {
-        setMessage("That looks like a repeated submission. Wait a few seconds and try again.");
+      if (Object.keys(nextFieldErrors).length) {
+        setFieldErrors(nextFieldErrors);
+        setMessage("Review the highlighted fields before creating this Profile.");
+        focusFirstError(nextFieldErrors);
         return;
       }
 
@@ -286,8 +395,17 @@ export default function CreatePage() {
 
       setSavingProfile(true);
       setMessage("");
+      setFieldErrors({});
+      setLastErrorRetryable(false);
+      setExistingProfileHref("");
+      setClaimHref("");
+
+      const staged = await stageSelectedFiles();
+      const mainPhotoIndex = Math.max(0, galleryImages.indexOf(form.heroImageDataUrl));
 
       const payload = {
+          uploadId,
+          idempotencyKey,
           name: form.name.trim() || [form.brand, form.model].filter(Boolean).join(" "),
           brand: form.brand,
           model: form.model,
@@ -305,11 +423,11 @@ export default function CreatePage() {
           location: form.location,
           visibility: form.visibility as "public" | "private" | "unlisted",
           summary: form.summary || "",
-          heroImageDataUrl: form.heroImageDataUrl,
-          photos: galleryImages,
-          documents: documents.map((document) => ({
+          heroImagePath: staged.photoPaths[mainPhotoIndex] || staged.photoPaths[0],
+          photos: staged.photoPaths,
+          documents: documents.map((document, index) => ({
             name: document.name,
-            dataUrl: document.dataUrl,
+            storagePath: staged.documentPaths[index],
             visibility: document.visibility,
             documentType: document.documentType,
             issuerSource: document.issuerSource,
@@ -326,11 +444,23 @@ export default function CreatePage() {
             form.neckProfile.trim() ? { label: "Neck profile", value: form.neckProfile.trim() } : null,
             form.pickups.trim() ? { label: "Pickups / electronics", value: form.pickups.trim() } : null,
             form.specsNotes.trim() ? { label: "Specs notes", value: form.specsNotes.trim() } : null,
-            form.serviceNotes.trim() ? { label: "Service notes", value: form.serviceNotes.trim() } : null,
             ...customFields
               .filter((field) => field.label.trim() && field.value.trim())
               .map((field) => ({ label: field.label.trim(), value: field.value.trim() }))
-          ].filter(Boolean)
+          ].filter(Boolean),
+          customLinks: customLinks
+            .filter((link) => link.label.trim() && link.url.trim())
+            .map((link) => ({ label: link.label.trim(), url: link.url.trim() })),
+          serviceEntry: form.serviceTitle.trim() || form.servicePublicDescription.trim() || form.servicePrivateNotes.trim() ? {
+            serviceDate: form.serviceDate,
+            eventType: form.serviceType,
+            title: form.serviceTitle.trim() || `${form.serviceType} service`,
+            publicDescription: form.servicePublicDescription,
+            privateNotes: form.servicePrivateNotes,
+            shopName: form.seller,
+            location: form.location,
+            isPublic: form.serviceIsPublic
+          } : undefined
         };
 
       const token = await getSupabaseAccessToken();
@@ -339,14 +469,24 @@ export default function CreatePage() {
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
         body: JSON.stringify(payload)
       });
-      const result = (await response.json().catch(() => null)) as SaveResult | null;
+      const result = (await response.json().catch(() => null)) as CreateErrorResponse | null;
 
       if (!response.ok || !result?.ok) {
+        if (result?.cleanupUploads) clearStagedPathsAfterServerCleanup();
+        setFieldErrors(result?.fieldErrors || {});
+        setLastErrorRetryable(Boolean(result?.retryable));
+        setExistingProfileHref(result?.existingProfileHref || "");
+        setClaimHref(result?.claimHref || "");
         if (response.status === 402) {
           setMessage(result?.message || "Free public beta accounts can create up to 25 Profiles. Contact QRguitar for commercial setup.");
           return;
         }
-        setMessage(result?.message || "Could not create this QRguitar Profile.");
+        if (response.status === 401) {
+          setMessage("Your session expired. Sign in again, then return to this page. Your form and selected files are still here.");
+        } else {
+          setMessage(result?.message || `The server returned ${response.status}. Your form and selected files are preserved.`);
+        }
+        if (result?.fieldErrors) focusFirstError(result.fieldErrors);
         return;
       } else {
         if (result.qrCode && result.permanentPath) {
@@ -365,21 +505,30 @@ export default function CreatePage() {
       if (showProfile) {
         router.push(`/i/${finalCode}`);
       }
-    } catch {
-      setMessage("Could not create this QRguitar Profile right now. Check your connection and try again.");
+    } catch (error) {
+      setLastErrorRetryable(true);
+      setMessage(error instanceof Error ? error.message : "The network request failed. Your form and selected files are preserved; try again.");
     } finally {
       setSavingProfile(false);
     }
   }
 
+  function focusFirstError(errors: Record<string, string>) {
+    const firstField = ["brand", "model", "serial", "instrumentType", "photos", "acquisitionDate", "customLinks", "documents"].find((field) => errors[field]);
+    window.setTimeout(() => {
+      const target = firstField === "photos"
+        ? document.getElementById("profilePhotos")
+        : firstField === "customLinks"
+          ? document.querySelector<HTMLElement>('[aria-label="Link URL"]')
+          : document.getElementById(firstField || "");
+      target?.focus();
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 0);
+  }
+
   function saveDraft() {
     void createRecordAndRedirect(false);
   }
-
-  function saveAndPreview() {
-    void createRecordAndRedirect(true);
-  }
-
 
   return authChecked && user ? (
     <>
@@ -427,11 +576,11 @@ export default function CreatePage() {
                 <section className="create-step-panel" aria-labelledby="create-step-one">
                   <div className="form-section-heading"><span className="eyebrow">Required</span><h2 id="create-step-one">Instrument and photo</h2><p>Start with the facts that identify the instrument and the photo people will recognize.</p></div>
                   <div className="form-grid">
-                    <Field label="Brand / Make" id="brand" value={form.brand} list="qrguitar-known-brands" placeholder="Start typing a brand" onChange={(value) => updateField("brand", value)} onBlur={(value) => updateField("brand", canonicalInstrumentBrand(value) || value.trim())} />
-                    <Field label="Model" id="model" value={form.model} onChange={(value) => updateField("model", value)} />
-                    <Field label="Serial Number" id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} placeholder="Manufacturer or builder serial" disabled={form.serialNotUsed} />
+                    <Field required error={fieldErrors.brand} label="Brand / Make" id="brand" value={form.brand} list="qrguitar-known-brands" placeholder="Start typing a brand" onChange={(value) => updateField("brand", value)} onBlur={(value) => updateField("brand", canonicalInstrumentBrand(value) || value.trim())} />
+                    <Field required error={fieldErrors.model} label="Model" id="model" value={form.model} onChange={(value) => updateField("model", value)} />
+                    <Field required={!form.serialNotUsed} error={fieldErrors.serial} label="Serial Number" id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} placeholder="Manufacturer or builder serial" disabled={form.serialNotUsed} />
                     <Field label="Year" id="year" value={form.year} onChange={(value) => updateField("year", value)} placeholder="If known" />
-                    <CategoryField label="Instrument type" id="instrumentType" value={form.instrumentType} options={categoryOptions} onChange={(value) => updateField("instrumentType", value)} />
+                    <CategoryField required error={fieldErrors.instrumentType} label="Instrument type" id="instrumentType" value={form.instrumentType} options={categoryOptions} onChange={(value) => updateField("instrumentType", value)} />
                   </div>
                   <label className="toggle-field create-inline-toggle">
                     <input type="checkbox" checked={form.serialNotUsed} onChange={(event) => setForm((current) => ({ ...current, serialNotUsed: event.target.checked, serial: event.target.checked ? "" : current.serial, showSerialPublic: event.target.checked ? false : current.showSerialPublic }))} />
@@ -443,36 +592,37 @@ export default function CreatePage() {
                     <span>Choose photos from your device or use your phone camera. JPG, PNG, or WebP up to 12MB each.</span>
                     <input id="profilePhotos" name="profilePhotos" type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={(event) => void addProfilePhotos(event.target.files)} />
                   </label>
-                  <PhotoManager images={galleryImages} mainImage={form.heroImageDataUrl} onSelectMain={selectMainPhoto} onRemove={removePhoto} onMove={movePhoto} />
+                  {fieldErrors.photos ? <p className="field-error" role="alert">{fieldErrors.photos}</p> : null}
+                  <PhotoOrganizer images={galleryImages} mainImage={form.heroImageDataUrl} onSelectMain={selectMainPhoto} onRemove={removePhoto} onMove={movePhoto} statusByImage={photoUploads} />
                 </section>
 
 
                 <section className="create-step-panel" aria-labelledby="create-step-two">
-                  <div className="form-section-heading"><span className="eyebrow">Visibility</span><h2 id="create-step-two">Owner context and privacy</h2><p>Choose where the Profile appears and add optional ownership context.</p></div>
+                  <div className="form-section-heading"><span className="eyebrow">Ownership and privacy</span><h2 id="create-step-two">Your relationship to this instrument</h2><p>This helps explain the ownership history. You can update or transfer the Profile later.</p></div>
                   <div className="form-grid">
                     <div className="field">
-                      <label htmlFor="ownerStatus">How this instrument is connected to you (optional)</label>
+                      <label htmlFor="ownerStatus">Relationship (optional)</label>
                       <select id="ownerStatus" value={form.ownerStatus} onChange={(event) => updateField("ownerStatus", event.target.value)}>
                         <option value="">Not specified</option>
                         <option value="Original owner">Original owner</option>
+                        <option value="Current owner">Current owner</option>
                         <option value="Store inventory">Store inventory</option>
-                        <option value="Subsequent owner">Subsequent owner</option>
                         <option value="Builder / Brand">Builder / Brand</option>
                         <option value="Other">Other</option>
                       </select>
                     </div>
                     <Field label="Owner display" id="owner" value={form.owner} onChange={(value) => updateField("owner", value)} placeholder="Name or collection" />
-                    <Field label="Acquisition date" id="acquisitionDate" value={form.acquisitionDate} onChange={(value) => updateField("acquisitionDate", value)} placeholder="YYYY, YYYY-MM, or YYYY-MM-DD" />
+                    <div className={`field${fieldErrors.acquisitionDate ? " has-error" : ""}`}><label htmlFor="acquisitionDate">Acquisition date</label><input id="acquisitionDate" type="date" value={form.acquisitionDate} onChange={(event) => updateField("acquisitionDate", event.target.value)} aria-invalid={Boolean(fieldErrors.acquisitionDate)} />{fieldErrors.acquisitionDate ? <span className="field-error">{fieldErrors.acquisitionDate}</span> : null}</div>
                     <Field label="Seller / store (optional)" id="seller" value={form.seller} onChange={(value) => updateField("seller", value)} />
                     <Field label="Location" id="location" value={form.location} onChange={(value) => updateField("location", value)} placeholder="City, region, country" />
                   </div>
                   <div className="privacy-toggle create-visibility-control" aria-label="Profile visibility">
-                    <div><strong>{form.visibility === "public" ? "Visible Profile" : form.visibility === "unlisted" ? "Unlisted Profile" : "Private Profile"}</strong><span>{form.visibility === "public" ? "Appears in the Catalog and opens by direct QR or link." : form.visibility === "unlisted" ? "Does not appear in the Catalog, but opens by direct QR or link." : "Available only to you and authorized QRguitar administration."}</span></div>
-                    <label className="field visibility-select" htmlFor="profileVisibility"><span>Visibility</span><select id="profileVisibility" value={form.visibility} onChange={(event) => updateField("visibility", event.target.value)}><option value="public">Visible</option><option value="unlisted">Unlisted</option><option value="private">Private</option></select></label>
+                    <div><strong>{form.visibility === "public" ? "Public" : form.visibility === "unlisted" ? "Unlisted" : "Private"}</strong><span>{form.visibility === "public" ? "Listed in the Catalog and available by QR or direct link." : form.visibility === "unlisted" ? "Hidden from the Catalog but available by QR or direct link." : "Available only to the signed-in owner and authorized admin."}</span></div>
+                    <label className="field visibility-select" htmlFor="profileVisibility"><span>Visibility</span><select id="profileVisibility" value={form.visibility} onChange={(event) => updateField("visibility", event.target.value)}><option value="public">Public</option><option value="unlisted">Unlisted</option><option value="private">Private</option></select></label>
                   </div>
                   <label className="toggle-field create-inline-toggle">
                     <input type="checkbox" disabled={!form.serial.trim()} checked={form.showSerialPublic && Boolean(form.serial.trim())} onChange={(event) => setForm((current) => ({ ...current, showSerialPublic: event.target.checked }))} />
-                    Show the Serial Number on the visible Profile
+                    Show Serial Number publicly
                   </label>
                   <p className="fine-print">The signed-in owner and authorized admin retain the Serial Number even when its separate public field is hidden.</p>
                 </section>
@@ -495,20 +645,32 @@ export default function CreatePage() {
                   <details className="advanced-panel">
                     <summary>Advanced specifications and notes</summary>
                     <div className="field custom-wide"><label htmlFor="specsNotes">Specification notes</label><textarea id="specsNotes" rows={4} value={form.specsNotes} onChange={(event) => updateField("specsNotes", event.target.value)} placeholder="Hardware, wiring, neck carve, fretwire, case details, or other specifications." /></div>
-                    <div className="field custom-wide"><label htmlFor="serviceNotes">Known service notes</label><textarea id="serviceNotes" rows={4} value={form.serviceNotes} onChange={(event) => updateField("serviceNotes", event.target.value)} placeholder="Setup, repair, fretwork, electronics, inspection, or restoration notes." /></div>
                     <div className="custom-list">
                       {customFields.map((field) => <div className="custom-row" key={field.id}><input aria-label="Specification label" placeholder="Specification" value={field.label} onChange={(event) => setCustomFields((current) => current.map((item) => item.id === field.id ? { ...item, label: event.target.value } : item))} /><input aria-label="Specification value" placeholder="Value" value={field.value} onChange={(event) => setCustomFields((current) => current.map((item) => item.id === field.id ? { ...item, value: event.target.value } : item))} /><button className="button secondary" type="button" onClick={() => setCustomFields((current) => current.filter((item) => item.id !== field.id))}>Remove</button></div>)}
                       <button className="button secondary" type="button" onClick={() => setCustomFields((current) => [...current, { id: `field-${Date.now()}`, label: "", value: "" }])}>Add specification</button>
                     </div>
                   </details>
                   <details className="advanced-panel">
+                    <summary>Add known service work</summary>
+                    <p className="fine-print">This creates a real Timeline service entry, not a loose specification.</p>
+                    <div className="form-grid">
+                      <div className="field"><label htmlFor="serviceDate">Service date</label><input id="serviceDate" type="date" value={form.serviceDate} onChange={(event) => updateField("serviceDate", event.target.value)} /></div>
+                      <div className="field"><label htmlFor="serviceType">Service type</label><select id="serviceType" value={form.serviceType} onChange={(event) => updateField("serviceType", event.target.value)}><option>Setup</option><option>Repair</option><option>Inspection</option><option>Restoration</option><option>Electronics</option><option>Fretwork</option><option>Other</option></select></div>
+                      <Field label="Entry title" id="serviceTitle" value={form.serviceTitle} onChange={(value) => updateField("serviceTitle", value)} placeholder="Example: Full setup and inspection" />
+                    </div>
+                    <div className="field custom-wide"><label htmlFor="servicePublicDescription">Service description</label><textarea id="servicePublicDescription" rows={3} value={form.servicePublicDescription} onChange={(event) => updateField("servicePublicDescription", event.target.value)} /></div>
+                    <div className="field custom-wide"><label htmlFor="servicePrivateNotes">Private owner notes</label><textarea id="servicePrivateNotes" rows={3} value={form.servicePrivateNotes} onChange={(event) => updateField("servicePrivateNotes", event.target.value)} /></div>
+                    <label className="toggle-field"><input type="checkbox" checked={form.serviceIsPublic} onChange={(event) => setForm((current) => ({ ...current, serviceIsPublic: event.target.checked }))} />Show this service entry on the public Timeline</label>
+                  </details>
+                  <details className="advanced-panel">
                     <summary>Links and supporting documents</summary>
                     <div className="custom-list">
                       {customLinks.map((link) => <div className="custom-row" key={link.id}><input aria-label="Link label" placeholder="Link label" value={link.label} onChange={(event) => setCustomLinks((current) => current.map((item) => item.id === link.id ? { ...item, label: event.target.value } : item))} /><input aria-label="Link URL" placeholder="https://..." value={link.url} onChange={(event) => setCustomLinks((current) => current.map((item) => item.id === link.id ? { ...item, url: event.target.value } : item))} /><button className="button secondary" type="button" onClick={() => setCustomLinks((current) => current.filter((item) => item.id !== link.id))}>Remove</button></div>)}
                       <button className="button secondary" type="button" onClick={() => setCustomLinks((current) => [...current, { id: `link-${Date.now()}`, label: "", url: "" }])}>Add link</button>
+                      {fieldErrors.customLinks ? <span className="field-error" role="alert">{fieldErrors.customLinks}</span> : null}
                     </div>
                     <label className="create-photo-drop compact" htmlFor="profileDocuments"><strong>Add documents (optional)</strong><span>Receipts, appraisals, invoices, build sheets, or service slips. New documents stay private by default.</span><input id="profileDocuments" type="file" accept="application/pdf,image/png,image/jpeg,image/webp" multiple onChange={(event) => void addDocuments(event.target.files)} /></label>
-                    {documents.length ? <div className="create-document-list">{documents.map((document) => <div key={document.id}><div><strong>{document.name}</strong><span>{document.visibility === "public" ? "Visible document" : "Private document"}</span></div><select aria-label={`${document.name} visibility`} value={document.visibility} onChange={(event) => setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, visibility: event.target.value as "public" | "hidden" } : item))}><option value="hidden">Private</option><option value="public">Visible</option></select><button type="button" onClick={() => setDocuments((current) => current.filter((item) => item.id !== document.id))}>Remove</button></div>)}</div> : null}
+                    {documents.length ? <div className="create-document-list">{documents.map((document) => <div key={document.id}><div><strong>{document.name}</strong><span>{document.uploadMessage || (document.visibility === "public" ? "Public document" : "Private document")}</span></div><select aria-label={`${document.name} visibility`} value={document.visibility} onChange={(event) => setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, visibility: event.target.value as "public" | "hidden" } : item))}><option value="hidden">Private</option><option value="public">Public</option></select><button type="button" onClick={() => { if (document.storagePath) void cleanupStagedPaths([document.storagePath]); setDocuments((current) => current.filter((item) => item.id !== document.id)); }}>Remove</button></div>)}</div> : null}
                   </details>
                   <p className="fine-print">Originality describes disclosed modification status. It does not mean QRguitar verification or authenticity confirmation.</p>
                 </section>
@@ -519,16 +681,15 @@ export default function CreatePage() {
                   <div className="create-review-grid">
                     <div><span>QRguitar ID</span><strong>{qrCode}</strong></div>
                     <div><span>Serial Number</span><strong>{form.serial || "No serial number"}</strong></div>
-                    <div><span>Visibility</span><strong>{form.visibility === "public" ? "Visible" : form.visibility === "unlisted" ? "Unlisted" : "Private"}</strong></div>
+                    <div><span>Visibility</span><strong>{form.visibility === "public" ? "Public" : form.visibility === "unlisted" ? "Unlisted" : "Private"}</strong></div>
                     <div><span>Availability</span><strong>{form.saleStatus === "for_sale" ? "For Sale" : "Not for Sale"}</strong></div>
                     <div><span>Originality</span><strong>{form.originalityStatus === "all_original" ? "All Original" : form.originalityStatus === "modified" ? "Modified" : "Not Specified"}</strong></div>
                     <div><span>Ownership</span><strong>{form.ownerStatus || "Not specified"}</strong></div>
                   </div>
-                  <details className="advanced-panel"><summary>Customize downloaded QR</summary><section className="qr-customizer" aria-label="QR code customization"><div><h3>QR appearance</h3><p>Keep strong contrast so stickers, tags, plates, and paperwork remain scannable.</p></div><div className="qr-controls"><ColorField label="QR color" value={qrStyle.foreground} onChange={(value) => updateQrStyle("foreground", value)} /><ColorField label="Background" value={qrStyle.background} onChange={(value) => updateQrStyle("background", value)} /><div className="field"><label htmlFor="qrLabel">Label</label><input id="qrLabel" value={qrStyle.labelText} onChange={(event) => updateQrStyle("labelText", event.target.value)} /></div><div className="field"><label htmlFor="qrShape">Style</label><select id="qrShape" value={qrStyle.shape} onChange={(event) => updateQrStyle("shape", event.target.value)}><option value="classic">Classic print</option><option value="soft">Soft premium</option></select></div><label className="toggle-field"><input type="checkbox" checked={qrStyle.includeLabel} onChange={(event) => updateQrStyle("includeLabel", event.target.checked)} />Include label on downloaded QR</label></div></section></details>
-                  <p className="create-permanent-note"><QrCode aria-hidden="true" /> This QRguitar ID and Profile URL remain permanent. Editing the title, specifications, photos, or Serial Number later does not replace this identity.</p>
+                  <p className="create-permanent-note">This QRguitar ID and Profile URL remain permanent. Customize the downloadable QR later from your Dashboard.</p>
                 </section>
 
-              {message ? <p className="form-message" role="status">{message}</p> : null}
+              {message ? <div className="form-message" role={fieldErrors && Object.keys(fieldErrors).length ? "alert" : "status"}><strong>{message}</strong>{existingProfileHref || claimHref ? <div className="form-actions">{existingProfileHref ? <Link className="button secondary" href={existingProfileHref}>View existing Profile</Link> : null}{claimHref ? <Link className="button secondary" href={claimHref}>Request ownership</Link> : null}</div> : null}{lastErrorRetryable ? <button className="button secondary" type="button" onClick={() => void createRecordAndRedirect(false)} disabled={savingProfile}>Retry safely</button> : null}</div> : null}
               <div className="create-wizard-actions">
                 <Link className="button secondary" href="/dashboard">Cancel</Link>
                 <button className="button" type="button" onClick={saveDraft} disabled={savingProfile}>{savingProfile ? "Creating Profile..." : "Create QRguitar Profile"}</button>
@@ -570,67 +731,6 @@ export default function CreatePage() {
       </main>
       <Footer />
     </>
-  );
-}
-
-function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return (
-    <div className="field color-field">
-      <label>{label}</label>
-      <div>
-        <input type="color" value={value} onChange={(event) => onChange(event.target.value)} aria-label={label} />
-        <input value={value} onChange={(event) => onChange(event.target.value)} aria-label={`${label} hex value`} />
-      </div>
-    </div>
-  );
-}
-
-function PhotoManager({
-  images,
-  mainImage,
-  onSelectMain,
-  onRemove,
-  onMove
-}: {
-  images: string[];
-  mainImage: string;
-  onSelectMain: (imageUrl: string) => void;
-  onRemove: (imageUrl: string) => void;
-  onMove: (imageUrl: string, direction: -1 | 1) => void;
-}) {
-  if (!images.length) {
-    return (
-      <div className="photo-manager empty">
-        <strong>No photos yet</strong>
-        <span>Add the main instrument photo first, then detail shots, case candy, serials, certificates, and condition photos.</span>
-      </div>
-    );
-  }
-
-  return (
-    <section className="photo-manager" aria-label="Profile photo manager">
-      <div className="photo-manager-header">
-        <strong>{images.length}/20 photos</strong>
-        <span>Main photo controls the profile hero and listings.</span>
-      </div>
-      <div className="photo-grid">
-        {images.map((imageUrl, index) => {
-          const isMain = imageUrl === mainImage || (!mainImage && index === 0);
-
-          return (
-            <article className={isMain ? "photo-tile main" : "photo-tile"} key={`${imageUrl}-${index}`}>
-              <img src={imageUrl} alt={`Instrument photo ${index + 1}`} />
-              <div>
-                <button type="button" onClick={() => onSelectMain(imageUrl)}>{isMain ? "Main Photo" : "Set Main"}</button>
-                <button type="button" disabled={index === 0} onClick={() => onMove(imageUrl, -1)} aria-label={`Move photo ${index + 1} earlier`}>Earlier</button>
-                <button type="button" disabled={index === images.length - 1} onClick={() => onMove(imageUrl, 1)} aria-label={`Move photo ${index + 1} later`}>Later</button>
-                <button type="button" onClick={() => onRemove(imageUrl)}>Remove</button>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-    </section>
   );
 }
 
@@ -697,7 +797,9 @@ function Field({
   placeholder,
   list,
   onBlur,
-  disabled = false
+  disabled = false,
+  required = false,
+  error = ""
 }: {
   label: string;
   id: string;
@@ -707,10 +809,12 @@ function Field({
   list?: string;
   onBlur?: (value: string) => void;
   disabled?: boolean;
+  required?: boolean;
+  error?: string;
 }) {
   return (
-    <div className="field">
-      <label htmlFor={id}>{label}</label>
+    <div className={`field${error ? " has-error" : ""}`}>
+      <label htmlFor={id}>{label}{required ? <span aria-hidden="true"> *</span> : null}</label>
       <input
         id={id}
         name={id}
@@ -718,9 +822,13 @@ function Field({
         placeholder={placeholder}
         list={list}
         disabled={disabled}
+        required={required}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? `${id}-error` : undefined}
         onChange={(event) => onChange(event.target.value)}
         onBlur={(event) => onBlur?.(event.target.value)}
       />
+      {error ? <span className="field-error" id={`${id}-error`}>{error}</span> : null}
     </div>
   );
 }
@@ -730,21 +838,25 @@ function CategoryField({
   id,
   value,
   options,
-  onChange
+  onChange,
+  required = false,
+  error = ""
 }: {
   label: string;
   id: string;
   value: string;
   options: string[];
   onChange: (value: string) => void;
+  required?: boolean;
+  error?: string;
 }) {
   const cleanedValue = value.trim();
   const hasCustomValue = cleanedValue && !options.some((option) => option.toLowerCase() === cleanedValue.toLowerCase());
 
   return (
-    <div className="field">
-      <label htmlFor={id}>{label}</label>
-      <select id={id} name={id} value={value} onChange={(event) => onChange(event.target.value)}>
+    <div className={`field${error ? " has-error" : ""}`}>
+      <label htmlFor={id}>{label}{required ? <span aria-hidden="true"> *</span> : null}</label>
+      <select id={id} name={id} value={value} required={required} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} onChange={(event) => onChange(event.target.value)}>
         <option value="">Select category</option>
         {hasCustomValue ? <option value={cleanedValue}>{cleanedValue}</option> : null}
         {options.map((option) => (
@@ -753,6 +865,7 @@ function CategoryField({
           </option>
         ))}
       </select>
+      {error ? <span className="field-error" id={`${id}-error`}>{error}</span> : null}
     </div>
   );
 }
@@ -806,4 +919,3 @@ function splitBulkLine(line: string, delimiter: string) {
   cells.push(current.trim());
   return cells;
 }
-

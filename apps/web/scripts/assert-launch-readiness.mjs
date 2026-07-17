@@ -2,7 +2,120 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),".."),read=(p)=>readFile(path.join(root,p),"utf8"),ok=(v,m)=>{if(!v)throw new Error(m)};
-const [e,a,c,l,r,s,p,i,h,x,co,pr,t,ca]=await Promise.all(["lib/public-profile-eligibility.ts","app/api/instruments/route.ts","lib/instrument-profile-contract.ts","lib/public-instruments.ts","app/robots.txt/route.ts","app/sitemap.xml/route.ts","app/reset-password/page.tsx","app/installers/page.tsx","app/how-it-works/page.tsx","app/globals.css","app/contact/page.tsx","app/privacy/page.tsx","app/terms/page.tsx","app/catalog/CatalogClient.tsx"].map(read));
-ok(e.includes("toUpperCase()")&&e.includes('"QRG-PI260001"'),"Retired guard missing");ok(a.includes("isRetiredPublicProfileCode(requestedCode)"),"API retired guard missing");ok(c.includes("ownerUserEmail: _ownerUserEmail")&&c.includes("showSerialPublic !== true"),"Public privacy sanitizer missing");ok(l.includes("isEligiblePublicProfile")&&!l.includes("demoInstrument"),"Public eligibility/fallback failed");ok(r.includes('.join("\\n")'),"robots newlines missing");ok(/"content-type"\s*:\s*"application\/xml; charset=utf-8"/i.test(s),"sitemap content type missing");ok(p.includes("authChecked")&&p.includes('useState("")'),"Reset states conflict");ok(!i.includes("Browse vetted installers by region")&&!i.includes("Directory opening soon"),"Installer page simulates finder");ok(h.includes('<ol className="product-guide-steps">')&&x.includes('.product-guide-steps li::marker { content: ""; }'),"How It Works numbering failed");for(const [n,v] of [["Contact",co],["Privacy",pr],["Terms",t]])ok(!/serial\/build/i.test(v),n+" has stale terminology");ok(!ca.includes("service history, proof, or Availability"),"Catalog promises missing filter");
-const b=process.env.QRGUITAR_TEST_BASE_URL?.replace(/\/$/,"");if(b){const d="QRG-PI260001",m="QRG-LAUNCH-GATE-MISSING";for(const q of[d,d.toLowerCase(),m])for(const u of["/i/"+q,"/api/instruments?code="+q]){const z=await fetch(b+u,{redirect:"manual",cache:"no-store"});ok(z.status===404,u+" returned "+z.status)}const z=await fetch(b+"/api/instruments",{cache:"no-store"}),j=await z.json();ok(z.ok&&j?.ok&&Array.isArray(j.instruments)&&j.instruments.length>0,"Public list invalid");for(const q of j.instruments){ok(String(q.qrCode||"").toUpperCase()!==d,"Retired Profile in list");ok(!("ownerUserEmail"in q)&&!("ownerEmail"in q),"Owner email leaked");if(q.showSerialPublic!==true)ok(!q.serial,"Hidden serial leaked")}const rr=await fetch(b+"/robots.txt",{cache:"no-store"}),rt=await rr.text();ok(rr.ok&&/text\/plain/i.test(rr.headers.get("content-type")||"")&&rt.split("\n").length>=10,"robots invalid");const sr=await fetch(b+"/sitemap.xml",{cache:"no-store"}),st=await sr.text();ok(sr.ok&&/(application|text)\/xml/i.test(sr.headers.get("content-type")||"")&&st.includes("<urlset")&&st.includes("</urlset>")&&!st.toUpperCase().includes(d),"sitemap invalid")}console.log("Launch readiness assertions passed"+(b?" against "+b:" (static mode)")+".");
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const read = (filePath) => readFile(path.join(root, filePath), "utf8");
+const ok = (value, message) => {
+  if (!value) throw new Error(message);
+};
+
+const [
+  eligibility,
+  instrumentsApi,
+  uploadApi,
+  createPage,
+  photoOrganizer,
+  profileContract,
+  publicInstruments,
+  robots,
+  sitemap,
+  resetPassword,
+  installers,
+  howItWorks,
+  styles,
+  contact,
+  privacy,
+  terms,
+  catalog,
+  card,
+  siteEditor,
+  migration
+] = await Promise.all([
+  "lib/public-profile-eligibility.ts",
+  "app/api/instruments/route.ts",
+  "app/api/instruments/uploads/route.ts",
+  "app/create/page.tsx",
+  "components/PhotoOrganizer.tsx",
+  "lib/instrument-profile-contract.ts",
+  "lib/public-instruments.ts",
+  "app/robots.txt/route.ts",
+  "app/sitemap.xml/route.ts",
+  "app/reset-password/page.tsx",
+  "app/installers/page.tsx",
+  "app/how-it-works/page.tsx",
+  "app/globals.css",
+  "app/contact/page.tsx",
+  "app/privacy/page.tsx",
+  "app/terms/page.tsx",
+  "app/catalog/CatalogClient.tsx",
+  "components/CollectibleRecordCard.tsx",
+  "app/site-editor/page.tsx",
+  "../../supabase/migrations/20260716123000_migrate_legacy_setup_note.sql"
+].map(read));
+
+ok(eligibility.includes("toUpperCase()") && eligibility.includes('"QRG-PI260001"'), "Retired guard missing");
+ok(instrumentsApi.includes("isRetiredPublicProfileCode(requestedCode)"), "API retired guard missing");
+ok(profileContract.includes("ownerUserEmail: _ownerUserEmail") && profileContract.includes("showSerialPublic !== true"), "Public privacy sanitizer missing");
+ok(publicInstruments.includes("isEligiblePublicProfile") && !publicInstruments.includes("demoInstrument"), "Public eligibility/fallback failed");
+ok(robots.includes('.join("\\n")'), "robots newlines missing");
+ok(/"content-type"\s*:\s*"application\/xml; charset=utf-8"/i.test(sitemap), "sitemap content type missing");
+ok(resetPassword.includes("authChecked") && resetPassword.includes('useState("")'), "Reset states conflict");
+ok(!installers.includes("Browse vetted installers by region") && !installers.includes("Directory opening soon"), "Installer page simulates finder");
+ok(howItWorks.includes('<ol className="product-guide-steps">') && styles.includes('.product-guide-steps li::marker { content: ""; }'), "How It Works numbering failed");
+for (const [name, source] of [["Contact", contact], ["Privacy", privacy], ["Terms", terms]]) {
+  ok(!/serial\/build/i.test(source), `${name} has stale terminology`);
+}
+ok(!catalog.includes("service history, proof, or Availability"), "Catalog promises missing filter");
+ok(profileContract.includes("if (event.isSystem) return false"), "System events counted as service history");
+ok(resetPassword.includes("hasRecoveryLink") && resetPassword.includes("isComplete") && resetPassword.includes("authChecked && !isComplete && hasSession"), "Reset states are not mutually exclusive");
+ok(!installers.includes("Owners can find a nearby shop") && installers.includes("connects approved shops and owners manually"), "Installer page overpromises a finder");
+ok(card.includes('record.showSerialPublic === true') && card.includes("<small>Serial Number</small>"), "Compact card serial privacy/label failed");
+ok(card.includes('variant === "catalog" && galleryImages.length > 1') && card.includes("onTouchStart") && card.includes("onTouchEnd") && card.includes("collectible-card-gallery-controls"), "Catalog carousel behavior missing");
+ok(styles.includes(".collectible-card-serial small") && styles.includes(".collectible-card-serial strong"), "Compact serial styling missing");
+ok(siteEditor.includes("!authChecked || (isSignedIn && isUnlocked)"), "Site Editor duplicates access messages");
+ok(migration.includes("migration:QRG-05068283:setup-2026-06-20") && migration.includes("date '2026-06-20'") && migration.includes("Properly setup on 6/20/2026"), "Canonical setup migration lost source/date/text");
+ok(migration.indexOf("insert into public.guitar_timeline_events") < migration.indexOf("delete from public.guitar_specs") && migration.includes("and exists ("), "Legacy setup deletion is not gated on canonical insert");
+
+// Create contract: staged uploads, bounded concurrency, preserved form state, and atomic publish.
+ok(uploadApi.includes('export async function POST') && uploadApi.includes('export async function DELETE'), "Staged upload create/cleanup routes missing");
+ok(uploadApi.includes("assertAccountCanWrite") && uploadApi.includes("MAX_STAGED_FILE_BYTES") && uploadApi.includes("profile-uploads"), "Staged upload authorization or limits missing");
+ok(createPage.includes("uploadWithConcurrency") && createPage.includes("concurrency = 3") && createPage.includes("stageSelectedFiles") && createPage.includes("cleanupUploads"), "Create upload orchestration missing");
+ok(createPage.includes("PhotoOrganizer") && createPage.includes("Add at least one clear instrument photo") && createPage.includes("no more than 20 photos"), "Create photo requirements missing");
+ok(!createPage.includes("QR customization"), "Create still includes premature QR customization");
+ok(photoOrganizer.includes("onDragStart") && photoOrganizer.includes("onPointerMove") && photoOrganizer.includes("Move earlier") && photoOrganizer.includes("Set photo"), "Photo organizer reorder/main controls missing");
+ok(styles.includes(".photo-drag-handle") && styles.includes("touch-action: none"), "Photo organizer mobile drag safety missing");
+ok(instrumentsApi.includes("idempotencyKey") && instrumentsApi.includes("createSubmissionContentKey") && instrumentsApi.includes("request_in_progress"), "Create idempotency contract missing");
+ok(instrumentsApi.includes('visibility: "private" as const') && instrumentsApi.includes("publishResult") && instrumentsApi.indexOf('visibility: "private" as const') < instrumentsApi.indexOf("publishResult"), "Create does not publish private-first");
+ok(instrumentsApi.includes("cleanupAndFail") && instrumentsApi.includes("removeStagedUploads") && instrumentsApi.includes("insertedGuitarId"), "Create rollback contract missing");
+ok(instrumentsApi.includes("fieldErrors") && instrumentsApi.includes("retryable") && instrumentsApi.includes("cleanupUploads"), "Create error contract missing");
+ok(!instrumentsApi.includes("serial/build ID"), "Create/update API has stale Serial Number terminology");
+
+const baseUrl = process.env.QRGUITAR_TEST_BASE_URL?.replace(/\/$/, "");
+if (baseUrl) {
+  const retiredCode = "QRG-PI260001";
+  const missingCode = "QRG-LAUNCH-GATE-MISSING";
+  for (const code of [retiredCode, retiredCode.toLowerCase(), missingCode]) {
+    for (const url of [`/i/${code}`, `/api/instruments?code=${code}`]) {
+      const response = await fetch(baseUrl + url, { redirect: "manual", cache: "no-store" });
+      ok(response.status === 404, `${url} returned ${response.status}`);
+    }
+  }
+
+  const listResponse = await fetch(baseUrl + "/api/instruments", { cache: "no-store" });
+  const listJson = await listResponse.json();
+  ok(listResponse.ok && listJson?.ok && Array.isArray(listJson.instruments) && listJson.instruments.length > 0, "Public list invalid");
+  for (const record of listJson.instruments) {
+    ok(String(record.qrCode || "").toUpperCase() !== retiredCode, "Retired Profile in list");
+    ok(!("ownerUserEmail" in record) && !("ownerEmail" in record), "Owner email leaked");
+    if (record.showSerialPublic !== true) ok(!record.serial, "Hidden serial leaked");
+  }
+
+  const robotsResponse = await fetch(baseUrl + "/robots.txt", { cache: "no-store" });
+  const robotsText = await robotsResponse.text();
+  ok(robotsResponse.ok && /text\/plain/i.test(robotsResponse.headers.get("content-type") || "") && robotsText.split("\n").length >= 10, "robots invalid");
+  const sitemapResponse = await fetch(baseUrl + "/sitemap.xml", { cache: "no-store" });
+  const sitemapText = await sitemapResponse.text();
+  ok(sitemapResponse.ok && /(application|text)\/xml/i.test(sitemapResponse.headers.get("content-type") || "") && sitemapText.includes("<urlset") && sitemapText.includes("</urlset>") && !sitemapText.toUpperCase().includes(retiredCode), "sitemap invalid");
+}
+
+console.log(`Launch readiness assertions passed${baseUrl ? ` against ${baseUrl}` : " (static mode)"}.`);

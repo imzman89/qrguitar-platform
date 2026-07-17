@@ -20,7 +20,7 @@ export function validateInstrumentSubmission(input: InstrumentValidationInput, h
   }
 
   if (!input.serial.trim() && !input.serialNotUsed) {
-    return "Enter a serial/build ID, or mark that this instrument does not use one.";
+    return "Enter a Serial Number, or mark that this instrument does not use one.";
   }
 
   if (required.some((value) => value.length > 80) || (input.summary || "").length > 2000) {

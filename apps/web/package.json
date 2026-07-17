@@ -7,6 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "local:qa": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../scripts/start-local-qa.ps1",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test:retired-profile": "node scripts/assert-retired-profile.mjs",

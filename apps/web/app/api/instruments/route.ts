@@ -17,6 +17,8 @@ import {
   isManagedInstrumentSpec,
   normalizeSerialBuildId,
   originalityFromSpecs,
+  profileLinkSpecLabel,
+  profileLinksFromSpecs,
   sanitizePublicInstrument,
   specValue
 } from "../../../lib/instrument-profile-contract";
@@ -57,10 +59,14 @@ type CreateInstrumentRequest = {
   visibility: "public" | "private" | "unlisted";
   summary: string;
   photos: string[];
+  uploadId?: string;
+  idempotencyKey?: string;
+  heroImagePath?: string;
   heroImageDataUrl?: string;
   documents?: Array<{
     name: string;
-    dataUrl: string;
+    dataUrl?: string;
+    storagePath?: string;
     visibility?: "public" | "hidden";
     documentType?: string;
     publicDescription?: string;
@@ -72,8 +78,19 @@ type CreateInstrumentRequest = {
     relatedServiceEventId?: string;
   }>;
   customFields?: Array<{ label: string; value: string }>;
+  customLinks?: Array<{ label: string; url: string }>;
   accountPlan?: AccountPlan;
   showSerialPublic?: boolean;
+  serviceEntry?: {
+    serviceDate?: string;
+    eventType?: string;
+    title?: string;
+    publicDescription?: string;
+    privateNotes?: string;
+    shopName?: string;
+    location?: string;
+    isPublic?: boolean;
+  };
 };
 
 type UpdateInstrumentRequest = Omit<CreateInstrumentRequest, "accountPlan"> & {
@@ -98,6 +115,13 @@ type SupabaseCreateResponse = {
   qrCode?: string;
   permanentPath?: string;
   message?: string;
+  code?: string;
+  fieldErrors?: Record<string, string>;
+  retryable?: boolean;
+  cleanupUploads?: boolean;
+  existingProfileFound?: boolean;
+  existingProfileHref?: string;
+  claimHref?: string;
 };
 
 type SupabaseReadResponse = {
@@ -219,6 +243,40 @@ function noStoreJson<T>(body: T, init: ResponseInit = {}) {
       ...(init.headers || {})
     }
   });
+}
+
+function createFailure(
+  status: number,
+  code: string,
+  message: string,
+  options: Omit<SupabaseCreateResponse, "ok" | "code" | "message"> = {}
+) {
+  return noStoreJson(
+    { ok: false, code, message, retryable: false, ...options } satisfies SupabaseCreateResponse,
+    { status }
+  );
+}
+
+function cleanCreateKey(value: unknown) {
+  const key = String(value || "").trim();
+  return /^[a-zA-Z0-9-]{12,100}$/.test(key) ? key : "";
+}
+
+function createSubmissionContentKey(ownerId: string, idempotencyKey: string) {
+  return `create_submission:${ownerId}:${idempotencyKey}`;
+}
+
+function isOwnedStagedPath(path: string, ownerId: string, uploadId: string, kind: "image" | "document") {
+  return path.startsWith(`${ownerId}/profile-uploads/${uploadId}/${kind}-`);
+}
+
+async function removeStagedUploads(
+  supabase: NonNullable<ReturnType<typeof createServerSupabaseClient>>,
+  mediaPaths: string[],
+  documentPaths: string[]
+) {
+  if (mediaPaths.length) await supabase.storage.from(MEDIA_BUCKET).remove(mediaPaths);
+  if (documentPaths.length) await supabase.storage.from(DOCUMENT_BUCKET).remove(documentPaths);
 }
 
 function revalidatePublicRecordSurfaces(qrCode: string) {
@@ -744,7 +802,7 @@ function mapInstrumentRow({
     heroImageDataUrl,
     galleryImageDataUrls,
     customFields,
-    customLinks: [],
+    customLinks: profileLinksFromSpecs(specs),
     ownershipTransferCount,
     qrStyle: defaultQrStyle as QrStyle,
     createdAt: guitar.created_at
@@ -1447,26 +1505,73 @@ export async function POST(request: Request) {
   noStore();
   const supabase = createServerSupabaseClient();
 
-  if (!supabase) {
-    return supabaseWriteUnavailableResponse();
-  }
+  if (!supabase) return createFailure(503, "service_unavailable", "QRguitar Profiles are temporarily unavailable.", { retryable: true });
 
   const auth = await getAuthenticatedUser(request);
-  if (!auth.user) {
-    return NextResponse.json({ ok: false, message: auth.error || "Sign in required." } satisfies SupabaseCreateResponse, { status: 401 });
-  }
+  if (!auth.user) return createFailure(401, "auth_required", auth.error || "Sign in again before creating this Profile.");
 
   const writeAccess = await assertAccountCanWrite(supabase, auth.user);
-  if (!writeAccess.ok) {
-    return NextResponse.json({ ok: false, message: writeAccess.message } satisfies SupabaseCreateResponse, { status: writeAccess.status });
-  }
+  if (!writeAccess.ok) return createFailure(writeAccess.status, "account_write_blocked", writeAccess.message);
 
   let body: CreateInstrumentRequest;
-
   try {
     body = (await request.json()) as CreateInstrumentRequest;
   } catch {
-    return NextResponse.json({ ok: false, message: "Invalid request body." } satisfies SupabaseCreateResponse, { status: 400 });
+    return createFailure(400, "invalid_request", "The create request could not be read. Your form has not been cleared.", { retryable: true });
+  }
+
+  const ownerUser = auth.user;
+  const uploadId = cleanCreateKey(body.uploadId);
+  const idempotencyKey = cleanCreateKey(body.idempotencyKey);
+  const rawPhotos = Array.isArray(body.photos) ? body.photos.map((value) => String(value || "").trim()).filter(Boolean) : [];
+  const rawDocuments = Array.isArray(body.documents) ? body.documents.slice(0, 10) : [];
+  const mediaPaths = Array.from(new Set(rawPhotos));
+  const documentPaths = rawDocuments.map((document) => String(document.storagePath || "").trim()).filter(Boolean);
+  const idempotencyContentKey = idempotencyKey ? createSubmissionContentKey(ownerUser.id, idempotencyKey) : "";
+
+  const cleanupAndFail = async (
+    status: number,
+    code: string,
+    message: string,
+    options: Omit<SupabaseCreateResponse, "ok" | "code" | "message"> = {}
+  ) => {
+    await removeStagedUploads(supabase, mediaPaths, documentPaths);
+    if (idempotencyContentKey) await supabase.from("site_content").delete().eq("content_key", idempotencyContentKey);
+    return createFailure(status, code, message, { cleanupUploads: true, ...options });
+  };
+
+  const preserveAndFail = (
+    status: number,
+    code: string,
+    message: string,
+    options: Omit<SupabaseCreateResponse, "ok" | "code" | "message"> = {}
+  ) => createFailure(status, code, message, { cleanupUploads: false, ...options });
+
+  if (!uploadId || !idempotencyKey) {
+    return createFailure(400, "invalid_upload_session", "Refresh the Create page and try again. Your selected files remain on this page.", { retryable: true });
+  }
+  if (rawPhotos.length > 20) {
+    return cleanupAndFail(400, "photo_limit_exceeded", "Choose no more than 20 photos.", { fieldErrors: { photos: "A Profile can include up to 20 photos." } });
+  }
+  if (rawDocuments.length > 10) {
+    return cleanupAndFail(400, "document_limit_exceeded", "Choose no more than 10 documents.", { fieldErrors: { documents: "A Profile can include up to 10 documents during creation." } });
+  }
+  if (!mediaPaths.length) {
+    return createFailure(400, "photo_required", "Add at least one clear photo before creating a QRguitar Profile.", {
+      fieldErrors: { photos: "At least one photo is required." }
+    });
+  }
+  if (mediaPaths.some((path) => !isOwnedStagedPath(path, ownerUser.id, uploadId, "image"))) {
+    return createFailure(400, "invalid_photo_upload", "One or more photo uploads could not be verified. Retry the failed files.", {
+      fieldErrors: { photos: "Retry the files marked as failed." },
+      retryable: true
+    });
+  }
+  if (documentPaths.length !== rawDocuments.length || documentPaths.some((path) => !isOwnedStagedPath(path, ownerUser.id, uploadId, "document"))) {
+    return preserveAndFail(400, "invalid_document_upload", "One or more document uploads could not be verified.", {
+      fieldErrors: { documents: "Remove or retry the failed document." },
+      retryable: true
+    });
   }
 
   const input = {
@@ -1483,32 +1588,58 @@ export async function POST(request: Request) {
     saleStatus: body.saleStatus === "for_sale" ? "for_sale" : "not_for_sale",
     originalityStatus: body.originalityStatus === "all_original" ? "all_original" : body.originalityStatus === "modified" ? "modified" : "unknown",
     ownerName: String(body.ownerName || "").trim(),
-    ownerEmail: normalizeLookupEmail(auth.user.email || ""),
     location: String(body.location || "").trim(),
     visibility: body.visibility === "private" ? "private" : body.visibility === "unlisted" ? "unlisted" : "public",
-    summary: String(body.summary || "").trim(),
-    photos: Array.isArray(body.photos) ? body.photos.slice(0, 20) : [],
-    documents: Array.isArray(body.documents) ? body.documents.slice(0, 10) : []
+    summary: String(body.summary || "").trim()
   };
+  const customLinks = (body.customLinks || [])
+    .map((link) => ({ label: String(link.label || "").trim(), url: String(link.url || "").trim() }))
+    .filter((link) => link.label && link.url)
+    .slice(0, 6);
 
-  const brandResolution = await resolveCanonicalBrand(supabase, input.brand);
+  const fieldErrors: Record<string, string> = {};
+  if (!input.brand) fieldErrors.brand = "Choose the instrument brand.";
+  if (!input.model) fieldErrors.model = "Enter the model or build name.";
+  if (!input.instrumentType) fieldErrors.instrumentType = "Choose the instrument type.";
+  if (!input.serial && !input.serialNotUsed) fieldErrors.serial = "Enter the Serial Number, or confirm this instrument does not use one.";
+  if (customLinks.some((link) => !/^https:\/\//i.test(link.url))) fieldErrors.customLinks = "Supporting links must begin with https://.";
+  if (Object.keys(fieldErrors).length) return preserveAndFail(400, "validation_failed", "Review the highlighted fields and try again.", { fieldErrors });
+
+  const previousSubmission = await supabase
+    .from("site_content")
+    .select("content_value")
+    .eq("content_key", idempotencyContentKey)
+    .maybeSingle<{ content_value?: { status?: string; qrCode?: string; permanentPath?: string } }>();
+  if (previousSubmission.error) {
+    return preserveAndFail(502, "request_lookup_failed", "The create request could not be checked safely. Try again.", { retryable: true });
+  }
+  if (previousSubmission.data?.content_value?.status === "complete") {
+    return noStoreJson({
+      ok: true,
+      qrCode: previousSubmission.data.content_value.qrCode,
+      permanentPath: previousSubmission.data.content_value.permanentPath,
+      message: "This Profile was already created."
+    } satisfies SupabaseCreateResponse);
+  }
+  if (previousSubmission.data?.content_value?.status === "pending") {
+    return preserveAndFail(409, "request_in_progress", "This Profile is still being created. Wait a moment, then retry.", { retryable: true });
+  }
+
+  let brandResolution: { brand: string; suggestion: string };
+  try {
+    brandResolution = await resolveCanonicalBrand(supabase, input.brand);
+  } catch {
+    return preserveAndFail(502, "brand_lookup_failed", "The brand list could not be checked. Try again.", { retryable: true });
+  }
   if (brandResolution.suggestion) {
-    return NextResponse.json(
-      { ok: false, message: `That brand looks like ${brandResolution.suggestion}. Choose the existing brand spelling to keep the Catalog clean.` },
-      { status: 409 }
-    );
+    return preserveAndFail(409, "brand_spelling_conflict", `That brand looks like ${brandResolution.suggestion}. Choose the existing spelling to keep the Catalog clean.`, {
+      fieldErrors: { brand: `Choose ${brandResolution.suggestion} from the brand list.` }
+    });
   }
   input.brand = brandResolution.brand;
 
-  if (!input.brand || !input.model || (!input.serial && !input.serialNotUsed)) {
-    return NextResponse.json({ ok: false, message: "Brand, model, and serial/build ID are required unless the instrument does not use one." }, { status: 400 });
-  }
-
-  const ownerUser = auth.user;
   const currentProfile = await supabase.from("profiles").select("plan,role").eq("id", ownerUser.id).maybeSingle<{ plan?: SupabasePlan; role?: string }>();
-  if (currentProfile.error) {
-    return NextResponse.json({ ok: false, message: "Could not read user profile." }, { status: 500 });
-  }
+  if (currentProfile.error) return preserveAndFail(502, "profile_lookup_failed", "Your account details could not be loaded. Try again.", { retryable: true });
 
   const resolvedAccountPlan = hasLaunchTestingAccess(ownerUser.email || "")
     ? "commercial"
@@ -1520,237 +1651,184 @@ export async function POST(request: Request) {
     plan: mapPlan(resolvedAccountPlan),
     created_at: new Date().toISOString()
   });
-
-  if (profileUpsert.error) {
-    return NextResponse.json({ ok: false, message: "Could not sync user profile." }, { status: 500 });
-  }
+  if (profileUpsert.error) return preserveAndFail(502, "profile_sync_failed", "Your account could not be prepared for this Profile. Try again.", { retryable: true });
 
   const existingProfileCount = await supabase.from("guitars").select("*", { count: "exact", head: true }).eq("owner_id", ownerUser.id);
-  if (existingProfileCount.error) {
-    return NextResponse.json({ ok: false, message: "Could not verify the Profile limit." }, { status: 500 });
-  }
-
-  const instrumentCount = existingProfileCount.count ?? 0;
-  if (instrumentCount < 0) {
-    return NextResponse.json({ ok: false, message: "Could not verify the Profile limit." }, { status: 500 });
-  }
-
-  if (!hasExpandedPlanAccess(resolvedAccountPlan) && instrumentCount >= 25) {
-    return NextResponse.json(
-      { ok: false, message: "Free public beta accounts can create up to 25 Profiles. Contact QRguitar for commercial setup or bulk onboarding." },
-      { status: 402 }
-    );
+  if (existingProfileCount.error) return preserveAndFail(502, "profile_limit_check_failed", "Your Profile limit could not be checked. Try again.", { retryable: true });
+  if (!hasExpandedPlanAccess(resolvedAccountPlan) && (existingProfileCount.count ?? 0) >= 25) {
+    return cleanupAndFail(402, "profile_limit_reached", "Free public beta accounts can create up to 25 Profiles. Contact QRguitar for commercial setup or bulk onboarding.");
   }
 
   const serialQrCode = qrCodeFromSerial(input.serial);
   let qrCode = serialQrCode || makeNewPermanentQrCode();
   if (serialQrCode) {
     const duplicateId = await findGuitarByExactSerial(supabase, input.serial).catch(() => "lookup-error");
-    if (duplicateId === "lookup-error") {
-      return NextResponse.json({ ok: false, message: "Could not verify the Serial Number." }, { status: 500 });
-    }
+    if (duplicateId === "lookup-error") return preserveAndFail(502, "serial_lookup_failed", "The Serial Number could not be checked. Try again.", { retryable: true });
     if (duplicateId) {
-      return NextResponse.json({
-        ok: false,
-        message: "Existing QRguitar Profile found - transfer or ownership claim required.",
-        existingProfileFound: true
-      }, { status: 409 });
+      const existing = await supabase
+        .from("guitars")
+        .select("qr_code,permanent_path,owner_id,visibility")
+        .eq("id", duplicateId)
+        .maybeSingle<{ qr_code: string; permanent_path: string; owner_id: string | null; visibility: string }>();
+      const canOpenExisting = existing.data && (existing.data.owner_id === ownerUser.id || existing.data.visibility !== "private");
+      return cleanupAndFail(409, "duplicate_serial", "A QRguitar Profile already uses this Serial Number. Open it or request ownership instead of creating a duplicate.", {
+        fieldErrors: { serial: "Existing Profile found for this Serial Number." },
+        existingProfileFound: true,
+        existingProfileHref: canOpenExisting ? existing.data?.permanent_path || `/i/${existing.data?.qr_code}` : undefined,
+        claimHref: "/ownership-claim"
+      });
     }
   } else {
     let uniqueCodeFound = false;
     for (let attempt = 0; attempt < 40; attempt += 1) {
-      const { count, error } = await supabase.from("guitars").select("id", { count: "exact", head: true }).eq("qr_code", qrCode);
-      if (error) {
-        return NextResponse.json({ ok: false, message: "Could not reserve a QRguitar ID." }, { status: 500 });
-      }
-      if (!count) {
+      const result = await supabase.from("guitars").select("id", { count: "exact", head: true }).eq("qr_code", qrCode);
+      if (result.error) return preserveAndFail(502, "id_reservation_failed", "A QRguitar ID could not be reserved. Try again.", { retryable: true });
+      if (!result.count) {
         uniqueCodeFound = true;
         break;
       }
       qrCode = makeNewPermanentQrCode();
     }
-    if (!uniqueCodeFound) {
-      return NextResponse.json({ ok: false, message: "Could not reserve a unique QRguitar ID. Please try again." }, { status: 503 });
-    }
+    if (!uniqueCodeFound) return preserveAndFail(503, "id_reservation_failed", "A unique QRguitar ID could not be reserved. Try again.", { retryable: true });
   }
 
-  const uploadedSources = Array.from(new Set([body.heroImageDataUrl || "", ...input.photos].filter(Boolean)));
-  if (uploadedSources.length < 1) {
-    return NextResponse.json(
-      { ok: false, message: "Add at least one photo before creating a QRguitar Profile." },
-      { status: 400 }
-    );
+  const claimSubmission = await supabase.from("site_content").insert({
+    content_key: idempotencyContentKey,
+    content_value: { status: "pending", uploadId, startedAt: new Date().toISOString() },
+    updated_by: ownerUser.id,
+    updated_at: new Date().toISOString()
+  });
+  if (claimSubmission.error) {
+    if (claimSubmission.error.code === "23505") return createFailure(409, "request_in_progress", "This Profile is already being created. Wait a moment, then retry.", { retryable: true });
+    return preserveAndFail(502, "request_reservation_failed", "The create request could not be reserved. Try again.", { retryable: true });
   }
 
-  const uploadedMediaPaths: string[] = [];
-  const mediaUploadErrors: string[] = [];
-  for (const [index, source] of uploadedSources.entries()) {
-    try {
-      const uploadedPath = await uploadImageSource(supabase, ownerUser.id, qrCode, source, `media-${index + 1}`);
-      if (uploadedPath) {
-        uploadedMediaPaths.push(uploadedPath);
-      } else if (isRenderablePublicMediaSource(source) && !source.startsWith("blob:")) {
-        uploadedMediaPaths.push(source);
-      }
-    } catch {
-      mediaUploadErrors.push(`Photo ${index + 1}`);
-    }
-  }
-
-  const heroImagePath = uploadedMediaPaths[0] || null;
-  const permanentPath = `/i/${qrCode}`;
-
-  const guitarPayload = {
-    owner_id: ownerUser.id,
-    qr_code: qrCode,
-    permanent_path: permanentPath,
-    name: input.name || `${input.brand} ${input.model}`.trim(),
-    brand: input.brand,
-    model: input.model,
-    year: input.year || null,
-    serial_number: input.serial || null,
-    no_serial_used: input.serialNotUsed,
-    builder: input.builder || null,
-    location: input.location || null,
-    status: "unverified" as const,
-    visibility: input.visibility as "public" | "unlisted" | "private",
-    summary: input.summary || "",
-    hero_image_path: heroImagePath
+  let insertedGuitarId = "";
+  const rollback = async (code: string, message: string) => {
+    if (insertedGuitarId) await supabase.from("guitars").delete().eq("id", insertedGuitarId).eq("owner_id", ownerUser.id);
+    await supabase.from("site_content").delete().eq("content_key", recordTrustContentKey(qrCode));
+    return cleanupAndFail(502, code, message, { retryable: true });
   };
 
-  const { data: insertedGuitar, error: insertError } = await supabase
+  const heroImagePath = String(body.heroImagePath || body.heroImageDataUrl || mediaPaths[0]).trim();
+  if (!mediaPaths.includes(heroImagePath)) {
+    return cleanupAndFail(400, "invalid_main_photo", "Choose a main photo from the uploaded photos.", {
+      fieldErrors: { photos: "Select one uploaded photo as the main photo." }
+    });
+  }
+
+  const permanentPath = `/i/${qrCode}`;
+  const guitarInsert = await supabase
     .from("guitars")
-    .insert(guitarPayload)
+    .insert({
+      owner_id: ownerUser.id,
+      qr_code: qrCode,
+      permanent_path: permanentPath,
+      name: input.name || `${input.brand} ${input.model}`.trim(),
+      brand: input.brand,
+      model: input.model,
+      year: input.year || null,
+      serial_number: input.serial || null,
+      no_serial_used: input.serialNotUsed,
+      builder: input.builder || null,
+      location: input.location || null,
+      status: "unverified" as const,
+      visibility: "private" as const,
+      summary: input.summary,
+      hero_image_path: heroImagePath
+    })
     .select("id,qr_code,permanent_path")
     .single();
-
-  if (insertError || !insertedGuitar) {
-    return NextResponse.json(
-      { ok: false, message: insertError?.message || "Could not create guitar record." },
-      { status: 500 }
-    );
+  if (guitarInsert.error || !guitarInsert.data) {
+    return cleanupAndFail(502, "profile_insert_failed", "The Profile could not be created. No Profile was published. Try again.", { retryable: true });
   }
+  insertedGuitarId = guitarInsert.data.id;
 
-  if (uploadedMediaPaths.length > 0) {
-    const mediaPayload = uploadedMediaPaths.slice(0, 20).map((storagePath, index) => ({
-      guitar_id: insertedGuitar.id,
-      storage_path: storagePath.slice(0, 2000),
-      alt: `Instrument media ${index + 1}`,
-      sort_order: index
-    }));
+  const mediaInsert = await supabase.from("guitar_media").insert(mediaPaths.map((storagePath, index) => ({
+    guitar_id: insertedGuitarId,
+    storage_path: storagePath.slice(0, 2000),
+    alt: `${input.brand} ${input.model} photo ${index + 1}`.trim(),
+    sort_order: index
+  })));
+  if (mediaInsert.error) return rollback("media_insert_failed", "The photo order could not be saved. No Profile was published. Try again.");
 
-    const mediaInsert = await supabase.from("guitar_media").insert(mediaPayload);
-    if (mediaInsert.error) {
-      revalidatePublicRecordSurfaces(insertedGuitar.qr_code);
-      return noStoreJson(
-        { ok: true, qrCode: insertedGuitar.qr_code, permanentPath: insertedGuitar.permanent_path, message: "Saved. Media placeholders could not be saved." },
-        { status: 200 }
-      );
-    }
-  }
-
-  const uploadedDocuments: Array<{ name: string; storagePath: string; isPublic: boolean; documentType: string; publicDescription: string; privateNotes: string; issuerSource: string; documentDate: string; description: string; relatedTimelineEventId: string; relatedServiceEventId: string }> = [];
-  for (const [index, document] of (body.documents || []).entries()) {
-    const uploadedPath = await uploadDocumentSource(supabase, ownerUser.id, insertedGuitar.id, document.dataUrl, `document-${index + 1}`);
-    if (uploadedPath) {
-      uploadedDocuments.push({
-        name: document.name || `Document ${index + 1}`,
-        storagePath: uploadedPath,
-        isPublic: document.visibility === "public",
-        documentType: cleanDocumentText(document.documentType, 80) || "Other",
-        publicDescription: cleanDocumentText(document.publicDescription, 1000),
-        privateNotes: cleanDocumentText(document.privateNotes, 2000),
-        issuerSource: cleanDocumentText(document.issuerSource, 200),
-        documentDate: cleanDocumentText(document.documentDate, 10),
-        description: cleanDocumentText(document.description, 1000),
-        relatedTimelineEventId: cleanDocumentText(document.relatedTimelineEventId, 80),
-        relatedServiceEventId: cleanDocumentText(document.relatedServiceEventId, 80)
-      });
-    }
-  }
-
-  if (uploadedDocuments.length > 0) {
-    const documentPayload = uploadedDocuments.map((document) => ({
-      guitar_id: insertedGuitar.id,
-      name: document.name.slice(0, 200),
-      storage_path: document.storagePath.slice(0, 2000),
-      is_public: document.isPublic,
+  if (rawDocuments.length) {
+    const documentInsert = await supabase.from("guitar_documents").insert(rawDocuments.map((document, index) => ({
+      guitar_id: insertedGuitarId,
+      name: (String(document.name || "").trim() || `Document ${index + 1}`).slice(0, 200),
+      storage_path: String(document.storagePath || "").slice(0, 2000),
+      is_public: document.visibility === "public",
       uploaded_by_user_id: ownerUser.id,
-      file_name: document.name.slice(0, 255),
-      document_type: document.documentType,
-      public_description: document.publicDescription || null,
-      private_notes: document.privateNotes || null,
-      issuer_source: document.issuerSource || null,
-      document_date: /^\d{4}-\d{2}-\d{2}$/.test(document.documentDate) ? document.documentDate : null,
-      description: document.description || null,
-      related_timeline_event_id: document.relatedTimelineEventId || null,
-      related_service_event_id: document.relatedServiceEventId || null
-    }));
-
-    const documentInsert = await supabase.from("guitar_documents").insert(documentPayload);
-    if (documentInsert.error) {
-      revalidatePublicRecordSurfaces(insertedGuitar.qr_code);
-      return noStoreJson(
-        { ok: true, qrCode: insertedGuitar.qr_code, permanentPath: insertedGuitar.permanent_path, message: "Saved. Document files could not be saved." },
-        { status: 200 }
-      );
-    }
+      file_name: (String(document.name || "").trim() || `Document ${index + 1}`).slice(0, 255),
+      document_type: cleanDocumentText(document.documentType, 80) || "Other",
+      public_description: cleanDocumentText(document.publicDescription, 1000) || null,
+      private_notes: cleanDocumentText(document.privateNotes, 2000) || null,
+      issuer_source: cleanDocumentText(document.issuerSource, 200) || null,
+      document_date: /^\d{4}-\d{2}-\d{2}$/.test(String(document.documentDate || "")) ? document.documentDate : null,
+      description: cleanDocumentText(document.description, 1000) || null,
+      related_timeline_event_id: cleanDocumentText(document.relatedTimelineEventId, 80) || null,
+      related_service_event_id: cleanDocumentText(document.relatedServiceEventId, 80) || null
+    })));
+    if (documentInsert.error) return rollback("document_insert_failed", "The documents could not be saved. No Profile was published. Try again.");
   }
 
   const specRows = [
-    { guitar_id: insertedGuitar.id, label: "Condition", value: input.condition, sort_order: 1 },
-    ...(input.instrumentType ? [{ guitar_id: insertedGuitar.id, label: "Type", value: input.instrumentType, sort_order: 2 }] : []),
-    ...(input.finish ? [{ guitar_id: insertedGuitar.id, label: "Finish", value: input.finish, sort_order: 3 }] : []),
-    { guitar_id: insertedGuitar.id, label: "Availability", value: input.saleStatus, sort_order: 4 },
-    { guitar_id: insertedGuitar.id, label: "Originality", value: input.originalityStatus, sort_order: 5 },
+    { guitar_id: insertedGuitarId, label: "Condition", value: input.condition, sort_order: 1 },
+    { guitar_id: insertedGuitarId, label: "Type", value: input.instrumentType, sort_order: 2 },
+    ...(input.finish ? [{ guitar_id: insertedGuitarId, label: "Finish", value: input.finish, sort_order: 3 }] : []),
+    { guitar_id: insertedGuitarId, label: "Availability", value: input.saleStatus, sort_order: 4 },
+    { guitar_id: insertedGuitarId, label: "Originality", value: input.originalityStatus, sort_order: 5 },
     ...(body.customFields || [])
       .filter((field) => String(field.label || "").trim() && String(field.value || "").trim())
-      .map((field, index) => ({
-        guitar_id: insertedGuitar.id,
-        label: String(field.label).trim(),
-        value: String(field.value).trim(),
-        sort_order: index + 6
-      }))
+      .map((field, index) => ({ guitar_id: insertedGuitarId, label: String(field.label).trim(), value: String(field.value).trim(), sort_order: index + 6 })),
+    ...customLinks.map((link, index) => ({
+      guitar_id: insertedGuitarId,
+      label: profileLinkSpecLabel(link.label).slice(0, 200),
+      value: link.url.slice(0, 2000),
+      sort_order: (body.customFields?.length || 0) + index + 6
+    }))
   ];
   const specInsert = await supabase.from("guitar_specs").insert(specRows);
+  if (specInsert.error) return rollback("spec_insert_failed", "The specifications could not be saved. No Profile was published. Try again.");
 
-  if (specInsert.error) {
-    revalidatePublicRecordSurfaces(insertedGuitar.qr_code);
-    return noStoreJson(
-      { ok: true, qrCode: insertedGuitar.qr_code, permanentPath: insertedGuitar.permanent_path, message: "Saved. Condition details could not be saved." },
-      { status: 200 }
-    );
+  const serviceEntry = body.serviceEntry;
+  if (serviceEntry && (String(serviceEntry.title || "").trim() || String(serviceEntry.publicDescription || "").trim() || String(serviceEntry.privateNotes || "").trim())) {
+    const eventDate = /^\d{4}-\d{2}-\d{2}$/.test(String(serviceEntry.serviceDate || "")) ? serviceEntry.serviceDate : null;
+    const serviceInsert = await supabase.from("guitar_timeline_events").insert({
+      guitar_id: insertedGuitarId,
+      created_by_user_id: ownerUser.id,
+      event_date: eventDate,
+      event_type: String(serviceEntry.eventType || "Service").trim().slice(0, 80),
+      title: String(serviceEntry.title || "Service history").trim().slice(0, 200),
+      description: String(serviceEntry.publicDescription || "").trim().slice(0, 2000),
+      private_notes: String(serviceEntry.privateNotes || "").trim().slice(0, 2000) || null,
+      shop_name: String(serviceEntry.shopName || "").trim().slice(0, 200) || null,
+      location: String(serviceEntry.location || input.location).trim().slice(0, 200) || null,
+      is_public: serviceEntry.isPublic === true
+    });
+    if (serviceInsert.error) return rollback("service_insert_failed", "The service entry could not be saved. No Profile was published. Try again.");
   }
 
   const showSerialPublic = Boolean(input.serial) && body.showSerialPublic !== false;
-  const trustResult = await supabase.from("site_content").upsert(
-    {
-      content_key: recordTrustContentKey(insertedGuitar.qr_code),
-      content_value: mergeRecordTrustSettings({ showSerialPublic }),
-      updated_at: new Date().toISOString()
-    },
-    { onConflict: "content_key" }
-  );
-  if (trustResult.error) {
-    revalidatePublicRecordSurfaces(insertedGuitar.qr_code);
-    return noStoreJson(
-      { ok: true, qrCode: insertedGuitar.qr_code, permanentPath: insertedGuitar.permanent_path, message: "Saved. Serial privacy settings could not be saved." },
-      { status: 200 }
-    );
-  }
+  const trustResult = await supabase.from("site_content").upsert({
+    content_key: recordTrustContentKey(qrCode),
+    content_value: mergeRecordTrustSettings({ showSerialPublic }),
+    updated_at: new Date().toISOString()
+  }, { onConflict: "content_key" });
+  if (trustResult.error) return rollback("privacy_insert_failed", "Serial privacy could not be saved. No Profile was published. Try again.");
 
-  revalidatePublicRecordSurfaces(insertedGuitar.qr_code);
-  return noStoreJson(
-    {
-      ok: true,
-      qrCode: insertedGuitar.qr_code,
-      permanentPath: insertedGuitar.permanent_path,
-      message: mediaUploadErrors.length ? `${mediaUploadErrors.join(", ")} could not be uploaded. The record was saved.` : undefined
-    },
-    { status: 200 }
-  );
+  const publishResult = await supabase.from("guitars").update({ visibility: input.visibility }).eq("id", insertedGuitarId).eq("owner_id", ownerUser.id);
+  if (publishResult.error) return rollback("publish_failed", "The Profile could not be published safely. Try again.");
+
+  const completeSubmission = await supabase.from("site_content").update({
+    content_value: { status: "complete", qrCode, permanentPath, completedAt: new Date().toISOString() },
+    updated_at: new Date().toISOString()
+  }).eq("content_key", idempotencyContentKey);
+  if (completeSubmission.error) return rollback("request_completion_failed", "The create request could not be finalized safely. Try again.");
+
+  revalidatePublicRecordSurfaces(qrCode);
+  return noStoreJson({ ok: true, qrCode, permanentPath, message: "QRguitar Profile created." } satisfies SupabaseCreateResponse);
 }
-
 export async function PATCH(request: Request) {
   noStore();
   const supabase = createServerSupabaseClient();
@@ -1803,7 +1881,7 @@ export async function PATCH(request: Request) {
 
     if (!String(existing.data.serial_number || "").trim() && !serialExceptionApproved && isAdmin && (verificationStatus === "verified" || authenticityStatus === "confirmed")) {
       return NextResponse.json(
-        { ok: false, message: "Records without a serial/build ID require a QRguitar serial exception before verification or authenticity confirmation." },
+        { ok: false, message: "Profiles without a Serial Number require a QRguitar serial exception before verification or authenticity confirmation." },
         { status: 400 }
       );
     }
@@ -1954,6 +2032,17 @@ export async function PATCH(request: Request) {
     photos: Array.isArray(body.photos) ? body.photos.slice(0, 20) : [],
     documents: Array.isArray(body.documents) ? body.documents.slice(0, 10) : []
   };
+  const rawCustomLinks = (body.customLinks || [])
+    .map((link) => ({ label: String(link.label || "").trim(), url: String(link.url || "").trim() }))
+    .filter((link) => link.label || link.url)
+    .slice(0, 6);
+  if (rawCustomLinks.some((link) => !link.label || !/^https:\/\//i.test(link.url))) {
+    return NextResponse.json(
+      { ok: false, message: "Add both a label and a secure https:// URL, or remove the incomplete link." },
+      { status: 400 }
+    );
+  }
+  const customLinks = rawCustomLinks;
 
   const brandResolution = await resolveCanonicalBrand(supabase, input.brand);
   if (brandResolution.suggestion) {
@@ -2170,7 +2259,7 @@ export async function PATCH(request: Request) {
   const existingDocuments = ((existingDocumentsResult.data || []) as GuitarDocumentRow[]);
   const uploadedDocuments: Array<{ name: string; storagePath: string; isPublic: boolean; documentType: string; publicDescription: string; privateNotes: string; issuerSource: string; documentDate: string; description: string; relatedTimelineEventId: string; relatedServiceEventId: string }> = [];
   for (const [index, document] of (body.documents || []).entries()) {
-    const uploadedPath = await uploadDocumentSource(supabase, ownerUser.id, existingGuitar.id, document.dataUrl, `document-${index + 1}`);
+    const uploadedPath = await uploadDocumentSource(supabase, ownerUser.id, existingGuitar.id, document.dataUrl || "", `document-${index + 1}`);
     const metadata = {
       documentType: cleanDocumentText(document.documentType, 80) || "Other",
       publicDescription: cleanDocumentText(document.publicDescription, 1000),
@@ -2191,7 +2280,7 @@ export async function PATCH(request: Request) {
       continue;
     }
 
-    const existingPath = await mapExistingDocumentSource(supabase, existingDocuments, document.dataUrl);
+    const existingPath = await mapExistingDocumentSource(supabase, existingDocuments, document.dataUrl || "");
     const existingDocument = existingPath
       ? existingDocuments.find((item) => item.storage_path === existingPath)
       : existingDocuments.find((item) => item.name === document.name);
@@ -2254,7 +2343,13 @@ export async function PATCH(request: Request) {
         label: String(field.label).trim(),
         value: String(field.value).trim(),
         sort_order: index + 6
-      }))
+      })),
+    ...customLinks.map((link, index) => ({
+      guitar_id: existingGuitar.id,
+      label: profileLinkSpecLabel(link.label).slice(0, 200),
+      value: link.url.slice(0, 2000),
+      sort_order: (body.customFields?.length || 0) + index + 6
+    }))
   ];
   const specInsert = await supabase.from("guitar_specs").insert(specRows);
   if (specInsert.error) {

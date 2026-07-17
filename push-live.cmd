@@ -8,6 +8,9 @@ set "DEFAULT_SUPABASE_URL=https://qvoruycxxrbarlafvhbi.supabase.co"
 set "NEXT_PUBLIC_SUPABASE_URL="
 set "SUPABASE_URL="
 set "SUPABASE_SERVICE_ROLE_KEY="
+for /f %%A in ('git rev-parse HEAD') do set "QRGUITAR_GIT_SHA=%%A"
+for /f "delims=" %%A in ('powershell -NoProfile -Command "(Get-Date).ToUniversalTime().ToString('o')"') do set "QRGUITAR_BUILD_TIMESTAMP=%%A"
+set "QRGUITAR_DEPLOYMENT_ID=cli-%QRGUITAR_GIT_SHA:~0,12%"
 
 if exist ".env.local" (
   for /f "usebackq tokens=1,* delims==" %%A in (".env.local") do (
@@ -67,6 +70,16 @@ if errorlevel 1 (
 echo.
 echo [2/2] Pushing to Vercel production...
 call npx --yes vercel@latest deploy --prod --yes ^
+  --build-env QRGUITAR_BUILD_ENV=production ^
+  --build-env QRGUITAR_GIT_SHA=%QRGUITAR_GIT_SHA% ^
+  --build-env QRGUITAR_BUILD_TIMESTAMP=%QRGUITAR_BUILD_TIMESTAMP% ^
+  --build-env QRGUITAR_BUILD_DIRTY=false ^
+  --build-env QRGUITAR_DEPLOYMENT_ID=%QRGUITAR_DEPLOYMENT_ID% ^
+  --env QRGUITAR_BUILD_ENV=production ^
+  --env QRGUITAR_GIT_SHA=%QRGUITAR_GIT_SHA% ^
+  --env QRGUITAR_BUILD_TIMESTAMP=%QRGUITAR_BUILD_TIMESTAMP% ^
+  --env QRGUITAR_BUILD_DIRTY=false ^
+  --env QRGUITAR_DEPLOYMENT_ID=%QRGUITAR_DEPLOYMENT_ID% ^
   --build-env NEXT_PUBLIC_SUPABASE_URL=%NEXT_PUBLIC_SUPABASE_URL% ^
   --build-env SUPABASE_URL=%SUPABASE_URL% ^
   --build-env SUPABASE_SERVICE_ROLE_KEY=%SUPABASE_SERVICE_ROLE_KEY% ^

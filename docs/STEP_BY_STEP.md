@@ -39,7 +39,7 @@ Create:
 ```text
 NEXT_PUBLIC_SUPABASE_URL=your_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3003
 ```
 
 ## 5. Run Locally
@@ -48,19 +48,19 @@ From the project root:
 
 ```bash
 npm install
-npm run dev:web
+npm run local:qa --workspace @qrguitar/web
 ```
 
 Open:
 
 ```text
-http://localhost:3000
+http://127.0.0.1:3003
 ```
 
 Try:
 
 ```text
-http://localhost:3000/catalog
+http://127.0.0.1:3003/catalog
 ```
 
 ## 6. Run Mobile

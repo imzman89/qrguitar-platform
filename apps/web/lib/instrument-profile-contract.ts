@@ -1,4 +1,4 @@
-import type { DemoInstrument, OriginalityStatus, SaleStatus, ServiceHistoryEntry } from "./local-demo";
+import type { CustomProfileLink, DemoInstrument, OriginalityStatus, SaleStatus, ServiceHistoryEntry } from "./local-demo";
 
 export type InstrumentSpecLike = { label: string; value: string };
 
@@ -10,6 +10,8 @@ const MANAGED_SPEC_LABELS = new Set([
   "availability",
   "originality"
 ]);
+
+const PROFILE_LINK_SPEC_PREFIX = "Profile link: ";
 
 export function normalizeSerialBuildId(value: string) {
   return String(value || "")
@@ -27,7 +29,26 @@ export function specValue(specs: InstrumentSpecLike[], label: string) {
 }
 
 export function isManagedInstrumentSpec(label: string) {
-  return MANAGED_SPEC_LABELS.has(label.trim().toLowerCase());
+  return MANAGED_SPEC_LABELS.has(label.trim().toLowerCase()) || isProfileLinkSpec(label);
+}
+
+export function isProfileLinkSpec(label: string) {
+  return label.trim().toLowerCase().startsWith(PROFILE_LINK_SPEC_PREFIX.toLowerCase());
+}
+
+export function profileLinkSpecLabel(label: string) {
+  return `${PROFILE_LINK_SPEC_PREFIX}${label.trim() || "Link"}`;
+}
+
+export function profileLinksFromSpecs(specs: InstrumentSpecLike[]): CustomProfileLink[] {
+  return specs
+    .filter((spec) => isProfileLinkSpec(spec.label) && /^https:\/\//i.test(spec.value.trim()))
+    .slice(0, 6)
+    .map((spec, index) => ({
+      id: `profile-link-${index}`,
+      label: spec.label.trim().slice(PROFILE_LINK_SPEC_PREFIX.length).trim() || "Link",
+      url: spec.value.trim()
+    }));
 }
 
 export function availabilityFromSpecs(specs: InstrumentSpecLike[]): SaleStatus {

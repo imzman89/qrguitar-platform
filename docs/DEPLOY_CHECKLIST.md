@@ -27,7 +27,7 @@ Paste:
 ```text
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3003
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 ```
 
@@ -37,7 +37,7 @@ Run:
 
 ```text
 npm install
-npm run dev:web
+npm run local:qa --workspace @qrguitar/web
 ```
 
 Then test:
@@ -55,7 +55,7 @@ In Vercel project settings, add:
 ```text
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
-NEXT_PUBLIC_SITE_URL=https://qrguitar.com
+NEXT_PUBLIC_SITE_URL=https://www.qrguitar.com
 SUPABASE_SERVICE_ROLE_KEY
 ```
 
@@ -77,12 +77,12 @@ That button:
 
 Check:
 
-- [https://qrguitar.com](https://qrguitar.com)
+- [https://www.qrguitar.com](https://www.qrguitar.com)
 - login
 - dashboard
 - create flow
 - catalog
-- demo record
+- real public Profiles
 
 ## 7. If something fails
 

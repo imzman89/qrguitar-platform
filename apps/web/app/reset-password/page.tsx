@@ -16,17 +16,25 @@ export default function ResetPasswordPage() {
   const [isWorking, setIsWorking] = useState(false);
   const [hasSession, setHasSession] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [hasRecoveryLink, setHasRecoveryLink] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
   const [safeNext, setSafeNext] = useState("/dashboard");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setSafeNext(sanitizeNext(params.get("next")));
+    setHasRecoveryLink(
+      params.has("code")
+      || params.has("token_hash")
+      || window.location.hash.includes("type=recovery")
+      || window.location.hash.includes("access_token")
+    );
 
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(({ data, error }) => {
       const ready = Boolean(data.session?.user);
       setHasSession(ready);
       setAuthChecked(true);
-      setStatus(ready ? "" : "Open the password reset link from your email to continue.");
+      setStatus(error ? cleanAuthError(error.message) : "");
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -66,8 +74,8 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    setStatus("Password updated.");
-    router.replace(safeNext);
+    setIsComplete(true);
+    window.setTimeout(() => router.replace(safeNext), 900);
   }
 
   return (
@@ -84,45 +92,75 @@ export default function ResetPasswordPage() {
           <section className="card auth-card">
             <div className="auth-card-head">
               <span>Password reset</span>
-              <strong>{!authChecked ? "Checking reset link." : hasSession ? "Enter a new password." : "Reset link required."}</strong>
+              <strong>
+                {!authChecked
+                  ? "Checking reset link."
+                  : isComplete
+                    ? "Password updated."
+                    : hasSession
+                      ? "Enter a new password."
+                      : hasRecoveryLink
+                        ? "Reset link invalid or expired."
+                        : "Reset link required."}
+              </strong>
             </div>
 
-            <div className="field">
-              <label htmlFor="password">New password</label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                autoComplete="new-password"
-                placeholder="At least 8 characters"
-                disabled={!authChecked || !hasSession}
-              />
-            </div>
+            {!authChecked ? <p className="form-message">Validating your secure link.</p> : null}
 
-            <div className="field">
-              <label htmlFor="confirmPassword">Confirm password</label>
-              <input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-                autoComplete="new-password"
-                placeholder="Re-enter new password"
-                disabled={!authChecked || !hasSession}
-              />
-            </div>
+            {authChecked && isComplete ? (
+              <>
+                <p className="form-message">Your new password is saved. Taking you back to QRguitar.</p>
+                <Link className="button" href={safeNext}>Continue</Link>
+              </>
+            ) : null}
 
-            <div className="form-actions">
-              <button className="button" type="button" onClick={savePassword} disabled={isWorking || !authChecked || !hasSession}>
-                {isWorking ? "Saving..." : "Save new password"}
-              </button>
-              <Link className="button secondary" href="/login">
-                Back to sign in
-              </Link>
-            </div>
+            {authChecked && !isComplete && !hasSession ? (
+              <>
+                <p className="form-message">
+                  {hasRecoveryLink
+                    ? "This reset link is no longer valid. Request a fresh password reset email."
+                    : "Open the password reset link from your email to continue."}
+                </p>
+                <Link className="button" href="/login">Back to sign in</Link>
+              </>
+            ) : null}
 
-            {status ? <p className="form-message">{status}</p> : null}
+            {authChecked && !isComplete && hasSession ? (
+              <>
+                <div className="field">
+                  <label htmlFor="password">New password</label>
+                  <input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    autoComplete="new-password"
+                    placeholder="At least 8 characters"
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="confirmPassword">Confirm password</label>
+                  <input
+                    id="confirmPassword"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    autoComplete="new-password"
+                    placeholder="Re-enter new password"
+                  />
+                </div>
+
+                <div className="form-actions">
+                  <button className="button" type="button" onClick={savePassword} disabled={isWorking}>
+                    {isWorking ? "Saving..." : "Save new password"}
+                  </button>
+                  <Link className="button secondary" href="/login">Back to sign in</Link>
+                </div>
+              </>
+            ) : null}
+
+            {status ? <p className="form-message error-message">{status}</p> : null}
           </section>
         </div>
       </main>

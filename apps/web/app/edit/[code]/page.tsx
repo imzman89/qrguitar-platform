@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Footer } from "../../../components/Footer";
 import { InstrumentPreview } from "../../../components/InstrumentPreview";
 import { Nav } from "../../../components/Nav";
+import { PhotoOrganizer } from "../../../components/PhotoOrganizer";
 import { createSubmissionFingerprint, isRepeatedBrowserSubmission, validateInstrumentSubmission } from "../../../lib/security";
 import {
   defaultQrStyle,
@@ -562,6 +563,16 @@ export default function EditInstrumentPage() {
     });
   }
 
+  function movePhoto(fromIndex: number, toIndex: number) {
+    setGalleryImages((current) => {
+      if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= current.length || toIndex >= current.length) return current;
+      const next = [...current];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }
+
   function buildInstrument(): DemoInstrument | null {
     if (!original) {
       return null;
@@ -693,7 +704,10 @@ export default function EditInstrumentPage() {
             ...customFields
               .filter((field) => field.label.trim() && field.value.trim())
               .map((field) => ({ label: field.label.trim(), value: field.value.trim() }))
-          ].filter(Boolean)
+          ].filter(Boolean),
+          customLinks: customLinks
+            .filter((link) => link.label.trim() && link.url.trim())
+            .map((link) => ({ label: link.label.trim(), url: link.url.trim() }))
         })
       });
       const payload = (await response.json().catch(() => null)) as { ok?: boolean; qrCode?: string; permanentPath?: string; message?: string } | null;
@@ -1144,11 +1158,11 @@ export default function EditInstrumentPage() {
                       }))
                     }
                   />
-                  This instrument does not use a serial/build ID
+                  This instrument does not use a Serial Number
                 </label>
                 <label className="toggle-field">
                   <input type="checkbox" checked={showSerialPublic} onChange={(event) => setShowSerialPublic(event.target.checked)} />
-                  Show serial/build ID on public profile
+                  Show Serial Number on public Profile
                 </label>
               </div>
               <p className="fine-print">
@@ -1415,11 +1429,12 @@ export default function EditInstrumentPage() {
                   </div>
                 </section>
               ) : null}
-              <PhotoManager
+              <PhotoOrganizer
                 images={galleryImages}
                 mainImage={form.heroImageDataUrl}
                 onSelectMain={selectMainPhoto}
                 onRemove={removePhoto}
+                onMove={movePhoto}
               />
               <section className="qr-customizer" aria-label="External media">
                 <div>
@@ -1677,55 +1692,6 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
         <input value={value} onChange={(event) => onChange(event.target.value)} aria-label={`${label} hex value`} />
       </div>
     </div>
-  );
-}
-
-function PhotoManager({
-  images,
-  mainImage,
-  onSelectMain,
-  onRemove
-}: {
-  images: string[];
-  mainImage: string;
-  onSelectMain: (imageUrl: string) => void;
-  onRemove: (imageUrl: string) => void;
-}) {
-  if (!images.length) {
-    return (
-      <div className="photo-manager empty">
-        <strong>No photos yet</strong>
-        <span>Add the main instrument photo first, then detail shots, case candy, serials, certificates, and condition photos.</span>
-      </div>
-    );
-  }
-
-  return (
-    <section className="photo-manager" aria-label="Profile photo manager">
-      <div className="photo-manager-header">
-        <strong>{images.length}/20 photos</strong>
-        <span>Main photo controls the profile hero and listings.</span>
-      </div>
-      <div className="photo-grid">
-        {images.map((imageUrl, index) => {
-          const isMain = imageUrl === mainImage || (!mainImage && index === 0);
-
-          return (
-            <article className={isMain ? "photo-tile main" : "photo-tile"} key={`${imageUrl}-${index}`}>
-              <img src={imageUrl} alt={`Instrument photo ${index + 1}`} />
-              <div>
-                <button type="button" onClick={() => onSelectMain(imageUrl)}>
-                  {isMain ? "Main Photo" : "Set Main"}
-                </button>
-                <button type="button" onClick={() => onRemove(imageUrl)}>
-                  Remove
-                </button>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-    </section>
   );
 }
 

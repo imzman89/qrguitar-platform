@@ -218,7 +218,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
     <>
       <Nav />
       <main className="section handout-page">
-        <div className="shell handout-shell">
+        <div className="shell handout-shell" data-print-mode={mode}>
           <div className="print-kit-toolbar no-print">
             <div>
               <Link className="print-kit-back-link" href="/dashboard">
@@ -321,7 +321,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                   {renderBadges()}
                   <dl className="print-kit-details">
                     <div><dt>QRguitar ID</dt><dd>{canonicalCode}</dd></div>
-                    {serialDisplay ? <div><dt>Serial / Build ID</dt><dd>{serialDisplay}</dd></div> : null}
+                    {serialDisplay ? <div><dt>Serial Number</dt><dd>{serialDisplay}</dd></div> : null}
                   </dl>
                   {detailFacts.length ? (
                     <div className="print-kit-fact-grid">
