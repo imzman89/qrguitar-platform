@@ -48,7 +48,7 @@ export function LatestPublicRecord({ initialRecord = null }: { initialRecord?: D
     return (
       <article className="latest-record-message" aria-label="Latest QRguitar Profile">
         <Globe2 size={14} />
-        <span>No visible Profiles yet.</span>
+        <span>No public Profiles yet.</span>
       </article>
     );
   }

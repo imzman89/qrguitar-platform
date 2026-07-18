@@ -938,7 +938,7 @@ function ProfilePanel({
           <span><strong>Current owner</strong>{instrument.owner || "Unclaimed"}</span>
           {instrument.builder ? <span><strong>Builder</strong>{instrument.builder}</span> : null}
           <span><strong>Recorded transfers</strong>{ownershipTransferCount || "None yet"}</span>
-          <span><strong>Visibility</strong>{instrument.visibility === "private" ? "Private profile" : instrument.visibility === "unlisted" ? "Unlisted profile" : "Visible profile"}</span>
+          <span><strong>Visibility</strong>{instrument.visibility === "private" ? "Private profile" : instrument.visibility === "unlisted" ? "Unlisted profile" : "Public profile"}</span>
                 </div>
                 <EmptyPanel
                   title="Ownership transfer"

@@ -207,7 +207,7 @@ export default function DashboardPage() {
   const stats = useMemo(
     () => [
       { label: "Total Profiles", value: String(instruments.length), filter: "all" as const, helper: "Every active Profile" },
-      { label: "Visible in Catalog", value: String(publicRecords), filter: "public" as const, helper: "Discoverable Profiles" },
+      { label: "Public in Catalog", value: String(publicRecords), filter: "public" as const, helper: "Discoverable Profiles" },
       { label: "Private / Unlisted", value: String(privateRecords + unlistedRecords), filter: "private" as const, helper: "Limited visibility" },
 
       { label: "Pending Transfers / Claims", value: String(pendingTransfers), filter: "transfers" as const, helper: "Awaiting completion" }
@@ -243,7 +243,7 @@ export default function DashboardPage() {
     }
 
     setInstruments((current) => current.map((item) => item.qrCode === instrument.qrCode ? { ...item, showSerialPublic } : item));
-    setDashboardMessage(showSerialPublic ? "Serial Number is now shown on the visible Profile." : "Serial Number is now hidden from the visible Profile.");
+    setDashboardMessage(showSerialPublic ? "Serial Number is now shown on the public Profile." : "Serial Number is now hidden from the public Profile.");
   }
 
   async function removeFromCollection(instrument: DemoInstrument) {
@@ -445,7 +445,7 @@ export default function DashboardPage() {
                             {imageSources.length ? <span>{imageSources.length} {imageSources.length === 1 ? "photo" : "photos"}</span> : null}
                             {serviceEntries.length ? <span>{serviceEntries.length} service {serviceEntries.length === 1 ? "entry" : "entries"}</span> : null}
                             {totalDocs ? <span>{publicDocs} public {publicDocs === 1 ? "document" : "documents"}{hiddenDocs ? `, ${hiddenDocs} private` : ""}</span> : null}
-                            <span>{instrument.visibility === "private" ? "Private" : instrument.visibility === "unlisted" ? "Unlisted" : "Visible"}</span>
+                            <span>{instrument.visibility === "private" ? "Private" : instrument.visibility === "unlisted" ? "Unlisted" : "Public"}</span>
                           </div>
                         </div>
                       </Link>

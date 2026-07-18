@@ -430,10 +430,7 @@ export async function getPublicInstruments() {
   ]);
   const visibleGuitars = guitars.filter((guitar) => {
     const profile = related.profiles.get(guitar.owner_id || "");
-    return isEligiblePublicProfile(guitar)
-      && profile?.hide_public_content !== true
-      && profile?.account_status !== "banned"
-      && profile?.account_status !== "removed";
+    return isEligiblePublicProfile(guitar, { ownerProfile: profile });
   });
 
   return Promise.all(

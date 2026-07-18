@@ -15,7 +15,7 @@ export default function PrivacyPage() {
     },
     {
       title: "Visibility choices",
-      copy: "Visible profiles can appear in the catalog and can be opened by QR code or direct link. Private profiles stay out of public browsing. Unlisted profiles stay out of the catalog but can be opened by direct link when enabled."
+      copy: "Public profiles can appear in the catalog and can be opened by QR code or direct link. Private profiles stay out of public browsing. Unlisted profiles stay out of the catalog but can be opened by direct link when enabled."
     },
     {
       title: "Serial Number and document privacy",

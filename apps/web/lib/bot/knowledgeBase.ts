@@ -58,7 +58,7 @@ const entries: KnowledgeEntry[] = [
     topic: "visibility",
     triggers: ["private", "public", "unlisted", "visibility", "hidden"],
     answer:
-      "Visible QRguitar Profiles can appear in the catalog. Private profiles do not appear publicly. Unlisted profiles stay out of the catalog but can load by direct QRguitar link. Hidden documents stay private unless the owner marks them public.",
+      "Public QRguitar Profiles can appear in the catalog. Private profiles do not appear publicly. Unlisted profiles stay out of the catalog but can load by direct QRguitar link. Hidden documents stay private unless the owner marks them public.",
     evidence: ["Visibility rules", "Hidden document policy"],
     nextSteps: ["Use public for records meant to be discovered.", "Use unlisted for direct-link sharing.", "Keep receipts and sensitive docs hidden by default."]
   },
@@ -74,7 +74,7 @@ const entries: KnowledgeEntry[] = [
     topic: "catalog",
     triggers: ["catalog", "public entries", "show up", "listing card"],
     answer:
-      "The catalog is for visible QRguitar Profiles. If a profile is public, it can appear there. If it is private, it stays out. If it is unlisted, it should not appear in browsing but can be opened by its direct link.",
+      "The catalog is for public QRguitar Profiles. If a profile is public, it can appear there. If it is private, it stays out. If it is unlisted, it should not appear in browsing but can be opened by its direct link.",
     evidence: ["Catalog visibility rules"],
     nextSteps: ["Set visibility to Public to show in catalog.", "Edit the record if a public listing needs updated specs or photos."]
   },

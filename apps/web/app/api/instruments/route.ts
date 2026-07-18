@@ -1090,10 +1090,7 @@ async function loadPublicRecordsFast(code?: string): Promise<LoadRecordsResult> 
 
   const visibleGuitars = guitars.filter((guitar) => {
     const profile = profilesById.get(guitar.owner_id || "");
-    return isEligiblePublicProfile(guitar, { allowUnlisted: Boolean(code) })
-      && profile?.hide_public_content !== true
-      && profile?.account_status !== "banned"
-      && profile?.account_status !== "removed";
+    return isEligiblePublicProfile(guitar, { allowUnlisted: Boolean(code), ownerProfile: profile });
   });
   const mediaUrlByPath = await resolvePublicMediaUrlMap(
     visibleGuitars.flatMap((guitar) => [
@@ -1313,10 +1310,7 @@ async function loadPublicRecords(supabase: ReturnType<typeof createServerSupabas
 
   const visibleGuitars = guitars.data.filter((guitar) => {
     const profile = profilesById.get((guitar as GuitarRow).owner_id || "");
-    return isEligiblePublicProfile(guitar as GuitarRow, { allowUnlisted: Boolean(code) })
-      && profile?.hide_public_content !== true
-      && profile?.account_status !== "banned"
-      && profile?.account_status !== "removed";
+    return isEligiblePublicProfile(guitar as GuitarRow, { allowUnlisted: Boolean(code), ownerProfile: profile });
   });
 
   return {

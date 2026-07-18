@@ -159,7 +159,7 @@ export const defaultSiteSettings: EditableSiteSettings = {
     emptyCollectionBody: "Register your first instrument to create a permanent QRguitar Profile.",
     firstRecordCtaLabel: "Register your first instrument",
     collectionHealthTitle: "Collection health",
-    collectionHealthHelper: "A quick read on how complete and visible your profiles are.",
+    collectionHealthHelper: "A quick read on your public, private, and unlisted Profiles.",
     nextActionsTitle: "Next best actions",
     nextActionsHelper: "Useful next steps based on your current collection.",
     proofGuidanceTitle: "Proof and documents",

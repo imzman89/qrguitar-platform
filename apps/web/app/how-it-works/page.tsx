@@ -19,7 +19,7 @@ import { Nav } from "../../components/Nav";
 const steps = [
   ["Check the identity", "Enter the Serial Number first. If a matching Profile exists, use ownership transfer or a reviewed claim instead of creating a duplicate."],
   ["Add the essentials", "Add the brand, model, one clear photo, and the details you know. You can expand the Profile later."],
-  ["Choose visibility", "Visible Profiles appear in the Catalog. Unlisted Profiles open by direct link. Private Profiles stay with the owner account."],
+  ["Choose visibility", "Public Profiles appear in the Catalog. Unlisted Profiles open by direct link. Private Profiles stay with the owner account."],
   ["Use the permanent QR", "Download or print the QR for the instrument, case, counter card, or paperwork. The link stays the same as the Profile grows."]
 ];
 
@@ -40,7 +40,7 @@ const audiences = [
 ];
 
 const faq = [
-  ["What if my instrument has a Serial Number?", "Its QRguitar ID uses QRG- followed by that Serial Number. The owner can hide the separate Serial Number field on a visible Profile without changing the QRguitar ID or QR link."],
+  ["What if my instrument has a Serial Number?", "Its QRguitar ID uses QRG- followed by that Serial Number. The owner can hide the separate Serial Number field on a public Profile without changing the QRguitar ID or QR link."],
   ["What if there is no Serial Number?", "QRguitar assigns a unique six-digit ID. Records without a Serial Number need QRguitar approval before verification or authenticity confirmation."],
   ["Can scanning the QR transfer ownership?", "No. A scan only opens the Profile. The current owner or shop must start a secure, recipient-bound transfer."],
   ["Can I keep a Profile out of the Catalog?", "Yes. Choose Unlisted for direct-link access or Private for owner and authorized admin access only."],
@@ -66,7 +66,7 @@ export default function HowItWorksPage() {
             </div>
             <div className="product-guide-principles" aria-label="QRguitar essentials">
               <div><Images /><strong>Add one clear photo</strong><span>Every Profile starts with a real image of the instrument.</span></div>
-              <div><Eye /><strong>Choose who can see it</strong><span>Use Visible, Unlisted, or Private without changing the permanent ID.</span></div>
+              <div><Eye /><strong>Choose who can see it</strong><span>Use Public, Unlisted, or Private without changing the permanent ID.</span></div>
               <div><QrCode /><strong>Print or share the QR</strong><span>The same link stays with the instrument as its Profile grows.</span></div>
             </div>
           </div>
@@ -118,7 +118,7 @@ export default function HowItWorksPage() {
           <div className="shell">
             <div className="section-heading centered-heading"><div className="eyebrow">Visibility</div><h2>You decide how the Profile is shared.</h2></div>
             <div className="product-guide-use-grid product-guide-three-grid">
-              <article><span><Eye /></span><h3>Visible</h3><p>Appears in the Catalog and opens through its direct QR or link.</p></article>
+              <article><span><Eye /></span><h3>Public</h3><p>Appears in the Catalog and opens through its direct QR or link.</p></article>
               <article><span><UserRoundCheck /></span><h3>Unlisted</h3><p>Stays out of the Catalog but opens for anyone with the direct QR or link.</p></article>
               <article><span><LockKeyhole /></span><h3>Private</h3><p>Opens only for the signed-in owner and authorized QRguitar administration.</p></article>
             </div>

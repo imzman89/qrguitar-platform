@@ -56,7 +56,8 @@ const [
 ok(eligibility.includes("toUpperCase()") && eligibility.includes('"QRG-PI260001"'), "Retired guard missing");
 ok(instrumentsApi.includes("isRetiredPublicProfileCode(requestedCode)"), "API retired guard missing");
 ok(profileContract.includes("ownerUserEmail: _ownerUserEmail") && profileContract.includes("showSerialPublic !== true"), "Public privacy sanitizer missing");
-ok(publicInstruments.includes("isEligiblePublicProfile") && !publicInstruments.includes("demoInstrument"), "Public eligibility/fallback failed");
+ok(eligibility.includes("ownerProfile") && eligibility.includes("hide_public_content") && eligibility.includes('"banned"') && eligibility.includes('"removed"'), "Shared public owner eligibility missing");
+ok(publicInstruments.includes("isEligiblePublicProfile(guitar, { ownerProfile: profile })") && !publicInstruments.includes("demoInstrument"), "Public eligibility/fallback failed");
 ok(robots.includes('.join("\\n")'), "robots newlines missing");
 ok(/"content-type"\s*:\s*"application\/xml; charset=utf-8"/i.test(sitemap), "sitemap content type missing");
 ok(resetPassword.includes("authChecked") && resetPassword.includes('useState("")'), "Reset states conflict");
@@ -104,9 +105,16 @@ if (baseUrl) {
   const listResponse = await fetch(baseUrl + "/api/instruments", { cache: "no-store" });
   const listJson = await listResponse.json();
   ok(listResponse.ok && listJson?.ok && Array.isArray(listJson.instruments) && listJson.instruments.length > 0, "Public list invalid");
+  ok(Number(listJson.count) === listJson.instruments.length, "Public list count mismatch");
+  const seenPublicCodes = new Set();
   for (const record of listJson.instruments) {
-    ok(String(record.qrCode || "").toUpperCase() !== retiredCode, "Retired Profile in list");
+    const publicCode = String(record.qrCode || "").toUpperCase();
+    ok(publicCode && !seenPublicCodes.has(publicCode), "Duplicate public Profile in list");
+    seenPublicCodes.add(publicCode);
+    ok(publicCode !== retiredCode, "Retired Profile in list");
     ok(!("ownerUserEmail" in record) && !("ownerEmail" in record), "Owner email leaked");
+    ok(record.visibility === "public", "Non-public Profile in public list");
+    ok(!record.collectionRemovedAt && !record.collectionRemovedReason, "Removed Profile leaked");
     if (record.showSerialPublic !== true) ok(!record.serial, "Hidden serial leaked");
   }
 
