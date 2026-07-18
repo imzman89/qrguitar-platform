@@ -769,7 +769,7 @@ export default function EditInstrumentPage() {
       router.refresh();
 
       if (preview) {
-        router.push(instrumentToProfileUrl(savedInstrument));
+        router.push(savedInstrument.visibility === "public" ? instrumentToProfileUrl(savedInstrument) : "/dashboard");
         return;
       }
 
@@ -1616,7 +1616,7 @@ export default function EditInstrumentPage() {
                   {savingRecord ? "Saving..." : "Save Changes"}
                 </button>
                 <button className="button" type="button" onClick={() => void saveChanges(true)} disabled={savingRecord || savingSafety}>
-                  {savingRecord ? "Saving..." : "Save and View Profile"}
+                  {savingRecord ? "Saving..." : form.visibility === "public" ? "Save and View Profile" : "Save and Return to Dashboard"}
                 </button>
                 <Link className="button secondary" href="/dashboard">
                   Back to Dashboard
