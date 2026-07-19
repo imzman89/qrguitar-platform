@@ -10,6 +10,7 @@ const ok = (value, message) => {
 
 const [
   migration,
+  provenanceProtection,
   serviceRoleGrants,
   submissions,
   evidence,
@@ -21,6 +22,7 @@ const [
   adminApi
 ] = await Promise.all([
   "../../supabase/migrations/20260718160000_service_provider_workflow.sql",
+  "../../supabase/migrations/20260719193000_protect_service_provider_provenance.sql",
   "../../supabase/migrations/20260718173000_grant_service_workflow_service_role.sql",
   "app/api/service-submissions/route.ts",
   "app/api/service-evidence/route.ts",
@@ -42,6 +44,11 @@ ok(migration.includes("unique index if not exists guitar_timeline_service_submis
 ok(migration.includes("insert into storage.buckets") && migration.includes("'service-evidence'") && migration.includes("public = false"), "Evidence bucket is not private");
 ok(migration.includes("consumed_at is not null") && migration.includes("expires_at <= now()"), "Review-token expiry or single-use guard missing");
 ok(!/\bdrop\s+(table|column|schema)\b/i.test(migration), "Migration contains a destructive drop");
+ok(provenanceProtection.includes("protect_service_provider_provenance_trigger"), "Provider provenance trigger missing");
+ok(provenanceProtection.includes("auth.role() <> 'authenticated'"), "Provider provenance protection does not distinguish client writes");
+ok(provenanceProtection.includes("new.source_kind := 'owner_reported'"), "Owner-reported provenance is not enforced");
+ok(provenanceProtection.includes("old.source_kind = 'provider_submitted_owner_approved'"), "Approved provider history mutation guard missing");
+ok(provenanceProtection.includes("new.service_submission_id := null"), "Service submission provenance can be forged");
 ok(serviceRoleGrants.includes("grant select, insert, update, delete on table"), "Workflow service-role table grants missing");
 ok(serviceRoleGrants.includes("to service_role"), "Workflow grants are not restricted to the service role");
 ok(!serviceRoleGrants.includes("to authenticated") && !serviceRoleGrants.includes("to anon"), "Workflow table privileges leak to client roles");
