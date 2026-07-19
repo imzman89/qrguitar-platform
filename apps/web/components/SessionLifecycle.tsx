@@ -10,8 +10,8 @@ import {
   sessionStartedAtKey
 } from "../lib/supabase-browser";
 
-const normalIdleMs = 30 * 60 * 1000;
-const adminIdleMs = 30 * 60 * 1000;
+const normalIdleMs = 8 * 60 * 60 * 1000;
+const adminIdleMs = 8 * 60 * 60 * 1000;
 const absoluteMaxMs = 14 * 24 * 60 * 60 * 1000;
 const activityWriteThrottleMs = 30 * 1000;
 
