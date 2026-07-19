@@ -1,5 +1,6 @@
 import { requireAdmin, adminJson } from "../_utils";
 import type { ServerSupabaseClient } from "../../../../lib/admin-auth";
+import { mergeRecordTrustSettings } from "../../../../lib/record-trust";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -52,6 +53,15 @@ export async function GET(request: Request) {
     tableCount(supabase, "profiles", [["account_status", "banned"]]),
     tableCount(supabase, "profiles", [["account_status", "removed"]])
   ]);
+  const trustResult = await supabase
+    .from("site_content")
+    .select("content_value")
+    .like("content_key", "record_trust:%");
+  const authenticityConfirmedRecords = trustResult.error
+    ? null
+    : ((trustResult.data || []) as Array<{ content_value?: unknown }>).filter((row) =>
+        mergeRecordTrustSettings(row.content_value as Parameters<typeof mergeRecordTrustSettings>[0]).authenticityStatus === "confirmed"
+      ).length;
 
   return adminJson({
     ok: true,
@@ -71,7 +81,7 @@ export async function GET(request: Request) {
       publicRecords,
       privateRecords,
       verifiedRecords,
-      authenticityConfirmedRecords: null,
+      authenticityConfirmedRecords,
       lostRecords,
       stolenRecords,
       pendingTransfers,
