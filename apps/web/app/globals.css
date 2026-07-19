@@ -4537,7 +4537,7 @@ select {
 .print-mode-toggle {
   width: min(100%, 560px);
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 5px;
   margin: 0 auto 18px;
   padding: 5px;
@@ -4568,6 +4568,20 @@ select {
   color: rgba(248, 246, 242, .6);
   font-size: 12px;
   text-align: center;
+}
+
+.print-service-picker {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 6px;
+  margin: 4px 8px 6px;
+  color: rgba(248, 246, 242, .72);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.print-service-picker select {
+  width: 100%;
 }
 
 .print-kit-warning {
@@ -4608,6 +4622,114 @@ select {
 .print-kit--handout {
   max-width: 820px;
   margin-inline: auto;
+}
+
+.print-kit--service {
+  max-width: 820px;
+  margin-inline: auto;
+}
+
+.print-service-profile {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 22px;
+  align-items: center;
+  padding: 22px;
+  border-bottom: 1px solid rgba(248, 246, 242, .1);
+  background: #111b20;
+}
+
+.print-service-photo {
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #071014;
+}
+
+.print-service-photo img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.print-service-profile h2 {
+  margin: 5px 0 8px;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.print-service-profile p:not(.print-kit-id-label) {
+  margin: 0;
+  color: rgba(248, 246, 242, .68);
+}
+
+.print-service-work {
+  padding: 22px;
+}
+
+.print-service-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.print-service-title span,
+.print-service-title > strong {
+  color: var(--gold-2);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.print-service-title h3 {
+  margin: 4px 0 12px;
+  font-size: 28px;
+}
+
+.print-service-work > p {
+  color: rgba(248, 246, 242, .78);
+}
+
+.print-service-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 16px 0;
+  background: rgba(248, 246, 242, .1);
+}
+
+.print-service-details > div {
+  padding: 12px;
+  background: #0b1216;
+}
+
+.print-service-details dt {
+  color: var(--gold-2);
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.print-service-details dd {
+  margin: 4px 0 0;
+  color: #f8f6f2;
+  white-space: pre-wrap;
+}
+
+.print-service-provenance {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  margin: 12px 0 0 !important;
+  color: #7ddc9a !important;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.print-service-qr {
+  margin-top: 0;
 }
 
 .print-kit-header {
@@ -4942,8 +5064,13 @@ select {
   }
 
   .print-kit-profile,
-  .print-kit-qr-panel {
+  .print-kit-qr-panel,
+  .print-service-profile {
     grid-template-columns: 1fr;
+  }
+
+  .print-service-photo {
+    max-height: 300px;
   }
 
   .print-kit-photo {
@@ -5005,6 +5132,14 @@ select {
     font-size: 11px;
   }
 
+  .print-mode-toggle {
+    grid-template-columns: 1fr;
+  }
+
+  .print-service-details {
+    grid-template-columns: 1fr;
+  }
+
   .print-kit-header,
   .print-kit-info,
   .print-kit-qr-panel,
@@ -5029,6 +5164,519 @@ select {
 
   .print-label-card {
     grid-template-columns: 108px minmax(0, 1fr);
+  }
+}
+
+.service-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 22px;
+}
+
+.service-work-shell,
+.service-review-shell,
+.admin-service-shell {
+  max-width: 1120px;
+}
+
+.service-work-heading,
+.service-review-heading,
+.admin-service-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
+  gap: 28px;
+  align-items: end;
+  margin-bottom: 22px;
+}
+
+.service-work-heading h1,
+.service-review-heading h1,
+.admin-service-hero h1 {
+  margin: 6px 0 10px;
+  font-size: clamp(38px, 6vw, 66px);
+  line-height: .95;
+}
+
+.service-work-heading p,
+.service-review-heading p,
+.admin-service-hero p {
+  max-width: 720px;
+  margin: 0;
+  color: rgba(248, 246, 242, .68);
+}
+
+.service-privacy-note {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px 10px;
+  border: 1px solid rgba(240, 161, 43, .22);
+  border-radius: 8px;
+  padding: 16px;
+  background: rgba(240, 161, 43, .055);
+}
+
+.service-privacy-note svg {
+  grid-row: 1 / 3;
+  color: var(--gold-2);
+}
+
+.service-privacy-note span {
+  color: rgba(248, 246, 242, .65);
+  font-size: 12px;
+}
+
+.service-message {
+  margin-bottom: 14px;
+  border: 1px solid rgba(240, 161, 43, .28);
+  border-radius: 7px;
+  padding: 12px 14px;
+  color: var(--gold-2);
+  background: rgba(240, 161, 43, .06);
+}
+
+.service-status {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: rgba(248, 246, 242, .78);
+  background: rgba(248, 246, 242, .055);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.service-status > div {
+  display: grid;
+  gap: 2px;
+}
+
+.service-status span {
+  color: rgba(248, 246, 242, .58);
+  font-size: 10px;
+  font-weight: 650;
+  text-transform: none;
+}
+
+.service-status--submitted,
+.service-status-submitted,
+.service-status--approved,
+.service-status-approved {
+  color: #7ddc9a;
+}
+
+.service-status--changes_requested,
+.service-status-changes_requested {
+  color: var(--gold-2);
+}
+
+.service-status--declined,
+.service-status-declined,
+.service-status--cancelled,
+.service-status-cancelled,
+.service-status--expired,
+.service-status-expired {
+  color: #ef9188;
+}
+
+.service-form-section,
+.service-approval-panel {
+  margin-bottom: 14px;
+  border: 1px solid rgba(248, 246, 242, .11);
+  border-radius: 8px;
+  padding: 22px;
+  background: #111b20;
+}
+
+.service-form-title {
+  display: flex;
+  gap: 13px;
+  margin-bottom: 18px;
+}
+
+.service-form-title > span {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #071014;
+  background: var(--gold-2);
+  font-weight: 950;
+}
+
+.service-form-title h2,
+.service-form-title p {
+  margin: 0;
+}
+
+.service-form-title p {
+  margin-top: 4px;
+  color: rgba(248, 246, 242, .6);
+  font-size: 13px;
+}
+
+.service-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.service-field-grid label,
+.service-approval-panel label {
+  display: grid;
+  gap: 6px;
+  color: rgba(248, 246, 242, .72);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.service-wide {
+  grid-column: 1 / -1;
+}
+
+.service-evidence-upload,
+.service-form-actions,
+.service-owner-actions,
+.admin-service-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  align-items: center;
+}
+
+.service-form-actions {
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.service-review-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, .6fr);
+  gap: 14px;
+}
+
+.service-review-provider,
+.service-private-copy,
+.service-approved-note {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+}
+
+.service-review-provider svg,
+.service-private-copy svg,
+.service-approved-note svg {
+  flex: 0 0 auto;
+  color: var(--gold-2);
+}
+
+.service-review-provider > div {
+  display: grid;
+  gap: 3px;
+}
+
+.service-review-provider span,
+.service-review-provider small {
+  color: rgba(248, 246, 242, .6);
+}
+
+.service-review-facts,
+.admin-service-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 18px 0;
+  background: rgba(248, 246, 242, .08);
+}
+
+.service-review-facts > div,
+.admin-service-meta > span {
+  padding: 11px;
+  background: #0b1216;
+}
+
+.service-review-facts dt,
+.admin-service-meta strong {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--gold-2);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.service-review-facts dd {
+  margin: 0;
+}
+
+.service-review-copy p,
+.service-approval-panel p {
+  color: rgba(248, 246, 242, .7);
+}
+
+.service-private-copy {
+  margin-top: 18px;
+  border: 1px solid rgba(240, 161, 43, .2);
+  border-radius: 7px;
+  padding: 12px;
+  background: rgba(240, 161, 43, .05);
+}
+
+.service-private-copy p {
+  margin: 3px 0 0;
+}
+
+.service-evidence-list {
+  display: grid;
+  gap: 8px;
+}
+
+.service-evidence-list a {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  border: 1px solid rgba(248, 246, 242, .1);
+  border-radius: 7px;
+  padding: 10px;
+}
+
+.service-evidence-list span {
+  min-width: 0;
+  display: grid;
+}
+
+.service-evidence-list small {
+  color: rgba(248, 246, 242, .58);
+}
+
+.service-approval-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, .45fr);
+  gap: 16px;
+}
+
+.service-owner-actions,
+.service-approved-note {
+  grid-column: 1 / -1;
+}
+
+.service-request-inbox {
+  margin: 18px 0;
+}
+
+.service-request-inbox__header,
+.service-request-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.service-request-inbox__header {
+  margin-bottom: 12px;
+}
+
+.service-request-inbox__header h2 {
+  margin: 4px 0;
+}
+
+.service-request-inbox__header p,
+.service-request-card p {
+  margin: 0;
+  color: rgba(248, 246, 242, .62);
+}
+
+.service-request-list {
+  display: grid;
+  gap: 8px;
+}
+
+.service-request-card {
+  border-top: 1px solid rgba(248, 246, 242, .09);
+  padding-top: 12px;
+}
+
+.service-request-card > div {
+  display: grid;
+  gap: 5px;
+}
+
+.admin-hero-actions,
+.admin-service-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.admin-service-counts span {
+  min-width: 120px;
+  display: grid;
+  border: 1px solid rgba(248, 246, 242, .1);
+  border-radius: 7px;
+  padding: 12px;
+  color: rgba(248, 246, 242, .6);
+  background: #111b20;
+}
+
+.admin-service-counts strong {
+  color: var(--gold-2);
+  font-size: 26px;
+}
+
+.admin-service-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px auto;
+  gap: 9px;
+  margin-bottom: 18px;
+}
+
+.admin-service-filters label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(248, 246, 242, .12);
+  border-radius: 6px;
+  padding: 0 10px;
+  background: #071014;
+}
+
+.admin-service-filters input {
+  border: 0;
+  background: transparent;
+}
+
+.admin-service-section {
+  margin-bottom: 24px;
+}
+
+.admin-service-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-service-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px 18px;
+  align-items: center;
+  border: 1px solid rgba(248, 246, 242, .11);
+  border-radius: 8px;
+  padding: 16px;
+  background: #111b20;
+}
+
+.admin-service-card__main {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.admin-service-card__main svg {
+  color: var(--gold-2);
+}
+
+.admin-service-card__main > div {
+  display: grid;
+  gap: 3px;
+}
+
+.admin-service-card__main span,
+.admin-service-card__main small,
+.admin-service-note {
+  color: rgba(248, 246, 242, .6);
+}
+
+.service-provider-state {
+  border-radius: 4px;
+  padding: 5px 7px;
+  color: rgba(248, 246, 242, .65);
+  background: rgba(248, 246, 242, .05);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.service-provider-state.verified {
+  color: #7ddc9a;
+}
+
+.admin-service-note {
+  margin: 0;
+  font-size: 12px;
+}
+
+.admin-service-submission {
+  display: block;
+}
+
+.admin-service-submission__heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.admin-service-submission__heading h3 {
+  margin: 8px 0 4px;
+  font-size: 22px;
+}
+
+.admin-service-submission__heading p {
+  margin: 0;
+  color: rgba(248, 246, 242, .62);
+}
+
+.admin-service-submission details {
+  border-top: 1px solid rgba(248, 246, 242, .09);
+  padding-top: 10px;
+}
+
+.admin-service-submission summary {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--gold-2);
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.admin-service-submission li {
+  margin-block: 5px;
+  color: rgba(248, 246, 242, .66);
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .service-work-heading,
+  .service-review-heading,
+  .admin-service-hero,
+  .service-review-grid,
+  .service-approval-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .service-field-grid,
+  .service-review-facts,
+  .admin-service-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-service-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-service-card {
+    grid-template-columns: 1fr;
+  }
+
+  .service-request-inbox__header,
+  .service-request-card,
+  .admin-service-submission__heading {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 
@@ -5086,7 +5734,11 @@ select {
   }
 
   .handout-shell[data-print-mode="handout"] .print-kit--label,
-  .handout-shell[data-print-mode="label"] .print-kit--handout {
+  .handout-shell[data-print-mode="handout"] .print-kit--service,
+  .handout-shell[data-print-mode="label"] .print-kit--handout,
+  .handout-shell[data-print-mode="label"] .print-kit--service,
+  .handout-shell[data-print-mode="service"] .print-kit--handout,
+  .handout-shell[data-print-mode="service"] .print-kit--label {
     display: none !important;
   }
 
@@ -5193,6 +5845,59 @@ select {
     margin: .1in;
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  .print-kit--service {
+    width: 7.65in;
+    max-width: 7.65in;
+    margin: 0 auto;
+    border-radius: 0;
+  }
+
+  .print-kit--service .print-kit-header {
+    padding: .12in .18in;
+  }
+
+  .print-kit--service .print-service-profile {
+    grid-template-columns: 1.85in minmax(0, 1fr);
+    gap: .16in;
+    padding: .14in .18in;
+  }
+
+  .print-kit--service .print-service-photo {
+    width: 1.85in;
+    height: 1.4in;
+  }
+
+  .print-kit--service .print-service-profile h2 {
+    font-size: 25px;
+  }
+
+  .print-kit--service .print-service-work {
+    padding: .14in .18in .08in;
+  }
+
+  .print-kit--service .print-service-title h3 {
+    font-size: 23px;
+  }
+
+  .print-kit--service .print-service-details > div {
+    padding: .08in;
+  }
+
+  .print-kit--service .print-kit-qr-panel {
+    grid-template-columns: 1.25in minmax(0, 1fr);
+    gap: .15in;
+    margin: .06in .18in .08in;
+    padding: .08in;
+  }
+
+  .print-kit--service .print-kit-qr-code {
+    width: 1.25in;
+  }
+
+  .print-kit--service .print-kit-footer {
+    padding: 0 .18in .1in;
   }
 }
 .qr-editor-panel {

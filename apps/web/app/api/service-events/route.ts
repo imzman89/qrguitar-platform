@@ -58,7 +58,19 @@ type ServiceEventRow = {
   is_system?: boolean | null;
   related_document_id?: string | null;
   related_media_id?: string | null;
+  source_kind?: "owner_reported" | "provider_submitted_owner_approved" | null;
+  provider_user_id?: string | null;
+  provider_display_name?: string | null;
+  provider_verified_at_snapshot?: string | null;
+  evidence_reviewed_at?: string | null;
+  service_submission_id?: string | null;
+  work_order_reference?: string | null;
+  parts_installed?: string | null;
+  setup_measurements?: string | null;
+  who_performed?: "self" | "shop" | "unknown" | null;
 };
+
+const SERVICE_SELECT = "id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_by_user_id,created_at,updated_at,date_precision,category,is_system,related_document_id,related_media_id,source_kind,provider_user_id,provider_display_name,provider_verified_at_snapshot,evidence_reviewed_at,service_submission_id,work_order_reference,parts_installed,setup_measurements,who_performed";
 
 function json<T>(body: T, init: ResponseInit = {}) {
   return NextResponse.json(body, {
@@ -128,6 +140,16 @@ function mapServiceEvent(row: ServiceEventRow, includePrivate = false, userId = 
     isSystem: row.is_system === true,
     relatedDocumentId: row.related_document_id || undefined,
     relatedMediaId: row.related_media_id || undefined,
+    sourceKind: row.source_kind || "owner_reported",
+    providerUserId: row.provider_user_id || undefined,
+    providerDisplayName: row.provider_display_name || undefined,
+    providerVerifiedAt: row.provider_verified_at_snapshot || undefined,
+    evidenceReviewedAt: row.evidence_reviewed_at || undefined,
+    serviceSubmissionId: row.service_submission_id || undefined,
+    workOrderReference: row.work_order_reference || undefined,
+    partsInstalled: row.parts_installed || undefined,
+    setupMeasurements: row.setup_measurements || undefined,
+    whoPerformed: row.who_performed || undefined,
     ...(includePrivate ? { canEdit, lockedReason: canEdit ? "" : lockedServiceHistoryMessage() } : {}),
     createdAt: row.created_at,
     updatedAt: row.updated_at || undefined
@@ -211,7 +233,7 @@ export async function GET(request: Request) {
 
   let query = supabase
     .from("guitar_timeline_events")
-    .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_by_user_id,created_at,updated_at,date_precision,category,is_system,related_document_id,related_media_id")
+    .select(SERVICE_SELECT)
     .eq("guitar_id", guitar.id)
     .order("event_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
@@ -284,9 +306,19 @@ export async function POST(request: Request) {
       private_notes: cleanText(body?.privateNotes, 4000),
       shop_name: cleanText(body?.shopName, 200),
       location: cleanText(body?.location, 200),
-      is_public: body?.isPublic === true
+      is_public: body?.isPublic === true,
+      source_kind: "owner_reported",
+      provider_user_id: null,
+      provider_display_name: null,
+      provider_verified_at_snapshot: null,
+      evidence_reviewed_at: null,
+      service_submission_id: null,
+      work_order_reference: cleanText(body?.workOrderReference, 160),
+      parts_installed: cleanText(body?.partsInstalled, 3000),
+      setup_measurements: cleanText(body?.setupMeasurements, 3000),
+      who_performed: body?.whoPerformed === "self" || body?.whoPerformed === "shop" ? body.whoPerformed : "unknown"
     })
-    .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_by_user_id,created_at,updated_at,date_precision,category,is_system,related_document_id,related_media_id")
+    .select(SERVICE_SELECT)
     .single<ServiceEventRow>();
 
   if (created.error || !created.data) {
@@ -334,10 +366,10 @@ export async function PATCH(request: Request) {
 
   const existingEntry = await supabase
     .from("guitar_timeline_events")
-    .select("id,guitar_id,created_by_user_id")
+    .select("id,guitar_id,created_by_user_id,source_kind")
     .eq("id", id)
     .eq("guitar_id", guitar.id)
-    .maybeSingle<Pick<ServiceEventRow, "id" | "guitar_id" | "created_by_user_id">>();
+    .maybeSingle<Pick<ServiceEventRow, "id" | "guitar_id" | "created_by_user_id" | "source_kind">>();
 
   if (existingEntry.error) {
     return json({ ok: false, message: existingEntry.error.message || "Could not read service entry." }, { status: 500 });
@@ -349,6 +381,10 @@ export async function PATCH(request: Request) {
 
   if (!access.isAdmin && existingEntry.data.created_by_user_id !== access.user?.id) {
     return json({ ok: false, message: lockedServiceHistoryMessage() }, { status: 403 });
+  }
+
+  if (!access.isAdmin && existingEntry.data.source_kind === "provider_submitted_owner_approved") {
+    return json({ ok: false, message: "Approved provider service is protected. Contact QRguitar support to correct its provenance." }, { status: 403 });
   }
 
   const title = cleanText(body?.title, 180);
@@ -371,6 +407,10 @@ export async function PATCH(request: Request) {
       shop_name: cleanText(body?.shopName, 200),
       location: cleanText(body?.location, 200),
       is_public: body?.isPublic === true,
+      work_order_reference: cleanText(body?.workOrderReference, 160),
+      parts_installed: cleanText(body?.partsInstalled, 3000),
+      setup_measurements: cleanText(body?.setupMeasurements, 3000),
+      who_performed: body?.whoPerformed === "self" || body?.whoPerformed === "shop" ? body.whoPerformed : "unknown",
       updated_at: new Date().toISOString()
     })
     .eq("id", id)
@@ -381,7 +421,7 @@ export async function PATCH(request: Request) {
   }
 
   const update = await updateQuery
-    .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_by_user_id,created_at,updated_at,date_precision,category,is_system,related_document_id,related_media_id")
+    .select(SERVICE_SELECT)
     .single<ServiceEventRow>();
 
   if (update.error || !update.data) {
@@ -429,10 +469,10 @@ export async function DELETE(request: Request) {
 
   const existingEntry = await supabase
     .from("guitar_timeline_events")
-    .select("id,guitar_id,created_by_user_id")
+    .select("id,guitar_id,created_by_user_id,source_kind")
     .eq("id", id)
     .eq("guitar_id", guitar.id)
-    .maybeSingle<Pick<ServiceEventRow, "id" | "guitar_id" | "created_by_user_id">>();
+    .maybeSingle<Pick<ServiceEventRow, "id" | "guitar_id" | "created_by_user_id" | "source_kind">>();
 
   if (existingEntry.error) {
     return json({ ok: false, message: existingEntry.error.message || "Could not read service entry." }, { status: 500 });
@@ -444,6 +484,11 @@ export async function DELETE(request: Request) {
 
   if (!access.isAdmin && existingEntry.data.created_by_user_id !== access.user?.id) {
     return json({ ok: false, message: lockedServiceHistoryMessage() }, { status: 403 });
+  }
+
+
+  if (!access.isAdmin && existingEntry.data.source_kind === "provider_submitted_owner_approved") {
+    return json({ ok: false, message: "Approved provider service is protected. Contact QRguitar support to correct its provenance." }, { status: 403 });
   }
 
   let deleteQuery = supabase.from("guitar_timeline_events").delete().eq("id", id).eq("guitar_id", guitar.id);

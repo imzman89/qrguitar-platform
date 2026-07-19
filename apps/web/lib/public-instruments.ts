@@ -82,6 +82,16 @@ type TimelineRow = {
   is_system?: boolean | null;
   related_document_id?: string | null;
   related_media_id?: string | null;
+  source_kind?: "owner_reported" | "provider_submitted_owner_approved" | null;
+  provider_user_id?: string | null;
+  provider_display_name?: string | null;
+  provider_verified_at_snapshot?: string | null;
+  evidence_reviewed_at?: string | null;
+  service_submission_id?: string | null;
+  work_order_reference?: string | null;
+  parts_installed?: string | null;
+  setup_measurements?: string | null;
+  who_performed?: "self" | "shop" | "unknown" | null;
 };
 
 type ExternalMediaRow = {
@@ -323,6 +333,16 @@ function mapPublicServiceEvent(row: TimelineRow) {
     isSystem: row.is_system === true,
     relatedDocumentId: row.related_document_id || undefined,
     relatedMediaId: row.related_media_id || undefined,
+    sourceKind: row.source_kind || "owner_reported",
+    providerUserId: row.provider_user_id || undefined,
+    providerDisplayName: row.provider_display_name || undefined,
+    providerVerifiedAt: row.provider_verified_at_snapshot || undefined,
+    evidenceReviewedAt: row.evidence_reviewed_at || undefined,
+    serviceSubmissionId: row.service_submission_id || undefined,
+    workOrderReference: row.work_order_reference || undefined,
+    partsInstalled: row.parts_installed || undefined,
+    setupMeasurements: row.setup_measurements || undefined,
+    whoPerformed: row.who_performed || undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at || undefined
   };
@@ -376,7 +396,7 @@ async function loadRelated(guitars: GuitarRow[], serviceRole = false) {
     ownerIds.length
       ? supabaseHttpsJson<ProfileRow[]>(`/rest/v1/profiles?select=id,display_name,account_status,hide_public_content&id=in.(${ownerIdFilter})`, { serviceRole })
       : Promise.resolve([]),
-    supabaseHttpsJson<TimelineRow[]>(`/rest/v1/guitar_timeline_events?select=id,guitar_id,event_date,event_type,title,description,shop_name,location,is_public,created_at,updated_at,date_precision,category,is_system,related_document_id,related_media_id&guitar_id=in.(${idFilter})&is_public=eq.true&order=event_date.desc.nullslast,created_at.desc`, { serviceRole })
+    supabaseHttpsJson<TimelineRow[]>(`/rest/v1/guitar_timeline_events?select=id,guitar_id,event_date,event_type,title,description,shop_name,location,is_public,created_at,updated_at,date_precision,category,is_system,related_document_id,related_media_id,source_kind,provider_user_id,provider_display_name,provider_verified_at_snapshot,evidence_reviewed_at,service_submission_id,work_order_reference,parts_installed,setup_measurements,who_performed&guitar_id=in.(${idFilter})&is_public=eq.true&order=event_date.desc.nullslast,created_at.desc`, { serviceRole })
       .catch(async (error: Error) => {
         if (!/column .* does not exist/i.test(error.message)) throw error;
         return supabaseHttpsJson<TimelineRow[]>(`/rest/v1/guitar_timeline_events?select=id,guitar_id,event_date,event_type,title,description,shop_name,location,is_public,created_at,updated_at&guitar_id=in.(${idFilter})&is_public=eq.true&order=event_date.desc.nullslast,created_at.desc`, { serviceRole });

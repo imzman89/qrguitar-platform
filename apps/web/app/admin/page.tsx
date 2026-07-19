@@ -1396,7 +1396,7 @@ export default function AdminPage() {
               <h1>QRguitar admin panel.</h1>
               <p>Manage users, Profiles, trust controls, safety alerts, transfers, proof documents, service history, site settings, and audit events.</p>
             </div>
-            {adminAuthorized ? <Link className="button secondary" href="/admin/site-editor">Site Editor</Link> : null}
+            {adminAuthorized ? <div className="admin-hero-actions"><Link className="button secondary" href="/admin/service-workflow">Service Operations</Link><Link className="button secondary" href="/admin/site-editor">Site Editor</Link></div> : null}
           </div>
           {!adminAuthorized ? (
             <section className="card admin-panel-card admin-login-card">

@@ -102,6 +102,10 @@ const emptyServiceForm = {
   privateNotes: "",
   shopName: "",
   location: "",
+  workOrderReference: "",
+  partsInstalled: "",
+  setupMeasurements: "",
+  whoPerformed: "unknown",
   isPublic: false
 };
 const emptyMediaForm = { url: "", title: "", caption: "", isPublic: true };
@@ -415,6 +419,10 @@ export default function EditInstrumentPage() {
       privateNotes: entry.privateNotes || "",
       shopName: entry.shopName || "",
       location: entry.location || "",
+      workOrderReference: entry.workOrderReference || "",
+      partsInstalled: entry.partsInstalled || "",
+      setupMeasurements: entry.setupMeasurements || "",
+      whoPerformed: entry.whoPerformed || "unknown",
       isPublic: entry.isPublic === true
     });
   }
@@ -1529,6 +1537,27 @@ export default function EditInstrumentPage() {
                     <label htmlFor="serviceLocation">Location</label>
                     <input id="serviceLocation" value={serviceForm.location} onChange={(event) => updateServiceField("location", event.target.value)} />
                   </div>
+                  <div className="field">
+                    <label htmlFor="servicePerformedBy">Who performed this work?</label>
+                    <select id="servicePerformedBy" value={serviceForm.whoPerformed} onChange={(event) => updateServiceField("whoPerformed", event.target.value)}>
+                      <option value="unknown">Not specified</option>
+                      <option value="self">Owner / self</option>
+                      <option value="shop">Shop or technician</option>
+                    </select>
+                    <small>Owner-entered history is labeled Owner-reported. Provider verification is controlled separately.</small>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="serviceWorkOrder">Work-order reference</label>
+                    <input id="serviceWorkOrder" value={serviceForm.workOrderReference} onChange={(event) => updateServiceField("workOrderReference", event.target.value)} />
+                  </div>
+                  <div className="field custom-wide">
+                    <label htmlFor="serviceParts">Parts installed</label>
+                    <textarea id="serviceParts" rows={2} value={serviceForm.partsInstalled} onChange={(event) => updateServiceField("partsInstalled", event.target.value)} />
+                  </div>
+                  <div className="field custom-wide">
+                    <label htmlFor="serviceMeasurements">Setup measurements</label>
+                    <textarea id="serviceMeasurements" rows={2} value={serviceForm.setupMeasurements} onChange={(event) => updateServiceField("setupMeasurements", event.target.value)} />
+                  </div>
                   <div className="field custom-wide">
                     <label htmlFor="servicePublicDescription">Public description</label>
                     <textarea id="servicePublicDescription" rows={3} value={serviceForm.publicDescription} onChange={(event) => updateServiceField("publicDescription", event.target.value)} />
@@ -1558,6 +1587,11 @@ export default function EditInstrumentPage() {
                       <article className="timeline-item" key={entry.id}>
                         <span>{entry.serviceDate || "Date unavailable"} · {entry.isPublic ? "Public" : "Private"}</span>
                         <h3>{entry.title}</h3>
+                        <p className="service-provenance">
+                          {entry.sourceKind === "provider_submitted_owner_approved"
+                            ? `Provider-submitted · Owner-approved${entry.providerVerifiedAt ? " · Verified Service Provider" : ""}${entry.evidenceReviewedAt ? " · QRguitar-reviewed evidence" : ""}`
+                            : "Owner-reported service"}
+                        </p>
                         <p>{[entry.eventType, entry.shopName, entry.location].filter(Boolean).join(" · ") || "Service entry"}</p>
                         {entry.publicDescription ? <p>{entry.publicDescription}</p> : null}
                         {entry.privateNotes ? <p className="fine-print">Private: {entry.privateNotes}</p> : null}

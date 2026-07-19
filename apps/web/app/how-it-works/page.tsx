@@ -125,6 +125,23 @@ export default function HowItWorksPage() {
           </div>
         </section>
 
+        <section className="section product-guide-identity" id="service-providers">
+          <div className="shell product-guide-split">
+            <div>
+              <div className="eyebrow">Service-provider workflow</div>
+              <h2>Service history the owner reviews before it becomes permanent.</h2>
+              <p>A signed-in repair shop or technician can submit completed work for an existing Profile. Receipts, work orders, and supporting photos stay private evidence.</p>
+              <p>The owner receives an in-app request and, when email delivery is configured, a secure review email. Nothing is published until the owner approves it.</p>
+            </div>
+            <div className="product-guide-visibility">
+              <div><Wrench /><strong>1. Provider submits</strong><span>The provider records the work, parts, measurements, and private evidence.</span></div>
+              <div><FileText /><strong>2. Owner reviews</strong><span>The owner can request changes, decline it, or choose public or private visibility.</span></div>
+              <div><UserRoundCheck /><strong>3. Owner approves</strong><span>Approval creates one protected service-history entry. Repeated approval cannot duplicate it.</span></div>
+              <div><ShieldCheck /><strong>4. Provenance stays honest</strong><span>Owner-reported, provider-submitted, verified-provider, and QRguitar evidence review are distinct labels.</span></div>
+            </div>
+          </div>
+        </section>
+
         <section className="section product-guide-identity" id="ownership">
           <div className="shell product-guide-split">
             <div>

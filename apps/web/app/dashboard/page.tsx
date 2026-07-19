@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, Mail, Repeat2, ShieldCheck } from "lucide-react";
+import { Copy, Mail, Repeat2, ShieldCheck, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { BulkProfileImport } from "../../components/BulkProfileImport";
@@ -26,6 +26,19 @@ import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/s
 import { getProfilePhotoUrls, getServiceHistoryEntries } from "../../lib/instrument-profile-contract";
 
 type DashboardFilter = "all" | "public" | "private" | "transfers";
+
+type ServiceRequestSummary = {
+  id: string;
+  qrCode: string;
+  profileTitle: string;
+  status: "draft" | "submitted" | "changes_requested" | "approved" | "declined" | "cancelled" | "expired";
+  title: string;
+  serviceType: string;
+  serviceDate: string;
+  evidenceCount: number;
+  updatedAt: string;
+  provider?: { publicDisplayName?: string; businessName?: string; verificationStatus?: "verified" | "unverified" } | null;
+};
 
 function mergeDashboardRecords(records: DemoInstrument[], user: DemoUser | null) {
   void user;
@@ -78,6 +91,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<DemoUser | null>(null);
   const [instruments, setInstruments] = useState<DemoInstrument[]>([]);
   const [transfers, setTransfers] = useState<DemoTransfer[]>([]);
+  const [serviceRequests, setServiceRequests] = useState<ServiceRequestSummary[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(true);
   const [authChecked, setAuthChecked] = useState(true);
   const [dashboardMessage, setDashboardMessage] = useState("");
@@ -137,15 +151,17 @@ export default function DashboardPage() {
     setLoadingRecords(true);
 
     getSupabaseAccessToken().then(async (token) => {
-      const [records, transferRecords] = await Promise.all([
+      const [records, transferRecords, requests] = await Promise.all([
         loadDashboardInstruments(token, false),
-        loadDashboardTransfers(token)
+        loadDashboardTransfers(token),
+        loadOwnerServiceRequests(token)
       ]);
 
-        if (!cancelled) {
-          setInstruments(mergeDashboardRecords(records, user));
+      if (!cancelled) {
+        setInstruments(mergeDashboardRecords(records, user));
         setTransfers(transferRecords);
-        }
+        setServiceRequests(requests);
+      }
     })
       .finally(() => {
         if (!cancelled) {
@@ -161,6 +177,9 @@ export default function DashboardPage() {
   const instrumentCodes = useMemo(() => new Set(instruments.map((instrument) => instrument.qrCode.toUpperCase())), [instruments]);
   const pendingTransfers = transfers.filter(
     (transfer) => transfer.status === "sent" && instrumentCodes.has(transfer.guitarQrCode.toUpperCase())
+  ).length;
+  const pendingServiceRequests = serviceRequests.filter(
+    (request) => request.status === "submitted" || request.status === "changes_requested"
   ).length;
   const accountPlan = getAccountPlan(user);
   const displayName = useMemo(() => getDisplayName(user), [user?.name, user?.email, user?.role]);
@@ -192,15 +211,17 @@ export default function DashboardPage() {
 
     getSupabaseAccessToken()
       .then(async (token) => {
-        const [records, transferRecords] = await Promise.all([
+        const [records, transferRecords, requests] = await Promise.all([
           loadDashboardInstruments(token, false),
-          loadDashboardTransfers(token)
+          loadDashboardTransfers(token),
+          loadOwnerServiceRequests(token)
         ]);
-        return { records, transferRecords };
+        return { records, transferRecords, requests };
       })
-      .then(({ records, transferRecords }) => {
+      .then(({ records, transferRecords, requests }) => {
         setInstruments(mergeDashboardRecords(records, user));
         setTransfers(transferRecords);
+        setServiceRequests(requests);
       });
   }
 
@@ -209,10 +230,10 @@ export default function DashboardPage() {
       { label: "Total Profiles", value: String(instruments.length), filter: "all" as const, helper: "Every active Profile" },
       { label: "Public in Catalog", value: String(publicRecords), filter: "public" as const, helper: "Discoverable Profiles" },
       { label: "Private / Unlisted", value: String(privateRecords + unlistedRecords), filter: "private" as const, helper: "Limited visibility" },
-
-      { label: "Pending Transfers / Claims", value: String(pendingTransfers), filter: "transfers" as const, helper: "Awaiting completion" }
+      { label: "Pending Transfers / Claims", value: String(pendingTransfers), filter: "transfers" as const, helper: "Awaiting completion" },
+      { label: "Service Requests", value: String(pendingServiceRequests), filter: "all" as const, helper: "Awaiting your review" }
     ],
-    [instruments.length, pendingTransfers, privateRecords, publicRecords, unlistedRecords]
+    [instruments.length, pendingServiceRequests, pendingTransfers, privateRecords, publicRecords, unlistedRecords]
   );
 
   async function updateSerialVisibility(instrument: DemoInstrument, showSerialPublic: boolean) {
@@ -391,6 +412,35 @@ export default function DashboardPage() {
             <span><b>{authenticityConfirmedRecords}</b> Authenticity Confirmed</span>
             {activeFilter !== "all" ? <button type="button" onClick={() => setActiveFilter("all")}>Clear filter</button> : null}
           </div>
+
+          {serviceRequests.length ? (
+            <section className="card service-request-inbox" aria-labelledby="service-requests-title">
+              <div className="service-request-inbox__header">
+                <div>
+                  <div className="eyebrow"><Wrench aria-hidden="true" /> Service records</div>
+                  <h3 id="service-requests-title">Service requests</h3>
+                  <p>Review provider-submitted work before it becomes part of the instrument's permanent history.</p>
+                </div>
+                <span>{pendingServiceRequests} awaiting review</span>
+              </div>
+              <div className="service-request-list">
+                {serviceRequests.slice(0, 8).map((request) => {
+                  const providerName = request.provider?.publicDisplayName || request.provider?.businessName || "Service provider";
+                  return (
+                    <article className="service-request-card" key={request.id}>
+                      <div>
+                        <span className={`service-status service-status--${request.status}`}>{serviceRequestStatusLabel(request.status)}</span>
+                        <h4>{request.title || request.serviceType}</h4>
+                        <p>{request.profileTitle || request.qrCode} · {providerName}{request.serviceDate ? ` · ${request.serviceDate}` : ""}</p>
+                        <small>{request.evidenceCount} private evidence file{request.evidenceCount === 1 ? "" : "s"}</small>
+                      </div>
+                      <Link className="button secondary" href={`/service-review/${request.id}`}>Review service</Link>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
 
           <section className={`card ${styles.instrumentTable}`}>
             <div className={styles.tableHeader}>
@@ -769,6 +819,26 @@ async function loadDashboardTransfers(token: string) {
   }
 
   return payload.transfers || [];
+}
+
+async function loadOwnerServiceRequests(token: string): Promise<ServiceRequestSummary[]> {
+  if (!token) return [];
+  const response = await fetch("/api/service-submissions?scope=owner", {
+    headers: { authorization: `Bearer ${token}` },
+    cache: "no-store"
+  });
+  const payload = (await response.json().catch(() => null)) as { ok?: boolean; submissions?: ServiceRequestSummary[] } | null;
+  return response.ok && payload?.ok ? payload.submissions || [] : [];
+}
+
+function serviceRequestStatusLabel(status: ServiceRequestSummary["status"]) {
+  if (status === "submitted") return "Review requested";
+  if (status === "changes_requested") return "Changes requested";
+  if (status === "approved") return "Approved";
+  if (status === "declined") return "Declined";
+  if (status === "cancelled") return "Cancelled";
+  if (status === "expired") return "Expired";
+  return "Draft";
 }
 
 function latestTransferForInstrument(transfers: DemoTransfer[], qrCode: string) {

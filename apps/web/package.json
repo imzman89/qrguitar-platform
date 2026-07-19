@@ -11,7 +11,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test:retired-profile": "node scripts/assert-retired-profile.mjs",
-    "test:launch": "node scripts/assert-launch-readiness.mjs"
+    "test:launch": "node scripts/assert-launch-readiness.mjs",
+    "test:service-workflow": "node scripts/assert-service-workflow.mjs"
   },
   "dependencies": {
     "@qrguitar/shared": "*",

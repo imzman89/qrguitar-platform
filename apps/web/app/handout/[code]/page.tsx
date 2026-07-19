@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ExternalLink, FileText, Printer, QrCode, ShieldCheck, Siren } from "lucide-react";
+import { ArrowLeft, ExternalLink, FileText, Printer, QrCode, ShieldCheck, Siren, Wrench } from "lucide-react";
 import QRCode from "qrcode";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -12,7 +12,8 @@ import {
   getInstrumentCondition,
   getInstrumentVerificationStatus,
   instrumentDisplayName,
-  type DemoInstrument
+  type DemoInstrument,
+  type ServiceHistoryEntry
 } from "../../../lib/local-demo";
 import { formatRecordLocation } from "../../../lib/record-location";
 import { getSupabaseAccessToken } from "../../../lib/supabase-browser";
@@ -24,19 +25,37 @@ type HandoutPayload = {
   message?: string;
 };
 
-type PrintMode = "handout" | "label";
+type PrintMode = "handout" | "label" | "service";
 
 const modeLabels: Record<PrintMode, string> = {
   handout: "Customer Handout",
-  label: "QR Label"
+  label: "QR Label",
+  service: "Service Summary"
 };
 
-const modeOrder: PrintMode[] = ["handout", "label"];
+const modeOrder: PrintMode[] = ["handout", "label", "service"];
 
 const modeDescriptions: Record<PrintMode, string> = {
   handout: "A one-page Profile summary for an owner, buyer, or service customer.",
-  label: "A compact label for an instrument case, hang tag, or paperwork."
+  label: "A compact label for an instrument case, hang tag, or paperwork.",
+  service: "A one-page summary of one canonical service-history entry."
 };
+
+function formatServiceDate(entry: ServiceHistoryEntry) {
+  if (!entry.serviceDate) return "Date not recorded";
+  const date = new Date(`${entry.serviceDate}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? entry.serviceDate : date.toLocaleDateString("en-US", { month: "long", day: entry.datePrecision === "day" ? "numeric" : undefined, year: "numeric" });
+}
+
+function serviceProvenance(entry: ServiceHistoryEntry) {
+  if (entry.sourceKind === "provider_submitted_owner_approved") {
+    const labels = ["Provider-submitted", "Owner-approved"];
+    if (entry.providerVerifiedAt) labels.push("Verified Service Provider");
+    if (entry.evidenceReviewedAt) labels.push("QRguitar-reviewed service evidence");
+    return labels.join(" - ");
+  }
+  return "Owner-reported service";
+}
 function humanizeStatus(value?: string) {
   const normalized = String(value || "").trim().toLowerCase();
   if (normalized === "for_sale") return "For Sale";
@@ -78,6 +97,8 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
   const [message, setMessage] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [mode, setMode] = useState<PrintMode>("handout");
+  const [ownerAuthorized, setOwnerAuthorized] = useState(false);
+  const [selectedServiceId, setSelectedServiceId] = useState("");
   const canonicalCode = instrument?.qrCode || code;
   const profileUrl = `https://www.qrguitar.com/i/${encodeURIComponent(canonicalCode)}`;
 
@@ -94,6 +115,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
       });
       const publicPayload = (await publicResponse.json().catch(() => null)) as HandoutPayload | null;
       if (!cancelled && publicResponse.ok && publicPayload?.ok && publicPayload.instrument) {
+        setOwnerAuthorized(false);
         setInstrument(publicPayload.instrument);
         if (publicPayload.instrument.qrCode && publicPayload.instrument.qrCode !== code) {
           router.replace(`/handout/${encodeURIComponent(publicPayload.instrument.qrCode)}`);
@@ -121,6 +143,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
       });
       const ownerPayload = (await ownerResponse.json().catch(() => null)) as HandoutPayload | null;
       if (!cancelled && ownerResponse.ok && ownerPayload?.ok && ownerPayload.instrument) {
+        setOwnerAuthorized(true);
         setInstrument(ownerPayload.instrument);
         if (ownerPayload.instrument.qrCode && ownerPayload.instrument.qrCode !== code) {
           router.replace(`/handout/${encodeURIComponent(ownerPayload.instrument.qrCode)}`);
@@ -176,7 +199,9 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
   const saleStatus = humanizeStatus(instrument?.saleStatus);
   const originalityStatus = humanizeStatus(instrument?.originalityStatus);
   const safety = instrument?.safetyStatus === "lost" || instrument?.safetyStatus === "stolen" || instrument?.safetyStatus === "recovered" ? instrument.safetyStatus : "";
-  const serialDisplay = instrument?.showSerialPublic === true && instrument?.serial ? instrument.serial : "";
+  const serialDisplay = instrument?.serial && (instrument.showSerialPublic === true || ownerAuthorized) ? instrument.serial : "";
+  const printableServiceEntries = useMemo(() => instrument ? getServiceHistoryEntries(instrument).filter((entry) => !entry.isSystem && Boolean(entry.sourceKind)) : [], [instrument]);
+  const selectedService = printableServiceEntries.find((entry) => entry.id === selectedServiceId) || printableServiceEntries[0] || null;
   const photoCount = galleryImages.length;
   const docCount = instrument ? publicDocumentCount(instrument) : 0;
   const serviceCount = instrument ? publicServiceCount(instrument) : 0;
@@ -190,6 +215,11 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
     serviceCount ? `${serviceCount} service entr${serviceCount === 1 ? "y" : "ies"}` : ""
   ].filter(Boolean);
   const isPrivate = instrument?.visibility === "private";
+
+  useEffect(() => {
+    if (!selectedServiceId && printableServiceEntries[0]) setSelectedServiceId(printableServiceEntries[0].id);
+    if (selectedServiceId && !printableServiceEntries.some((entry) => entry.id === selectedServiceId)) setSelectedServiceId(printableServiceEntries[0]?.id || "");
+  }, [printableServiceEntries, selectedServiceId]);
 
   function renderBadges() {
     if (!instrument) return null;
@@ -227,7 +257,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
               </Link>
               <div className="eyebrow">QRguitar Print Kit</div>
               <h1>Print the right piece.</h1>
-              <p>Use the handout for a customer or owner. Use the label for a case, tag, or paperwork.</p>
+              <p>Use the handout for a customer, the label for a case, or the service summary for completed canonical work.</p>
             </div>
             <div className="print-kit-toolbar-actions">
               <Link className="button secondary" href={`/i/${encodeURIComponent(canonicalCode)}`} target="_blank">
@@ -236,7 +266,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
               </Link>
               <button className="button" type="button" onClick={() => window.print()} disabled={!instrument || !qrDataUrl}>
                 <Printer size={16} />
-                Print {mode === "handout" ? "Handout" : "Label"}
+                Print {mode === "handout" ? "Handout" : mode === "label" ? "Label" : "Service Summary"}
               </button>
             </div>
           </div>
@@ -255,6 +285,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                 </button>
               ))}
               <p className="print-mode-description">{modeDescriptions[mode]}</p>
+              {mode === "service" ? <label className="print-service-picker">Service entry<select value={selectedService?.id || ""} onChange={(event) => setSelectedServiceId(event.target.value)} disabled={!printableServiceEntries.length}>{printableServiceEntries.length ? printableServiceEntries.map((entry) => <option value={entry.id} key={entry.id}>{formatServiceDate(entry)} - {entry.title}</option>) : <option value="">No canonical service entries available</option>}</select></label> : null}
             </div>
           ) : null}
 
@@ -290,6 +321,32 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                 </div>
               </section>
             </article>
+          ) : mode === "service" ? selectedService ? (
+            <article className="print-kit print-kit--service" aria-label={`Printable service summary for ${title}`}>
+              <header className="print-kit-header">
+                <div className="print-kit-wordmark">QR<span>guitar</span></div>
+                <div><span>Service Summary</span><strong>{canonicalCode}</strong></div>
+              </header>
+              <section className="print-service-profile">
+                <div className="print-service-photo">{photoUrl ? <img src={photoUrl} alt={`${title} main photo`} /> : <span>No photo available</span>}</div>
+                <div><p className="print-kit-id-label">Permanent QRguitar Profile</p><h2>{title}</h2><p>{primaryFacts.join(" / ")}</p><dl className="print-kit-details"><div><dt>QRguitar ID</dt><dd>{canonicalCode}</dd></div>{serialDisplay ? <div><dt>Serial Number</dt><dd>{serialDisplay}</dd></div> : null}</dl></div>
+              </section>
+              <section className="print-service-work">
+                <div className="print-service-title"><div><span>{selectedService.category || selectedService.eventType || "Service"}</span><h3>{selectedService.title}</h3></div><strong>{formatServiceDate(selectedService)}</strong></div>
+                {selectedService.publicDescription ? <p>{selectedService.publicDescription}</p> : null}
+                <dl className="print-service-details">
+                  {selectedService.shopName || selectedService.providerDisplayName ? <div><dt>Provider / shop</dt><dd>{selectedService.providerDisplayName || selectedService.shopName}</dd></div> : null}
+                  {selectedService.workOrderReference ? <div><dt>Work order</dt><dd>{selectedService.workOrderReference}</dd></div> : null}
+                  {selectedService.partsInstalled ? <div><dt>Parts installed</dt><dd>{selectedService.partsInstalled}</dd></div> : null}
+                  {selectedService.setupMeasurements ? <div><dt>Setup measurements</dt><dd>{selectedService.setupMeasurements}</dd></div> : null}
+                </dl>
+                <p className="print-service-provenance"><ShieldCheck size={15} /> {serviceProvenance(selectedService)}</p>
+              </section>
+              <section className="print-kit-qr-panel print-service-qr"><div className="print-kit-qr-code">{qrDataUrl ? <img src={qrDataUrl} alt={`QR code for ${title}`} /> : <QrCode />}</div><div><p className="print-kit-scan-label">Scan to open the permanent Profile</p><h3>Keep service history connected.</h3><strong>{profileUrl}</strong></div></section>
+              <footer className="print-kit-footer"><span>Private evidence and internal notes are not included.</span><strong>qrguitar.com</strong></footer>
+            </article>
+          ) : (
+            <section className="card handout-status"><Wrench /><h2>No canonical service entry is available.</h2><p>Only owner-created or provider-submitted, owner-approved service history can be printed.</p></section>
           ) : (
             <article className="print-kit print-kit--handout" aria-label={`Printable QRguitar handout for ${title}`}>
               <header className="print-kit-header">

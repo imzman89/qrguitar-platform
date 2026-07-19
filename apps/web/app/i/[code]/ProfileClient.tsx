@@ -14,6 +14,7 @@ import {
   Share2,
   ShieldCheck,
   SlidersHorizontal,
+  Wrench,
   X
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -278,6 +279,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
   }, [code, stored]);
 
   const canEdit = Boolean(currentUserEmail && instrument?.ownerUserEmail && currentUserEmail === instrument.ownerUserEmail.toLowerCase());
+  const canSubmitService = Boolean(currentUserEmail && instrument && !canEdit && instrument.visibility !== "private");
 
   const galleryImages = instrument
     ? Array.from(
@@ -657,6 +659,16 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
         </section>
         ) : null}
 
+        {canSubmitService ? (
+          <section className="scan-actions" aria-label="Service provider actions">
+            <Action
+              icon={<Wrench />}
+              label="Submit Service Work"
+              onClick={() => router.push(`/service-work/${instrument.qrCode}`)}
+            />
+          </section>
+        ) : null}
+
         {actionNotice ? (
           <section className="scan-action-panel" role="status" aria-live="polite">
             <div>
@@ -896,6 +908,7 @@ function ProfilePanel({
               date={formatTimelineEntryDate(entry)}
               title={entry.title}
               copy={[
+                serviceSourceLabel(entry),
                 entry.category || entry.eventType,
                 entry.publicDescription,
                 [entry.shopName, entry.location].filter(Boolean).join(" · ")
@@ -1234,6 +1247,16 @@ function formatTimelineEntryDate(entry: ServiceHistoryEntry) {
     year: "numeric",
     ...(entry.datePrecision === "day" ? { day: "numeric" } : {})
   }).format(parsed);
+}
+
+function serviceSourceLabel(entry: ServiceHistoryEntry) {
+  if (entry.sourceKind === "provider_submitted_owner_approved") {
+    const labels = ["Provider-submitted", "Owner-approved"];
+    if (entry.providerVerifiedAt) labels.push("Verified Service Provider");
+    if (entry.evidenceReviewedAt) labels.push("QRguitar-reviewed evidence");
+    return labels.join(" - ");
+  }
+  return entry.isSystem ? "" : "Owner-reported service";
 }
 
 function externalMediaEmbedUrl(item: ExternalMediaItem) {

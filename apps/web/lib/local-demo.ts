@@ -139,6 +139,16 @@ export type ServiceHistoryEntry = {
   relatedMediaId?: string;
   canEdit?: boolean;
   lockedReason?: string;
+  sourceKind?: "owner_reported" | "provider_submitted_owner_approved";
+  providerUserId?: string;
+  providerDisplayName?: string;
+  providerVerifiedAt?: string;
+  evidenceReviewedAt?: string;
+  serviceSubmissionId?: string;
+  workOrderReference?: string;
+  partsInstalled?: string;
+  setupMeasurements?: string;
+  whoPerformed?: "self" | "shop" | "unknown";
   createdAt?: string;
   updatedAt?: string;
 };
