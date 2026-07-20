@@ -160,7 +160,7 @@ export default function ResetPasswordPage() {
               </>
             ) : null}
 
-            {status ? <p className="form-message error-message">{status}</p> : null}
+            {status && (!authChecked || hasSession) ? <p className="form-message error-message">{status}</p> : null}
           </section>
         </div>
       </main>

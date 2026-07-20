@@ -612,10 +612,10 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           {trustItems.length ? (
             <div className="profile-trust-summary" aria-label="Trust review">
               {trustItems.map((item) => (
-                <div key={item.label}>
-                  <strong><ShieldCheck size={15} /> {item.label}</strong>
+                <details key={item.label}>
+                  <summary><ShieldCheck size={15} /> {item.label}</summary>
                   <p>{item.note}</p>
-                </div>
+                </details>
               ))}
             </div>
           ) : null}
@@ -879,7 +879,7 @@ function ProfilePanel({
 
     return (
       <section className="scan-tab-panel">
-        <PanelHeader icon={<SlidersHorizontal />} label="Specifications" title="Build details, setup notes, and serial info." />
+        <PanelHeader icon={<SlidersHorizontal />} label="Specifications" title="Build details, setup notes, and Serial Number." />
         <div className="profile-data-grid">
           {visibleSpecs.map((spec) => (
             <span key={spec.label}><strong>{spec.label}</strong>{spec.value}</span>
@@ -911,8 +911,8 @@ function ProfilePanel({
                 serviceSourceLabel(entry),
                 entry.category || entry.eventType,
                 entry.publicDescription,
-                [entry.shopName, entry.location].filter(Boolean).join(" · ")
-              ].filter(Boolean).join(" · ")}
+                [entry.shopName, entry.location].filter(Boolean).join(" / ")
+              ].filter(Boolean).join(" / ")}
               key={entry.id}
             />
           ))}

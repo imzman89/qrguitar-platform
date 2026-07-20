@@ -6823,24 +6823,26 @@ select {
   background: rgba(255, 255, 255, .018);
 }
 
-.profile-trust-summary > div {
+.profile-trust-summary > details {
   min-width: 0;
   padding: 16px 22px;
 }
 
-.profile-trust-summary > div + div {
+.profile-trust-summary > details + details {
   border-left: 1px solid rgba(255, 255, 255, .1);
 }
 
-.profile-trust-summary strong {
+.profile-trust-summary summary {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   color: #9bd8ae;
   font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
-.profile-trust-summary > div + div strong {
+.profile-trust-summary > details + details summary {
   color: #bed78d;
 }
 
@@ -9089,11 +9091,11 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
     grid-template-columns: 1fr;
   }
 
-  .profile-trust-summary > div {
+  .profile-trust-summary > details {
     padding: 14px 17px;
   }
 
-  .profile-trust-summary > div + div {
+  .profile-trust-summary > details + details {
     border-top: 1px solid rgba(255, 255, 255, .1);
     border-left: 0;
   }

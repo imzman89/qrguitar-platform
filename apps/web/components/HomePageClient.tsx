@@ -174,6 +174,20 @@ export function HomePageClient({
             </div>
           </div>
         </section>
+
+        <section className="section alt">
+          <div className="shell">
+            <div className="section-header">
+              <div className="eyebrow">Ready when the instrument is</div>
+              <h2>Start the Profile that stays with it.</h2>
+              <p>Create one Profile now, then add photos, history, and proof as the instrument&apos;s story grows.</p>
+            </div>
+            <div className="section-cta">
+              <Link className="button" href="/create">Create Profile</Link>
+              <Link className="button secondary" href="/catalog">Browse Profiles</Link>
+            </div>
+          </div>
+        </section>
       </main>
       <Footer />
     </>
