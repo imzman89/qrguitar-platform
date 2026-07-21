@@ -1,12 +1,14 @@
 "use client";
 
-import { Copy, Mail, Repeat2, ShieldCheck, Wrench } from "lucide-react";
+import { Copy, Ellipsis, FileSpreadsheet, Mail, Repeat2, ShieldCheck, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { BulkProfileImport } from "../../components/BulkProfileImport";
+import { ActionDrawer } from "../../components/ActionDrawer";
+import { CompactQr } from "../../components/CompactQr";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import { ProfileStatusBadges } from "../../components/ProfileStatusBadges";
+import { ProfileQuickEdit } from "../../components/ProfileQuickEdit";
 import { QrDownload } from "../../components/QrDownload";
 import { RecordShareButton } from "../../components/RecordShareButton";
 import styles from "./dashboard-records.module.css";
@@ -25,7 +27,7 @@ import {
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
 import { getProfilePhotoUrls, getServiceHistoryEntries } from "../../lib/instrument-profile-contract";
 
-type DashboardFilter = "all" | "public" | "private" | "transfers";
+type DashboardFilter = "all" | "public" | "private" | "transfers" | "service" | "safety";
 
 type ServiceRequestSummary = {
   id: string;
@@ -97,6 +99,11 @@ export default function DashboardPage() {
   const [dashboardMessage, setDashboardMessage] = useState("");
   const [dashboardCopy, setDashboardCopy] = useState(defaultSiteSettings.dashboard);
   const [activeFilter, setActiveFilter] = useState<DashboardFilter>("all");
+  const [quickEditRecord, setQuickEditRecord] = useState<DemoInstrument | null>(null);
+  const [collectionHandle, setCollectionHandle] = useState("");
+  const [collectionAccountType, setCollectionAccountType] = useState("");
+  const [actionRecord, setActionRecord] = useState<DemoInstrument | null>(null);
+  const [actionTrigger, setActionTrigger] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     void fetchPublishedSiteSettings().then((published) => {
@@ -174,6 +181,17 @@ export default function DashboardPage() {
     };
   }, [user?.email]);
 
+  useEffect(() => {
+    if (!user?.email) return;
+    getSupabaseAccessToken().then(async (token) => {
+      const response = await fetch("/api/account", { headers: { authorization: `Bearer ${token}` }, cache: "no-store" });
+      const payload = await response.json().catch(() => null) as { account?: { publicCollection?: { enabled?: boolean; handle?: string; accountType?: string } } } | null;
+      const collection = payload?.account?.publicCollection;
+      setCollectionHandle(collection?.enabled ? String(collection.handle || "") : "");
+      setCollectionAccountType(String(collection?.accountType || ""));
+    }).catch(() => { setCollectionHandle(""); setCollectionAccountType(""); });
+  }, [user?.email]);
+
   const instrumentCodes = useMemo(() => new Set(instruments.map((instrument) => instrument.qrCode.toUpperCase())), [instruments]);
   const pendingTransfers = transfers.filter(
     (transfer) => transfer.status === "sent" && instrumentCodes.has(transfer.guitarQrCode.toUpperCase())
@@ -187,6 +205,7 @@ export default function DashboardPage() {
   const publicRecords = instruments.filter((instrument) => instrument.visibility === "public").length;
   const privateRecords = instruments.filter((instrument) => instrument.visibility === "private").length;
   const unlistedRecords = instruments.filter((instrument) => instrument.visibility === "unlisted").length;
+  const safetyAlerts = instruments.filter((instrument) => instrument.safetyStatus === "lost" || instrument.safetyStatus === "stolen").length;
 
   const verifiedRecords = instruments.filter((instrument) => getInstrumentVerificationStatus(instrument) === "verified").length;
   const authenticityConfirmedRecords = instruments.filter((instrument) => instrument.authenticityStatus === "confirmed").length;
@@ -231,9 +250,10 @@ export default function DashboardPage() {
       { label: "Public in Catalog", value: String(publicRecords), filter: "public" as const, helper: "Discoverable Profiles" },
       { label: "Private / Unlisted", value: String(privateRecords + unlistedRecords), filter: "private" as const, helper: "Limited visibility" },
       { label: "Pending Transfers / Claims", value: String(pendingTransfers), filter: "transfers" as const, helper: "Awaiting completion" },
-      { label: "Service Requests", value: String(pendingServiceRequests), filter: "all" as const, helper: "Awaiting your review" }
+      { label: "Service Requests", value: String(pendingServiceRequests), filter: "service" as const, helper: "Awaiting your review" },
+      { label: "Lost / Stolen", value: String(safetyAlerts), filter: "safety" as const, helper: "Active safety alerts" }
     ],
-    [instruments.length, pendingServiceRequests, pendingTransfers, privateRecords, publicRecords, unlistedRecords]
+    [instruments.length, pendingServiceRequests, pendingTransfers, privateRecords, publicRecords, safetyAlerts, unlistedRecords]
   );
 
   async function updateSerialVisibility(instrument: DemoInstrument, showSerialPublic: boolean) {
@@ -264,6 +284,7 @@ export default function DashboardPage() {
     }
 
     setInstruments((current) => current.map((item) => item.qrCode === instrument.qrCode ? { ...item, showSerialPublic } : item));
+    setActionRecord((current) => current?.qrCode === instrument.qrCode ? { ...current, showSerialPublic } : current);
     setDashboardMessage(showSerialPublic ? "Serial Number is now shown on the public Profile." : "Serial Number is now hidden from the public Profile.");
   }
 
@@ -376,18 +397,20 @@ export default function DashboardPage() {
         <div className="shell">
           <div className="dashboard-hero">
             <div>
-              <div className="eyebrow">{dashboardCopy.pageTitle}</div>
-              <h2>{user ? `Welcome back, ${displayName}.` : "Manage profiles, QR codes, transfers, and visibility."}</h2>
+              <div className="eyebrow">Owner Dashboard</div>
+              <h2>{user ? `Welcome back, ${displayName}.` : "Your QRguitar workspace."}</h2>
               <p>
                 {user
-                  ? `${dashboardCopy.subtitle} ${accountSummary}`
+                  ? `Manage your Profiles, service, privacy, QR tools, and ownership from one place. ${accountSummary}`
                   : "Create a profile, manage QR downloads, and keep ownership history attached to the same QRguitar Profile."}
               </p>
             </div>
             <div className="dashboard-buttons">
-              <Link className="button" href="/create">
-                Create Profile
-              </Link>
+              <Link className="button" href="/create">Create Profile</Link>
+              <Link className="button secondary" href="/dashboard/import"><FileSpreadsheet size={16} /> Bulk Import</Link>
+              <button className="button secondary" type="button" onClick={() => setActiveFilter("service")}>Service Requests</button>
+              <Link className="button secondary" href="/ownership-claim">Transfers / Claims</Link>
+              {collectionHandle ? <Link className="button secondary" href={`/collections/${collectionHandle}`}>View Public Collection</Link> : null}
             </div>
           </div>
           {dashboardMessage ? <div className="admin-message">{dashboardMessage}</div> : null}
@@ -442,7 +465,7 @@ export default function DashboardPage() {
             </section>
           ) : null}
 
-          <section className={`card ${styles.instrumentTable}`}>
+          <section className={`card ${styles.instrumentTable}`} id="saved-profiles">
             <div className={styles.tableHeader}>
               <div>
                 <div className="eyebrow">Your instruments</div>
@@ -475,11 +498,7 @@ export default function DashboardPage() {
                       <span className={styles.profileNumber} aria-label={`Collection profile ${profileNumber}`}>
                         {String(profileNumber).padStart(2, "0")}
                       </span>
-                      <Link
-                        className={styles.instrumentBodyLink}
-                        href={instrumentToProfileUrl(instrument)}
-                        aria-label={`Open ${title} profile`}
-                      >
+                      <Link className={styles.instrumentBodyLink} href={instrumentToProfileUrl(instrument)} aria-label={`Open ${title} profile`}>
                         <DashboardInstrumentThumb sources={imageSources} title={title} />
                         <div className={styles.instrumentDetails}>
                           <div className={styles.instrumentInfo}>
@@ -499,40 +518,23 @@ export default function DashboardPage() {
                           </div>
                         </div>
                       </Link>
-                      <div className={styles.qrActionColumn}>
-                        <div className={styles.qrPanel}>
-                          <QrDownload
-                            code={instrument.qrCode}
-                            label={title}
-                            qrStyle={instrument.qrStyle}
-                            onStyleChange={(qrStyle) => setInstruments((current) => current.map((item) => item.qrCode === instrument.qrCode ? { ...item, qrStyle } : item))}
-                          />
+                      <aside className={styles.qrActionColumn}>
+                        <div className={styles.compactQr}><CompactQr code={instrument.qrCode} label={title} /><span>{instrument.qrCode}</span></div>
+                        <div className={styles.primaryActions}>
+                          <Link className="button" href={instrumentToProfileUrl(instrument)}>View</Link>
+                          <Link className="button secondary" href={`/edit/${instrument.qrCode}`}>Edit</Link>
+                          <button className="button secondary" type="button" onClick={() => setQuickEditRecord(instrument)}>Quick Edit</button>
                         </div>
-                        <div className={styles.instrumentActions}>
-                          <Link className="button secondary" href={`/edit/${instrument.qrCode}`}>Edit Profile</Link>
-                          <Link className="button secondary" href={instrumentToProfileUrl(instrument)}>View Profile</Link>
-                          {instrument.serial ? (
-                            <button className="button secondary" type="button" onClick={() => void updateSerialVisibility(instrument, !instrument.showSerialPublic)}>
-                              {instrument.showSerialPublic ? "Hide Serial Publicly" : "Show Serial Publicly"}
-                            </button>
-                          ) : null}
-                          <RecordShareButton className={styles.dashboardShare} code={instrument.qrCode} title={title} showLabel />
-                        </div>
-                        <button className={`button secondary ${styles.dangerAction}`} type="button" onClick={() => void removeFromCollection(instrument)}>
-                          Remove Profile
-                        </button>
-                      </div>
-                      <TransferPanel
-                        className={styles.transferPanel}
-                        bodyClassName={styles.transferPanelBody}
-                        instrument={instrument}
-                        user={user}
-                        latestTransfer={latestTransferForInstrument(transfers, instrument.qrCode)}
-                        onTransferCreated={(transfer) => {
-                          setTransfers((current) => [transfer, ...current.filter((item) => item.id !== transfer.id)]);
-                        }}
-                        onTransferChanged={refreshInstruments}
-                      />
+                        <button
+                          className={styles.moreButton}
+                          type="button"
+                          aria-haspopup="dialog"
+                          onClick={(event) => {
+                            setActionTrigger(event.currentTarget);
+                            setActionRecord(instrument);
+                          }}
+                        ><Ellipsis size={18} /> More</button>
+                      </aside>
                     </article>
                   );
                 })
@@ -550,9 +552,24 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          {instruments.length ? <BulkProfileImport ownerName={displayName} onComplete={refreshInstruments} /> : null}
         </div>
       </main>
+      {quickEditRecord ? <ProfileQuickEdit record={quickEditRecord} onClose={() => setQuickEditRecord(null)} onSaved={(saved) => { setInstruments((current) => current.map((item) => item.qrCode === saved.qrCode ? saved : item)); setQuickEditRecord(null); setDashboardMessage("Quick Edit saved."); }} /> : null}
+      {actionRecord ? (
+        <ActionDrawer eyebrow="Profile actions" title={dashboardRecordTitle(actionRecord)} returnFocusTo={actionTrigger} onClose={() => setActionRecord(null)}>
+          <div className={styles.drawerIdentity}>
+            <DashboardInstrumentThumb sources={getProfilePhotoUrls(actionRecord)} title={dashboardRecordTitle(actionRecord)} />
+            <div><b>{actionRecord.qrCode}</b><span>{actionRecord.serial ? `Serial Number ${actionRecord.serial}` : "No Serial Number"}</span></div>
+          </div>
+          <div className={styles.drawerSections}>
+            <section><b>QR tools</b><QrDownload code={actionRecord.qrCode} label={dashboardRecordTitle(actionRecord)} qrStyle={actionRecord.qrStyle} onStyleChange={(qrStyle) => { setInstruments((current) => current.map((item) => item.qrCode === actionRecord.qrCode ? { ...item, qrStyle } : item)); setActionRecord((current) => current ? { ...current, qrStyle } : current); }} /><Link href={`/handout/${actionRecord.qrCode}`}>Print Kit</Link><RecordShareButton className={styles.dashboardShare} code={actionRecord.qrCode} title={dashboardRecordTitle(actionRecord)} showLabel /></section>
+            <section><b>History</b><Link href={`/edit/${actionRecord.qrCode}#timeline`}>Add Timeline Event</Link><Link href={`/edit/${actionRecord.qrCode}#service`}>Add Service Entry</Link><Link href={`/edit/${actionRecord.qrCode}#media`}>Add Media</Link><Link href={`/edit/${actionRecord.qrCode}#documents`}>Add Document</Link></section>
+            <section><b>Privacy & safety</b>{actionRecord.serial ? <button type="button" onClick={() => void updateSerialVisibility(actionRecord, !actionRecord.showSerialPublic)}>{actionRecord.showSerialPublic ? "Hide Serial Number" : "Show Serial Number"}</button> : null}<Link href={`/edit/${actionRecord.qrCode}#privacy-safety`}>Visibility and safety</Link></section>
+            <TransferPanel className={styles.transferPanel} bodyClassName={styles.transferPanelBody} instrument={actionRecord} user={user} allowBuyerCode={collectionAccountType === "shop" || collectionAccountType === "builder"} latestTransfer={latestTransferForInstrument(transfers, actionRecord.qrCode)} onTransferCreated={(transfer) => setTransfers((current) => [transfer, ...current.filter((item) => item.id !== transfer.id)])} onTransferChanged={refreshInstruments} />
+            <section className={styles.drawerDanger}><b>Danger zone</b><button className={styles.dangerAction} type="button" onClick={() => void removeFromCollection(actionRecord)}>Remove Profile</button></section>
+          </div>
+        </ActionDrawer>
+      ) : null}
       <Footer />
     </>
   );
@@ -563,6 +580,7 @@ function TransferPanel({
   bodyClassName,
   instrument,
   user,
+  allowBuyerCode,
   latestTransfer,
   onTransferCreated,
   onTransferChanged
@@ -571,6 +589,7 @@ function TransferPanel({
   bodyClassName: string;
   instrument: DemoInstrument;
   user: DemoUser | null;
+  allowBuyerCode: boolean;
   latestTransfer?: DemoTransfer;
   onTransferCreated: (transfer: DemoTransfer) => void;
   onTransferChanged: () => void;
@@ -579,6 +598,10 @@ function TransferPanel({
   const [toEmail, setToEmail] = useState("");
   const [message, setMessage] = useState("");
   const [lastCreatedClaimUrl, setLastCreatedClaimUrl] = useState("");
+  const [handoffMode, setHandoffMode] = useState<"email" | "buyer_code">("email");
+  const [expiresInDays, setExpiresInDays] = useState("7");
+  const [buyerCode, setBuyerCode] = useState("");
+  const [orderReference, setOrderReference] = useState("");
   const [saving, setSaving] = useState(false);
 
   const claimUrl =
@@ -596,6 +619,12 @@ function TransferPanel({
     setMessage("Claim link copied.");
   }
 
+  async function copyBuyerCode() {
+    if (!buyerCode) return;
+    await window.navigator.clipboard?.writeText(buyerCode);
+    setMessage("Private buyer code copied.");
+  }
+
   async function createTransfer() {
     setMessage("");
     setSaving(true);
@@ -610,11 +639,14 @@ function TransferPanel({
         body: JSON.stringify({
           qrCode: instrument.qrCode,
           toEmail,
-          toName
+          toName,
+          mode: handoffMode,
+          expiresInDays: Number(expiresInDays),
+          orderReference
         })
       });
       const result = (await response.json().catch(() => null)) as
-        | { ok?: boolean; message?: string; transfer?: DemoTransfer }
+        | { ok?: boolean; message?: string; transfer?: DemoTransfer; buyerCode?: string }
         | null;
 
       if (!response.ok || !result?.ok || !result.transfer) {
@@ -622,8 +654,11 @@ function TransferPanel({
         return;
       }
 
-      const nextClaimUrl = typeof window !== "undefined" ? `${window.location.origin}${result.transfer.claimPath}` : result.transfer.claimPath;
+      const nextClaimUrl = handoffMode === "email"
+        ? typeof window !== "undefined" ? `${window.location.origin}${result.transfer.claimPath}` : result.transfer.claimPath
+        : "";
       setLastCreatedClaimUrl(nextClaimUrl);
+      setBuyerCode(String(result.buyerCode || ""));
       onTransferCreated(result.transfer);
       setMessage(result.message || "Transfer email sent. You can also copy the claim link.");
     } finally {
@@ -658,11 +693,31 @@ function TransferPanel({
       }
 
       setLastCreatedClaimUrl("");
+      setBuyerCode("");
+      setOrderReference("");
       if (result.transfer) {
         onTransferCreated(result.transfer);
       }
       setMessage(result.message || "Transfer cancelled.");
       onTransferChanged();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function resendBuyerInvitation() {
+    if (!latestTransfer) return;
+    setSaving(true);
+    setMessage("");
+    try {
+      const token = await getSupabaseAccessToken();
+      const response = await fetch("/api/transfers", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id: latestTransfer.id, action: "resend" })
+      });
+      const result = await response.json().catch(() => null) as { ok?: boolean; message?: string } | null;
+      setMessage(result?.message || (response.ok ? "Invitation resent." : "Could not resend invitation."));
     } finally {
       setSaving(false);
     }
@@ -677,10 +732,16 @@ function TransferPanel({
       <div className={bodyClassName}>
         <div className="transfer-copy">
           <span className="mini-eyebrow">Ownership handoff</span>
-          <strong>Email a claim link to the next owner.</strong>
-          <p>The recipient signs in with the email below, opens the claim link, and accepts the same permanent QRguitar Profile.</p>
+          <strong>{handoffMode === "buyer_code" ? "Prepare a private code for an in-person buyer." : "Email a claim link to the next owner."}</strong>
+          <p>{handoffMode === "buyer_code" ? "Use this at checkout or pickup. The code expires, works once, and can be bound to the buyer's email." : "The recipient signs in with the email below, opens the claim link, and accepts the same permanent QRguitar Profile."}</p>
         </div>
         <div className="transfer-form">
+          {allowBuyerCode && !hasPendingTransfer ? (
+            <div className="transfer-mode" role="group" aria-label="Handoff method">
+              <button type="button" aria-pressed={handoffMode === "email"} onClick={() => { setHandoffMode("email"); setBuyerCode(""); }}>Email invitation</button>
+              <button type="button" aria-pressed={handoffMode === "buyer_code"} onClick={() => { setHandoffMode("buyer_code"); setBuyerCode(""); }}>Private buyer code</button>
+            </div>
+          ) : null}
           <label>
             New owner name
             <input
@@ -691,7 +752,7 @@ function TransferPanel({
             />
           </label>
           <label>
-            New owner email
+            {handoffMode === "buyer_code" ? "Buyer email (optional, recommended)" : "New owner email"}
             <input
               type="email"
               value={toEmail}
@@ -700,12 +761,25 @@ function TransferPanel({
               placeholder="new-owner@example.com"
             />
           </label>
+          {handoffMode === "buyer_code" && !hasPendingTransfer ? (
+            <>
+              <label>
+                Order or receipt reference (optional)
+                <input value={orderReference} onChange={(event) => setOrderReference(event.target.value)} placeholder="Order 1048 or receipt 6812" />
+                <small>If entered, the buyer must match it. QRguitar stores only a one-way check.</small>
+              </label>
+              <label>
+                Code expires
+                <select value={expiresInDays} onChange={(event) => setExpiresInDays(event.target.value)}>
+                  <option value="1">After 24 hours</option><option value="3">After 3 days</option><option value="7">After 7 days</option><option value="14">After 14 days</option><option value="30">After 30 days</option>
+                </select>
+              </label>
+            </>
+          ) : null}
           {hasPendingTransfer ? (
             <div className="transfer-actions">
-              <button className="button secondary" type="button" onClick={() => void copyClaimLink()}>
-                <Copy size={16} />
-                Copy Claim Link
-              </button>
+              {!latestTransfer?.handoffPrepared ? <button className="button secondary" type="button" onClick={() => void copyClaimLink()}><Copy size={16} />Copy Claim Link</button> : null}
+              {latestTransfer?.handoffPrepared && latestTransfer.toEmail ? <button className="button secondary" type="button" onClick={() => void resendBuyerInvitation()} disabled={saving}><Mail size={16} />Resend Sign-in Email</button> : null}
               {latestTransfer ? (
                 <button
                   className="button secondary"
@@ -719,10 +793,16 @@ function TransferPanel({
             </div>
           ) : (
             <button className="button" type="button" onClick={() => void createTransfer()} disabled={saving}>
-              <Mail size={16} />
-              {saving ? "Sending..." : "Send Transfer Email"}
+              {handoffMode === "email" ? <Mail size={16} /> : <Copy size={16} />}
+              {saving ? "Preparing..." : handoffMode === "email" ? "Send Transfer Email" : "Prepare for Buyer"}
             </button>
           )}
+          {buyerCode ? (
+            <div className="buyer-code-box" role="status">
+              <span>Copy this code now</span><strong>{buyerCode}</strong><small>It is shown once. {orderReference ? "Give the buyer the matching order or receipt reference too. " : ""}Cancelling the handoff revokes it.</small>
+              <button className="button secondary" type="button" onClick={() => void copyBuyerCode()}><Copy size={16} /> Copy Buyer Code</button>
+            </div>
+          ) : null}
         </div>
         {latestTransfer ? (
           <div className="claim-link-box">
@@ -731,11 +811,11 @@ function TransferPanel({
                 ? "Claim received"
                 : latestTransfer.status === "cancelled"
                   ? "Transfer cancelled"
-                  : "Claim link created"}
+                  : latestTransfer.handoffPrepared ? "Private buyer handoff prepared" : "Claim link created"}
             </span>
-            <strong>{latestTransfer.toName} - {latestTransfer.toEmail}</strong>
-            <code>{visibleClaimUrl}</code>
-            {latestTransfer.status === "sent" ? (
+            <strong>{[latestTransfer.toName, latestTransfer.toEmail].filter(Boolean).join(" - ") || "Recipient not email-bound"}</strong>
+            {latestTransfer.handoffPrepared ? <small>{latestTransfer.expiresAt ? `Expires ${new Date(latestTransfer.expiresAt).toLocaleString()}. ` : ""}The private code is never stored in readable form. Revoke and prepare a new handoff if it was not copied.</small> : <code>{visibleClaimUrl}</code>}
+            {latestTransfer.status === "sent" && !latestTransfer.handoffPrepared ? (
               <button className="button secondary" type="button" onClick={() => void copyClaimLink()}>
                 <Copy size={16} />
                 Copy Claim Link
@@ -762,6 +842,8 @@ function TransferPanel({
 function matchesDashboardFilter(instrument: DemoInstrument, filter: DashboardFilter, transfers: DemoTransfer[]) {
   if (filter === "public") return instrument.visibility === "public";
   if (filter === "private") return instrument.visibility === "private" || instrument.visibility === "unlisted";
+  if (filter === "service") return getServiceHistoryEntries(instrument).length > 0;
+  if (filter === "safety") return instrument.safetyStatus === "lost" || instrument.safetyStatus === "stolen";
 
   if (filter === "transfers") {
     return transfers.some((transfer) =>

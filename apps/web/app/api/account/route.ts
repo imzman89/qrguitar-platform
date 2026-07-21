@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
 import { assertAccountCanWrite } from "../../../lib/admin-auth";
+import {
+  cleanPublicCollection,
+  defaultPublicCollectionSettings,
+  publicCollectionHandleKey,
+  publicCollectionOwnerKey,
+  type PublicCollectionSettings
+} from "../../../lib/public-collections";
 import { createServerSupabaseClient, getAuthenticatedUser } from "../../../lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -52,6 +59,12 @@ export async function GET(request: Request) {
     .is("owner_removed_at", null);
 
   const recordRows = records.error ? [] : records.data || [];
+  const collectionResult = await supabase
+    .from("site_content")
+    .select("content_value")
+    .eq("content_key", publicCollectionOwnerKey(auth.user.id))
+    .maybeSingle<{ content_value?: Partial<PublicCollectionSettings> }>();
+  const publicCollection = cleanPublicCollection(collectionResult.data?.content_value || defaultPublicCollectionSettings);
 
   return json({
     ok: true,
@@ -61,6 +74,7 @@ export async function GET(request: Request) {
       role: profile.data?.role || "user",
       plan: profile.data?.plan || "free",
       accountStatus: profile.data?.account_status || "active",
+      publicCollection,
       stats: {
         records: recordRows.length,
         publicRecords: recordRows.filter((record) => record.visibility === "public").length,
@@ -88,7 +102,7 @@ export async function PATCH(request: Request) {
     return json({ ok: false, message: writeAccess.message }, { status: writeAccess.status });
   }
 
-  const body = await request.json().catch(() => null) as { displayName?: string } | null;
+  const body = await request.json().catch(() => null) as { displayName?: string; publicCollection?: Partial<PublicCollectionSettings> } | null;
   const displayName = cleanDisplayName(body?.displayName);
   if (displayName.length < 2) {
     return json({ ok: false, message: "Display name must be at least 2 characters." }, { status: 400 });
@@ -117,5 +131,49 @@ export async function PATCH(request: Request) {
     return json({ ok: false, message: userSaved.error.message || "Could not update account login profile." }, { status: 500 });
   }
 
-  return json({ ok: true, account: { email: auth.user.email || "", displayName }, message: "Account updated." });
+  let publicCollection = defaultPublicCollectionSettings;
+  if (body?.publicCollection) {
+    publicCollection = cleanPublicCollection({
+      ...body.publicCollection,
+      publicName: body.publicCollection.publicName || (body.publicCollection.enabled ? displayName : "")
+    });
+    if (publicCollection.enabled && (!publicCollection.handle || publicCollection.handle.length < 3)) {
+      return json({ ok: false, message: "Choose a collection handle with at least 3 letters or numbers." }, { status: 400 });
+    }
+
+    const ownerKey = publicCollectionOwnerKey(auth.user.id);
+    const prior = await supabase.from("site_content").select("content_value").eq("content_key", ownerKey).maybeSingle<{ content_value?: Partial<PublicCollectionSettings> }>();
+    const priorCollection = cleanPublicCollection(prior.data?.content_value || defaultPublicCollectionSettings);
+    if (publicCollection.enabled) {
+      const handleKey = publicCollectionHandleKey(publicCollection.handle);
+      const handleOwner = await supabase.from("site_content").select("content_value").eq("content_key", handleKey).maybeSingle<{ content_value?: { ownerId?: string } }>();
+      if (handleOwner.data?.content_value?.ownerId && handleOwner.data.content_value.ownerId !== auth.user.id) {
+        return json({ ok: false, message: "That public collection handle is already in use." }, { status: 409 });
+      }
+      const handleSaved = await supabase.from("site_content").upsert({
+        content_key: handleKey,
+        content_value: { ownerId: auth.user.id },
+        updated_by: auth.user.id,
+        updated_at: new Date().toISOString()
+      }, { onConflict: "content_key" });
+      if (handleSaved.error) return json({ ok: false, message: "Could not reserve that collection handle." }, { status: 500 });
+    }
+
+    if (priorCollection.handle && priorCollection.handle !== publicCollection.handle) {
+      await supabase.from("site_content").delete().eq("content_key", publicCollectionHandleKey(priorCollection.handle));
+    }
+    if (!publicCollection.enabled && priorCollection.handle) {
+      await supabase.from("site_content").delete().eq("content_key", publicCollectionHandleKey(priorCollection.handle));
+    }
+
+    const collectionSaved = await supabase.from("site_content").upsert({
+      content_key: ownerKey,
+      content_value: { ...publicCollection, ownerId: auth.user.id },
+      updated_by: auth.user.id,
+      updated_at: new Date().toISOString()
+    }, { onConflict: "content_key" });
+    if (collectionSaved.error) return json({ ok: false, message: "Could not save public collection settings." }, { status: 500 });
+  }
+
+  return json({ ok: true, account: { email: auth.user.email || "", displayName, publicCollection }, message: "Account updated." });
 }

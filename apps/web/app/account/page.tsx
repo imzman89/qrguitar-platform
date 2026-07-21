@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { LockKeyhole, LogOut, ShieldCheck, UserRound } from "lucide-react";
+import { ExternalLink, LockKeyhole, LogOut, ShieldCheck, UserRound, UsersRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import { clearQrGuitarSessionState, createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
+import { defaultPublicCollectionSettings, type PublicCollectionSettings } from "../../lib/public-collections";
 
 type AccountPayload = {
   ok?: boolean;
@@ -16,6 +17,7 @@ type AccountPayload = {
     role: string;
     plan: string;
     accountStatus: string;
+    publicCollection?: PublicCollectionSettings;
     stats?: {
       records: number;
       publicRecords: number;
@@ -25,6 +27,17 @@ type AccountPayload = {
     };
   };
 };
+
+type AccountSection = "overview" | "profile" | "collection" | "security" | "access" | "privacy";
+
+const accountSections: Array<{ id: AccountSection; label: string }> = [
+  { id: "overview", label: "Overview" },
+  { id: "profile", label: "Profile" },
+  { id: "collection", label: "Public collection" },
+  { id: "security", label: "Security" },
+  { id: "access", label: "Account access" },
+  { id: "privacy", label: "Privacy" }
+];
 
 export default function AccountPage() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
@@ -37,6 +50,8 @@ export default function AccountPage() {
   const [status, setStatus] = useState("");
   const [signedIn, setSignedIn] = useState(false);
   const [isWorking, setIsWorking] = useState(false);
+  const [publicCollection, setPublicCollection] = useState<PublicCollectionSettings>(defaultPublicCollectionSettings);
+  const [activeSection, setActiveSection] = useState<AccountSection>("overview");
 
   useEffect(() => {
     let cancelled = false;
@@ -73,6 +88,7 @@ export default function AccountPage() {
       setRole(payload.account.role);
       setPlan(payload.account.plan);
       setAccountStatus(payload.account.accountStatus);
+      setPublicCollection(payload.account.publicCollection || { ...defaultPublicCollectionSettings, publicName: payload.account.displayName });
       setStats(payload.account.stats || { records: 0, publicRecords: 0, privateRecords: 0, unlistedRecords: 0, recordsWithPhotos: 0 });
       setStatus("");
     }
@@ -94,7 +110,7 @@ export default function AccountPage() {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ displayName })
+      body: JSON.stringify({ displayName, publicCollection })
     });
     const payload = (await response.json().catch(() => null)) as AccountPayload | null;
     setIsWorking(false);
@@ -105,6 +121,7 @@ export default function AccountPage() {
     }
 
     setStatus(payload.message || "Account updated.");
+    if (payload.account?.publicCollection) setPublicCollection(payload.account.publicCollection);
     window.dispatchEvent(new CustomEvent("qrguitar:auth"));
   }
 
@@ -164,7 +181,7 @@ export default function AccountPage() {
     <>
       <Nav />
       <main className="section auth-page">
-        <div className="shell auth-layout">
+        <div className="shell auth-layout account-layout">
           <section className="account-hero-copy">
             <div className="eyebrow">Account</div>
             <h1>Your QRguitar account.</h1>
@@ -201,7 +218,37 @@ export default function AccountPage() {
           </section>
 
           <div className="account-settings-stack">
-            <section className="card auth-card account-settings-card">
+            <nav className="account-section-nav" aria-label="Account sections">
+              {accountSections.map((section) => (
+                <button
+                  aria-current={activeSection === section.id ? "page" : undefined}
+                  className={activeSection === section.id ? "active" : ""}
+                  key={section.id}
+                  onClick={() => setActiveSection(section.id)}
+                  type="button"
+                >
+                  {section.label}
+                </button>
+              ))}
+            </nav>
+
+            {activeSection === "overview" ? (
+              <section className="card auth-card account-settings-card account-overview-card">
+                <div className="auth-card-head">
+                  <span>Workspace</span>
+                  <strong><ShieldCheck size={18} aria-hidden="true" /> Account overview</strong>
+                </div>
+                <p className="account-card-copy">Manage your identity, public collection, access, and privacy without leaving your owner workspace.</p>
+                <div className="account-overview-actions">
+                  <button type="button" onClick={() => setActiveSection("profile")}><UserRound size={17} aria-hidden="true" /><span><b>Profile details</b><small>Update the name connected to your Profiles.</small></span></button>
+                  <button type="button" onClick={() => setActiveSection("collection")}><UsersRound size={17} aria-hidden="true" /><span><b>Public collection</b><small>Choose what other people can discover.</small></span></button>
+                  <button type="button" onClick={() => setActiveSection("security")}><LockKeyhole size={17} aria-hidden="true" /><span><b>Security</b><small>Reset your password or sign out securely.</small></span></button>
+                  <Link href="/dashboard"><ShieldCheck size={17} aria-hidden="true" /><span><b>Profile controls</b><small>Manage visibility, serial display, documents, and QR tools.</small></span></Link>
+                </div>
+              </section>
+            ) : null}
+
+            {activeSection === "profile" ? <section className="card auth-card account-settings-card">
               <div className="auth-card-head">
                 <span>Profile</span>
                 <strong><UserRound size={18} aria-hidden="true" /> Account details</strong>
@@ -224,9 +271,35 @@ export default function AccountPage() {
                   {isWorking ? "Saving..." : "Save account"}
                 </button>
               </div>
-            </section>
+            </section> : null}
 
-            <section className="card auth-card account-settings-card">
+            {activeSection === "collection" ? <section className="card auth-card account-settings-card" id="public-collection">
+              <div className="auth-card-head">
+                <span>Public collection</span>
+                <strong><UsersRound size={18} aria-hidden="true" /> Share your collection</strong>
+              </div>
+              <p className="account-card-copy">Opt in to a public collection page that shows only Profiles you have already made public. Private and unlisted Profiles never appear.</p>
+              <label className="toggle-field">
+                <input type="checkbox" checked={publicCollection.enabled} onChange={(event) => setPublicCollection((current) => ({ ...current, enabled: event.target.checked }))} />
+                Enable my public collection
+              </label>
+              <div className="form-grid compact">
+                <label className="field"><span>Public name</span><input value={publicCollection.publicName} onChange={(event) => setPublicCollection((current) => ({ ...current, publicName: event.target.value }))} placeholder={displayName} /></label>
+                <label className="field"><span>Collection handle</span><input value={publicCollection.handle} onChange={(event) => setPublicCollection((current) => ({ ...current, handle: event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") }))} placeholder="my-collection" /></label>
+                <label className="field"><span>Account type</span><select value={publicCollection.accountType} onChange={(event) => setPublicCollection((current) => ({ ...current, accountType: event.target.value as PublicCollectionSettings["accountType"] }))}><option value="player">Player</option><option value="collector">Collector</option><option value="shop">Shop / retailer</option><option value="builder">Builder / brand</option><option value="luthier">Luthier / technician</option><option value="other">Other</option></select></label>
+                <label className="field"><span>Location (optional)</span><input value={publicCollection.location} onChange={(event) => setPublicCollection((current) => ({ ...current, location: event.target.value }))} placeholder="City, region, country" /></label>
+                <label className="field custom-wide"><span>Short bio</span><textarea rows={3} value={publicCollection.bio} onChange={(event) => setPublicCollection((current) => ({ ...current, bio: event.target.value }))} placeholder="What you collect, build, repair, or sell." /></label>
+                <label className="field"><span>Website (optional)</span><input type="url" value={publicCollection.websiteUrl} onChange={(event) => setPublicCollection((current) => ({ ...current, websiteUrl: event.target.value }))} placeholder="https://" /></label>
+                <label className="field"><span>Avatar URL (optional)</span><input type="url" value={publicCollection.avatarUrl} onChange={(event) => setPublicCollection((current) => ({ ...current, avatarUrl: event.target.value }))} placeholder="https://" /></label>
+              </div>
+              <label className="toggle-field"><input type="checkbox" checked={publicCollection.allowIndexing} onChange={(event) => setPublicCollection((current) => ({ ...current, allowIndexing: event.target.checked }))} /> Allow search engines to index this collection</label>
+              <div className="form-actions">
+                <button className="button" type="button" onClick={saveAccount} disabled={isWorking}>{isWorking ? "Saving..." : "Save collection settings"}</button>
+                {publicCollection.enabled && publicCollection.handle ? <Link className="button secondary" href={`/collections/${publicCollection.handle}`} target="_blank">Preview collection <ExternalLink size={15} /></Link> : null}
+              </div>
+            </section> : null}
+
+            {activeSection === "security" ? <section className="card auth-card account-settings-card">
               <div className="auth-card-head">
                 <span>Security</span>
                 <strong><LockKeyhole size={18} aria-hidden="true" /> Password access</strong>
@@ -240,9 +313,9 @@ export default function AccountPage() {
                   <LogOut size={16} aria-hidden="true" /> Sign out
                 </button>
               </div>
-            </section>
+            </section> : null}
 
-            <section className="card auth-card account-settings-card">
+            {activeSection === "access" ? <section className="card auth-card account-settings-card">
               <div className="auth-card-head">
                 <span>Access</span>
                 <strong><ShieldCheck size={18} aria-hidden="true" /> Current account level</strong>
@@ -262,9 +335,9 @@ export default function AccountPage() {
                 </div>
               </div>
               <p className="account-card-copy">Verification, commercial access, and manual review are handled by QRguitar during beta.</p>
-            </section>
+            </section> : null}
 
-            <section className="card auth-card account-settings-card">
+            {activeSection === "privacy" ? <section className="card auth-card account-settings-card">
               <div className="auth-card-head">
                 <span>Privacy</span>
                 <strong><ShieldCheck size={18} aria-hidden="true" /> Record controls</strong>
@@ -276,7 +349,7 @@ export default function AccountPage() {
                 <Link className="button secondary" href="/dashboard">Manage profiles</Link>
                 <Link className="button secondary" href="/contact">Get support</Link>
               </div>
-            </section>
+            </section> : null}
 
             {status ? <p className="form-message account-form-message">{status}</p> : null}
           </div>

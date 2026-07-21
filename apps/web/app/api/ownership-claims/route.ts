@@ -89,6 +89,16 @@ async function findGuitarBySerial(supabase: NonNullable<ReturnType<typeof create
   return (fallback.data || []).find((row) => normalizeSerialBuildId(String(row.serial_number || "")) === normalized)?.id || "";
 }
 
+async function findGuitarByIdentifier(supabase: NonNullable<ReturnType<typeof createServerSupabaseClient>>, identifier: string) {
+  const normalizedCode = identifier.trim().toUpperCase();
+  if (normalizedCode.startsWith("QRG-")) {
+    const result = await supabase.from("guitars").select("id").eq("qr_code", normalizedCode).maybeSingle<{ id: string }>();
+    if (result.error) throw new Error("Profile lookup is temporarily unavailable.");
+    return result.data?.id || "";
+  }
+  return findGuitarBySerial(supabase, normalizeSerialBuildId(identifier));
+}
+
 async function loadGuitar(supabase: NonNullable<ReturnType<typeof createServerSupabaseClient>>, guitarId: string) {
   return supabase
     .from("guitars")
@@ -175,7 +185,7 @@ export async function GET(request: Request) {
       guitars.get(claim.guitar_id),
       evidenceCounts.get(claim.id) || 0,
       safeEvidenceByClaim.get(claim.id) || [],
-      admin.ok
+      admin.ok || claim.claimant_user_id === auth.user?.id
     ))
   });
 }
@@ -188,23 +198,32 @@ export async function POST(request: Request) {
   if (!writeAccess.ok) return json({ ok: false, message: writeAccess.message }, writeAccess.status);
 
   const body = await request.json().catch(() => ({})) as {
+    identifier?: string;
     serial?: string;
+    claimType?: "owner_transfer" | "store_purchase" | "legacy_review";
+    challengeCode?: string;
     acquisitionDetails?: string;
     ownershipDeclaration?: string;
     evidence?: EvidenceInput[];
   };
-  const normalized = normalizeSerialBuildId(body.serial || "");
+  const identifier = cleanText(body.identifier || body.serial, 120);
+  const normalized = normalizeSerialBuildId(identifier);
+  const claimType = ["owner_transfer", "store_purchase", "legacy_review"].includes(String(body.claimType)) ? body.claimType! : "legacy_review";
+  const challengeCode = cleanText(body.challengeCode, 12).toUpperCase();
   const acquisitionDetails = cleanText(body.acquisitionDetails, 3000);
   const ownershipDeclaration = cleanText(body.ownershipDeclaration, 1500);
   const evidence = Array.isArray(body.evidence) ? body.evidence.slice(0, MAX_EVIDENCE_FILES) : [];
-  if (normalized.length < 4) return json({ ok: false, message: "Enter the exact Serial Number." }, 400);
+  if (normalized.length < 4) return json({ ok: false, message: "Enter the QRguitar ID or exact Serial Number." }, 400);
   if (acquisitionDetails.length < 20) return json({ ok: false, message: "Explain when and how you acquired the instrument." }, 400);
   if (ownershipDeclaration.length < 20) return json({ ok: false, message: "Confirm your ownership declaration in your own words." }, 400);
   if (!evidence.length) return json({ ok: false, message: "Add at least one current photo or ownership document." }, 400);
+  if (claimType === "legacy_review" && (challengeCode.length !== 6 || !evidence.some((item) => item.type === "possession_challenge"))) {
+    return json({ ok: false, message: "Add a current possession photo showing the six-character challenge code." }, 400);
+  }
 
   try {
-    const guitarId = await findGuitarBySerial(supabase, normalized);
-    if (!guitarId) return json({ ok: false, message: "No QRguitar Profile matches that exact serial." }, 404);
+    const guitarId = await findGuitarByIdentifier(supabase, identifier);
+    if (!guitarId) return json({ ok: false, message: "No QRguitar Profile matches that ID or exact Serial Number." }, 404);
     const guitarResult = await loadGuitar(supabase, guitarId);
     const guitar = guitarResult.data;
     if (guitarResult.error || !guitar) return json({ ok: false, message: "The matching Profile is unavailable." }, 404);
@@ -221,12 +240,12 @@ export async function POST(request: Request) {
 
     const claimInsert = await supabase.from("ownership_claims").insert({
       guitar_id: guitar.id,
-      claim_type: "legacy_review",
+      claim_type: claimType,
       status: guitar.owner_id ? "awaiting_owner" : "admin_review",
       current_owner_id: guitar.owner_id,
       claimant_user_id: auth.user.id,
       acquisition_details: acquisitionDetails,
-      ownership_declaration: ownershipDeclaration
+      ownership_declaration: claimType === "legacy_review" ? `${ownershipDeclaration}\n\nPossession challenge: ${challengeCode}` : ownershipDeclaration
     }).select("*").single<ClaimRow>();
     if (claimInsert.error || !claimInsert.data) return json({ ok: false, message: claimInsert.error?.message || "Could not create the ownership request." }, 500);
 
@@ -260,7 +279,7 @@ export async function POST(request: Request) {
       actor_user_id: auth.user.id,
       action: "submitted",
       note: "Ownership request submitted with private evidence.",
-      metadata: { evidence_count: evidence.length }
+      metadata: { evidence_count: evidence.length, claim_type: claimType, possession_challenge: claimType === "legacy_review" ? challengeCode : null }
     });
 
     return json({ ok: true, message: guitar.owner_id ? "Ownership request sent to the current owner for review." : "Ownership request sent for QRguitar review.", claim: safeClaim(claim, guitar, evidence.length) }, 201);
@@ -276,7 +295,12 @@ export async function PATCH(request: Request) {
   const writeAccess = await assertAccountCanWrite(supabase, auth.user);
   if (!writeAccess.ok) return json({ ok: false, message: writeAccess.message }, writeAccess.status);
 
-  const body = await request.json().catch(() => ({})) as { id?: string; action?: "cancel" | "approve" | "deny"; note?: string };
+  const body = await request.json().catch(() => ({})) as {
+    id?: string;
+    action?: "cancel" | "approve" | "deny" | "request_information" | "expire" | "resubmit";
+    note?: string;
+    evidence?: EvidenceInput[];
+  };
   const id = cleanText(body.id, 80);
   const action = body.action;
   if (!id || !action) return json({ ok: false, message: "Ownership request and action are required." }, 400);
@@ -288,12 +312,59 @@ export async function PATCH(request: Request) {
   const admin = await getAdminContext(request);
   const isAdmin = admin.ok;
   const note = cleanText(body.note, 1000);
-  if (action === "cancel") {
+  if (action === "resubmit") {
+    if (claim.claimant_user_id !== auth.user.id || claim.status !== "awaiting_claimant") {
+      return json({ ok: false, message: "Only the claimant can respond to this evidence request." }, 403);
+    }
+    const evidence = Array.isArray(body.evidence) ? body.evidence.slice(0, MAX_EVIDENCE_FILES) : [];
+    if (!evidence.length) return json({ ok: false, message: "Add at least one requested evidence file." }, 400);
+    const uploadedPaths: string[] = [];
+    try {
+      for (const [index, file] of evidence.entries()) {
+        const parsed = parseEvidence(file);
+        const path = `claims/${claim.id}/${auth.user.id}/response-${Date.now()}-${index + 1}-${randomUUID()}.${parsed.extension}`;
+        const upload = await supabase.storage.from(EVIDENCE_BUCKET).upload(path, parsed.bytes, { contentType: parsed.mimeType, upsert: false });
+        if (upload.error) throw upload.error;
+        uploadedPaths.push(path);
+        const inserted = await supabase.from("ownership_claim_evidence").insert({
+          claim_id: claim.id,
+          uploaded_by: auth.user.id,
+          evidence_type: cleanText(file.type, 80) || (parsed.mimeType === "application/pdf" ? "ownership_document" : "additional_evidence"),
+          file_name: cleanText(file.name, 180) || `Additional evidence ${index + 1}`,
+          storage_path: path,
+          private_note: cleanText(file.note, 500) || null
+        });
+        if (inserted.error) throw inserted.error;
+      }
+      const nextStatus = claim.current_owner_id ? "awaiting_owner" : "admin_review";
+      const updated = await supabase.from("ownership_claims").update({ status: nextStatus, admin_review_note: null, updated_at: new Date().toISOString() }).eq("id", id);
+      if (updated.error) throw updated.error;
+      await supabase.from("ownership_claim_events").insert({ claim_id: id, actor_user_id: auth.user.id, action: "evidence_resubmitted", note: note || "Additional private evidence submitted.", metadata: { evidence_count: evidence.length } });
+      return json({ ok: true, status: nextStatus, message: nextStatus === "awaiting_owner" ? "Evidence sent to the current owner for review." : "Evidence returned to QRguitar for review." });
+    } catch (error) {
+      if (uploadedPaths.length) {
+        await supabase.storage.from(EVIDENCE_BUCKET).remove(uploadedPaths);
+        await supabase.from("ownership_claim_evidence").delete().in("storage_path", uploadedPaths);
+      }
+      return json({ ok: false, message: error instanceof Error ? error.message : "Could not submit the requested evidence." }, 500);
+    }
+  } else if (action === "cancel") {
     if (claim.claimant_user_id !== auth.user.id) return json({ ok: false, message: "Only the claimant can cancel this request." }, 403);
-    await supabase.from("ownership_claims").update({ status: "cancelled", decided_at: new Date().toISOString(), decided_by: auth.user.id, updated_at: new Date().toISOString() }).eq("id", id);
+    const result = await supabase.from("ownership_claims").update({ status: "cancelled", decided_at: new Date().toISOString(), decided_by: auth.user.id, updated_at: new Date().toISOString() }).eq("id", id);
+    if (result.error) return json({ ok: false, message: result.error.message || "Could not cancel the ownership request." }, 409);
   } else if (action === "deny") {
     if (claim.current_owner_id !== auth.user.id && !isAdmin) return json({ ok: false, message: "Current owner or admin review is required." }, 403);
-    await supabase.from("ownership_claims").update({ status: "denied", owner_response_note: note || null, decided_at: new Date().toISOString(), decided_by: auth.user.id, updated_at: new Date().toISOString() }).eq("id", id);
+    const result = await supabase.from("ownership_claims").update({ status: "denied", owner_response_note: note || null, decided_at: new Date().toISOString(), decided_by: auth.user.id, updated_at: new Date().toISOString() }).eq("id", id);
+    if (result.error) return json({ ok: false, message: result.error.message || "Could not deny the ownership request." }, 409);
+  } else if (action === "request_information") {
+    if (!isAdmin) return json({ ok: false, message: "Admin review is required to request more information." }, 403);
+    if (!note) return json({ ok: false, message: "Explain what additional evidence is required." }, 400);
+    const result = await supabase.from("ownership_claims").update({ status: "awaiting_claimant", admin_review_note: note, updated_at: new Date().toISOString() }).eq("id", id);
+    if (result.error) return json({ ok: false, message: result.error.message || "Could not request more information." }, 409);
+  } else if (action === "expire") {
+    if (!isAdmin) return json({ ok: false, message: "Admin review is required to expire an ownership request." }, 403);
+    const result = await supabase.from("ownership_claims").update({ status: "expired", admin_review_note: note || null, decided_at: new Date().toISOString(), decided_by: auth.user.id, updated_at: new Date().toISOString() }).eq("id", id);
+    if (result.error) return json({ ok: false, message: result.error.message || "Could not expire the ownership request." }, 409);
   } else {
     if (claim.current_owner_id !== auth.user.id && !isAdmin) return json({ ok: false, message: "Current owner or admin review is required." }, 403);
     const approved = await supabase.rpc("approve_ownership_claim", { p_claim_id: id, p_decided_by: auth.user.id, p_decision_note: note || null });
@@ -302,5 +373,11 @@ export async function PATCH(request: Request) {
   }
 
   await supabase.from("ownership_claim_events").insert({ claim_id: id, actor_user_id: auth.user.id, action, note: note || null });
-  return json({ ok: true, message: action === "cancel" ? "Ownership request cancelled." : "Ownership request denied." });
+  const messages: Record<string, string> = {
+    cancel: "Ownership request cancelled.",
+    deny: "Ownership request denied.",
+    request_information: "Additional evidence requested.",
+    expire: "Ownership request expired."
+  };
+  return json({ ok: true, message: messages[action] || "Ownership request updated." });
 }

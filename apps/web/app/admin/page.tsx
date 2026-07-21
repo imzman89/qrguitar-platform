@@ -589,13 +589,19 @@ export default function AdminPage() {
     }
   }
 
-  async function updateOwnershipClaim(claim: AdminOwnershipClaim, action: "approve" | "deny") {
+  async function updateOwnershipClaim(claim: AdminOwnershipClaim, action: "approve" | "deny" | "request_information" | "expire") {
     const token = await tokenPromise;
     if (!token) {
       setMessage("Sign in required.");
       return;
     }
-    const note = window.prompt(action === "approve" ? "Optional approval note" : "Reason for denial");
+    const prompts = {
+      approve: "Optional approval note",
+      deny: "Reason for denial",
+      request_information: "What additional evidence is required?",
+      expire: "Optional reason for expiring this request"
+    } as const;
+    const note = window.prompt(prompts[action]);
     if (note === null) return;
     setBusy(`${action}:${claim.id}`);
     const response = await fetch("/api/ownership-claims", {
@@ -1187,7 +1193,9 @@ export default function AdminPage() {
                   {claim.status === "awaiting_owner" || claim.status === "admin_review" ? (
                     <>
                       <button type="button" disabled={busy === `approve:${claim.id}`} onClick={() => void updateOwnershipClaim(claim, "approve")}>Approve</button>
+                      <button type="button" disabled={busy === `request_information:${claim.id}`} onClick={() => void updateOwnershipClaim(claim, "request_information")}>Request evidence</button>
                       <button type="button" disabled={busy === `deny:${claim.id}`} onClick={() => void updateOwnershipClaim(claim, "deny")}>Deny</button>
+                      <button type="button" disabled={busy === `expire:${claim.id}`} onClick={() => void updateOwnershipClaim(claim, "expire")}>Expire</button>
                     </>
                   ) : null}
                 </div>

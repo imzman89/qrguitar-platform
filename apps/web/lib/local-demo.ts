@@ -66,6 +66,11 @@ export type DemoInstrument = {
   instrumentType?: string;
   builder?: string;
   owner: string;
+  publicCollection?: {
+    handle: string;
+    publicName: string;
+    accountType: string;
+  };
   ownerUserEmail?: string;
   location: string;
   visibility?: "public" | "private" | "unlisted";
@@ -188,6 +193,9 @@ export type DemoTransfer = {
   claimEmailVerifiedAt?: string;
   acceptedAt?: string;
   cancelledAt?: string;
+  handoffPrepared?: boolean;
+  orderReferenceRequired?: boolean;
+  expiresAt?: string;
 };
 
 export type QrStyle = {

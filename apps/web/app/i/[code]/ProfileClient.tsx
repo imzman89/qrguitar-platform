@@ -18,6 +18,7 @@ import {
   X
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import QRCode from "qrcode";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -578,6 +579,11 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
               <strong>{instrument.model || instrument.instrumentType || "QRguitar Profile"}</strong>
             </div>
             <h1>{instrumentDisplayName(instrument)}</h1>
+            {instrument.publicCollection ? (
+              <Link className="profile-collection-link" href={`/collections/${instrument.publicCollection.handle}`}>
+                From the collection of {instrument.publicCollection.publicName}
+              </Link>
+            ) : null}
             <ProfileStatusBadges
               record={{
                 ...instrument,
@@ -634,6 +640,16 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
             <small className="scan-copy-notice">Copy failed. You can copy the URL from your browser bar.</small>
           ) : null}
         </ProfileIdentity>
+
+        {!canEdit ? (
+          <aside className="profile-claim-entry" aria-label="Ownership help">
+            <div>
+              <strong>Is this your instrument?</strong>
+              <span>A QR scan never changes ownership. Start a private request if the current owner cannot send you a transfer.</span>
+            </div>
+            <Link className="button secondary" href={`/ownership-claim?code=${encodeURIComponent(instrument.qrCode)}`}>Claim or transfer ownership</Link>
+          </aside>
+        ) : null}
 
         {canEdit ? (
         <section className="scan-actions" aria-label="Owner profile actions">

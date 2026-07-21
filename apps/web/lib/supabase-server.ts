@@ -18,6 +18,7 @@ async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit, ti
   try {
     return await fetch(input, {
       ...init,
+      cache: init?.cache || "no-store",
       signal: controller.signal
     });
   } finally {

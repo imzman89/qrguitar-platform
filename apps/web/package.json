@@ -12,7 +12,9 @@
     "typecheck": "tsc --noEmit",
     "test:retired-profile": "node scripts/assert-retired-profile.mjs",
     "test:launch": "node scripts/assert-launch-readiness.mjs",
-    "test:service-workflow": "node scripts/assert-service-workflow.mjs"
+    "test:service-workflow": "node scripts/assert-service-workflow.mjs",
+    "test:owner-experience": "node scripts/assert-owner-experience.mjs",
+    "test:premium-product": "node scripts/assert-premium-product.mjs"
   },
   "dependencies": {
     "@qrguitar/shared": "*",

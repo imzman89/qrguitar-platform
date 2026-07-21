@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -17,26 +20,31 @@ import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 
 const steps = [
-  ["Check the identity", "Enter the Serial Number first. If a matching Profile exists, use ownership transfer or a reviewed claim instead of creating a duplicate."],
-  ["Add the essentials", "Add the brand, model, one clear photo, and the details you know. You can expand the Profile later."],
-  ["Choose visibility", "Public Profiles appear in the Catalog. Unlisted Profiles open by direct link. Private Profiles stay with the owner account."],
-  ["Use the permanent QR", "Download or print the QR for the instrument, case, counter card, or paperwork. The link stays the same as the Profile grows."]
+  ["Create or find the Profile", "Enter the Serial Number first. If a matching Profile exists, use transfer or a reviewed claim instead of creating a duplicate."],
+  ["Add identity, photos, and history", "Start with the instrument identity and one clear photo, then add the details and history you know."],
+  ["Use the permanent QR", "Download, share, or print the QR for the instrument, case, counter card, or paperwork."],
+  ["Maintain service and ownership", "Add approved service, media, documents, and ownership changes to the same permanent Profile over time."]
 ];
 
 const capabilities = [
-  { icon: <Images />, title: "Photos and details", copy: "Show the instrument clearly and keep its specifications in one place." },
-  { icon: <Wrench />, title: "Service history", copy: "Record setups, repairs, restoration, and maintenance as they happen." },
-  { icon: <FileText />, title: "Documents", copy: "Keep receipts, appraisals, invoices, and build sheets private or publish selected documents." },
-  { icon: <Repeat2 />, title: "Ownership transfer", copy: "Send the same permanent Profile to the next owner through a secure email handoff." },
-  { icon: <AlertTriangle />, title: "Lost or stolen notice", copy: "Display a clear public alert when an instrument is reported lost or stolen." },
-  { icon: <ShieldCheck />, title: "Trust review", copy: "QRguitar verification and authenticity review remain separate, controlled trust signals." }
+  { icon: <QrCode />, title: "Identity and QR", copy: "Keep the QRguitar ID, permitted Serial Number, and permanent Profile link together." },
+  { icon: <Images />, title: "Photos, specs, and media", copy: "Show the instrument clearly with useful details, video, and audio." },
+  { icon: <Wrench />, title: "Timeline and service", copy: "Record ownership milestones and owner-approved provider work." },
+  { icon: <FileText />, title: "Documents and print", copy: "Keep private evidence, share selected documents, and print handouts or QR labels." },
+  { icon: <Eye />, title: "Public, Unlisted, or Private", copy: "Choose how each Profile is discovered without changing its permanent identity." },
+  { icon: <AlertTriangle />, title: "Safety and provenance", copy: "Publish lost or stolen alerts and preserve reviewed historical evidence." },
+  { icon: <Repeat2 />, title: "Transfers and claims", copy: "Hand the same Profile to its next owner through a recipient-bound workflow." },
+  { icon: <Store />, title: "Collections and Bulk Import", copy: "Opt into a public collection or prepare larger inventories privately before publishing." }
 ];
 
 const audiences = [
-  ["Owners and collectors", "Organize a collection, share selected Profiles, and keep useful history with each instrument."],
-  ["Shops and repair teams", "Give customers a scannable Profile, add service history, and print a handout at pickup."],
-  ["Builders and brands", "Create consistent Profiles for new instruments and manage larger inventories from one account."],
-  ["Buyers and future owners", "Review visible photos, identity, history, and trust signals before an instrument changes hands."]
+  ["Players", "Document an instrument, maintain its history, share it, and transfer it when ownership changes."],
+  ["Collectors", "Choose privacy per Profile, preserve provenance, and opt into a public collection when ready."],
+  ["Shops", "Bulk import private inventory, refine Profiles, print counter or pickup materials, and transfer to customers."],
+  ["Builders", "Create build Profiles with official specifications, media, and a clean purchaser handoff."],
+  ["Brands", "Keep product identity consistent across new and used instruments while supporting larger rollouts."],
+  ["Luthiers / Technicians", "Submit repair, restoration, setup, and service work for owner approval so accepted history stays with the instrument."],
+  ["Buyers", "Review public identity, history, trust signals, and seller collections before transfer or claim."]
 ];
 
 const faq = [
@@ -49,6 +57,9 @@ const faq = [
 ];
 
 export default function HowItWorksPage() {
+  const [activeAudience, setActiveAudience] = useState(0);
+  const selectedAudience = audiences[activeAudience] || audiences[0];
+
   return (
     <>
       <Nav />
@@ -57,8 +68,8 @@ export default function HowItWorksPage() {
           <div className="shell product-guide-hero-inner">
             <div>
               <div className="eyebrow">How QRguitar works</div>
-              <h1>Create the Profile once. Keep it with the instrument.</h1>
-              <p>Start with one real photo and the instrument identity. Add history over time, then share the same permanent QRguitar Profile wherever the instrument goes.</p>
+              <h1>One permanent Profile that grows with the instrument.</h1>
+              <p>Create or find the instrument identity, add one real photo, and keep service, media, documents, and ownership connected to the same QR.</p>
               <div className="product-guide-actions">
                 <Link className="button" href="/create">Create Profile <ArrowRight size={16} /></Link>
                 <Link className="button secondary" href="/catalog">Browse QRguitar Profiles</Link>
@@ -100,6 +111,11 @@ export default function HowItWorksPage() {
               <div><ShieldCheck /><strong>Permanent link</strong><span>Editing details never changes the Profile URL or an already printed QR.</span></div>
             </div>
           </div>
+          <div className="shell product-guide-visibility-grid" aria-label="Profile visibility options">
+            <article><Eye /><div><strong>Public</strong><span>Listed in the Catalog and available through its QR or direct link.</span></div></article>
+            <article><UserRoundCheck /><div><strong>Unlisted</strong><span>Kept out of the Catalog, but available to anyone with the QR or direct link.</span></div></article>
+            <article><LockKeyhole /><div><strong>Private</strong><span>Available only to the signed-in owner and authorized QRguitar administration.</span></div></article>
+          </div>
         </section>
 
         <section className="section product-guide-uses" id="profile-capabilities">
@@ -114,46 +130,16 @@ export default function HowItWorksPage() {
           </div>
         </section>
 
-        <section className="section product-guide-uses" id="visibility">
-          <div className="shell">
-            <div className="section-heading centered-heading"><div className="eyebrow">Visibility</div><h2>You decide how the Profile is shared.</h2></div>
-            <div className="product-guide-use-grid product-guide-three-grid">
-              <article><span><Eye /></span><h3>Public</h3><p>Appears in the Catalog and opens through its direct QR or link.</p></article>
-              <article><span><UserRoundCheck /></span><h3>Unlisted</h3><p>Stays out of the Catalog but opens for anyone with the direct QR or link.</p></article>
-              <article><span><LockKeyhole /></span><h3>Private</h3><p>Opens only for the signed-in owner and authorized QRguitar administration.</p></article>
-            </div>
-          </div>
-        </section>
-
         <section className="section product-guide-identity" id="service-providers">
-          <div className="shell product-guide-split">
-            <div>
-              <div className="eyebrow">Service-provider workflow</div>
-              <h2>Service history the owner reviews before it becomes permanent.</h2>
-              <p>A signed-in repair shop or technician can submit completed work for an existing Profile. Receipts, work orders, and supporting photos stay private evidence.</p>
-              <p>The owner receives an in-app request and, when email delivery is configured, a secure review email. Nothing is published until the owner approves it.</p>
-            </div>
-            <div className="product-guide-visibility">
-              <div><Wrench /><strong>1. Provider submits</strong><span>The provider records the work, parts, measurements, and private evidence.</span></div>
-              <div><FileText /><strong>2. Owner reviews</strong><span>The owner can request changes, decline it, or choose public or private visibility.</span></div>
-              <div><UserRoundCheck /><strong>3. Owner approves</strong><span>Approval creates one protected service-history entry. Repeated approval cannot duplicate it.</span></div>
-              <div><ShieldCheck /><strong>4. Provenance stays honest</strong><span>Owner-reported, provider-submitted, verified-provider, and QRguitar evidence review are distinct labels.</span></div>
-            </div>
-          </div>
-        </section>
-
-        <section className="section product-guide-identity" id="ownership">
-          <div className="shell product-guide-split">
-            <div>
-              <div className="eyebrow">When ownership changes</div>
-              <h2>Transfer the Profile, not a copy of it.</h2>
-              <p>The current owner or shop enters the recipient email and sends a secure claim link. The recipient signs in and accepts the existing Profile.</p>
-              <p>Photos, the permanent QRguitar ID, and protected history stay connected. A public scan alone can never take ownership.</p>
-            </div>
-            <div className="product-guide-visibility">
-              <div><Store /><strong>1. Start the handoff</strong><span>The current owner or shop sends the transfer from the dashboard.</span></div>
-              <div><UserRoundCheck /><strong>2. Recipient accepts</strong><span>The recipient signs in with the intended email and reviews the Profile.</span></div>
-              <div><Repeat2 /><strong>3. Same Profile continues</strong><span>The QRguitar ID and URL remain unchanged for the next owner.</span></div>
+          <div className="shell">
+            <div className="section-heading centered-heading"><div className="eyebrow">Service and ownership</div><h2>Keep real work and real handoffs connected.</h2><p>Owners stay in control of what becomes part of the permanent Profile.</p></div>
+            <div className="product-guide-dual-flow">
+              <article>
+                <Wrench /><div><h3>Service the owner approves</h3><p>A provider submits completed work and private evidence. The owner reviews, requests changes, declines, or approves it before anything is published.</p><Link href="/how-it-works#service-providers">Provider work stays clearly attributed</Link></div>
+              </article>
+              <article id="ownership">
+                <Repeat2 /><div><h3>Transfer the same Profile</h3><p>The current owner sends a recipient-bound claim. The next owner accepts the existing Profile, while its QRguitar ID, URL, photos, and protected history stay connected.</p><span>A public scan can never take ownership.</span></div>
+              </article>
             </div>
           </div>
         </section>
@@ -161,8 +147,15 @@ export default function HowItWorksPage() {
         <section className="section product-guide-uses" id="who-it-is-for">
           <div className="shell">
             <div className="section-heading centered-heading"><div className="eyebrow">Made for the instrument community</div><h2>Useful at home, at the bench, and across the counter.</h2></div>
-            <div className="product-guide-audience-grid">
-              {audiences.map(([title, copy]) => <article key={title}><h3>{title}</h3><p>{copy}</p></article>)}
+            <div className="product-guide-role-switcher">
+              <div className="product-guide-role-tabs" role="tablist" aria-label="Choose your role">
+                {audiences.map(([title], index) => <button className={index === activeAudience ? "is-active" : ""} type="button" role="tab" aria-selected={index === activeAudience} key={title} onClick={() => setActiveAudience(index)}>{title}</button>)}
+              </div>
+              <article className="product-guide-role-panel" role="tabpanel">
+                <span>{String(activeAudience + 1).padStart(2, "0")}</span>
+                <div><h3>{selectedAudience[0]}</h3><p>{selectedAudience[1]}</p></div>
+                <Link className="button secondary" href={activeAudience === 5 ? "/account#service-provider" : activeAudience === 6 ? "/ownership-claim" : activeAudience === 2 || activeAudience === 3 || activeAudience === 4 ? "/dashboard/import" : "/create"}>{activeAudience === 5 ? "Set up provider tools" : activeAudience === 6 ? "Open Claim Center" : activeAudience === 2 || activeAudience === 3 || activeAudience === 4 ? "Open inventory tools" : "Create a Profile"}</Link>
+              </article>
             </div>
           </div>
         </section>

@@ -129,7 +129,7 @@ export function CollectibleRecordCard({
             {summary ? <p className="collectible-card-summary">{summary}</p> : null}
           </div>
 
-          <ProfileStatusBadges record={record} />
+          <ProfileStatusBadges record={record} maxBadges={3} />
 
           <div className="collectible-card-facts" aria-label="Profile contents">
             {publicSerial ? (
@@ -153,6 +153,11 @@ export function CollectibleRecordCard({
       </div>
 
       <RecordShareButton className="collectible-card-share" code={record.qrCode} title={title} />
+      {record.publicCollection ? (
+        <Link className="collectible-card-collection-link" href={`/collections/${record.publicCollection.handle}`} aria-label={`Open ${record.publicCollection.publicName} collection`}>
+          From the collection of {record.publicCollection.publicName}
+        </Link>
+      ) : null}
       {showSecondaryAction ? (
         <Link className="collectible-card-secondary-link" href={secondaryHref}>
           {secondaryLabel}

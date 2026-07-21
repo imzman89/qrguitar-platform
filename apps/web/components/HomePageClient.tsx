@@ -8,6 +8,7 @@ import { LatestPublicRecord } from "./LatestPublicRecord";
 import { Nav } from "./Nav";
 import { siteCopy } from "../content/site-copy";
 import type { DemoInstrument } from "../lib/local-demo";
+import { getProfilePhotoUrls } from "../lib/instrument-profile-contract";
 import { buildEditableHomeCopy, fetchPublishedSiteSettings, type EditableSiteSettings } from "../lib/site-settings";
 
 export function HomePageClient({
@@ -18,6 +19,7 @@ export function HomePageClient({
   initialSettings: EditableSiteSettings;
 }) {
   const [settings, setSettings] = useState<EditableSiteSettings | null>(initialSettings);
+  const [activeAudience, setActiveAudience] = useState(0);
 
   useEffect(() => {
     void fetchPublishedSiteSettings().then((published) => {
@@ -71,6 +73,9 @@ export function HomePageClient({
     };
   }, [settings]);
 
+  const recordPhoto = initialLatestRecord ? getProfilePhotoUrls(initialLatestRecord)[0] : "";
+  const selectedAudience = copy.audiences.cards[activeAudience] || copy.audiences.cards[0];
+
   return (
     <>
       <Nav />
@@ -115,8 +120,8 @@ export function HomePageClient({
           </div>
         </section>
 
-        <section className="section">
-          <div className="shell split record-holds-layout">
+        <section className="section record-holds-section">
+          <div className="shell record-holds-layout">
             <div className="record-holds-copy">
               <div className="eyebrow">{copy.customization.eyebrow}</div>
               <h2>{copy.customization.headline}</h2>
@@ -135,6 +140,17 @@ export function HomePageClient({
                 </Link>
               </div>
             </div>
+            <div className="record-holds-visual" aria-label="A QRguitar Profile keeps the instrument and its history together">
+              <div className="record-holds-photo">
+                {recordPhoto ? <img src={recordPhoto} alt="A documented instrument in QRguitar" /> : <div className="record-holds-photo-empty" aria-hidden="true" />}
+                <span>One permanent identity</span>
+              </div>
+              <div className="record-holds-facts">
+                <div><span>01</span><strong>Identity</strong><p>Serial number, specifications, visibility, and permanent QRguitar ID.</p></div>
+                <div><span>02</span><strong>Proof</strong><p>Photos, selected documents, verification, and authenticity status.</p></div>
+                <div><span>03</span><strong>History</strong><p>Service, timeline events, ownership handoffs, and safety alerts.</p></div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -145,10 +161,28 @@ export function HomePageClient({
               <h2>{copy.audiences.headline}</h2>
               <p>{copy.audiences.body}</p>
             </div>
-            <div className="grid four">
-              {copy.audiences.cards.map((item) => (
-                <Card key={item.title} icon={<item.icon size={28} />} title={item.title} copy={item.copy} />
-              ))}
+            <div className="audience-switcher">
+              <div className="audience-tabs" role="tablist" aria-label="Choose how you use QRguitar">
+                {copy.audiences.cards.map((item, index) => (
+                  <button
+                    className={index === activeAudience ? "is-active" : ""}
+                    key={item.title}
+                    type="button"
+                    role="tab"
+                    aria-selected={index === activeAudience}
+                    onClick={() => setActiveAudience(index)}
+                  >
+                    {item.title}
+                  </button>
+                ))}
+              </div>
+              {selectedAudience ? (
+                <article className="audience-panel" role="tabpanel">
+                  <div className="icon"><selectedAudience.icon size={30} /></div>
+                  <div><h3>{selectedAudience.title}</h3><p>{selectedAudience.copy}</p></div>
+                  <Link className="button secondary" href="/how-it-works">See the workflow</Link>
+                </article>
+              ) : null}
             </div>
             {copy.audiences.cta ? (
               <div className="section-cta">

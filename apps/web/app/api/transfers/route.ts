@@ -1,8 +1,10 @@
+import { createHash, randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@supabase/supabase-js";
 import { createServerSupabaseClient, getAuthenticatedUser, getSupabaseEnvStatus } from "../../../lib/supabase-server";
 import { assertAccountCanWrite, isAdminRole, logAdminAuditEvent, normalizeEmail as normalizeAdminEmail, readAdminEmailList } from "../../../lib/admin-auth";
+import { cleanPublicCollection, defaultPublicCollectionSettings, publicCollectionOwnerKey, type PublicCollectionSettings } from "../../../lib/public-collections";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -41,7 +43,13 @@ type TransferRow = {
   accepted_at: string | null;
   created_at: string;
   fee_cents?: number | null;
+  expires_at?: string | null;
+  claim_token_hash?: string | null;
+  purchaser_code_hash?: string | null;
+  claim_prepared_at?: string | null;
 };
+
+const TRANSFER_SELECT = "id,guitar_id,from_owner_id,to_email,to_name,status,accepted_by,accepted_at,created_at,fee_cents,expires_at,claim_token_hash,purchaser_code_hash,claim_prepared_at";
 
 type ServerSupabaseClient = NonNullable<ReturnType<typeof createServerSupabaseClient>>;
 
@@ -59,6 +67,29 @@ function normalizeEmail(email: string) {
   return String(email || "").trim().toLowerCase();
 }
 
+function normalizeBuyerCode(value: string) {
+  return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function hashBuyerCode(value: string) {
+  return createHash("sha256").update(normalizeBuyerCode(value)).digest("hex");
+}
+
+function normalizeOrderReference(value: string) {
+  return String(value || "").trim().toUpperCase().replace(/\s+/g, " ");
+}
+
+function hashOrderReference(value: string) {
+  return createHash("sha256").update(normalizeOrderReference(value)).digest("hex");
+}
+
+function createBuyerCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = randomBytes(12);
+  const raw = Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
+  return `${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8)}`;
+}
+
 function transferClaimPath(id: string) {
   return `/transfer/${id}`;
 }
@@ -70,7 +101,7 @@ function transferClaimUrl(request: Request, id: string) {
 }
 
 function transferStatus(status: TransferRow["status"]) {
-  return status === "accepted" || status === "cancelled" ? status : "sent";
+  return status === "accepted" ? "accepted" : status === "cancelled" || status === "expired" ? "cancelled" : "sent";
 }
 
 async function canAdminister(supabase: ServerSupabaseClient, user: User) {
@@ -93,6 +124,9 @@ function mapTransfer(row: TransferRow, guitar?: GuitarRow | null, includePrivate
     claimPath: transferClaimPath(row.id),
     createdAt: row.created_at,
     acceptedAt: row.accepted_at || undefined,
+    handoffPrepared: Boolean(row.purchaser_code_hash),
+    orderReferenceRequired: Boolean(row.claim_token_hash),
+    expiresAt: row.expires_at || undefined,
     feeCents: row.fee_cents || 0,
     paymentCollected: true
   };
@@ -110,7 +144,9 @@ async function sendTransferClaimEmail(request: Request, transfer: TransferRow, g
       persistSession: false
     }
   });
-  const claimUrl = transferClaimUrl(request, transfer.id);
+  const claimUrl = transfer.purchaser_code_hash
+    ? `${(process.env.NEXT_PUBLIC_SITE_URL || env.siteUrl || new URL(request.url).origin).replace(/\/$/, "")}/ownership-claim?handoff=buyer-code`
+    : transferClaimUrl(request, transfer.id);
   const recordName = guitar.name || guitar.model || guitar.qr_code;
   const { error } = await authClient.auth.signInWithOtp({
     email: transfer.to_email,
@@ -154,7 +190,7 @@ async function loadGuitarsById(supabase: ServerSupabaseClient, ids: string[]) {
 async function loadTransferById(supabase: ServerSupabaseClient, id: string) {
   const result = await supabase
     .from("ownership_transfers")
-    .select("id,guitar_id,from_owner_id,to_email,to_name,status,accepted_by,accepted_at,created_at,fee_cents")
+    .select(TRANSFER_SELECT)
     .eq("id", id)
     .maybeSingle<TransferRow>();
 
@@ -210,7 +246,7 @@ export async function GET(request: Request) {
 
   const result = await supabase
     .from("ownership_transfers")
-    .select("id,guitar_id,from_owner_id,to_email,to_name,status,accepted_by,accepted_at,created_at,fee_cents")
+    .select(TRANSFER_SELECT)
     .or(`from_owner_id.eq.${auth.user.id},accepted_by.eq.${auth.user.id}`)
     .order("created_at", { ascending: false });
 
@@ -241,13 +277,16 @@ export async function POST(request: Request) {
     return json({ ok: false, message: writeAccess.message }, { status: writeAccess.status });
   }
 
-  const body = await request.json().catch(() => null) as { qrCode?: string; toEmail?: string; toName?: string } | null;
+  const body = await request.json().catch(() => null) as { qrCode?: string; toEmail?: string; toName?: string; mode?: "email" | "buyer_code"; expiresInDays?: number; orderReference?: string } | null;
   const qrCode = String(body?.qrCode || "").trim().toUpperCase();
   const toEmail = normalizeEmail(body?.toEmail || "");
   const toName = String(body?.toName || "").trim();
+  const mode = body?.mode === "buyer_code" ? "buyer_code" : "email";
+  const expiresInDays = Math.min(30, Math.max(1, Number(body?.expiresInDays) || 7));
+  const orderReference = normalizeOrderReference(body?.orderReference || "");
 
-  if (!qrCode || !toEmail || !toEmail.includes("@")) {
-    return json({ ok: false, message: "QRguitar ID and recipient email are required." }, { status: 400 });
+  if (!qrCode || (mode === "email" && (!toEmail || !toEmail.includes("@"))) || (toEmail && !toEmail.includes("@"))) {
+    return json({ ok: false, message: mode === "email" ? "QRguitar ID and recipient email are required." : "Enter a valid optional recipient email." }, { status: 400 });
   }
 
   const guitarResult = await supabase
@@ -266,14 +305,26 @@ export async function POST(request: Request) {
     return json({ ok: false, message: "Only the current owner can create a transfer." }, { status: 403 });
   }
 
+  if (mode === "buyer_code" && !isAdmin) {
+    const settings = await supabase.from("site_content").select("content_value")
+      .eq("content_key", publicCollectionOwnerKey(auth.user.id)).maybeSingle<{ content_value?: Record<string, unknown> }>();
+    const collection = cleanPublicCollection((settings.data?.content_value || defaultPublicCollectionSettings) as Partial<PublicCollectionSettings>);
+    if (collection.accountType !== "shop" && collection.accountType !== "builder") {
+      return json({ ok: false, message: "Private buyer codes are available to enrolled shop and builder accounts." }, { status: 403 });
+    }
+  }
+
   const existing = await supabase
     .from("ownership_transfers")
-    .select("id,guitar_id,from_owner_id,to_email,to_name,status,accepted_by,accepted_at,created_at,fee_cents")
+    .select(TRANSFER_SELECT)
     .eq("guitar_id", guitarResult.data.id)
     .eq("status", "sent")
     .maybeSingle<TransferRow>();
 
   if (existing.data) {
+    if (mode === "buyer_code" || existing.data.purchaser_code_hash) {
+      return json({ ok: false, message: "A pending handoff already exists. Revoke it before preparing a new private buyer code." }, { status: 409 });
+    }
     const emailResult = await sendTransferClaimEmail(request, existing.data, guitarResult.data);
     return json({
       ok: true,
@@ -285,6 +336,8 @@ export async function POST(request: Request) {
     });
   }
 
+  const buyerCode = mode === "buyer_code" ? createBuyerCode() : "";
+  const expiresAt = mode === "buyer_code" ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString() : null;
   const created = await supabase
     .from("ownership_transfers")
     .insert({
@@ -293,13 +346,32 @@ export async function POST(request: Request) {
       to_email: toEmail,
       to_name: toName,
       status: "sent",
-      fee_cents: 0
+      fee_cents: 0,
+      ...(mode === "buyer_code" ? {
+        purchaser_code_hash: hashBuyerCode(buyerCode),
+        claim_token_hash: orderReference ? hashOrderReference(orderReference) : null,
+        expires_at: expiresAt,
+        claim_prepared_at: new Date().toISOString()
+      } : {})
     })
-    .select("id,guitar_id,from_owner_id,to_email,to_name,status,accepted_by,accepted_at,created_at,fee_cents")
+    .select(TRANSFER_SELECT)
     .single<TransferRow>();
 
   if (created.error || !created.data) {
     return json({ ok: false, message: created.error?.message || "Could not create transfer." }, { status: 500 });
+  }
+
+  if (mode === "buyer_code") {
+    const emailResult = toEmail ? await sendTransferClaimEmail(request, created.data, guitarResult.data) : null;
+    return json({
+      ok: true,
+      transfer: mapTransfer(created.data, guitarResult.data, true),
+      buyerCode,
+      emailSent: emailResult?.ok || false,
+      message: emailResult?.ok
+        ? "Private buyer code prepared and a secure sign-in invitation was emailed. Copy the code now; QRguitar will not display it again."
+        : "Private buyer code prepared. Copy it now; QRguitar will not display it again."
+    });
   }
 
   const emailResult = await sendTransferClaimEmail(request, created.data, guitarResult.data);
@@ -330,11 +402,59 @@ export async function PATCH(request: Request) {
     return json({ ok: false, message: writeAccess.message }, { status: writeAccess.status });
   }
 
-  const body = await request.json().catch(() => null) as { id?: string; action?: "cancel" | "accept"; reason?: string } | null;
+  const body = await request.json().catch(() => null) as { id?: string; action?: "cancel" | "accept" | "redeem_code" | "resend"; reason?: string; code?: string; orderReference?: string } | null;
   const id = String(body?.id || "").trim();
   const action = body?.action;
 
-  if (!id || (action !== "cancel" && action !== "accept")) {
+  if (action === "redeem_code") {
+    const code = normalizeBuyerCode(body?.code || "");
+    if (code.length !== 12) {
+      return json({ ok: false, message: "Enter the complete 12-character private buyer code." }, { status: 400 });
+    }
+
+    const result = await supabase.from("ownership_transfers").select(TRANSFER_SELECT)
+      .eq("purchaser_code_hash", hashBuyerCode(code)).eq("status", "sent").maybeSingle<TransferRow>();
+    const prepared = result.data;
+    if (result.error || !prepared) {
+      return json({ ok: false, message: "That private buyer code is invalid, revoked, or already used." }, { status: 404 });
+    }
+    if (!prepared.expires_at || Date.parse(prepared.expires_at) <= Date.now()) {
+      await supabase.from("ownership_transfers").update({ status: "expired" }).eq("id", prepared.id).eq("status", "sent");
+      return json({ ok: false, message: "That private buyer code has expired. Ask the seller or shop for a new one." }, { status: 410 });
+    }
+    if (prepared.to_email && normalizeEmail(prepared.to_email) !== normalizeEmail(auth.user.email || "")) {
+      return json({ ok: false, message: "Sign in with the recipient email assigned to this buyer code." }, { status: 403 });
+    }
+    if (prepared.claim_token_hash && hashOrderReference(body?.orderReference || "") !== prepared.claim_token_hash) {
+      return json({ ok: false, message: "Enter the order or receipt reference supplied with this buyer handoff." }, { status: 403 });
+    }
+
+    const profile = await supabase.from("profiles").select("display_name,plan,role").eq("id", auth.user.id).maybeSingle<ProfileRow>();
+    const profileUpsert = await supabase.from("profiles").upsert({
+      id: auth.user.id,
+      display_name: profile.data?.display_name || auth.user.user_metadata?.display_name || auth.user.email || "",
+      plan: profile.data?.plan || "single",
+      role: profile.data?.role || "user"
+    }, { onConflict: "id" });
+    if (profileUpsert.error) return json({ ok: false, message: "Could not prepare your recipient profile." }, { status: 500 });
+
+    const completion = await supabase.rpc("complete_ownership_transfer", { p_transfer_id: prepared.id, p_new_owner_id: auth.user.id });
+    if (completion.error) {
+      const status = /owner changed|no longer available/i.test(completion.error.message || "") ? 409 : 500;
+      return json({ ok: false, message: completion.error.message || "Could not accept this handoff." }, { status });
+    }
+    const guitars = await loadGuitarsById(supabase, [prepared.guitar_id]);
+    const guitar = guitars.get(prepared.guitar_id) || null;
+    const completed = await loadTransferById(supabase, prepared.id);
+    return json({
+      ok: true,
+      transfer: completed ? mapTransfer(completed, guitar ? { ...guitar, owner_id: auth.user.id } : null, true) : undefined,
+      permanentPath: guitar?.permanent_path || `/i/${guitar?.qr_code || ""}`,
+      message: "Ownership accepted. The QRguitar Profile, ID, URL, and protected history stayed with the instrument."
+    });
+  }
+
+  if (!id || (action !== "cancel" && action !== "accept" && action !== "resend")) {
     return json({ ok: false, message: "Transfer ID and action are required." }, { status: 400 });
   }
 
@@ -346,6 +466,22 @@ export async function PATCH(request: Request) {
   const guitars = await loadGuitarsById(supabase, [transfer.guitar_id]);
   const guitar = guitars.get(transfer.guitar_id) || null;
   const isAdmin = await canAdminister(supabase, auth.user);
+
+  if (action === "resend") {
+    if (transfer.status !== "sent" || !transfer.purchaser_code_hash || !transfer.to_email) {
+      return json({ ok: false, message: "This private handoff does not have a resendable buyer invitation." }, { status: 400 });
+    }
+    if (transfer.from_owner_id !== auth.user.id && guitar?.owner_id !== auth.user.id && !isAdmin) {
+      return json({ ok: false, message: "Only the current owner can resend this invitation." }, { status: 403 });
+    }
+    if (!guitar) return json({ ok: false, message: "The Profile for this handoff was not found." }, { status: 404 });
+    const emailResult = await sendTransferClaimEmail(request, transfer, guitar);
+    return json({
+      ok: emailResult.ok,
+      transfer: mapTransfer(transfer, guitar, true),
+      message: emailResult.ok ? "Secure sign-in invitation resent. The private buyer code was not included." : emailResult.message
+    }, { status: emailResult.ok ? 200 : 502 });
+  }
 
   if (action === "cancel") {
     if (transfer.status !== "sent") {
@@ -361,7 +497,7 @@ export async function PATCH(request: Request) {
       .update({ status: "cancelled" })
       .eq("id", id)
       .eq("status", "sent")
-      .select("id,guitar_id,from_owner_id,to_email,to_name,status,accepted_by,accepted_at,created_at,fee_cents")
+      .select(TRANSFER_SELECT)
       .single<TransferRow>();
 
     if (update.error || !update.data) {
@@ -386,6 +522,10 @@ export async function PATCH(request: Request) {
 
   if (transfer.status !== "sent") {
     return json({ ok: false, message: "This transfer is no longer available." }, { status: 400 });
+  }
+
+  if (transfer.purchaser_code_hash) {
+    return json({ ok: false, message: "This handoff requires its private buyer code in the Ownership Claim Center." }, { status: 403 });
   }
 
   if (normalizeEmail(auth.user.email || "") !== normalizeEmail(transfer.to_email) && !isAdmin) {

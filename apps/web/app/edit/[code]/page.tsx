@@ -149,6 +149,18 @@ export default function EditInstrumentPage() {
   const [externalMedia, setExternalMedia] = useState<ExternalMediaItem[]>([]);
   const [mediaForm, setMediaForm] = useState(emptyMediaForm);
   const [savingMedia, setSavingMedia] = useState(false);
+  const [activeEditorSection, setActiveEditorSection] = useState("identity");
+
+  useEffect(() => {
+    const syncSectionFromHash = () => {
+      const section = window.location.hash.slice(1);
+      if (section) setActiveEditorSection(section);
+    };
+
+    syncSectionFromHash();
+    window.addEventListener("hashchange", syncSectionFromHash);
+    return () => window.removeEventListener("hashchange", syncSectionFromHash);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -954,6 +966,40 @@ export default function EditInstrumentPage() {
                   </select>
                 </label>
               </div>
+              <nav className="editor-section-nav" aria-label="Edit Profile sections">
+                <a aria-current={activeEditorSection === "identity" ? "location" : undefined} href="#identity">Identity</a>
+                <a aria-current={activeEditorSection === "photos" ? "location" : undefined} href="#photos">Photos</a>
+                <a aria-current={activeEditorSection === "details" ? "location" : undefined} href="#details">Details</a>
+                <a aria-current={activeEditorSection === "timeline" ? "location" : undefined} href="#timeline">Timeline &amp; Ownership</a>
+                <a aria-current={activeEditorSection === "service" ? "location" : undefined} href="#service">Service</a>
+                <a aria-current={activeEditorSection === "media" ? "location" : undefined} href="#media">Media</a>
+                <a aria-current={activeEditorSection === "documents" ? "location" : undefined} href="#documents">Documents</a>
+                <a aria-current={activeEditorSection === "privacy-safety" ? "location" : undefined} href="#privacy-safety">Privacy &amp; Safety</a>
+                <a aria-current={activeEditorSection === "qr-print" ? "location" : undefined} href="#qr-print">QR &amp; Print</a>
+              </nav>
+              <label className="editor-section-select">
+                <span>Current section</span>
+                <select
+                  aria-label="Edit Profile section"
+                  value={activeEditorSection}
+                  onChange={(event) => {
+                    const section = event.target.value;
+                    setActiveEditorSection(section);
+                    window.history.replaceState(null, "", `#${section}`);
+                    document.getElementById(section)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                >
+                  <option value="identity">Identity</option>
+                  <option value="photos">Photos</option>
+                  <option value="details">Details</option>
+                  <option value="timeline">Timeline &amp; Ownership</option>
+                  <option value="service">Service</option>
+                  <option value="media">Media</option>
+                  <option value="documents">Documents</option>
+                  <option value="privacy-safety">Privacy &amp; Safety</option>
+                  <option value="qr-print">QR &amp; Print</option>
+                </select>
+              </label>
               <section className="card verification-card" aria-label="Trust and verification">
                 <div>
                   <span className="eyebrow">Trust & Verification</span>
@@ -1030,7 +1076,7 @@ export default function EditInstrumentPage() {
                   </label>
                 </div>
               </section>
-              <section className="card verification-card" aria-label="Lost or stolen alert">
+              <section className="card verification-card" id="privacy-safety" aria-label="Lost or stolen alert">
                 <div>
                   <span className="eyebrow">Lost / Stolen Alert</span>
                   <h3>{safetyStatusLabel(safetyStatus)}</h3>
@@ -1078,7 +1124,7 @@ export default function EditInstrumentPage() {
                   </div>
                 </div>
               </section>
-            <form className="card form">
+            <form className="card form" id="identity">
               <input
                 aria-hidden="true"
                 autoComplete="off"
@@ -1092,7 +1138,7 @@ export default function EditInstrumentPage() {
                 <span className="eyebrow">Core identity</span>
                 <p>Make/model/serial are the main identity. Add anything else only when it helps the profile.</p>
               </div>
-              <div className="form-grid">
+              <div className="form-grid" id="details">
                 <Field
                   label="Make / brand"
                   id="brand"
@@ -1301,7 +1347,7 @@ export default function EditInstrumentPage() {
                 />
                 <span>Upload up to 20 photos. Pick one as the main image for dashboard cards, catalog listings, and the public profile hero.</span>
               </div>
-              <div className="field photo-field">
+              <div className="field photo-field" id="documents">
                 <label htmlFor="profileDocuments">Documents</label>
                 <input
                   id="profileDocuments"
@@ -1437,14 +1483,16 @@ export default function EditInstrumentPage() {
                   </div>
                 </section>
               ) : null}
-              <PhotoOrganizer
-                images={galleryImages}
-                mainImage={form.heroImageDataUrl}
-                onSelectMain={selectMainPhoto}
-                onRemove={removePhoto}
-                onMove={movePhoto}
-              />
-              <section className="qr-customizer" aria-label="External media">
+              <div id="photos">
+                <PhotoOrganizer
+                  images={galleryImages}
+                  mainImage={form.heroImageDataUrl}
+                  onSelectMain={selectMainPhoto}
+                  onRemove={removePhoto}
+                  onMove={movePhoto}
+                />
+              </div>
+              <section className="qr-customizer" id="media" aria-label="External media">
                 <div>
                   <span className="eyebrow">Media links</span>
                   <h3>Add Video or Audio</h3>
@@ -1490,10 +1538,10 @@ export default function EditInstrumentPage() {
                   </div>
                 ) : null}
               </section>
-              <section className="qr-customizer" aria-label="Timeline and service history">
+              <section className="qr-customizer" id="timeline" aria-label="Timeline and service history">
                 <div>
                   <span className="eyebrow">Instrument history</span>
-                  <h3>Timeline &amp; Service History</h3>
+                  <h3 id="service">Timeline &amp; Service History</h3>
                   <p>Add the history you know - purchases, ownership, service, modifications, restoration, and important milestones.</p>
                 </div>
                 <div className="qr-controls">
@@ -1617,7 +1665,7 @@ export default function EditInstrumentPage() {
                   </div>
                 )}
               </section>
-              <section className="qr-customizer" aria-label="QR code customization">
+              <section className="qr-customizer" id="qr-print" aria-label="QR code customization">
                 <div>
                   <span className="eyebrow">QR appearance</span>
                   <h3>Customize QR Appearance</h3>
@@ -1645,7 +1693,7 @@ export default function EditInstrumentPage() {
                 </div>
               </section>
               {message ? <p className="form-message">{message}</p> : null}
-              <div className="form-actions">
+              <div className="form-actions editor-save-bar">
                 <button className="button" type="button" onClick={() => void saveChanges(false)} disabled={savingRecord || savingSafety}>
                   {savingRecord ? "Saving..." : "Save Changes"}
                 </button>

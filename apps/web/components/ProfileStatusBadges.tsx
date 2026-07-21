@@ -10,6 +10,7 @@ type ProfileStatusBadgesProps = {
   record: DemoInstrument;
   includeCondition?: boolean;
   includeCategory?: boolean;
+  maxBadges?: number;
   className?: string;
 };
 
@@ -17,6 +18,7 @@ export function ProfileStatusBadges({
   record,
   includeCondition = true,
   includeCategory = false,
+  maxBadges,
   className = ""
 }: ProfileStatusBadgesProps) {
   const condition = getInstrumentCondition(record);
@@ -32,33 +34,18 @@ export function ProfileStatusBadges({
       ? "Modified"
       : "";
 
+  const badges: ReactNode[] = [];
+  if (safetyStatus !== "clear") badges.push(<StatusBadge key="safety" tone={safetyStatus === "recovered" ? "recovered" : "safety"} label={safetyStatusLabel(safetyStatus)} icon={<Siren aria-hidden="true" />} />);
+  if (record.showVerificationBadge !== false) badges.push(<StatusBadge key="verification" tone={verificationStatus === "verified" ? "verified" : "unverified"} label={verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"} icon={<ShieldCheck aria-hidden="true" />} />);
+  if (record.showAuthenticityBadge !== false) badges.push(<StatusBadge key="authenticity" tone={authenticityStatus === "confirmed" ? "auth-confirmed" : "auth-unconfirmed"} label={authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"} icon={<ShieldCheck aria-hidden="true" />} />);
+  if (saleStatus) badges.push(<StatusBadge key="sale" tone="sale" label={saleStatus} />);
+  if (originalityStatus) badges.push(<StatusBadge key="originality" tone="disclosure" label={originalityStatus} />);
+  if (includeCondition) badges.push(<StatusBadge key="condition" tone="condition" label={condition === "new" ? "New" : "Used"} />);
+  if (includeCategory && record.instrumentType) badges.push(<StatusBadge key="category" tone="disclosure" label={record.instrumentType} />);
+
   return (
     <div className={`record-badge-row ${className}`.trim()} aria-label="Profile status">
-      {includeCondition ? <StatusBadge tone="condition" label={condition === "new" ? "New" : "Used"} /> : null}
-      {record.showVerificationBadge !== false ? (
-        <StatusBadge
-          tone={verificationStatus === "verified" ? "verified" : "unverified"}
-          label={verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"}
-          icon={<ShieldCheck aria-hidden="true" />}
-        />
-      ) : null}
-      {record.showAuthenticityBadge !== false ? (
-        <StatusBadge
-          tone={authenticityStatus === "confirmed" ? "auth-confirmed" : "auth-unconfirmed"}
-          label={authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}
-          icon={<ShieldCheck aria-hidden="true" />}
-        />
-      ) : null}
-      {safetyStatus !== "clear" ? (
-        <StatusBadge
-          tone={safetyStatus === "recovered" ? "recovered" : "safety"}
-          label={safetyStatusLabel(safetyStatus)}
-          icon={<Siren aria-hidden="true" />}
-        />
-      ) : null}
-      {saleStatus ? <StatusBadge tone="sale" label={saleStatus} /> : null}
-      {originalityStatus ? <StatusBadge tone="disclosure" label={originalityStatus} /> : null}
-      {includeCategory && record.instrumentType ? <StatusBadge tone="disclosure" label={record.instrumentType} /> : null}
+      {typeof maxBadges === "number" ? badges.slice(0, maxBadges) : badges}
     </div>
   );
 }
