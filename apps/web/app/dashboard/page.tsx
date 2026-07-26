@@ -26,6 +26,8 @@ import {
 } from "../../lib/local-demo";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
 import { getProfilePhotoUrls, getServiceHistoryEntries } from "../../lib/instrument-profile-contract";
+import { getContentValue } from "../../lib/content-registry";
+import { useSiteContent } from "../../lib/use-site-content";
 
 type DashboardFilter = "all" | "public" | "private" | "transfers" | "service" | "safety";
 
@@ -90,6 +92,7 @@ function DashboardInstrumentThumb({ sources, title }: { sources: string[]; title
 }
 
 export default function DashboardPage() {
+  const content = useSiteContent();
   const [user, setUser] = useState<DemoUser | null>(null);
   const [instruments, setInstruments] = useState<DemoInstrument[]>([]);
   const [transfers, setTransfers] = useState<DemoTransfer[]>([]);
@@ -397,19 +400,19 @@ export default function DashboardPage() {
         <div className="shell">
           <div className="dashboard-hero">
             <div>
-              <div className="eyebrow">Owner Dashboard</div>
+              <div className="eyebrow">{getContentValue(content, "dashboard.hero.headline")}</div>
               <h2>{user ? `Welcome back, ${displayName}.` : "Your QRguitar workspace."}</h2>
               <p>
                 {user
-                  ? `Manage your Profiles, service, privacy, QR tools, and ownership from one place. ${accountSummary}`
+                  ? `${getContentValue(content, "dashboard.hero.body")} ${accountSummary}`
                   : "Create a profile, manage QR downloads, and keep ownership history attached to the same QRguitar Profile."}
               </p>
             </div>
             <div className="dashboard-buttons">
-              <Link className="button" href="/create">Create Profile</Link>
-              <Link className="button secondary" href="/dashboard/import"><FileSpreadsheet size={16} /> Bulk Import</Link>
+              <Link className="button" href="/create">{getContentValue(content, "dashboard.actions.create")}</Link>
+              <Link className="button secondary" href="/dashboard/import"><FileSpreadsheet size={16} /> {getContentValue(content, "dashboard.actions.bulk")}</Link>
               <button className="button secondary" type="button" onClick={() => setActiveFilter("service")}>Service Requests</button>
-              <Link className="button secondary" href="/ownership-claim">Transfers / Claims</Link>
+              <Link className="button secondary" href="/ownership-claim">{getContentValue(content, "dashboard.actions.claims")}</Link>
               {collectionHandle ? <Link className="button secondary" href={`/collections/${collectionHandle}`}>View Public Collection</Link> : null}
             </div>
           </div>
@@ -469,7 +472,7 @@ export default function DashboardPage() {
             <div className={styles.tableHeader}>
               <div>
                 <div className="eyebrow">Your instruments</div>
-                <h3>Saved QRguitar Profiles</h3>
+                <h3>{getContentValue(content, "dashboard.collection.title")}</h3>
               </div>
               <Link className="button secondary" href="/create">
                 Add Guitar
@@ -521,8 +524,8 @@ export default function DashboardPage() {
                       <aside className={styles.qrActionColumn}>
                         <div className={styles.compactQr}><CompactQr code={instrument.qrCode} label={title} /><span>{instrument.qrCode}</span></div>
                         <div className={styles.primaryActions}>
-                          <Link className="button" href={instrumentToProfileUrl(instrument)}>View</Link>
-                          <Link className="button secondary" href={`/edit/${instrument.qrCode}`}>Edit</Link>
+                          <Link className="button" href={instrumentToProfileUrl(instrument)}>{getContentValue(content, "dashboard.card.open")}</Link>
+                          <Link className="button secondary" href={`/edit/${instrument.qrCode}`}>{getContentValue(content, "dashboard.card.edit")}</Link>
                           <button className="button secondary" type="button" onClick={() => setQuickEditRecord(instrument)}>Quick Edit</button>
                         </div>
                         <button
@@ -533,7 +536,7 @@ export default function DashboardPage() {
                             setActionTrigger(event.currentTarget);
                             setActionRecord(instrument);
                           }}
-                        ><Ellipsis size={18} /> More</button>
+                        ><Ellipsis size={18} /> {getContentValue(content, "dashboard.card.more")}</button>
                       </aside>
                     </article>
                   );
@@ -566,7 +569,7 @@ export default function DashboardPage() {
             <section><b>History</b><Link href={`/edit/${actionRecord.qrCode}#timeline`}>Add Timeline Event</Link><Link href={`/edit/${actionRecord.qrCode}#service`}>Add Service Entry</Link><Link href={`/edit/${actionRecord.qrCode}#media`}>Add Media</Link><Link href={`/edit/${actionRecord.qrCode}#documents`}>Add Document</Link></section>
             <section><b>Privacy & safety</b>{actionRecord.serial ? <button type="button" onClick={() => void updateSerialVisibility(actionRecord, !actionRecord.showSerialPublic)}>{actionRecord.showSerialPublic ? "Hide Serial Number" : "Show Serial Number"}</button> : null}<Link href={`/edit/${actionRecord.qrCode}#privacy-safety`}>Visibility and safety</Link></section>
             <TransferPanel className={styles.transferPanel} bodyClassName={styles.transferPanelBody} instrument={actionRecord} user={user} allowBuyerCode={collectionAccountType === "shop" || collectionAccountType === "builder"} latestTransfer={latestTransferForInstrument(transfers, actionRecord.qrCode)} onTransferCreated={(transfer) => setTransfers((current) => [transfer, ...current.filter((item) => item.id !== transfer.id)])} onTransferChanged={refreshInstruments} />
-            <section className={styles.drawerDanger}><b>Danger zone</b><button className={styles.dangerAction} type="button" onClick={() => void removeFromCollection(actionRecord)}>Remove Profile</button></section>
+            <section className={styles.drawerDanger}><b>Danger zone</b><button className={styles.dangerAction} type="button" onClick={() => void removeFromCollection(actionRecord)}>{getContentValue(content, "dashboard.card.remove")}</button></section>
           </div>
         </ActionDrawer>
       ) : null}

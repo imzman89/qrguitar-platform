@@ -12,10 +12,12 @@ import {
   type DemoInstrument
 } from "../../lib/local-demo";
 import { getServiceHistoryEntries } from "../../lib/instrument-profile-contract";
+import { getContentValue } from "../../lib/content-registry";
+import type { EditorialComposition } from "../../lib/site-settings";
 
 type ShowFilter = "All profiles" | "For Sale" | "Not for Sale" | "New" | "Used" | "Verified" | "Unverified" | "Authenticity Confirmed" | "Authenticity Unconfirmed" | "All Original" | "Modified" | "Safety Alerts" | "Service History";
 
-export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrument[] }) {
+export function CatalogClient({ initialRecords, content, composition }: { initialRecords: DemoInstrument[]; content: Record<string, string>; composition: EditorialComposition["catalog"] }) {
   const [records, setRecords] = useState<DemoInstrument[]>(dedupeByCodeAndDate(initialRecords));
   const [hasLoadedRecords, setHasLoadedRecords] = useState(initialRecords.length > 0);
   const [brand, setBrand] = useState("All brands");
@@ -161,6 +163,8 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
 
   const visibleCount = visibleRecords.length;
   const totalCount = records.length;
+  const guidance = composition.sections.find((section) => section.id === "guidance");
+  const guidanceBlock = guidance?.blocks.find((block) => block.visible);
 
   const topBrands = useMemo(() => {
     return unique(records.map((record) => record.brand).filter(Boolean));
@@ -216,14 +220,21 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
         <div className="shell">
           <div className="dashboard-hero">
             <div>
-              <div className="eyebrow">The Catalog</div>
-              <h2>Browse QRguitar Profiles.</h2>
-              <p>Search by brand, model, or exact Serial Number. Filter by availability, condition, trust, originality, or history.</p>
+              <div className="eyebrow">{getContentValue(content, "catalog.hero.eyebrow")}</div>
+              <h2>{getContentValue(content, "catalog.hero.headline")}</h2>
+              <p>{getContentValue(content, "catalog.hero.body")}</p>
             </div>
             <Link className="button" href="/create">
               Create Profile
             </Link>
           </div>
+
+          {guidance?.visible && guidanceBlock ? (
+            <section className="catalog-guidance" aria-label="Catalog guidance">
+              <strong>{guidanceBlock.title}</strong>
+              <span>{guidanceBlock.body}</span>
+            </section>
+          ) : null}
 
           <section className="catalog-filters" aria-label="Catalog filters">
             <label className="catalog-search">
@@ -353,8 +364,8 @@ export function CatalogClient({ initialRecords }: { initialRecords: DemoInstrume
             ) : (
               <div className="card catalog-empty">
                 <div className="eyebrow">No profiles found</div>
-                <h3>No matching profiles in the catalog.</h3>
-                <p>Try clearing filters, changing status, or searching by serial, brand, model, or type.</p>
+                <h3>{getContentValue(content, "catalog.empty.title")}</h3>
+                <p>{getContentValue(content, "catalog.empty.body")}</p>
               </div>
             )}
           </section>

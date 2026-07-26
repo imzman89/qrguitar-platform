@@ -1,60 +1,36 @@
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
+import { EditorialIcon } from "../../components/EditorialIcon";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
+import { getContentValue } from "../../lib/content-registry";
+import { loadPublishedSiteSettings } from "../../lib/site-settings-server";
+import { buildManagedPageMetadata } from "../../lib/site-metadata";
 
-export const metadata: Metadata = {
-  title: "Contact",
-  description: "Contact QRguitar support for public beta help."
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildManagedPageMetadata("contact", "/contact");
+}
 
-export default function ContactPage() {
-  const supportTopics = [
-    {
-      title: "Account or login help",
-      copy: "Password reset, account access, profile details, and session issues.",
-      href: "mailto:support@qrguitar.com?subject=QRguitar%20account%20help"
-    },
-    {
-      title: "Profile or QR help",
-      copy: "Permanent QRguitar IDs, photo uploads, QR downloads, public/private visibility, and profile edits.",
-      href: "mailto:support@qrguitar.com?subject=QRguitar%20record%20or%20QR%20help"
-    },
-    {
-      title: "Verification review",
-      copy: "Manual beta review for specs, provenance, documents, Serial Numbers, and authenticity evidence.",
-      href: "mailto:support@qrguitar.com?subject=QRguitar%20verification%20review"
-    },
-    {
-      title: "Lost, stolen, or transfer help",
-      copy: "Safety alerts, ownership transfer questions, claim links, and edge cases that need manual support.",
-      href: "mailto:support@qrguitar.com?subject=QRguitar%20safety%20or%20transfer%20help"
-    },
-    {
-      title: "Shop, builder, or brand onboarding",
-      copy: "Bulk profile planning, brand logo requests, QR installs, handouts, and commercial setup questions.",
-      href: "mailto:support@qrguitar.com?subject=QRguitar%20shop%20brand%20or%20builder%20help"
-    },
-    {
-      title: "Documents and privacy",
-      copy: "Questions about visible documents, private files, receipts, appraisals, and what should stay hidden.",
-      href: "mailto:support@qrguitar.com?subject=QRguitar%20document%20privacy%20help"
-    }
-  ];
+export default async function ContactPage() {
+  const settings = await loadPublishedSiteSettings();
+  const sections = settings.composition.contact.sections;
+  const sectionStyle = (sectionId: string): CSSProperties => {
+    const index = sections.findIndex((section) => section.id === sectionId);
+    return { order: index < 0 ? 99 : index, display: sections[index]?.visible === false ? "none" : undefined };
+  };
+  const supportTopics = sections.find((section) => section.id === "categories")?.blocks.filter((block) => block.visible) || [];
 
   return (
     <>
       <Nav />
-      <main>
-        <section className="section">
+      <main className="editorial-composed-page">
+        <section className="section" style={sectionStyle("hero")}>
           <div className="shell legal-page contact-page">
             <div className="contact-hero">
               <div>
                 <div className="eyebrow">Support</div>
-                <h1>Support for QRguitar Profiles.</h1>
-                <p>
-                  Get help with account access, permanent QRguitar Profiles, QR downloads, hidden documents, service history,
-                  lost/stolen alerts, transfers, and manual beta verification review.
-                </p>
+                <h1>{getContentValue(settings.content, "contact.hero.headline")}</h1>
+                <p>{getContentValue(settings.content, "contact.hero.body")}</p>
               </div>
               <div className="contact-direct-card">
                 <span>Public support inbox</span>
@@ -63,15 +39,25 @@ export default function ContactPage() {
               </div>
             </div>
 
+          </div>
+        </section>
+
+        <section className="section" style={sectionStyle("categories")}>
+          <div className="shell legal-page contact-page">
             <div className="contact-topic-grid">
               {supportTopics.map((topic) => (
-                <a className="contact-topic-card" href={topic.href} key={topic.title}>
+                <a className="contact-topic-card" href={topic.ctaUrl || "mailto:support@qrguitar.com"} key={topic.id}>
+                  <EditorialIcon name={topic.icon} />
                   <strong>{topic.title}</strong>
-                  <span>{topic.copy}</span>
+                  <span>{topic.body}</span>
                 </a>
               ))}
             </div>
+          </div>
+        </section>
 
+        <section className="section" style={sectionStyle("checklist")}>
+          <div className="shell legal-page contact-page">
             <div className="legal-card contact-checklist">
               <h2>What to include</h2>
               <ul>

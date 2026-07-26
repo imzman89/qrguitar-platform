@@ -59,6 +59,10 @@ export async function PATCH(request: Request, context: { params: { id: string } 
   const reason = cleanText(body?.reason, 1000);
   const now = new Date().toISOString();
 
+  if (!reason) {
+    return adminJson({ ok: false, message: "An operator reason is required for the audit trail." }, { status: 400 });
+  }
+
   const existing = await supabase
     .from("guitars")
     .select("id,owner_id,qr_code,permanent_path,name,brand,model,status,visibility,safety_status,public_safety_note,admin_archived_at,owner_removed_at")

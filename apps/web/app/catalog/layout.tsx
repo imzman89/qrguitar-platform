@@ -1,12 +1,10 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { buildPageMetadata } from "../../lib/seo";
+import { buildManagedPageMetadata } from "../../lib/site-metadata";
 
-export const metadata: Metadata = buildPageMetadata(
-  "Browse QRguitar Profiles",
-  "Browse QRguitar Profiles for instruments, amps, pedals, builders, shops, and collectors.",
-  "/catalog"
-);
+export async function generateMetadata(): Promise<Metadata> {
+  return buildManagedPageMetadata("catalog", "/catalog");
+}
 
 export default function CatalogLayout({ children }: { children: ReactNode }) {
   return children;

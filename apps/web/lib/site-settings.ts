@@ -1,5 +1,6 @@
 import { CheckCircle2 } from "lucide-react";
 import { siteCopy } from "../content/site-copy";
+import { defaultContentValues, getContentValue, mergeContentValues } from "./content-registry";
 import { defaultInstrumentCategories, normalizeInstrumentCategories } from "./instrument-categories";
 
 export const siteSettingsKey = "qrguitar.siteSettings";
@@ -13,6 +14,33 @@ type PricingPlanInput = {
   badge?: string;
   features: string[];
 };
+
+export type EditorialIcon = "qr" | "history" | "photo" | "shield" | "store" | "wrench" | "transfer" | "document" | "eye" | "help" | "link";
+export type EditorialPageKey = "home" | "howItWorks" | "catalog" | "installers" | "contact" | "footer";
+
+export type EditorialBlock = {
+  id: string;
+  name: string;
+  title: string;
+  body: string;
+  label?: string;
+  icon?: EditorialIcon;
+  ctaLabel?: string;
+  ctaUrl?: string;
+  items?: string[];
+  visible: boolean;
+  protected?: boolean;
+};
+
+export type EditorialSection = {
+  id: string;
+  name: string;
+  visible: boolean;
+  locked?: boolean;
+  blocks: EditorialBlock[];
+};
+
+export type EditorialComposition = Record<EditorialPageKey, { sections: EditorialSection[] }>;
 
 export type EditableSiteSettings = {
   brandName: string;
@@ -89,6 +117,121 @@ export type EditableSiteSettings = {
     verificationGuidanceTitle: string;
     verificationGuidanceBody: string;
   };
+  composition: EditorialComposition;
+  content: Record<string, string>;
+};
+
+export const editorialPageLabels: Record<EditorialPageKey, string> = {
+  home: "Homepage",
+  howItWorks: "How It Works",
+  catalog: "Catalog",
+  installers: "Installers",
+  contact: "Contact",
+  footer: "Footer"
+};
+
+export const editorialIconAllowlist: EditorialIcon[] = ["qr", "history", "photo", "shield", "store", "wrench", "transfer", "document", "eye", "help", "link"];
+
+export const defaultEditorialComposition: EditorialComposition = {
+  home: {
+    sections: [
+      { id: "hero", name: "Hero and latest Profile", visible: true, locked: true, blocks: [] },
+      { id: "lifecycle", name: "Profile lifecycle", visible: true, blocks: [
+        { id: "home-step-identity", name: "Create identity", title: "Create the identity", body: "Add one real photo and the instrument details you know.", icon: "qr", visible: true, protected: true },
+        { id: "home-step-history", name: "Build history", title: "Build the history", body: "Keep service, documents, photos, and ownership connected.", icon: "history", visible: true },
+        { id: "home-step-share", name: "Scan and share", title: "Scan and share", body: "Use the permanent QR code wherever the instrument goes.", icon: "photo", visible: true }
+      ] },
+      { id: "anatomy", name: "Profile anatomy", visible: true, blocks: [
+        { id: "home-anatomy-identity", name: "Identity", title: "Identity", body: "Serial Number, specifications, visibility, and permanent QRguitar ID.", icon: "qr", visible: true, protected: true },
+        { id: "home-anatomy-proof", name: "Proof", title: "Proof", body: "Photos, selected documents, verification, and authenticity status.", icon: "shield", visible: true },
+        { id: "home-anatomy-history", name: "History", title: "History", body: "Service, Timeline events, ownership handoffs, and safety alerts.", icon: "history", visible: true }
+      ] },
+      { id: "roles", name: "Role and use cases", visible: true, blocks: [
+        { id: "home-role-player", name: "Players", title: "Players", body: "Keep an instrument's identity, photos, service, and ownership history together.", icon: "photo", visible: true, protected: true },
+        { id: "home-role-collector", name: "Collectors", title: "Collectors", body: "Preserve provenance and choose what becomes part of a public collection.", icon: "shield", visible: true },
+        { id: "home-role-shop", name: "Shops and builders", title: "Shops and builders", body: "Prepare Profiles, QR materials, service history, and customer handoffs.", icon: "store", visible: true }
+      ] },
+      { id: "pricing", name: "Public beta pricing", visible: true, blocks: [
+        { id: "home-price-beta", name: "Free Public Beta", title: "Free Public Beta", label: "$0", body: "Create up to 25 Profiles during public beta without a hard paywall.", ctaLabel: "Create Free Profile", ctaUrl: "/create", items: ["Up to 25 Profiles during beta", "Public, Private, or Unlisted", "QR download included"], icon: "qr", visible: true, protected: true },
+        { id: "home-price-commercial", name: "Commercial and brand setup", title: "Commercial / Brand Setup", label: "From $99+", body: "For builders, retailers, repair shops, brands, and commercial accounts that need onboarding or bulk help.", ctaLabel: "Contact QRguitar", ctaUrl: "mailto:support@qrguitar.com", items: ["Builder, retailer, and shop onboarding", "Bulk Profile setup", "QR hardware and verification support"], icon: "store", visible: true }
+      ] },
+      { id: "finalCta", name: "Closing action", visible: true, blocks: [] }
+    ]
+  },
+  howItWorks: {
+    sections: [
+      { id: "hero", name: "Hero", visible: true, locked: true, blocks: [] },
+      { id: "lifecycle", name: "Instrument lifecycle", visible: true, blocks: [
+        { id: "how-step-create", name: "Create or find", title: "Create or find the Profile", body: "Enter the Serial Number first. If a matching Profile exists, use transfer or a reviewed claim instead of creating a duplicate.", icon: "qr", visible: true, protected: true },
+        { id: "how-step-build", name: "Add identity", title: "Add identity, photos, and history", body: "Start with the instrument identity and one clear photo, then add the details and history you know.", icon: "photo", visible: true },
+        { id: "how-step-qr", name: "Use the QR", title: "Use the permanent QR", body: "Download, share, or print the QR for the instrument, case, counter card, or paperwork.", icon: "qr", visible: true },
+        { id: "how-step-maintain", name: "Maintain history", title: "Maintain service and ownership", body: "Add approved service, media, documents, and ownership changes to the same permanent Profile over time.", icon: "history", visible: true }
+      ] },
+      { id: "identity", name: "Identity and privacy", visible: true, blocks: [] },
+      { id: "features", name: "Feature map", visible: true, blocks: [
+        { id: "how-feature-identity", name: "Identity and QR", title: "Identity and QR", body: "Keep the QRguitar ID, permitted Serial Number, and permanent Profile link together.", icon: "qr", visible: true, protected: true },
+        { id: "how-feature-media", name: "Photos and media", title: "Photos, specs, and media", body: "Show the instrument clearly with useful details, video, and audio.", icon: "photo", visible: true },
+        { id: "how-feature-service", name: "Timeline and service", title: "Timeline and service", body: "Record ownership milestones and owner-approved provider work.", icon: "wrench", visible: true },
+        { id: "how-feature-docs", name: "Documents and print", title: "Documents and print", body: "Keep private evidence, share selected documents, and print handouts or QR labels.", icon: "document", visible: true },
+        { id: "how-feature-privacy", name: "Visibility", title: "Public, Unlisted, or Private", body: "Choose how each Profile is discovered without changing its permanent identity.", icon: "eye", visible: true },
+        { id: "how-feature-safety", name: "Safety", title: "Safety and provenance", body: "Publish lost or stolen alerts and preserve reviewed historical evidence.", icon: "shield", visible: true },
+        { id: "how-feature-transfer", name: "Transfers and claims", title: "Transfers and claims", body: "Hand the same Profile to its next owner through a recipient-bound workflow.", icon: "transfer", visible: true },
+        { id: "how-feature-collections", name: "Collections and Bulk Import", title: "Collections and Bulk Import", body: "Opt into a public collection or prepare larger inventories privately before publishing.", icon: "store", visible: true }
+      ] },
+      { id: "service", name: "Service and ownership", visible: true, blocks: [] },
+      { id: "roles", name: "Role journeys", visible: true, blocks: [
+        { id: "how-role-player", name: "Players", title: "Players", body: "Document an instrument, maintain its history, share it, and transfer it when ownership changes.", ctaLabel: "Create a Profile", ctaUrl: "/create", icon: "photo", visible: true, protected: true },
+        { id: "how-role-collector", name: "Collectors", title: "Collectors", body: "Choose privacy per Profile, preserve provenance, and opt into a public collection when ready.", ctaLabel: "Create a Profile", ctaUrl: "/create", icon: "shield", visible: true },
+        { id: "how-role-shop", name: "Shops", title: "Shops", body: "Bulk import private inventory, refine Profiles, print materials, and transfer to customers.", ctaLabel: "Open inventory tools", ctaUrl: "/dashboard/import", icon: "store", visible: true },
+        { id: "how-role-builder", name: "Builders", title: "Builders", body: "Create build Profiles with official specifications, media, and a clean purchaser handoff.", ctaLabel: "Open inventory tools", ctaUrl: "/dashboard/import", icon: "store", visible: true },
+        { id: "how-role-brand", name: "Brands", title: "Brands", body: "Keep product identity consistent across new and used instruments while supporting larger rollouts.", ctaLabel: "Open inventory tools", ctaUrl: "/dashboard/import", icon: "store", visible: true },
+        { id: "how-role-provider", name: "Service providers", title: "Luthiers / Technicians", body: "Submit repair, restoration, setup, and service work for owner approval.", ctaLabel: "Set up provider tools", ctaUrl: "/account#service-provider", icon: "wrench", visible: true },
+        { id: "how-role-buyer", name: "Buyers", title: "Buyers", body: "Review public identity, history, trust signals, and seller collections before transfer or claim.", ctaLabel: "Open Claim Center", ctaUrl: "/ownership-claim", icon: "eye", visible: true }
+      ] },
+      { id: "faq", name: "Common questions", visible: true, blocks: [
+        { id: "how-faq-serial", name: "Serial Number privacy", title: "Can I hide the Serial Number?", body: "Yes. The owner can keep the Serial Number in the private workspace while hiding it from public surfaces without changing the QRguitar ID.", icon: "help", visible: true, protected: true },
+        { id: "how-faq-no-serial", name: "No Serial Number", title: "What if there is no Serial Number?", body: "QRguitar assigns a unique six-digit ID. Trust approval requires QRguitar review.", icon: "help", visible: true },
+        { id: "how-faq-transfer", name: "Transfer safety", title: "Can scanning the QR transfer ownership?", body: "No. A scan only opens the Profile. The current owner or shop must start a secure, recipient-bound transfer.", icon: "help", visible: true },
+        { id: "how-faq-visibility", name: "Catalog privacy", title: "Can I keep a Profile out of the Catalog?", body: "Yes. Choose Unlisted for direct-link access or Private for owner and authorized admin access only.", icon: "help", visible: true }
+      ] },
+      { id: "finalCta", name: "Closing action", visible: true, blocks: [] }
+    ]
+  },
+  catalog: { sections: [
+    { id: "hero", name: "Catalog introduction", visible: true, locked: true, blocks: [] },
+    { id: "guidance", name: "Search guidance", visible: true, blocks: [{ id: "catalog-guide-search", name: "Search guidance", title: "Find the right Profile", body: "Search by QRguitar ID, Serial Number, title, model, or brand, then narrow the results with practical filters.", icon: "help", visible: true, protected: true }] }
+  ] },
+  installers: { sections: [
+    { id: "hero", name: "Installer introduction", visible: true, locked: true, blocks: [] },
+    { id: "process", name: "Partner process", visible: true, blocks: [
+      { id: "installer-apply", name: "Apply", title: "Apply", body: "Submit shop details, service area, finish experience, and references.", icon: "store", visible: true, protected: true },
+      { id: "installer-verify", name: "Verify", title: "Verify", body: "QRguitar reviews the business and confirms qualified partners.", icon: "shield", visible: true },
+      { id: "installer-coordinate", name: "Coordinate", title: "Coordinate", body: "QRguitar connects approved shops and owners for installation or repair-linked documentation.", icon: "transfer", visible: true }
+    ] },
+    { id: "apply", name: "Partner application", visible: true, blocks: [] }
+  ] },
+  contact: { sections: [
+    { id: "hero", name: "Support introduction", visible: true, locked: true, blocks: [] },
+    { id: "categories", name: "Support categories", visible: true, blocks: [
+      { id: "contact-account", name: "Account help", title: "Account or login help", body: "Password reset, account access, Profile details, and session issues.", ctaLabel: "Email support", ctaUrl: "mailto:support@qrguitar.com?subject=QRguitar%20account%20help", icon: "help", visible: true, protected: true },
+      { id: "contact-profile", name: "Profile and QR help", title: "Profile or QR help", body: "Permanent IDs, photo uploads, QR downloads, visibility, and Profile edits.", ctaLabel: "Email support", ctaUrl: "mailto:support@qrguitar.com?subject=QRguitar%20Profile%20or%20QR%20help", icon: "qr", visible: true },
+      { id: "contact-verification", name: "Verification review", title: "Verification review", body: "Manual beta review for specifications, provenance, documents, Serial Numbers, and authenticity evidence.", ctaLabel: "Email support", ctaUrl: "mailto:support@qrguitar.com?subject=QRguitar%20verification%20review", icon: "shield", visible: true },
+      { id: "contact-ownership", name: "Ownership help", title: "Lost, stolen, or transfer help", body: "Safety alerts, transfers, claims, and edge cases that need manual support.", ctaLabel: "Email support", ctaUrl: "mailto:support@qrguitar.com?subject=QRguitar%20safety%20or%20transfer%20help", icon: "transfer", visible: true },
+      { id: "contact-commercial", name: "Commercial onboarding", title: "Shop, builder, or brand onboarding", body: "Bulk Profile planning, brand logos, QR installs, handouts, and commercial setup.", ctaLabel: "Email support", ctaUrl: "mailto:support@qrguitar.com?subject=QRguitar%20commercial%20onboarding", icon: "store", visible: true }
+    ] },
+    { id: "checklist", name: "Support checklist", visible: true, blocks: [] }
+  ] },
+  footer: { sections: [
+    { id: "links", name: "Footer links", visible: true, locked: true, blocks: [
+      { id: "footer-dashboard", name: "Dashboard", title: "Dashboard", body: "", ctaLabel: "Dashboard", ctaUrl: "/dashboard", icon: "link", visible: true, protected: true },
+      { id: "footer-catalog", name: "Catalog", title: "Catalog", body: "", ctaLabel: "Catalog", ctaUrl: "/catalog", icon: "link", visible: true, protected: true },
+      { id: "footer-create", name: "Create", title: "Create", body: "", ctaLabel: "Create", ctaUrl: "/create", icon: "link", visible: true },
+      { id: "footer-how", name: "How It Works", title: "How It Works", body: "", ctaLabel: "How It Works", ctaUrl: "/how-it-works", icon: "link", visible: true },
+      { id: "footer-privacy", name: "Privacy", title: "Privacy", body: "", ctaLabel: "Privacy", ctaUrl: "/privacy", icon: "link", visible: true, protected: true },
+      { id: "footer-terms", name: "Terms", title: "Terms", body: "", ctaLabel: "Terms", ctaUrl: "/terms", icon: "link", visible: true, protected: true },
+      { id: "footer-contact", name: "Contact", title: "Contact", body: "", ctaLabel: "Contact", ctaUrl: "/contact", icon: "link", visible: true }
+    ] }
+  ] }
 };
 
 export const defaultSiteSettings: EditableSiteSettings = {
@@ -174,8 +317,137 @@ export const defaultSiteSettings: EditableSiteSettings = {
     transferGuidanceBody: "Use transfer tools for normal handoffs and support for edge cases during beta.",
     verificationGuidanceTitle: "Verification and authenticity",
     verificationGuidanceBody: "Manual verification and authenticity review are handled carefully during beta."
-  }
+  },
+  composition: structuredClone(defaultEditorialComposition),
+  content: { ...defaultContentValues }
 };
+
+const editorialPageKeys = Object.keys(defaultEditorialComposition) as EditorialPageKey[];
+
+function cleanEditorialText(value: unknown, fallback = "") {
+  return typeof value === "string" ? value.slice(0, 4000) : fallback;
+}
+
+function normalizeEditorialBlock(value: unknown, fallback?: EditorialBlock): EditorialBlock {
+  const block = value && typeof value === "object" ? value as Partial<EditorialBlock> : {};
+  const icon = editorialIconAllowlist.includes(block.icon as EditorialIcon)
+    ? block.icon as EditorialIcon
+    : fallback?.icon;
+  return {
+    id: cleanEditorialText(block.id, fallback?.id || ""),
+    name: cleanEditorialText(block.name, fallback?.name || "Untitled block"),
+    title: cleanEditorialText(block.title, fallback?.title || ""),
+    body: cleanEditorialText(block.body, fallback?.body || ""),
+    ...(block.label !== undefined || fallback?.label !== undefined
+      ? { label: cleanEditorialText(block.label, fallback?.label || "") }
+      : {}),
+    ...(icon ? { icon } : {}),
+    ...(block.ctaLabel !== undefined || fallback?.ctaLabel !== undefined
+      ? { ctaLabel: cleanEditorialText(block.ctaLabel, fallback?.ctaLabel || "") }
+      : {}),
+    ...(block.ctaUrl !== undefined || fallback?.ctaUrl !== undefined
+      ? { ctaUrl: cleanEditorialText(block.ctaUrl, fallback?.ctaUrl || "") }
+      : {}),
+    ...(Array.isArray(block.items) || fallback?.items
+      ? { items: (Array.isArray(block.items) ? block.items : fallback?.items || []).map((item) => cleanEditorialText(item)).slice(0, 20) }
+      : {}),
+    visible: typeof block.visible === "boolean" ? block.visible : fallback?.visible !== false,
+    ...(fallback?.protected || block.protected ? { protected: true } : {})
+  };
+}
+
+export function normalizeEditorialComposition(value?: Partial<EditorialComposition> | null): EditorialComposition {
+  return Object.fromEntries(editorialPageKeys.map((pageKey) => {
+    const defaults = defaultEditorialComposition[pageKey];
+    const candidate = value?.[pageKey];
+    if (!candidate || !Array.isArray(candidate.sections)) {
+      return [pageKey, structuredClone(defaults)];
+    }
+    const fallbackById = new Map(defaults.sections.map((section) => [section.id, section]));
+    const sections = candidate.sections.map((section) => {
+      const fallback = fallbackById.get(String(section?.id || ""));
+      const fallbackBlocks = new Map((fallback?.blocks || []).map((block) => [block.id, block]));
+      const blocks = Array.isArray(section?.blocks)
+        ? section.blocks.map((block) => normalizeEditorialBlock(block, fallbackBlocks.get(String(block?.id || ""))))
+        : structuredClone(fallback?.blocks || []);
+      return {
+        id: cleanEditorialText(section?.id, fallback?.id || ""),
+        name: cleanEditorialText(section?.name, fallback?.name || "Untitled section"),
+        visible: typeof section?.visible === "boolean" ? section.visible : fallback?.visible !== false,
+        ...(fallback?.locked || section?.locked ? { locked: true } : {}),
+        blocks
+      } satisfies EditorialSection;
+    });
+    return [pageKey, { sections }];
+  })) as EditorialComposition;
+}
+
+function isSafeEditorialUrl(value: string) {
+  if (!value.trim()) return true;
+  return /^(\/[^/]|https?:\/\/|mailto:)/i.test(value.trim());
+}
+
+function containsUnsafeEditorialMarkup(value: string) {
+  return /<\s*script\b|javascript\s*:|on\w+\s*=/i.test(value);
+}
+
+export function validateEditorialComposition(composition: EditorialComposition) {
+  const errors: Record<string, string> = {};
+  for (const pageKey of editorialPageKeys) {
+    const path = `composition.${pageKey}`;
+    const defaults = defaultEditorialComposition[pageKey];
+    const page = composition?.[pageKey];
+    if (!page || !Array.isArray(page.sections)) {
+      errors[path] = "This page needs its supported section structure.";
+      continue;
+    }
+    const ids = page.sections.map((section) => section.id);
+    const expectedIds = defaults.sections.map((section) => section.id);
+    if (new Set(ids).size !== ids.length) errors[`${path}.sections`] = "Section IDs must be unique.";
+    const missing = expectedIds.filter((id) => !ids.includes(id));
+    const unsupported = ids.filter((id) => !expectedIds.includes(id));
+    if (missing.length || unsupported.length) {
+      errors[`${path}.sections`] = `Keep every supported section exactly once${missing.length ? `; missing ${missing.join(", ")}` : ""}${unsupported.length ? `; unsupported ${unsupported.join(", ")}` : ""}.`;
+    }
+    for (const locked of defaults.sections.filter((section) => section.locked)) {
+      const expectedIndex = expectedIds.indexOf(locked.id);
+      const actualIndex = ids.indexOf(locked.id);
+      const candidate = page.sections[actualIndex];
+      if (actualIndex !== expectedIndex || candidate?.visible === false) {
+        errors[`${path}.${locked.id}`] = "This required section must stay visible in its fixed position.";
+      }
+    }
+    for (const section of page.sections) {
+      const sectionPath = `${path}.${section.id || "unknown"}`;
+      if (!section.id.trim() || !section.name.trim()) errors[sectionPath] = "Section ID and name are required.";
+      if (containsUnsafeEditorialMarkup(section.name)) errors[sectionPath] = "Unsafe markup is not allowed.";
+      if (section.blocks.length > 12) errors[`${sectionPath}.blocks`] = "Use no more than 12 blocks in one section.";
+      const blockIds = section.blocks.map((block) => block.id);
+      if (new Set(blockIds).size !== blockIds.length) errors[`${sectionPath}.blocks`] = "Block IDs must be unique.";
+      const defaultSection = defaults.sections.find((item) => item.id === section.id);
+      if ((defaultSection?.blocks.length || 0) > 0 && section.blocks.length < 1) {
+        errors[`${sectionPath}.blocks`] = "Keep at least one block in this section.";
+      }
+      for (const protectedBlock of defaultSection?.blocks.filter((block) => block.protected) || []) {
+        if (!blockIds.includes(protectedBlock.id)) errors[`${sectionPath}.blocks`] = `Protected block ${protectedBlock.name} cannot be removed.`;
+      }
+      for (const block of section.blocks) {
+        const blockPath = `${sectionPath}.${block.id || "unknown"}`;
+        if (!block.id.trim() || !block.name.trim() || !block.title.trim()) errors[blockPath] = "Block ID, semantic name, and title are required.";
+        if (block.icon && !editorialIconAllowlist.includes(block.icon)) errors[`${blockPath}.icon`] = "Choose an approved icon.";
+        if (block.ctaUrl && !isSafeEditorialUrl(block.ctaUrl)) errors[`${blockPath}.ctaUrl`] = "Use a local, HTTPS, HTTP, or mailto URL.";
+        if ([block.name, block.title, block.body, block.label || "", block.ctaLabel || "", block.ctaUrl || "", ...(block.items || [])].some(containsUnsafeEditorialMarkup)) {
+          errors[blockPath] = "Unsafe HTML or script content is not allowed.";
+        }
+      }
+    }
+  }
+  return errors;
+}
+
+export function getEditorialSection(settings: EditableSiteSettings, page: EditorialPageKey, id: string) {
+  return settings.composition[page].sections.find((section) => section.id === id);
+}
 
 function normalizePricingCards(cards: PricingPlanInput[]) {
   const cleaned = cards
@@ -337,7 +609,9 @@ export function mergeSiteSettings(settings?: Partial<EditableSiteSettings> | nul
     dashboard: {
       ...defaultSiteSettings.dashboard,
       ...(settings?.dashboard || {})
-    }
+    },
+    composition: normalizeEditorialComposition(settings?.composition),
+    content: mergeContentValues(settings?.content as Record<string, unknown> | undefined)
   });
 }
 
@@ -421,7 +695,12 @@ export function buildEditableHomeCopy(settings: EditableSiteSettings) {
   return {
     hero: {
       ...siteCopy.hero,
-      ...settings.hero
+      ...settings.hero,
+      eyebrow: getContentValue(settings.content, "home.hero.eyebrow"),
+      headline: getContentValue(settings.content, "home.hero.headline"),
+      body: getContentValue(settings.content, "home.hero.body"),
+      primaryCta: getContentValue(settings.content, "home.hero.primaryCta"),
+      secondaryCta: getContentValue(settings.content, "home.hero.secondaryCta")
     },
     workflow: {
       eyebrow: settings.sections.howEyebrow,
@@ -452,8 +731,8 @@ export function buildEditableHomeCopy(settings: EditableSiteSettings) {
     },
     pricing: {
       eyebrow: settings.sections.pricingEyebrow,
-      headline: settings.sections.pricingHeadline,
-      body: settings.sections.pricingBody,
+      headline: getContentValue(settings.content, "home.pricing.headline") || settings.sections.pricingHeadline,
+      body: getContentValue(settings.content, "home.pricing.body") || settings.sections.pricingBody,
       plans: settings.sections.pricingCards.map((plan) => ({
         ...plan,
         icon: siteCopy.workflow.cards[0].icon

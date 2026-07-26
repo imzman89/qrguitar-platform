@@ -7,6 +7,7 @@ import { Footer } from "../../../components/Footer";
 import { InstrumentPreview } from "../../../components/InstrumentPreview";
 import { Nav } from "../../../components/Nav";
 import { PhotoOrganizer } from "../../../components/PhotoOrganizer";
+import { getContentValue } from "../../../lib/content-registry";
 import { createSubmissionFingerprint, isRepeatedBrowserSubmission, validateInstrumentSubmission } from "../../../lib/security";
 import {
   defaultQrStyle,
@@ -21,6 +22,7 @@ import { defaultSiteSettings, fetchPublishedSiteSettings } from "../../../lib/si
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../../lib/supabase-browser";
 import { qrCodeFromSerial } from "../../../lib/qrguitar-id";
 import { canonicalInstrumentBrand, establishedInstrumentBrands } from "../../../lib/instrument-brands";
+import { useSiteContent } from "../../../lib/use-site-content";
 
 const emptyForm = {
   name: "",
@@ -111,6 +113,7 @@ const emptyServiceForm = {
 const emptyMediaForm = { url: "", title: "", caption: "", isPublic: true };
 
 export default function EditInstrumentPage() {
+  const content = useSiteContent();
   const params = useParams<{ code: string }>();
   const router = useRouter();
   const code = params.code?.toUpperCase() || "";
@@ -930,7 +933,8 @@ export default function EditInstrumentPage() {
         <div className="shell split create-layout">
           <div>
             <div className="eyebrow">Edit QRguitar Profile</div>
-            <h2>Edit the profile while preserving every printed QR link.</h2>
+            <h2>{getContentValue(content, "edit.hero.headline")}</h2>
+            <p>{getContentValue(content, "edit.hero.body")}</p>
             <p>
               Update make, model, serial number, optional nickname, specs, links, photos, and QR appearance.
               Admin-approved Serial Number corrections update the QRguitar ID while preserving previous QR links.
@@ -1695,10 +1699,10 @@ export default function EditInstrumentPage() {
               {message ? <p className="form-message">{message}</p> : null}
               <div className="form-actions editor-save-bar">
                 <button className="button" type="button" onClick={() => void saveChanges(false)} disabled={savingRecord || savingSafety}>
-                  {savingRecord ? "Saving..." : "Save Changes"}
+                  {savingRecord ? "Saving..." : getContentValue(content, "edit.actions.save")}
                 </button>
                 <button className="button" type="button" onClick={() => void saveChanges(true)} disabled={savingRecord || savingSafety}>
-                  {savingRecord ? "Saving..." : form.visibility === "public" ? "Save and View Profile" : "Save and Return to Dashboard"}
+                  {savingRecord ? "Saving..." : form.visibility === "public" ? getContentValue(content, "edit.actions.saveView") : "Save and Return to Dashboard"}
                 </button>
                 <Link className="button secondary" href="/dashboard">
                   Back to Dashboard

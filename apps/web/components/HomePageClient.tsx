@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Footer } from "./Footer";
+import { EditorialIcon } from "./EditorialIcon";
 import { LatestPublicRecord } from "./LatestPublicRecord";
 import { Nav } from "./Nav";
 import { siteCopy } from "../content/site-copy";
@@ -74,154 +75,108 @@ export function HomePageClient({
   }, [settings]);
 
   const recordPhoto = initialLatestRecord ? getProfilePhotoUrls(initialLatestRecord)[0] : "";
-  const selectedAudience = copy.audiences.cards[activeAudience] || copy.audiences.cards[0];
+  const homeSections = settings?.composition.home.sections || [];
+  const sectionBlocks = (sectionId: string) => homeSections.find((section) => section.id === sectionId)?.blocks.filter((block) => block.visible) || [];
+  const audienceBlocks = sectionBlocks("roles");
+  const selectedAudience = audienceBlocks[activeAudience] || audienceBlocks[0];
+
+  const renderedSections: Record<string, ReactNode> = {
+    hero: (
+      <section className="hero">
+        <div className="shell hero-grid">
+          <div className="hero-copy">
+            <div className="eyebrow">{copy.hero.eyebrow}</div>
+            <h1>{copy.hero.headline}</h1>
+            <p>{copy.hero.body}</p>
+            <div className="hero-actions">
+              <Link className="button" href="/create">{copy.hero.primaryCta}</Link>
+              <Link className="button secondary" href="/catalog">{copy.hero.secondaryCta}</Link>
+            </div>
+            <div className="trust-row" aria-label="Platform highlights">
+              {cleanHeroTrust(copy.hero.trust).map((item) => <span key={item}>{item}</span>)}
+            </div>
+          </div>
+          <LatestPublicRecord initialRecord={initialLatestRecord} />
+        </div>
+      </section>
+    ),
+    lifecycle: (
+      <section className="section alt">
+        <div className="shell">
+          <div className="section-header">
+            <div className="eyebrow">{copy.workflow.eyebrow}</div>
+            <h2>{copy.workflow.headline}</h2>
+            <p>{copy.workflow.body}</p>
+          </div>
+          <div className="grid three">
+            {sectionBlocks("lifecycle").map((item) => <Card key={item.id} icon={<EditorialIcon name={item.icon} size={30} />} title={item.title} copy={item.body} />)}
+          </div>
+        </div>
+      </section>
+    ),
+    anatomy: (
+      <section className="section record-holds-section">
+        <div className="shell record-holds-layout">
+          <div className="record-holds-copy">
+            <div className="eyebrow">{copy.customization.eyebrow}</div>
+            <h2>{copy.customization.headline}</h2>
+            <p>{copy.customization.body}</p>
+            <div className="check-list">
+              {copy.customization.checks.map((item) => <div className="check-item" key={item.copy}><item.icon size={18} /><span>{item.copy}</span></div>)}
+            </div>
+            <div className="inline-cta-row"><Link className="button" href="/create">{copy.customization.cta}</Link></div>
+          </div>
+          <div className="record-holds-visual" aria-label="A QRguitar Profile keeps the instrument and its history together">
+            <div className="record-holds-photo">
+              {recordPhoto ? <img src={recordPhoto} alt="A documented instrument in QRguitar" /> : <div className="record-holds-photo-empty" aria-hidden="true" />}
+              <span>One permanent identity</span>
+            </div>
+            <div className="record-holds-facts">
+              {sectionBlocks("anatomy").map((item, index) => <div key={item.id}><span>{String(index + 1).padStart(2, "0")}</span><strong>{item.title}</strong><p>{item.body}</p></div>)}
+            </div>
+          </div>
+        </div>
+      </section>
+    ),
+    roles: (
+      <section className="section alt">
+        <div className="shell">
+          <div className="section-header"><div className="eyebrow">{copy.audiences.eyebrow}</div><h2>{copy.audiences.headline}</h2><p>{copy.audiences.body}</p></div>
+          <div className="audience-switcher">
+            <div className="audience-tabs" role="tablist" aria-label="Choose how you use QRguitar">
+              {audienceBlocks.map((item, index) => <button className={index === activeAudience ? "is-active" : ""} key={item.id} type="button" role="tab" aria-selected={index === activeAudience} onClick={() => setActiveAudience(index)}>{item.title}</button>)}
+            </div>
+            {selectedAudience ? <article className="audience-panel" role="tabpanel"><div className="icon"><EditorialIcon name={selectedAudience.icon} size={30} /></div><div><h3>{selectedAudience.title}</h3><p>{selectedAudience.body}</p></div><Link className="button secondary" href={selectedAudience.ctaUrl || "/how-it-works"}>{selectedAudience.ctaLabel || "See the workflow"}</Link></article> : null}
+          </div>
+          {copy.audiences.cta ? <div className="section-cta"><Link className="button" href="/dashboard">{copy.audiences.cta}</Link></div> : null}
+        </div>
+      </section>
+    ),
+    pricing: (
+      <section className="section pricing-section">
+        <div className="shell">
+          <div className="section-header"><div className="eyebrow">{copy.pricing.eyebrow}</div><h2>{copy.pricing.headline}</h2><p>{copy.pricing.body}</p></div>
+          <div className="pricing-grid">
+            {sectionBlocks("pricing").map((plan) => <PricingCard key={plan.id} name={plan.title} price={plan.label || ""} copy={plan.body} features={plan.items || []} cta={plan.ctaLabel} href={plan.ctaUrl} />)}
+          </div>
+        </div>
+      </section>
+    ),
+    finalCta: (
+      <section className="section alt">
+        <div className="shell">
+          <div className="section-header"><div className="eyebrow">Ready when the instrument is</div><h2>{settings?.content["home.finalCta.headline"] || "Start the Profile that stays with it."}</h2><p>{settings?.content["home.finalCta.body"] || "Create one Profile now, then add photos, history, and proof as the instrument's story grows."}</p></div>
+          <div className="section-cta"><Link className="button" href="/create">Create Profile</Link><Link className="button secondary" href="/catalog">Browse Profiles</Link></div>
+        </div>
+      </section>
+    )
+  };
 
   return (
     <>
       <Nav />
       <main>
-        <section className="hero">
-          <div className="shell hero-grid">
-            <div className="hero-copy">
-              <div className="eyebrow">{copy.hero.eyebrow}</div>
-              <h1>{copy.hero.headline}</h1>
-              <p>{copy.hero.body}</p>
-              <div className="hero-actions">
-                <Link className="button" href="/create">
-                  {copy.hero.primaryCta}
-                </Link>
-                <Link className="button secondary" href="/catalog">
-                  {copy.hero.secondaryCta}
-                </Link>
-              </div>
-              <div className="trust-row" aria-label="Platform highlights">
-                {cleanHeroTrust(copy.hero.trust).map((item) => (
-                  <span key={item}>{item}</span>
-                ))}
-              </div>
-            </div>
-
-            <LatestPublicRecord initialRecord={initialLatestRecord} />
-          </div>
-        </section>
-
-        <section className="section alt">
-          <div className="shell">
-            <div className="section-header">
-              <div className="eyebrow">{copy.workflow.eyebrow}</div>
-              <h2>{copy.workflow.headline}</h2>
-              <p>{copy.workflow.body}</p>
-            </div>
-            <div className="grid three">
-              {copy.workflow.cards.map((item) => (
-                <Card key={item.title} icon={<item.icon size={30} />} title={item.title} copy={item.copy} />
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="section record-holds-section">
-          <div className="shell record-holds-layout">
-            <div className="record-holds-copy">
-              <div className="eyebrow">{copy.customization.eyebrow}</div>
-              <h2>{copy.customization.headline}</h2>
-              <p>{copy.customization.body}</p>
-              <div className="check-list">
-                {copy.customization.checks.map((item) => (
-                  <div className="check-item" key={item.copy}>
-                    <item.icon size={18} />
-                    <span>{item.copy}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="inline-cta-row">
-                <Link className="button" href="/create">
-                  {copy.customization.cta}
-                </Link>
-              </div>
-            </div>
-            <div className="record-holds-visual" aria-label="A QRguitar Profile keeps the instrument and its history together">
-              <div className="record-holds-photo">
-                {recordPhoto ? <img src={recordPhoto} alt="A documented instrument in QRguitar" /> : <div className="record-holds-photo-empty" aria-hidden="true" />}
-                <span>One permanent identity</span>
-              </div>
-              <div className="record-holds-facts">
-                <div><span>01</span><strong>Identity</strong><p>Serial number, specifications, visibility, and permanent QRguitar ID.</p></div>
-                <div><span>02</span><strong>Proof</strong><p>Photos, selected documents, verification, and authenticity status.</p></div>
-                <div><span>03</span><strong>History</strong><p>Service, timeline events, ownership handoffs, and safety alerts.</p></div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="section alt">
-          <div className="shell">
-            <div className="section-header">
-              <div className="eyebrow">{copy.audiences.eyebrow}</div>
-              <h2>{copy.audiences.headline}</h2>
-              <p>{copy.audiences.body}</p>
-            </div>
-            <div className="audience-switcher">
-              <div className="audience-tabs" role="tablist" aria-label="Choose how you use QRguitar">
-                {copy.audiences.cards.map((item, index) => (
-                  <button
-                    className={index === activeAudience ? "is-active" : ""}
-                    key={item.title}
-                    type="button"
-                    role="tab"
-                    aria-selected={index === activeAudience}
-                    onClick={() => setActiveAudience(index)}
-                  >
-                    {item.title}
-                  </button>
-                ))}
-              </div>
-              {selectedAudience ? (
-                <article className="audience-panel" role="tabpanel">
-                  <div className="icon"><selectedAudience.icon size={30} /></div>
-                  <div><h3>{selectedAudience.title}</h3><p>{selectedAudience.copy}</p></div>
-                  <Link className="button secondary" href="/how-it-works">See the workflow</Link>
-                </article>
-              ) : null}
-            </div>
-            {copy.audiences.cta ? (
-              <div className="section-cta">
-                <Link className="button" href="/dashboard">
-                  {copy.audiences.cta}
-                </Link>
-              </div>
-            ) : null}
-          </div>
-        </section>
-
-        <section className="section pricing-section">
-          <div className="shell">
-            <div className="section-header">
-              <div className="eyebrow">{copy.pricing.eyebrow}</div>
-              <h2>{copy.pricing.headline}</h2>
-              <p>{copy.pricing.body}</p>
-            </div>
-            <div className="pricing-grid">
-              {copy.pricing.plans.map((plan) => (
-                <PricingCard key={plan.name} {...plan} />
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="section alt">
-          <div className="shell">
-            <div className="section-header">
-              <div className="eyebrow">Ready when the instrument is</div>
-              <h2>Start the Profile that stays with it.</h2>
-              <p>Create one Profile now, then add photos, history, and proof as the instrument&apos;s story grows.</p>
-            </div>
-            <div className="section-cta">
-              <Link className="button" href="/create">Create Profile</Link>
-              <Link className="button secondary" href="/catalog">Browse Profiles</Link>
-            </div>
-          </div>
-        </section>
+        {homeSections.filter((section) => section.visible).map((section) => <Fragment key={section.id}>{renderedSections[section.id] || null}</Fragment>)}
       </main>
       <Footer />
     </>
@@ -258,20 +213,23 @@ function PricingCard({
   price,
   copy,
   badge,
-  features
+  features,
+  cta,
+  href
 }: {
   name: string;
   price: string;
   copy: string;
   badge?: string;
   features: string[];
+  cta?: string;
+  href?: string;
 }) {
   const normalizedName = name.trim().toLowerCase();
-  const cta = normalizedName === "free public beta" ? "Create Free Profile" : "Contact QRguitar";
-  const href =
-    normalizedName === "free public beta"
+  const resolvedCta = cta || (normalizedName === "free public beta" ? "Create Free Profile" : "Contact QRguitar");
+  const resolvedHref = href || (normalizedName === "free public beta"
       ? "/create"
-      : `mailto:support@qrguitar.com?subject=${encodeURIComponent(`QRguitar ${name}`)}`;
+      : `mailto:support@qrguitar.com?subject=${encodeURIComponent(`QRguitar ${name}`)}`);
 
   return (
     <article className={badge ? "price-card featured" : "price-card"}>
@@ -284,8 +242,8 @@ function PricingCard({
           <li key={feature}>{feature}</li>
         ))}
       </ul>
-      <Link className="button" href={href}>
-        {cta}
+      <Link className="button" href={resolvedHref}>
+        {resolvedCta}
       </Link>
     </article>
   );

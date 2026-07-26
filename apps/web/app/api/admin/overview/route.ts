@@ -6,10 +6,18 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
-async function tableCount(supabase: ServerSupabaseClient, table: string, filters: Array<[string, string | boolean]> = []) {
+async function tableCount(
+  supabase: ServerSupabaseClient,
+  table: string,
+  filters: Array<[string, string | boolean]> = [],
+  exclusions: Array<[string, string | boolean]> = []
+) {
   let query = supabase.from(table).select("id", { count: "exact", head: true });
   for (const [column, value] of filters) {
     query = query.eq(column, value);
+  }
+  for (const [column, value] of exclusions) {
+    query = query.neq(column, value);
   }
   const result = await query;
   return result.error ? null : result.count || 0;
@@ -47,7 +55,7 @@ export async function GET(request: Request) {
     tableCount(supabase, "guitars", [["safety_status", "lost"]]),
     tableCount(supabase, "guitars", [["safety_status", "stolen"]]),
     tableCount(supabase, "ownership_transfers", [["status", "sent"]]),
-    tableCount(supabase, "guitar_timeline_events"),
+    tableCount(supabase, "guitar_timeline_events", [], [["event_type", "profile_created"]]),
     tableCount(supabase, "guitar_documents"),
     tableCount(supabase, "profiles", [["account_status", "locked"]]),
     tableCount(supabase, "profiles", [["account_status", "banned"]]),
@@ -62,6 +70,20 @@ export async function GET(request: Request) {
     : ((trustResult.data || []) as Array<{ content_value?: unknown }>).filter((row) =>
         mergeRecordTrustSettings(row.content_value as Parameters<typeof mergeRecordTrustSettings>[0]).authenticityStatus === "confirmed"
       ).length;
+  const [adminAuditCheck, serviceWorkflowCheck, storageCheck] = await Promise.all([
+    supabase.from("admin_audit_events").select("id", { count: "exact", head: true }),
+    supabase.from("service_provider_profiles").select("user_id", { count: "exact", head: true }),
+    supabase.storage.listBuckets()
+  ]);
+  const bucketNames = new Set((storageCheck.data || []).map((bucket) => bucket.name));
+  const requiredBuckets = ["instrument-media", "instrument-documents", "service-evidence"];
+  const missingBuckets = requiredBuckets.filter((bucket) => !bucketNames.has(bucket));
+  const gitCommitSha = process.env.QRGUITAR_GIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA || "unknown";
+  const deploymentIdentifier =
+    process.env.QRGUITAR_DEPLOYMENT_ID ||
+    process.env.VERCEL_DEPLOYMENT_ID ||
+    process.env.VERCEL_URL ||
+    "local-review";
 
   return adminJson({
     ok: true,
@@ -87,6 +109,39 @@ export async function GET(request: Request) {
       pendingTransfers,
       serviceEntries,
       proofDocuments
+    },
+    systemHealth: {
+      build: {
+        gitCommitSha,
+        buildTimestamp: process.env.QRGUITAR_BUILD_TIMESTAMP || null,
+        dirtyWorkingTree: process.env.QRGUITAR_BUILD_DIRTY === "true"
+      },
+      deployment: {
+        environment: process.env.QRGUITAR_BUILD_ENV || "local",
+        identifier: deploymentIdentifier
+      },
+      supabase: {
+        configured: Boolean(
+          process.env.NEXT_PUBLIC_SUPABASE_URL &&
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
+          process.env.SUPABASE_SERVICE_ROLE_KEY
+        ),
+        responding: !authUsers.error
+      },
+      migrations: {
+        adminFoundation: !adminAuditCheck.error,
+        serviceWorkflow: !serviceWorkflowCheck.error
+      },
+      email: {
+        provider: "Brevo",
+        configured: Boolean(process.env.BREVO_API_KEY),
+        senderConfigured: Boolean(process.env.EMAIL_FROM || process.env.SMTP_FROM)
+      },
+      storage: {
+        responding: !storageCheck.error,
+        requiredBucketsReady: missingBuckets.length === 0,
+        missingBuckets
+      }
     },
     migrationNotice: admin.message
   });

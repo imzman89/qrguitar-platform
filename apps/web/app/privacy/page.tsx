@@ -1,17 +1,20 @@
 import type { Metadata } from "next";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
+import { getContentValue } from "../../lib/content-registry";
+import { loadPublishedSiteSettings } from "../../lib/site-settings-server";
+import { buildManagedPageMetadata } from "../../lib/site-metadata";
 
-export const metadata: Metadata = {
-  title: "Privacy",
-  description: "Public beta privacy notes for QRguitar Profiles, private documents, and instrument data."
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildManagedPageMetadata("privacy", "/privacy");
+}
 
-export default function PrivacyPage() {
+export default async function PrivacyPage() {
+  const settings = await loadPublishedSiteSettings();
   const sections = [
     {
-      title: "What a QRguitar Profile can contain",
-      copy: "A Profile can include photos, brand, model, year, Serial Number, instrument information, service history, ownership-transfer status, lost/stolen safety status, public documents, and private proof documents the owner chooses to store."
+      title: getContentValue(settings.content, "privacy.sections.dataCollected.heading"),
+      copy: getContentValue(settings.content, "privacy.sections.dataCollected.body")
     },
     {
       title: "Visibility choices",
@@ -38,7 +41,7 @@ export default function PrivacyPage() {
         <section className="section">
           <div className="shell legal-page">
             <div className="eyebrow">Privacy</div>
-            <h1>Privacy for QRguitar Profiles.</h1>
+            <h1>{getContentValue(settings.content, "privacy.hero.headline")}</h1>
             <p>
               QRguitar is built around user-controlled instrument profiles. Some profile data is intended to be visible
               when an owner makes a profile public or unlisted. Other data, including hidden serials and private proof

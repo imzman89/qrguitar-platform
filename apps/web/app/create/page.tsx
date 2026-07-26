@@ -12,6 +12,8 @@ import { defaultSiteSettings, fetchPublishedSiteSettings } from "../../lib/site-
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
 import { makePreviewQrCode, qrCodeFromSerial } from "../../lib/qrguitar-id";
 import { canonicalInstrumentBrand, establishedInstrumentBrands } from "../../lib/instrument-brands";
+import { getContentValue } from "../../lib/content-registry";
+import { useSiteContent } from "../../lib/use-site-content";
 
 const documentTypeOptions = [
   "Receipt",
@@ -66,6 +68,7 @@ function makeClientKey() {
 }
 
 export default function CreatePage() {
+  const content = useSiteContent();
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [honeypot, setHoneypot] = useState("");
@@ -555,14 +558,14 @@ export default function CreatePage() {
         <div className="shell">
           <header className="create-wizard-hero">
             <div>
-              <div className="eyebrow">Create a QRguitar Profile</div>
-              <h1>Start with the instrument. Build the history over time.</h1>
-              <p>Add the identity and one real photo now. You can keep expanding the Profile with service, media, documents, and ownership history later.</p>
+              <div className="eyebrow">Create Profile</div>
+              <h1>{getContentValue(content, "create.hero.headline")}</h1>
+              <p>{getContentValue(content, "create.hero.body")}</p>
             </div>
             <div className="permanent-id create-id-preview">
               <span>QRguitar ID preview</span>
               <strong>{qrCode}</strong>
-              <small>Your QRguitar ID is permanent. When a Serial Number is provided, the QRguitar ID uses that Serial Number.</small>
+              <small>{getContentValue(content, "create.serial.help")}</small>
             </div>
           </header>
 
@@ -574,7 +577,7 @@ export default function CreatePage() {
 
 
                 <section className="create-step-panel" aria-labelledby="create-step-one">
-                  <div className="form-section-heading"><span className="eyebrow">Required</span><h2 id="create-step-one">Instrument and photo</h2><p>Start with the facts that identify the instrument and the photo people will recognize.</p></div>
+                  <div className="form-section-heading"><span className="eyebrow">Required</span><h2 id="create-step-one">{getContentValue(content, "create.identity.heading")}</h2><p>{getContentValue(content, "create.photo.help")}</p></div>
                   <div className="form-grid">
                     <Field required error={fieldErrors.brand} label="Brand / Make" id="brand" value={form.brand} list="qrguitar-known-brands" placeholder="Start typing a brand" onChange={(value) => updateField("brand", value)} onBlur={(value) => updateField("brand", canonicalInstrumentBrand(value) || value.trim())} />
                     <Field required error={fieldErrors.model} label="Model" id="model" value={form.model} onChange={(value) => updateField("model", value)} />
@@ -588,7 +591,7 @@ export default function CreatePage() {
                   </label>
                   <p className="fine-print">If no Serial Number exists, QRguitar assigns a secure generated ID. Verification without a Serial Number requires prior QRguitar approval.</p>
                   <label className="create-photo-drop" htmlFor="profilePhotos">
-                    <strong>Add at least one real instrument photo</strong>
+                    <strong>{getContentValue(content, "create.photo.help")}</strong>
                     <span>Choose photos from your device or use your phone camera. JPG, PNG, or WebP up to 12MB each.</span>
                     <input id="profilePhotos" name="profilePhotos" type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={(event) => void addProfilePhotos(event.target.files)} />
                   </label>

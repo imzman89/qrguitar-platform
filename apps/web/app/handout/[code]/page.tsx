@@ -18,6 +18,8 @@ import {
 import { formatRecordLocation } from "../../../lib/record-location";
 import { getSupabaseAccessToken } from "../../../lib/supabase-browser";
 import { getServiceHistoryEntries } from "../../../lib/instrument-profile-contract";
+import { getContentValue } from "../../../lib/content-registry";
+import { useSiteContent } from "../../../lib/use-site-content";
 
 type HandoutPayload = {
   ok?: boolean;
@@ -90,6 +92,7 @@ function Badge({ children, tone = "neutral", icon }: { children: ReactNode; tone
 }
 
 export default function HandoutPage({ params }: { params: { code: string } }) {
+  const content = useSiteContent();
   const code = String(params.code || "").trim().toUpperCase();
   const router = useRouter();
   const [instrument, setInstrument] = useState<DemoInstrument | null>(null);
@@ -255,7 +258,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                 <ArrowLeft size={15} />
                 Dashboard
               </Link>
-              <div className="eyebrow">QRguitar Print Kit</div>
+              <div className="eyebrow">{getContentValue(content, "printWorkspace.title")}</div>
               <h1>Print the right piece.</h1>
               <p>Use the handout for a customer, the label for a case, or the service summary for completed canonical work.</p>
             </div>
@@ -266,7 +269,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
               </Link>
               <button className="button" type="button" onClick={() => window.print()} disabled={!instrument || !qrDataUrl}>
                 <Printer size={16} />
-                Print {mode === "handout" ? "Handout" : mode === "label" ? "Label" : "Service Summary"}
+                {getContentValue(content, "printWorkspace.print")} {mode === "handout" ? getContentValue(content, "printWorkspace.handout") : mode === "label" ? getContentValue(content, "printWorkspace.label") : "Service Summary"}
               </button>
             </div>
           </div>
@@ -281,7 +284,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                   aria-pressed={mode === key}
                   onClick={() => setMode(key)}
                 >
-                  {modeLabels[key]}
+                  {key === "handout" ? getContentValue(content, "printWorkspace.handout") : key === "label" ? getContentValue(content, "printWorkspace.label") : modeLabels[key]}
                 </button>
               ))}
               <p className="print-mode-description">{modeDescriptions[mode]}</p>
@@ -394,7 +397,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                 </div>
                 <div>
                   <p className="print-kit-scan-label">Scan this code</p>
-                  <h3>Open the permanent Profile.</h3>
+                  <h3>{getContentValue(content, "printWorkspace.scanInstruction")}</h3>
                   <p>Photos, identity, service history, documents, and future ownership updates stay connected to this QRguitar ID.</p>
                   <strong>{profileUrl}</strong>
                 </div>

@@ -1,5 +1,25 @@
 "use client";
 
+import {
+  Activity,
+  BookOpenText,
+  Boxes,
+  ChevronRight,
+  FileCheck2,
+  FileClock,
+  FileText,
+  Gauge,
+  Guitar,
+  Image as ImageIcon,
+  KeyRound,
+  Menu,
+  Search,
+  ShieldCheck,
+  TriangleAlert,
+  UserCog,
+  Users,
+  X
+} from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Footer } from "../../components/Footer";
@@ -13,6 +33,14 @@ type OverviewPayload = {
   migrationNotice?: string;
   admin?: { email?: string; role?: string; accessSource?: string; accountStatus?: string };
   counts?: Record<string, number | null>;
+  systemHealth?: {
+    build?: { gitCommitSha?: string; buildTimestamp?: string | null; dirtyWorkingTree?: boolean };
+    deployment?: { environment?: string; identifier?: string };
+    supabase?: { configured?: boolean; responding?: boolean };
+    migrations?: { adminFoundation?: boolean; serviceWorkflow?: boolean };
+    email?: { provider?: string; configured?: boolean; senderConfigured?: boolean };
+    storage?: { responding?: boolean; requiredBucketsReady?: boolean; missingBuckets?: string[] };
+  };
 };
 
 type AdminUser = {
@@ -175,7 +203,8 @@ type SectionId =
   | "service"
   | "brand-logos"
   | "access"
-  | "audit";
+  | "audit"
+  | "system";
 
 type PendingAdminAction =
   | {
@@ -188,6 +217,7 @@ type PendingAdminAction =
       reason: string;
       note?: string;
       includeNote?: boolean;
+      typedConfirmation?: string;
     }
   | {
       kind: "record";
@@ -213,22 +243,33 @@ type PendingAdminAction =
       title: string;
       target: string;
       reason: string;
+    }
+  | {
+      kind: "claim";
+      claim: AdminOwnershipClaim;
+      action: "approve" | "deny" | "request_information" | "expire";
+      title: string;
+      target: string;
+      reason: string;
     };
 
-const sections: Array<{ id: SectionId; label: string }> = [
-  { id: "overview", label: "Overview" },
-  { id: "users", label: "Users" },
-  { id: "records", label: "Records" },
-  { id: "trust", label: "Trust" },
-  { id: "safety", label: "Safety" },
-  { id: "transfers", label: "Transfers" },
-  { id: "claims", label: "Ownership Claims" },
-  { id: "proof", label: "Proof Vault" },
-  { id: "service", label: "Service History" },
-  { id: "brand-logos", label: "Brand Logos" },
-  { id: "access", label: "Admin Access" },
-  { id: "audit", label: "Audit Log" }
+const sections: Array<{ id: SectionId; label: string; group: string; icon: typeof Gauge }> = [
+  { id: "overview", label: "Overview", group: "Command", icon: Gauge },
+  { id: "users", label: "Users", group: "Manage", icon: Users },
+  { id: "records", label: "Profiles", group: "Manage", icon: Guitar },
+  { id: "trust", label: "Trust", group: "Review", icon: ShieldCheck },
+  { id: "safety", label: "Safety", group: "Review", icon: TriangleAlert },
+  { id: "transfers", label: "Transfers", group: "Ownership", icon: Boxes },
+  { id: "claims", label: "Claims", group: "Ownership", icon: FileCheck2 },
+  { id: "proof", label: "Evidence", group: "Records", icon: FileText },
+  { id: "service", label: "Service", group: "Records", icon: BookOpenText },
+  { id: "brand-logos", label: "Brand Registry", group: "Platform", icon: ImageIcon },
+  { id: "access", label: "Admin Access", group: "Platform", icon: KeyRound },
+  { id: "audit", label: "Audit Log", group: "Platform", icon: FileClock },
+  { id: "system", label: "System Health", group: "Platform", icon: Activity }
 ];
+
+const sectionGroups = ["Command", "Manage", "Review", "Ownership", "Records", "Platform"];
 
 const overviewLinks: Record<string, { section: SectionId; filter?: string }> = {
   totalUsers: { section: "users" },
@@ -350,19 +391,29 @@ export default function AdminPage() {
   const [siteSettings, setSiteSettings] = useState<EditableSiteSettings>(defaultSiteSettings);
   const [brandLogoBrand, setBrandLogoBrand] = useState("");
   const [brandLogoUrl, setBrandLogoUrl] = useState("");
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<AdminRecord | null>(null);
+  const [navOpen, setNavOpen] = useState(false);
 
   const tokenPromise = useMemo(() => getSupabaseAccessToken(), []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    setActiveSection(cleanSection(params.get("section")));
-    setUserFilter(params.get("filter") || "");
-    setRecordFilter(params.get("filter") || "");
-    setTransferFilter(params.get("filter") || "");
+    const section = cleanSection(params.get("section"));
+    const filter = params.get("filter") || "";
+    setActiveSection(section);
+    if (section === "users") setUserFilter(filter);
+    if (section === "records" || section === "trust" || section === "safety") setRecordFilter(filter);
+    if (section === "transfers") setTransferFilter(filter);
   }, []);
 
   function goToSection(section: SectionId, filter = "") {
     setActiveSection(section);
+    setAdminSearch("");
+    setSortKey("created-desc");
+    setUserFilter("");
+    setRecordFilter("");
+    setTransferFilter("");
     if (section === "users") setUserFilter(filter);
     if (section === "records" || section === "trust" || section === "safety") setRecordFilter(filter);
     if (section === "transfers") setTransferFilter(filter);
@@ -370,6 +421,9 @@ export default function AdminPage() {
     params.set("section", section);
     if (filter) params.set("filter", filter);
     window.history.replaceState(null, "", `/admin?${params.toString()}`);
+    setNavOpen(false);
+    setSelectedUser(null);
+    setSelectedRecord(null);
   }
 
   const loadAdmin = useCallback(async () => {
@@ -469,6 +523,26 @@ export default function AdminPage() {
     void saveBrandLogoMapping(next);
   }
 
+  function exportAuditLog() {
+    const safeEvents = filteredAudit.map((event) => ({
+      action: actionLabel(event.action),
+      targetType: event.target_type || "",
+      targetId: event.target_id || "",
+      reason: event.reason || "",
+      createdAt: event.created_at,
+      metadata: event.metadata || {}
+    }));
+    const blob = new Blob([JSON.stringify(safeEvents, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `qrguitar-admin-audit-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }
+
   function beginUserAction(user: AdminUser, action: string, extra: Record<string, unknown> = {}, options: { includeNote?: boolean; confirm?: boolean; title?: string } = {}) {
     if (!options.includeNote && !options.confirm) {
       void updateUser(user, action, extra);
@@ -484,7 +558,8 @@ export default function AdminPage() {
       target: user.email || user.id,
       reason: "",
       note: options.includeNote ? user.adminNotes || "" : undefined,
-      includeNote: options.includeNote
+      includeNote: options.includeNote,
+      typedConfirmation: ""
     });
   }
 
@@ -512,8 +587,8 @@ export default function AdminPage() {
     }
   }
 
-  function beginRecordAction(record: AdminRecord, action: string, extra: Record<string, unknown> = {}, options: { includeTrustNotes?: boolean; includeSafetyNotes?: boolean; title?: string } = {}) {
-    if (!options.includeTrustNotes && !options.includeSafetyNotes) {
+  function beginRecordAction(record: AdminRecord, action: string, extra: Record<string, unknown> = {}, options: { includeTrustNotes?: boolean; includeSafetyNotes?: boolean; confirm?: boolean; title?: string } = {}) {
+    if (!options.includeTrustNotes && !options.includeSafetyNotes && !options.confirm) {
       void updateRecord(record, action, extra);
       return;
     }
@@ -562,7 +637,14 @@ export default function AdminPage() {
   }
 
   function beginTransferAction(transfer: AdminTransfer, action: "cancel") {
-    void updateTransfer(transfer, action);
+    setPendingAction({
+      kind: "transfer",
+      transfer,
+      action,
+      title: "Cancel ownership transfer",
+      target: `${transfer.recordTitle || "QRguitar Profile"} (${transfer.recordCode || transfer.guitar_id})`,
+      reason: ""
+    });
   }
 
   async function updateTransfer(transfer: AdminTransfer, action: "cancel", reason = "") {
@@ -589,25 +671,38 @@ export default function AdminPage() {
     }
   }
 
-  async function updateOwnershipClaim(claim: AdminOwnershipClaim, action: "approve" | "deny" | "request_information" | "expire") {
+  function beginOwnershipClaimAction(claim: AdminOwnershipClaim, action: "approve" | "deny" | "request_information" | "expire") {
+    const titles = {
+      approve: "Approve ownership claim",
+      deny: "Deny ownership claim",
+      request_information: "Request additional evidence",
+      expire: "Expire ownership claim"
+    } as const;
+    setPendingAction({
+      kind: "claim",
+      claim,
+      action,
+      title: titles[action],
+      target: `${claim.profileTitle} (${claim.qrCode || "protected Profile"})`,
+      reason: ""
+    });
+  }
+
+  async function updateOwnershipClaim(
+    claim: AdminOwnershipClaim,
+    action: "approve" | "deny" | "request_information" | "expire",
+    reason: string
+  ) {
     const token = await tokenPromise;
     if (!token) {
       setMessage("Sign in required.");
       return;
     }
-    const prompts = {
-      approve: "Optional approval note",
-      deny: "Reason for denial",
-      request_information: "What additional evidence is required?",
-      expire: "Optional reason for expiring this request"
-    } as const;
-    const note = window.prompt(prompts[action]);
-    if (note === null) return;
     setBusy(`${action}:${claim.id}`);
     const response = await fetch("/api/ownership-claims", {
       method: "PATCH",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ id: claim.id, action, note })
+      body: JSON.stringify({ id: claim.id, action, note: reason })
     });
     const payload = await response.json().catch(() => ({}));
     setBusy("");
@@ -636,7 +731,7 @@ export default function AdminPage() {
         pendingAction.user,
         pendingAction.action,
         pendingAction.includeNote ? { ...pendingAction.extra, adminNotes: pendingAction.note || "" } : pendingAction.extra,
-        ""
+        pendingAction.reason
       );
     } else if (pendingAction.kind === "record") {
       await updateRecord(
@@ -655,10 +750,12 @@ export default function AdminPage() {
             safetyNote: pendingAction.safetyNote || ""
           } : {})
         },
-        ""
+        pendingAction.reason
       );
+    } else if (pendingAction.kind === "transfer") {
+      await updateTransfer(pendingAction.transfer, pendingAction.action, pendingAction.reason);
     } else {
-      await updateTransfer(pendingAction.transfer, pendingAction.action, "");
+      await updateOwnershipClaim(pendingAction.claim, pendingAction.action, pendingAction.reason);
     }
 
     setPendingAction(null);
@@ -688,6 +785,7 @@ export default function AdminPage() {
       if (sortKey === "status") return a.accountStatus.localeCompare(b.accountStatus);
       if (sortKey === "records") return b.recordCount - a.recordCount;
       if (sortKey === "last-sign-in") return String(b.lastSignInAt).localeCompare(String(a.lastSignInAt));
+      if (sortKey === "created-asc") return String(a.createdAt).localeCompare(String(b.createdAt));
       return String(b.createdAt).localeCompare(String(a.createdAt));
     });
     return list;
@@ -728,6 +826,7 @@ export default function AdminPage() {
       if (sortKey === "safety") return safetyLabel(a.safetyStatus).localeCompare(safetyLabel(b.safetyStatus));
       if (sortKey === "service") return b.serviceEventCount - a.serviceEventCount;
       if (sortKey === "proof") return b.proofDocumentCount - a.proofDocumentCount;
+      if (sortKey === "created-asc") return String(a.createdAt).localeCompare(String(b.createdAt));
       return String(b.createdAt).localeCompare(String(a.createdAt));
     });
     return list;
@@ -741,8 +840,10 @@ export default function AdminPage() {
         const matchesFilter = !transferFilter || transfer.status === transferFilter || (transferFilter === "pending" && transfer.status === "sent");
         return matchesSearch && matchesFilter;
       })
-      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
-  }, [adminSearch, recordsPayload?.transfers, transferFilter]);
+      .sort((a, b) => sortKey === "created-asc"
+        ? String(a.created_at).localeCompare(String(b.created_at))
+        : String(b.created_at).localeCompare(String(a.created_at)));
+  }, [adminSearch, recordsPayload?.transfers, sortKey, transferFilter]);
 
   const filteredProof = useMemo(() => {
     const search = normalize(adminSearch);
@@ -756,15 +857,27 @@ export default function AdminPage() {
 
   const filteredAudit = useMemo(() => {
     const search = normalize(adminSearch);
-    return auditEvents.filter((event) => !search || normalize(`${event.actor_email} ${event.action} ${event.target_type} ${event.target_id} ${event.reason}`).includes(search));
-  }, [adminSearch, auditEvents]);
+    return auditEvents
+      .filter((event) => !search || normalize(`${event.actor_email} ${event.action} ${event.target_type} ${event.target_id} ${event.reason}`).includes(search))
+      .sort((a, b) => {
+        if (sortKey === "email") return String(a.actor_email || "").localeCompare(String(b.actor_email || ""));
+        if (sortKey === "status") return a.action.localeCompare(b.action);
+        if (sortKey === "created-asc") return a.created_at.localeCompare(b.created_at);
+        return b.created_at.localeCompare(a.created_at);
+      });
+  }, [adminSearch, auditEvents, sortKey]);
 
   function filterControls(kind: "users" | "records" | "transfers" | "audit") {
     return (
       <div className="admin-filter-row">
-        <input value={adminSearch} onChange={(event) => setAdminSearch(event.target.value)} placeholder="Search this section" />
+        <input
+          value={adminSearch}
+          onChange={(event) => setAdminSearch(event.target.value)}
+          placeholder="Search this section"
+          aria-label={`Search ${kind}`}
+        />
         {kind === "users" ? (
-          <select value={userFilter} onChange={(event) => setUserFilter(event.target.value)}>
+          <select value={userFilter} onChange={(event) => setUserFilter(event.target.value)} aria-label="Filter users">
             <option value="">All users</option>
             <option value="active">Active</option>
             <option value="locked">Locked</option>
@@ -776,7 +889,7 @@ export default function AdminPage() {
             <option value="has-records">Users with records</option>
           </select>
         ) : kind === "transfers" ? (
-          <select value={transferFilter} onChange={(event) => setTransferFilter(event.target.value)}>
+          <select value={transferFilter} onChange={(event) => setTransferFilter(event.target.value)} aria-label="Filter transfers">
             <option value="">All transfers</option>
             <option value="pending">Pending</option>
             <option value="accepted">Accepted</option>
@@ -784,7 +897,7 @@ export default function AdminPage() {
             <option value="expired">Expired</option>
           </select>
         ) : kind === "records" ? (
-          <select value={recordFilter} onChange={(event) => setRecordFilter(event.target.value)}>
+          <select value={recordFilter} onChange={(event) => setRecordFilter(event.target.value)} aria-label="Filter records">
             <option value="">Active records</option>
             <option value="archived">Archived</option>
             <option value="owner-removed">Owner Removed</option>
@@ -804,26 +917,37 @@ export default function AdminPage() {
             <option value="has-service">Has service history</option>
           </select>
         ) : (
-          <select value={sortKey} onChange={(event) => setSortKey(event.target.value)}>
+          <select value={sortKey} onChange={(event) => setSortKey(event.target.value)} aria-label="Sort audit events">
             <option value="created-desc">Newest</option>
+            <option value="created-asc">Oldest</option>
             <option value="email">Actor</option>
             <option value="status">Action</option>
           </select>
         )}
         {kind !== "audit" ? (
-          <select value={sortKey} onChange={(event) => setSortKey(event.target.value)}>
+          <select value={sortKey} onChange={(event) => setSortKey(event.target.value)} aria-label={`Sort ${kind}`}>
             <option value="created-desc">Newest</option>
-            <option value="email">Email</option>
-            <option value="title">Title</option>
-            <option value="owner">Owner</option>
-            <option value="status">Status</option>
-            <option value="role">Role</option>
-            <option value="visibility">Visibility</option>
-            <option value="verification">Verification</option>
-            <option value="authenticity">Authenticity</option>
-            <option value="safety">Safety</option>
-            <option value="records">Record count</option>
-            <option value="last-sign-in">Last sign-in</option>
+            <option value="created-asc">Oldest</option>
+            {kind === "users" ? (
+              <>
+                <option value="email">Email</option>
+                <option value="status">Status</option>
+                <option value="role">Role</option>
+                <option value="records">Record count</option>
+                <option value="last-sign-in">Last sign-in</option>
+              </>
+            ) : kind === "records" ? (
+              <>
+                <option value="title">Title</option>
+                <option value="owner">Owner</option>
+                <option value="visibility">Visibility</option>
+                <option value="verification">Verification</option>
+                <option value="authenticity">Authenticity</option>
+                <option value="safety">Safety</option>
+                <option value="service">Service count</option>
+                <option value="proof">Evidence count</option>
+              </>
+            ) : null}
           </select>
         ) : null}
       </div>
@@ -834,7 +958,7 @@ export default function AdminPage() {
     return (
       <div className="admin-table">
         {list.length ? list.map((record) => (
-          <div className="admin-row" key={record.id}>
+            <div className="admin-row admin-entity-row" key={record.id}>
             <div>
               <strong>{record.qrCode} - {record.title}</strong>
               <span>
@@ -851,28 +975,9 @@ export default function AdminPage() {
                 <button type="button" onClick={() => goToSection("safety", record.safetyStatus || "clear")}>{safetyLabel(record.safetyStatus)}</button>
               </div>
             </div>
-            <div className="admin-row-actions">
-              {record.visibility === "public" && !record.isArchived && !record.isOwnerRemoved ? (
-                <Link href={record.permanentPath}>Open Public</Link>
-              ) : (
-                <button type="button" disabled title="Private, archived, or removed records do not have an active public page.">No public page</button>
-              )}
-              <Link href={`/edit/${record.qrCode}`}>Edit</Link>
-              {record.visibility !== "public" && !record.isArchived && !record.isOwnerRemoved ? (
-                <button type="button" disabled={busy === `set_visibility:${record.id}`} onClick={() => beginRecordAction(record, "set_visibility", { visibility: "public" }, { title: "Make Public" })}>Make Public</button>
-              ) : null}
-              {record.visibility !== "private" && !record.isArchived ? (
-                <button type="button" disabled={busy === `set_visibility:${record.id}`} onClick={() => beginRecordAction(record, "set_visibility", { visibility: "private" }, { title: "Make Private" })}>Make Private</button>
-              ) : null}
-              {record.isArchived ? (
-                <button type="button" disabled={busy === `restore_archive:${record.id}`} onClick={() => beginRecordAction(record, "restore_archive", {}, { title: "Restore from Archive" })}>Restore from Archive</button>
-              ) : (
-                <button type="button" disabled={busy === `archive:${record.id}`} onClick={() => beginRecordAction(record, "archive", {}, { title: "Archive Record" })}>Archive Record</button>
-              )}
-              {record.isOwnerRemoved ? (
-                <button type="button" disabled title="Deleted dashboard records cannot be restored. Create a new record instead.">Deleted</button>
-              ) : null}
-            </div>
+            <button type="button" className="admin-open-entity" onClick={() => setSelectedRecord(record)}>
+              Open Profile <ChevronRight size={16} />
+            </button>
           </div>
         )) : <p className="admin-empty">No records match this view.</p>}
       </div>
@@ -949,7 +1054,7 @@ export default function AdminPage() {
           {filterControls("users")}
           <div className="admin-table">
             {filteredUsers.length ? filteredUsers.map((user) => (
-              <div className="admin-row" key={user.id}>
+              <div className="admin-row admin-entity-row" key={user.id}>
                 <div>
                   <strong>{user.email || user.id}</strong>
                   <span className="admin-user-summary">
@@ -961,42 +1066,9 @@ export default function AdminPage() {
                   {user.hidePublicContent ? <small>Public content hidden by admin.</small> : null}
                   {user.adminNotes ? <small>Admin note saved.</small> : null}
                 </div>
-                <div className="admin-row-actions">
-                  {user.accountStatus === "removed" ? null : user.accountStatus === "locked" ? (
-                    <button type="button" disabled={busy === `unlock:${user.id}`} onClick={() => beginUserAction(user, "unlock", {}, { title: "Unlock Account" })}>Unlock</button>
-                  ) : (
-                    <button type="button" disabled={user.envManaged === true || busy === `lock:${user.id}`} title={user.envManaged ? "Environment-managed admin access is not changed here." : ""} onClick={() => beginUserAction(user, "lock", {}, { title: "Lock Account" })}>Lock</button>
-                  )}
-                  {user.accountStatus === "banned" ? (
-                    <button type="button" disabled={busy === `unban:${user.id}`} onClick={() => beginUserAction(user, "unban", {}, { title: "Unban User" })}>Unban</button>
-                  ) : user.accountStatus !== "removed" ? (
-                    <button type="button" disabled={user.envManaged === true || busy === `ban:${user.id}`} title={user.envManaged ? "Environment-managed admin access is not changed here." : ""} onClick={() => beginUserAction(user, "ban", {}, { title: "Ban User" })}>Ban User</button>
-                  ) : null}
-                  {user.accountStatus === "removed" ? (
-                    <button type="button" disabled={busy === `restore_user:${user.id}`} onClick={() => beginUserAction(user, "restore_user", {}, { title: "Restore User" })}>Restore User</button>
-                  ) : (
-                    <button type="button" disabled={user.envManaged === true || busy === `remove:${user.id}`} title={user.envManaged ? "Environment-managed admin access is not changed here." : ""} onClick={() => beginUserAction(user, "remove", {}, { title: "Remove User" })}>Remove User</button>
-                  )}
-                  {user.hidePublicContent ? (
-                    <button type="button" disabled={busy === `restore_public_content:${user.id}`} onClick={() => beginUserAction(user, "restore_public_content", {}, { title: "Restore Public Content" })}>Restore Public</button>
-                  ) : user.accountStatus !== "banned" && user.accountStatus !== "removed" ? (
-                    <button type="button" disabled={busy === `hide_public_content:${user.id}`} onClick={() => beginUserAction(user, "hide_public_content", {}, { title: "Hide Public Content" })}>Hide Public</button>
-                  ) : null}
-                  {user.accountStatus !== "banned" && user.accountStatus !== "removed" ? (
-                    <button type="button" disabled={user.envManaged === true} title={user.envManaged ? "Environment-managed admin access is not changed here." : ""} onClick={() => beginUserAction(user, "change_role", { role: user.role === "admin" ? "user" : "admin" }, { title: user.role === "admin" ? "Remove Admin" : "Add Admin" })}>
-                      {user.envManaged ? "Env Admin" : user.role === "admin" ? "Remove Admin" : "Add Admin"}
-                    </button>
-                  ) : null}
-                  <button type="button" onClick={() => beginUserAction(user, "admin_note", {}, { includeNote: true, title: "Save Admin Note" })}>Note</button>
-                  <button
-                    type="button"
-                    disabled={!user.deleteEligible || busy === `delete_empty_user:${user.id}`}
-                    title={user.deleteEligible ? "Permanently delete this empty auth user." : user.deleteDisabledReason || "Only empty non-admin users can be deleted."}
-                    onClick={() => beginUserAction(user, "delete_empty_user", {}, { confirm: true, title: "Delete Empty User" })}
-                  >
-                    Delete Empty User
-                  </button>
-                </div>
+                <button type="button" className="admin-open-entity" onClick={() => setSelectedUser(user)}>
+                  Open User <ChevronRight size={16} />
+                </button>
               </div>
             )) : <p className="admin-empty">No users match this view.</p>}
           </div>
@@ -1009,7 +1081,7 @@ export default function AdminPage() {
         <section className="card admin-panel-card">
           <div className="admin-section-head">
             <div>
-              <h2>Records</h2>
+              <h2>Profiles</h2>
               <p>Open, edit, archive, restore, and filter QRguitar Profiles without changing permanent QR URLs.</p>
             </div>
           </div>
@@ -1039,16 +1111,16 @@ export default function AdminPage() {
                 </div>
                 <div className="admin-row-actions">
                   <Link href={`/edit/${record.qrCode}`}>Full Editor</Link>
-                  <button type="button" disabled={busy === `set_verification:${record.id}`} onClick={() => void updateRecord(record, "set_verification", { verificationStatus: record.verificationStatus === "Verified" ? "unverified" : "verified" })}>
+                  <button type="button" disabled={busy === `set_verification:${record.id}`} onClick={() => beginRecordAction(record, "set_verification", { verificationStatus: record.verificationStatus === "Verified" ? "unverified" : "verified" }, { confirm: true, title: "Update Verification" })}>
                     {record.verificationStatus === "Verified" ? "Set Unverified" : "Set Verified"}
                   </button>
-                  <button type="button" disabled={busy === `set_authenticity:${record.id}`} onClick={() => void updateRecord(record, "set_authenticity", { authenticityStatus: record.authenticityStatus === "Authenticity Confirmed" ? "unconfirmed" : "confirmed" })}>
+                  <button type="button" disabled={busy === `set_authenticity:${record.id}`} onClick={() => beginRecordAction(record, "set_authenticity", { authenticityStatus: record.authenticityStatus === "Authenticity Confirmed" ? "unconfirmed" : "confirmed" }, { confirm: true, title: "Update Authenticity" })}>
                     {record.authenticityStatus === "Authenticity Confirmed" ? "Set Unconfirmed" : "Set Confirmed"}
                   </button>
-                  <button type="button" disabled={busy === `set_trust_badge_visibility:${record.id}`} onClick={() => void updateRecord(record, "set_trust_badge_visibility", { showVerificationBadge: record.showVerificationBadge === false })}>
+                  <button type="button" disabled={busy === `set_trust_badge_visibility:${record.id}`} onClick={() => beginRecordAction(record, "set_trust_badge_visibility", { showVerificationBadge: record.showVerificationBadge === false }, { confirm: true, title: record.showVerificationBadge === false ? "Show Verification Badge" : "Hide Verification Badge" })}>
                     {record.showVerificationBadge === false ? "Show Verified Badge" : "Hide Verified Badge"}
                   </button>
-                  <button type="button" disabled={busy === `set_trust_badge_visibility:${record.id}`} onClick={() => void updateRecord(record, "set_trust_badge_visibility", { showAuthenticityBadge: record.showAuthenticityBadge === false })}>
+                  <button type="button" disabled={busy === `set_trust_badge_visibility:${record.id}`} onClick={() => beginRecordAction(record, "set_trust_badge_visibility", { showAuthenticityBadge: record.showAuthenticityBadge === false }, { confirm: true, title: record.showAuthenticityBadge === false ? "Show Authenticity Badge" : "Hide Authenticity Badge" })}>
                     {record.showAuthenticityBadge === false ? "Show Auth Badge" : "Hide Auth Badge"}
                   </button>
                   <button type="button" onClick={() => beginRecordAction(record, "set_trust_badge_visibility", {
@@ -1085,10 +1157,10 @@ export default function AdminPage() {
                 </div>
                 <div className="admin-row-actions">
                   <Link href={`/edit/${record.qrCode}`}>Full Editor</Link>
-                  <button type="button" disabled={busy === `set_safety:${record.id}`} onClick={() => void updateRecord(record, "set_safety", { safetyStatus: "clear" })}>No Alert</button>
-                  <button type="button" disabled={busy === `set_safety:${record.id}`} onClick={() => void updateRecord(record, "set_safety", { safetyStatus: "lost", publicSafetyNote: "This instrument has been reported lost." })}>Lost</button>
-                  <button type="button" disabled={busy === `set_safety:${record.id}`} onClick={() => void updateRecord(record, "set_safety", { safetyStatus: "stolen", publicSafetyNote: "This instrument has been reported stolen." })}>Stolen</button>
-                  <button type="button" disabled={busy === `set_safety:${record.id}`} onClick={() => void updateRecord(record, "set_safety", { safetyStatus: "recovered" })}>Recovered</button>
+                  <button type="button" disabled={busy === `set_safety:${record.id}`} onClick={() => beginRecordAction(record, "set_safety", { safetyStatus: "clear" }, { confirm: true, title: "Clear Safety Alert" })}>No Alert</button>
+                  <button type="button" disabled={busy === `set_safety:${record.id}`} onClick={() => beginRecordAction(record, "set_safety", { safetyStatus: "lost", publicSafetyNote: "This instrument has been reported lost." }, { confirm: true, title: "Report Lost" })}>Lost</button>
+                  <button type="button" disabled={busy === `set_safety:${record.id}`} onClick={() => beginRecordAction(record, "set_safety", { safetyStatus: "stolen", publicSafetyNote: "This instrument has been reported stolen." }, { confirm: true, title: "Report Stolen" })}>Stolen</button>
+                  <button type="button" disabled={busy === `set_safety:${record.id}`} onClick={() => beginRecordAction(record, "set_safety", { safetyStatus: "recovered" }, { confirm: true, title: "Mark Recovered" })}>Recovered</button>
                   <button type="button" onClick={() => beginRecordAction(record, "set_safety", { safetyStatus: record.safetyStatus || "clear" }, { includeSafetyNotes: true, title: "Edit Safety Notes" })}>Edit Notes</button>
                 </div>
               </div>
@@ -1192,10 +1264,10 @@ export default function AdminPage() {
                   {claim.qrCode ? <Link href={`/edit/${claim.qrCode}`}>Review Profile</Link> : null}
                   {claim.status === "awaiting_owner" || claim.status === "admin_review" ? (
                     <>
-                      <button type="button" disabled={busy === `approve:${claim.id}`} onClick={() => void updateOwnershipClaim(claim, "approve")}>Approve</button>
-                      <button type="button" disabled={busy === `request_information:${claim.id}`} onClick={() => void updateOwnershipClaim(claim, "request_information")}>Request evidence</button>
-                      <button type="button" disabled={busy === `deny:${claim.id}`} onClick={() => void updateOwnershipClaim(claim, "deny")}>Deny</button>
-                      <button type="button" disabled={busy === `expire:${claim.id}`} onClick={() => void updateOwnershipClaim(claim, "expire")}>Expire</button>
+                      <button type="button" disabled={busy === `approve:${claim.id}`} onClick={() => beginOwnershipClaimAction(claim, "approve")}>Approve</button>
+                      <button type="button" disabled={busy === `request_information:${claim.id}`} onClick={() => beginOwnershipClaimAction(claim, "request_information")}>Request evidence</button>
+                      <button type="button" disabled={busy === `deny:${claim.id}`} onClick={() => beginOwnershipClaimAction(claim, "deny")}>Deny</button>
+                      <button type="button" disabled={busy === `expire:${claim.id}`} onClick={() => beginOwnershipClaimAction(claim, "expire")}>Expire</button>
                     </>
                   ) : null}
                 </div>
@@ -1338,7 +1410,7 @@ export default function AdminPage() {
             <button
               type="button"
               disabled={!accessTarget || accessTarget.role !== "admin" || accessTarget.envManaged === true}
-              onClick={() => accessTarget ? beginUserAction(accessTarget, "change_role", { role: "user" }, { title: "Remove Admin" }) : undefined}
+              onClick={() => accessTarget ? beginUserAction(accessTarget, "change_role", { role: "owner" }, { title: "Remove Admin" }) : undefined}
             >
               {accessTarget?.envManaged ? "Managed by environment" : "Remove Admin"}
             </button>
@@ -1351,7 +1423,7 @@ export default function AdminPage() {
                   <span>{user.envManaged ? "Managed by environment" : "Database admin"} - {user.accountStatus}</span>
                 </div>
                 <div className="admin-row-actions">
-                  <button type="button" disabled={user.envManaged === true} onClick={() => beginUserAction(user, "change_role", { role: "user" }, { title: "Remove Admin" })}>
+                  <button type="button" disabled={user.envManaged === true} onClick={() => beginUserAction(user, "change_role", { role: "owner" }, { title: "Remove Admin" })}>
                     {user.envManaged ? "Managed by environment" : "Remove Admin"}
                   </button>
                 </div>
@@ -1363,6 +1435,72 @@ export default function AdminPage() {
       );
     }
 
+    if (activeSection === "system") {
+      const health = overview?.systemHealth;
+      const primarySystems = [
+        {
+          label: "Application",
+          status: health?.build?.gitCommitSha && health.build.gitCommitSha !== "unknown" ? "healthy" : "unknown",
+          summary: health?.build?.gitCommitSha && health.build.gitCommitSha !== "unknown" ? `Release ${health.build.gitCommitSha.slice(0, 8)}` : "Release identity was not reported",
+          details: [`Admin API: ${overview?.ok ? "responding" : "not confirmed"}`, `Environment: ${health?.deployment?.environment || "local QA"}`, `Deployment: ${health?.deployment?.identifier || "not reported"}`]
+        },
+        {
+          label: "Database",
+          status: health?.supabase?.configured === true && health?.supabase?.responding === true ? "healthy" : health?.supabase?.configured === false ? "warning" : "unknown",
+          summary: health?.supabase?.responding ? "Supabase responding" : "Connection not confirmed",
+          details: [`Configuration: ${health?.supabase?.configured ? "present" : "not confirmed"}`, `Admin migration: ${health?.migrations?.adminFoundation ? "ready" : "not confirmed"}`, `Service migration: ${health?.migrations?.serviceWorkflow ? "ready" : "not confirmed"}`]
+        },
+        {
+          label: "Email",
+          status: health?.email?.configured === true && health?.email?.senderConfigured === true ? "healthy" : health?.email?.configured === true ? "warning" : "unknown",
+          summary: health?.email?.configured && health?.email?.senderConfigured ? "Provider and sender configured" : "Delivery configuration not confirmed",
+          details: [`Provider API: ${health?.email?.configured ? "configured" : "unknown"}`, `Sender identity: ${health?.email?.senderConfigured ? "configured" : "unknown"}`, "Recipient data and credentials are intentionally hidden"]
+        },
+        {
+          label: "Storage",
+          status: health?.storage?.responding === true && health?.storage?.requiredBucketsReady === true ? "healthy" : health?.storage?.responding === true ? "warning" : "unknown",
+          summary: health?.storage?.requiredBucketsReady ? "Required buckets ready" : "Bucket readiness not confirmed",
+          details: [`Storage API: ${health?.storage?.responding ? "responding" : "unknown"}`, `Required buckets: ${health?.storage?.requiredBucketsReady ? "ready" : "review"}`, `Missing: ${health?.storage?.missingBuckets?.join(", ") || "none reported"}`]
+        }
+      ];
+      return (
+        <section className="admin-system-health">
+          <div className="admin-section-head"><div><h2>System Health</h2><p>Production services, release identity, integrations, and operational status.</p></div><button type="button" onClick={() => void loadAdmin()}>Run checks</button></div>
+          <div className="admin-health-strip">
+            {primarySystems.map((system) => (
+              <details className={`admin-health-system is-${system.status}`} key={system.label}>
+                <summary><span>{system.status === "healthy" ? "Healthy" : system.status === "warning" ? "Warning" : "Unknown"}</span><strong>{system.label}</strong><small>{system.summary}</small></summary>
+                <ul>{system.details.map((detail) => <li key={detail}>{detail}</li>)}</ul>
+              </details>
+            ))}
+          </div>
+          <div className="admin-system-sections">
+            <section>
+              <span>Release identity</span>
+              <dl>
+                <div><dt>Environment</dt><dd>{health?.deployment?.environment || "Local QA"}</dd></div>
+                <div><dt>Build SHA</dt><dd><code>{health?.build?.gitCommitSha || "Unknown"}</code></dd></div>
+                <div><dt>Deployment</dt><dd>{health?.deployment?.identifier || "Unknown"}</dd></div>
+                <div><dt>Git state</dt><dd>{health?.build?.dirtyWorkingTree ? "Dirty review candidate" : health?.build?.gitCommitSha ? "Reported clean" : "Unknown"}</dd></div>
+                <div><dt>Canonical local origin</dt><dd>127.0.0.1:3003</dd></div>
+              </dl>
+            </section>
+            <section>
+              <span>Operations</span>
+              <dl>
+                <div><dt>Profiles loaded</dt><dd>{recordsPayload?.ok ? records.length : "Unknown"}</dd></div>
+                <div><dt>Recent audit events</dt><dd>{Array.isArray(auditEvents) ? auditEvents.length : "Unknown"}</dd></div>
+                <div><dt>Content publishing</dt><dd>Shared server-backed source</dd></div>
+                <div><dt>Required migrations</dt><dd>{health?.migrations?.adminFoundation && health?.migrations?.serviceWorkflow ? "Ready" : "Review"}</dd></div>
+                <div><dt>Last check</dt><dd>{new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</dd></div>
+              </dl>
+            </section>
+          </div>
+          <div className="admin-system-meta"><span>Signed in</span><strong>{overview?.admin?.email || "Authorized admin"}</strong><span>Access source</span><strong>{overview?.admin?.accessSource || "Unknown"}</strong></div>
+        </section>
+      );
+    }
+
     return (
       <section className="card admin-panel-card">
         <div className="admin-section-head">
@@ -1370,6 +1508,7 @@ export default function AdminPage() {
             <h2>Audit Log</h2>
             <p>Human-readable admin action history. Metadata is summarized behind details controls.</p>
           </div>
+          <button type="button" onClick={exportAuditLog} disabled={!filteredAudit.length}>Export safe JSON</button>
         </div>
         {filterControls("audit")}
         <div className="admin-table">
@@ -1377,7 +1516,7 @@ export default function AdminPage() {
             <div className="admin-row" key={event.id}>
               <div>
                 <strong>{actionLabel(event.action)}</strong>
-                <span>{event.actor_email || "System"} - {event.target_type || "target"} {event.target_id || ""}</span>
+                <span>Admin operator - {event.target_type || "target"} {event.target_id || ""}</span>
                 <small>{formatDate(event.created_at)} - {event.reason || "No reason listed"}</small>
                 {event.metadata ? (
                   <details className="admin-details">
@@ -1393,19 +1532,57 @@ export default function AdminPage() {
     );
   })();
 
+  const activeSectionMeta = sections.find((section) => section.id === activeSection) || sections[0];
+  const ActiveSectionIcon = activeSectionMeta.icon;
+
+  const entityDrawer = selectedUser ? (
+    <div className="admin-drawer-layer">
+      <button type="button" className="admin-drawer-backdrop" onClick={() => setSelectedUser(null)} aria-label="Close user details" />
+      <aside className="admin-entity-drawer" role="dialog" aria-modal="true" aria-label={`User details for ${selectedUser.email}`}>
+        <header><div><span>User account</span><h2>{selectedUser.email}</h2></div><button type="button" onClick={() => setSelectedUser(null)} aria-label="Close"><X size={18} /></button></header>
+        <div className="admin-drawer-body">
+          <div className="admin-drawer-chips"><span className={adminChipClass("role", userRoleChipValue(selectedUser))}>{userRoleLabel(selectedUser)}</span><span className={adminChipClass("status", selectedUser.accountStatus)}>{selectedUser.accountStatus}</span></div>
+          <dl><div><dt>Profiles</dt><dd>{selectedUser.recordCount}</dd></div><div><dt>Public / private</dt><dd>{selectedUser.publicRecordCount} / {selectedUser.privateRecordCount}</dd></div><div><dt>Last sign-in</dt><dd>{formatDate(selectedUser.lastSignInAt)}</dd></div><div><dt>Created</dt><dd>{formatDate(selectedUser.createdAt)}</dd></div></dl>
+          <section><span>Account access</span><div className="admin-drawer-actions">
+            {selectedUser.accountStatus === "locked" ? <button type="button" onClick={() => beginUserAction(selectedUser, "unlock", {}, { confirm: true, title: "Unlock Account" })}>Unlock account</button> : <button type="button" disabled={selectedUser.envManaged} onClick={() => beginUserAction(selectedUser, "lock", {}, { confirm: true, title: "Lock Account" })}>Lock account</button>}
+            {selectedUser.accountStatus === "banned" ? <button type="button" onClick={() => beginUserAction(selectedUser, "unban", {}, { confirm: true, title: "Unban User" })}>Unban user</button> : <button type="button" disabled={selectedUser.envManaged || selectedUser.accountStatus === "removed"} onClick={() => beginUserAction(selectedUser, "ban", {}, { confirm: true, title: "Ban User" })}>Ban user</button>}
+            {selectedUser.accountStatus === "removed" ? <button type="button" onClick={() => beginUserAction(selectedUser, "restore_user", {}, { confirm: true, title: "Restore User" })}>Restore user</button> : <button type="button" disabled={selectedUser.envManaged} onClick={() => beginUserAction(selectedUser, "remove", {}, { confirm: true, title: "Remove User" })}>Remove user</button>}
+          </div></section>
+          <section><span>Public presence</span><div className="admin-drawer-actions"><button type="button" onClick={() => beginUserAction(selectedUser, selectedUser.hidePublicContent ? "restore_public_content" : "hide_public_content", {}, { confirm: true, title: selectedUser.hidePublicContent ? "Restore Public Content" : "Hide Public Content" })}>{selectedUser.hidePublicContent ? "Restore public content" : "Hide public content"}</button></div></section>
+          <section><span>Administration</span><div className="admin-drawer-actions"><button type="button" disabled={selectedUser.envManaged} onClick={() => beginUserAction(selectedUser, "change_role", { role: selectedUser.role === "admin" ? "owner" : "admin" }, { confirm: true, title: selectedUser.role === "admin" ? "Remove Admin" : "Add Admin" })}>{selectedUser.role === "admin" ? "Remove admin" : "Add admin"}</button><button type="button" onClick={() => beginUserAction(selectedUser, "admin_note", {}, { includeNote: true, title: "Save Admin Note" })}>Internal note</button></div></section>
+          <section className="admin-danger-zone"><span>Permanent action</span><p>{selectedUser.deleteDisabledReason || "Only eligible accounts with no Profiles, claims, transfers, submissions, or evidence can be permanently deleted."}</p><button type="button" disabled={!selectedUser.deleteEligible} onClick={() => beginUserAction(selectedUser, "delete_empty_user", {}, { confirm: true, title: "Permanently Delete Eligible Account" })}>Permanently delete eligible account</button></section>
+        </div>
+      </aside>
+    </div>
+  ) : selectedRecord ? (
+    <div className="admin-drawer-layer">
+      <button type="button" className="admin-drawer-backdrop" onClick={() => setSelectedRecord(null)} aria-label="Close Profile details" />
+      <aside className="admin-entity-drawer" role="dialog" aria-modal="true" aria-label={`Profile details for ${selectedRecord.title}`}>
+        <header><div><span>QRguitar Profile</span><h2>{selectedRecord.title}</h2><small>{selectedRecord.qrCode}</small></div><button type="button" onClick={() => setSelectedRecord(null)} aria-label="Close"><X size={18} /></button></header>
+        <div className="admin-drawer-body">
+          <dl><div><dt>Owner</dt><dd>{selectedRecord.ownerEmail || "No owner"}</dd></div><div><dt>Visibility</dt><dd>{selectedRecord.visibility}</dd></div><div><dt>Service / evidence</dt><dd>{selectedRecord.serviceEventCount} / {selectedRecord.proofDocumentCount}</dd></div><div><dt>Created</dt><dd>{formatDate(selectedRecord.createdAt)}</dd></div></dl>
+          <section><span>Open</span><div className="admin-drawer-actions"><Link href={`/edit/${selectedRecord.qrCode}`}>Full editor</Link>{selectedRecord.visibility === "public" && !selectedRecord.isArchived && !selectedRecord.isOwnerRemoved ? <Link href={selectedRecord.permanentPath}>Public Profile</Link> : null}</div></section>
+          <section><span>Visibility</span><div className="admin-drawer-actions"><button type="button" disabled={selectedRecord.visibility === "public" || selectedRecord.isArchived} onClick={() => beginRecordAction(selectedRecord, "set_visibility", { visibility: "public" }, { confirm: true, title: "Make Public" })}>Make public</button><button type="button" disabled={selectedRecord.visibility === "private" || selectedRecord.isArchived} onClick={() => beginRecordAction(selectedRecord, "set_visibility", { visibility: "private" }, { confirm: true, title: "Make Private" })}>Make private</button></div></section>
+          <section><span>Trust and safety</span><div className="admin-drawer-actions"><button type="button" onClick={() => beginRecordAction(selectedRecord, "set_verification", { verificationStatus: selectedRecord.verificationStatus === "Verified" ? "unverified" : "verified" }, { includeTrustNotes: true, title: "Update Verification" })}>{selectedRecord.verificationStatus === "Verified" ? "Set unverified" : "Set verified"}</button><button type="button" onClick={() => beginRecordAction(selectedRecord, "set_authenticity", { authenticityStatus: selectedRecord.authenticityStatus === "Authenticity Confirmed" ? "unconfirmed" : "confirmed" }, { includeTrustNotes: true, title: "Update Authenticity" })}>{selectedRecord.authenticityStatus === "Authenticity Confirmed" ? "Set unconfirmed" : "Confirm authenticity"}</button><button type="button" onClick={() => beginRecordAction(selectedRecord, "set_safety", { safetyStatus: selectedRecord.safetyStatus || "clear" }, { includeSafetyNotes: true, title: "Update Safety Status" })}>Safety details</button></div></section>
+          <section className="admin-danger-zone"><span>Archive</span><p>Archiving removes the Profile from active public surfaces without changing its permanent QRguitar ID.</p><button type="button" onClick={() => beginRecordAction(selectedRecord, selectedRecord.isArchived ? "restore_archive" : "archive", {}, { confirm: true, title: selectedRecord.isArchived ? "Restore from Archive" : "Archive Profile" })}>{selectedRecord.isArchived ? "Restore Profile" : "Archive Profile"}</button></section>
+        </div>
+      </aside>
+    </div>
+  ) : null;
+
   return (
     <>
       <Nav />
-      <main className="section admin-page">
-        <div className="shell">
-          <div className="admin-hero">
-            <div>
-              <div className="eyebrow">Owner admin</div>
-              <h1>QRguitar admin panel.</h1>
-              <p>Manage users, Profiles, trust controls, safety alerts, transfers, proof documents, service history, site settings, and audit events.</p>
-            </div>
-            {adminAuthorized ? <div className="admin-hero-actions"><Link className="button secondary" href="/admin/service-workflow">Service Operations</Link><Link className="button secondary" href="/admin/site-editor">Site Editor</Link></div> : null}
-          </div>
+      <main className="admin-page">
+        <div className="admin-command-bar">
+          <div><button type="button" className="admin-mobile-nav" onClick={() => setNavOpen(true)} aria-label="Open admin navigation"><Menu size={18} /></button><div><span>Owner command center</span><strong>{activeSectionMeta.label}</strong></div></div>
+          {adminAuthorized ? <label className="admin-global-search"><Search size={16} /><input value={adminSearch} onChange={(event) => setAdminSearch(event.target.value)} placeholder="Search users, Profiles, or IDs" /></label> : null}
+          <div className="admin-command-meta"><span>Local QA</span><strong>{overview?.admin?.email || "Admin"}</strong></div>
+        </div>
+        <div className={adminAuthorized ? "admin-shell" : "admin-shell is-locked"}>
+          {adminAuthorized ? <aside className={navOpen ? "admin-sidebar is-open" : "admin-sidebar"}><header><strong>QRguitar Admin</strong><button type="button" onClick={() => setNavOpen(false)} aria-label="Close admin navigation"><X size={17} /></button></header>{sectionGroups.map((group) => <nav key={group} aria-label={`${group} sections`}><span>{group}</span>{sections.filter((section) => section.group === group).map((section) => { const Icon = section.icon; return <button type="button" className={section.id === activeSection ? "active" : ""} onClick={() => goToSection(section.id)} key={section.id}><Icon size={16} />{section.label}</button>; })}</nav>)}<div className="admin-sidebar-links"><Link href="/admin/service-workflow">Service Operations</Link><Link href="/admin/site-editor">Content Studio</Link></div></aside> : null}
+          {navOpen ? <button type="button" className="admin-sidebar-backdrop" onClick={() => setNavOpen(false)} aria-label="Close admin navigation" /> : null}
+          <div className="admin-main">
           {!adminAuthorized ? (
             <section className="card admin-panel-card admin-login-card">
               <div className="eyebrow">Admin access</div>
@@ -1417,14 +1594,8 @@ export default function AdminPage() {
             </section>
           ) : (
             <>
+              <div className="admin-main-heading"><ActiveSectionIcon size={22} /><div><span>{activeSectionMeta.group}</span><h1>{activeSectionMeta.label}</h1></div></div>
               {message ? <div className="admin-message">{message}</div> : null}
-              <div className="admin-tabs" role="tablist" aria-label="Admin sections">
-                {sections.map((section) => (
-                  <button type="button" className={section.id === activeSection ? "active" : ""} onClick={() => goToSection(section.id)} key={section.id}>
-                    {section.label}
-                  </button>
-                ))}
-              </div>
             </>
           )}
           {pendingAction ? (
@@ -1440,6 +1611,21 @@ export default function AdminPage() {
                     Cancel
                   </button>
                 </div>
+                <div className="admin-impact-summary">
+                  <strong>Impact</strong>
+                  <p>{pendingAction.kind === "user" && pendingAction.action === "delete_empty_user" ? "This permanently removes the eligible authentication account. It cannot be undone." : "This changes operational data immediately. The action is recorded in the audit trail and the affected view is refreshed."}</p>
+                  <span>{pendingAction.kind === "user" && pendingAction.action === "delete_empty_user" ? "Irreversible" : "Reversible where the corresponding restore action is available"}</span>
+                </div>
+                <label>
+                  Operator reason
+                  <textarea value={pendingAction.reason} onChange={(event) => setPendingAction({ ...pendingAction, reason: event.target.value })} rows={2} placeholder="Required for the audit trail" />
+                </label>
+                {pendingAction.kind === "user" && pendingAction.action === "delete_empty_user" ? (
+                  <label>
+                    Type the account email to confirm permanent deletion
+                    <input value={pendingAction.typedConfirmation || ""} onChange={(event) => setPendingAction({ ...pendingAction, typedConfirmation: event.target.value })} autoComplete="off" />
+                  </label>
+                ) : null}
                 {pendingAction.kind === "user" && pendingAction.includeNote ? (
                   <label>
                     Internal admin note
@@ -1483,7 +1669,7 @@ export default function AdminPage() {
                   </div>
                 ) : null}
                 <div className="form-actions">
-                  <button className="button" type="button" onClick={() => void confirmPendingAction()}>
+                  <button className="button" type="button" disabled={!pendingAction.reason.trim() || (pendingAction.kind === "user" && pendingAction.action === "delete_empty_user" && pendingAction.typedConfirmation?.trim().toLowerCase() !== pendingAction.user.email.trim().toLowerCase())} onClick={() => void confirmPendingAction()}>
                     Confirm
                   </button>
                   <button className="button secondary" type="button" onClick={() => setPendingAction(null)}>
@@ -1494,7 +1680,9 @@ export default function AdminPage() {
             </div>
           ) : null}
           {adminAuthorized ? content : null}
+          </div>
         </div>
+        {entityDrawer}
       </main>
       <Footer />
     </>

@@ -1,17 +1,20 @@
 import type { Metadata } from "next";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
+import { getContentValue } from "../../lib/content-registry";
+import { loadPublishedSiteSettings } from "../../lib/site-settings-server";
+import { buildManagedPageMetadata } from "../../lib/site-metadata";
 
-export const metadata: Metadata = {
-  title: "Terms",
-  description: "Public beta terms for using QRguitar instrument profiles."
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildManagedPageMetadata("terms", "/terms");
+}
 
-export default function TermsPage() {
+export default async function TermsPage() {
+  const settings = await loadPublishedSiteSettings();
   const sections = [
     {
-      title: "Your content and responsibility",
-      copy: "You are responsible for the photos, specs, Serial Number and instrument information, notes, documents, and links you add. Do not upload content you do not have permission to store or share."
+      title: getContentValue(settings.content, "terms.sections.accounts.heading"),
+      copy: getContentValue(settings.content, "terms.sections.accounts.body")
     },
     {
       title: "Permanent QR concept",
@@ -38,7 +41,7 @@ export default function TermsPage() {
         <section className="section">
           <div className="shell legal-page">
             <div className="eyebrow">Terms</div>
-            <h1>QRguitar is in public beta.</h1>
+            <h1>{getContentValue(settings.content, "terms.hero.headline")}</h1>
             <p>
               QRguitar provides QR-linked instrument profiles for guitars, basses, amps, pedals, builders, shops,
               collectors, and future owners. These terms explain the practical rules for using the beta.

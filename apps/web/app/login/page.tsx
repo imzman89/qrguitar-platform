@@ -6,10 +6,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import { clearQrGuitarSessionState, createBrowserSupabaseClient, sessionExpiredMessageKey } from "../../lib/supabase-browser";
+import { getContentValue } from "../../lib/content-registry";
+import { useSiteContent } from "../../lib/use-site-content";
 
 type LoginMode = "login" | "register" | "reset";
 
 export default function LoginPage() {
+  const content = useSiteContent();
   const router = useRouter();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [mode, setMode] = useState<LoginMode>("login");
@@ -27,7 +30,7 @@ export default function LoginPage() {
     setSafeNext(nextPath);
     const expiredMessage = window.localStorage.getItem(sessionExpiredMessageKey);
     if (params.get("reason") === "session-expired" || expiredMessage) {
-      setStatus(expiredMessage || "Your session expired. Please sign in again.");
+      setStatus(expiredMessage || getContentValue(content, "login.sessionExpired"));
       window.localStorage.removeItem(sessionExpiredMessageKey);
     }
 
@@ -153,25 +156,25 @@ export default function LoginPage() {
         <div className="shell auth-layout">
           <section>
             <div className="eyebrow">Customer account</div>
-            <h1>{mode === "register" ? "Create your QRguitar account." : mode === "reset" ? "Reset your QRguitar password." : "Sign in to QRguitar."}</h1>
+            <h1>{mode === "register" ? "Create your QRguitar account." : mode === "reset" ? "Reset your QRguitar password." : getContentValue(content, "login.hero.headline")}</h1>
             <p>
               {mode === "register"
                 ? "Create an account so your Profiles, QR links, photos, documents, and ownership tools stay tied to you."
                 : mode === "reset"
                   ? "Enter your account email and QRguitar will send a secure password reset link."
-                : "Sign in to manage your private profiles, create QRguitar IDs, and edit your instruments."}
+                : getContentValue(content, "login.hero.body")}
             </p>
             <div className="auth-tabs" role="tablist" aria-label="Account mode">
               <button className={mode === "login" ? "active" : ""} type="button" onClick={() => switchMode("login")}>
                 Login
               </button>
               <button className={mode === "register" ? "active" : ""} type="button" onClick={() => switchMode("register")}>
-                Create account
+                {getContentValue(content, "login.actions.create")}
               </button>
             </div>
             {mode === "login" ? (
               <button className="link-button auth-inline-link" type="button" onClick={() => switchMode("reset")}>
-                Forgot password?
+                {getContentValue(content, "login.actions.forgot")}
               </button>
             ) : null}
           </section>
@@ -220,12 +223,12 @@ export default function LoginPage() {
                 <div className="form-actions">
                   {mode === "login" ? (
                     <button className="button" type="button" onClick={login} disabled={isWorking}>
-                      Sign in
+                      {getContentValue(content, "login.actions.submit")}
                     </button>
                   ) : null}
                   {mode === "register" ? (
                     <button className="button" type="button" onClick={register} disabled={isWorking}>
-                      Create account
+                      {getContentValue(content, "login.actions.create")}
                     </button>
                   ) : null}
                   {mode === "reset" ? (

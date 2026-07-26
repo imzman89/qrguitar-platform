@@ -7,6 +7,8 @@ import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import { clearQrGuitarSessionState, createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
 import { defaultPublicCollectionSettings, type PublicCollectionSettings } from "../../lib/public-collections";
+import { getContentValue } from "../../lib/content-registry";
+import { useSiteContent } from "../../lib/use-site-content";
 
 type AccountPayload = {
   ok?: boolean;
@@ -40,6 +42,7 @@ const accountSections: Array<{ id: AccountSection; label: string }> = [
 ];
 
 export default function AccountPage() {
+  const content = useSiteContent();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -98,6 +101,13 @@ export default function AccountPage() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    const requestedSection = new URLSearchParams(window.location.search).get("section");
+    if (accountSections.some((section) => section.id === requestedSection)) {
+      setActiveSection(requestedSection as AccountSection);
+    }
   }, []);
 
   async function saveAccount() {
@@ -184,8 +194,8 @@ export default function AccountPage() {
         <div className="shell auth-layout account-layout">
           <section className="account-hero-copy">
             <div className="eyebrow">Account</div>
-            <h1>Your QRguitar account.</h1>
-            <p>Keep your profile, collection, transfers, and private tools tied to the right account.</p>
+            <h1>{getContentValue(content, "account.hero.headline")}</h1>
+            <p>{getContentValue(content, "account.hero.body")}</p>
             <div className="mini-chip-row">
               <span>{accountStatus || "active"}</span>
               <span>{plan || "free"}</span>
@@ -251,7 +261,7 @@ export default function AccountPage() {
             {activeSection === "profile" ? <section className="card auth-card account-settings-card">
               <div className="auth-card-head">
                 <span>Profile</span>
-                <strong><UserRound size={18} aria-hidden="true" /> Account details</strong>
+                <strong><UserRound size={18} aria-hidden="true" /> {getContentValue(content, "account.profile.heading")}</strong>
               </div>
 
               <div className="field">
@@ -268,7 +278,7 @@ export default function AccountPage() {
 
               <div className="form-actions">
                 <button className="button" type="button" onClick={saveAccount} disabled={isWorking}>
-                  {isWorking ? "Saving..." : "Save account"}
+                  {isWorking ? "Saving..." : getContentValue(content, "account.actions.save")}
                 </button>
               </div>
             </section> : null}
@@ -276,9 +286,9 @@ export default function AccountPage() {
             {activeSection === "collection" ? <section className="card auth-card account-settings-card" id="public-collection">
               <div className="auth-card-head">
                 <span>Public collection</span>
-                <strong><UsersRound size={18} aria-hidden="true" /> Share your collection</strong>
+                <strong><UsersRound size={18} aria-hidden="true" /> {getContentValue(content, "collections.hero.headline")}</strong>
               </div>
-              <p className="account-card-copy">Opt in to a public collection page that shows only Profiles you have already made public. Private and unlisted Profiles never appear.</p>
+              <p className="account-card-copy">{getContentValue(content, "collections.hero.body")}</p>
               <label className="toggle-field">
                 <input type="checkbox" checked={publicCollection.enabled} onChange={(event) => setPublicCollection((current) => ({ ...current, enabled: event.target.checked }))} />
                 Enable my public collection
@@ -294,20 +304,20 @@ export default function AccountPage() {
               </div>
               <label className="toggle-field"><input type="checkbox" checked={publicCollection.allowIndexing} onChange={(event) => setPublicCollection((current) => ({ ...current, allowIndexing: event.target.checked }))} /> Allow search engines to index this collection</label>
               <div className="form-actions">
-                <button className="button" type="button" onClick={saveAccount} disabled={isWorking}>{isWorking ? "Saving..." : "Save collection settings"}</button>
+                <button className="button" type="button" onClick={saveAccount} disabled={isWorking}>{isWorking ? "Saving..." : getContentValue(content, "collections.actions.save")}</button>
                 {publicCollection.enabled && publicCollection.handle ? <Link className="button secondary" href={`/collections/${publicCollection.handle}`} target="_blank">Preview collection <ExternalLink size={15} /></Link> : null}
               </div>
             </section> : null}
 
             {activeSection === "security" ? <section className="card auth-card account-settings-card">
               <div className="auth-card-head">
-                <span>Security</span>
+                <span>{getContentValue(content, "account.security.heading")}</span>
                 <strong><LockKeyhole size={18} aria-hidden="true" /> Password access</strong>
               </div>
               <p className="account-card-copy">Send yourself a secure reset link any time. QRguitar never shows or stores your password in this dashboard.</p>
               <div className="form-actions">
                 <button className="button secondary" type="button" onClick={sendPasswordReset} disabled={isWorking}>
-                  Email password reset
+                  {getContentValue(content, "account.actions.reset")}
                 </button>
                 <button className="button secondary" type="button" onClick={signOut} disabled={isWorking}>
                   <LogOut size={16} aria-hidden="true" /> Sign out

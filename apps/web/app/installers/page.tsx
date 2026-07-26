@@ -1,16 +1,17 @@
 import { Paintbrush, ShieldCheck } from "lucide-react";
 import Link from "next/link";
+import type { CSSProperties } from "react";
+import { EditorialIcon } from "../../components/EditorialIcon";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import type { Metadata } from "next";
+import { getContentValue } from "../../lib/content-registry";
+import { loadPublishedSiteSettings } from "../../lib/site-settings-server";
+import { buildManagedPageMetadata } from "../../lib/site-metadata";
 
-export const metadata: Metadata = {
-  title: "QRguitar installer network",
-  robots: {
-    index: false,
-    follow: false
-  }
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildManagedPageMetadata("installers", "/installers");
+}
 
 const installerServices = [
   "Under-finish QR placement",
@@ -20,35 +21,25 @@ const installerServices = [
   "Ownership handoff assistance"
 ];
 
-const vettingSteps = [
-  {
-    title: "Apply",
-    copy: "Luthiers, repair shops, and guitar retailers submit shop details, service area, finish experience, and references."
-  },
-  {
-    title: "Verify",
-    copy: "QRguitar reviews the shop, confirms the real business, and labels qualified partners as vetted installers."
-  },
-  {
-    title: "Coordinate",
-    copy: "During the early partner program, QRguitar connects approved shops and owners manually for installation or repair-linked documentation."
-  }
-];
-
-export default function InstallersPage() {
+export default async function InstallersPage() {
+  const settings = await loadPublishedSiteSettings();
+  const content = settings.content;
+  const sections = settings.composition.installers.sections;
+  const sectionStyle = (sectionId: string): CSSProperties => {
+    const index = sections.findIndex((section) => section.id === sectionId);
+    return { order: index < 0 ? 99 : index, display: sections[index]?.visible === false ? "none" : undefined };
+  };
+  const vettingSteps = sections.find((section) => section.id === "process")?.blocks.filter((block) => block.visible) || [];
   return (
     <>
       <Nav />
-      <main>
-        <section className="section installer-hero">
+      <main className="editorial-composed-page">
+        <section className="section installer-hero" style={sectionStyle("hero")}>
           <div className="shell installer-hero-grid">
             <div>
-              <div className="eyebrow">QRguitar installer network</div>
-              <h1>Help shape the QRguitar installer network.</h1>
-              <p>
-                QRguitar is reviewing early partners for permanent, finish-safe QR placement. Public installer search is
-                not live yet; shops and owners can contact QRguitar for manual beta guidance.
-              </p>
+              <div className="eyebrow">{getContentValue(content, "installers.hero.eyebrow")}</div>
+              <h1>{getContentValue(content, "installers.hero.headline")}</h1>
+              <p>{getContentValue(content, "installers.hero.body")}</p>
               <div className="hero-actions">
                 <Link className="button" href="mailto:support@qrguitar.com?subject=QRguitar%20Installer%20Network%20Application">
                   Contact QRguitar
@@ -71,26 +62,26 @@ export default function InstallersPage() {
           </div>
         </section>
 
-        <section className="section alt">
+        <section className="section alt" style={sectionStyle("process")}>
           <div className="shell">
             <div className="section-header">
               <div className="eyebrow">How it works</div>
               <h2>A trusted path from QR code to permanent install.</h2>
-              <p>Owners can start with a QRguitar Profile now. Physical installation support is handled manually during beta.</p>
+              <p>Owners can start with a QRguitar Profile now. QRguitar connects approved shops and owners manually during beta.</p>
             </div>
             <div className="grid three">
               {vettingSteps.map((step, index) => (
-                <article className="card" key={step.title}>
-                  <div className="step-number">{index + 1}</div>
+                <article className="card" key={step.id}>
+                  <div className="step-number"><EditorialIcon name={step.icon} /> {index + 1}</div>
                   <h3>{step.title}</h3>
-                  <p>{step.copy}</p>
+                  <p>{step.body}</p>
                 </article>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="section alt" id="apply">
+        <section className="section alt" id="apply" style={sectionStyle("apply")}>
           <div className="shell installer-apply">
             <div>
               <div className="eyebrow">For luthiers and repair shops</div>

@@ -6,8 +6,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import { createBrowserSupabaseClient } from "../../lib/supabase-browser";
+import { getContentValue } from "../../lib/content-registry";
+import { useSiteContent } from "../../lib/use-site-content";
 
 export default function ResetPasswordPage() {
+  const content = useSiteContent();
   const router = useRouter();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [password, setPassword] = useState("");
@@ -85,8 +88,8 @@ export default function ResetPasswordPage() {
         <div className="shell auth-layout">
           <section>
             <div className="eyebrow">Account recovery</div>
-            <h1>Create a new QRguitar password.</h1>
-            <p>Use the secure reset link from your email, then set a new password for your account.</p>
+            <h1>{getContentValue(content, "resetPassword.hero.headline")}</h1>
+            <p>{getContentValue(content, "resetPassword.hero.body")}</p>
           </section>
 
           <section className="card auth-card">

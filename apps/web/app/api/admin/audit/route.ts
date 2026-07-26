@@ -4,6 +4,24 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
+const PRIVATE_METADATA_KEY = /(email|token|secret|password|storage.?path|signed.?url|authorization|cookie)/i;
+
+function sanitizeAuditMetadata(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sanitizeAuditMetadata);
+  }
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+      key,
+      PRIVATE_METADATA_KEY.test(key) ? "[redacted]" : sanitizeAuditMetadata(item)
+    ])
+  );
+}
+
 export async function GET(request: Request) {
   const access = await requireAdmin(request);
   if (!access.ok) {
@@ -31,5 +49,12 @@ export async function GET(request: Request) {
     );
   }
 
-  return adminJson({ ok: true, auditEvents: result.data || [] });
+  return adminJson({
+    ok: true,
+    auditEvents: (result.data || []).map((event) => ({
+      ...event,
+      actor_email: undefined,
+      metadata: sanitizeAuditMetadata(event.metadata)
+    }))
+  });
 }

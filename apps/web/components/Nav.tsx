@@ -5,14 +5,20 @@ import { LogOut, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { BrandLogo } from "./BrandLogo";
 import { clearQrGuitarSessionState, createBrowserSupabaseClient } from "../lib/supabase-browser";
+import { defaultSiteSettings, fetchPublishedSiteSettings } from "../lib/site-settings";
+import { getContentValue } from "../lib/content-registry";
 
 export function Nav() {
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [content, setContent] = useState(defaultSiteSettings.content);
 
   async function logout() {
     const supabase = createBrowserSupabaseClient();
+    void fetchPublishedSiteSettings().then((settings) => {
+      if (settings) setContent(settings.content);
+    });
     await supabase.auth.signOut();
     clearQrGuitarSessionState();
     setIsSignedIn(false);
@@ -41,10 +47,10 @@ export function Nav() {
         Menu
       </button>
       <nav className={isOpen ? "nav-links open" : "nav-links"} id="primary-navigation" aria-label="Primary navigation">
-        <Link href="/dashboard">Dashboard</Link>
-        <Link href="/catalog">Catalog</Link>
-        <Link href="/create">Create</Link>
-        <Link href="/how-it-works">How It Works</Link>
+        <Link href="/dashboard">{getContentValue(content, "global.navigation.dashboard")}</Link>
+        <Link href="/catalog">{getContentValue(content, "global.navigation.catalog")}</Link>
+        <Link href="/create">{getContentValue(content, "global.navigation.create")}</Link>
+        <Link href="/how-it-works">{getContentValue(content, "global.navigation.howItWorks")}</Link>
         {isSignedIn ? (
           <div className="nav-account-menu">
             <button

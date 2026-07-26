@@ -16,7 +16,8 @@ type Body = {
 
 function roleValue(value: unknown) {
   const role = cleanText(value, 20);
-  return role === "admin" || role === "user" || role === "owner" || role === "builder" || role === "shop" ? role : null;
+  if (role === "user") return "owner";
+  return role === "admin" || role === "owner" || role === "builder" || role === "shop" ? role : null;
 }
 
 async function countOtherAdminAccess(supabase: ServerSupabaseClient, targetUserId: string) {
@@ -111,6 +112,10 @@ export async function PATCH(request: Request, context: { params: { id: string } 
 
   if (targetIsEnvManaged && ["lock", "ban", "remove", "delete_empty_user", "change_role"].includes(action)) {
     return adminJson({ ok: false, message: "This admin is managed by server environment settings." }, { status: 400 });
+  }
+
+  if (!reason) {
+    return adminJson({ ok: false, message: "An operator reason is required for the audit trail." }, { status: 400 });
   }
 
   const update: Record<string, unknown> = {};

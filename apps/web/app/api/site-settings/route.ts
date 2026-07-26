@@ -3,6 +3,7 @@ import { revalidatePath, unstable_noStore as noStore } from "next/cache";
 import { createServerSupabaseClient, createServerSupabaseClientWithTimeout, getSupabaseEnvStatus } from "../../../lib/supabase-server";
 import { defaultSiteSettings, mergeSiteSettings, publishedSiteSettingsKey, type EditableSiteSettings } from "../../../lib/site-settings";
 import { getAdminContext } from "../../../lib/admin-auth";
+import { sitePreviewCookie, sitePreviewDraftKey, verifySitePreviewToken } from "../../../lib/site-preview";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -26,7 +27,7 @@ function noStoreJson<T>(body: T, init: ResponseInit = {}) {
   });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   noStore();
   const supabase = createServerSupabaseClientWithTimeout(3000);
   if (!supabase) {
@@ -38,17 +39,23 @@ export async function GET() {
     });
   }
 
+  const cookieHeader = request.headers.get("cookie") || "";
+  const previewToken = cookieHeader.match(new RegExp(`(?:^|;\\s*)${sitePreviewCookie}=([^;]+)`))?.[1];
+  const preview = verifySitePreviewToken(previewToken ? decodeURIComponent(previewToken) : "");
   const { data, error } = await supabase
     .from("site_content")
     .select("content_value")
-    .eq("content_key", publishedSiteSettingsKey)
+    .eq("content_key", preview ? sitePreviewDraftKey : publishedSiteSettingsKey)
     .maybeSingle<SiteContentRow>();
 
   if (error) {
     return noStoreJson({ ok: false, settings: defaultSiteSettings, message: "Published site settings are unavailable." });
   }
 
-  return noStoreJson({ ok: true, settings: data?.content_value ? mergeSiteSettings(data.content_value) : null });
+  const content = preview
+    ? ((data?.content_value as { settings?: Partial<EditableSiteSettings> } | null)?.settings || null)
+    : data?.content_value;
+  return noStoreJson({ ok: true, preview: preview ? "draft" : "published", settings: content ? mergeSiteSettings(content) : null });
 }
 
 export async function PUT(request: Request) {

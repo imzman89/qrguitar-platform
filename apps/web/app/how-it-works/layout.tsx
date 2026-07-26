@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { buildManagedPageMetadata } from "../../lib/site-metadata";
 
-export const metadata: Metadata = {
-  title: "How It Works",
-  description: "Learn how QRguitar Profiles, permanent identities, serial privacy, QR scanning, ownership transfers, and shop workflows work."
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildManagedPageMetadata("howItWorks", "/how-it-works");
+}
 
 export default function HowItWorksLayout({ children }: { children: ReactNode }) {
   return children;

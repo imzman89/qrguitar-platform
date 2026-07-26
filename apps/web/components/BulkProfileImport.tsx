@@ -6,6 +6,8 @@ import type { DemoInstrument } from "../lib/local-demo";
 import { canonicalInstrumentBrand } from "../lib/instrument-brands";
 import { qrCodeFromSerial } from "../lib/qrguitar-id";
 import { getSupabaseAccessToken } from "../lib/supabase-browser";
+import { getContentValue } from "../lib/content-registry";
+import { useSiteContent } from "../lib/use-site-content";
 
 type BulkProfileImportProps = {
   onComplete?: () => void;
@@ -49,6 +51,7 @@ type ColumnMapping = Record<string, string>;
 const importTargets = ["", ...headers] as const;
 
 export function BulkProfileImport({ onComplete = () => undefined, ownerName = "" }: BulkProfileImportProps) {
+  const content = useSiteContent();
   const [text, setText] = useState("");
   const [rows, setRows] = useState<BulkRow[]>([]);
   const [message, setMessage] = useState("");
@@ -252,7 +255,7 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
 
   return (
     <section className="bulk-import-workspace">
-      <header className="bulk-import-heading"><div><span className="eyebrow">Bulk Import</span><h1>Add inventory without losing control.</h1><p>Import up to 50 instruments, review every row, and create valid Profiles privately. Nothing is published automatically.</p></div><button className="button secondary" type="button" onClick={() => void copyTemplate()}><Clipboard size={16} /> Copy template</button></header>
+      <header className="bulk-import-heading"><div><span className="eyebrow">Bulk Import</span><h1>{getContentValue(content, "bulkImport.hero.headline")}</h1><p>{getContentValue(content, "bulkImport.hero.body")}</p></div><button className="button secondary" type="button" onClick={() => void copyTemplate()}><Clipboard size={16} /> {getContentValue(content, "bulkImport.actions.template")}</button></header>
       <ol className="import-steps" aria-label="Import workflow"><li className={text ? "is-complete" : "is-active"}><b>1</b><span>Add inventory</span></li><li className={rows.length ? "is-complete" : ""}><b>2</b><span>Map columns</span></li><li className={rows.length ? "is-active" : ""}><b>3</b><span>Preview & validate</span></li><li><b>4</b><span>Create private Profiles</span></li></ol>
       <div className="bulk-import-grid">
         <div className="bulk-import-intro">

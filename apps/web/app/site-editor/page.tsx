@@ -1,1209 +1,1058 @@
 "use client";
 
-import { Clipboard, Eye, Image as ImageIcon, LockKeyhole, Plus, RotateCcw, Save, Search, ShieldCheck, SlidersHorizontal, Trash2 } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  Clipboard,
+  Clock3,
+  Cloud,
+  Code2,
+  Eye,
+  FileClock,
+  Image as ImageIcon,
+  Laptop,
+  LockKeyhole,
+  Menu,
+  Monitor,
+  Paintbrush,
+  PanelLeftClose,
+  PanelRightClose,
+  RefreshCw,
+  RotateCcw,
+  Save,
+  Search,
+  Send,
+  Smartphone,
+  Tablet,
+  Upload,
+  UnlockKeyhole,
+  X
+} from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
+import { SiteCompositionEditor } from "../../components/SiteCompositionEditor";
+import {
+  contentAreas,
+  contentCoverageManifest,
+  contentCoverageSummary,
+  contentPagesForArea,
+  contentRegistry,
+  defaultContentValues,
+  validateContentValues,
+  type ContentArea,
+  type ContentRegistryEntry
+} from "../../lib/content-registry";
 import {
   applyThemeSettings,
   defaultSiteSettings,
-  fetchPublishedSiteSettings,
   mergeSiteSettings,
-  saveSiteSettings,
+  normalizeBrandLogoKey,
   siteSettingsKey,
-  type EditableSiteSettings
+  type EditableSiteSettings,
+  type EditorialPageKey
 } from "../../lib/site-settings";
-import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
+import { getSupabaseAccessToken } from "../../lib/supabase-browser";
 
-type EditorTab = "brand" | "hero" | "sections" | "dashboard" | "colors" | "seo" | "preview";
+type PreviewDevice = "desktop" | "tablet" | "mobile";
+type PreviewSource = "draft" | "published";
+type EditorMode = "content" | "advanced";
+type SpecialPage = "Theme" | "Brand assets" | "Revision history" | "Copy coverage" | "Advanced JSON";
+type SelectedPage = { area: ContentArea | "Design" | "Advanced"; page: string };
+type ConfirmAction = { kind: "discard" } | { kind: "publish" } | { kind: "restore"; revision: Revision };
 
-const seoImageOptions = [
-  { label: "White / orange social card", value: "/seo/qrguitar-og-v2.png" },
-  { label: "Alternate social card", value: "/seo/qrguitar-og.png" },
-  { label: "Text logo", value: "/seo/qrguitar-text-logo.svg" },
-  { label: "Header logo", value: "/qrguitar-logo-white-orange.svg" }
-];
+type Revision = {
+  id: string;
+  updatedAt: string;
+  publishedAt: string;
+  publishedBy: string;
+  note: string;
+  area: string;
+  changedFields: string[];
+};
 
-const faviconOptions = [
-  { label: "QRguitar logo", value: "/qrguitar-logo-white-orange.svg" },
-  { label: "Text logo", value: "/seo/qrguitar-text-logo.svg" },
-  { label: "Social card", value: "/seo/qrguitar-og-v2.png" }
-];
+type SiteEditorPayload = {
+  ok?: boolean;
+  message?: string;
+  published?: EditableSiteSettings;
+  publishedAt?: string;
+  draft?: EditableSiteSettings | null;
+  draftMeta?: {
+    basePublishedAt?: string;
+    updatedAt?: string;
+    updatedBy?: string;
+    note?: string;
+    area?: string;
+    changedFields?: string[];
+  } | null;
+  revisions?: Revision[];
+  errors?: Record<string, string>;
+  conflict?: boolean;
+};
 
-const tabs: Array<{ id: EditorTab; label: string }> = [
-  { id: "brand", label: "Brand" },
-  { id: "hero", label: "Hero" },
-  { id: "sections", label: "Homepage Sections" },
-  { id: "dashboard", label: "Dashboard Copy" },
-  { id: "colors", label: "Theme Colors" },
-  { id: "seo", label: "SEO" },
-  { id: "preview", label: "Settings JSON" }
-];
+const crashRecoveryKey = `${siteSettingsKey}.crashRecovery`;
+
+const legacyContentBindings: Record<string, (settings: EditableSiteSettings, value: string) => EditableSiteSettings> = {
+  "global.brand.name": (settings, value) => ({ ...settings, brandName: value }),
+  "global.brand.tagline": (settings, value) => ({ ...settings, tagline: value }),
+  "home.hero.eyebrow": (settings, value) => ({ ...settings, hero: { ...settings.hero, eyebrow: value } }),
+  "home.hero.headline": (settings, value) => ({ ...settings, hero: { ...settings.hero, headline: value } }),
+  "home.hero.body": (settings, value) => ({ ...settings, hero: { ...settings.hero, body: value } }),
+  "home.hero.primaryCta": (settings, value) => ({ ...settings, hero: { ...settings.hero, primaryCta: value } }),
+  "home.hero.secondaryCta": (settings, value) => ({ ...settings, hero: { ...settings.hero, secondaryCta: value } }),
+  "home.lifecycle.headline": (settings, value) => ({ ...settings, sections: { ...settings.sections, howHeadline: value } }),
+  "home.lifecycle.body": (settings, value) => ({ ...settings, sections: { ...settings.sections, howBody: value } }),
+  "home.pricing.headline": (settings, value) => ({ ...settings, sections: { ...settings.sections, pricingHeadline: value } }),
+  "home.pricing.body": (settings, value) => ({ ...settings, sections: { ...settings.sections, pricingBody: value } }),
+  "dashboard.hero.headline": (settings, value) => ({ ...settings, dashboard: { ...settings.dashboard, pageTitle: value } }),
+  "dashboard.hero.body": (settings, value) => ({ ...settings, dashboard: { ...settings.dashboard, subtitle: value } }),
+  "dashboard.empty.title": (settings, value) => ({ ...settings, dashboard: { ...settings.dashboard, emptyCollectionTitle: value } }),
+  "dashboard.empty.body": (settings, value) => ({ ...settings, dashboard: { ...settings.dashboard, emptyCollectionBody: value } }),
+  "seo.global.title": (settings, value) => ({ ...settings, seo: { ...settings.seo, title: value } }),
+  "seo.global.description": (settings, value) => ({ ...settings, seo: { ...settings.seo, description: value } }),
+  "seo.global.image": (settings, value) => ({ ...settings, seo: { ...settings.seo, image: value } })
+};
+
+function hydrateLegacyContent(settings: EditableSiteSettings) {
+  const content = { ...settings.content };
+  const legacy: Record<string, string> = {
+    "global.brand.name": settings.brandName,
+    "global.brand.tagline": settings.tagline,
+    "home.hero.eyebrow": settings.hero.eyebrow,
+    "home.hero.headline": settings.hero.headline,
+    "home.hero.body": settings.hero.body,
+    "home.hero.primaryCta": settings.hero.primaryCta,
+    "home.hero.secondaryCta": settings.hero.secondaryCta,
+    "home.lifecycle.headline": settings.sections.howHeadline,
+    "home.lifecycle.body": settings.sections.howBody,
+    "home.pricing.headline": settings.sections.pricingHeadline,
+    "home.pricing.body": settings.sections.pricingBody,
+    "dashboard.hero.headline": settings.dashboard.pageTitle,
+    "dashboard.hero.body": settings.dashboard.subtitle,
+    "dashboard.empty.title": settings.dashboard.emptyCollectionTitle,
+    "dashboard.empty.body": settings.dashboard.emptyCollectionBody,
+    "seo.global.title": settings.seo.title,
+    "seo.global.description": settings.seo.description,
+    "seo.global.image": settings.seo.image
+  };
+  for (const [key, value] of Object.entries(legacy)) {
+    if (content[key] === defaultContentValues[key] && value && value !== defaultContentValues[key]) content[key] = value;
+  }
+  return { ...settings, content };
+}
+
+function formatTime(value?: string) {
+  if (!value) return "Not yet";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Not yet" : date.toLocaleString();
+}
+
+function groupEntries(entries: ContentRegistryEntry[]) {
+  const groups = new Map<string, ContentRegistryEntry[]>();
+  for (const entry of entries) groups.set(entry.section, [...(groups.get(entry.section) || []), entry]);
+  return Array.from(groups.entries());
+}
+
+function pagePurpose(selected: SelectedPage) {
+  const purposes: Record<string, string> = {
+    Homepage: "Shape the first impression and guide visitors toward creating or exploring a QRguitar Profile.",
+    "How It Works": "Explain the complete QRguitar lifecycle in language customers can understand quickly.",
+    Catalog: "Control the discovery language surrounding visible QRguitar Profiles.",
+    Dashboard: "Guide owners through their collection, actions, and next steps.",
+    Contact: "Keep support paths clear, direct, and useful.",
+    Privacy: "Maintain the public privacy explanation without changing protected policy behavior.",
+    Terms: "Maintain the public terms copy without changing protected enforcement.",
+    Theme: "Tune approved visual tokens while preserving accessible contrast.",
+    "Brand assets": "Manage shared QRguitar and instrument-brand presentation.",
+    "Revision history": "Review prior publications and restore a safe version into the draft.",
+    "Copy coverage": "Review which visible surfaces are controlled by the Content Studio.",
+    "Advanced JSON": "Recovery tools for validated settings export and import."
+  };
+  return purposes[selected.page] || `Edit the approved customer-facing content for ${selected.page}.`;
+}
+
+function hexToRgb(value: string) {
+  const hex = value.trim().replace(/^#/, "");
+  if (!/^[0-9a-f]{6}$/i.test(hex)) return null;
+  return [0, 2, 4].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16));
+}
+
+function contrastRatio(foreground: string, background: string) {
+  const luminance = (value: string) => {
+    const rgb = hexToRgb(value);
+    if (!rgb) return null;
+    const channels = rgb.map((channel) => {
+      const normalized = channel / 255;
+      return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  };
+  const first = luminance(foreground);
+  const second = luminance(background);
+  if (first === null || second === null) return null;
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+}
+
+function emailPreviewValue(value: string) {
+  const samples: Record<string, string> = {
+    profile_title: "1962 Sunburst Stratocaster",
+    profile_url: "https://www.qrguitar.com/i/QRG-EXAMPLE123",
+    provider_name: "Example Guitar Service",
+    claim_url: "https://www.qrguitar.com/ownership-claim",
+    sender_name: "Current owner",
+    reset_url: "https://www.qrguitar.com/reset-password",
+    safety_status: "Reported lost"
+  };
+  return value.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (match, key: string) => samples[key] || match);
+}
 
 export default function SiteEditorPage() {
-  const router = useRouter();
+  const [selected, setSelected] = useState<SelectedPage>({ area: "Marketing", page: "Homepage" });
   const [settings, setSettings] = useState<EditableSiteSettings>(defaultSiteSettings);
-  const [message, setMessage] = useState("Ready to edit.");
-  const [activeTab, setActiveTab] = useState<EditorTab>("hero");
-  const [isUnlocked, setIsUnlocked] = useState(false);
-  const [isAdminSession, setIsAdminSession] = useState(false);
-  const [copyError, setCopyError] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
-  const [isSignedIn, setIsSignedIn] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [publishedSettings, setPublishedSettings] = useState<EditableSiteSettings>(defaultSiteSettings);
-  const [localDraft, setLocalDraft] = useState<EditableSiteSettings | null>(null);
-  const [showDraftNotice, setShowDraftNotice] = useState(false);
+  const [published, setPublished] = useState<EditableSiteSettings>(defaultSiteSettings);
+  const [publishedAt, setPublishedAt] = useState("");
+  const [draftMeta, setDraftMeta] = useState<SiteEditorPayload["draftMeta"]>(null);
+  const [revisions, setRevisions] = useState<Revision[]>([]);
+  const [query, setQuery] = useState("");
+  const [message, setMessage] = useState("Checking admin access…");
+  const [status, setStatus] = useState<"loading" | "saved" | "saving" | "dirty" | "error">("loading");
+  const [authorized, setAuthorized] = useState(false);
+  const [previewSource, setPreviewSource] = useState<PreviewSource>("draft");
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [previewError, setPreviewError] = useState("");
+  const [device, setDevice] = useState<PreviewDevice>("desktop");
+  const [previewVersion, setPreviewVersion] = useState(0);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [editorMode, setEditorMode] = useState<EditorMode>("content");
+  const [openFieldSection, setOpenFieldSection] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [note, setNote] = useState("");
+  const [advancedJson, setAdvancedJson] = useState("");
+  const [advancedUnlocked, setAdvancedUnlocked] = useState(false);
+  const [brandName, setBrandName] = useState("");
+  const [brandLogoUrl, setBrandLogoUrl] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
+  const loaded = useRef(false);
+  const lastServerDraft = useRef("");
 
-  const editorStatusTitle = !authChecked
-    ? "Checking owner access."
-    : !isSignedIn
-      ? "Sign in required."
-      : isUnlocked
-        ? message
-        : "Admin access required.";
-  const editorStatusBody = !authChecked
-    ? ""
-    : !isSignedIn
-      ? "Sign in with the owner account before changing live site settings."
-      : isUnlocked
-        ? "Save publishes changes across desktop, mobile, and public visitors."
-        : "Sign in with an authorized admin account to change published site settings.";
-  const seoChecks = [
-    {
-      label: "Title",
-      value: settings.seo.title.length >= 45 && settings.seo.title.length <= 60 ? "Good" : "Needs 45-60 characters"
-    },
-    {
-      label: "Description",
-      value: settings.seo.description.length >= 120 && settings.seo.description.length <= 160 ? "Good" : "Needs 120-160 characters"
-    },
-    {
-      label: "Social image",
-      value: settings.seo.image ? "Set" : "Missing"
-    },
-    {
-      label: "Tab thumbnail",
-      value: settings.seo.favicon ? "Set" : "Missing"
-    }
-  ];
-  const hasUnsavedChanges = useMemo(
-    () => JSON.stringify(settings) !== JSON.stringify(publishedSettings),
-    [settings, publishedSettings]
+  const selectedEntries = useMemo(() => {
+    const search = query.trim().toLowerCase();
+    return contentRegistry.filter((entry) => {
+      const matchesPage = entry.area === selected.area && entry.page === selected.page;
+      const matchesSearch = !search || `${entry.key} ${entry.page} ${entry.section} ${entry.label} ${entry.help}`.toLowerCase().includes(search);
+      return (search ? matchesSearch : matchesPage);
+    });
+  }, [query, selected]);
+
+  const currentPageEntries = contentRegistry.filter((entry) => entry.area === selected.area && entry.page === selected.page);
+  const fieldGroups = useMemo(() => groupEntries(selectedEntries), [selectedEntries]);
+  const compositionPageKey = useMemo<EditorialPageKey | null>(() => {
+    if (query) return null;
+    const supported: Partial<Record<ContentArea, Record<string, EditorialPageKey>>> = {
+      Global: { Footer: "footer" },
+      Marketing: { Homepage: "home", "How It Works": "howItWorks", Catalog: "catalog", Installers: "installers" },
+      "Support & Legal": { Contact: "contact" }
+    };
+    return selected.area in supported
+      ? supported[selected.area as ContentArea]?.[selected.page] || null
+      : null;
+  }, [query, selected]);
+  const previewPath = currentPageEntries.find((entry) => entry.previewPath)?.previewPath || "/";
+  const changedKeys = useMemo(
+    () => Object.keys(settings.content).filter((key) => settings.content[key] !== published.content[key]),
+    [published.content, settings.content]
   );
+  const hasChanges = JSON.stringify(settings) !== JSON.stringify(published);
+  const textContrast = contrastRatio(settings.colors.text, settings.colors.background);
+  const actionContrast = contrastRatio(settings.colors.background, settings.colors.cream);
+  const accentContrast = contrastRatio(settings.colors.gold, settings.colors.background);
 
   useEffect(() => {
-    const supabase = createBrowserSupabaseClient();
+    setOpenFieldSection(fieldGroups[0]?.[0] || "");
+  }, [selected.area, selected.page, query]);
+
+  useEffect(() => {
+    const updatePreviewLayout = () => {
+      if (window.innerWidth < 1000) setPreviewOpen(false);
+      setDevice(window.innerWidth < 640 ? "mobile" : window.innerWidth < 1000 ? "tablet" : "desktop");
+    };
+    updatePreviewLayout();
+    window.addEventListener("resize", updatePreviewLayout);
+    return () => window.removeEventListener("resize", updatePreviewLayout);
+  }, []);
+
+  function applyPayload(payload: SiteEditorPayload, preferDraft = true) {
+    if (payload.published) {
+      const nextPublished = hydrateLegacyContent(mergeSiteSettings(payload.published));
+      setPublished(nextPublished);
+      setPublishedAt(payload.publishedAt || "");
+      const next = preferDraft && payload.draft ? hydrateLegacyContent(mergeSiteSettings(payload.draft)) : nextPublished;
+      setSettings(next);
+      setAdvancedJson(JSON.stringify(next, null, 2));
+      lastServerDraft.current = payload.draft ? JSON.stringify(next) : "";
+      applyThemeSettings(next);
+    }
+    setDraftMeta(payload.draftMeta || null);
+    setRevisions(payload.revisions || []);
+  }
+
+  async function api(action?: string, body: Record<string, unknown> = {}) {
+    const token = await getSupabaseAccessToken();
+    if (!token) throw new Error("Sign in with an authorized admin account.");
+    const response = await fetch("/api/site-editor", {
+      method: action ? "PUT" : "GET",
+      headers: { Authorization: `Bearer ${token}`, ...(action ? { "Content-Type": "application/json" } : {}) },
+      cache: "no-store",
+      body: action ? JSON.stringify({ action, ...body }) : undefined
+    });
+    const payload = (await response.json().catch(() => ({}))) as SiteEditorPayload;
+    if (!response.ok) {
+      const error = new Error(payload.message || "Site Editor request failed.") as Error & { payload?: SiteEditorPayload };
+      error.payload = payload;
+      throw error;
+    }
+    return payload;
+  }
+
+  async function saveDraft(nextSettings: EditableSiteSettings) {
+    return api("save_draft", {
+      settings: nextSettings,
+      basePublishedAt: draftMeta?.basePublishedAt || publishedAt,
+      note: "Autosaved draft",
+      area: `${selected.area} / ${selected.page}`
+    });
+  }
+
+  async function issueDraftPreview(path: string) {
+    const token = await getSupabaseAccessToken();
+    if (!token) throw new Error("Sign in with an authorized admin account.");
+    const response = await fetch("/api/site-editor/preview", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store"
+    });
+    const payload = (await response.json().catch(() => ({}))) as { ok?: boolean; token?: string; message?: string };
+    if (!response.ok || !payload.token) throw new Error(payload.message || "Could not authorize the draft preview.");
+    const authorizationUrl = `/api/site-editor/preview?prepare=1&token=${encodeURIComponent(payload.token)}&path=${encodeURIComponent(path)}`;
+    const authorization = await fetch(authorizationUrl, {
+      cache: "no-store",
+      credentials: "same-origin"
+    });
+    const authorizedPreview = (await authorization.json().catch(() => ({}))) as { ok?: boolean; path?: string };
+    if (!authorization.ok || !authorizedPreview.ok || !authorizedPreview.path) {
+      throw new Error("Could not open the authorized draft preview.");
+    }
+    return `${authorizedPreview.path}${authorizedPreview.path.includes("?") ? "&" : "?"}cmsPreview=draft`;
+  }
+
+  async function clearDraftPreview() {
+    const token = await getSupabaseAccessToken();
+    if (!token) throw new Error("Sign in with an authorized admin account.");
+    const response = await fetch("/api/site-editor/preview", {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store"
+    });
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => ({}))) as { message?: string };
+      throw new Error(payload.message || "Could not load the published preview.");
+    }
+  }
+
+  useEffect(() => {
     let cancelled = false;
-
-    supabase.auth.getSession().then(({ data }) => {
-      if (cancelled) {
-        return;
-      }
-
-      const hasSession = Boolean(data.session?.user);
-      setIsSignedIn(hasSession);
-      setAuthChecked(true);
-
-      if (!hasSession) {
-        setIsAdminSession(false);
-        router.replace(`/login?next=${encodeURIComponent("/site-editor")}&reason=session-expired`);
-        return;
-      }
-
-      void getSupabaseAccessToken().then(async (token) => {
-        if (!token || cancelled) return;
-        const response = await fetch("/api/admin/overview", {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store"
-        });
-        if (response.ok && !cancelled) {
-          setIsAdminSession(true);
-          setIsUnlocked(true);
-          setMessage("Admin session verified. Editor unlocked.");
-        } else if (!cancelled) {
-          setIsAdminSession(false);
-          setIsUnlocked(false);
-          setMessage("This account does not have site editor access.");
-        }
+    void api()
+      .then((payload) => {
+        if (cancelled) return;
+        applyPayload(payload, true);
+        setAuthorized(true);
+        setStatus("saved");
+        setMessage(payload.draft ? "Server draft loaded." : "Published content loaded.");
+        loaded.current = true;
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setAuthorized(false);
+        setStatus("error");
+        setMessage(error instanceof Error ? error.message : "Admin access required.");
       });
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      const hasSession = Boolean(session?.user);
-      setIsSignedIn(hasSession);
-      setAuthChecked(true);
-
-      if (!hasSession) {
-        setIsUnlocked(false);
-        setIsAdminSession(false);
-      }
-    });
-
     return () => {
       cancelled = true;
-      listener.subscription.unsubscribe();
     };
-  }, [router]);
+  }, []);
 
   useEffect(() => {
-    if (!authChecked || !isSignedIn) {
-      return;
+    let cancelled = false;
+    if (!authorized) return;
+    if (previewSource === "published") {
+      setPreviewError("");
+      setPreviewUrl("");
+      void clearDraftPreview()
+        .then(() => {
+          if (!cancelled) setPreviewUrl(`${previewPath}?cmsPreview=published&v=${previewVersion}`);
+        })
+        .catch((error) => {
+          if (!cancelled) setPreviewError(error instanceof Error ? error.message : "Published preview is unavailable.");
+        });
+      return () => {
+        cancelled = true;
+      };
     }
+    setPreviewError("");
+    setPreviewUrl("");
+    void issueDraftPreview(previewPath)
+      .then((url) => {
+        if (!cancelled) setPreviewUrl(url);
+      })
+      .catch((error) => {
+        if (!cancelled) setPreviewError(error instanceof Error ? error.message : "Draft preview is unavailable.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authorized, previewPath, previewSource, previewVersion]);
 
-    if (!isAdminSession) {
-      return;
-    }
-    const rawDraft = window.localStorage.getItem(siteSettingsKey);
-    const draft = readLocalSiteDraft(rawDraft);
-
-    void fetchPublishedSiteSettings().then((published) => {
-      const nextPublished = published || defaultSiteSettings;
-      setPublishedSettings(nextPublished);
-      setSettings(nextPublished);
-      applyThemeSettings(nextPublished);
-
-      if (draft && JSON.stringify(draft) !== JSON.stringify(nextPublished)) {
-        setLocalDraft(draft);
-        setShowDraftNotice(true);
-        setMessage("Published settings loaded. A local draft exists on this device.");
+  useEffect(() => {
+    if (!loaded.current || !authorized) return;
+    window.localStorage.setItem(crashRecoveryKey, JSON.stringify(settings));
+    if (JSON.stringify(settings) !== lastServerDraft.current && hasChanges) setStatus("dirty");
+    const timer = window.setTimeout(() => {
+      if (!hasChanges) {
+        if (!draftMeta) return;
+        setStatus("saving");
+        void api("discard_draft", { note: "Draft matched the published version" })
+          .then((payload) => {
+            applyPayload(payload, false);
+            window.localStorage.removeItem(crashRecoveryKey);
+            setStatus("saved");
+            setMessage("All changes restored to the published version.");
+            setPreviewVersion((value) => value + 1);
+          })
+          .catch((error) => {
+            setStatus("error");
+            setMessage(error instanceof Error ? error.message : "Could not clear the restored draft.");
+          });
         return;
       }
-
-      setLocalDraft(null);
-      setShowDraftNotice(false);
-      setMessage("Published site settings loaded.");
-    });
-  }, [authChecked, isAdminSession, isSignedIn]);
+      if (JSON.stringify(settings) === lastServerDraft.current) return;
+      const savedDraft = JSON.stringify(settings);
+      setStatus("saving");
+      void saveDraft(settings)
+        .then((payload) => {
+          if (payload.published) {
+            setPublished(hydrateLegacyContent(mergeSiteSettings(payload.published)));
+            setPublishedAt(payload.publishedAt || "");
+          }
+          setDraftMeta(payload.draftMeta || null);
+          setRevisions(payload.revisions || []);
+          lastServerDraft.current = savedDraft;
+          setStatus("saved");
+          setMessage("Draft autosaved on the server.");
+          setPreviewVersion((value) => value + 1);
+        })
+        .catch((error) => {
+          setStatus("error");
+          setMessage(error instanceof Error ? error.message : "Autosave failed.");
+        });
+    }, 1800);
+    return () => window.clearTimeout(timer);
+  }, [authorized, draftMeta, hasChanges, publishedAt, selected.area, selected.page, settings]);
 
   useEffect(() => {
-    if (!authChecked || !isSignedIn || !isUnlocked || !hasUnsavedChanges) {
+    if (!confirmAction) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setConfirmAction(null);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [confirmAction]);
+
+  function updateContent(key: string, value: string) {
+    const entry = contentRegistry.find((candidate) => candidate.key === key);
+    if (entry && ["security-locked", "data-derived", "browser-platform"].includes(entry.classification)) return;
+    setSettings((current) => {
+      let next = { ...current, content: { ...current.content, [key]: value } };
+      const bind = legacyContentBindings[key];
+      if (bind) next = bind(next, value);
+      return next;
+    });
+    setErrors((current) => ({ ...current, [key]: "" }));
+  }
+
+  async function publish() {
+    const validation = validateContentValues(settings.content);
+    setErrors(validation);
+    if (Object.keys(validation).length) {
+      setStatus("error");
+      setMessage("Fix the highlighted fields before publishing.");
       return;
     }
-
-    window.localStorage.setItem(siteSettingsKey, JSON.stringify(settings));
-    setLocalDraft(settings);
-  }, [authChecked, hasUnsavedChanges, isSignedIn, isUnlocked, settings]);
-
-  const settingsJson = useMemo(() => JSON.stringify(settings, null, 2), [settings]);
-
-  function continueLocalDraft() {
-    if (!localDraft) {
+    if (textContrast === null || actionContrast === null || textContrast < 4.5 || actionContrast < 4.5) {
+      setStatus("error");
+      setMessage("Publishing blocked: primary text and primary actions must meet 4.5:1 contrast.");
       return;
     }
-
-    setSettings(localDraft);
-    applyThemeSettings(localDraft);
-    setShowDraftNotice(false);
-    setMessage("Local draft loaded. Save Changes will publish it globally after the server confirms.");
+    setStatus("saving");
+    try {
+      const payload = await api("publish", {
+        settings,
+        basePublishedAt: draftMeta?.basePublishedAt || publishedAt,
+        note,
+        area: `${selected.area} / ${selected.page}`
+      });
+      applyPayload(payload, false);
+      window.localStorage.removeItem(crashRecoveryKey);
+      setStatus("saved");
+      setMessage("Published globally.");
+      setNote("");
+      setPreviewVersion((value) => value + 1);
+    } catch (error) {
+      const payload = (error as Error & { payload?: SiteEditorPayload }).payload;
+      setErrors(payload?.errors || {});
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : "Publish failed.");
+    }
   }
 
-  function discardLocalDraft() {
-    window.localStorage.removeItem(siteSettingsKey);
-    setLocalDraft(null);
-    setShowDraftNotice(false);
-    setSettings(publishedSettings);
-    applyThemeSettings(publishedSettings);
-    setMessage("Local draft discarded. Published settings loaded.");
+  async function discardDraft() {
+    setStatus("saving");
+    try {
+      const payload = await api("discard_draft", { note: "Discarded from Content Studio" });
+      applyPayload(payload, false);
+      window.localStorage.removeItem(crashRecoveryKey);
+      setStatus("saved");
+      setMessage("Draft discarded. Published content restored.");
+    } catch (error) {
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : "Could not discard draft.");
+    }
   }
 
-  function update<K extends keyof EditableSiteSettings>(section: K, value: EditableSiteSettings[K]) {
-    const next = { ...settings, [section]: value };
-    setSettings(next);
-    applyThemeSettings(next);
+  async function restoreRevision(revision: Revision) {
+    setStatus("saving");
+    try {
+      const payload = await api("restore_revision", {
+        revisionId: revision.id,
+        note: `Restored revision from ${revision.publishedAt}`,
+        area: "Revision history"
+      });
+      applyPayload(payload, true);
+      setStatus("saved");
+      setMessage("Revision restored to draft. Review before publishing.");
+    } catch (error) {
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : "Could not restore revision.");
+    }
   }
 
-  function updateCategoryOption(index: number, value: string) {
-    const next = [...settings.instrumentCategories];
-    next[index] = value;
-    setSettings({ ...settings, instrumentCategories: next });
-  }
-
-  function addCategoryOption() {
-    setSettings({ ...settings, instrumentCategories: [...settings.instrumentCategories, "New category"] });
-  }
-
-  function removeCategoryOption(index: number) {
-    const next = settings.instrumentCategories.filter((_, current) => current !== index);
-    setSettings({ ...settings, instrumentCategories: next });
-  }
-
-  function updateHero(field: keyof EditableSiteSettings["hero"], value: string) {
-    const next = { ...settings, hero: { ...settings.hero, [field]: value } };
-    setSettings(next);
-    applyThemeSettings(next);
-  }
-
-  function updateSection(field: keyof EditableSiteSettings["sections"], value: string) {
-    const next = { ...settings, sections: { ...settings.sections, [field]: value } };
-    setSettings(next);
-    applyThemeSettings(next);
-  }
-
-  function updateColor(field: keyof EditableSiteSettings["colors"], value: string) {
-    const next = { ...settings, colors: { ...settings.colors, [field]: value } };
-    setSettings(next);
-    applyThemeSettings(next);
-  }
-
-  function updateSeo(field: keyof EditableSiteSettings["seo"], value: string) {
-    const next = { ...settings, seo: { ...settings.seo, [field]: value } };
-    setSettings(next);
-  }
-
-  function updateDashboard(field: keyof EditableSiteSettings["dashboard"], value: string) {
-    const next = { ...settings, dashboard: { ...settings.dashboard, [field]: value } };
-    setSettings(next);
-  }
-
-  function updateSectionCard(
-    section: "howCards" | "audienceCards",
-    index: number,
-    field: "title" | "copy",
-    value: string
-  ) {
-    const list = [...settings.sections[section]];
-    list[index] = { ...list[index], [field]: value };
-    setSettings({ ...settings, sections: { ...settings.sections, [section]: list } });
-    applyThemeSettings({ ...settings, sections: { ...settings.sections, [section]: list } });
-  }
-
-  function addSectionCard(section: "howCards" | "audienceCards") {
-    const next = [...settings.sections[section], { title: "New card", copy: "Add details here." }];
-    const updated = { ...settings, sections: { ...settings.sections, [section]: next } };
-    setSettings(updated);
-    applyThemeSettings(updated);
-  }
-
-  function removeSectionCard(section: "howCards" | "audienceCards", index: number) {
-    const next = settings.sections[section].filter((_, current) => current !== index);
-    const updated = { ...settings, sections: { ...settings.sections, [section]: next } };
-    setSettings(updated);
-    applyThemeSettings(updated);
-  }
-
-  function updateDetailsCheck(index: number, value: string) {
-    const next = [...settings.sections.detailsChecks];
-    next[index] = value;
-    const updated = { ...settings, sections: { ...settings.sections, detailsChecks: next } };
-    setSettings(updated);
-    applyThemeSettings(updated);
-  }
-
-  function addDetailsCheck() {
-    const next = [...settings.sections.detailsChecks, "Add a detail your customers should see."];
-    const updated = { ...settings, sections: { ...settings.sections, detailsChecks: next } };
-    setSettings(updated);
-    applyThemeSettings(updated);
-  }
-
-  function removeDetailsCheck(index: number) {
-    const next = settings.sections.detailsChecks.filter((_, current) => current !== index);
-    const updated = { ...settings, sections: { ...settings.sections, detailsChecks: next } };
-    setSettings(updated);
-    applyThemeSettings(updated);
-  }
-
-  function updatePricingPlanField(index: number, field: "name" | "price" | "copy" | "badge", value: string) {
-    const next = [...settings.sections.pricingCards];
-    next[index] = { ...next[index], [field]: value };
-    const updated = { ...settings, sections: { ...settings.sections, pricingCards: next } };
-    setSettings(updated);
-    applyThemeSettings(updated);
-  }
-
-  function updatePricingPlanFeature(planIndex: number, featureIndex: number, value: string) {
-    const next = [...settings.sections.pricingCards];
-    const features = [...(next[planIndex]?.features || [])];
-    features[featureIndex] = value;
-    next[planIndex] = { ...next[planIndex], features };
-    const updated = { ...settings, sections: { ...settings.sections, pricingCards: next } };
-    setSettings(updated);
-    applyThemeSettings(updated);
-  }
-
-  function addPricingPlanFeature(planIndex: number) {
-    const next = [...settings.sections.pricingCards];
-    const plan = { ...next[planIndex] };
-    plan.features = [...(plan.features || []), "Add one benefit for this plan."];
-    next[planIndex] = plan;
-    const updated = { ...settings, sections: { ...settings.sections, pricingCards: next } };
-    setSettings(updated);
-    applyThemeSettings(updated);
-  }
-
-  function removePricingPlanFeature(planIndex: number, featureIndex: number) {
-    const next = [...settings.sections.pricingCards];
-    const plan = { ...next[planIndex] };
-    plan.features = (plan.features || []).filter((_, current) => current !== featureIndex);
-    next[planIndex] = plan;
-    const updated = { ...settings, sections: { ...settings.sections, pricingCards: next } };
-    setSettings(updated);
-    applyThemeSettings(updated);
-  }
-
-  async function onSave(event?: FormEvent) {
-    event?.preventDefault();
-
-    if (isSaving) {
+  function loadAdvancedJson() {
+    if (!advancedUnlocked) {
+      setMessage("Unlock Settings JSON before loading an import.");
+      setStatus("error");
       return;
     }
+    try {
+      const parsed = JSON.parse(advancedJson) as Partial<EditableSiteSettings>;
+      const next = hydrateLegacyContent(mergeSiteSettings(parsed));
+      const validation = validateContentValues(next.content);
+      if (Object.keys(validation).length) {
+        setErrors(validation);
+        setMessage("JSON is valid, but content validation failed.");
+        setStatus("error");
+        return;
+      }
+      setSettings(next);
+      applyThemeSettings(next);
+      setMessage("Validated JSON loaded into the draft. Save Draft to keep it.");
+      setStatus("dirty");
+    } catch {
+      setMessage("Settings JSON is not valid JSON.");
+      setStatus("error");
+    }
+  }
 
-    setIsSaving(true);
-    setMessage("Saving and publishing site settings...");
+  function downloadSettingsBackup() {
+    const blob = new Blob([JSON.stringify(settings, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `qrguitar-content-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setMessage("Settings backup downloaded.");
+  }
 
+  function saveBrandLogo() {
+    const key = normalizeBrandLogoKey(brandName);
+    const url = brandLogoUrl.trim();
+    if (!key || !/^(https?:\/\/|\/)/i.test(url)) {
+      setMessage("Enter a brand and a valid https URL or site-relative path.");
+      setStatus("error");
+      return;
+    }
+    setSettings((current) => ({ ...current, brandLogos: { ...current.brandLogos, [key]: url } }));
+    setBrandName("");
+    setBrandLogoUrl("");
+    setStatus("dirty");
+    setMessage("Brand logo added to the draft.");
+  }
+
+  async function sendEmailTest() {
+    setEmailSending(true);
+    setMessage("Sending a safe test to the authenticated admin…");
     try {
       const token = await getSupabaseAccessToken();
-      const response = await fetch("/api/site-settings", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ settings })
+      if (!token) throw new Error("Sign in with an authorized admin account.");
+      const fields = Object.fromEntries(selectedEntries.map((entry) => [entry.key, settings.content[entry.key] ?? entry.defaultValue]));
+      const response = await fetch("/api/site-editor/test-email", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ fields })
       });
-      const payload = (await response.json()) as { ok?: boolean; message?: string; settings?: EditableSiteSettings };
-
-      if (!response.ok || !payload.ok) {
-        setMessage(`Save failed (${response.status}): ${payload.message || "Could not publish to every device."}`);
-        return;
-      }
-
-      const published = payload.settings || (await fetchPublishedSiteSettings());
-      if (published) {
-        setSettings(published);
-        setPublishedSettings(published);
-        setLocalDraft(null);
-        setShowDraftNotice(false);
-        saveSiteSettings(published);
-        applyThemeSettings(published);
-      }
-
-      setMessage(payload.message || "Published globally.");
+      const payload = (await response.json().catch(() => ({}))) as { message?: string };
+      if (!response.ok) throw new Error(payload.message || "Test email failed.");
+      setStatus("saved");
+      setMessage(payload.message || "Test email sent to the authenticated admin.");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Check your connection and try Save again.";
-      setMessage(`Save failed: ${message}`);
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : "Test email failed.");
     } finally {
-      setIsSaving(false);
+      setEmailSending(false);
     }
   }
 
-  function onReset() {
-    setSettings(publishedSettings);
-    applyThemeSettings(publishedSettings);
-    setMessage("Unsaved changes reset to the published settings.");
-  }
+  const tree = (
+    <nav className="cms-tree" aria-label="Content sections">
+      <div className="cms-mode-switch" role="group" aria-label="Editing mode">
+        <button
+          type="button"
+          className={editorMode === "content" ? "active" : ""}
+          onClick={() => {
+            setEditorMode("content");
+            if (selected.area === "Advanced" || selected.area === "Emails" || selected.area === "SEO" || selected.page === "Theme") {
+              setSelected({ area: "Marketing", page: "Homepage" });
+            }
+          }}
+        >
+          Content
+        </button>
+        <button
+          type="button"
+          className={editorMode === "advanced" ? "active" : ""}
+          onClick={() => {
+            setEditorMode("advanced");
+            setSelected({ area: "Emails", page: contentPagesForArea("Emails")[0] || "Service" });
+          }}
+        >
+          Advanced
+        </button>
+      </div>
+      <div className="cms-tree-search">
+        <Search size={16} aria-hidden="true" />
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search content" aria-label="Search content" />
+      </div>
+      {contentAreas.filter((area) => editorMode === "content" ? !["Emails", "SEO"].includes(area) : ["Emails", "SEO"].includes(area)).map((area) => (
+        <details open={Boolean(query) || area === selected.area} key={area}>
+          <summary>{area}</summary>
+          <div>
+            {contentPagesForArea(area).map((page) => (
+              <button
+                type="button"
+                className={selected.area === area && selected.page === page ? "active" : ""}
+                onClick={() => { setSelected({ area, page }); setQuery(""); setSidebarOpen(false); }}
+                key={page}
+              >
+                {page}
+              </button>
+            ))}
+          </div>
+        </details>
+      ))}
+      {editorMode === "content" ? (
+        <details open={selected.area === "Design"}>
+          <summary>Design</summary>
+          <div>
+            <button type="button" className={selected.page === "Brand assets" ? "active" : ""} onClick={() => { setSelected({ area: "Design", page: "Brand assets" }); setSidebarOpen(false); }}>Brand assets</button>
+          </div>
+        </details>
+      ) : (
+        <>
+          <details open={selected.area === "Design"}>
+            <summary>Design</summary>
+            <div>
+              {(["Theme", "Brand assets"] as SpecialPage[]).map((page) => (
+                <button type="button" className={selected.page === page ? "active" : ""} onClick={() => { setSelected({ area: "Design", page }); setSidebarOpen(false); }} key={page}>{page}</button>
+              ))}
+            </div>
+          </details>
+          <details open={selected.area === "Advanced"}>
+            <summary>Advanced</summary>
+            <div>
+              {(["Revision history", "Copy coverage", "Advanced JSON"] as SpecialPage[]).map((page) => (
+                <button type="button" className={selected.page === page ? "active" : ""} onClick={() => { setSelected({ area: "Advanced", page }); setSidebarOpen(false); }} key={page}>{page}</button>
+              ))}
+            </div>
+          </details>
+        </>
+      )}
+      {changedKeys.length ? <div className="cms-recent-edit"><span>Draft activity</span><strong>{changedKeys.length} unpublished {changedKeys.length === 1 ? "field" : "fields"}</strong><small>{selected.page} is open</small></div> : null}
+    </nav>
+  );
 
-  async function copySettingsJson() {
-    try {
-      await window.navigator.clipboard?.writeText(settingsJson);
-      setCopyError(false);
-      setMessage("Current settings JSON copied.");
-    } catch {
-      setCopyError(true);
-      setMessage("Clipboard blocked in this browser. Manually copy from the text area below.");
-    }
+  const standardEditor = (
+    <div className="cms-fields">
+      {compositionPageKey ? (
+        <SiteCompositionEditor
+          pageKey={compositionPageKey}
+          sections={settings.composition[compositionPageKey].sections}
+          onChange={(sections) => setSettings((current) => ({
+            ...current,
+            composition: {
+              ...current.composition,
+              [compositionPageKey]: { sections }
+            }
+          }))}
+        />
+      ) : null}
+      {fieldGroups.map(([section, entries]) => {
+        const isOpen = section === openFieldSection;
+        return (
+        <section className={`cms-field-group cms-content-section${isOpen ? " is-open" : ""}`} key={section}>
+          <button type="button" className="cms-content-section-head" aria-expanded={isOpen} onClick={() => setOpenFieldSection(isOpen ? "" : section)}>
+            <span><small>{selected.page}</small><strong>{section}</strong><em>{entries.length} {entries.length === 1 ? "field" : "fields"}</em></span>
+            <ChevronDown className={isOpen ? "is-open" : ""} size={18} />
+          </button>
+          {isOpen ? <div className="cms-field-list">
+            {entries.map((entry) => {
+              const value = settings.content[entry.key] ?? entry.defaultValue;
+              const id = `content-${entry.key.replace(/[^a-z0-9]+/gi, "-")}`;
+              const locked = ["security-locked", "data-derived", "browser-platform"].includes(entry.classification);
+              return (
+                <label className={`${errors[entry.key] ? "cms-field has-error" : "cms-field"}${locked ? " is-locked" : ""}`} htmlFor={id} key={entry.key}>
+                  <span className="cms-field-label">
+                    <strong>{entry.label}</strong>
+                    <span>{locked ? <small className="cms-classification is-locked">Managed by system</small> : null}<small>{value.length}/{entry.maxLength}</small></span>
+                  </span>
+                  {entry.type === "textarea" ? (
+                    <textarea id={id} value={value} rows={4} maxLength={entry.maxLength} readOnly={locked} aria-readonly={locked} onChange={(event) => updateContent(entry.key, event.target.value)} />
+                  ) : (
+                    <input id={id} type={entry.type === "email" ? "email" : "text"} value={value} maxLength={entry.maxLength} readOnly={locked} aria-readonly={locked} onChange={(event) => updateContent(entry.key, event.target.value)} />
+                  )}
+                  <span className="cms-field-help">{errors[entry.key] || (locked ? `${entry.help} This value is intentionally read-only.` : entry.help)}</span>
+                  {entry.allowedVariables?.length ? (
+                    <span className="cms-variable-list">Allowed variables: {entry.allowedVariables.map((variable) => <code key={variable}>{`{{${variable}}}`}</code>)}</span>
+                  ) : null}
+                  {!locked && value !== entry.defaultValue ? <button type="button" className="cms-field-reset" onClick={(event) => { event.preventDefault(); updateContent(entry.key, entry.defaultValue); }}><RotateCcw size={13} /> Reset field</button> : null}
+                </label>
+              );
+            })}
+          </div> : null}
+        </section>
+      )})}
+      {!selectedEntries.length ? <div className="cms-empty"><Search size={22} /><h2>No content matched.</h2><p>Try a page name, field label, or content key.</p></div> : null}
+    </div>
+  );
+
+  const emailSubject = selectedEntries.find((entry) => entry.key.endsWith(".subject"));
+  const emailPreheader = selectedEntries.find((entry) => entry.key.endsWith(".preheader"));
+  const emailHeading = selectedEntries.find((entry) => entry.key.endsWith(".heading"));
+  const emailBody = selectedEntries.find((entry) => entry.key.endsWith(".body"));
+  const emailCta = selectedEntries.find((entry) => entry.key.endsWith(".cta"));
+  const emailFooter = selectedEntries.find((entry) => entry.key.endsWith(".footer"));
+  const emailEditor = (
+    <div className="cms-fields">
+      {standardEditor}
+      <section className="cms-field-group cms-email-studio">
+        <header><div><span>Safe preview</span><h2>Email preview</h2></div><Send size={20} /></header>
+        <p className="cms-section-intro">Whitelisted variables are replaced with sample values here. Previewing never sends an email or exposes a real token.</p>
+        <div className="cms-email-preview">
+          <div className="cms-email-envelope">
+            <span>Subject</span>
+            <strong>{emailPreviewValue(emailSubject ? settings.content[emailSubject.key] : `${selected.page} notification`)}</strong>
+            <small>{emailPreviewValue(emailPreheader ? settings.content[emailPreheader.key] : "A secure QRguitar update is ready.")}</small>
+          </div>
+          <article>
+            <div className="cms-email-brand">QR<span>guitar</span></div>
+            <p className="cms-email-kicker">QRguitar notification</p>
+            <h3>{emailPreviewValue(emailHeading ? settings.content[emailHeading.key] : selected.page)}</h3>
+            <p>{emailPreviewValue(emailBody ? settings.content[emailBody.key] : "Review this QRguitar update securely from your account.")}</p>
+            <span className="cms-email-button">{emailCta ? settings.content[emailCta.key] : "Open QRguitar"}</span>
+            <small>{emailPreviewValue(emailFooter ? settings.content[emailFooter.key] : "QRguitar · Permanent instrument identity and history")}</small>
+          </article>
+          <div className="cms-plain-preview">
+            <strong>Plain-text preview</strong>
+            <pre>{`${emailPreviewValue(emailPreheader ? settings.content[emailPreheader.key] : "A secure QRguitar update is ready.")}\n\n${emailPreviewValue(emailHeading ? settings.content[emailHeading.key] : selected.page)}\n\n${emailPreviewValue(emailBody ? settings.content[emailBody.key] : "Review this QRguitar update securely from your account.")}\n\n${emailCta ? settings.content[emailCta.key] : "Open QRguitar"}\n\n${emailPreviewValue(emailFooter ? settings.content[emailFooter.key] : "QRguitar · Permanent instrument identity and history")}`}</pre>
+          </div>
+        </div>
+        <div className="cms-email-actions">
+          <button type="button" className="button secondary" onClick={() => void sendEmailTest()} disabled={emailSending}>
+            <Send size={16} /> {emailSending ? "Sending test…" : "Send test to my admin email"}
+          </button>
+          <small>The recipient is fixed to the authenticated admin account. Addresses cannot be entered here.</small>
+        </div>
+      </section>
+    </div>
+  );
+
+  const seoTitleEntry = selectedEntries.find((entry) => entry.key.endsWith(".title"));
+  const seoDescriptionEntry = selectedEntries.find((entry) => entry.key.endsWith(".description"));
+  const seoOgTitleEntry = selectedEntries.find((entry) => entry.key.endsWith(".ogTitle"));
+  const seoOgDescriptionEntry = selectedEntries.find((entry) => entry.key.endsWith(".ogDescription"));
+  const seoImageEntry = selectedEntries.find((entry) => entry.key.endsWith(".image"));
+  const seoIndexingEntry = selectedEntries.find((entry) => entry.key.endsWith(".indexing"));
+  const seoTitle = seoTitleEntry ? settings.content[seoTitleEntry.key] : settings.seo.title;
+  const seoDescription = seoDescriptionEntry ? settings.content[seoDescriptionEntry.key] : settings.seo.description;
+  const seoOgTitle = seoOgTitleEntry ? settings.content[seoOgTitleEntry.key] : seoTitle;
+  const seoOgDescription = seoOgDescriptionEntry ? settings.content[seoOgDescriptionEntry.key] : seoDescription;
+  const seoEditor = (
+    <div className="cms-fields">
+      {standardEditor}
+      <section className="cms-field-group cms-seo-studio">
+        <header><div><span>Search and social</span><h2>Live SEO preview</h2></div><Search size={20} /></header>
+        <div className="cms-seo-guidance">
+          <span className={seoTitle.length >= 30 && seoTitle.length <= 60 ? "is-pass" : "is-warning"}>Title {seoTitle.length}/60</span>
+          <span className={seoDescription.length >= 70 && seoDescription.length <= 160 ? "is-pass" : "is-warning"}>Description {seoDescription.length}/160</span>
+          <span className={seoImageEntry && settings.content[seoImageEntry.key] ? "is-pass" : "is-warning"}>{seoImageEntry ? "Social image set" : "Using global social image"}</span>
+          <span className={seoIndexingEntry && settings.content[seoIndexingEntry.key] === "noindex, nofollow" ? "is-warning" : "is-pass"}>{seoIndexingEntry ? settings.content[seoIndexingEntry.key] : "index, follow"}</span>
+        </div>
+        <div className="cms-search-preview">
+          <span>https://www.qrguitar.com{previewPath === "/" ? "" : previewPath}</span>
+          <h3>{seoTitle || "Untitled QRguitar page"}</h3>
+          <p>{seoDescription || "Add a clear description for search results."}</p>
+        </div>
+        <div className="cms-social-preview">
+          <div>{seoImageEntry ? settings.content[seoImageEntry.key] : settings.seo.image}</div>
+          <strong>{seoOgTitle || "QRguitar"}</strong>
+          <p>{seoOgDescription || "Add a social description."}</p>
+          <small>qrguitar.com</small>
+        </div>
+      </section>
+    </div>
+  );
+
+  const themeEditor = (
+    <section className="cms-field-group">
+      <header><div><span>Design system</span><h2>Theme</h2></div><Paintbrush size={20} /></header>
+      <p className="cms-section-intro">Change the small set of approved QRguitar color tokens. Preview contrast before publishing.</p>
+      <div className="cms-color-grid">
+        {Object.entries(settings.colors).map(([key, value]) => (
+          <label className="cms-color-field" key={key}>
+            <span><i style={{ background: value }} />{key.replace(/([A-Z])/g, " $1")}</span>
+            <input type="text" value={value} maxLength={7} onChange={(event) => {
+              const next = { ...settings, colors: { ...settings.colors, [key]: event.target.value } };
+              setSettings(next);
+              applyThemeSettings(next);
+            }} />
+          </label>
+        ))}
+      </div>
+      <div className="cms-contrast-grid" aria-label="Theme contrast checks">
+        {[
+          ["Primary text", textContrast, 4.5],
+          ["Primary action", actionContrast, 4.5],
+          ["Accent text", accentContrast, 3]
+        ].map(([label, ratio, minimum]) => {
+          const numericRatio = typeof ratio === "number" ? ratio : null;
+          const passes = numericRatio !== null && numericRatio >= Number(minimum);
+          return <div className={passes ? "is-pass" : "is-warning"} key={String(label)}><span>{label}</span><strong>{numericRatio ? `${numericRatio.toFixed(2)}:1` : "Invalid color"}</strong><small>{passes ? "Readable" : `Needs ${minimum}:1`}</small></div>;
+        })}
+      </div>
+      <div className="cms-theme-sample" style={{ background: settings.colors.background, color: settings.colors.text, borderColor: settings.colors.gold }}>
+        <span style={{ color: settings.colors.gold }}>Live token preview</span>
+        <h3>Clear, calm, unmistakably QRguitar.</h3>
+        <button type="button" style={{ background: settings.colors.cream, color: settings.colors.background }}>Primary action</button>
+      </div>
+    </section>
+  );
+
+  const brandEditor = (
+    <div className="cms-fields">
+      <section className="cms-field-group">
+        <header><div><span>Design system</span><h2>Brand assets</h2></div><ImageIcon size={20} /></header>
+        <p className="cms-section-intro">Official brand logos are controlled here. Instrument owners cannot replace a brand identity.</p>
+        <div className="cms-inline-form">
+          <label>Brand<input value={brandName} onChange={(event) => setBrandName(event.target.value)} placeholder="Fender" /></label>
+          <label>Transparent logo URL<input value={brandLogoUrl} onChange={(event) => setBrandLogoUrl(event.target.value)} placeholder="/brands/fender.svg" /></label>
+          <button className="button secondary" type="button" onClick={saveBrandLogo}>Add to draft</button>
+        </div>
+      </section>
+      <section className="cms-field-group">
+        <header><div><span>Registry</span><h2>Official logos</h2></div><span>{Object.keys(settings.brandLogos).length}</span></header>
+        <div className="cms-asset-list">
+          {Object.entries(settings.brandLogos).map(([key, url]) => (
+            <div key={key}><img src={url} alt="" /><div><strong>{key}</strong><small>{url}</small></div><button type="button" onClick={() => setSettings((current) => { const next = { ...current.brandLogos }; delete next[key]; return { ...current, brandLogos: next }; })}>Remove</button></div>
+          ))}
+          {!Object.keys(settings.brandLogos).length ? <p>No official logos have been added. Brand names continue to render as text.</p> : null}
+        </div>
+      </section>
+    </div>
+  );
+
+  const historyEditor = (
+    <section className="cms-field-group">
+      <header><div><span>Publishing safety</span><h2>Revision history</h2></div><FileClock size={20} /></header>
+      <p className="cms-section-intro">Restore places a prior version into the shared draft. Nothing goes live until you review and publish it.</p>
+      <div className="cms-revision-list">
+        {revisions.map((revision) => (
+          <article key={revision.id}>
+            <div><strong>{revision.note}</strong><span>{revision.area}</span><small>{formatTime(revision.publishedAt)} · {revision.changedFields.length} changed fields</small></div>
+            <button type="button" className="button secondary" onClick={() => setConfirmAction({ kind: "restore", revision })}><RotateCcw size={15} /> Restore to draft</button>
+          </article>
+        ))}
+        {!revisions.length ? <p>No prior published revisions yet.</p> : null}
+      </div>
+    </section>
+  );
+
+  const coverageEditor = (
+    <div className="cms-fields">
+      <section className="cms-field-group">
+        <header><div><span>Content governance</span><h2>Copy coverage</h2></div><Code2 size={20} /></header>
+        <p className="cms-section-intro">Every application string is assigned to an editable, locked, data-derived, or browser-owned class. Locked copy is visible for review but cannot be weakened from Content Studio.</p>
+        <div className="cms-coverage-summary">
+          <div><strong>{contentCoverageSummary.totalKeys}</strong><span>registered fields</span></div>
+          <div><strong>{contentCoverageSummary.editableStandard + contentCoverageSummary.editableAdvanced}</strong><span>editable fields</span></div>
+          <div><strong>{contentCoverageSummary.securityLocked}</strong><span>security locked</span></div>
+          <div className={contentCoverageSummary.unresolved ? "is-warning" : "is-pass"}><strong>{contentCoverageSummary.unresolved}</strong><span>unclassified</span></div>
+        </div>
+      </section>
+      <section className="cms-field-group">
+        <header><div><span>Machine-readable manifest</span><h2>Classification sources</h2></div><span>{contentCoverageManifest.length}</span></header>
+        <div className="cms-coverage-list">
+          {contentCoverageManifest.map((entry) => <article key={entry.source}><div><strong>{entry.source}</strong><span className={`cms-classification is-${entry.classification}`}>{entry.classification.replace(/-/g, " ")}</span></div><p>{entry.reason}</p></article>)}
+        </div>
+      </section>
+    </div>
+  );
+
+  const advancedEditor = (
+    <section className="cms-field-group">
+      <header><div><span>Advanced</span><h2>Settings JSON</h2></div>{advancedUnlocked ? <UnlockKeyhole size={20} /> : <LockKeyhole size={20} />}</header>
+      <p className="cms-section-intro">Normal editing never requires JSON. This validated import/export surface is for recovery and controlled migrations.</p>
+      <div className={advancedUnlocked ? "cms-json-state is-unlocked" : "cms-json-state"}>
+        <strong>{advancedUnlocked ? "Editing unlocked" : "Read-only by default"}</strong>
+        <span>{advancedUnlocked ? "Validate before loading. Publishing still requires the normal Publish action." : "Download a backup before unlocking an advanced import."}</span>
+      </div>
+      <textarea className="cms-json" value={advancedJson} onChange={(event) => setAdvancedJson(event.target.value)} rows={26} spellCheck={false} readOnly={!advancedUnlocked} aria-readonly={!advancedUnlocked} />
+      <div className="form-actions">
+        <button type="button" className="button secondary" onClick={downloadSettingsBackup}><Save size={16} /> Download backup</button>
+        <button type="button" className="button secondary" onClick={() => setAdvancedUnlocked((value) => !value)}>{advancedUnlocked ? <LockKeyhole size={16} /> : <UnlockKeyhole size={16} />} {advancedUnlocked ? "Lock editor" : "Unlock editor"}</button>
+        <button type="button" className="button secondary" onClick={loadAdvancedJson} disabled={!advancedUnlocked}><Upload size={16} /> Validate and load draft</button>
+        <button type="button" className="button secondary" onClick={() => void navigator.clipboard.writeText(JSON.stringify(settings, null, 2))}><Clipboard size={16} /> Copy export</button>
+      </div>
+    </section>
+  );
+
+  if (!authorized) {
+    return (
+      <><Nav /><main className="section cms-access"><div className="shell"><section className="card"><div className="eyebrow">Owner tools</div><h1>{status === "loading" ? "Checking Site Editor access." : "Admin access required."}</h1><p>{message}</p><Link className="button" href={`/login?next=${encodeURIComponent("/site-editor")}`}>Sign in</Link></section></div></main><Footer /></>
+    );
   }
 
   return (
     <>
       <Nav />
-      <main className="section site-editor-page">
-        <div className="shell">
-          <div className="site-editor-admin-hero">
-            <div>
-              <div className="owner-badge">
-                <ShieldCheck size={16} />
-                Owner only
-              </div>
-              <h1>QRguitar site editor.</h1>
-              <p>Owner controls for published homepage copy, brand text, SEO, and theme colors. This stays hidden from normal public navigation.</p>
-            </div>
-            {!authChecked || (isSignedIn && isUnlocked) ? (
-              <div className="editor-status card">
-                <SlidersHorizontal size={28} />
-                <strong>{editorStatusTitle}</strong>
-                {editorStatusBody ? <span>{editorStatusBody}</span> : null}
-              </div>
-            ) : null}
+      <main className="cms-page">
+        <header className="cms-commandbar">
+          <div>
+            <button type="button" className="cms-mobile-tree" onClick={() => setSidebarOpen(true)} aria-label="Open content tree" aria-expanded={sidebarOpen}><Menu size={18} /></button>
+            <div><span>Content Studio</span><strong>{selected.page}</strong></div>
           </div>
+          <div className={`cms-save-state is-${status}`} aria-live="polite">
+            {status === "saving" ? <RefreshCw size={14} className="spin" /> : status === "saved" ? <Check size={14} /> : status === "error" ? <X size={14} /> : <Cloud size={14} />}
+            <span>{status === "dirty" ? `${changedKeys.length || 1} unpublished ${changedKeys.length === 1 ? "change" : "changes"}` : status === "saving" ? "Saving draft…" : message}</span>
+          </div>
+          <div className="cms-command-actions">
+            <button type="button" className="button secondary" onClick={() => setConfirmAction({ kind: "discard" })} disabled={!draftMeta && !hasChanges}>Discard draft</button>
+            <button type="button" className="button secondary" onClick={() => setPreviewOpen((value) => !value)} aria-expanded={previewOpen}><Eye size={16} /> {previewOpen ? "Hide preview" : "Preview"}</button>
+            <button type="button" className="button" onClick={() => setConfirmAction({ kind: "publish" })} disabled={status === "saving" || !hasChanges}><Send size={16} /> Publish</button>
+          </div>
+        </header>
 
-          {authChecked && !isSignedIn ? (
-            <section className="card owner-gate">
-              <LockKeyhole size={34} />
+        <div className={previewOpen ? "cms-workspace" : "cms-workspace is-preview-collapsed"}>
+          <aside className={sidebarOpen ? "cms-sidebar is-open" : "cms-sidebar"}>
+            <div className="cms-sidebar-head"><div><span>QRguitar</span><strong>Site content</strong></div><button type="button" onClick={() => setSidebarOpen(false)} aria-label="Close content tree"><PanelLeftClose size={18} /></button></div>
+            {tree}
+          </aside>
+          {sidebarOpen ? <button type="button" className="cms-sidebar-backdrop" onClick={() => setSidebarOpen(false)} aria-label="Close content tree" /> : null}
+
+          <section className="cms-editor">
+            <div className="cms-editor-heading">
               <div>
-                <span className="mini-eyebrow">Sign in required</span>
-                <h2>Your session expired.</h2>
-                <p>Please sign in again before opening owner tools.</p>
+                <span>{selected.area} / {selected.page}</span>
+                <h1>{selected.page}</h1>
+                <p>{query ? `Search results for "${query}"` : pagePurpose(selected)}</p>
+                <div className="cms-editor-timestamps">
+                  <span>Draft saved <strong>{formatTime(draftMeta?.updatedAt)}</strong></span>
+                  <span>Published <strong>{formatTime(publishedAt)}</strong></span>
+                </div>
               </div>
-              <Link className="button" href={`/login?next=${encodeURIComponent("/site-editor")}&reason=session-expired`}>
-                Sign in again
-              </Link>
-            </section>
-          ) : null}
-
-          {authChecked && isSignedIn && !isUnlocked ? (
-            <section className="card owner-gate">
-              <LockKeyhole size={34} />
-              <div>
-                <span className="mini-eyebrow">Admin access required</span>
-                <h2>This account cannot open the site editor.</h2>
-                <p>Use an authorized QRguitar admin account to manage published site settings.</p>
-              </div>
-              <Link className="button" href="/account">Account</Link>
-            </section>
-          ) : null}
-
-          {authChecked && isSignedIn && isUnlocked ? (
-            <div className="site-editor-layout admin-editor-layout">
-              <section className="admin-editor-main">
-                <div className="editor-tabs" role="tablist" aria-label="Site editor sections">
-                  {tabs.map((tab) => (
-                    <button
-                      className={activeTab === tab.id ? "active" : undefined}
-                      type="button"
-                      onClick={() => setActiveTab(tab.id)}
-                      key={tab.id}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                {showDraftNotice ? (
-                  <section className="card editor-draft-notice">
-                    <div>
-                      <span className="mini-eyebrow">Local draft available</span>
-                      <h2>A local draft exists on this device.</h2>
-                      <p>Published settings are loaded now. Continue the local draft only if you want to publish those device-only edits.</p>
-                    </div>
-                    <div className="form-actions">
-                      <button className="button" type="button" onClick={continueLocalDraft}>
-                        Continue Editing Draft
-                      </button>
-                      <button className="button secondary" type="button" onClick={discardLocalDraft}>
-                        Discard Draft and Load Published
-                      </button>
-                    </div>
-                  </section>
-                ) : null}
-
-                {hasUnsavedChanges ? (
-                  <div className="admin-message">Unsaved changes. Save Changes publishes after the server confirms.</div>
-                ) : (
-                  <div className="admin-message">Published settings are in sync.</div>
-                )}
-
-                {activeTab === "brand" ? (
-                  <section className="card editor-card">
-                    <EditorHeader
-                      label="Brand"
-                      title="Basic site identity"
-                      copy="Keep this short and plain. These fields feed the public brand and footer text."
-                    />
-                    <TextField label="Brand name" value={settings.brandName} onChange={(value) => update("brandName", value)} />
-                    <TextArea label="Footer line" value={settings.tagline} onChange={(value) => update("tagline", value)} rows={3} />
-                    <div className="editor-subsection">
-                      <div className="subsection-head">
-                        <h3>Instrument categories</h3>
-                        <button type="button" className="button secondary" onClick={addCategoryOption}>
-                          <Plus size={14} /> Add category
-                        </button>
-                      </div>
-                      <p className="editor-help-text">These options feed the Type / category dropdown on create and edit forms.</p>
-                      {settings.instrumentCategories.map((category, index) => (
-                        <div key={`category-${index}`} className="editor-array-card feature-row">
-                          <TextField
-                            label={`Category ${index + 1}`}
-                            value={category}
-                            onChange={(value) => updateCategoryOption(index, value)}
-                          />
-                          <button type="button" className="button secondary" onClick={() => removeCategoryOption(index)}>
-                            <Trash2 size={14} /> Remove category
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-
-                {activeTab === "hero" ? (
-                  <section className="card editor-card">
-                    <EditorHeader
-                      label="Hero"
-                      title="First thing people read"
-                      copy="This controls the top homepage message and calls to action."
-                    />
-                    <TextField label="Eyebrow" value={settings.hero.eyebrow} onChange={(value) => updateHero("eyebrow", value)} />
-                    <TextArea label="Headline" value={settings.hero.headline} onChange={(value) => updateHero("headline", value)} rows={2} />
-                    <TextArea label="Subtext" value={settings.hero.body} onChange={(value) => updateHero("body", value)} rows={4} />
-                    <div className="form-grid">
-                      <TextField label="Main button" value={settings.hero.primaryCta} onChange={(value) => updateHero("primaryCta", value)} />
-                      <TextField
-                        label="Second button"
-                        value={settings.hero.secondaryCta}
-                        onChange={(value) => updateHero("secondaryCta", value)}
-                      />
-                    </div>
-                  </section>
-                ) : null}
-
-                {activeTab === "sections" ? (
-                  <section className="card editor-card">
-                    <EditorHeader
-                      label="Homepage sections"
-                      title="Main page wiring"
-                      copy="Every visible homepage section can be edited from here."
-                    />
-
-                    <div className="editor-subsection">
-                      <div className="editor-section-grid">
-                        <TextField
-                          label="How it works eyebrow"
-                          value={settings.sections.howEyebrow}
-                          onChange={(value) => updateSection("howEyebrow", value)}
-                        />
-                        <TextArea
-                          label="How it works headline"
-                          value={settings.sections.howHeadline}
-                          onChange={(value) => updateSection("howHeadline", value)}
-                          rows={2}
-                        />
-                      </div>
-                      <TextArea
-                        label="How it works body"
-                        value={settings.sections.howBody}
-                        onChange={(value) => updateSection("howBody", value)}
-                        rows={3}
-                      />
-                    </div>
-
-                    <div className="editor-subsection">
-                      <div className="subsection-head">
-                        <h3>How it works cards</h3>
-                        <button type="button" className="button secondary" onClick={() => addSectionCard("howCards")}>
-                          <Plus size={14} /> Add card
-                        </button>
-                      </div>
-                      {settings.sections.howCards.map((card, index) => (
-                        <div key={`how-${index}`} className="editor-array-card">
-                          <TextField
-                            label={`Card ${index + 1} title`}
-                            value={card.title}
-                            onChange={(value) => updateSectionCard("howCards", index, "title", value)}
-                          />
-                          <TextArea
-                            label={`Card ${index + 1} text`}
-                            value={card.copy}
-                            onChange={(value) => updateSectionCard("howCards", index, "copy", value)}
-                            rows={2}
-                          />
-                          <button type="button" className="button secondary" onClick={() => removeSectionCard("howCards", index)}>
-                            <Trash2 size={14} /> Remove card
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="editor-subsection">
-                      <div className="editor-section-grid">
-                        <TextField
-                          label="Customization eyebrow"
-                          value={settings.sections.detailsEyebrow}
-                          onChange={(value) => updateSection("detailsEyebrow", value)}
-                        />
-                        <TextArea
-                          label="Customization headline"
-                          value={settings.sections.detailsHeadline}
-                          onChange={(value) => updateSection("detailsHeadline", value)}
-                          rows={2}
-                        />
-                      </div>
-                      <TextArea
-                        label="Customization body"
-                        value={settings.sections.detailsBody}
-                        onChange={(value) => updateSection("detailsBody", value)}
-                        rows={3}
-                      />
-                      <TextField
-                        label="Customization action text"
-                        value={settings.sections.detailsCta}
-                        onChange={(value) => updateSection("detailsCta", value)}
-                      />
-                      <TextField
-                        label="Promoted spotlight QR code (optional)"
-                        value={settings.sections.detailsFeaturedCode}
-                        onChange={(value) => updateSection("detailsFeaturedCode", value)}
-                      />
-                      <div className="editor-subsection">
-                        <div className="subsection-head">
-                          <h3>Record details checklist</h3>
-                          <button type="button" className="button secondary" onClick={addDetailsCheck}>
-                            <Plus size={14} /> Add item
-                          </button>
-                        </div>
-                        {settings.sections.detailsChecks.map((item, index) => (
-                          <div key={`check-${index}`} className="editor-array-card">
-                            <TextArea
-                              label={`Item ${index + 1}`}
-                              value={item}
-                              onChange={(value) => updateDetailsCheck(index, value)}
-                              rows={2}
-                            />
-                            <button type="button" className="button secondary" onClick={() => removeDetailsCheck(index)}>
-                              <Trash2 size={14} /> Remove item
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="editor-subsection">
-                      <div className="editor-section-grid">
-                        <TextField
-                          label="Audience eyebrow"
-                          value={settings.sections.audienceEyebrow}
-                          onChange={(value) => updateSection("audienceEyebrow", value)}
-                        />
-                        <TextArea
-                          label="Audience headline"
-                          value={settings.sections.audienceHeadline}
-                          onChange={(value) => updateSection("audienceHeadline", value)}
-                          rows={2}
-                        />
-                      </div>
-                      <TextArea
-                        label="Audience body"
-                        value={settings.sections.audienceBody}
-                        onChange={(value) => updateSection("audienceBody", value)}
-                        rows={3}
-                      />
-                      <TextField
-                        label="Audience action text"
-                        value={settings.sections.audienceCta}
-                        onChange={(value) => updateSection("audienceCta", value)}
-                      />
-                      <div className="subsection-head">
-                        <h3>Audience cards</h3>
-                        <button type="button" className="button secondary" onClick={() => addSectionCard("audienceCards")}>
-                          <Plus size={14} /> Add card
-                        </button>
-                      </div>
-                      {settings.sections.audienceCards.map((card, index) => (
-                        <div key={`audience-${index}`} className="editor-array-card">
-                          <TextField
-                            label={`Card ${index + 1} title`}
-                            value={card.title}
-                            onChange={(value) => updateSectionCard("audienceCards", index, "title", value)}
-                          />
-                          <TextArea
-                            label={`Card ${index + 1} text`}
-                            value={card.copy}
-                            onChange={(value) => updateSectionCard("audienceCards", index, "copy", value)}
-                            rows={2}
-                          />
-                          <button
-                            type="button"
-                            className="button secondary"
-                            onClick={() => removeSectionCard("audienceCards", index)}
-                          >
-                            <Trash2 size={14} /> Remove card
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="editor-subsection">
-                      <div className="editor-section-grid">
-                        <TextField
-                          label="Pricing eyebrow"
-                          value={settings.sections.pricingEyebrow}
-                          onChange={(value) => updateSection("pricingEyebrow", value)}
-                        />
-                        <TextArea
-                          label="Pricing headline"
-                          value={settings.sections.pricingHeadline}
-                          onChange={(value) => updateSection("pricingHeadline", value)}
-                          rows={2}
-                        />
-                      </div>
-                      <TextArea
-                        label="Pricing body"
-                        value={settings.sections.pricingBody}
-                        onChange={(value) => updateSection("pricingBody", value)}
-                        rows={3}
-                      />
-                      <TextField
-                        label="Commercial title"
-                        value={settings.sections.pricingEnterpriseTitle}
-                        onChange={(value) => updateSection("pricingEnterpriseTitle", value)}
-                      />
-                      <TextArea
-                        label="Commercial body"
-                        value={settings.sections.pricingEnterpriseBody}
-                        onChange={(value) => updateSection("pricingEnterpriseBody", value)}
-                        rows={3}
-                      />
-                      <div className="editor-subsection">
-                        <div className="subsection-head">
-                          <h3>Pricing cards</h3>
-                        </div>
-                        {settings.sections.pricingCards.map((plan, planIndex) => (
-                          <div key={`plan-${planIndex}`} className="editor-array-card">
-                            <TextField
-                              label={`Plan ${planIndex + 1} name`}
-                              value={plan.name}
-                              onChange={(value) => updatePricingPlanField(planIndex, "name", value)}
-                            />
-                            <TextField
-                              label="Price"
-                              value={plan.price}
-                              onChange={(value) => updatePricingPlanField(planIndex, "price", value)}
-                            />
-                            <TextArea
-                              label="Summary"
-                              value={plan.copy}
-                              onChange={(value) => updatePricingPlanField(planIndex, "copy", value)}
-                              rows={2}
-                            />
-                            <TextField
-                              label="Badge (optional)"
-                              value={plan.badge || ""}
-                              onChange={(value) => updatePricingPlanField(planIndex, "badge", value)}
-                            />
-                            <div className="subsection-head">
-                              <h4>Plan features</h4>
-                              <button type="button" className="button secondary" onClick={() => addPricingPlanFeature(planIndex)}>
-                                <Plus size={14} /> Add feature
-                              </button>
-                            </div>
-                            {plan.features.map((feature, featureIndex) => (
-                              <div key={`feature-${planIndex}-${featureIndex}`} className="editor-array-card feature-row">
-                                <TextArea
-                                  label={`Feature ${featureIndex + 1}`}
-                                  value={feature}
-                                  onChange={(value) => updatePricingPlanFeature(planIndex, featureIndex, value)}
-                                  rows={2}
-                                />
-                                <button
-                                  type="button"
-                                  className="button secondary"
-                                  onClick={() => removePricingPlanFeature(planIndex, featureIndex)}
-                                >
-                                  <Trash2 size={14} /> Remove feature
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </section>
-                ) : null}
-
-                {activeTab === "dashboard" ? (
-                  <section className="card editor-card">
-                    <EditorHeader
-                      label="Dashboard copy"
-                      title="Owner dashboard language"
-                      copy="Edit helpful owner-facing text only. Counts, buttons, Profiles, and actions stay real."
-                    />
-                    <TextField
-                      label="Dashboard label"
-                      value={settings.dashboard.pageTitle}
-                      onChange={(value) => updateDashboard("pageTitle", value)}
-                    />
-                    <TextArea
-                      label="Dashboard subtitle"
-                      value={settings.dashboard.subtitle}
-                      onChange={(value) => updateDashboard("subtitle", value)}
-                      rows={3}
-                    />
-                    <div className="editor-section-grid">
-                      <TextField
-                        label="Empty collection title"
-                        value={settings.dashboard.emptyCollectionTitle}
-                        onChange={(value) => updateDashboard("emptyCollectionTitle", value)}
-                      />
-                      <TextField
-                        label="First record button"
-                        value={settings.dashboard.firstRecordCtaLabel}
-                        onChange={(value) => updateDashboard("firstRecordCtaLabel", value)}
-                      />
-                    </div>
-                    <TextArea
-                      label="Empty collection body"
-                      value={settings.dashboard.emptyCollectionBody}
-                      onChange={(value) => updateDashboard("emptyCollectionBody", value)}
-                      rows={2}
-                    />
-                    <div className="editor-section-grid">
-                      <TextField
-                        label="Collection health title"
-                        value={settings.dashboard.collectionHealthTitle}
-                        onChange={(value) => updateDashboard("collectionHealthTitle", value)}
-                      />
-                      <TextField
-                        label="Next actions title"
-                        value={settings.dashboard.nextActionsTitle}
-                        onChange={(value) => updateDashboard("nextActionsTitle", value)}
-                      />
-                    </div>
-                    <TextArea
-                      label="Collection health helper"
-                      value={settings.dashboard.collectionHealthHelper}
-                      onChange={(value) => updateDashboard("collectionHealthHelper", value)}
-                      rows={2}
-                    />
-                    <TextArea
-                      label="Next actions helper"
-                      value={settings.dashboard.nextActionsHelper}
-                      onChange={(value) => updateDashboard("nextActionsHelper", value)}
-                      rows={2}
-                    />
-                    <div className="editor-subsection">
-                      <h3>Dashboard guidance cards</h3>
-                      <div className="editor-section-grid">
-                        <TextField
-                          label="Proof/documents title"
-                          value={settings.dashboard.proofGuidanceTitle}
-                          onChange={(value) => updateDashboard("proofGuidanceTitle", value)}
-                        />
-                        <TextField
-                          label="Service history title"
-                          value={settings.dashboard.serviceGuidanceTitle}
-                          onChange={(value) => updateDashboard("serviceGuidanceTitle", value)}
-                        />
-                      </div>
-                      <TextArea
-                        label="Proof/documents body"
-                        value={settings.dashboard.proofGuidanceBody}
-                        onChange={(value) => updateDashboard("proofGuidanceBody", value)}
-                        rows={2}
-                      />
-                      <TextArea
-                        label="Service history body"
-                        value={settings.dashboard.serviceGuidanceBody}
-                        onChange={(value) => updateDashboard("serviceGuidanceBody", value)}
-                        rows={2}
-                      />
-                      <div className="editor-section-grid">
-                        <TextField
-                          label="QR/download title"
-                          value={settings.dashboard.qrGuidanceTitle}
-                          onChange={(value) => updateDashboard("qrGuidanceTitle", value)}
-                        />
-                        <TextField
-                          label="Privacy title"
-                          value={settings.dashboard.privacyGuidanceTitle}
-                          onChange={(value) => updateDashboard("privacyGuidanceTitle", value)}
-                        />
-                      </div>
-                      <TextArea
-                        label="QR/download body"
-                        value={settings.dashboard.qrGuidanceBody}
-                        onChange={(value) => updateDashboard("qrGuidanceBody", value)}
-                        rows={2}
-                      />
-                      <TextArea
-                        label="Privacy body"
-                        value={settings.dashboard.privacyGuidanceBody}
-                        onChange={(value) => updateDashboard("privacyGuidanceBody", value)}
-                        rows={2}
-                      />
-                      <div className="editor-section-grid">
-                        <TextField
-                          label="Transfer title"
-                          value={settings.dashboard.transferGuidanceTitle}
-                          onChange={(value) => updateDashboard("transferGuidanceTitle", value)}
-                        />
-                        <TextField
-                          label="Verification title"
-                          value={settings.dashboard.verificationGuidanceTitle}
-                          onChange={(value) => updateDashboard("verificationGuidanceTitle", value)}
-                        />
-                      </div>
-                      <TextArea
-                        label="Transfer body"
-                        value={settings.dashboard.transferGuidanceBody}
-                        onChange={(value) => updateDashboard("transferGuidanceBody", value)}
-                        rows={2}
-                      />
-                      <TextArea
-                        label="Verification body"
-                        value={settings.dashboard.verificationGuidanceBody}
-                        onChange={(value) => updateDashboard("verificationGuidanceBody", value)}
-                        rows={2}
-                      />
-                    </div>
-                  </section>
-                ) : null}
-
-                {activeTab === "colors" ? (
-                  <section className="card editor-card">
-                    <EditorHeader
-                      label="Theme colors"
-                      title="Dark premium system"
-                      copy="These update the current browser preview immediately and save locally when you click Save."
-                    />
-                    <div className="color-editor-grid">
-                      <ColorField
-                        label="Background"
-                        value={settings.colors.background}
-                        onChange={(value) => updateColor("background", value)}
-                      />
-                      <ColorField label="Panels" value={settings.colors.panel} onChange={(value) => updateColor("panel", value)} />
-                      <ColorField label="Guitar orange" value={settings.colors.gold} onChange={(value) => updateColor("gold", value)} />
-                      <ColorField label="Button cream" value={settings.colors.cream} onChange={(value) => updateColor("cream", value)} />
-                      <ColorField label="Text" value={settings.colors.text} onChange={(value) => updateColor("text", value)} />
-                    </div>
-                  </section>
-                ) : null}
-
-                {activeTab === "seo" ? (
-                  <section className="card editor-card">
-                    <EditorHeader
-                      label="SEO"
-                      title="Search, sharing, and traffic"
-                      copy="Control the words and images people see in Google, text messages, Facebook, X, and link previews."
-                    />
-                    <div className="seo-editor-grid">
-                      <TextField label="Google page title" value={settings.seo.title} onChange={(value) => updateSeo("title", value)} />
-                      <CharacterHint current={settings.seo.title.length} target="Good target: 45-60 characters" />
-                      <TextArea
-                        label="Google page description"
-                        value={settings.seo.description}
-                        onChange={(value) => updateSeo("description", value)}
-                        rows={4}
-                      />
-                      <CharacterHint current={settings.seo.description.length} target="Good target: 120-160 characters" />
-                      <TextArea
-                        label="Keywords / topics"
-                        value={settings.seo.keywords}
-                        onChange={(value) => updateSeo("keywords", value)}
-                        rows={3}
-                      />
-                      <TextField
-                        label="Canonical URL"
-                        value={settings.seo.canonicalUrl}
-                        onChange={(value) => updateSeo("canonicalUrl", value)}
-                      />
-                      <TextField
-                        label="Twitter handle"
-                        value={settings.seo.twitterHandle}
-                        onChange={(value) => updateSeo("twitterHandle", value)}
-                      />
-                      <TextArea
-                        label="Robots"
-                        value={settings.seo.robots}
-                        onChange={(value) => updateSeo("robots", value)}
-                        rows={2}
-                      />
-                      <div className="editor-subsection seo-image-editor">
-                        <div className="subsection-head">
-                          <div>
-                            <h3>SEO images</h3>
-                            <span className="editor-inline-note">Pick the image used for social shares, text previews, and homepage Open Graph metadata.</span>
-                          </div>
-                          <ImageIcon size={18} />
-                        </div>
-                        <div className="seo-image-options">
-                          {seoImageOptions.map((option) => (
-                            <button
-                              className={settings.seo.image === option.value ? "active" : ""}
-                              type="button"
-                              key={option.value}
-                              onClick={() => updateSeo("image", option.value)}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                        <TextField
-                          label="Custom image path or URL"
-                          value={settings.seo.image}
-                          onChange={(value) => updateSeo("image", value)}
-                        />
-                        <small className="editor-inline-note">Best size: 1200 x 630 PNG or JPG. Use a full URL or a file path from the public folder, like /seo/qrguitar-og-v2.png.</small>
-                      </div>
-                      <div className="editor-subsection seo-image-editor">
-                        <div className="subsection-head">
-                          <div>
-                            <h3>Browser tab thumbnail</h3>
-                            <span className="editor-inline-note">This controls the favicon/tab icon people see in browser tabs, bookmarks, and saved shortcuts.</span>
-                          </div>
-                          <ImageIcon size={18} />
-                        </div>
-                        <div className="seo-image-options">
-                          {faviconOptions.map((option) => (
-                            <button
-                              className={settings.seo.favicon === option.value ? "active" : ""}
-                              type="button"
-                              key={option.value}
-                              onClick={() => updateSeo("favicon", option.value)}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                        <TextField
-                          label="Custom tab icon path or URL"
-                          value={settings.seo.favicon}
-                          onChange={(value) => updateSeo("favicon", value)}
-                        />
-                      </div>
-                    </div>
-                    <div className="seo-checklist">
-                      <span><Search size={15} /> Say what QRguitar does in plain words: permanent QRguitar Profiles, photos, specs, documents, service history, ownership, and QR codes.</span>
-                      <span><Search size={15} /> Include real guitar-world phrases customers search for, such as guitar inventory, service history, warranty profiles, builders, shops, and collectors.</span>
-                      <span><Search size={15} /> Use location terms only when they are true, such as Rhode Island guitar repair, Cranston guitar shop, or US builder profiles.</span>
-                    </div>
-                  </section>
-                ) : null}
-
-                {activeTab === "preview" ? (
-                  <section className="card editor-card">
-                    <EditorHeader
-                      label="Settings JSON"
-                      title="Current Editor Settings JSON"
-                      copy="Backup and compare the values currently loaded in the editor. This is not a visual preview."
-                    />
-                    <textarea className="settings-json-preview" readOnly rows={16} value={settingsJson} />
-                    <div className="preview-actions">
-                      <button className="button secondary" type="button" onClick={() => void copySettingsJson()}>
-                        <Clipboard size={16} /> Copy JSON
-                      </button>
-                    </div>
-                    {copyError ? (
-                      <p className="copy-warning">Clipboard blocked in this browser. Use the JSON box to copy manually.</p>
-                    ) : null}
-                  </section>
-                ) : null}
-              </section>
-
-            <aside className="editor-preview">
-                <div className="editor-status card">
-                  <span className="mini-eyebrow">Owner session</span>
-                  <strong>Admin access verified</strong>
-                  <span>Edits remain private to this browser until you click Save Changes.</span>
-                </div>
-                <div className="editor-preview-panel">
-                  <span className="eyebrow">{settings.hero.eyebrow}</span>
-                  <h2>{settings.hero.headline}</h2>
-                  <p>{settings.hero.body}</p>
-                  <div className="hero-actions">
-                    <span className="button">{settings.hero.primaryCta}</span>
-                    <span className="button secondary">{settings.hero.secondaryCta}</span>
-                  </div>
-                </div>
-                <div className="seo-preview-card">
-                  <span className="mini-eyebrow">SEO preview</span>
-                  <div className="seo-preview-wordmark" aria-label="QRguitar SEO preview wordmark">
-                    <img src="/qrguitar-logo-white-orange.svg" alt="QRguitar logo preview" />
-                  </div>
-                  <strong>{settings.seo.title}</strong>
-                  <p>{settings.seo.description}</p>
-                  <small>qrguitar.com</small>
-                </div>
-                <div className="seo-preview-card favicon-preview-card">
-                  <span className="mini-eyebrow">Browser tab</span>
-                  <div className="favicon-preview-row">
-                    <img src={settings.seo.favicon} alt="" />
-                    <strong>{settings.seo.title || "QRguitar"}</strong>
-                  </div>
-                  <p>Saved tab icon and title preview.</p>
-                </div>
-                <div className="editor-save-bar">
-                  <button className="button" type="button" onClick={() => void onSave()} disabled={isSaving}>
-                    <Save size={16} /> {isSaving ? "Saving..." : "Save Changes"}
-                  </button>
-                  <button className="button secondary" type="button" onClick={onReset}>
-                    <RotateCcw size={16} /> Reset Changes
-                  </button>
-                  <a className="button secondary" href="/?fresh=editor">
-                    <Eye size={16} /> View Live Homepage
-                  </a>
-                  <button className="button secondary" type="button" onClick={() => void copySettingsJson()}>
-                    <Clipboard size={16} /> Copy Current Settings JSON
-                  </button>
-                </div>
-                <small className="editor-local-note">Unsaved changes are backed up in this browser until they are published or discarded.</small>
-              </aside>
+              <button type="button" className="button secondary cms-review-changes" onClick={() => setShowCompare((value) => !value)} disabled={!changedKeys.length}><Clock3 size={16} /> {changedKeys.length ? `Review ${changedKeys.length} ${changedKeys.length === 1 ? "change" : "changes"}` : "No changes"}</button>
             </div>
-          ) : null}
+            {showCompare ? (
+              <section className="cms-compare">
+                <header><strong>Draft compared with published</strong><button type="button" onClick={() => setShowCompare(false)} aria-label="Close comparison"><X size={16} /></button></header>
+                {changedKeys.length ? changedKeys.slice(0, 50).map((key) => <div key={key}><code>{key}</code><span>{published.content[key] || "(empty)"}</span><strong>→</strong><span>{settings.content[key] || "(empty)"}</span></div>) : <p>No content fields differ from the published version.</p>}
+              </section>
+            ) : null}
+            {selected.area === "Design" && selected.page === "Theme" ? themeEditor : selected.area === "Design" ? brandEditor : selected.page === "Revision history" ? historyEditor : selected.page === "Copy coverage" ? coverageEditor : selected.page === "Advanced JSON" ? advancedEditor : selected.area === "Emails" ? emailEditor : selected.area === "SEO" ? seoEditor : standardEditor}
+          </section>
+
+          {previewOpen ? <aside className="cms-preview-panel">
+            <div className="cms-preview-toolbar">
+              <div className="cms-segmented" role="group" aria-label="Preview source">
+                <button type="button" className={previewSource === "draft" ? "active" : ""} onClick={() => setPreviewSource("draft")}>Draft</button>
+                <button type="button" className={previewSource === "published" ? "active" : ""} onClick={() => setPreviewSource("published")}>Published</button>
+              </div>
+              <div className="cms-device-buttons" role="group" aria-label="Preview size">
+                <button type="button" className={device === "desktop" ? "active" : ""} onClick={() => setDevice("desktop")} aria-label="Desktop preview"><Monitor size={16} /></button>
+                <button type="button" className={device === "tablet" ? "active" : ""} onClick={() => setDevice("tablet")} aria-label="Tablet preview"><Tablet size={16} /></button>
+                <button type="button" className={device === "mobile" ? "active" : ""} onClick={() => setDevice("mobile")} aria-label="Mobile preview"><Smartphone size={16} /></button>
+              </div>
+              <button type="button" onClick={() => setPreviewVersion((value) => value + 1)} aria-label="Refresh preview"><RefreshCw size={16} /></button>
+              <a href={previewUrl || previewPath} target="_blank" rel="noreferrer" aria-label="Open full preview"><Eye size={16} /></a>
+              <button type="button" onClick={() => setPreviewOpen(false)} aria-label="Collapse preview"><PanelRightClose size={16} /></button>
+            </div>
+            <div className={`cms-preview-frame is-${device}`}>
+              {previewError ? <div className="cms-preview-error"><strong>Preview unavailable</strong><p>{previewError}</p><button type="button" onClick={() => setPreviewVersion((value) => value + 1)}>Try again</button></div> : null}
+              {!previewError && previewUrl ? <iframe key={`${previewUrl}-${previewVersion}`} src={previewUrl} title={`${selected.page} ${previewSource} preview`} /> : null}
+              {!previewError && !previewUrl ? <div className="cms-preview-loading"><RefreshCw size={18} className="spin" /><span>Opening the real {previewSource} page…</span></div> : null}
+            </div>
+            <div className="cms-preview-meta">
+              <div><span>Selected route</span><strong>{previewPath}</strong></div>
+              <div><span>Previewing</span><strong>{previewSource === "draft" ? "Shared draft" : "Published site"}</strong></div>
+            </div>
+          </aside> : null}
         </div>
+        {confirmAction ? (
+          <div className="cms-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmAction(null); }}>
+            <section className="cms-modal" role="dialog" aria-modal="true" aria-labelledby="cms-confirm-title">
+              <header><div><span>Publishing safety</span><h2 id="cms-confirm-title">{confirmAction.kind === "discard" ? "Discard shared draft?" : confirmAction.kind === "publish" ? `Publish ${selected.page}?` : "Restore this revision?"}</h2></div><button type="button" onClick={() => setConfirmAction(null)} aria-label="Close confirmation"><X size={18} /></button></header>
+              <p>{confirmAction.kind === "discard"
+                ? "This removes the current shared draft and returns the editor to the published version. Published pages will not change."
+                : confirmAction.kind === "publish"
+                  ? `${changedKeys.length || 1} unpublished ${changedKeys.length === 1 ? "change" : "changes"} will be published globally. The prior live version stays available in revision history.`
+                  : `This copies the version published ${formatTime(confirmAction.revision.publishedAt)} into the shared draft. It will not go live until you publish it.`}</p>
+              {confirmAction.kind === "publish" ? <label className="cms-release-note">Release note (optional)<input value={note} onChange={(event) => setNote(event.target.value)} placeholder={`What changed on ${selected.page}?`} maxLength={180} /></label> : null}
+              <div className="cms-modal-actions">
+                <button type="button" className="button secondary" onClick={() => setConfirmAction(null)}>Cancel</button>
+                <button type="button" className="button" onClick={() => {
+                  const action = confirmAction;
+                  setConfirmAction(null);
+                  if (action.kind === "discard") void discardDraft();
+                  else if (action.kind === "publish") void publish();
+                  else void restoreRevision(action.revision);
+                }}>{confirmAction.kind === "discard" ? "Discard draft" : confirmAction.kind === "publish" ? "Confirm publish" : "Restore to draft"}</button>
+              </div>
+            </section>
+          </div>
+        ) : null}
       </main>
-      <Footer />
     </>
-  );
-}
-
-function readLocalSiteDraft(rawDraft: string | null) {
-  if (!rawDraft) {
-    return null;
-  }
-
-  try {
-    return mergeSiteSettings(JSON.parse(rawDraft) as Partial<EditableSiteSettings>);
-  } catch {
-    return null;
-  }
-}
-
-function EditorHeader({ label, title, copy }: { label: string; title: string; copy: string }) {
-  return (
-    <div className="editor-card-header">
-      <span className="mini-eyebrow">{label}</span>
-      <h2>{title}</h2>
-      <p>{copy}</p>
-    </div>
-  );
-}
-
-function TextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      <input value={value} onChange={(event) => onChange(event.target.value)} />
-    </label>
-  );
-}
-
-function TextArea({
-  label,
-  value,
-  rows,
-  onChange
-}: {
-  label: string;
-  value: string;
-  rows: number;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      <textarea rows={rows} value={value} onChange={(event) => onChange(event.target.value)} />
-    </label>
-  );
-}
-
-function CharacterHint({ current, target }: { current: number; target: string }) {
-  return (
-    <p className="seo-character-hint">
-      {current} characters. {target}.
-    </p>
-  );
-}
-
-function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return (
-    <label className="color-field">
-      <span>{label}</span>
-      <input type="color" value={value} onChange={(event) => onChange(event.target.value)} />
-      <input value={value} onChange={(event) => onChange(event.target.value)} />
-    </label>
   );
 }

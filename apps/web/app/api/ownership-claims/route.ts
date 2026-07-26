@@ -312,6 +312,10 @@ export async function PATCH(request: Request) {
   const admin = await getAdminContext(request);
   const isAdmin = admin.ok;
   const note = cleanText(body.note, 1000);
+  const adminDecision = action === "approve" || action === "deny" || action === "request_information" || action === "expire";
+  if (isAdmin && adminDecision && !note) {
+    return json({ ok: false, message: "An operator reason is required for the audit trail." }, 400);
+  }
   if (action === "resubmit") {
     if (claim.claimant_user_id !== auth.user.id || claim.status !== "awaiting_claimant") {
       return json({ ok: false, message: "Only the claimant can respond to this evidence request." }, 403);

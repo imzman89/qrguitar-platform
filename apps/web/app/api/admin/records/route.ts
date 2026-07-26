@@ -55,7 +55,10 @@ export async function GET(request: Request) {
       .select("id,owner_id,qr_code,permanent_path,name,brand,model,serial_number,status,visibility,safety_status,public_safety_note,safety_note,admin_archived_at,admin_archive_reason,owner_removed_at,owner_removed_reason,created_at,updated_at")
       .order("created_at", { ascending: false }),
     supabase.from("guitar_documents").select("id,guitar_id,name,file_name,file_size_bytes,is_public,document_type,created_at,updated_at"),
-    supabase.from("guitar_timeline_events").select("id,guitar_id,is_public,event_type,title,event_date,shop_name,location,created_at"),
+    supabase
+      .from("guitar_timeline_events")
+      .select("id,guitar_id,is_public,event_type,title,event_date,shop_name,location,created_at")
+      .neq("event_type", "profile_created"),
     supabase.from("ownership_transfers").select("id,guitar_id,from_owner_id,accepted_by,status,to_email,created_at,accepted_at"),
     supabase.auth.admin.listUsers({ page: 1, perPage: 1000 })
   ]);

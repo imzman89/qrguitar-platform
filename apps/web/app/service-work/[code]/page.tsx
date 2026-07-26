@@ -6,12 +6,15 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Footer } from "../../../components/Footer";
 import { Nav } from "../../../components/Nav";
+import { getContentValue } from "../../../lib/content-registry";
 import { getSupabaseAccessToken } from "../../../lib/supabase-browser";
+import { useSiteContent } from "../../../lib/use-site-content";
 
 const categories = ["Setup", "Repair", "Electronics", "Fretwork", "Structural Repair", "Finish Work", "Restoration", "Modification", "Inspection", "Appraisal", "Amplifier Service", "Other"];
 type Submission = { id: string; status: string; profileTitle: string; title: string; emailDeliveryStatus: string; emailDeliveryMessage: string; ownerReviewNote?: string; evidenceCount: number };
 
 export default function ServiceWorkPage() {
+  const content = useSiteContent();
   const params = useParams<{ code: string }>();
   const qrCode = decodeURIComponent(params.code || "").toUpperCase();
   const [token, setToken] = useState("");
@@ -76,7 +79,7 @@ export default function ServiceWorkPage() {
 
   return <><Nav /><main className="service-work-page"><section className="section"><div className="shell service-work-shell">
     <Link className="text-link service-back" href={`/i/${encodeURIComponent(qrCode)}`}><ArrowLeft size={16} /> Back to Profile</Link>
-    <div className="service-work-heading"><div><div className="eyebrow">Service provider workspace</div><h1>Submit completed service work.</h1><p>Add the work details and private evidence. Nothing is published until the current Profile owner approves it.</p></div><div className="service-privacy-note"><FileLock2 /><strong>Evidence stays private</strong><span>Invoices, slips, measurements, and photos are visible only to the provider, owner, and authorized QRguitar admin.</span></div></div>
+    <div className="service-work-heading"><div><div className="eyebrow">Service provider workspace</div><h1>{getContentValue(content, "serviceProviders.hero.headline")}</h1><p>{getContentValue(content, "serviceProviders.hero.body")}</p></div><div className="service-privacy-note"><FileLock2 /><strong>Evidence stays private</strong><span>Invoices, slips, measurements, and photos are visible only to the provider, owner, and authorized QRguitar admin.</span></div></div>
     {!token ? <div className="app-panel"><h2>Sign in required</h2><p>Use the provider account that performed the work.</p><Link className="button" href={`/login?next=${encodeURIComponent(`/service-work/${qrCode}`)}`}>Sign in</Link></div> : <>
       {message && <div className="service-message" role="status">{message}</div>}
       {submission && <div className={`service-status service-status-${submission.status}`}><CheckCircle2 /><div><strong>{submission.status.replace(/_/g, " ")}</strong><span>{submission.emailDeliveryMessage || `${submission.evidenceCount} private evidence file${submission.evidenceCount === 1 ? "" : "s"}`}</span></div></div>}

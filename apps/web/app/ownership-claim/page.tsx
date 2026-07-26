@@ -7,19 +7,21 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
+import { getContentValue } from "../../lib/content-registry";
+import { useSiteContent } from "../../lib/use-site-content";
 
 type EvidenceDraft = { name: string; dataUrl: string; type: string };
 type ClaimType = "owner_transfer" | "store_purchase" | "legacy_review";
 type ScenarioId = "store" | "builder" | "seller" | "no-transfer" | "gift" | "legacy";
 type ClaimSummary = { id: string; status: string; profileTitle: string; qrCode: string; evidenceCount: number; claimType: ClaimType; createdAt: string; adminReviewNote?: string };
 
-const scenarios: Array<{ id: ScenarioId; title: string; copy: string; icon: typeof Store; claimType: ClaimType; preferredTransfer?: boolean }> = [
-  { id: "store", title: "Bought new from a store", copy: "Use the recipient-bound invitation supplied by the store, or request a reviewed purchase claim.", icon: Store, claimType: "store_purchase" },
-  { id: "builder", title: "Bought from a brand or builder", copy: "Accept the issuer's secure handoff, or document the direct purchase for review.", icon: Wrench, claimType: "store_purchase" },
-  { id: "seller", title: "Bought used and the seller can transfer it", copy: "Ask the current owner to send a secure transfer invitation from their Dashboard.", icon: Handshake, claimType: "owner_transfer", preferredTransfer: true },
-  { id: "no-transfer", title: "Bought used without a transfer", copy: "Submit possession and purchase evidence without exposing it publicly.", icon: PackageCheck, claimType: "legacy_review" },
-  { id: "gift", title: "Gifted or inherited", copy: "Use an owner transfer when possible, or submit gift or estate evidence for review.", icon: Gift, claimType: "legacy_review" },
-  { id: "legacy", title: "I possess an old or abandoned Profile", copy: "Prove current possession with a private challenge photo and supporting evidence.", icon: ShieldCheck, claimType: "legacy_review" }
+const scenarioDefinitions: Array<{ id: ScenarioId; key: "store" | "builder" | "transfer" | "used" | "gift" | "legacy"; icon: typeof Store; claimType: ClaimType; preferredTransfer?: boolean }> = [
+  { id: "store", key: "store", icon: Store, claimType: "store_purchase" },
+  { id: "builder", key: "builder", icon: Wrench, claimType: "store_purchase" },
+  { id: "seller", key: "transfer", icon: Handshake, claimType: "owner_transfer", preferredTransfer: true },
+  { id: "no-transfer", key: "used", icon: PackageCheck, claimType: "legacy_review" },
+  { id: "gift", key: "gift", icon: Gift, claimType: "legacy_review" },
+  { id: "legacy", key: "legacy", icon: ShieldCheck, claimType: "legacy_review" }
 ];
 
 const statusSteps = ["submitted", "awaiting_owner", "admin_review", "approved"];
@@ -45,6 +47,7 @@ function claimStatusLabel(status: string) {
 }
 
 function OwnershipClaimContent() {
+  const content = useSiteContent();
   const searchParams = useSearchParams();
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [scenarioId, setScenarioId] = useState<ScenarioId | "">(searchParams.get("handoff") === "buyer-code" ? "builder" : "");
@@ -61,7 +64,12 @@ function OwnershipClaimContent() {
   const [responseEvidence, setResponseEvidence] = useState<EvidenceDraft[]>([]);
   const [buyerCode, setBuyerCode] = useState("");
   const [buyerOrderReference, setBuyerOrderReference] = useState("");
-  const scenario = useMemo(() => scenarios.find((item) => item.id === scenarioId), [scenarioId]);
+  const scenarios = useMemo(() => scenarioDefinitions.map((item) => ({
+    ...item,
+    title: getContentValue(content, `claimCenter.scenarios.${item.key}.title`),
+    copy: getContentValue(content, `claimCenter.scenarios.${item.key}.body`)
+  })), [content]);
+  const scenario = useMemo(() => scenarios.find((item) => item.id === scenarioId), [scenarioId, scenarios]);
   const needsChallenge = scenario?.claimType === "legacy_review";
 
   useEffect(() => {
@@ -207,7 +215,7 @@ function OwnershipClaimContent() {
       <main className="section claim-center-page">
         <div className="shell">
           <header className="claim-center-hero">
-            <div><div className="eyebrow">Ownership Claim Center</div><h1>How did this instrument come to you?</h1><p className="lede">Choose the situation that fits. A QR scan or matching Serial Number can find a Profile, but neither can transfer ownership on its own.</p></div>
+            <div><div className="eyebrow">Ownership Claim Center</div><h1>{getContentValue(content, "claimCenter.hero.headline")}</h1><p className="lede">{getContentValue(content, "claimCenter.hero.body")}</p></div>
             <aside><ShieldCheck aria-hidden="true" /><b>Evidence stays private</b><span>Only the current owner and authorized QRguitar reviewers can access submitted files.</span></aside>
           </header>
 

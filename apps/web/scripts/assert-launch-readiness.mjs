@@ -73,7 +73,7 @@ ok(!installers.includes("Owners can find a nearby shop") && installers.includes(
 ok(card.includes('record.showSerialPublic === true') && card.includes("<small>Serial Number</small>"), "Compact card serial privacy/label failed");
 ok(card.includes('variant === "catalog" && galleryImages.length > 1') && card.includes("onTouchStart") && card.includes("onTouchEnd") && card.includes("collectible-card-gallery-controls"), "Catalog carousel behavior missing");
 ok(styles.includes(".collectible-card-serial small") && styles.includes(".collectible-card-serial strong"), "Compact serial styling missing");
-ok(siteEditor.includes("!authChecked || (isSignedIn && isUnlocked)"), "Site Editor duplicates access messages");
+ok(siteEditor.includes("if (!authorized)") && siteEditor.includes('status === "loading" ? "Checking Site Editor access." : "Admin access required."'), "Site Editor access gate is missing or duplicates access messages");
 ok(migration.includes("migration:QRG-05068283:setup-2026-06-20") && migration.includes("date '2026-06-20'") && migration.includes("Properly setup on 6/20/2026"), "Canonical setup migration lost source/date/text");
 ok(migration.indexOf("insert into public.guitar_timeline_events") < migration.indexOf("delete from public.guitar_specs") && migration.includes("and exists ("), "Legacy setup deletion is not gated on canonical insert");
 
