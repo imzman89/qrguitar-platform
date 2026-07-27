@@ -10,7 +10,7 @@ type InstrumentsResponse = {
   instruments?: DemoInstrument[];
 };
 
-export function LatestPublicRecord({ initialRecord = null }: { initialRecord?: DemoInstrument | null }) {
+export function LatestPublicRecord({ initialRecord = null, content }: { initialRecord?: DemoInstrument | null; content?: Record<string, string> }) {
   const [latest, setLatest] = useState<DemoInstrument | null>(initialRecord);
   const [loaded, setLoaded] = useState(Boolean(initialRecord));
 
@@ -59,6 +59,7 @@ export function LatestPublicRecord({ initialRecord = null }: { initialRecord?: D
       variant="latest"
       eyebrow="Latest QRguitar Profile"
       ctaLabel="Open Profile"
+      content={content}
     />
   );
 }

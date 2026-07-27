@@ -13,10 +13,10 @@ import { getProfilePhotoUrls } from "../lib/instrument-profile-contract";
 import { buildEditableHomeCopy, fetchPublishedSiteSettings, type EditableSiteSettings } from "../lib/site-settings";
 
 export function HomePageClient({
-  initialLatestRecord,
+  initialRecords,
   initialSettings
 }: {
-  initialLatestRecord: DemoInstrument | null;
+  initialRecords: DemoInstrument[];
   initialSettings: EditableSiteSettings;
 }) {
   const [settings, setSettings] = useState<EditableSiteSettings | null>(initialSettings);
@@ -74,7 +74,15 @@ export function HomePageClient({
     };
   }, [settings]);
 
-  const recordPhoto = initialLatestRecord ? getProfilePhotoUrls(initialLatestRecord)[0] : "";
+  const initialLatestRecord = initialRecords[0] || null;
+  const heroImages = new Set(initialLatestRecord ? getProfilePhotoUrls(initialLatestRecord) : []);
+  const supportingRecord = initialRecords.find((record) =>
+    record.qrCode !== initialLatestRecord?.qrCode &&
+    getProfilePhotoUrls(record).some((image) => !heroImages.has(image))
+  );
+  const recordPhoto = supportingRecord
+    ? getProfilePhotoUrls(supportingRecord).find((image) => !heroImages.has(image)) || ""
+    : "";
   const homeSections = settings?.composition.home.sections || [];
   const sectionBlocks = (sectionId: string) => homeSections.find((section) => section.id === sectionId)?.blocks.filter((block) => block.visible) || [];
   const audienceBlocks = sectionBlocks("roles");
@@ -96,7 +104,7 @@ export function HomePageClient({
               {cleanHeroTrust(copy.hero.trust).map((item) => <span key={item}>{item}</span>)}
             </div>
           </div>
-          <LatestPublicRecord initialRecord={initialLatestRecord} />
+          <LatestPublicRecord initialRecord={initialLatestRecord} content={settings?.content} />
         </div>
       </section>
     ),
@@ -128,7 +136,7 @@ export function HomePageClient({
           </div>
           <div className="record-holds-visual" aria-label="A QRguitar Profile keeps the instrument and its history together">
             <div className="record-holds-photo">
-              {recordPhoto ? <img src={recordPhoto} alt="A documented instrument in QRguitar" /> : <div className="record-holds-photo-empty" aria-hidden="true" />}
+              {recordPhoto ? <img src={recordPhoto} alt={`Documented ${supportingRecord?.brand || "instrument"} in QRguitar`} /> : <div className="record-holds-photo-empty"><span>{settings?.content["home.anatomy.fallback"] || "A permanent identity for every instrument"}</span></div>}
               <span>One permanent identity</span>
             </div>
             <div className="record-holds-facts">

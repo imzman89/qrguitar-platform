@@ -166,10 +166,6 @@ export function CatalogClient({ initialRecords, content, composition }: { initia
   const guidance = composition.sections.find((section) => section.id === "guidance");
   const guidanceBlock = guidance?.blocks.find((block) => block.visible);
 
-  const topBrands = useMemo(() => {
-    return unique(records.map((record) => record.brand).filter(Boolean));
-  }, [records]);
-
   async function searchExactSerial() {
     const serial = query.trim();
     if (serial.length < 4) {
@@ -323,9 +319,10 @@ export function CatalogClient({ initialRecords, content, composition }: { initia
 
           <section className="catalog-summary" aria-label="Catalog discovery highlights">
             <div className="catalog-toolbar">
-              <p>
-                <strong>{visibleCount}</strong> of <strong>{totalCount}</strong> visible profiles.
-              </p>
+              <p><strong>{formatResultLabel(
+                getContentValue(content, hasFilterOrSearch ? "catalog.results.filtered" : "catalog.results.all"),
+                visibleCount
+              )}</strong></p>
               {hasFilterOrSearch ? (
                 <button
                   className="button secondary"
@@ -340,13 +337,9 @@ export function CatalogClient({ initialRecords, content, composition }: { initia
                   }}
                 >
                   <SlidersHorizontal size={14} />
-                  Reset filters
+                  {getContentValue(content, "catalog.actions.reset")}
                 </button>
               ) : null}
-            </div>
-            <div className="catalog-highlights">
-              <span>{topBrands.slice(0, 2).join(" / ") || "Premium catalog"}</span>
-              <span>{totalCount} visible {totalCount === 1 ? "profile" : "profiles"}</span>
             </div>
           </section>
 
@@ -359,7 +352,7 @@ export function CatalogClient({ initialRecords, content, composition }: { initia
               </div>
             ) : visibleRecords.length ? (
               visibleRecords.map((record) => (
-                <CollectibleRecordCard record={record} variant="catalog" key={record.qrCode} />
+                <CollectibleRecordCard record={record} variant="catalog" key={record.qrCode} content={content} />
               ))
             ) : (
               <div className="card catalog-empty">
@@ -374,6 +367,10 @@ export function CatalogClient({ initialRecords, content, composition }: { initia
       <Footer />
     </>
   );
+}
+
+function formatResultLabel(template: string, count: number) {
+  return template.replace("{count}", String(count));
 }
 
 function unique(values: string[]) {

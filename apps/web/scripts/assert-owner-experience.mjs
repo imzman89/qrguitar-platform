@@ -6,7 +6,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (filePath) => readFile(path.join(root, filePath), "utf8");
 const ok = (value, message) => { if (!value) throw new Error(message); };
 
-const [bulk, bulkRoute, accountApi, collectionPage, collections, publicInstruments, card, dashboard, quickEdit, howItWorks, siteSettings, sitemap, styles] = await Promise.all([
+const [bulk, bulkRoute, accountApi, collectionPage, collections, publicInstruments, card, collectibleCard, dashboard, quickEdit, howItWorks, siteSettings, sitemap, styles] = await Promise.all([
   "components/BulkProfileImport.tsx",
   "app/dashboard/import/page.tsx",
   "app/api/account/route.ts",
@@ -14,6 +14,7 @@ const [bulk, bulkRoute, accountApi, collectionPage, collections, publicInstrumen
   "lib/public-collections.ts",
   "lib/public-instruments.ts",
   "components/CollectibleRecordCard.tsx",
+  "lib/collectible-card.ts",
   "app/dashboard/page.tsx",
   "components/ProfileQuickEdit.tsx",
   "app/how-it-works/HowItWorksClient.tsx",
@@ -36,8 +37,8 @@ ok(accountApi.includes("already in use") && accountApi.includes("status: 409"), 
 ok(collections.includes("enabled: false") && collectionPage.includes("notFound()"), "Public Collections are not opt-in");
 ok(collectionPage.includes("getPublicInstruments(ownerId)") && publicInstruments.includes("visibility=eq.public") && publicInstruments.includes("ownerId"), "Collection public-only contract missing");
 ok(!collectionPage.includes("ownerUserEmail") && !collectionPage.includes("ownerEmail"), "Collection page references private email");
-ok(card.includes("record.publicCollection") && card.includes("collection-link") && card.includes("maxBadges={3}"), "Shared card collection link or badge limit missing");
-ok(card.includes('record.showSerialPublic === true') && card.includes("RecordShareButton") && card.includes("collectible-card-gallery-controls"), "Card privacy or independent controls missing");
+ok(collectibleCard.includes("record.publicCollection") && card.includes("collectible-card-collection-link") && card.includes("maxBadges={3}"), "Shared card collection link or badge limit missing");
+ok(collectibleCard.includes('record.showSerialPublic === true') && card.includes("RecordShareButton") && card.includes("collectible-card-gallery-controls"), "Card privacy or independent controls missing");
 ok(dashboard.includes("ProfileQuickEdit") && dashboard.includes("Quick Edit") && dashboard.includes("<details") && dashboard.includes("QrDownload"), "Owner card actions missing");
 ok(quickEdit.includes("beforeunload") && quickEdit.includes("Save Quick Edit") && quickEdit.includes("showSerialPublic") && quickEdit.includes("safetyStatus"), "Quick Edit contract missing");
 ok(siteSettings.includes("Luthiers / Technicians") && siteSettings.includes("Buyers") && siteSettings.includes("Collectors") && siteSettings.includes("Shops"), "How It Works role paths missing");

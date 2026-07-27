@@ -8350,6 +8350,229 @@ button.button {
   gap: 12px;
 }
 
+/* Public collectible media: one natural interaction model on every card. */
+.collectible-card-media-rail {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  touch-action: pan-y pinch-zoom;
+  cursor: grab;
+}
+
+.collectible-card-media-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.collectible-card-media-rail:active {
+  cursor: grabbing;
+}
+
+.collectible-card-media-rail:focus-visible {
+  outline: 2px solid rgba(240, 161, 43, .8);
+  outline-offset: -4px;
+}
+
+.collectible-card-media-slide {
+  flex: 0 0 100%;
+  width: 100%;
+  min-width: 100%;
+  height: 100%;
+  min-height: inherit;
+  position: relative;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+}
+
+.collectible-card-media-slide .collectible-card-empty-media {
+  height: 100%;
+}
+
+.collectible-card-image-count {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: 14px;
+  min-height: 22px;
+  border: 1px solid rgba(248, 246, 242, .12);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 7px 3px;
+  color: rgba(248, 246, 242, .82);
+  background: rgba(5, 8, 9, .68);
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.collectible-card-collection-link {
+  position: static;
+  width: fit-content;
+  max-width: 100%;
+  display: block;
+  margin-top: 2px;
+  z-index: auto;
+  overflow: hidden;
+  color: rgba(248, 246, 242, .68);
+  font-size: 11px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  text-decoration-color: rgba(240, 161, 43, .38);
+  white-space: nowrap;
+}
+
+.collectible-card-collection-link:hover,
+.collectible-card-collection-link:focus-visible {
+  color: var(--gold-2);
+}
+
+.collectible-card-profile-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* The public Profile hero is the photograph gallery; Media is supplemental only. */
+.scan-hero-gallery {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  background: #070b0d;
+  touch-action: pan-y pinch-zoom;
+}
+
+.scan-hero-media-frame {
+  min-width: 0;
+  position: relative;
+}
+
+.scan-hero-gallery-controls {
+  position: absolute;
+  z-index: 4;
+  inset: 50% 16px auto;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.scan-hero-gallery-controls button {
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(248, 246, 242, .18);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--text);
+  background: rgba(4, 7, 9, .72);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .3);
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.scan-hero-gallery-controls button:last-child svg {
+  transform: rotate(180deg);
+}
+
+.scan-hero-gallery-controls button:hover,
+.scan-hero-gallery-controls button:focus-visible {
+  border-color: rgba(240, 161, 43, .58);
+  color: var(--gold-2);
+}
+
+.scan-hero-thumbnails {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 10px 12px 12px;
+  border-top: 1px solid rgba(248, 246, 242, .08);
+  border-right: 1px solid var(--border-soft);
+  background: #070b0d;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(240, 161, 43, .45) transparent;
+}
+
+.scan-hero-thumbnails button {
+  flex: 0 0 84px;
+  width: 84px;
+  aspect-ratio: 4 / 3;
+  border: 1px solid rgba(248, 246, 242, .12);
+  border-radius: 7px;
+  overflow: hidden;
+  padding: 0;
+  background: #0b1013;
+  cursor: pointer;
+  scroll-snap-align: center;
+}
+
+.scan-hero-thumbnails button.active {
+  border-color: var(--gold-2);
+  box-shadow: 0 0 0 1px rgba(240, 161, 43, .28);
+}
+
+.scan-hero-thumbnails button:focus-visible {
+  outline: 2px solid var(--gold-2);
+  outline-offset: 2px;
+}
+
+.scan-hero-thumbnails img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+@media (min-width: 901px) {
+  .scan-hero-gallery {
+    min-height: 620px;
+    border-right: 1px solid var(--border-soft);
+  }
+
+  .scan-hero-gallery .scan-hero-media {
+    min-height: 550px;
+    border-right: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .scan-hero-gallery-controls {
+    inset-inline: 10px;
+  }
+
+  .scan-hero-gallery-controls button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .scan-hero-thumbnails {
+    border-right: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .collectible-card-media-rail {
+    scroll-behavior: auto;
+  }
+
+  .collectible-card-image {
+    transition: none;
+  }
+}
+
 .external-media-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));

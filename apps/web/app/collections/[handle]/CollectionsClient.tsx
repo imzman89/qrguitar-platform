@@ -3,9 +3,10 @@
 import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { CollectibleRecordCard } from "../../../components/CollectibleRecordCard";
+import { getContentValue } from "../../../lib/content-registry";
 import { getInstrumentCondition, type DemoInstrument } from "../../../lib/local-demo";
 
-export function CollectionsClient({ records }: { records: DemoInstrument[] }) {
+export function CollectionsClient({ records, content }: { records: DemoInstrument[]; content: Record<string, string> }) {
   const [query, setQuery] = useState("");
   const [brand, setBrand] = useState("All brands");
   const [condition, setCondition] = useState("All conditions");
@@ -34,10 +35,17 @@ export function CollectionsClient({ records }: { records: DemoInstrument[] }) {
       <label><span>Type</span><select value={type} onChange={(event) => setType(event.target.value)}>{types.map((item) => <option key={item}>{item}</option>)}</select></label>
       <label><span>Sort</span><select value={sort} onChange={(event) => setSort(event.target.value)}><option>Newest</option><option>Oldest</option><option>Title</option></select></label>
     </div>
-    <p className="collection-result-count">{visible.length} {visible.length === 1 ? "Profile" : "Profiles"}</p>
+    <p className="collection-result-count">
+      {getContentValue(content, "collections.results.count").replace("{count}", String(visible.length))}
+    </p>
     <div className="catalog-record-grid collection-record-grid">
-      {visible.map((record) => <CollectibleRecordCard key={record.qrCode} record={record} />)}
+      {visible.map((record) => <CollectibleRecordCard key={record.qrCode} record={record} content={content} />)}
     </div>
-    {!visible.length ? <div className="empty-state"><h2>No matching Profiles.</h2><p>Try a broader search or filter.</p></div> : null}
+    {!visible.length ? (
+      <div className="empty-state">
+        <h2>{getContentValue(content, "collections.empty.filteredTitle")}</h2>
+        <p>{getContentValue(content, "collections.empty.filteredBody")}</p>
+      </div>
+    ) : null}
   </>;
 }

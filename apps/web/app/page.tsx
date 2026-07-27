@@ -10,21 +10,17 @@ import { getContentValue } from "../lib/content-registry";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-function latestRecordWithFastFallback() {
-  return new Promise<DemoInstrument | null>((resolve) => {
-    const timeout = setTimeout(() => resolve(null), 5000);
+function publicRecordsWithFastFallback() {
+  return new Promise<DemoInstrument[]>((resolve) => {
+    const timeout = setTimeout(() => resolve([]), 5000);
     getPublicInstruments()
-      .then((records) => resolve(sanitizeLatestRecord(records[0] || null)))
-      .catch(() => resolve(null))
+      .then((records) => resolve(records.map(sanitizePresentationRecord)))
+      .catch(() => resolve([]))
       .finally(() => clearTimeout(timeout));
   });
 }
 
-function sanitizeLatestRecord(record: DemoInstrument | null) {
-  if (!record) {
-    return null;
-  }
-
+function sanitizePresentationRecord(record: DemoInstrument) {
   const { saleStatus: _saleStatus, originalityStatus: _originalityStatus, ...presentationRecord } = record;
   return presentationRecord as DemoInstrument;
 }
@@ -78,10 +74,10 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function HomePage() {
   noStore();
-  const [publishedSettings, initialLatestRecord] = await Promise.all([
+  const [publishedSettings, initialRecords] = await Promise.all([
     loadPublishedSiteSettings(),
-    latestRecordWithFastFallback()
+    publicRecordsWithFastFallback()
   ]);
 
-  return <HomePageClient initialLatestRecord={initialLatestRecord} initialSettings={publishedSettings} />;
+  return <HomePageClient initialRecords={initialRecords} initialSettings={publishedSettings} />;
 }

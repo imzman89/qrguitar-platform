@@ -28,6 +28,7 @@ const [
   terms,
   catalog,
   card,
+  collectibleCard,
   siteEditor,
   migration
 ] = await Promise.all([
@@ -49,6 +50,7 @@ const [
   "app/terms/page.tsx",
   "app/catalog/CatalogClient.tsx",
   "components/CollectibleRecordCard.tsx",
+  "lib/collectible-card.ts",
   "app/site-editor/page.tsx",
   "../../supabase/migrations/20260716123000_migrate_legacy_setup_note.sql"
 ].map(read));
@@ -70,8 +72,15 @@ ok(!catalog.includes("service history, proof, or Availability"), "Catalog promis
 ok(profileContract.includes("if (event.isSystem) return false"), "System events counted as service history");
 ok(resetPassword.includes("hasRecoveryLink") && resetPassword.includes("isComplete") && resetPassword.includes("authChecked && !isComplete && hasSession"), "Reset states are not mutually exclusive");
 ok(!installers.includes("Owners can find a nearby shop") && installers.includes("connects approved shops and owners manually"), "Installer page overpromises a finder");
-ok(card.includes('record.showSerialPublic === true') && card.includes("<small>Serial Number</small>"), "Compact card serial privacy/label failed");
-ok(card.includes('variant === "catalog" && galleryImages.length > 1') && card.includes("onTouchStart") && card.includes("onTouchEnd") && card.includes("collectible-card-gallery-controls"), "Catalog carousel behavior missing");
+ok(collectibleCard.includes('record.showSerialPublic === true') && card.includes("<small>Serial Number</small>"), "Compact card serial privacy/label failed");
+ok(
+  card.includes("card.images.length > 1")
+    && card.includes("onPointerMove={handlePointerMove}")
+    && card.includes("onWheel={handleWheel}")
+    && card.includes("onKeyDown={handleKeyDown}")
+    && card.includes("collectible-card-gallery-controls"),
+  "Public card carousel behavior missing"
+);
 ok(styles.includes(".collectible-card-serial small") && styles.includes(".collectible-card-serial strong"), "Compact serial styling missing");
 ok(siteEditor.includes("if (!authorized)") && siteEditor.includes('status === "loading" ? "Checking Site Editor access." : "Admin access required."'), "Site Editor access gate is missing or duplicates access messages");
 ok(migration.includes("migration:QRG-05068283:setup-2026-06-20") && migration.includes("date '2026-06-20'") && migration.includes("Properly setup on 6/20/2026"), "Canonical setup migration lost source/date/text");

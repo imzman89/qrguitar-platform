@@ -6,6 +6,7 @@ import { cleanCollectionHandle, cleanPublicCollection, publicCollectionHandleKey
 import { getPublicInstruments } from "../../../lib/public-instruments";
 import { createServerSupabaseClient } from "../../../lib/supabase-server";
 import { CollectionsClient } from "./CollectionsClient";
+import { loadPublishedSiteSettings } from "../../../lib/site-settings-server";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ han
   const result = await loadCollection(handle);
   if (!result) notFound();
   const { settings, records } = result;
+  const publishedSettings = await loadPublishedSiteSettings();
   const role = ({ player: "Player", collector: "Collector", shop: "Shop", builder: "Builder / Brand", luthier: "Luthier / Technician", other: "Instrument Community" } as const)[settings.accountType];
   return <>
     <Nav />
@@ -49,7 +51,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ han
         <div><span className="eyebrow">Public Collection</span><h1>{settings.publicName}</h1><p className="collection-role">{role}{settings.location ? ` / ${settings.location}` : ""}</p>{settings.bio ? <p>{settings.bio}</p> : null}{settings.websiteUrl ? <a href={settings.websiteUrl} target="_blank" rel="noreferrer">Visit website</a> : null}</div>
         <strong className="collection-count">{records.length}<small>Public {records.length === 1 ? "Profile" : "Profiles"}</small></strong>
       </header>
-      <CollectionsClient records={records} />
+      <CollectionsClient records={records} content={publishedSettings.content} />
     </main>
     <Footer />
   </>;
