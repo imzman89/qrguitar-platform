@@ -12699,6 +12699,7 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 .admin-health-grid small { color: var(--muted); }
 .admin-system-meta { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 20px; margin-top: 18px; border-top: 1px solid rgba(239, 236, 228, .1); padding-top: 18px; }
 .admin-system-meta span { color: var(--muted); }
+.admin-system-meta strong { min-width: 0; overflow-wrap: anywhere; }
 .admin-drawer-layer { position: fixed; inset: 0; z-index: 1500; display: grid; justify-items: end; }
 .admin-drawer-backdrop { position: absolute; inset: 0; width: 100%; border: 0; background: rgba(2, 6, 8, .72); backdrop-filter: blur(3px); }
 .admin-entity-drawer { position: relative; width: min(520px, calc(100vw - 24px)); height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr); border-left: 1px solid rgba(239, 236, 228, .14); background: #0c1418; box-shadow: -28px 0 72px rgba(0, 0, 0, .5); }
