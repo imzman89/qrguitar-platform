@@ -13323,11 +13323,21 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   padding-top: 7px;
 }
 .admin-health-system summary {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 8px;
   color: var(--gold-2);
   font-size: 9px;
   font-weight: 800;
   text-transform: uppercase;
   cursor: pointer;
+}
+.admin-health-system summary small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  line-height: 1.4;
+  text-transform: none;
 }
 .admin-health-system ul {
   display: grid;
