@@ -12912,6 +12912,28 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   .admin-command-bar { grid-template-columns: auto minmax(220px, 1fr); }
   .admin-command-meta { display: none !important; }
 }
+@media (max-width: 1099px) {
+  .admin-command-bar { grid-template-columns: minmax(0, 1fr) minmax(220px, .9fr); }
+  .admin-mobile-nav { display: grid; }
+  .admin-shell { display: block; width: 100%; }
+  .admin-sidebar {
+    position: fixed;
+    z-index: 1100;
+    top: 0;
+    left: 0;
+    width: min(300px, calc(100vw - 42px));
+    height: 100dvh;
+    transform: translateX(-105%);
+    transition: transform 160ms ease;
+    box-shadow: 24px 0 64px rgba(0, 0, 0, .48);
+  }
+  .admin-sidebar.is-open { transform: none; }
+  .admin-sidebar > header button { display: grid; place-items: center; border: 0; color: var(--text); background: transparent; }
+  .admin-sidebar-backdrop { position: fixed; inset: 0; z-index: 1090; width: 100%; border: 0; background: rgba(2, 6, 8, .7); }
+  .admin-main { width: 100%; min-width: 0; padding-top: 26px; }
+  .admin-command-card h3,
+  .admin-main-heading h1 { overflow-wrap: normal; word-break: normal; hyphens: none; }
+}
 @media (max-width: 900px) {
   .admin-command-bar { grid-template-columns: minmax(0, 1fr) minmax(180px, .8fr); }
   .admin-mobile-nav, .cms-mobile-tree { display: grid; }

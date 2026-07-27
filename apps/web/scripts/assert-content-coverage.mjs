@@ -12,6 +12,7 @@ const runtimeFiles = [
   "components/Footer.tsx",
   "app/page.tsx",
   "app/how-it-works/page.tsx",
+  "app/how-it-works/HowItWorksClient.tsx",
   "app/catalog/page.tsx",
   "app/catalog/CatalogClient.tsx",
   "app/dashboard/page.tsx",

@@ -13,6 +13,14 @@ export const fetchCache = "force-no-store";
 const DRAFT_KEY = "site-editor:draft";
 const REVISION_PREFIX = "site-editor:revision:";
 const NO_STORE_HEADERS = { "Cache-Control": "no-store, no-cache, must-revalidate" };
+const EDITORIAL_ROUTES = {
+  home: "/",
+  howItWorks: "/how-it-works",
+  catalog: "/catalog",
+  installers: "/installers",
+  contact: "/contact",
+  footer: "/"
+} as const;
 
 type SiteContentRow = {
   content_key: string;
@@ -52,6 +60,43 @@ function changedContentKeys(a: EditableSiteSettings, b: EditableSiteSettings) {
   return Array.from(new Set(changed)).sort();
 }
 
+function revalidatePublishedSettings(changedFields: string[], before: EditableSiteSettings, after: EditableSiteSettings) {
+  const paths = new Set<string>(["/api/site-settings"]);
+  const contentRoutes: Array<[string, string]> = [
+    ["home.", "/"],
+    ["howItWorks.", "/how-it-works"],
+    ["catalog.", "/catalog"],
+    ["contact.", "/contact"],
+    ["seo.home.", "/"],
+    ["seo.howItWorks.", "/how-it-works"],
+    ["seo.catalog.", "/catalog"],
+    ["seo.contact.", "/contact"]
+  ];
+
+  for (const field of changedFields) {
+    for (const [prefix, path] of contentRoutes) {
+      if (field.startsWith(prefix)) paths.add(path);
+    }
+  }
+
+  if (changedFields.some((field) => ["brandName", "tagline", "colors", "seo", "global."].some((prefix) => field === prefix || field.startsWith(prefix)))) {
+    paths.add("/");
+    paths.add("/how-it-works");
+    paths.add("/catalog");
+    paths.add("/contact");
+  }
+
+  if (changedFields.includes("composition")) {
+    for (const [page, path] of Object.entries(EDITORIAL_ROUTES)) {
+      const key = page as keyof EditableSiteSettings["composition"];
+      if (JSON.stringify(before.composition[key]) !== JSON.stringify(after.composition[key])) paths.add(path);
+    }
+  }
+
+  for (const path of paths) revalidatePath(path);
+  revalidatePath("/", "layout");
+}
+
 function validHex(value: string) {
   return /^#[0-9a-f]{6}$/i.test(value);
 }
@@ -62,6 +107,14 @@ function validateSettings(settings: EditableSiteSettings) {
     if (!validHex(value)) errors[`colors.${key}`] = "Use a six-digit hex color.";
   }
   if (!settings.brandName.trim()) errors.brandName = "Brand name is required.";
+  try {
+    const canonical = new URL(settings.seo.canonicalUrl);
+    if (canonical.protocol !== "https:" || canonical.hostname !== "www.qrguitar.com" || canonical.username || canonical.password) {
+      errors["seo.canonicalUrl"] = "Use the canonical QRguitar HTTPS origin.";
+    }
+  } catch {
+    errors["seo.canonicalUrl"] = "Enter a valid canonical URL.";
+  }
   return errors;
 }
 
@@ -312,8 +365,7 @@ export async function PUT(request: Request) {
     metadata: { area: body.area || "All content", changedFields, revisionId }
   });
 
-  revalidatePath("/", "layout");
-  revalidatePath("/api/site-settings");
+  revalidatePublishedSettings(changedFields, current.published, settings);
   return json({
     ok: true,
     message: cleanupResult.error ? "Published globally. The saved draft could not be cleared." : "Published globally.",

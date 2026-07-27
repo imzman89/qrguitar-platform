@@ -21,7 +21,7 @@ import {
   X
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import { defaultSiteSettings, mergeSiteSettings, normalizeBrandLogoKey, type EditableSiteSettings } from "../../lib/site-settings";
@@ -394,6 +394,11 @@ export default function AdminPage() {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<AdminRecord | null>(null);
   const [navOpen, setNavOpen] = useState(false);
+  const navButtonRef = useRef<HTMLButtonElement | null>(null);
+  const sidebarRef = useRef<HTMLElement | null>(null);
+  const entityDrawerRef = useRef<HTMLElement | null>(null);
+  const modalRef = useRef<HTMLElement | null>(null);
+  const overlayKind = pendingAction ? "modal" : selectedUser || selectedRecord ? "entity" : navOpen ? "navigation" : "";
 
   const tokenPromise = useMemo(() => getSupabaseAccessToken(), []);
 
@@ -425,6 +430,80 @@ export default function AdminPage() {
     setSelectedUser(null);
     setSelectedRecord(null);
   }
+
+  useEffect(() => {
+    const overlay = overlayKind === "modal"
+      ? modalRef.current
+      : overlayKind === "entity"
+        ? entityDrawerRef.current
+        : overlayKind === "navigation"
+          ? sidebarRef.current
+          : null;
+    if (!overlay) return;
+    const activeOverlay = overlay;
+
+    const returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    const focusableSelector = [
+      "a[href]",
+      "button:not([disabled])",
+      "input:not([disabled])",
+      "select:not([disabled])",
+      "textarea:not([disabled])",
+      '[tabindex]:not([tabindex="-1"])'
+    ].join(",");
+    document.body.style.overflow = "hidden";
+
+    const focusTimer = window.setTimeout(() => {
+      const firstFocusable = activeOverlay.querySelector<HTMLElement>(focusableSelector);
+      (firstFocusable || activeOverlay).focus();
+    }, 0);
+
+    function closeTopOverlay() {
+      if (overlayKind === "modal") setPendingAction(null);
+      else if (overlayKind === "entity") {
+        setSelectedUser(null);
+        setSelectedRecord(null);
+      }
+      else setNavOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeTopOverlay();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(activeOverlay.querySelectorAll<HTMLElement>(focusableSelector))
+        .filter((element) => !element.hasAttribute("disabled") && element.getClientRects().length > 0);
+      if (!focusable.length) {
+        event.preventDefault();
+        activeOverlay.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      window.setTimeout(() => {
+        if (returnFocus?.isConnected) returnFocus.focus();
+        else if (navButtonRef.current?.isConnected) navButtonRef.current.focus();
+      }, 0);
+    };
+  }, [overlayKind]);
 
   const loadAdmin = useCallback(async () => {
     setLoading(true);
@@ -1538,7 +1617,7 @@ export default function AdminPage() {
   const entityDrawer = selectedUser ? (
     <div className="admin-drawer-layer">
       <button type="button" className="admin-drawer-backdrop" onClick={() => setSelectedUser(null)} aria-label="Close user details" />
-      <aside className="admin-entity-drawer" role="dialog" aria-modal="true" aria-label={`User details for ${selectedUser.email}`}>
+      <aside ref={entityDrawerRef} tabIndex={-1} className="admin-entity-drawer" role="dialog" aria-modal="true" aria-label={`User details for ${selectedUser.email}`}>
         <header><div><span>User account</span><h2>{selectedUser.email}</h2></div><button type="button" onClick={() => setSelectedUser(null)} aria-label="Close"><X size={18} /></button></header>
         <div className="admin-drawer-body">
           <div className="admin-drawer-chips"><span className={adminChipClass("role", userRoleChipValue(selectedUser))}>{userRoleLabel(selectedUser)}</span><span className={adminChipClass("status", selectedUser.accountStatus)}>{selectedUser.accountStatus}</span></div>
@@ -1557,7 +1636,7 @@ export default function AdminPage() {
   ) : selectedRecord ? (
     <div className="admin-drawer-layer">
       <button type="button" className="admin-drawer-backdrop" onClick={() => setSelectedRecord(null)} aria-label="Close Profile details" />
-      <aside className="admin-entity-drawer" role="dialog" aria-modal="true" aria-label={`Profile details for ${selectedRecord.title}`}>
+      <aside ref={entityDrawerRef} tabIndex={-1} className="admin-entity-drawer" role="dialog" aria-modal="true" aria-label={`Profile details for ${selectedRecord.title}`}>
         <header><div><span>QRguitar Profile</span><h2>{selectedRecord.title}</h2><small>{selectedRecord.qrCode}</small></div><button type="button" onClick={() => setSelectedRecord(null)} aria-label="Close"><X size={18} /></button></header>
         <div className="admin-drawer-body">
           <dl><div><dt>Owner</dt><dd>{selectedRecord.ownerEmail || "No owner"}</dd></div><div><dt>Visibility</dt><dd>{selectedRecord.visibility}</dd></div><div><dt>Service / evidence</dt><dd>{selectedRecord.serviceEventCount} / {selectedRecord.proofDocumentCount}</dd></div><div><dt>Created</dt><dd>{formatDate(selectedRecord.createdAt)}</dd></div></dl>
@@ -1575,12 +1654,12 @@ export default function AdminPage() {
       <Nav />
       <main className="admin-page">
         <div className="admin-command-bar">
-          <div><button type="button" className="admin-mobile-nav" onClick={() => setNavOpen(true)} aria-label="Open admin navigation"><Menu size={18} /></button><div><span>Owner command center</span><strong>{activeSectionMeta.label}</strong></div></div>
+          <div><button ref={navButtonRef} type="button" className="admin-mobile-nav" onClick={() => setNavOpen(true)} aria-label="Open admin navigation" aria-controls="admin-primary-navigation" aria-expanded={navOpen}><Menu size={18} /></button><div><span>Owner command center</span><strong>{activeSectionMeta.label}</strong></div></div>
           {adminAuthorized ? <label className="admin-global-search"><Search size={16} /><input value={adminSearch} onChange={(event) => setAdminSearch(event.target.value)} placeholder="Search users, Profiles, or IDs" /></label> : null}
           <div className="admin-command-meta"><span>Local QA</span><strong>{overview?.admin?.email || "Admin"}</strong></div>
         </div>
         <div className={adminAuthorized ? "admin-shell" : "admin-shell is-locked"}>
-          {adminAuthorized ? <aside className={navOpen ? "admin-sidebar is-open" : "admin-sidebar"}><header><strong>QRguitar Admin</strong><button type="button" onClick={() => setNavOpen(false)} aria-label="Close admin navigation"><X size={17} /></button></header>{sectionGroups.map((group) => <nav key={group} aria-label={`${group} sections`}><span>{group}</span>{sections.filter((section) => section.group === group).map((section) => { const Icon = section.icon; return <button type="button" className={section.id === activeSection ? "active" : ""} onClick={() => goToSection(section.id)} key={section.id}><Icon size={16} />{section.label}</button>; })}</nav>)}<div className="admin-sidebar-links"><Link href="/admin/service-workflow">Service Operations</Link><Link href="/admin/site-editor">Content Studio</Link></div></aside> : null}
+          {adminAuthorized ? <aside ref={sidebarRef} tabIndex={-1} id="admin-primary-navigation" aria-label="Admin navigation" className={navOpen ? "admin-sidebar is-open" : "admin-sidebar"}><header><strong>QRguitar Admin</strong><button type="button" onClick={() => setNavOpen(false)} aria-label="Close admin navigation"><X size={17} /></button></header>{sectionGroups.map((group) => <nav key={group} aria-label={`${group} sections`}><span>{group}</span>{sections.filter((section) => section.group === group).map((section) => { const Icon = section.icon; return <button type="button" className={section.id === activeSection ? "active" : ""} onClick={() => goToSection(section.id)} key={section.id}><Icon size={16} />{section.label}</button>; })}</nav>)}<div className="admin-sidebar-links"><Link href="/admin/service-workflow">Service Operations</Link><Link href="/admin/site-editor">Content Studio</Link></div></aside> : null}
           {navOpen ? <button type="button" className="admin-sidebar-backdrop" onClick={() => setNavOpen(false)} aria-label="Close admin navigation" /> : null}
           <div className="admin-main">
           {!adminAuthorized ? (
@@ -1600,7 +1679,7 @@ export default function AdminPage() {
           )}
           {pendingAction ? (
             <div className="admin-modal-backdrop" role="presentation">
-              <section className="card admin-modal" role="dialog" aria-modal="true" aria-label={pendingAction.title}>
+              <section ref={modalRef} tabIndex={-1} className="card admin-modal" role="dialog" aria-modal="true" aria-label={pendingAction.title}>
                 <div className="admin-section-head">
                   <div>
                     <div className="eyebrow">Confirm admin action</div>

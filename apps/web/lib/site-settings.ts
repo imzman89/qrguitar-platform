@@ -449,6 +449,10 @@ export function getEditorialSection(settings: EditableSiteSettings, page: Editor
   return settings.composition[page].sections.find((section) => section.id === id);
 }
 
+export function resolveVisibleEditorialSections(settings: EditableSiteSettings, page: EditorialPageKey) {
+  return settings.composition[page].sections.filter((section) => section.visible !== false);
+}
+
 function normalizePricingCards(cards: PricingPlanInput[]) {
   const cleaned = cards
     .filter((item) => item && typeof item.name === "string" && item.name.trim().length > 0)

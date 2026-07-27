@@ -11,6 +11,11 @@ const settingsServer = read("lib/site-settings-server.ts");
 const middleware = read("middleware.ts");
 const compositionEditor = read("components/SiteCompositionEditor.tsx");
 const settings = read("lib/site-settings.ts");
+const howItWorksPage = read("app/how-it-works/page.tsx");
+const howItWorksClient = read("app/how-it-works/HowItWorksClient.tsx");
+const layout = read("app/layout.tsx");
+const metadata = read("lib/site-metadata.ts");
+const themeRuntime = read("components/ThemeRuntime.tsx");
 
 for (const marker of ["site-editor:draft", "site-editor:revision:", "save_draft", "restore_revision", "basePublishedAt", "conflict: true", "validateContentValues", "logAdminAuditEvent"]) {
   if (!route.includes(marker)) throw new Error(`Site Editor API is missing ${marker}.`);
@@ -43,6 +48,23 @@ for (const marker of ["qrguitar_site_preview", "X-Robots-Tag", "noindex, nofollo
   if (!middleware.includes(marker)) throw new Error(`Preview middleware is missing ${marker}.`);
 }
 if (/mock\s+(draft\s+)?preview/i.test(page)) throw new Error("Content Studio still contains a mock-only preview.");
+for (const marker of ["resolveVisibleEditorialSections", "loadPublishedSiteSettings", "revalidatePublishedSettings", 'revalidatePath("/", "layout")']) {
+  if (![settings, howItWorksPage, howItWorksClient, route].some((source) => source.includes(marker))) {
+    throw new Error(`Published section visibility is missing ${marker}.`);
+  }
+}
+if (!howItWorksPage.includes("loadPublishedSiteSettings") || !howItWorksClient.includes("visibleSectionIds.has")) {
+  throw new Error("How It Works does not omit hidden published sections from server-backed rendering.");
+}
+if (!layout.includes("buildManagedSiteMetadata") || !metadata.includes("buildManagedSiteMetadata") || themeRuntime.includes("applySeoSettings")) {
+  throw new Error("Published metadata is not server authoritative.");
+}
+if (metadata.includes('template: "%s | QRguitar"')) {
+  throw new Error("Published page titles must not receive a second QRguitar suffix.");
+}
+if (!route.includes('errors["seo.canonicalUrl"]') || !route.includes('canonical.hostname !== "www.qrguitar.com"')) {
+  throw new Error("Invalid external canonical URLs are not rejected.");
+}
 
 const origin = process.env.QRGUITAR_TEST_ORIGIN || "http://127.0.0.1:3003";
 const readResponse = await fetch(`${origin}/api/site-editor`, { cache: "no-store" });

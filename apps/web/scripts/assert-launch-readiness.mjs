@@ -42,7 +42,7 @@ const [
   "app/sitemap.xml/route.ts",
   "app/reset-password/page.tsx",
   "app/installers/page.tsx",
-  "app/how-it-works/page.tsx",
+  "app/how-it-works/HowItWorksClient.tsx",
   "app/globals.css",
   "app/contact/page.tsx",
   "app/privacy/page.tsx",

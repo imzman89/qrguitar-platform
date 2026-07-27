@@ -4,6 +4,7 @@ import path from "node:path";
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const page = read("app/admin/page.tsx");
+const styles = read("app/globals.css");
 const usersApi = read("app/api/admin/users/[id]/route.ts");
 const recordsApi = read("app/api/admin/records/[id]/route.ts");
 const claimsApi = read("app/api/ownership-claims/route.ts");
@@ -13,6 +14,12 @@ const recordsListApi = read("app/api/admin/records/route.ts");
 if (page.includes("window.prompt")) throw new Error("Admin still uses browser prompts.");
 for (const marker of ["admin-command-bar", "admin-sidebar", "admin-entity-drawer", 'kind: "claim"', 'kind: "transfer"', "Operator reason", "System Health"]) {
   if (!page.includes(marker)) throw new Error(`Admin command center is missing ${marker}.`);
+}
+for (const marker of ["aria-controls=\"admin-primary-navigation\"", "aria-expanded={navOpen}", "focusableSelector", 'event.key === "Escape"', 'document.body.style.overflow = "hidden"', "returnFocus.focus()"]) {
+  if (!page.includes(marker)) throw new Error(`Admin responsive accessibility is missing ${marker}.`);
+}
+for (const marker of ["@media (max-width: 1099px)", ".admin-shell { display: block; width: 100%; }", ".admin-sidebar.is-open { transform: none; }"]) {
+  if (!styles.includes(marker)) throw new Error(`Admin responsive shell is missing ${marker}.`);
 }
 for (const api of [usersApi, recordsApi]) {
   if (!api.includes("An operator reason is required for the audit trail.")) throw new Error("Admin mutation API does not enforce an operator reason.");

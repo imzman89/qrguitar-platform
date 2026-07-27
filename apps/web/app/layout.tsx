@@ -3,9 +3,12 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { ThemeRuntime } from "../components/ThemeRuntime";
 import { SessionLifecycle } from "../components/SessionLifecycle";
-import { buildDefaultMetadata, buildOrganizationJsonLd } from "../lib/seo";
+import { buildOrganizationJsonLd } from "../lib/seo";
+import { buildManagedSiteMetadata } from "../lib/site-metadata";
 
-export const metadata: Metadata = buildDefaultMetadata();
+export async function generateMetadata(): Promise<Metadata> {
+  return buildManagedSiteMetadata();
+}
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const organizationJsonLd = buildOrganizationJsonLd();

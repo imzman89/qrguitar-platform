@@ -16,7 +16,7 @@ const [bulk, bulkRoute, accountApi, collectionPage, collections, publicInstrumen
   "components/CollectibleRecordCard.tsx",
   "app/dashboard/page.tsx",
   "components/ProfileQuickEdit.tsx",
-  "app/how-it-works/page.tsx",
+  "app/how-it-works/HowItWorksClient.tsx",
   "lib/site-settings.ts",
   "app/sitemap.xml/route.ts",
   "app/globals.css"
