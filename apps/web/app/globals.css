@@ -13341,6 +13341,46 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
+.admin-system-sections > section {
+  min-width: 0;
+  border: 1px solid rgba(239, 236, 228, .1);
+  border-radius: 7px;
+  padding: 14px;
+  background: rgba(4, 9, 11, .35);
+}
+.admin-system-sections > section > span {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.admin-system-sections > section dl {
+  display: grid;
+  grid-template-columns: minmax(110px, .4fr) minmax(0, 1fr);
+  gap: 7px 10px;
+  min-width: 0;
+  margin: 0;
+}
+.admin-system-sections > section dt {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.admin-system-sections > section dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 10px;
+}
+.admin-system-sections > section code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .admin-system-section {
   border: 1px solid rgba(239, 236, 228, .1);
   border-radius: 7px;
@@ -13408,6 +13448,15 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   }
 }
 @media (max-width: 640px) {
+  .admin-section-head {
+    display: grid;
+    align-items: start;
+  }
+  .admin-section-head > button {
+    width: max-content;
+    max-width: 100%;
+    white-space: nowrap;
+  }
   .cms-commandbar {
     grid-template-columns: minmax(0, 1fr);
     gap: 8px;
@@ -13439,11 +13488,13 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   .cms-focused-block > header {
     display: grid;
   }
-  .admin-system-section dl {
+  .admin-system-section dl,
+  .admin-system-sections > section dl {
     grid-template-columns: minmax(0, 1fr);
     gap: 3px;
   }
-  .admin-system-section dd {
+  .admin-system-section dd,
+  .admin-system-sections > section dd {
     margin-bottom: 7px;
   }
 }
