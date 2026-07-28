@@ -12373,6 +12373,83 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   line-height: 1.5;
 }
 
+.continuity-section {
+  border-block: 1px solid var(--line);
+  background: #091014;
+}
+
+.continuity-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, .72fr) minmax(0, 1.28fr);
+  gap: clamp(36px, 7vw, 92px);
+  align-items: center;
+}
+
+.continuity-intro h2 {
+  max-width: 650px;
+  margin: 10px 0 16px;
+}
+
+.continuity-intro p {
+  max-width: 580px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.continuity-intro .text-link {
+  display: inline-flex;
+  margin-top: 10px;
+  color: var(--gold-2);
+  font-size: 12px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.continuity-intro .text-link:hover,
+.continuity-intro .text-link:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.continuity-list {
+  border-block: 1px solid var(--line);
+}
+
+.continuity-list article {
+  display: grid;
+  grid-template-columns: 34px 28px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  padding: 24px 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.continuity-list article:last-child {
+  border-bottom: 0;
+}
+
+.continuity-list article > span {
+  color: var(--gold-2);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.continuity-list article > svg {
+  color: var(--gold-2);
+}
+
+.continuity-list h3 {
+  margin: 0 0 5px;
+  font-size: 18px;
+}
+
+.continuity-list p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 .audience-switcher {
   display: grid;
   grid-template-columns: minmax(190px, .55fr) minmax(0, 1.45fr);
@@ -12595,6 +12672,7 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   }
 
   .record-holds-layout,
+  .continuity-layout,
   .audience-switcher,
   .product-guide-role-switcher {
     grid-template-columns: 1fr;
@@ -12629,6 +12707,12 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 
   .record-holds-photo {
     min-height: 330px;
+  }
+
+  .continuity-list article {
+    grid-template-columns: 28px 24px minmax(0, 1fr);
+    gap: 12px;
+    padding-block: 20px;
   }
 
   .product-guide-dual-flow > article,

@@ -16,6 +16,7 @@
     "test:owner-experience": "node scripts/assert-owner-experience.mjs",
     "test:premium-product": "node scripts/assert-premium-product.mjs",
     "test:public-collectible": "node scripts/assert-public-collectible.mjs",
+    "test:production-truth": "node scripts/assert-production-truth.mjs",
     "test:content-coverage": "node scripts/assert-content-coverage.mjs",
     "test:admin": "node scripts/assert-admin.mjs",
     "test:site-editor": "node scripts/assert-site-editor.mjs"

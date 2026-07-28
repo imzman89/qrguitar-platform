@@ -160,6 +160,27 @@ export function HomePageClient({
         </div>
       </section>
     ),
+    continuity: (
+      <section className="section continuity-section">
+        <div className="shell continuity-layout">
+          <div className="continuity-intro">
+            <div className="eyebrow">History that stays useful</div>
+            <h2>One Profile, through the work and every handoff.</h2>
+            <p>QRguitar keeps the instrument&apos;s identity connected while owners decide which service, documents, and history become public.</p>
+            <Link className="text-link" href="/how-it-works">See the full workflow</Link>
+          </div>
+          <div className="continuity-list">
+            {sectionBlocks("continuity").map((item, index) => (
+              <article key={item.id}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <EditorialIcon name={item.icon} size={22} />
+                <div><h3>{item.title}</h3><p>{item.body}</p></div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+    ),
     pricing: (
       <section className="section pricing-section">
         <div className="shell">

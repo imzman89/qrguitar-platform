@@ -348,7 +348,7 @@ export function CatalogClient({ initialRecords, content, composition }: { initia
               <div className="card catalog-empty">
                 <div className="eyebrow">Loading QRguitar Profiles</div>
                 <h3>Opening the catalog.</h3>
-                <p>Fetching the latest visible profiles now.</p>
+                <p>Fetching the latest Public Profiles now.</p>
               </div>
             ) : visibleRecords.length ? (
               visibleRecords.map((record) => (

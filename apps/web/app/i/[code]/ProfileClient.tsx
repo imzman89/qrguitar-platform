@@ -842,6 +842,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           {visibleTabs.map((tab) => (
             <button
               className={activeTab === tab.id ? "active" : undefined}
+              data-profile-tab={tab.id}
               type="button"
               onClick={() => {
                 setActionNotice(null);

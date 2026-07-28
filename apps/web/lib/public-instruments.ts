@@ -1,9 +1,10 @@
 import { defaultQrStyle, type DemoInstrument } from "./local-demo";
 import { mergeRecordTrustSettings, recordTrustContentKey, type RecordTrustSettings } from "./record-trust";
 import { unstable_noStore as noStore } from "next/cache";
-import { supabaseHttpsJson, supabaseSignedStorageUrl, supabaseStoragePublicUrl } from "./supabase-http";
+import { supabaseHttpsJson } from "./supabase-http";
 import { isEligiblePublicProfile, isRetiredPublicProfileCode, normalizePublicProfileCode } from "./public-profile-eligibility";
 import { cleanPublicCollection, publicCollectionOwnerKey, type PublicCollectionSettings } from "./public-collections";
+import { publicFileUrl } from "./public-file-url";
 import {
   availabilityFromSpecs,
   getServiceHistoryEntries,
@@ -126,8 +127,6 @@ type PublicCollectionSiteRow = {
   content_value: Partial<PublicCollectionSettings> | null;
 };
 
-const PUBLIC_MEDIA_SIGNED_URL_TTL_SECONDS = 60 * 60 * 24;
-
 const stalePublicSpecValues = new Set([
   "alder",
   "maple neck, rosewood board"
@@ -168,59 +167,44 @@ function publicUrlOrStoragePath(path?: string | null) {
   return value;
 }
 
-async function resolveMediaSources(paths: string[]) {
+function resolveMediaSources(paths: string[], qrCode: string) {
   const uniquePaths = Array.from(new Set(paths.filter(Boolean)));
-
-  const resolved = await Promise.all(uniquePaths.map(async (path) => {
+  return uniquePaths.map((path) => {
     const source = publicUrlOrStoragePath(path);
     if (!source) {
       return "";
     }
 
     if (source === path && !source.startsWith("/")) {
-      try {
-        const signed = await supabaseSignedStorageUrl("instrument-media", source, PUBLIC_MEDIA_SIGNED_URL_TTL_SECONDS);
-        if (signed) {
-          return signed;
-        }
-      } catch {
-        // Fall through to a public URL; media signing should not block public profile data.
-      }
-
-      return supabaseStoragePublicUrl("instrument-media", source);
+      return publicFileUrl(qrCode, "media", source);
     }
 
     return source;
-  }));
-
-  return resolved.filter(Boolean);
+  }).filter(Boolean);
 }
 
-async function resolveDocumentSources(documents: DocumentRow[]) {
-  const resolved = await Promise.all(documents.filter((item) => item.is_public).map(async (document) => {
+function resolveDocumentSources(documents: DocumentRow[], qrCode: string) {
+  const resolved = documents.filter((item) => item.is_public).map((document) => {
     const source = publicUrlOrStoragePath(document.storage_path);
     if (!source) {
       return null;
     }
 
     if (source === document.storage_path && !source.startsWith("/")) {
-      const signedUrl = await supabaseSignedStorageUrl("instrument-documents", source, 60 * 15).catch(() => "");
-      return signedUrl
-        ? {
-            name: document.name,
-            url: signedUrl,
-            visibility: "public",
-            documentType: document.document_type || "",
-            publicDescription: document.public_description || "",
-            issuerSource: document.issuer_source || "",
-            documentDate: document.document_date || "",
-            description: document.description || "",
-            fileSizeBytes: document.file_size_bytes || undefined,
-            relatedTimelineEventId: document.related_timeline_event_id || undefined,
-            relatedServiceEventId: document.related_service_event_id || undefined,
-            createdAt: document.created_at || ""
-          }
-        : null;
+      return {
+        name: document.name,
+        url: publicFileUrl(qrCode, "document", source),
+        visibility: "public",
+        documentType: document.document_type || "",
+        publicDescription: document.public_description || "",
+        issuerSource: document.issuer_source || "",
+        documentDate: document.document_date || "",
+        description: document.description || "",
+        fileSizeBytes: document.file_size_bytes || undefined,
+        relatedTimelineEventId: document.related_timeline_event_id || undefined,
+        relatedServiceEventId: document.related_service_event_id || undefined,
+        createdAt: document.created_at || ""
+      };
     }
 
     return {
@@ -237,7 +221,7 @@ async function resolveDocumentSources(documents: DocumentRow[]) {
       relatedServiceEventId: document.related_service_event_id || undefined,
       createdAt: document.created_at || ""
     };
-  }));
+  });
 
   return resolved.filter(Boolean) as NonNullable<DemoInstrument["documentFiles"]>;
 }
@@ -484,9 +468,9 @@ export async function getPublicInstruments(ownerId?: string) {
   return Promise.all(
     visibleGuitars.map(async (guitar) => {
       const heroStoragePath = guitar.hero_image_path || "";
-      const media = await resolveMediaSources((related.media.get(guitar.id) || []).filter((storagePath) => storagePath !== heroStoragePath));
-      const heroImagePath = heroStoragePath ? (await resolveMediaSources([heroStoragePath]))[0] : "";
-      const documents = await resolveDocumentSources(related.documents.get(guitar.id) || []);
+      const media = resolveMediaSources((related.media.get(guitar.id) || []).filter((storagePath) => storagePath !== heroStoragePath), guitar.qr_code);
+      const heroImagePath = heroStoragePath ? resolveMediaSources([heroStoragePath], guitar.qr_code)[0] : "";
+      const documents = resolveDocumentSources(related.documents.get(guitar.id) || [], guitar.qr_code);
       return sanitizePublicInstrument(mapRecord({
         guitar: { ...guitar, hero_image_path: heroImagePath || guitar.hero_image_path },
         media,
@@ -542,9 +526,9 @@ export async function getPublicInstrumentByCode(code: string) {
     return null;
   }
   const heroStoragePath = data.hero_image_path || "";
-  const media = await resolveMediaSources((related.media.get(data.id) || []).filter((storagePath) => storagePath !== heroStoragePath));
-  const heroImagePath = heroStoragePath ? (await resolveMediaSources([heroStoragePath]))[0] : "";
-  const documents = await resolveDocumentSources(related.documents.get(data.id) || []);
+  const media = resolveMediaSources((related.media.get(data.id) || []).filter((storagePath) => storagePath !== heroStoragePath), data.qr_code);
+  const heroImagePath = heroStoragePath ? resolveMediaSources([heroStoragePath], data.qr_code)[0] : "";
+  const documents = resolveDocumentSources(related.documents.get(data.id) || [], data.qr_code);
 
   return sanitizePublicInstrument(mapRecord({
     guitar: { ...data, hero_image_path: heroImagePath || data.hero_image_path },

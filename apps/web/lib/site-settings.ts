@@ -151,6 +151,11 @@ export const defaultEditorialComposition: EditorialComposition = {
         { id: "home-role-collector", name: "Collectors", title: "Collectors", body: "Preserve provenance and choose what becomes part of a public collection.", icon: "shield", visible: true },
         { id: "home-role-shop", name: "Shops and builders", title: "Shops and builders", body: "Prepare Profiles, QR materials, service history, and customer handoffs.", icon: "store", visible: true }
       ] },
+      { id: "continuity", name: "Service, ownership, and provenance", visible: true, blocks: [
+        { id: "home-continuity-service", name: "Service", title: "Document the work", body: "Keep owner-approved service entries and supporting details connected to the instrument.", icon: "wrench", visible: true, protected: true },
+        { id: "home-continuity-ownership", name: "Ownership", title: "Hand it off securely", body: "Use a reviewed claim or owner-initiated transfer when the instrument changes hands.", icon: "transfer", visible: true },
+        { id: "home-continuity-provenance", name: "Provenance", title: "Preserve what matters", body: "Carry verified identity, selected documents, and meaningful history forward without rewriting the past.", icon: "history", visible: true }
+      ] },
       { id: "pricing", name: "Public beta pricing", visible: true, blocks: [
         { id: "home-price-beta", name: "Free Public Beta", title: "Free Public Beta", label: "$0", body: "Create up to 25 Profiles during public beta without a hard paywall.", ctaLabel: "Create Free Profile", ctaUrl: "/create", items: ["Up to 25 Profiles during beta", "Public, Private, or Unlisted", "QR download included"], icon: "qr", visible: true, protected: true },
         { id: "home-price-commercial", name: "Commercial and brand setup", title: "Commercial / Brand Setup", label: "From $99+", body: "For builders, retailers, repair shops, brands, and commercial accounts that need onboarding or bulk help.", ctaLabel: "Contact QRguitar", ctaUrl: "mailto:support@qrguitar.com", items: ["Builder, retailer, and shop onboarding", "Bulk Profile setup", "QR hardware and verification support"], icon: "store", visible: true }
@@ -364,7 +369,9 @@ export function normalizeEditorialComposition(value?: Partial<EditorialCompositi
       return [pageKey, structuredClone(defaults)];
     }
     const fallbackById = new Map(defaults.sections.map((section) => [section.id, section]));
-    const sections = candidate.sections.map((section) => {
+    const candidateById = new Map(candidate.sections.map((section) => [String(section?.id || ""), section]));
+    const orderedSections = defaults.sections.map((fallback) => candidateById.get(fallback.id) || fallback);
+    const sections = orderedSections.map((section) => {
       const fallback = fallbackById.get(String(section?.id || ""));
       const fallbackBlocks = new Map((fallback?.blocks || []).map((block) => [block.id, block]));
       const blocks = Array.isArray(section?.blocks)
@@ -539,6 +546,16 @@ function normalizeProfileCopy(value: string) {
     [new RegExp(`\\b${stalePublic} ${staleRecord}\\b`, "gi"), "QRguitar Profile"],
     [new RegExp(`\\b${stalePublicLower} ${staleRecords.toLowerCase()}\\b`, "gi"), "QRguitar Profiles"],
     [new RegExp(`\\b${stalePublicLower} ${staleRecord.toLowerCase()}\\b`, "gi"), "QRguitar Profile"],
+    [/\bVisible Profiles\b/g, "Public Profiles"],
+    [/\bVisible Profile\b/g, "Public Profile"],
+    [/\bvisible profiles\b/g, "Public Profiles"],
+    [/\bvisible profile\b/g, "Public Profile"],
+    [/\bExplore visible instruments\b/gi, "Explore Public Profiles"],
+    [/\bChoose Visible, Unlisted, or Private\b/gi, "Choose Public, Unlisted, or Private"],
+    [/\bShare selected (?:visible|Public) Profiles\b/gi, "Share your Public Profiles"],
+    [/\bwhich visible Profiles\b/gi, "which Public Profiles"],
+    [/\bserial\s*\/\s*build information\b/gi, "Serial Number and identity information"],
+    [/\bserial\s*\/\s*build ID\b/gi, "Serial Number"],
     [/\bpermanent records\b/gi, "permanent QRguitar Profiles"],
     [/\bpermanent record\b/gi, "permanent QRguitar Profile"],
     [/\binstrument records\b/gi, "instrument profiles"],
