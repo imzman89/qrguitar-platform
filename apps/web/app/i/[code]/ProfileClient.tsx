@@ -37,7 +37,7 @@ import {
 import { formatRecordLocation } from "../../../lib/record-location";
 import { fetchPublishedSiteSettings, normalizeBrandLogoKey } from "../../../lib/site-settings";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../../lib/supabase-browser";
-import { getTimelineEvents } from "../../../lib/instrument-profile-contract";
+import { resolveInstrumentPresentation } from "../../../lib/instrument-profile-contract";
 import { getContentValue } from "../../../lib/content-registry";
 
 type ProfileTab = "overview" | "specs" | "timeline" | "ownership" | "media" | "repairs" | "documents";
@@ -279,42 +279,33 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
   const canEdit = Boolean(currentUserEmail && instrument?.ownerUserEmail && currentUserEmail === instrument.ownerUserEmail.toLowerCase());
   const canSubmitService = Boolean(currentUserEmail && instrument && !canEdit && instrument.visibility !== "private");
 
-  const galleryImages = useMemo(() => instrument
-    ? Array.from(
-      new Set([instrument.heroImageDataUrl, ...(instrument.galleryImageDataUrls || [])].filter(Boolean) as string[])
-    ).slice(0, 20)
-    : [], [instrument?.galleryImageDataUrls, instrument?.heroImageDataUrl]);
-  const documentFiles = useMemo(() => instrument
-    ? (instrument.documentFiles || []).filter((file) => {
-      if (instrument.visibility === "private") {
-        return true;
-      }
-
-      return file.visibility === "public";
-    })
-    : [], [instrument?.documentFiles, instrument?.visibility]);
-  const externalMedia = useMemo(
-    () => instrument ? (instrument.externalMedia || []).filter((item) => item.isPublic) : [],
-    [instrument?.externalMedia]
+  const presentation = useMemo(
+    () => instrument ? resolveInstrumentPresentation(instrument, "public") : null,
+    [instrument]
   );
-  const timelineEvents = useMemo(() => instrument ? getTimelineEvents(instrument) : [], [instrument]);
-  const meaningfulTimelineEvents = useMemo(() => timelineEvents.filter(
-    (entry) => entry.isPublic && !entry.isSystem && !/profile created/i.test(entry.title)
-  ), [timelineEvents]);
-  const visibleTabs = useMemo<Array<{ id: ProfileTab; label: string }>>(() => {
-    const tabs: Array<{ id: ProfileTab; label: string }> = [
+  const galleryImages = presentation?.photos || [];
+  const documentFiles = presentation?.documents || [];
+  const externalMedia = presentation?.supplementalMedia || [];
+  const timelineEvents = presentation?.timelineEvents || [];
+  const meaningfulTimelineEvents = presentation?.meaningfulTimelineEvents || [];
+  const visibleTabs = useMemo<Array<{ id: ProfileTab; label: string; count?: number }>>(() => {
+    const tabs: Array<{ id: ProfileTab; label: string; count?: number }> = [
       { id: "overview", label: getContentValue(publicContent, "profile.tabs.overview") },
       { id: "specs", label: getContentValue(publicContent, "profile.tabs.specifications") }
     ];
 
-    if (meaningfulTimelineEvents.length || Number(instrument?.ownershipTransferCount || 0) > 0) {
-      tabs.push({ id: "timeline", label: getContentValue(publicContent, "profile.tabs.timeline") });
+    if (presentation?.tabs.timeline) {
+      tabs.push({
+        id: "timeline",
+        label: getContentValue(publicContent, "profile.tabs.timeline"),
+        count: meaningfulTimelineEvents.length + Number(instrument?.ownershipTransferCount || 0)
+      });
     }
-    if (externalMedia.length) {
-      tabs.push({ id: "media", label: getContentValue(publicContent, "profile.tabs.media") });
+    if (presentation?.tabs.media) {
+      tabs.push({ id: "media", label: getContentValue(publicContent, "profile.tabs.media"), count: externalMedia.length });
     }
-    if (documentFiles.length) {
-      tabs.push({ id: "documents", label: getContentValue(publicContent, "profile.tabs.documents") });
+    if (presentation?.tabs.documents) {
+      tabs.push({ id: "documents", label: getContentValue(publicContent, "profile.tabs.documents"), count: documentFiles.length });
     }
 
     return tabs;
@@ -323,6 +314,9 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     externalMedia.length,
     instrument?.ownershipTransferCount,
     meaningfulTimelineEvents.length,
+    presentation?.tabs.documents,
+    presentation?.tabs.media,
+    presentation?.tabs.timeline,
     publicContent
   ]);
   const isVerifiedRecord = instrument ? getInstrumentVerificationStatus(instrument) === "verified" : false;
@@ -838,19 +832,33 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           </section>
         ) : null}
 
-        <nav className="scan-tabs" aria-label="Instrument profile sections">
+        <nav className="scan-tabs" aria-label="Instrument profile sections" role="tablist">
           {visibleTabs.map((tab) => (
             <button
               className={activeTab === tab.id ? "active" : undefined}
               data-profile-tab={tab.id}
               type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              tabIndex={activeTab === tab.id ? 0 : -1}
               onClick={() => {
                 setActionNotice(null);
                 switchTab(tab.id);
               }}
+              onKeyDown={(event) => {
+                if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+                event.preventDefault();
+                const currentIndex = visibleTabs.findIndex((item) => item.id === tab.id);
+                const direction = event.key === "ArrowRight" ? 1 : -1;
+                const nextTab = visibleTabs[(currentIndex + direction + visibleTabs.length) % visibleTabs.length];
+                switchTab(nextTab.id);
+                requestAnimationFrame(() => {
+                  document.querySelector<HTMLButtonElement>(`.scan-tabs button[data-profile-tab="${nextTab.id}"]`)?.focus();
+                });
+              }}
               key={tab.id}
             >
-              {tab.label}
+              {tab.label}{tab.count ? <span className="scan-tab-count">{tab.count}</span> : null}
             </button>
           ))}
         </nav>
@@ -1024,17 +1032,15 @@ function ProfilePanel({
   if (activeTab === "timeline") {
     const createdDate = formatProfileDate(instrument.createdAt);
     const transferDate = latestTransfer ? formatProfileDate(latestTransfer.createdAt) : null;
-    const publicTimelineEvents = timelineEvents.filter((entry) => entry.isPublic);
-    const hasProfileCreatedEvent = publicTimelineEvents.some((entry) => entry.isSystem && entry.title === "QRguitar Profile created");
+    const publicTimelineEvents = timelineEvents.filter((entry) =>
+      entry.isPublic && !entry.isSystem && !/^(qrguitar )?profile created$/i.test(entry.title.trim())
+    );
     const ownershipTransferCount = Math.max(0, Number(instrument.ownershipTransferCount || 0));
 
     return (
       <section className="scan-tab-panel">
         <PanelHeader icon={<Clock3 />} label="Timeline" title="The profile stays useful as the instrument moves through the world." />
         <div className="timeline-list">
-          {!hasProfileCreatedEvent ? (
-            <TimelineItem date={createdDate} title="QRguitar Profile created" copy="A permanent QRguitar Profile was created for this instrument." />
-          ) : null}
           {publicTimelineEvents.map((entry) => (
             <TimelineItem
               date={formatTimelineEntryDate(entry)}
@@ -1066,9 +1072,10 @@ function ProfilePanel({
               copy="QRguitar keeps the permanent profile with the instrument while prior-owner details stay private."
             />
           ) : null}
-          {!publicTimelineEvents.some((entry) => !entry.isSystem) ? (
-            <TimelineItem date="Add history" title="The known history starts here." copy="Owners can add purchases, ownership, service, modifications, restoration, and important milestones." />
-          ) : null}
+          <div className="timeline-origin-marker">
+            <Clock3 aria-hidden="true" />
+            <span><strong>Profile origin</strong>{createdDate}</span>
+          </div>
         </div>
       </section>
     );
@@ -1301,7 +1308,7 @@ function ProfileQr({ code }: { code: string }) {
 
 function formatProfileDate(value?: string) {
   if (!value) {
-    return "Date unknown";
+    return "Date not recorded";
   }
 
   const parsed = new Date(value);
@@ -1320,7 +1327,7 @@ function formatDocumentDate(value: string) {
 
 function formatTimelineEntryDate(entry: ServiceHistoryEntry) {
   if (entry.datePrecision === "unknown" || !entry.serviceDate) {
-    return entry.createdAt && entry.isSystem ? formatProfileDate(entry.createdAt) : "Date unknown";
+    return entry.createdAt && entry.isSystem ? formatProfileDate(entry.createdAt) : "Date not recorded";
   }
 
   if (entry.datePrecision === "year") {

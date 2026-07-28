@@ -23,6 +23,7 @@ function excludes(source, snippet, message) {
 
 const card = read("components/CollectibleRecordCard.tsx");
 const resolver = read("lib/collectible-card.ts");
+const presentation = read("lib/instrument-profile-contract.ts");
 const latest = read("components/LatestPublicRecord.tsx");
 const catalog = read("app/catalog/CatalogClient.tsx");
 const collection = read("app/collections/[handle]/CollectionsClient.tsx");
@@ -34,10 +35,11 @@ includes(card, "resolveCollectibleCard(record)", "Public cards must use the shar
 includes(latest, "<CollectibleRecordCard", "The homepage latest Profile must use the shared card.");
 includes(catalog, "<CollectibleRecordCard", "Catalog Profiles must use the shared card.");
 includes(collection, "<CollectibleRecordCard", "Public collection Profiles must use the shared card.");
-includes(resolver, "record.showSerialPublic", "Public serial visibility must respect the explicit privacy setting.");
+includes(resolver, "presentation.serialNumber", "Public cards must use the shared serial presentation contract.");
+includes(presentation, "instrument.showSerialPublic === true", "Public serial visibility must respect the explicit privacy setting.");
 includes(resolver, "publicSerial:", "The shared DTO must keep public Serial Number separate from QRguitar ID.");
 includes(card, "maxBadges={3}", "Collectible cards must cap compact status badges.");
-includes(card, "card.images.length > 1", "One-photo Profiles must not render gallery controls.");
+includes(card, "galleryImages.length > 1", "One-photo Profiles must not render gallery controls.");
 includes(card, "onPointerMove={handlePointerMove}", "Card galleries must support pointer dragging.");
 includes(card, "onWheel={handleWheel}", "Card galleries must support horizontal wheel movement.");
 includes(card, "onKeyDown={handleKeyDown}", "Card galleries must support keyboard navigation.");

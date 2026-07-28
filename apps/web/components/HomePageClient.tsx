@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, type ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CollectibleRecordCard } from "./CollectibleRecordCard";
 import { Footer } from "./Footer";
 import { EditorialIcon } from "./EditorialIcon";
 import { LatestPublicRecord } from "./LatestPublicRecord";
@@ -21,6 +22,8 @@ export function HomePageClient({
 }) {
   const [settings, setSettings] = useState<EditableSiteSettings | null>(initialSettings);
   const [activeAudience, setActiveAudience] = useState(0);
+  const archiveRailRef = useRef<HTMLDivElement | null>(null);
+  const archiveDrag = useRef({ pointerId: -1, startX: 0, scrollLeft: 0 });
 
   useEffect(() => {
     void fetchPublishedSiteSettings().then((published) => {
@@ -76,17 +79,56 @@ export function HomePageClient({
 
   const initialLatestRecord = initialRecords[0] || null;
   const heroImages = new Set(initialLatestRecord ? getProfilePhotoUrls(initialLatestRecord) : []);
+  const archiveImages = new Set(heroImages);
+  const archiveRecords = initialRecords.filter((record) => {
+    if (record.qrCode === initialLatestRecord?.qrCode) return false;
+    const leadImage = getProfilePhotoUrls(record)[0];
+    if (!leadImage || archiveImages.has(leadImage)) return false;
+    archiveImages.add(leadImage);
+    return true;
+  }).slice(0, 4);
+  const archiveCodes = new Set(archiveRecords.map((record) => record.qrCode));
   const supportingRecord = initialRecords.find((record) =>
     record.qrCode !== initialLatestRecord?.qrCode &&
-    getProfilePhotoUrls(record).some((image) => !heroImages.has(image))
+    !archiveCodes.has(record.qrCode) &&
+    getProfilePhotoUrls(record).some((image) => !archiveImages.has(image))
   );
   const recordPhoto = supportingRecord
-    ? getProfilePhotoUrls(supportingRecord).find((image) => !heroImages.has(image)) || ""
+    ? getProfilePhotoUrls(supportingRecord).find((image) => !archiveImages.has(image)) || ""
     : "";
   const homeSections = settings?.composition.home.sections || [];
   const sectionBlocks = (sectionId: string) => homeSections.find((section) => section.id === sectionId)?.blocks.filter((block) => block.visible) || [];
   const audienceBlocks = sectionBlocks("roles");
   const selectedAudience = audienceBlocks[activeAudience] || audienceBlocks[0];
+
+  function beginArchiveDrag(event: PointerEvent<HTMLDivElement>) {
+    const rail = archiveRailRef.current;
+    if (!rail) return;
+    archiveDrag.current = { pointerId: event.pointerId, startX: event.clientX, scrollLeft: rail.scrollLeft };
+    rail.setPointerCapture(event.pointerId);
+  }
+
+  function moveArchiveDrag(event: PointerEvent<HTMLDivElement>) {
+    const rail = archiveRailRef.current;
+    if (!rail || archiveDrag.current.pointerId !== event.pointerId) return;
+    rail.scrollLeft = archiveDrag.current.scrollLeft - (event.clientX - archiveDrag.current.startX);
+  }
+
+  function endArchiveDrag(event: PointerEvent<HTMLDivElement>) {
+    const rail = archiveRailRef.current;
+    if (!rail || archiveDrag.current.pointerId !== event.pointerId) return;
+    rail.releasePointerCapture(event.pointerId);
+    archiveDrag.current.pointerId = -1;
+  }
+
+  function handleArchiveKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    event.currentTarget.scrollBy({
+      left: (event.key === "ArrowRight" ? 1 : -1) * Math.max(280, event.currentTarget.clientWidth * 0.72),
+      behavior: "smooth"
+    });
+  }
 
   const renderedSections: Record<string, ReactNode> = {
     hero: (
@@ -106,6 +148,38 @@ export function HomePageClient({
           </div>
           <LatestPublicRecord initialRecord={initialLatestRecord} content={settings?.content} />
         </div>
+        {archiveRecords.length ? (
+          <div className="shell home-archive">
+            <div className="home-archive-heading">
+              <div>
+                <div className="eyebrow">{settings?.content["home.archive.eyebrow"] || "The living archive"}</div>
+                <h2>{settings?.content["home.archive.heading"] || "Explore the archive"}</h2>
+              </div>
+              <Link className="text-link" href="/catalog">View all Profiles</Link>
+            </div>
+            <div
+              ref={archiveRailRef}
+              className="home-archive-rail"
+              role="region"
+              aria-label="Explore additional QRguitar Profiles"
+              tabIndex={0}
+              onPointerDown={beginArchiveDrag}
+              onPointerMove={moveArchiveDrag}
+              onPointerUp={endArchiveDrag}
+              onPointerCancel={endArchiveDrag}
+              onKeyDown={handleArchiveKeyDown}
+            >
+              {archiveRecords.map((record) => (
+                <CollectibleRecordCard
+                  key={record.qrCode}
+                  record={record}
+                  variant="archive"
+                  content={settings?.content}
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
       </section>
     ),
     lifecycle: (

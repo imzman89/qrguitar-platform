@@ -72,7 +72,7 @@ ok(!publicInstruments.includes("service_submission_evidence"), "Public mapping r
 
 ok(email.includes("Nothing becomes part of the public Profile until you approve it"), "Owner email overstates publication");
 ok(email.includes('status: "failed"') && email.includes("email delivery failed"), "Email failure is not reported honestly");
-ok(printKit.includes('PrintMode = "handout" | "label" | "service"'), "Service Summary print mode missing");
+ok(printKit.includes('PrintMode = "label" | "hangtag" | "handout" | "service"'), "Service Summary print mode missing");
 ok(printKit.includes("Private evidence and internal notes are not included"), "Print Kit private-evidence disclosure missing");
 ok(!printKit.includes("storage_path"), "Print Kit exposes a private evidence path");
 ok(adminApi.includes("createSignedUrl") && adminApi.includes("previewUrl"), "Admin evidence review link missing");

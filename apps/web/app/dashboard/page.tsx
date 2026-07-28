@@ -565,8 +565,8 @@ export default function DashboardPage() {
             <div><b>{actionRecord.qrCode}</b><span>{actionRecord.serial ? `Serial Number ${actionRecord.serial}` : "No Serial Number"}</span></div>
           </div>
           <div className={styles.drawerSections}>
-            <section><b>QR tools</b><QrDownload code={actionRecord.qrCode} label={dashboardRecordTitle(actionRecord)} qrStyle={actionRecord.qrStyle} onStyleChange={(qrStyle) => { setInstruments((current) => current.map((item) => item.qrCode === actionRecord.qrCode ? { ...item, qrStyle } : item)); setActionRecord((current) => current ? { ...current, qrStyle } : current); }} /><Link href={`/handout/${actionRecord.qrCode}`}>Print Kit</Link><RecordShareButton className={styles.dashboardShare} code={actionRecord.qrCode} title={dashboardRecordTitle(actionRecord)} showLabel /></section>
-            <section><b>History</b><Link href={`/edit/${actionRecord.qrCode}#timeline`}>Add Timeline Event</Link><Link href={`/edit/${actionRecord.qrCode}#service`}>Add Service Entry</Link><Link href={`/edit/${actionRecord.qrCode}#media`}>Add Media</Link><Link href={`/edit/${actionRecord.qrCode}#documents`}>Add Document</Link></section>
+            <section><b>QR tools</b><QrDownload code={actionRecord.qrCode} label={dashboardRecordTitle(actionRecord)} qrStyle={actionRecord.qrStyle} showPrintHandout={false} onStyleChange={(qrStyle) => { setInstruments((current) => current.map((item) => item.qrCode === actionRecord.qrCode ? { ...item, qrStyle } : item)); setActionRecord((current) => current ? { ...current, qrStyle } : current); }} /><Link href={`/handout/${actionRecord.qrCode}`}>Open Print Suite</Link><RecordShareButton className={styles.dashboardShare} code={actionRecord.qrCode} title={dashboardRecordTitle(actionRecord)} showLabel /></section>
+            <section><b>History</b><Link href={`/edit/${actionRecord.qrCode}#timeline`}>Add Timeline Event</Link><Link href={`/edit/${actionRecord.qrCode}#service`}>Add Service Entry</Link><Link href={`/edit/${actionRecord.qrCode}#media`}>Add Supplemental Media</Link><Link href={`/edit/${actionRecord.qrCode}#documents`}>Add Document</Link></section>
             <section><b>Privacy & safety</b>{actionRecord.serial ? <button type="button" onClick={() => void updateSerialVisibility(actionRecord, !actionRecord.showSerialPublic)}>{actionRecord.showSerialPublic ? "Hide Serial Number" : "Show Serial Number"}</button> : null}<Link href={`/edit/${actionRecord.qrCode}#privacy-safety`}>Visibility and safety</Link></section>
             <TransferPanel className={styles.transferPanel} bodyClassName={styles.transferPanelBody} instrument={actionRecord} user={user} allowBuyerCode={collectionAccountType === "shop" || collectionAccountType === "builder"} latestTransfer={latestTransferForInstrument(transfers, actionRecord.qrCode)} onTransferCreated={(transfer) => setTransfers((current) => [transfer, ...current.filter((item) => item.id !== transfer.id)])} onTransferChanged={refreshInstruments} />
             <section className={styles.drawerDanger}><b>Danger zone</b><button className={styles.dangerAction} type="button" onClick={() => void removeFromCollection(actionRecord)}>{getContentValue(content, "dashboard.card.remove")}</button></section>
@@ -611,7 +611,7 @@ function TransferPanel({
     typeof window !== "undefined" && latestTransfer ? `${window.location.origin}${latestTransfer.claimPath}` : "";
   const visibleClaimUrl = claimUrl || lastCreatedClaimUrl;
   const hasPendingTransfer = latestTransfer?.status === "sent";
-  const transferStatus = latestTransfer ? transferStatusLabel(latestTransfer) : "Start a secure handoff";
+  const transferStatus = latestTransfer ? transferStatusLabel(latestTransfer) : null;
 
   async function copyClaimLink() {
     if (!visibleClaimUrl) {
@@ -729,8 +729,8 @@ function TransferPanel({
   return (
     <details className={className} data-pending={hasPendingTransfer ? "true" : "false"}>
       <summary>
-        <span>Transfer Ownership</span>
-        <strong>{transferStatus}</strong>
+        <span>Transfer Ownership<small>Start a secure handoff to the next owner.</small></span>
+        {transferStatus ? <strong>{transferStatus}</strong> : null}
       </summary>
       <div className={bodyClassName}>
         <div className="transfer-copy">

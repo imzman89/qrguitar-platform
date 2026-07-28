@@ -1,4 +1,4 @@
-import { getProfilePhotoUrls, getPublicDocumentCount } from "./instrument-profile-contract";
+import { resolveInstrumentPresentation } from "./instrument-profile-contract";
 import {
   instrumentDisplayName,
   instrumentToProfileUrl,
@@ -20,7 +20,8 @@ export type CollectibleCardData = {
 };
 
 export function resolveCollectibleCard(record: DemoInstrument): CollectibleCardData {
-  const images = getProfilePhotoUrls(record);
+  const presentation = resolveInstrumentPresentation(record, "public");
+  const images = presentation.photos;
   const factLine = [record.brand, record.year, formatRecordLocation(record)]
     .map((value) => String(value || "").trim())
     .filter(Boolean)
@@ -34,9 +35,9 @@ export function resolveCollectibleCard(record: DemoInstrument): CollectibleCardD
     factLine,
     summary: cleanCardSummary(record.summary),
     images,
-    publicSerial: record.showSerialPublic === true ? String(record.serial || "").trim() : "",
-    photoCount: images.length,
-    publicDocumentCount: getPublicDocumentCount(record),
+    publicSerial: presentation.serialNumber,
+    photoCount: presentation.counts.photos,
+    publicDocumentCount: presentation.counts.documents,
     collection: record.publicCollection || null
   };
 }

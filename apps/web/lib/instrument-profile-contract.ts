@@ -1,4 +1,12 @@
-import type { CustomProfileLink, DemoInstrument, OriginalityStatus, SaleStatus, ServiceHistoryEntry } from "./local-demo";
+import type {
+  CustomDocumentFile,
+  CustomProfileLink,
+  DemoInstrument,
+  ExternalMediaItem,
+  OriginalityStatus,
+  SaleStatus,
+  ServiceHistoryEntry
+} from "./local-demo";
 
 export type InstrumentSpecLike = { label: string; value: string };
 
@@ -127,7 +135,7 @@ export function getServiceHistoryEntries(
       datePrecision: "unknown",
       category,
       eventType: category.toLowerCase(),
-      title: `${category} note`,
+      title: category === "Service" ? "Service history" : category,
       publicDescription: value,
       isPublic: true,
       isSystem: false,
@@ -146,6 +154,129 @@ export function getProfilePhotoUrls(instrument: Pick<DemoInstrument, "heroImageD
 
 export function getPublicDocumentCount(instrument: Pick<DemoInstrument, "documentFiles">) {
   return (instrument.documentFiles || []).filter((document) => document.visibility === "public").length;
+}
+
+export type InstrumentPresentationScope = "public" | "owner";
+
+export type InstrumentPresentation = {
+  scope: InstrumentPresentationScope;
+  photos: string[];
+  documents: CustomDocumentFile[];
+  supplementalMedia: ExternalMediaItem[];
+  timelineEvents: ServiceHistoryEntry[];
+  meaningfulTimelineEvents: ServiceHistoryEntry[];
+  serviceEntries: ServiceHistoryEntry[];
+  profileOrigin: ServiceHistoryEntry | null;
+  serialNumber: string;
+  counts: {
+    photos: number;
+    documents: number;
+    supplementalMedia: number;
+    timeline: number;
+    service: number;
+    privateDocuments: number;
+  };
+  tabs: {
+    overview: true;
+    specifications: boolean;
+    timeline: boolean;
+    media: boolean;
+    documents: boolean;
+  };
+};
+
+export function isAllowedSupplementalMedia(item: ExternalMediaItem) {
+  let parsed: URL;
+  try {
+    parsed = new URL(item.canonicalUrl);
+  } catch {
+    return false;
+  }
+
+  if (parsed.protocol !== "https:") return false;
+  const hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
+
+  if (item.provider === "youtube") {
+    return hostname === "youtube.com" || hostname === "youtu.be" || hostname === "youtube-nocookie.com";
+  }
+  if (item.provider === "vimeo") {
+    return hostname === "vimeo.com" || hostname === "player.vimeo.com";
+  }
+  if (item.provider === "audio") {
+    return /\.(mp3|m4a|aac|wav|ogg|oga)(?:$|[?#])/i.test(parsed.pathname + parsed.search + parsed.hash);
+  }
+
+  return item.provider === "link";
+}
+
+export function resolveInstrumentPresentation(
+  instrument: DemoInstrument,
+  scope: InstrumentPresentationScope = "public"
+): InstrumentPresentation {
+  const isOwner = scope === "owner";
+  const documents = (instrument.documentFiles || []).filter((document) =>
+    isOwner || document.visibility === "public"
+  );
+  const supplementalMedia = (instrument.externalMedia || []).filter((item) =>
+    (isOwner || item.isPublic === true) && isAllowedSupplementalMedia(item)
+  );
+  const timelineEvents = getTimelineEvents(instrument).filter((event) =>
+    isOwner || event.isPublic === true
+  );
+  const meaningfulTimelineEvents = timelineEvents.filter((event) =>
+    !event.isSystem && !/^(qrguitar )?profile created$/i.test(event.title.trim())
+  );
+  const profileOrigin = timelineEvents.find((event) =>
+    event.isSystem || /^(qrguitar )?profile created$/i.test(event.title.trim())
+  ) || null;
+  const serviceEntries = getServiceHistoryEntries(instrument).filter((event) =>
+    isOwner || event.isPublic === true
+  );
+  const serialNumber = isOwner || instrument.showSerialPublic === true
+    ? String(instrument.serial || "").trim()
+    : "";
+  const photos = getProfilePhotoUrls(instrument).slice(0, 20);
+  const specifications = [
+    instrument.brand,
+    instrument.model,
+    instrument.year,
+    instrument.instrumentType,
+    instrument.finish,
+    instrument.bodyWood,
+    instrument.neckWood,
+    instrument.pickups,
+    ...(instrument.customFields || []).map((field) => field.value)
+  ].some((value) => Boolean(String(value || "").trim()));
+  const privateDocuments = isOwner
+    ? (instrument.documentFiles || []).filter((document) => document.visibility !== "public").length
+    : 0;
+
+  return {
+    scope,
+    photos,
+    documents,
+    supplementalMedia,
+    timelineEvents,
+    meaningfulTimelineEvents,
+    serviceEntries,
+    profileOrigin,
+    serialNumber,
+    counts: {
+      photos: photos.length,
+      documents: documents.length,
+      supplementalMedia: supplementalMedia.length,
+      timeline: meaningfulTimelineEvents.length,
+      service: serviceEntries.length,
+      privateDocuments
+    },
+    tabs: {
+      overview: true,
+      specifications,
+      timeline: meaningfulTimelineEvents.length > 0 || Number(instrument.ownershipTransferCount || 0) > 0,
+      media: supplementalMedia.length > 0,
+      documents: documents.length > 0
+    }
+  };
 }
 
 export function getProfileCompleteness(instrument: DemoInstrument) {

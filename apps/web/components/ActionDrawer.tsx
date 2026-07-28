@@ -21,6 +21,12 @@ export function ActionDrawer({ children, eyebrow, onClose, returnFocusTo, title 
   useEffect(() => {
     if (!mounted) return;
     const previousOverflow = document.body.style.overflow;
+    const previousPaddingRight = document.body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    if (scrollbarWidth > 0) {
+      const currentPaddingRight = Number.parseFloat(window.getComputedStyle(document.body).paddingRight) || 0;
+      document.body.style.paddingRight = `${currentPaddingRight + scrollbarWidth}px`;
+    }
     document.body.style.overflow = "hidden";
     panelRef.current?.focus();
 
@@ -49,6 +55,7 @@ export function ActionDrawer({ children, eyebrow, onClose, returnFocusTo, title 
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
+      document.body.style.paddingRight = previousPaddingRight;
       document.removeEventListener("keydown", handleKeyDown);
       returnFocusTo?.focus();
     };

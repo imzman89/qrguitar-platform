@@ -72,9 +72,14 @@ ok(!catalog.includes("service history, proof, or Availability"), "Catalog promis
 ok(profileContract.includes("if (event.isSystem) return false"), "System events counted as service history");
 ok(resetPassword.includes("hasRecoveryLink") && resetPassword.includes("isComplete") && resetPassword.includes("authChecked && !isComplete && hasSession"), "Reset states are not mutually exclusive");
 ok(!installers.includes("Owners can find a nearby shop") && installers.includes("connects approved shops and owners manually"), "Installer page overpromises a finder");
-ok(collectibleCard.includes('record.showSerialPublic === true') && card.includes("<small>Serial Number</small>"), "Compact card serial privacy/label failed");
 ok(
-  card.includes("card.images.length > 1")
+  collectibleCard.includes("presentation.serialNumber")
+    && profileContract.includes("instrument.showSerialPublic === true")
+    && card.includes("<small>Serial Number</small>"),
+  "Compact card serial privacy/label failed"
+);
+ok(
+  card.includes("galleryImages.length > 1")
     && card.includes("onPointerMove={handlePointerMove}")
     && card.includes("onWheel={handleWheel}")
     && card.includes("onKeyDown={handleKeyDown}")

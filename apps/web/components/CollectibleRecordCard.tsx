@@ -19,7 +19,7 @@ import { RecordShareButton } from "./RecordShareButton";
 
 type CollectibleRecordCardProps = {
   record: DemoInstrument;
-  variant?: "latest" | "catalog" | "spotlight";
+  variant?: "latest" | "catalog" | "spotlight" | "archive";
   eyebrow?: string;
   createdLabel?: string;
   ctaLabel?: string;
@@ -44,10 +44,11 @@ export function CollectibleRecordCard({
   const [failedImages, setFailedImages] = useState<number[]>([]);
   const railRef = useRef<HTMLDivElement | null>(null);
   const dragState = useRef({ pointerId: -1, startX: 0, scrollLeft: 0, moved: false });
+  const galleryImages = variant === "archive" ? card.images.slice(0, 1) : card.images;
   const showSecondaryAction = variant !== "latest" && secondaryHref && secondaryLabel;
   const showSecondaryText = variant !== "latest" && !secondaryHref && secondaryLabel;
-  const summary = variant === "latest" ? "" : card.summary;
-  const showGalleryControls = card.images.length > 1;
+  const summary = variant === "latest" || variant === "archive" ? "" : card.summary;
+  const showGalleryControls = galleryImages.length > 1;
   const attributionPrefix = content?.["cards.attribution.collection"] || "From the collection of";
 
   useEffect(() => {
@@ -57,8 +58,8 @@ export function CollectibleRecordCard({
 
   function moveGallery(direction: -1 | 1) {
     const rail = railRef.current;
-    if (!rail || card.images.length < 2) return;
-    const next = (activeImageIndex + direction + card.images.length) % card.images.length;
+    if (!rail || galleryImages.length < 2) return;
+    const next = (activeImageIndex + direction + galleryImages.length) % galleryImages.length;
     rail.scrollTo({ left: next * rail.clientWidth, behavior: "smooth" });
     setActiveImageIndex(next);
   }
@@ -84,7 +85,7 @@ export function CollectibleRecordCard({
     if (!rail || dragState.current.pointerId !== event.pointerId) return;
     rail.releasePointerCapture(event.pointerId);
     dragState.current.pointerId = -1;
-    const next = Math.max(0, Math.min(card.images.length - 1, Math.round(rail.scrollLeft / Math.max(1, rail.clientWidth))));
+    const next = Math.max(0, Math.min(galleryImages.length - 1, Math.round(rail.scrollLeft / Math.max(1, rail.clientWidth))));
     rail.scrollTo({ left: next * rail.clientWidth, behavior: "smooth" });
     setActiveImageIndex(next);
   }
@@ -118,7 +119,7 @@ export function CollectibleRecordCard({
             className="collectible-card-media-rail"
             role="region"
             aria-roledescription="carousel"
-            aria-label={`${card.title} photos. Image ${activeImageIndex + 1} of ${Math.max(1, card.images.length)}.`}
+            aria-label={`${card.title} photos. Image ${activeImageIndex + 1} of ${Math.max(1, galleryImages.length)}.`}
             tabIndex={0}
             onClick={handleRailClick}
             onPointerDown={handlePointerDown}
@@ -129,11 +130,11 @@ export function CollectibleRecordCard({
             onKeyDown={handleKeyDown}
             onScroll={(event) => {
               const rail = event.currentTarget;
-              setActiveImageIndex(Math.max(0, Math.min(card.images.length - 1, Math.round(rail.scrollLeft / Math.max(1, rail.clientWidth)))));
+              setActiveImageIndex(Math.max(0, Math.min(galleryImages.length - 1, Math.round(rail.scrollLeft / Math.max(1, rail.clientWidth)))));
             }}
           >
-            {card.images.length ? (
-              card.images.map((imageUrl, index) => (
+            {galleryImages.length ? (
+              galleryImages.map((imageUrl, index) => (
                 <div className="collectible-card-media-slide" key={`${imageUrl}-${index}`} aria-hidden={index !== activeImageIndex}>
                   {failedImages.includes(index) ? (
                     <div className="collectible-card-empty-media"><span>QRguitar</span><strong>Photo unavailable</strong></div>
@@ -141,7 +142,7 @@ export function CollectibleRecordCard({
                     <img
                       className="collectible-card-image"
                       src={imageUrl}
-                      alt={`${card.title} photo ${index + 1} of ${card.images.length}`}
+                      alt={`${card.title} photo ${index + 1} of ${galleryImages.length}`}
                       loading={variant === "latest" && index === 0 ? "eager" : "lazy"}
                       decoding="async"
                       draggable={false}
@@ -161,7 +162,7 @@ export function CollectibleRecordCard({
               {createdLabel ? <span className="collectible-card-age">{createdLabel}</span> : null}
             </div>
             <span className="collectible-card-code">{card.code}</span>
-            {showGalleryControls ? <span className="collectible-card-image-count">{activeImageIndex + 1}/{card.images.length}</span> : null}
+            {showGalleryControls ? <span className="collectible-card-image-count">{activeImageIndex + 1}/{galleryImages.length}</span> : null}
           </div>
 
           {showGalleryControls ? (

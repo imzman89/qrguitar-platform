@@ -10,6 +10,7 @@ type QrDownloadProps = {
   label: string;
   qrStyle?: QrStyle;
   onStyleChange?: (style: QrStyle) => void;
+  showPrintHandout?: boolean;
 };
 
 type LabelLines = {
@@ -24,7 +25,7 @@ const qrPresets: Array<{ label: string; style: Pick<QrStyle, "foreground" | "bac
   { label: "Print", helper: "Black QR on white", style: { foreground: "#071014", background: "#f8f6f2", shape: "classic" } }
 ];
 
-export function QrDownload({ code, label, qrStyle, onStyleChange }: QrDownloadProps) {
+export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHandout = true }: QrDownloadProps) {
   const [dataUrl, setDataUrl] = useState("");
   const [style, setStyle] = useState<QrStyle>(qrStyle ?? defaultQrStyle);
   const [labelInput, setLabelInput] = useState("");
@@ -155,9 +156,11 @@ export function QrDownload({ code, label, qrStyle, onStyleChange }: QrDownloadPr
         <button className="button secondary qr-edit-button" type="button" onClick={() => setIsEditing((current) => !current)}>
           {isEditing ? "Close" : "Customize QR"}
         </button>
-        <a className="button secondary qr-handout-button" href={`/handout/${encodeURIComponent(code)}`} target="_blank" rel="noreferrer">
-          Print Handout
-        </a>
+        {showPrintHandout ? (
+          <a className="button secondary qr-handout-button" href={`/handout/${encodeURIComponent(code)}`} target="_blank" rel="noreferrer">
+            Print Handout
+          </a>
+        ) : null}
       </div>
 
       {isEditing ? (

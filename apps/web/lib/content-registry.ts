@@ -83,6 +83,8 @@ const coreContentRegistry: ContentRegistryEntry[] = [
   field("home.pricing.body", "Marketing", "Homepage", "Public beta", "Pricing body", "Create and maintain QRguitar Profiles without a hard paywall while the registry grows. Paid help is available separately.", { maxLength: 260, previewPath: "/" }),
   field("home.finalCta.headline", "Marketing", "Homepage", "Closing action", "Headline", "Give the next instrument a permanent place to live.", { maxLength: 120, previewPath: "/" }),
   field("home.finalCta.body", "Marketing", "Homepage", "Closing action", "Body", "Create a Profile in minutes and keep improving it for years.", { maxLength: 180, previewPath: "/" }),
+  field("home.archive.eyebrow", "Marketing", "Homepage", "Archive rail", "Eyebrow", "The living archive", { maxLength: 60, previewPath: "/" }),
+  field("home.archive.heading", "Marketing", "Homepage", "Archive rail", "Heading", "Explore the archive", { maxLength: 100, previewPath: "/" }),
 
   field("howItWorks.hero.eyebrow", "Marketing", "How It Works", "Hero", "Eyebrow", "How QRguitar works", { maxLength: 70, previewPath: "/how-it-works" }),
   field("howItWorks.hero.headline", "Marketing", "How It Works", "Hero", "Headline", "One permanent Profile for every instrument.", { maxLength: 110, previewPath: "/how-it-works" }),
@@ -269,8 +271,10 @@ const completionRegistry: ContentRegistryEntry[] = [
   field("media.heading", "Product", "Media", "Section", "Heading", "Media", { maxLength: 50, previewPath: "/catalog" }),
   field("documents.heading", "Product", "Documents", "Section", "Heading", "Documents", { maxLength: 50, previewPath: "/catalog" }),
   field("printWorkspace.title", "Product", "Print Workspace", "Header", "Title", "QRguitar Print Kit", { maxLength: 80, previewPath: "/dashboard" }),
-  field("printWorkspace.handout", "Product", "Print Workspace", "Modes", "Handout label", "Customer Handout", { maxLength: 50, previewPath: "/dashboard" }),
+  field("printWorkspace.handout", "Product", "Print Workspace", "Modes", "Profile sheet label", "Profile Sheet", { maxLength: 50, previewPath: "/dashboard" }),
   field("printWorkspace.label", "Product", "Print Workspace", "Modes", "QR label label", "QR Label", { maxLength: 40, previewPath: "/dashboard" }),
+  field("printWorkspace.hangtag", "Product", "Print Workspace", "Modes", "Hang tag label", "Hang Tag", { maxLength: 40, previewPath: "/dashboard" }),
+  field("printWorkspace.service", "Product", "Print Workspace", "Modes", "Service summary label", "Service Summary", { maxLength: 50, previewPath: "/dashboard" }),
   field("printWorkspace.print", "Product", "Print Workspace", "Actions", "Print label", "Print", { maxLength: 30, previewPath: "/dashboard" }),
 
   field("serviceProviders.hero.body", "Workflows", "Service Providers", "Header", "Body", "Submit professional service details to the owner for review without taking ownership of the Profile.", { maxLength: 250, previewPath: "/service-work/preview" }),

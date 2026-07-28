@@ -6641,6 +6641,40 @@ button.button {
   font-weight: 850;
 }
 
+.service-form-section input:not([type="file"]):not([type="checkbox"]):not([type="radio"]),
+.service-form-section select,
+.service-form-section textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(248, 246, 242, .16);
+  border-radius: 6px;
+  padding: 11px 12px;
+  color: var(--text);
+  background: #081115;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  outline: 0;
+  transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+}
+
+.service-form-section textarea {
+  resize: vertical;
+}
+
+.service-form-section input:not([type="file"]):not([type="checkbox"]):not([type="radio"]):focus,
+.service-form-section select:focus,
+.service-form-section textarea:focus {
+  border-color: rgba(240, 161, 43, .72);
+  background: #0a151a;
+  box-shadow: 0 0 0 3px rgba(240, 161, 43, .11);
+}
+
+.service-form-section input::placeholder,
+.service-form-section textarea::placeholder {
+  color: rgba(248, 246, 242, .38);
+}
+
 .service-wide {
   grid-column: 1 / -1;
 }
@@ -11421,6 +11455,302 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   }
 }
 
+/* Final experience: living archive, content-aware Profile navigation, and Print Suite. */
+.home-archive {
+  margin-top: clamp(30px, 5vw, 64px);
+  min-width: 0;
+}
+
+.home-archive-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+
+.home-archive-heading h2 {
+  margin: 5px 0 0;
+  font-size: clamp(28px, 3vw, 44px);
+}
+
+.home-archive-rail {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  padding: 2px 2px 14px;
+  cursor: grab;
+  scroll-padding-inline: 2px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  touch-action: pan-y pinch-zoom;
+}
+
+.hero {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.hero > .shell {
+  min-width: 0;
+}
+
+.home-archive-rail:active {
+  cursor: grabbing;
+}
+
+.home-archive-rail:focus-visible {
+  border-radius: 8px;
+  outline: 2px solid var(--gold-2);
+  outline-offset: 4px;
+}
+
+.home-archive-rail > .collectible-card {
+  flex: 0 0 clamp(380px, 39vw, 500px);
+  scroll-snap-align: start;
+}
+
+.collectible-card--archive .collectible-card-link {
+  grid-template-columns: minmax(170px, 42%) minmax(0, 1fr);
+  min-height: 286px;
+}
+
+.collectible-card--archive .collectible-card-media {
+  height: 100%;
+  min-height: 286px;
+  aspect-ratio: auto;
+}
+
+.collectible-card--archive .collectible-card-content {
+  min-height: 286px;
+  padding: 20px;
+  gap: 10px;
+  align-content: center;
+}
+
+.collectible-card--archive h3 {
+  font-size: clamp(21px, 2vw, 27px);
+}
+
+.collectible-card--archive .collectible-card-facts,
+.collectible-card--archive .record-badge-row {
+  gap: 5px;
+}
+
+.collectible-card--archive .collectible-card-actions {
+  padding-top: 2px;
+}
+
+.scan-tab-count {
+  min-width: 20px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(239, 236, 228, .12);
+  border-radius: 999px;
+  padding: 2px 6px;
+  color: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.scan-tabs button.active .scan-tab-count {
+  border-color: rgba(240, 161, 43, .32);
+  color: var(--gold-2);
+}
+
+.timeline-origin-marker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-top: 1px solid rgba(239, 236, 228, .1);
+  margin-top: 8px;
+  padding: 18px 2px 2px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.timeline-origin-marker strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.timeline-origin-marker > span {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.print-suite-controls {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  border-top: 1px solid rgba(239, 236, 228, .1);
+  margin-top: 6px;
+  padding-top: 14px;
+}
+
+.print-suite-controls > label,
+.print-suite-controls fieldset {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  border: 1px solid rgba(239, 236, 228, .1);
+  border-radius: 7px;
+  margin: 0;
+  padding: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.print-suite-controls fieldset label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text);
+  font-weight: 650;
+}
+
+.print-suite-controls legend {
+  padding-inline: 4px;
+  color: var(--gold-2);
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.print-suite-controls select {
+  min-width: 0;
+  width: 100%;
+  min-height: 40px;
+}
+
+.print-suite-reset {
+  min-height: 44px;
+  align-self: end;
+  border: 1px solid rgba(239, 236, 228, .14);
+  border-radius: 7px;
+  color: var(--text);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.print-kit--hangtag {
+  width: min(100%, 5in);
+  margin-inline: auto;
+}
+
+.print-hangtag-photo {
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: #070b0d;
+}
+
+.print-hangtag-photo img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+}
+
+.print-hangtag-info {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  gap: 18px;
+  align-items: center;
+  padding: 22px;
+}
+
+.print-hangtag-info h2 {
+  margin: 3px 0 6px;
+  overflow-wrap: anywhere;
+  font-size: clamp(24px, 4vw, 38px);
+  line-height: 1;
+}
+
+.print-hangtag-qr {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  padding: 7px;
+  background: #fff;
+}
+
+.print-hangtag-qr img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.handout-shell[data-print-theme="dark"] .print-kit {
+  color: #f4f1e9;
+  background: #0d1519;
+}
+
+@media (max-width: 640px) {
+  .home-archive-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .home-archive-rail > .collectible-card {
+    flex-basis: min(86vw, 360px);
+  }
+
+  .collectible-card--archive .collectible-card-link {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    min-height: 0;
+  }
+
+  .collectible-card--archive .collectible-card-media {
+    height: auto;
+    min-height: 0;
+    aspect-ratio: 4 / 3;
+  }
+
+  .collectible-card--archive .collectible-card-content {
+    min-height: 232px;
+    padding: 17px;
+  }
+
+  .print-suite-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .print-hangtag-info {
+    grid-template-columns: minmax(0, 1fr) 104px;
+    padding: 16px;
+  }
+}
+
+@media print {
+  .handout-shell .print-kit {
+    display: none !important;
+  }
+
+  .handout-shell[data-print-mode="label"] .print-kit--label,
+  .handout-shell[data-print-mode="hangtag"] .print-kit--hangtag,
+  .handout-shell[data-print-mode="handout"] .print-kit--handout,
+  .handout-shell[data-print-mode="service"] .print-kit--service {
+    display: block !important;
+  }
+
+  .print-kit--hangtag {
+    width: 100% !important;
+    max-width: none !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
+
 @media (max-width: 640px) {
   .dashboard-metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -12852,7 +13182,7 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 /* Portal-mounted owner actions keep Dashboard cards out of the dialog layout flow. */
 .action-drawer-layer { position: fixed; inset: 0; z-index: 1200; display: grid; justify-items: end; }
 .action-drawer-backdrop { position: absolute; inset: 0; width: 100%; border: 0; padding: 0; cursor: default; background: rgba(2, 6, 8, .72); backdrop-filter: blur(3px); }
-.action-drawer { position: relative; width: min(460px, calc(100vw - 24px)); height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr); border-left: 1px solid rgba(239, 236, 228, .14); background: #0d1519; box-shadow: -24px 0 64px rgba(0, 0, 0, .5); animation: action-drawer-in 160ms ease-out; outline: none; }
+.action-drawer { position: relative; width: min(clamp(420px, 38vw, 540px), calc(100vw - 24px)); height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr); border-left: 1px solid rgba(239, 236, 228, .14); background: #0d1519; box-shadow: -24px 0 64px rgba(0, 0, 0, .5); animation: action-drawer-in 160ms ease-out; outline: none; }
 .action-drawer-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid rgba(239, 236, 228, .1); padding: 18px 20px; }
 .action-drawer-header > div { min-width: 0; }
 .action-drawer-header span { display: block; margin-bottom: 5px; color: var(--gold-2); font-size: 10px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }

@@ -27,19 +27,16 @@ type HandoutPayload = {
   message?: string;
 };
 
-type PrintMode = "handout" | "label" | "service";
+type PrintMode = "label" | "hangtag" | "handout" | "service";
+type PrintScope = "public" | "owner";
+type PrintSize = "letter" | "a4" | "4x6" | "compact";
 
-const modeLabels: Record<PrintMode, string> = {
-  handout: "Customer Handout",
-  label: "QR Label",
-  service: "Service Summary"
-};
-
-const modeOrder: PrintMode[] = ["handout", "label", "service"];
+const modeOrder: PrintMode[] = ["label", "hangtag", "handout", "service"];
 
 const modeDescriptions: Record<PrintMode, string> = {
-  handout: "A one-page Profile summary for an owner, buyer, or service customer.",
   label: "A compact label for an instrument case, hang tag, or paperwork.",
+  hangtag: "An image-led counter card for a case, display, or service handoff.",
+  handout: "A one-page Profile sheet for an owner, buyer, or service customer.",
   service: "A one-page summary of one canonical service-history entry."
 };
 
@@ -101,6 +98,15 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [mode, setMode] = useState<PrintMode>("handout");
   const [ownerAuthorized, setOwnerAuthorized] = useState(false);
+  const [printScope, setPrintScope] = useState<PrintScope>("public");
+  const [printSize, setPrintSize] = useState<PrintSize>("letter");
+  const [orientation, setOrientation] = useState<"portrait" | "landscape">("portrait");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [includePhoto, setIncludePhoto] = useState(true);
+  const [includeSerial, setIncludeSerial] = useState(true);
+  const [includeAvailability, setIncludeAvailability] = useState(true);
+  const [includeLogo, setIncludeLogo] = useState(true);
+  const [includeAttribution, setIncludeAttribution] = useState(true);
   const [selectedServiceId, setSelectedServiceId] = useState("");
   const canonicalCode = instrument?.qrCode || code;
   const profileUrl = `https://www.qrguitar.com/i/${encodeURIComponent(canonicalCode)}`;
@@ -202,7 +208,10 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
   const saleStatus = humanizeStatus(instrument?.saleStatus);
   const originalityStatus = humanizeStatus(instrument?.originalityStatus);
   const safety = instrument?.safetyStatus === "lost" || instrument?.safetyStatus === "stolen" || instrument?.safetyStatus === "recovered" ? instrument.safetyStatus : "";
-  const serialDisplay = instrument?.serial && (instrument.showSerialPublic === true || ownerAuthorized) ? instrument.serial : "";
+  const serialDisplay = includeSerial && instrument?.serial && (
+    instrument.showSerialPublic === true ||
+    (printScope === "owner" && ownerAuthorized)
+  ) ? instrument.serial : "";
   const printableServiceEntries = useMemo(() => instrument ? getServiceHistoryEntries(instrument).filter((entry) => !entry.isSystem && Boolean(entry.sourceKind)) : [], [instrument]);
   const selectedService = printableServiceEntries.find((entry) => entry.id === selectedServiceId) || printableServiceEntries[0] || null;
   const photoCount = galleryImages.length;
@@ -218,11 +227,39 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
     serviceCount ? `${serviceCount} service entr${serviceCount === 1 ? "y" : "ies"}` : ""
   ].filter(Boolean);
   const isPrivate = instrument?.visibility === "private";
+  const pageDimensions = {
+    letter: ["8.5in", "11in"],
+    a4: ["210mm", "297mm"],
+    "4x6": ["4in", "6in"],
+    compact: ["3.5in", "2.25in"]
+  }[printSize];
+  const resolvedPageDimensions = orientation === "landscape"
+    ? `${pageDimensions[1]} ${pageDimensions[0]}`
+    : `${pageDimensions[0]} ${pageDimensions[1]}`;
 
   useEffect(() => {
     if (!selectedServiceId && printableServiceEntries[0]) setSelectedServiceId(printableServiceEntries[0].id);
     if (selectedServiceId && !printableServiceEntries.some((entry) => entry.id === selectedServiceId)) setSelectedServiceId(printableServiceEntries[0]?.id || "");
   }, [printableServiceEntries, selectedServiceId]);
+
+  function resetPrintOptions() {
+    setPrintScope("public");
+    setPrintSize(mode === "label" ? "compact" : mode === "hangtag" ? "4x6" : "letter");
+    setOrientation("portrait");
+    setTheme("light");
+    setIncludePhoto(mode !== "label");
+    setIncludeSerial(true);
+    setIncludeAvailability(true);
+    setIncludeLogo(true);
+    setIncludeAttribution(true);
+  }
+
+  function printModeLabel(value: PrintMode) {
+    if (value === "label") return getContentValue(content, "printWorkspace.label");
+    if (value === "hangtag") return getContentValue(content, "printWorkspace.hangtag");
+    if (value === "handout") return getContentValue(content, "printWorkspace.handout");
+    return getContentValue(content, "printWorkspace.service");
+  }
 
   function renderBadges() {
     if (!instrument) return null;
@@ -249,9 +286,10 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
 
   return (
     <>
+      <style>{`@media print { @page { size: ${resolvedPageDimensions}; margin: ${printSize === "compact" ? "0.12in" : "0.3in"}; } }`}</style>
       <Nav />
       <main className="section handout-page">
-        <div className="shell handout-shell" data-print-mode={mode}>
+        <div className="shell handout-shell" data-print-mode={mode} data-print-size={printSize} data-print-orientation={orientation} data-print-theme={theme}>
           <div className="print-kit-toolbar no-print">
             <div>
               <Link className="print-kit-back-link" href="/dashboard">
@@ -260,7 +298,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
               </Link>
               <div className="eyebrow">{getContentValue(content, "printWorkspace.title")}</div>
               <h1>Print the right piece.</h1>
-              <p>Use the handout for a customer, the label for a case, or the service summary for completed canonical work.</p>
+              <p>Choose one format, keep the public-safe default, and print only the piece you need.</p>
             </div>
             <div className="print-kit-toolbar-actions">
               <Link className="button secondary" href={`/i/${encodeURIComponent(canonicalCode)}`} target="_blank">
@@ -269,7 +307,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
               </Link>
               <button className="button" type="button" onClick={() => window.print()} disabled={!instrument || !qrDataUrl}>
                 <Printer size={16} />
-                {getContentValue(content, "printWorkspace.print")} {mode === "handout" ? getContentValue(content, "printWorkspace.handout") : mode === "label" ? getContentValue(content, "printWorkspace.label") : "Service Summary"}
+                {getContentValue(content, "printWorkspace.print")} {printModeLabel(mode)}
               </button>
             </div>
           </div>
@@ -284,11 +322,30 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                   aria-pressed={mode === key}
                   onClick={() => setMode(key)}
                 >
-                  {key === "handout" ? getContentValue(content, "printWorkspace.handout") : key === "label" ? getContentValue(content, "printWorkspace.label") : modeLabels[key]}
+                  {printModeLabel(key)}
                 </button>
               ))}
               <p className="print-mode-description">{modeDescriptions[mode]}</p>
               {mode === "service" ? <label className="print-service-picker">Service entry<select value={selectedService?.id || ""} onChange={(event) => setSelectedServiceId(event.target.value)} disabled={!printableServiceEntries.length}>{printableServiceEntries.length ? printableServiceEntries.map((entry) => <option value={entry.id} key={entry.id}>{formatServiceDate(entry)} - {entry.title}</option>) : <option value="">No canonical service entries available</option>}</select></label> : null}
+              <div className="print-suite-controls">
+                <fieldset>
+                  <legend>Copy</legend>
+                  <label><input type="radio" name="print-scope" checked={printScope === "public"} onChange={() => setPrintScope("public")} /> Public-safe copy</label>
+                  <label title={ownerAuthorized ? "Include owner-visible fields you explicitly select." : "Sign in as the owner to use this option."}><input type="radio" name="print-scope" checked={printScope === "owner"} disabled={!ownerAuthorized} onChange={() => setPrintScope("owner")} /> Owner copy</label>
+                </fieldset>
+                <label>Size<select value={printSize} onChange={(event) => setPrintSize(event.target.value as PrintSize)}><option value="letter">Letter</option><option value="a4">A4</option><option value="4x6">4 x 6</option><option value="compact">Compact card</option></select></label>
+                <label>Orientation<select value={orientation} onChange={(event) => setOrientation(event.target.value as "portrait" | "landscape")}><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></label>
+                <label>Theme<select value={theme} onChange={(event) => setTheme(event.target.value as "light" | "dark")}><option value="light">Light</option><option value="dark">Dark</option></select></label>
+                <fieldset>
+                  <legend>Include</legend>
+                  <label><input type="checkbox" checked={includeLogo} onChange={(event) => setIncludeLogo(event.target.checked)} /> Logo</label>
+                  {mode !== "label" ? <label><input type="checkbox" checked={includePhoto} onChange={(event) => setIncludePhoto(event.target.checked)} /> Photograph</label> : null}
+                  <label><input type="checkbox" checked={includeSerial} onChange={(event) => setIncludeSerial(event.target.checked)} /> Serial Number</label>
+                  {mode !== "label" ? <label><input type="checkbox" checked={includeAvailability} onChange={(event) => setIncludeAvailability(event.target.checked)} /> Availability</label> : null}
+                  {mode === "hangtag" || mode === "handout" ? <label><input type="checkbox" checked={includeAttribution} onChange={(event) => setIncludeAttribution(event.target.checked)} /> Public attribution</label> : null}
+                </fieldset>
+                <button type="button" className="print-suite-reset" onClick={resetPrintOptions}>Reset</button>
+              </div>
             </div>
           ) : null}
 
@@ -316,22 +373,42 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                   {qrDataUrl ? <img src={qrDataUrl} alt={`QR code for ${title}`} /> : <QrCode />}
                 </div>
                 <div className="print-label-info">
-                  <div className="print-label-wordmark">QR<span>guitar</span></div>
+                  {includeLogo ? <div className="print-label-wordmark">QR<span>guitar</span></div> : null}
                   <p>Scan Profile</p>
                   <h2>{title}</h2>
                   <strong>{canonicalCode}</strong>
+                  {serialDisplay ? <small>Serial Number: {serialDisplay}</small> : null}
                   <small>{profileUrl}</small>
                 </div>
               </section>
             </article>
+          ) : mode === "hangtag" ? (
+            <article className="print-kit print-kit--hangtag" aria-label={`Printable hang tag for ${title}`}>
+              <header className="print-kit-header">
+                {includeLogo ? <div className="print-kit-wordmark">QR<span>guitar</span></div> : <div />}
+                <div><span>Scan the Profile</span><strong>{canonicalCode}</strong></div>
+              </header>
+              {includePhoto ? <div className="print-hangtag-photo">{photoUrl ? <img src={photoUrl} alt={`${title} main photo`} /> : <span>No photo available</span>}</div> : null}
+              <section className="print-hangtag-info">
+                <div><p className="print-kit-id-label">QRguitar Profile</p><h2>{title}</h2><p>{primaryFacts.join(" / ")}</p>{renderBadges()}</div>
+                <div className="print-hangtag-qr">{qrDataUrl ? <img src={qrDataUrl} alt={`QR code for ${title}`} /> : <QrCode />}</div>
+              </section>
+              <dl className="print-kit-details">
+                <div><dt>QRguitar ID</dt><dd>{canonicalCode}</dd></div>
+                {serialDisplay ? <div><dt>Serial Number</dt><dd>{serialDisplay}</dd></div> : null}
+                {includeAvailability && saleStatus ? <div><dt>Availability</dt><dd>{saleStatus}</dd></div> : null}
+                {includeAttribution && instrument.publicCollection?.publicName ? <div><dt>Collection</dt><dd>{instrument.publicCollection.publicName}</dd></div> : null}
+              </dl>
+              <footer className="print-kit-footer"><span>Scan for identity, history, and updates.</span><strong>qrguitar.com</strong></footer>
+            </article>
           ) : mode === "service" ? selectedService ? (
             <article className="print-kit print-kit--service" aria-label={`Printable service summary for ${title}`}>
               <header className="print-kit-header">
-                <div className="print-kit-wordmark">QR<span>guitar</span></div>
+                {includeLogo ? <div className="print-kit-wordmark">QR<span>guitar</span></div> : <div />}
                 <div><span>Service Summary</span><strong>{canonicalCode}</strong></div>
               </header>
               <section className="print-service-profile">
-                <div className="print-service-photo">{photoUrl ? <img src={photoUrl} alt={`${title} main photo`} /> : <span>No photo available</span>}</div>
+                {includePhoto ? <div className="print-service-photo">{photoUrl ? <img src={photoUrl} alt={`${title} main photo`} /> : <span>No photo available</span>}</div> : null}
                 <div><p className="print-kit-id-label">Permanent QRguitar Profile</p><h2>{title}</h2><p>{primaryFacts.join(" / ")}</p><dl className="print-kit-details"><div><dt>QRguitar ID</dt><dd>{canonicalCode}</dd></div>{serialDisplay ? <div><dt>Serial Number</dt><dd>{serialDisplay}</dd></div> : null}</dl></div>
               </section>
               <section className="print-service-work">
@@ -353,7 +430,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
           ) : (
             <article className="print-kit print-kit--handout" aria-label={`Printable QRguitar handout for ${title}`}>
               <header className="print-kit-header">
-                <div className="print-kit-wordmark">QR<span>guitar</span></div>
+                {includeLogo ? <div className="print-kit-wordmark">QR<span>guitar</span></div> : <div />}
                 <div>
                   <span>Instrument Profile Handout</span>
                   <strong>{canonicalCode}</strong>
@@ -361,7 +438,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
               </header>
 
               <section className="print-kit-profile">
-                <div className="print-kit-photo">
+                {includePhoto ? <div className="print-kit-photo">
                   {photoUrl ? (
                     <img
                       src={photoUrl}
@@ -373,7 +450,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                   ) : (
                     <span>No photo available</span>
                   )}
-                </div>
+                </div> : null}
                 <div className="print-kit-info">
                   <p className="print-kit-id-label">Permanent QRguitar Profile</p>
                   <h2>{title}</h2>
@@ -382,6 +459,8 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                   <dl className="print-kit-details">
                     <div><dt>QRguitar ID</dt><dd>{canonicalCode}</dd></div>
                     {serialDisplay ? <div><dt>Serial Number</dt><dd>{serialDisplay}</dd></div> : null}
+                    {includeAvailability && saleStatus ? <div><dt>Availability</dt><dd>{saleStatus}</dd></div> : null}
+                    {includeAttribution && instrument.publicCollection?.publicName ? <div><dt>Collection</dt><dd>{instrument.publicCollection.publicName}</dd></div> : null}
                   </dl>
                   {detailFacts.length ? (
                     <div className="print-kit-fact-grid">
