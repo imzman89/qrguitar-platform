@@ -142,9 +142,6 @@ export function HomePageClient({
               <Link className="button" href="/create">{copy.hero.primaryCta}</Link>
               <Link className="button secondary" href="/catalog">{copy.hero.secondaryCta}</Link>
             </div>
-            <div className="trust-row" aria-label="Platform highlights">
-              {cleanHeroTrust(copy.hero.trust).map((item) => <span key={item}>{item}</span>)}
-            </div>
           </div>
           <LatestPublicRecord initialRecord={initialLatestRecord} content={settings?.content} />
         </div>
@@ -155,7 +152,7 @@ export function HomePageClient({
                 <div className="eyebrow">{settings?.content["home.archive.eyebrow"] || "The living archive"}</div>
                 <h2>{settings?.content["home.archive.heading"] || "Explore the archive"}</h2>
               </div>
-              <Link className="text-link" href="/catalog">View all Profiles</Link>
+              <Link className="text-link" href="/catalog">{settings?.content["home.archive.viewAll"] || "View all Profiles"}</Link>
             </div>
             <div
               ref={archiveRailRef}
@@ -238,10 +235,10 @@ export function HomePageClient({
       <section className="section continuity-section">
         <div className="shell continuity-layout">
           <div className="continuity-intro">
-            <div className="eyebrow">History that stays useful</div>
-            <h2>One Profile, through the work and every handoff.</h2>
-            <p>QRguitar keeps the instrument&apos;s identity connected while owners decide which service, documents, and history become public.</p>
-            <Link className="text-link" href="/how-it-works">See the full workflow</Link>
+            <div className="eyebrow">{settings?.content["home.continuity.eyebrow"] || "History that stays useful"}</div>
+            <h2>{settings?.content["home.continuity.headline"] || "One Profile, through the work and every handoff."}</h2>
+            <p>{settings?.content["home.continuity.body"] || "QRguitar keeps the instrument's identity connected while owners decide which service, documents, and history become public."}</p>
+            <Link className="text-link" href="/how-it-works">{settings?.content["home.continuity.cta"] || "See the full workflow"}</Link>
           </div>
           <div className="continuity-list">
             {sectionBlocks("continuity").map((item, index) => (
@@ -268,8 +265,8 @@ export function HomePageClient({
     finalCta: (
       <section className="section alt">
         <div className="shell">
-          <div className="section-header"><div className="eyebrow">Ready when the instrument is</div><h2>{settings?.content["home.finalCta.headline"] || "Start the Profile that stays with it."}</h2><p>{settings?.content["home.finalCta.body"] || "Create one Profile now, then add photos, history, and proof as the instrument's story grows."}</p></div>
-          <div className="section-cta"><Link className="button" href="/create">Create Profile</Link><Link className="button secondary" href="/catalog">Browse Profiles</Link></div>
+          <div className="section-header"><div className="eyebrow">{settings?.content["home.finalCta.eyebrow"] || "Ready when the instrument is"}</div><h2>{settings?.content["home.finalCta.headline"] || "Start the Profile that stays with it."}</h2><p>{settings?.content["home.finalCta.body"] || "Create one Profile now, then add photos, history, and proof as the instrument's story grows."}</p></div>
+          <div className="section-cta"><Link className="button" href="/create">{settings?.content["home.finalCta.primaryCta"] || "Create Profile"}</Link><Link className="button secondary" href="/catalog">{settings?.content["home.finalCta.secondaryCta"] || "Browse Profiles"}</Link></div>
         </div>
       </section>
     )
@@ -284,21 +281,6 @@ export function HomePageClient({
       <Footer />
     </>
   );
-}
-
-function cleanHeroTrust(items: string[]) {
-  const stale = new Set([
-    "Unique QR for each instrument",
-    "Specs, photos, repairs, and receipts",
-    "Owner-transfer tools in beta"
-  ]);
-  const cleaned = items.map((item) => item.trim()).filter(Boolean).filter((item) => !stale.has(item));
-
-  if (!cleaned.length) {
-    return ["Permanent QR identity", "Photos, specs, proof & history"];
-  }
-
-  return cleaned.slice(0, 2);
 }
 
 function Card({ icon, title, copy }: { icon: ReactNode; title: string; copy: string }) {

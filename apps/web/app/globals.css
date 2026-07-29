@@ -5862,7 +5862,7 @@ button.button {
   padding: 15px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.025);
-  color: var(--ink);
+  color: var(--text);
   text-align: left;
   text-decoration: none;
   cursor: pointer;
@@ -11455,6 +11455,80 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   }
 }
 
+/* Final design-release guard: concise first paint and image-led identity. */
+.hero-copy {
+  align-self: center;
+}
+
+.hero-copy > p {
+  max-width: 580px;
+}
+
+.catalog-page .dashboard-hero {
+  min-height: 0;
+  padding-block: clamp(18px, 3vw, 34px);
+}
+
+.catalog-page .dashboard-hero h2 {
+  max-width: 15ch;
+  font-size: clamp(42px, 4.8vw, 62px);
+  line-height: .96;
+}
+
+@media (min-width: 901px) {
+  .scan-hero h1 {
+    max-width: 15ch;
+    font-size: clamp(42px, 3.35vw, 56px);
+    line-height: .96;
+  }
+}
+
+@media (max-width: 700px) {
+  .hero {
+    padding-block: 30px 46px;
+  }
+
+  .hero-grid {
+    gap: 24px;
+  }
+
+  .hero h1 {
+    max-width: 13ch;
+    margin-block: 8px 12px;
+    font-size: clamp(34px, 10.25vw, 40px);
+    line-height: .98;
+  }
+
+  .hero-copy > p {
+    margin-bottom: 18px;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  .hero-actions {
+    display: grid;
+    grid-template-columns: minmax(0, .86fr) minmax(0, 1.14fr);
+    gap: 8px;
+  }
+
+  .hero-actions .button {
+    min-width: 0;
+    min-height: 42px;
+    padding-inline: 10px;
+    font-size: 11px;
+    white-space: normal;
+  }
+
+  .catalog-page .dashboard-hero {
+    padding-block: 8px 18px;
+  }
+
+  .catalog-page .dashboard-hero h2 {
+    max-width: 12ch;
+    font-size: 40px;
+  }
+}
+
 /* Final experience: living archive, content-aware Profile navigation, and Print Suite. */
 .home-archive {
   margin-top: clamp(30px, 5vw, 64px);
@@ -12435,6 +12509,19 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 
 .quick-edit-dialog > header { top: 0; border-bottom: 1px solid var(--line); }
 .quick-edit-dialog > footer { bottom: 0; justify-content: flex-end; border-top: 1px solid var(--line); }
+.quick-edit-dialog > header .icon-button {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(248, 246, 242, .14);
+  border-radius: 50%;
+  padding: 0;
+  color: var(--text);
+  background: rgba(248, 246, 242, .035);
+}
+.quick-edit-dialog > header .icon-button svg { width: 18px; height: 18px; }
 .quick-edit-dialog h2 { margin: 2px 0 0; font-size: clamp(22px, 3vw, 32px); }
 .quick-edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 20px; }
 .quick-edit-wide { grid-column: 1 / -1; }
