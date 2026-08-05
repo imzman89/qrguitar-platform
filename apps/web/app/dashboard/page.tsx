@@ -487,7 +487,7 @@ export default function DashboardPage() {
               ) : displayedInstruments.length ? (
                 displayedInstruments.map((instrument) => {
                   const totalDocs = instrument.documentFiles?.length || 0;
-                  const publicDocs = instrument.documentFiles?.filter((file) => file.visibility !== "hidden").length || 0;
+                  const publicDocs = instrument.documentFiles?.filter((file) => file.visibility === "public").length || 0;
                   const hiddenDocs = Math.max(0, totalDocs - publicDocs);
                   const imageSources = getProfilePhotoUrls(instrument);
                   const serviceEntries = getServiceHistoryEntries(instrument);

@@ -25,8 +25,15 @@ function routeUsesAdminTimeout(pathname: string) {
   return pathname === "/site-editor" || pathname.startsWith("/admin");
 }
 
-function routeCanStayAfterExpiry(pathname: string) {
-  return pathname === "/login" || pathname === "/reset-password";
+function routeRequiresSession(pathname: string) {
+  return pathname === "/dashboard" ||
+    pathname.startsWith("/dashboard/") ||
+    pathname === "/create" ||
+    pathname === "/account" ||
+    pathname === "/site-editor" ||
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/edit/") ||
+    pathname.startsWith("/service-review/");
 }
 
 function sessionTimestamp(session: { user?: { last_sign_in_at?: string | null } | null } | null) {
@@ -61,7 +68,7 @@ export function SessionLifecycle() {
       window.dispatchEvent(new CustomEvent("qrguitar:auth"));
 
       const currentPath = pathnameRef.current || "/";
-      if (!routeCanStayAfterExpiry(currentPath)) {
+      if (routeRequiresSession(currentPath)) {
         router.replace(`/login?reason=session-expired&next=${encodeURIComponent(currentPath)}`);
       }
     }

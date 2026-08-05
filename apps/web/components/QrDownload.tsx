@@ -158,7 +158,7 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHando
         </button>
         {showPrintHandout ? (
           <a className="button secondary qr-handout-button" href={`/handout/${encodeURIComponent(code)}`} target="_blank" rel="noreferrer">
-            Print Handout
+            Open Print Suite
           </a>
         ) : null}
       </div>

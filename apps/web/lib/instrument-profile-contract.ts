@@ -180,6 +180,7 @@ export type InstrumentPresentation = {
     overview: true;
     specifications: boolean;
     timeline: boolean;
+    service: boolean;
     media: boolean;
     documents: boolean;
   };
@@ -224,7 +225,8 @@ export function resolveInstrumentPresentation(
     isOwner || event.isPublic === true
   );
   const meaningfulTimelineEvents = timelineEvents.filter((event) =>
-    !event.isSystem && !/^(qrguitar )?profile created$/i.test(event.title.trim())
+    !event.isSystem && !/^(qrguitar )?profile created$/i.test(event.title.trim()) &&
+    !isServiceHistoryEvent(event)
   );
   const profileOrigin = timelineEvents.find((event) =>
     event.isSystem || /^(qrguitar )?profile created$/i.test(event.title.trim())
@@ -273,6 +275,7 @@ export function resolveInstrumentPresentation(
       overview: true,
       specifications,
       timeline: meaningfulTimelineEvents.length > 0 || Number(instrument.ownershipTransferCount || 0) > 0,
+      service: serviceEntries.length > 0,
       media: supplementalMedia.length > 0,
       documents: documents.length > 0
     }
@@ -306,7 +309,7 @@ export function sanitizePublicInstrument(instrument: DemoInstrument): DemoInstru
   } = instrument;
 
   if (publicInstrument.showSerialPublic !== true) {
-    publicInstrument.serial = "";
+    delete (publicInstrument as Partial<DemoInstrument>).serial;
   }
 
   publicInstrument.documentFiles = (publicInstrument.documentFiles || [])

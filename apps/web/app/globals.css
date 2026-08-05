@@ -4876,6 +4876,49 @@ select {
   gap: 7px;
 }
 
+.print-kit-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0 22px 12px;
+  background: rgba(248, 246, 242, .1);
+}
+
+.print-kit-summary-grid span {
+  min-width: 0;
+  padding: 10px;
+  color: rgba(248, 246, 242, .76);
+  background: #0b1216;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.print-kit-summary-grid strong {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--gold-2);
+  font-size: 8px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.print-kit-timeline-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  margin: 0 22px 12px;
+  border: 1px solid rgba(248, 246, 242, .1);
+  padding: 10px 12px;
+  color: rgba(248, 246, 242, .68);
+  font-size: 10px;
+}
+
+.print-kit-timeline-summary > strong {
+  color: var(--gold-2);
+  text-transform: uppercase;
+}
+
 .print-kit-badge,
 .print-kit-fact-grid span {
   min-height: 23px;
@@ -5023,6 +5066,8 @@ select {
 
 .print-kit-footer strong {
   color: var(--gold-2);
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 
 .print-kit--label {
@@ -5161,6 +5206,15 @@ select {
 
   .print-label-card h2 {
     font-size: 18px;
+  }
+
+  .print-kit-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-inline: 12px;
+  }
+
+  .print-kit-timeline-summary {
+    margin-inline: 12px;
   }
 }
 
@@ -7180,6 +7234,47 @@ button.button {
     border-radius: 0;
   }
 
+  .handout-shell[data-print-size="compact"] .print-kit--label {
+    width: 3.45in;
+    max-width: 3.45in;
+    height: 2.2in !important;
+    max-height: 2.2in !important;
+  }
+
+  .handout-page[data-print-page-size="compact"],
+  .handout-page[data-print-page-size="compact"] .handout-shell,
+  .handout-page[data-print-page-size="compact"] [data-print-frame] {
+    width: 3.5in !important;
+    height: 2.25in !important;
+    min-height: 0 !important;
+    max-height: 2.25in !important;
+    overflow: hidden !important;
+  }
+
+  .handout-shell[data-print-size="compact"] .print-label-card {
+    grid-template-columns: 1.18in minmax(0, 1fr) !important;
+    gap: .08in;
+    margin: .05in;
+    padding: .06in;
+    height: 2.08in;
+    overflow: hidden;
+  }
+
+  .handout-shell[data-print-size="compact"] .print-label-wordmark {
+    margin-bottom: .04in;
+    font-size: 12px;
+  }
+
+  .handout-shell[data-print-size="compact"] .print-label-card h2 {
+    margin-block: .03in;
+    font-size: 13px;
+  }
+
+  .handout-shell[data-print-size="compact"] .print-label-card small {
+    margin-top: .03in;
+    font-size: 6.5px;
+  }
+
   .print-kit--label .print-label-card {
     grid-template-columns: 1.6in minmax(0, 1fr) !important;
     margin: .1in;
@@ -7238,6 +7333,15 @@ button.button {
 
   .print-kit--service .print-kit-footer {
     padding: 0 .18in .1in;
+  }
+
+  .print-kit--handout .print-kit-summary-grid {
+    margin: 0 .18in .07in;
+  }
+
+  .print-kit--handout .print-kit-timeline-summary {
+    margin: 0 .18in .07in;
+    padding: .06in .08in;
   }
 }
 .qr-editor-panel {
@@ -11584,6 +11688,21 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   scroll-snap-align: start;
 }
 
+@media (min-width: 900px) {
+  .home-archive-rail {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+    padding-bottom: 2px;
+    cursor: default;
+    scroll-snap-type: none;
+  }
+
+  .home-archive-rail > .collectible-card {
+    min-width: 0;
+  }
+}
+
 .collectible-card--archive .collectible-card-link {
   grid-template-columns: minmax(170px, 42%) minmax(0, 1fr);
   min-height: 286px;
@@ -11822,6 +11941,99 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
     page-break-inside: avoid;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
+  }
+
+  .handout-shell[data-print-size="4x6"] .print-kit--hangtag {
+    width: 3.4in !important;
+    max-width: 3.4in !important;
+    height: 5.35in !important;
+    max-height: 5.35in !important;
+    margin: 0 auto !important;
+    overflow: hidden !important;
+  }
+
+  .handout-shell[data-print-size="4x6"] .print-kit-header {
+    gap: .08in;
+    padding: .08in .1in;
+  }
+
+  .handout-shell[data-print-size="4x6"] .print-kit-wordmark {
+    font-size: 17px;
+  }
+
+  .handout-shell[data-print-size="4x6"] .print-kit-header > div:last-child span {
+    font-size: 7px;
+  }
+
+  .handout-shell[data-print-size="4x6"] .print-kit-header strong {
+    font-size: 9px;
+  }
+
+  .handout-shell[data-print-size="4x6"] .print-hangtag-photo {
+    height: 2.02in;
+    aspect-ratio: auto;
+  }
+
+  .handout-shell[data-print-size="4x6"] .print-hangtag-info {
+    grid-template-columns: minmax(0, 1fr) .78in;
+    gap: .08in;
+    padding: .1in;
+  }
+
+  .handout-shell[data-print-size="4x6"] .print-hangtag-info h2 {
+    margin: .02in 0 .04in;
+    font-size: 18px;
+  }
+
+  .handout-shell[data-print-size="4x6"] .print-hangtag-info p,
+  .handout-shell[data-print-size="4x6"] .print-kit-id-label {
+    font-size: 7.5px;
+    line-height: 1.25;
+  }
+
+  .handout-shell[data-print-size="4x6"] .print-hangtag-qr {
+    width: .78in;
+    padding: .04in;
+  }
+
+  .handout-shell[data-print-size="4x6"] .print-kit-badges {
+    gap: .03in;
+  }
+
+  .handout-shell[data-print-size="4x6"] .print-kit-badge {
+    min-height: 0;
+    padding: .02in .03in;
+    font-size: 6.5px;
+  }
+
+  .handout-shell[data-print-size="4x6"] .print-kit-badge svg {
+    width: 8px;
+    height: 8px;
+  }
+
+  .handout-shell[data-print-size="4x6"] .print-kit-details {
+    margin: 0 .1in;
+  }
+
+  .handout-shell[data-print-size="4x6"] .print-kit-details > div {
+    padding: .05in 0;
+  }
+
+  .handout-shell[data-print-size="4x6"] .print-kit-details dt {
+    font-size: 6.5px;
+  }
+
+  .handout-shell[data-print-size="4x6"] .print-kit-details dd {
+    margin-top: .02in;
+    font-size: 8px;
+  }
+
+  .handout-shell[data-print-size="4x6"] .print-kit-footer {
+    align-items: center;
+    flex-direction: row;
+    gap: .06in;
+    padding: .05in .1in .08in;
+    font-size: 7px;
   }
 }
 

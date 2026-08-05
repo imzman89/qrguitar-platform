@@ -2371,6 +2371,25 @@ export async function PATCH(request: Request) {
     return noStoreJson({ ok: true, qrCode: nextQrCode, permanentPath: `/i/${nextQrCode}`, message: "Saved. Condition details could not be refreshed." }, { status: 200 });
   }
 
+  const currentTrust = (await loadTrustSettingsMap(supabase, [nextQrCode])).get(nextQrCode) || defaultRecordTrustSettings;
+  const trust = mergeRecordTrustSettings({
+    ...currentTrust,
+    showSerialPublic: typeof body.showSerialPublic === "boolean"
+      ? Boolean(input.serial) && body.showSerialPublic
+      : currentTrust.showSerialPublic
+  });
+  const trustResult = await supabase.from("site_content").upsert(
+    {
+      content_key: recordTrustContentKey(nextQrCode),
+      content_value: trust,
+      updated_at: new Date().toISOString()
+    },
+    { onConflict: "content_key" }
+  );
+  if (trustResult.error) {
+    return NextResponse.json({ ok: false, message: "Profile details were saved, but Serial Number visibility could not be updated. Try again." }, { status: 500 });
+  }
+
   revalidatePublicRecordSurfaces(input.qrCode);
   revalidatePublicRecordSurfaces(nextQrCode);
   return noStoreJson({

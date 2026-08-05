@@ -124,6 +124,7 @@ const coreContentRegistry: ContentRegistryEntry[] = [
   field("profile.tabs.overview", "Product", "Public Profile", "Navigation", "Overview tab", "Overview", { maxLength: 30, previewPath: "/catalog" }),
   field("profile.tabs.specifications", "Product", "Public Profile", "Navigation", "Specifications tab", "Specifications", { maxLength: 30, previewPath: "/catalog" }),
   field("profile.tabs.timeline", "Product", "Public Profile", "Navigation", "Timeline tab", "Timeline", { maxLength: 30, previewPath: "/catalog" }),
+  field("profile.tabs.service", "Product", "Public Profile", "Navigation", "Service tab", "Service", { maxLength: 30, previewPath: "/catalog" }),
   field("profile.tabs.media", "Product", "Public Profile", "Navigation", "Media tab", "Media", { maxLength: 30, previewPath: "/catalog" }),
   field("profile.tabs.documents", "Product", "Public Profile", "Navigation", "Documents tab", "Documents", { maxLength: 30, previewPath: "/catalog" }),
   field("home.anatomy.fallback", "Marketing", "Homepage", "Profile anatomy", "Fallback label", "A permanent identity for every instrument", { maxLength: 100, previewPath: "/" }),

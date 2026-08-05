@@ -40,7 +40,7 @@ import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../../li
 import { resolveInstrumentPresentation } from "../../../lib/instrument-profile-contract";
 import { getContentValue } from "../../../lib/content-registry";
 
-type ProfileTab = "overview" | "specs" | "timeline" | "ownership" | "media" | "repairs" | "documents";
+type ProfileTab = "overview" | "specs" | "timeline" | "service" | "ownership" | "media" | "repairs" | "documents";
 const PROFILE_FETCH_TIMEOUT_MS = 28000;
 
 export function ProfileClient({ code: codeParam, initialInstrument }: { code: string; initialInstrument: DemoInstrument | null }) {
@@ -301,6 +301,9 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
         count: meaningfulTimelineEvents.length + Number(instrument?.ownershipTransferCount || 0)
       });
     }
+    if (presentation?.tabs.service) {
+      tabs.push({ id: "service", label: getContentValue(publicContent, "profile.tabs.service"), count: presentation.counts.service });
+    }
     if (presentation?.tabs.media) {
       tabs.push({ id: "media", label: getContentValue(publicContent, "profile.tabs.media"), count: externalMedia.length });
     }
@@ -316,6 +319,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     meaningfulTimelineEvents.length,
     presentation?.tabs.documents,
     presentation?.tabs.media,
+    presentation?.tabs.service,
     presentation?.tabs.timeline,
     publicContent
   ]);
@@ -877,6 +881,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           latestTransfer={latestTransfer}
           isVerifiedRecord={isVerifiedRecord}
           timelineEvents={timelineEvents}
+          serviceEntries={presentation?.serviceEntries || []}
         />
 
         {activeMedia ? (
@@ -998,7 +1003,8 @@ function ProfilePanel({
   transferMessage,
   latestTransfer,
   isVerifiedRecord,
-  timelineEvents
+  timelineEvents,
+  serviceEntries
 }: {
   activeTab: ProfileTab;
   instrument: DemoInstrument;
@@ -1013,6 +1019,7 @@ function ProfilePanel({
   latestTransfer?: DemoTransfer;
   isVerifiedRecord: boolean;
   timelineEvents: ServiceHistoryEntry[];
+  serviceEntries: ServiceHistoryEntry[];
 }) {
   if (activeTab === "specs") {
     const visibleSpecs = [...specs, ...optionalSpecs].filter((spec) => hasMeaningfulPublicValue(spec.value));
@@ -1033,7 +1040,10 @@ function ProfilePanel({
     const createdDate = formatProfileDate(instrument.createdAt);
     const transferDate = latestTransfer ? formatProfileDate(latestTransfer.createdAt) : null;
     const publicTimelineEvents = timelineEvents.filter((entry) =>
-      entry.isPublic && !entry.isSystem && !/^(qrguitar )?profile created$/i.test(entry.title.trim())
+      entry.isPublic &&
+      !entry.isSystem &&
+      !/^(qrguitar )?profile created$/i.test(entry.title.trim()) &&
+      !serviceEntries.some((service) => service.id === entry.id)
     );
     const ownershipTransferCount = Math.max(0, Number(instrument.ownershipTransferCount || 0));
 
@@ -1076,6 +1086,28 @@ function ProfilePanel({
             <Clock3 aria-hidden="true" />
             <span><strong>Profile origin</strong>{createdDate}</span>
           </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (activeTab === "service") {
+    return (
+      <section className="scan-tab-panel">
+        <PanelHeader icon={<Wrench />} label="Service" title="Owner-approved work connected to this instrument." />
+        <div className="timeline-list">
+          {serviceEntries.map((entry) => (
+            <TimelineItem
+              date={formatTimelineEntryDate(entry)}
+              title={entry.title}
+              copy={[
+                serviceSourceLabel(entry),
+                entry.publicDescription,
+                [entry.providerDisplayName || entry.shopName, entry.location].filter(Boolean).join(" / ")
+              ].filter(Boolean).join(" / ")}
+              key={entry.id}
+            />
+          ))}
         </div>
       </section>
     );
