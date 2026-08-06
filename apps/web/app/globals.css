@@ -13925,6 +13925,68 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   .admin-sidebar, .cms-sidebar { transition: none; }
 }
 
+/* Final responsive usability pass: preserve the desktop hierarchy without
+   squeezing owner and admin workspaces on touch-sized screens. */
+.import-mapping-grid select {
+  min-height: 40px;
+}
+
+.cms-section-controls button,
+.cms-block-actions button,
+.cms-add-block {
+  min-height: 36px;
+}
+
+.footer-links a,
+.footer-links button {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .auth-layout.account-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+
+  .account-hero-copy {
+    align-self: start;
+  }
+}
+
+@media (max-width: 640px) {
+  .catalog-guidance {
+    display: grid;
+    align-items: start;
+    gap: 5px;
+  }
+
+  .catalog-guidance span {
+    line-height: 1.55;
+  }
+
+  .admin-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .admin-stat-card {
+    min-height: 92px;
+    padding: 16px;
+  }
+
+  .account-section-nav button {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 360px) {
+  .admin-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* Content Studio focus pass */
 .cms-workspace {
   grid-template-columns: 260px minmax(0, 1fr) minmax(380px, 440px);

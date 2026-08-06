@@ -950,7 +950,7 @@ export default function SiteEditorPage() {
 
   if (!authorized) {
     return (
-      <><Nav /><main className="section cms-access"><div className="shell"><section className="card"><div className="eyebrow">Owner tools</div><h1>{status === "loading" ? "Checking Site Editor access." : "Admin access required."}</h1><p>{message}</p><Link className="button" href={`/login?next=${encodeURIComponent("/site-editor")}`}>Sign in</Link></section></div></main><Footer /></>
+      <><Nav /><main className="section cms-access"><div className="shell"><section className="card"><div className="eyebrow">Owner tools</div><h1>{status === "loading" ? "Checking Site Editor access." : "Admin access required."}</h1><p>{message}</p>{status !== "loading" ? <Link className="button" href={`/login?next=${encodeURIComponent("/site-editor")}`}>Sign in</Link> : null}</section></div></main><Footer /></>
     );
   }
 

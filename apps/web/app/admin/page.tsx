@@ -1667,9 +1667,11 @@ export default function AdminPage() {
               <div className="eyebrow">Admin access</div>
               <h2>{loading ? "Checking admin access." : "Sign in with an authorized admin account."}</h2>
               <p>{loading ? "Confirming your session before admin tools load." : "Owner tools stay hidden until an authorized admin account is signed in."}</p>
-              <Link className="button" href={`/login?next=${encodeURIComponent("/admin")}`}>
-                Sign in
-              </Link>
+              {!loading ? (
+                <Link className="button" href={`/login?next=${encodeURIComponent("/admin")}`}>
+                  Sign in
+                </Link>
+              ) : null}
             </section>
           ) : (
             <>
