@@ -110,10 +110,10 @@ const coreContentRegistry: ContentRegistryEntry[] = [
 
   field("catalog.hero.eyebrow", "Marketing", "Catalog", "Introduction", "Eyebrow", "The Catalog", { maxLength: 50, previewPath: "/catalog" }),
   field("catalog.hero.headline", "Marketing", "Catalog", "Introduction", "Headline", "Browse QRguitar Profiles", { maxLength: 90, previewPath: "/catalog" }),
-  field("catalog.hero.body", "Marketing", "Catalog", "Introduction", "Body", "Explore Public Profiles by brand, type, status, availability, and history.", { maxLength: 220, previewPath: "/catalog" }),
+  field("catalog.hero.body", "Marketing", "Catalog", "Introduction", "Body", "Explore QRguitar Profiles by brand, category, trust status, availability, and history.", { maxLength: 220, previewPath: "/catalog" }),
   field("catalog.empty.title", "Marketing", "Catalog", "Empty state", "Title", "No Profiles match these filters.", { maxLength: 90, previewPath: "/catalog" }),
   field("catalog.empty.body", "Marketing", "Catalog", "Empty state", "Body", "Clear a filter or search for another instrument.", { maxLength: 150, previewPath: "/catalog" }),
-  field("catalog.results.all", "Marketing", "Catalog", "Results", "All results label", "{count} Public Profiles", { allowedVariables: ["count"], maxLength: 70, previewPath: "/catalog" }),
+  field("catalog.results.all", "Marketing", "Catalog", "Results", "All results label", "{count} Profiles", { allowedVariables: ["count"], maxLength: 70, previewPath: "/catalog" }),
   field("catalog.results.filtered", "Marketing", "Catalog", "Results", "Filtered results label", "{count} Results", { allowedVariables: ["count"], maxLength: 70, previewPath: "/catalog" }),
   field("catalog.actions.reset", "Marketing", "Catalog", "Actions", "Reset filters label", "Reset filters", { maxLength: 40, previewPath: "/catalog" }),
   field("cards.attribution.collection", "Marketing", "Shared CTAs and states", "Profile cards", "Collection attribution", "From the collection of", { maxLength: 60, previewPath: "/catalog" }),

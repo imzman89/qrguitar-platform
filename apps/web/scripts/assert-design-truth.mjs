@@ -99,7 +99,7 @@ const catalogResult = await get("/catalog");
 for (const record of records) {
   assert(catalogResult.text.includes(record.qrCode), `Catalog is missing ${record.qrCode}.`);
 }
-const resultLabel = `${records.length} Public Profiles`;
+const resultLabel = `${records.length} Profiles`;
 assert(catalogResult.text.includes(resultLabel), `Catalog count does not match API count (${resultLabel}).`);
 
 const sitemapResult = await get("/sitemap.xml");

@@ -1425,20 +1425,26 @@ export default function AdminPage() {
               <p>Manage official brand logo URLs. User uploads never become brand logos.</p>
             </div>
           </div>
-          <div className="admin-filter-row">
-            <input
-              list="admin-used-brands"
-              value={brandLogoBrand}
-              onChange={(event) => setBrandLogoBrand(event.target.value)}
-              placeholder="Brand name, such as Fender"
-            />
-            <input
-              value={brandLogoUrl}
-              onChange={(event) => setBrandLogoUrl(event.target.value)}
-              placeholder="Transparent logo URL"
-            />
-            <button type="button" disabled={busy === "brand-logo"} onClick={saveCurrentBrandLogo}>
-              Save Logo
+          <div className="admin-brand-form">
+            <label>
+              <span>Brand</span>
+              <input
+                list="admin-used-brands"
+                value={brandLogoBrand}
+                onChange={(event) => setBrandLogoBrand(event.target.value)}
+                placeholder="Choose a brand"
+              />
+            </label>
+            <label>
+              <span>Transparent logo URL</span>
+              <input
+                value={brandLogoUrl}
+                onChange={(event) => setBrandLogoUrl(event.target.value)}
+                placeholder="https://example.com/logo.png"
+              />
+            </label>
+            <button className="button" type="button" disabled={busy === "brand-logo"} onClick={saveCurrentBrandLogo}>
+              <ImageIcon size={16} /> {busy === "brand-logo" ? "Saving..." : "Save Logo"}
             </button>
           </div>
           <datalist id="admin-used-brands">
@@ -1462,7 +1468,12 @@ export default function AdminPage() {
                   <button type="button" disabled={busy === "brand-logo"} onClick={() => removeCurrentBrandLogo(brandKey)}>Remove Logo</button>
                 </div>
               </div>
-            )) : <p className="admin-empty">No official brand logos saved yet. Profiles will show brand text only.</p>}
+            )) : (
+              <div className="admin-brand-empty">
+                <ImageIcon size={22} aria-hidden="true" />
+                <div><strong>No official logos yet</strong><p>Profiles will use clean brand text until an administrator assigns an approved transparent logo.</p></div>
+              </div>
+            )}
           </div>
         </section>
       );

@@ -217,7 +217,7 @@ export function CatalogClient({ initialRecords, content, composition }: { initia
           <div className="dashboard-hero">
             <div>
               <div className="eyebrow">{getContentValue(content, "catalog.hero.eyebrow")}</div>
-              <h2>{getContentValue(content, "catalog.hero.headline")}</h2>
+              <h1>{getContentValue(content, "catalog.hero.headline")}</h1>
               <p>{getContentValue(content, "catalog.hero.body")}</p>
             </div>
             <Link className="button" href="/create">
@@ -348,7 +348,7 @@ export function CatalogClient({ initialRecords, content, composition }: { initia
               <div className="card catalog-empty">
                 <div className="eyebrow">Loading QRguitar Profiles</div>
                 <h3>Opening the catalog.</h3>
-                <p>Fetching the latest Public Profiles now.</p>
+                <p>Fetching the latest QRguitar Profiles now.</p>
               </div>
             ) : visibleRecords.length ? (
               visibleRecords.map((record) => (

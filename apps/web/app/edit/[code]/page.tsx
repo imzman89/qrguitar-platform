@@ -933,7 +933,7 @@ export default function EditInstrumentPage() {
         <div className="shell split create-layout">
           <div>
             <div className="eyebrow">Edit QRguitar Profile</div>
-            <h2>{getContentValue(content, "edit.hero.headline")}</h2>
+            <h1>{getContentValue(content, "edit.hero.headline")}</h1>
             <p>{getContentValue(content, "edit.hero.body")}</p>
             <p>
               Update make, model, serial number, optional nickname, specs, links, photos, and QR appearance.
@@ -1752,7 +1752,7 @@ export default function EditInstrumentPage() {
                   ? message || "Only the profile owner can edit this profile."
                   : message || "Sign in with the account that owns this QRguitar Profile."}
             </p>
-            {forbidden ? (
+            {!ready ? null : forbidden ? (
               <Link className="button" href="/dashboard">
                 Back to Dashboard
               </Link>

@@ -401,7 +401,7 @@ export default function DashboardPage() {
           <div className="dashboard-hero">
             <div>
               <div className="eyebrow">{getContentValue(content, "dashboard.hero.headline")}</div>
-              <h2>{user ? `Welcome back, ${displayName}.` : "Your QRguitar workspace."}</h2>
+              <h1>{user ? `Welcome back, ${displayName}.` : "Your QRguitar workspace."}</h1>
               <p>
                 {user
                   ? `${getContentValue(content, "dashboard.hero.body")} ${accountSummary}`
