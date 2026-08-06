@@ -153,26 +153,28 @@ export default function LoginPage() {
     <>
       <Nav />
       <main className="section auth-page">
-        <div className="shell auth-layout">
+        <div className={isSignedIn ? "shell auth-layout is-signed-in" : "shell auth-layout"}>
           <section>
-            <div className="eyebrow">Customer account</div>
-            <h1>{mode === "register" ? "Create your QRguitar account." : mode === "reset" ? "Reset your QRguitar password." : getContentValue(content, "login.hero.headline")}</h1>
+            <div className="eyebrow">{isSignedIn ? "Account ready" : "Customer account"}</div>
+            <h1>{isSignedIn ? "Welcome back." : mode === "register" ? "Create your QRguitar account." : mode === "reset" ? "Reset your QRguitar password." : getContentValue(content, "login.hero.headline")}</h1>
             <p>
-              {mode === "register"
+              {isSignedIn
+                ? "Your Profiles and owner tools are ready in the dashboard."
+                : mode === "register"
                 ? "Create an account so your Profiles, QR links, photos, documents, and ownership tools stay tied to you."
                 : mode === "reset"
                   ? "Enter your account email and QRguitar will send a secure password reset link."
                 : getContentValue(content, "login.hero.body")}
             </p>
-            <div className="auth-tabs" role="tablist" aria-label="Account mode">
+            {!isSignedIn ? <div className="auth-tabs" role="tablist" aria-label="Account mode">
               <button className={mode === "login" ? "active" : ""} type="button" onClick={() => switchMode("login")}>
                 Login
               </button>
               <button className={mode === "register" ? "active" : ""} type="button" onClick={() => switchMode("register")}>
                 {getContentValue(content, "login.actions.create")}
               </button>
-            </div>
-            {mode === "login" ? (
+            </div> : null}
+            {!isSignedIn && mode === "login" ? (
               <button className="link-button auth-inline-link" type="button" onClick={() => switchMode("reset")}>
                 {getContentValue(content, "login.actions.forgot")}
               </button>
@@ -183,16 +185,15 @@ export default function LoginPage() {
             {isSignedIn ? (
               <>
                 <div className="eyebrow">Signed in</div>
-                <h2>Your QRguitar session is active.</h2>
-                <p>Go to your dashboard or sign out before using another account.</p>
+                <h2>Continue where you left off.</h2>
+                <p>Open your collection, manage Profiles, or update account settings.</p>
                 <div className="form-actions">
                   <Link className="button" href="/dashboard">
-                    Dashboard
+                    Open dashboard
                   </Link>
-                  <button className="button secondary" type="button" onClick={logout} disabled={isWorking}>
-                    Sign out
-                  </button>
+                  <Link className="button secondary" href="/account">Account settings</Link>
                 </div>
+                <button className="link-button auth-signout-link" type="button" onClick={logout} disabled={isWorking}>Sign out</button>
               </>
             ) : (
               <>

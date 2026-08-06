@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Fragment, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CollectibleRecordCard } from "./CollectibleRecordCard";
@@ -23,6 +24,7 @@ export function HomePageClient({
   const [settings, setSettings] = useState<EditableSiteSettings | null>(initialSettings);
   const [activeAudience, setActiveAudience] = useState(0);
   const [failedRecordPhotos, setFailedRecordPhotos] = useState<string[]>([]);
+  const [archiveIndex, setArchiveIndex] = useState(0);
   const archiveRailRef = useRef<HTMLDivElement | null>(null);
   const archiveDrag = useRef({ pointerId: -1, startX: 0, scrollLeft: 0 });
 
@@ -101,6 +103,7 @@ export function HomePageClient({
   const selectedAudience = audienceBlocks[activeAudience] || audienceBlocks[0];
 
   function beginArchiveDrag(event: PointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== "mouse") return;
     const rail = archiveRailRef.current;
     if (!rail) return;
     archiveDrag.current = { pointerId: event.pointerId, startX: event.clientX, scrollLeft: rail.scrollLeft };
@@ -108,12 +111,14 @@ export function HomePageClient({
   }
 
   function moveArchiveDrag(event: PointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== "mouse") return;
     const rail = archiveRailRef.current;
     if (!rail || archiveDrag.current.pointerId !== event.pointerId) return;
     rail.scrollLeft = archiveDrag.current.scrollLeft - (event.clientX - archiveDrag.current.startX);
   }
 
   function endArchiveDrag(event: PointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== "mouse") return;
     const rail = archiveRailRef.current;
     if (!rail || archiveDrag.current.pointerId !== event.pointerId) return;
     rail.releasePointerCapture(event.pointerId);
@@ -127,6 +132,25 @@ export function HomePageClient({
       left: (event.key === "ArrowRight" ? 1 : -1) * Math.max(280, event.currentTarget.clientWidth * 0.72),
       behavior: "smooth"
     });
+  }
+
+  function moveArchive(direction: -1 | 1) {
+    const rail = archiveRailRef.current;
+    if (!rail || !archiveRecords.length) return;
+    const next = Math.max(0, Math.min(archiveRecords.length - 1, archiveIndex + direction));
+    const target = rail.children.item(next) as HTMLElement | null;
+    rail.scrollTo({ left: target?.offsetLeft || 0, behavior: "smooth" });
+    setArchiveIndex(next);
+  }
+
+  function updateArchiveIndex() {
+    const rail = archiveRailRef.current;
+    if (!rail || !rail.children.length) return;
+    const cards = Array.from(rail.children) as HTMLElement[];
+    const next = cards.reduce((closest, card, index) => (
+      Math.abs(card.offsetLeft - rail.scrollLeft) < Math.abs(cards[closest].offsetLeft - rail.scrollLeft) ? index : closest
+    ), 0);
+    setArchiveIndex(next);
   }
 
   const renderedSections: Record<string, ReactNode> = {
@@ -151,7 +175,18 @@ export function HomePageClient({
                 <div className="eyebrow">{settings?.content["home.archive.eyebrow"] || "The living archive"}</div>
                 <h2>{settings?.content["home.archive.heading"] || "Explore the archive"}</h2>
               </div>
-              <Link className="text-link" href="/catalog">{settings?.content["home.archive.viewAll"] || "View all Profiles"}</Link>
+              <div className="home-archive-actions">
+                <div className="home-archive-controls" aria-label="Browse archive Profiles">
+                  <button type="button" onClick={() => moveArchive(-1)} disabled={archiveIndex === 0} aria-label="Previous Profile">
+                    <ChevronLeft size={17} aria-hidden="true" />
+                  </button>
+                  <span aria-live="polite">{archiveIndex + 1} / {archiveRecords.length}</span>
+                  <button type="button" onClick={() => moveArchive(1)} disabled={archiveIndex === archiveRecords.length - 1} aria-label="Next Profile">
+                    <ChevronRight size={17} aria-hidden="true" />
+                  </button>
+                </div>
+                <Link className="text-link" href="/catalog">{settings?.content["home.archive.viewAll"] || "View all Profiles"}</Link>
+              </div>
             </div>
             <div
               ref={archiveRailRef}
@@ -164,6 +199,7 @@ export function HomePageClient({
               onPointerUp={endArchiveDrag}
               onPointerCancel={endArchiveDrag}
               onKeyDown={handleArchiveKeyDown}
+              onScroll={updateArchiveIndex}
             >
               {archiveRecords.map((record) => (
                 <CollectibleRecordCard

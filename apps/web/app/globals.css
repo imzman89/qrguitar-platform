@@ -8502,7 +8502,7 @@ button.button {
   scroll-behavior: smooth;
   scrollbar-width: none;
   overscroll-behavior-x: contain;
-  touch-action: pan-y pinch-zoom;
+  touch-action: pan-x pan-y pinch-zoom;
   cursor: grab;
 }
 
@@ -11662,7 +11662,53 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   scroll-padding-inline: 2px;
   scroll-snap-type: x mandatory;
   scrollbar-width: thin;
-  touch-action: pan-y pinch-zoom;
+  touch-action: pan-x pan-y pinch-zoom;
+}
+
+.home-archive-actions,
+.home-archive-controls {
+  display: flex;
+  align-items: center;
+}
+
+.home-archive-actions {
+  gap: 18px;
+}
+
+.home-archive-controls {
+  gap: 8px;
+}
+
+.home-archive-controls button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(248, 246, 242, .14);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--text);
+  background: rgba(248, 246, 242, .035);
+  cursor: pointer;
+}
+
+.home-archive-controls button:hover,
+.home-archive-controls button:focus-visible {
+  border-color: rgba(240, 161, 43, .48);
+  color: var(--gold-2);
+}
+
+.home-archive-controls button:disabled {
+  cursor: default;
+  opacity: .3;
+}
+
+.home-archive-controls span {
+  min-width: 38px;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .hero {
@@ -11700,6 +11746,10 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 
   .home-archive-rail > .collectible-card {
     min-width: 0;
+  }
+
+  .home-archive-controls {
+    display: none;
   }
 }
 
@@ -11887,12 +11937,27 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 
 @media (max-width: 640px) {
   .home-archive-heading {
-    align-items: start;
-    flex-direction: column;
+    align-items: end;
+    flex-direction: row;
+    gap: 12px;
+  }
+
+  .home-archive-heading h2 {
+    font-size: 30px;
+  }
+
+  .home-archive-actions {
+    flex-direction: column-reverse;
+    gap: 8px;
+    align-items: flex-end;
+  }
+
+  .home-archive-actions .text-link {
+    font-size: 11px;
   }
 
   .home-archive-rail > .collectible-card {
-    flex-basis: min(86vw, 360px);
+    flex-basis: calc(100vw - 52px);
   }
 
   .collectible-card--archive .collectible-card-link {
@@ -14976,5 +15041,178 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 
   .create-page .create-layout > div > h1 {
     font-size: 40px;
+  }
+}
+
+/* Mobile product pass: immediate account access, compact discovery, and native touch rails. */
+.auth-signout-link {
+  width: fit-content;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.auth-layout.is-signed-in {
+  grid-template-columns: minmax(0, .9fr) minmax(360px, 480px);
+}
+
+@media (max-width: 900px) {
+  .auth-page {
+    padding-block: 38px 58px;
+  }
+
+  .auth-layout,
+  .auth-layout.is-signed-in {
+    gap: 26px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .auth-layout h1 {
+    max-width: 12ch;
+    margin-bottom: 12px;
+    font-size: clamp(38px, 10vw, 48px);
+    line-height: 1;
+  }
+
+  .auth-layout > section:first-child > p {
+    max-width: 42rem;
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  .auth-tabs {
+    margin-top: 18px;
+  }
+
+  .auth-inline-link {
+    margin-top: 10px;
+    border: 0;
+    padding: 4px 0;
+    background: transparent;
+    font-size: 12px;
+  }
+
+  .auth-card {
+    gap: 14px;
+    padding: 22px;
+  }
+
+  .auth-card h2 {
+    margin-bottom: 4px;
+    font-size: 25px;
+  }
+
+  .auth-card > p {
+    font-size: 14px;
+    line-height: 1.55;
+  }
+}
+
+@media (max-width: 640px) {
+  .catalog-page {
+    padding-top: 28px;
+  }
+
+  .catalog-page .dashboard-hero {
+    gap: 14px;
+    margin-bottom: 14px;
+    padding-block: 0 14px;
+  }
+
+  .catalog-page .dashboard-hero h1 {
+    max-width: 13ch;
+    margin-bottom: 10px;
+    font-size: 36px;
+    line-height: 1;
+  }
+
+  .catalog-page .dashboard-hero p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .catalog-page .dashboard-hero > .button {
+    width: fit-content;
+    min-height: 38px;
+    justify-self: start;
+    padding: 8px 13px;
+    font-size: 11px;
+  }
+
+  .catalog-guidance {
+    display: grid;
+    gap: 3px;
+    margin: 0 0 12px;
+    border: 0;
+    border-left: 2px solid rgba(240, 161, 43, .4);
+    padding: 2px 0 2px 11px;
+    background: transparent;
+  }
+
+  .catalog-guidance strong {
+    font-size: 12px;
+  }
+
+  .catalog-guidance span {
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .catalog-filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 9px 7px;
+    margin-bottom: 12px;
+    padding: 11px;
+  }
+
+  .catalog-search {
+    grid-column: 1 / -1;
+  }
+
+  .catalog-filters label {
+    min-width: 0;
+    gap: 5px;
+    font-size: 9px;
+  }
+
+  .catalog-filters select,
+  .catalog-filters input {
+    min-width: 0;
+    min-height: 40px;
+    padding-inline: 7px;
+    font-size: 11px;
+  }
+
+  .catalog-search span {
+    grid-template-columns: 16px minmax(0, 1fr) 32px;
+    padding-inline: 10px;
+  }
+
+  .catalog-summary {
+    border: 0;
+    padding: 2px 0 10px;
+    background: transparent;
+  }
+
+  .catalog-toolbar p {
+    font-size: 12px;
+  }
+
+  .auth-page {
+    padding-block: 28px 48px;
+  }
+
+  .auth-layout {
+    gap: 22px;
+  }
+
+  .auth-card {
+    padding: 20px 18px;
+  }
+
+  .auth-card .form-actions {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

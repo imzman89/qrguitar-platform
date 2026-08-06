@@ -44,6 +44,9 @@ includes(homepage, "archiveImages.has(leadImage)", "The archive must not repeat 
 includes(homepage, "home-archive-rail", "The archive must provide an intentional horizontal rail.");
 includes(homepage, "onPointerMove={moveArchiveDrag}", "The archive rail must support pointer drag.");
 includes(homepage, "handleArchiveKeyDown", "The archive rail must support keyboard movement.");
+includes(homepage, 'event.pointerType !== "mouse"', "Native touch scrolling must not be intercepted by mouse drag handling.");
+includes(homepage, "home-archive-controls", "Mobile archive browsing must provide explicit navigation controls.");
+includes(drawerCss, "touch-action: pan-x pan-y pinch-zoom", "Profile rails must permit native horizontal touch movement.");
 
 includes(dashboard, "Open Print Suite", "Dashboard must expose one coherent Print Suite action.");
 includes(dashboard, "Add Supplemental Media", "Dashboard History actions must distinguish supplemental Media from photographs.");

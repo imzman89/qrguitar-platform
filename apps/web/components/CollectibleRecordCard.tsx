@@ -65,6 +65,7 @@ export function CollectibleRecordCard({
   }
 
   function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== "mouse") return;
     const rail = railRef.current;
     if (!rail) return;
     dragState.current = { pointerId: event.pointerId, startX: event.clientX, scrollLeft: rail.scrollLeft, moved: false };
@@ -72,6 +73,7 @@ export function CollectibleRecordCard({
   }
 
   function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== "mouse") return;
     const rail = railRef.current;
     const drag = dragState.current;
     if (!rail || drag.pointerId !== event.pointerId) return;
@@ -81,6 +83,7 @@ export function CollectibleRecordCard({
   }
 
   function handlePointerEnd(event: PointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== "mouse") return;
     const rail = railRef.current;
     if (!rail || dragState.current.pointerId !== event.pointerId) return;
     rail.releasePointerCapture(event.pointerId);
