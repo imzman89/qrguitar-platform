@@ -22,6 +22,7 @@ export function HomePageClient({
 }) {
   const [settings, setSettings] = useState<EditableSiteSettings | null>(initialSettings);
   const [activeAudience, setActiveAudience] = useState(0);
+  const [failedRecordPhoto, setFailedRecordPhoto] = useState("");
   const archiveRailRef = useRef<HTMLDivElement | null>(null);
   const archiveDrag = useRef({ pointerId: -1, startX: 0, scrollLeft: 0 });
 
@@ -87,15 +88,10 @@ export function HomePageClient({
     archiveImages.add(leadImage);
     return true;
   }).slice(0, 4);
-  const archiveCodes = new Set(archiveRecords.map((record) => record.qrCode));
-  const supportingRecord = initialRecords.find((record) =>
-    record.qrCode !== initialLatestRecord?.qrCode &&
-    !archiveCodes.has(record.qrCode) &&
-    getProfilePhotoUrls(record).some((image) => !archiveImages.has(image))
-  );
-  const recordPhoto = supportingRecord
-    ? getProfilePhotoUrls(supportingRecord).find((image) => !archiveImages.has(image)) || ""
-    : "";
+  const supportingRecord = initialRecords.find((record) => getProfilePhotoUrls(record).length > 1)
+    || initialRecords.find((record) => getProfilePhotoUrls(record).length > 0);
+  const supportingPhotos = supportingRecord ? getProfilePhotoUrls(supportingRecord) : [];
+  const recordPhoto = supportingPhotos[1] || supportingPhotos[0] || "";
   const homeSections = settings?.composition.home.sections || [];
   const sectionBlocks = (sectionId: string) => homeSections.find((section) => section.id === sectionId)?.blocks.filter((block) => block.visible) || [];
   const audienceBlocks = sectionBlocks("roles");
@@ -207,7 +203,9 @@ export function HomePageClient({
           </div>
           <div className="record-holds-visual" aria-label="A QRguitar Profile keeps the instrument and its history together">
             <div className="record-holds-photo">
-              {recordPhoto ? <img src={recordPhoto} alt={`Documented ${supportingRecord?.brand || "instrument"} in QRguitar`} /> : <div className="record-holds-photo-empty"><span>{settings?.content["home.anatomy.fallback"] || "A permanent identity for every instrument"}</span></div>}
+              {recordPhoto && failedRecordPhoto !== recordPhoto
+                ? <img src={recordPhoto} alt={`Documented ${supportingRecord?.brand || "instrument"} in QRguitar`} onError={() => setFailedRecordPhoto(recordPhoto)} />
+                : <div className="record-holds-photo-empty"><span>{settings?.content["home.anatomy.fallback"] || "A permanent identity for every instrument"}</span></div>}
               <span>One permanent identity</span>
             </div>
             <div className="record-holds-facts">

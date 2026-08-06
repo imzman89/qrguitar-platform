@@ -12952,7 +12952,19 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 }
 
 .record-holds-photo-empty {
+  display: grid;
+  place-items: center;
+  padding: 32px;
   background: linear-gradient(145deg, rgba(240, 161, 43, .14), rgba(248, 246, 242, .03));
+}
+
+.record-holds-photo-empty span {
+  max-width: 240px;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 750;
+  line-height: 1.45;
+  text-align: center;
 }
 
 .record-holds-photo > span {
