@@ -957,7 +957,7 @@ export default function SiteEditorPage() {
   return (
     <>
       <Nav />
-      <main className="cms-page">
+      <main className={previewOpen ? "cms-page is-preview-open" : "cms-page"}>
         <header className="cms-commandbar">
           <div>
             <button type="button" className="cms-mobile-tree" onClick={() => setSidebarOpen(true)} aria-label="Open content tree" aria-expanded={sidebarOpen}><Menu size={18} /></button>
@@ -988,7 +988,9 @@ export default function SiteEditorPage() {
                 <h1>{selected.page}</h1>
                 <p>{query ? `Search results for "${query}"` : pagePurpose(selected)}</p>
                 <div className="cms-editor-timestamps">
-                  <span>Draft saved <strong>{formatTime(draftMeta?.updatedAt)}</strong></span>
+                  {draftMeta?.updatedAt
+                    ? <span>Draft saved <strong>{formatTime(draftMeta.updatedAt)}</strong></span>
+                    : <span>Draft <strong>None</strong></span>}
                   <span>Published <strong>{formatTime(publishedAt)}</strong></span>
                 </div>
               </div>
@@ -1016,7 +1018,7 @@ export default function SiteEditorPage() {
               </div>
               <button type="button" onClick={() => setPreviewVersion((value) => value + 1)} aria-label="Refresh preview"><RefreshCw size={16} /></button>
               <a href={previewUrl || previewPath} target="_blank" rel="noreferrer" aria-label="Open full preview"><Eye size={16} /></a>
-              <button type="button" onClick={() => setPreviewOpen(false)} aria-label="Collapse preview"><PanelRightClose size={16} /></button>
+              <button type="button" className="cms-preview-close" onClick={() => setPreviewOpen(false)} aria-label="Close preview"><PanelRightClose size={16} /><span>Close</span></button>
             </div>
             <div className={`cms-preview-frame is-${device}`}>
               {previewError ? <div className="cms-preview-error"><strong>Preview unavailable</strong><p>{previewError}</p><button type="button" onClick={() => setPreviewVersion((value) => value + 1)}>Try again</button></div> : null}

@@ -30,15 +30,16 @@ type AccountPayload = {
   };
 };
 
-type AccountSection = "overview" | "profile" | "collection" | "security" | "access" | "privacy";
+type AccountSection = "overview" | "profile" | "collection" | "security" | "notifications" | "provider" | "privacy";
 
 const accountSections: Array<{ id: AccountSection; label: string }> = [
   { id: "overview", label: "Overview" },
-  { id: "profile", label: "Profile" },
-  { id: "collection", label: "Public collection" },
+  { id: "collection", label: "Collection Page" },
+  { id: "profile", label: "Profile & Identity" },
   { id: "security", label: "Security" },
-  { id: "access", label: "Account access" },
-  { id: "privacy", label: "Privacy" }
+  { id: "notifications", label: "Notifications" },
+  { id: "provider", label: "Provider / Business" },
+  { id: "privacy", label: "Privacy & Data" }
 ];
 
 export default function AccountPage() {
@@ -203,8 +204,8 @@ export default function AccountPage() {
             </div>
             <div className="account-quick-links">
               <Link href="/dashboard">Dashboard</Link>
-              <Link href="/create">Create profile</Link>
-              <Link href="/catalog">Browse profiles</Link>
+              <Link href="/create">Create Profile</Link>
+              <Link href="/catalog">Explore the Catalog</Link>
               <Link href="/contact">Support</Link>
             </div>
             <div className="account-summary-grid">
@@ -251,7 +252,7 @@ export default function AccountPage() {
                 <p className="account-card-copy">Manage your identity, public collection, access, and privacy without leaving your owner workspace.</p>
                 <div className="account-overview-actions">
                   <button type="button" onClick={() => setActiveSection("profile")}><UserRound size={17} aria-hidden="true" /><span><b>Profile details</b><small>Update the name connected to your Profiles.</small></span></button>
-                  <button type="button" onClick={() => setActiveSection("collection")}><UsersRound size={17} aria-hidden="true" /><span><b>Public collection</b><small>Choose what other people can discover.</small></span></button>
+                  <button type="button" onClick={() => setActiveSection("collection")}><UsersRound size={17} aria-hidden="true" /><span><b>Collection page</b><small>Share your public Profiles from one link.</small></span></button>
                   <button type="button" onClick={() => setActiveSection("security")}><LockKeyhole size={17} aria-hidden="true" /><span><b>Security</b><small>Reset your password or sign out securely.</small></span></button>
                   <Link href="/dashboard"><ShieldCheck size={17} aria-hidden="true" /><span><b>Profile controls</b><small>Manage visibility, serial display, documents, and QR tools.</small></span></Link>
                 </div>
@@ -285,13 +286,13 @@ export default function AccountPage() {
 
             {activeSection === "collection" ? <section className="card auth-card account-settings-card" id="public-collection">
               <div className="auth-card-head">
-                <span>Public collection</span>
-                <strong><UsersRound size={18} aria-hidden="true" /> {getContentValue(content, "collections.hero.headline")}</strong>
+                <span>Collection page</span>
+                <strong><UsersRound size={18} aria-hidden="true" /> Share your collection</strong>
               </div>
-              <p className="account-card-copy">{getContentValue(content, "collections.hero.body")}</p>
+              <p className="account-card-copy">Create one shareable page for your public QRguitar Profiles. Private and unlisted Profiles never appear there.</p>
               <label className="toggle-field">
                 <input type="checkbox" checked={publicCollection.enabled} onChange={(event) => setPublicCollection((current) => ({ ...current, enabled: event.target.checked }))} />
-                Enable my public collection
+                Publish my collection page
               </label>
               <div className="form-grid compact">
                 <label className="field"><span>Public name</span><input value={publicCollection.publicName} onChange={(event) => setPublicCollection((current) => ({ ...current, publicName: event.target.value }))} placeholder={displayName} /></label>
@@ -303,9 +304,14 @@ export default function AccountPage() {
                 <label className="field"><span>Avatar URL (optional)</span><input type="url" value={publicCollection.avatarUrl} onChange={(event) => setPublicCollection((current) => ({ ...current, avatarUrl: event.target.value }))} placeholder="https://" /></label>
               </div>
               <label className="toggle-field"><input type="checkbox" checked={publicCollection.allowIndexing} onChange={(event) => setPublicCollection((current) => ({ ...current, allowIndexing: event.target.checked }))} /> Allow search engines to index this collection</label>
+              <label className="toggle-field">
+                <input type="checkbox" checked={publicCollection.allowMessages} onChange={(event) => setPublicCollection((current) => ({ ...current, allowMessages: event.target.checked }))} />
+                Allow signed-in members to send private inquiries
+              </label>
+              <p className="field-note">Your email stays private. QRguitar relays the first message, and you decide whether to reply.</p>
               <div className="form-actions">
-                <button className="button" type="button" onClick={saveAccount} disabled={isWorking}>{isWorking ? "Saving..." : getContentValue(content, "collections.actions.save")}</button>
-                {publicCollection.enabled && publicCollection.handle ? <Link className="button secondary" href={`/collections/${publicCollection.handle}`} target="_blank">Preview collection <ExternalLink size={15} /></Link> : null}
+                <button className="button" type="button" onClick={saveAccount} disabled={isWorking}>{isWorking ? "Saving..." : "Save collection page"}</button>
+                {publicCollection.enabled && publicCollection.handle ? <Link className="button secondary" href={`/collections/${publicCollection.handle}`} target="_blank">Open collection page <ExternalLink size={15} /></Link> : null}
               </div>
             </section> : null}
 
@@ -325,38 +331,46 @@ export default function AccountPage() {
               </div>
             </section> : null}
 
-            {activeSection === "access" ? <section className="card auth-card account-settings-card">
+            {activeSection === "notifications" ? <section className="card auth-card account-settings-card">
               <div className="auth-card-head">
-                <span>Access</span>
-                <strong><ShieldCheck size={18} aria-hidden="true" /> Current account level</strong>
+                <span>Notifications</span>
+                <strong><ShieldCheck size={18} aria-hidden="true" /> Account notices</strong>
+              </div>
+              <p className="account-card-copy">Security, transfer, claim, and service-review notices are sent to your account email when action is required.</p>
+              <div className="account-status-grid">
+                <div><span>Delivery email</span><strong>{email}</strong></div>
+                <div><span>Required notices</span><strong>Enabled</strong></div>
+              </div>
+              <p className="field-note">Required account and ownership notices cannot be disabled during public beta.</p>
+            </section> : null}
+
+            {activeSection === "provider" ? <section className="card auth-card account-settings-card">
+              <div className="auth-card-head">
+                <span>Provider / Business</span>
+                <strong><ShieldCheck size={18} aria-hidden="true" /> Business tools</strong>
               </div>
               <div className="account-status-grid">
-                <div>
-                  <span>Status</span>
-                  <strong>{accountStatus || "active"}</strong>
-                </div>
-                <div>
-                  <span>Plan</span>
-                  <strong>{plan || "free"}</strong>
-                </div>
-                <div>
-                  <span>Role</span>
-                  <strong>{role || "user"}</strong>
-                </div>
+                <div><span>Status</span><strong>{accountStatus || "active"}</strong></div>
+                <div><span>Plan</span><strong>{plan || "free"}</strong></div>
+                <div><span>Role</span><strong>{role || "user"}</strong></div>
               </div>
-              <p className="account-card-copy">Verification, commercial access, and manual review are handled by QRguitar during beta.</p>
+              <p className="account-card-copy">Use business tools when you manage inventory at scale or document work for an instrument owner.</p>
+              <div className="form-actions">
+                <Link className="button secondary" href="/dashboard/import">Open Bulk Import</Link>
+                <Link className="button secondary" href="/installers">Service Provider Network</Link>
+              </div>
             </section> : null}
 
             {activeSection === "privacy" ? <section className="card auth-card account-settings-card">
               <div className="auth-card-head">
-                <span>Privacy</span>
-                <strong><ShieldCheck size={18} aria-hidden="true" /> Record controls</strong>
+                <span>Privacy &amp; Data</span>
+                <strong><ShieldCheck size={18} aria-hidden="true" /> Profile controls</strong>
               </div>
               <p className="account-card-copy">
-                Each profile controls visibility, hidden proof documents, service history, serial display, and QR downloads from its editor.
+                Each Profile controls visibility, private documents, service history, Serial Number display, and QR downloads from its editor.
               </p>
               <div className="form-actions">
-                <Link className="button secondary" href="/dashboard">Manage profiles</Link>
+                <Link className="button secondary" href="/dashboard">Manage Profiles</Link>
                 <Link className="button secondary" href="/contact">Get support</Link>
               </div>
             </section> : null}

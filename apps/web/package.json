@@ -20,6 +20,9 @@
     "test:design-truth": "node scripts/assert-design-truth.mjs",
     "test:final-experience": "node scripts/assert-final-experience.mjs",
     "test:customer-ready": "node scripts/assert-customer-ready.mjs",
+    "test:brand-experience": "node scripts/assert-brand-experience.mjs",
+    "test:master-release": "node scripts/assert-master-release.mjs",
+    "test:final-signed-in-acceptance": "node scripts/assert-final-signed-in-acceptance.mjs",
     "test:content-coverage": "node scripts/assert-content-coverage.mjs",
     "test:admin": "node scripts/assert-admin.mjs",
     "test:site-editor": "node scripts/assert-site-editor.mjs"
@@ -38,6 +41,8 @@
     "@types/qrcode": "^1.5.5",
     "@types/react": "^18.2.79",
     "@types/react-dom": "^18.3.0",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "14.2.35",
     "typescript": "^5.5.4"
   }
 }

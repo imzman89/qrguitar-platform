@@ -13,24 +13,24 @@ export default async function TermsPage() {
   const settings = await loadPublishedSiteSettings();
   const sections = [
     {
-      title: getContentValue(settings.content, "terms.sections.accounts.heading"),
-      copy: getContentValue(settings.content, "terms.sections.accounts.body")
+      title: getContentValue(settings.content, "terms.sections.content.heading"),
+      copy: getContentValue(settings.content, "terms.sections.content.body")
     },
     {
-      title: "Permanent QR concept",
-      copy: "QRguitar is designed so the QRguitar ID and /i/[code] profile URL stay with the instrument as details are edited. QRguitar cannot guarantee eternal hosting by every third-party provider, network, phone, browser, or storage service."
+      title: getContentValue(settings.content, "terms.sections.ids.heading"),
+      copy: getContentValue(settings.content, "terms.sections.ids.body")
     },
     {
-      title: "Verification and authenticity",
-      copy: "Verification and authenticity review are based on available evidence at the time of review. They are not an appraisal, insurance guarantee, fraud-proof certificate, guarantee of future condition, or guarantee against undisclosed modifications."
+      title: getContentValue(settings.content, "terms.sections.verification.heading"),
+      copy: getContentValue(settings.content, "terms.sections.verification.body")
     },
     {
-      title: "Safety and transfers",
-      copy: "Lost/stolen reports must be truthful. Ownership transfers must be started and accepted by people with proper authorization. Abuse, fraud, impersonation, or infringing uploads may result in account restrictions."
+      title: getContentValue(settings.content, "terms.sections.ownership.heading"),
+      copy: getContentValue(settings.content, "terms.sections.ownership.body")
     },
     {
-      title: "Beta and future paid features",
-      copy: "QRguitar is in public beta. Features, limits, and paid services may change. No checkout or payment flow is live unless it is clearly presented inside the product at the time you use it."
+      title: getContentValue(settings.content, "terms.sections.beta.heading"),
+      copy: getContentValue(settings.content, "terms.sections.beta.body")
     }
   ];
 
@@ -42,10 +42,7 @@ export default async function TermsPage() {
           <div className="shell legal-page">
             <div className="eyebrow">Terms</div>
             <h1>{getContentValue(settings.content, "terms.hero.headline")}</h1>
-            <p>
-              QRguitar provides QR-linked instrument profiles for guitars, basses, amps, pedals, builders, shops,
-              collectors, and future owners. These terms explain the practical rules for using the beta.
-            </p>
+            <p>{getContentValue(settings.content, "terms.hero.intro")}</p>
             {sections.map((section) => (
               <div className="legal-card" key={section.title}>
                 <h2>{section.title}</h2>
@@ -53,8 +50,8 @@ export default async function TermsPage() {
               </div>
             ))}
             <div className="legal-card">
-              <h2>Support</h2>
-              <p>Questions can be sent to <a href="mailto:support@qrguitar.com">support@qrguitar.com</a>.</p>
+              <h2>{getContentValue(settings.content, "terms.sections.support.heading")}</h2>
+              <p>{getContentValue(settings.content, "terms.sections.support.body")}</p>
             </div>
           </div>
         </section>

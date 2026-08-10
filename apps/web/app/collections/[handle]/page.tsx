@@ -7,6 +7,7 @@ import { getPublicInstruments } from "../../../lib/public-instruments";
 import { createServerSupabaseClient } from "../../../lib/supabase-server";
 import { CollectionsClient } from "./CollectionsClient";
 import { loadPublishedSiteSettings } from "../../../lib/site-settings-server";
+import { CollectionInquiryForm } from "../../../components/CollectionInquiryForm";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ han
         <strong className="collection-count">{records.length}<small>Public {records.length === 1 ? "Profile" : "Profiles"}</small></strong>
       </header>
       <CollectionsClient records={records} content={publishedSettings.content} />
+      {settings.allowMessages ? <CollectionInquiryForm handle={settings.handle} publicName={settings.publicName} profiles={records.map((record) => ({ code: record.qrCode, title: record.name || [record.brand, record.model].filter(Boolean).join(" ") || record.qrCode }))} /> : null}
     </main>
     <Footer />
   </>;

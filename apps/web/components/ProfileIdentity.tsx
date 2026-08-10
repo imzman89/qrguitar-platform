@@ -41,8 +41,18 @@ export function buildProfileIdentityFields(values: ProfileIdentityValues): Profi
   ].filter((field): field is ProfileIdentityField => Boolean(field.value));
 }
 
-export function ProfileIdentity({ values, mediaSummary = "", children }: { values: ProfileIdentityValues; mediaSummary?: string; children?: ReactNode }) {
-  const fields = buildProfileIdentityFields(values);
+export function ProfileIdentity({
+  values,
+  mediaSummary = "",
+  excludeLabels = [],
+  children
+}: {
+  values: ProfileIdentityValues;
+  mediaSummary?: string;
+  excludeLabels?: ProfileIdentityField["label"][];
+  children?: ReactNode;
+}) {
+  const fields = buildProfileIdentityFields(values).filter((field) => !excludeLabels.includes(field.label));
 
   return (
     <section className="identity-card">

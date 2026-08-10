@@ -89,7 +89,7 @@ export function HomePageClient({
     if (!leadImage || archiveImages.has(leadImage)) return false;
     archiveImages.add(leadImage);
     return true;
-  }).slice(0, 4);
+  }).slice(0, 3);
   const supportingRecord = initialRecords.find((record) => record.qrCode !== initialLatestRecord?.qrCode && getProfilePhotoUrls(record).length > 1)
     || initialRecords.find((record) => record.qrCode !== initialLatestRecord?.qrCode && getProfilePhotoUrls(record).length > 0);
   const supportingPhotos = supportingRecord ? getProfilePhotoUrls(supportingRecord) : [];
@@ -168,12 +168,16 @@ export function HomePageClient({
           </div>
           <LatestPublicRecord initialRecord={initialLatestRecord} content={settings?.content} />
         </div>
-        {archiveRecords.length ? (
-          <div className="shell home-archive">
+      </section>
+    ),
+    archive: archiveRecords.length ? (
+      <section className="section home-archive-section">
+        <div className="shell home-archive">
             <div className="home-archive-heading">
               <div>
-                <div className="eyebrow">{settings?.content["home.archive.eyebrow"] || "The living archive"}</div>
-                <h2>{settings?.content["home.archive.heading"] || "Explore the archive"}</h2>
+                <div className="eyebrow">{settings?.content["home.archive.eyebrow"] || "PUBLIC PROFILES"}</div>
+                <h2>{settings?.content["home.archive.heading"] || "See what's already documented."}</h2>
+                <p>{settings?.content["home.archive.body"] || "Browse real QRguitar Profiles from the public Catalog."}</p>
               </div>
               <div className="home-archive-actions">
                 <div className="home-archive-controls" aria-label="Browse archive Profiles">
@@ -211,11 +215,10 @@ export function HomePageClient({
               ))}
             </div>
           </div>
-        ) : null}
       </section>
-    ),
+    ) : null,
     lifecycle: (
-      <section className="section alt">
+      <section className="section home-lifecycle-section">
         <div className="shell">
           <div className="section-header">
             <div className="eyebrow">{copy.workflow.eyebrow}</div>
@@ -235,17 +238,14 @@ export function HomePageClient({
             <div className="eyebrow">{copy.customization.eyebrow}</div>
             <h2>{copy.customization.headline}</h2>
             <p>{copy.customization.body}</p>
-            <div className="check-list">
-              {copy.customization.checks.map((item) => <div className="check-item" key={item.copy}><item.icon size={18} /><span>{item.copy}</span></div>)}
-            </div>
-            <div className="inline-cta-row"><Link className="button" href="/create">{copy.customization.cta}</Link></div>
+            <div className="inline-cta-row"><Link className="button" href={supportingRecord ? `/i/${encodeURIComponent(supportingRecord.qrCode)}` : "/catalog"}>{copy.customization.cta}</Link></div>
           </div>
           <div className="record-holds-visual" aria-label="A QRguitar Profile keeps the instrument and its history together">
             <div className="record-holds-photo">
               {recordPhoto
                 ? <img src={recordPhoto} alt={`Documented ${supportingRecord?.brand || "instrument"} in QRguitar`} onError={() => setFailedRecordPhotos((current) => current.includes(recordPhoto) ? current : [...current, recordPhoto])} />
                 : <div className="record-holds-photo-empty"><span>{settings?.content["home.anatomy.fallback"] || "A permanent identity for every instrument"}</span></div>}
-              <span>One permanent identity</span>
+              <span>One Profile</span>
             </div>
             <div className="record-holds-facts">
               {sectionBlocks("anatomy").map((item, index) => <div key={item.id}><span>{String(index + 1).padStart(2, "0")}</span><strong>{item.title}</strong><p>{item.body}</p></div>)}
@@ -255,16 +255,15 @@ export function HomePageClient({
       </section>
     ),
     roles: (
-      <section className="section alt">
+      <section className="section home-roles-section">
         <div className="shell">
-          <div className="section-header"><div className="eyebrow">{copy.audiences.eyebrow}</div><h2>{copy.audiences.headline}</h2><p>{copy.audiences.body}</p></div>
+          <div className="section-header"><div className="eyebrow">{copy.audiences.eyebrow}</div><h2>{copy.audiences.headline}</h2>{copy.audiences.body ? <p>{copy.audiences.body}</p> : null}</div>
           <div className="audience-switcher">
             <div className="audience-tabs" role="tablist" aria-label="Choose how you use QRguitar">
               {audienceBlocks.map((item, index) => <button className={index === activeAudience ? "is-active" : ""} key={item.id} type="button" role="tab" aria-selected={index === activeAudience} onClick={() => setActiveAudience(index)}>{item.title}</button>)}
             </div>
             {selectedAudience ? <article className="audience-panel" role="tabpanel"><div className="icon"><EditorialIcon name={selectedAudience.icon} size={30} /></div><div><h3>{selectedAudience.title}</h3><p>{selectedAudience.body}</p></div><Link className="button secondary" href={selectedAudience.ctaUrl || "/how-it-works"}>{selectedAudience.ctaLabel || "See the workflow"}</Link></article> : null}
           </div>
-          {copy.audiences.cta ? <div className="section-cta"><Link className="button" href="/dashboard">{copy.audiences.cta}</Link></div> : null}
         </div>
       </section>
     ),
@@ -272,10 +271,10 @@ export function HomePageClient({
       <section className="section continuity-section">
         <div className="shell continuity-layout">
           <div className="continuity-intro">
-            <div className="eyebrow">{settings?.content["home.continuity.eyebrow"] || "History that stays useful"}</div>
-            <h2>{settings?.content["home.continuity.headline"] || "One Profile, through the work and every handoff."}</h2>
-            <p>{settings?.content["home.continuity.body"] || "QRguitar keeps the instrument's identity connected while owners decide which service, documents, and history become public."}</p>
-            <Link className="text-link" href="/how-it-works">{settings?.content["home.continuity.cta"] || "See the full workflow"}</Link>
+            <div className="eyebrow">{settings?.content["home.continuity.eyebrow"] || "SERVICE & OWNERSHIP"}</div>
+            <h2>{settings?.content["home.continuity.headline"] || "The history stays with the instrument."}</h2>
+            <p>{settings?.content["home.continuity.body"] || "Approved service and completed ownership transfers update the same Profile. The QRguitar ID and link do not change."}</p>
+            <Link className="text-link" href="/how-it-works">{settings?.content["home.continuity.cta"] || "See How It Works"}</Link>
           </div>
           <div className="continuity-list">
             {sectionBlocks("continuity").map((item, index) => (
@@ -292,7 +291,7 @@ export function HomePageClient({
     pricing: (
       <section className="section pricing-section">
         <div className="shell">
-          <div className="section-header"><div className="eyebrow">{copy.pricing.eyebrow}</div><h2>{copy.pricing.headline}</h2><p>{copy.pricing.body}</p></div>
+          <div className="section-header"><div className="eyebrow">{copy.pricing.eyebrow}</div><h2>{copy.pricing.headline}</h2>{copy.pricing.body ? <p>{copy.pricing.body}</p> : null}</div>
           <div className="pricing-grid">
             {sectionBlocks("pricing").map((plan) => <PricingCard key={plan.id} name={plan.title} price={plan.label || ""} copy={plan.body} features={plan.items || []} cta={plan.ctaLabel} href={plan.ctaUrl} />)}
           </div>
@@ -300,10 +299,10 @@ export function HomePageClient({
       </section>
     ),
     finalCta: (
-      <section className="section alt">
+      <section className="section home-final-cta">
         <div className="shell">
-          <div className="section-header"><div className="eyebrow">{settings?.content["home.finalCta.eyebrow"] || "Ready when the instrument is"}</div><h2>{settings?.content["home.finalCta.headline"] || "Start the Profile that stays with it."}</h2><p>{settings?.content["home.finalCta.body"] || "Create one Profile now, then add photos, history, and proof as the instrument's story grows."}</p></div>
-          <div className="section-cta"><Link className="button" href="/create">{settings?.content["home.finalCta.primaryCta"] || "Create Profile"}</Link><Link className="button secondary" href="/catalog">{settings?.content["home.finalCta.secondaryCta"] || "Browse Profiles"}</Link></div>
+          <div className="section-header">{settings?.content["home.finalCta.eyebrow"] ? <div className="eyebrow">{settings.content["home.finalCta.eyebrow"]}</div> : null}<h2>{settings?.content["home.finalCta.headline"] || "Start with one instrument."}</h2><p>{settings?.content["home.finalCta.body"] || "Create the Profile now. Add the rest over time."}</p></div>
+          <div className="section-cta"><Link className="button" href="/create">{settings?.content["home.finalCta.primaryCta"] || "Create a Profile"}</Link><Link className="button secondary" href="/catalog">{settings?.content["home.finalCta.secondaryCta"] || "Explore the Catalog"}</Link></div>
         </div>
       </section>
     )

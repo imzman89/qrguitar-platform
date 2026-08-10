@@ -28,7 +28,7 @@ const documentTypeOptions = [
   "Insurance",
   "Manual",
   "Original Case Candy",
-  "Ownership Proof",
+  "Ownership Evidence",
   "Other"
 ];
 type DocumentDraft = {
@@ -577,22 +577,27 @@ export default function CreatePage() {
 
 
                 <section className="create-step-panel" aria-labelledby="create-step-one">
-                  <div className="form-section-heading"><span className="eyebrow">Required</span><h2 id="create-step-one">{getContentValue(content, "create.identity.heading")}</h2><p>{getContentValue(content, "create.photo.help")}</p></div>
+                  <div className="form-section-heading"><span className="eyebrow">Step 1</span><h2 id="create-step-one">Instrument</h2><p>{getContentValue(content, "create.identity.body")}</p></div>
                   <div className="form-grid">
                     <Field required error={fieldErrors.brand} label="Brand / Make" id="brand" value={form.brand} list="qrguitar-known-brands" placeholder="Start typing a brand" onChange={(value) => updateField("brand", value)} onBlur={(value) => updateField("brand", canonicalInstrumentBrand(value) || value.trim())} />
                     <Field required error={fieldErrors.model} label="Model" id="model" value={form.model} onChange={(value) => updateField("model", value)} />
                     <Field required={!form.serialNotUsed} error={fieldErrors.serial} label="Serial Number" id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} placeholder="Manufacturer or builder serial" disabled={form.serialNotUsed} />
-                    <Field label="Year" id="year" value={form.year} onChange={(value) => updateField("year", value)} placeholder="If known" />
+                    <Field label="Year (optional)" id="year" value={form.year} onChange={(value) => updateField("year", value)} placeholder="Leave blank if unknown" />
                     <CategoryField required error={fieldErrors.instrumentType} label="Instrument type" id="instrumentType" value={form.instrumentType} options={categoryOptions} onChange={(value) => updateField("instrumentType", value)} />
                   </div>
                   <label className="toggle-field create-inline-toggle">
                     <input type="checkbox" checked={form.serialNotUsed} onChange={(event) => setForm((current) => ({ ...current, serialNotUsed: event.target.checked, serial: event.target.checked ? "" : current.serial, showSerialPublic: event.target.checked ? false : current.showSerialPublic }))} />
                     This instrument has no Serial Number
                   </label>
-                  <p className="fine-print">If no Serial Number exists, QRguitar assigns a secure generated ID. Verification without a Serial Number requires prior QRguitar approval.</p>
+                  <p className="fine-print">{getContentValue(content, "create.serial.generatedHelp")} Verification without a Serial Number requires prior QRguitar approval.</p>
+                </section>
+
+
+                <section className="create-step-panel" aria-labelledby="create-step-two">
+                  <div className="form-section-heading"><span className="eyebrow">Step 2</span><h2 id="create-step-two">{getContentValue(content, "create.photos.heading")}</h2><p>{getContentValue(content, "create.photos.body")}</p></div>
                   <label className="create-photo-drop" htmlFor="profilePhotos">
                     <strong>{getContentValue(content, "create.photo.help")}</strong>
-                    <span>Choose photos from your device or use your phone camera. JPG, PNG, or WebP up to 12MB each.</span>
+                    <span>Choose photos from your device or use your phone camera. Files can be up to 12MB each.</span>
                     <input id="profilePhotos" name="profilePhotos" type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={(event) => void addProfilePhotos(event.target.files)} />
                   </label>
                   {fieldErrors.photos ? <p className="field-error" role="alert">{fieldErrors.photos}</p> : null}
@@ -600,8 +605,8 @@ export default function CreatePage() {
                 </section>
 
 
-                <section className="create-step-panel" aria-labelledby="create-step-two">
-                  <div className="form-section-heading"><span className="eyebrow">Ownership and privacy</span><h2 id="create-step-two">Your relationship to this instrument</h2><p>This helps explain the ownership history. You can update or transfer the Profile later.</p></div>
+                <section className="create-step-panel" aria-labelledby="create-step-three">
+                  <div className="form-section-heading"><span className="eyebrow">Step 3</span><h2 id="create-step-three">{getContentValue(content, "create.ownership.heading")}</h2><p>{getContentValue(content, "create.ownership.body")}</p></div>
                   <div className="form-grid">
                     <div className="field">
                       <label htmlFor="ownerStatus">Relationship (optional)</label>
@@ -631,8 +636,8 @@ export default function CreatePage() {
                 </section>
 
 
-                <section className="create-step-panel" aria-labelledby="create-step-three">
-                  <div className="form-section-heading"><span className="eyebrow">Optional details</span><h2 id="create-step-three">Instrument details</h2><p>Add what is useful now. History, service, media, and documents can continue growing after creation.</p></div>
+                <section className="create-step-panel" aria-labelledby="create-step-four">
+                  <div className="form-section-heading"><span className="eyebrow">Step 4</span><h2 id="create-step-four">Details</h2><p>{getContentValue(content, "create.details.body")}</p></div>
                   <div className="form-grid">
                     <Field label="Display title / nickname" id="name" value={form.name} onChange={(value) => updateField("name", value)} placeholder="Defaults to Brand + Model" />
                     <div className="field"><label htmlFor="instrumentCondition">Condition</label><select id="instrumentCondition" value={form.instrumentCondition} onChange={(event) => updateField("instrumentCondition", event.target.value)}><option value="new">New</option><option value="used">Used</option></select></div>
@@ -679,8 +684,8 @@ export default function CreatePage() {
                 </section>
 
 
-                <section className="create-step-panel" aria-labelledby="create-step-four">
-                  <div className="form-section-heading"><span className="eyebrow">Review</span><h2 id="create-step-four">Confirm and create</h2><p>Confirm the identity, photo, visibility, and ownership details before creating the permanent Profile.</p></div>
+                <section className="create-step-panel" aria-labelledby="create-step-five">
+                  <div className="form-section-heading"><span className="eyebrow">Step 5</span><h2 id="create-step-five">{getContentValue(content, "create.review.heading")}</h2><p>{getContentValue(content, "create.review.body")}</p></div>
                   <div className="create-review-grid">
                     <div><span>QRguitar ID</span><strong>{qrCode}</strong></div>
                     <div><span>Serial Number</span><strong>{form.serial || "No serial number"}</strong></div>
@@ -695,7 +700,7 @@ export default function CreatePage() {
               {message ? <div className="form-message" role={fieldErrors && Object.keys(fieldErrors).length ? "alert" : "status"}><strong>{message}</strong>{existingProfileHref || claimHref ? <div className="form-actions">{existingProfileHref ? <Link className="button secondary" href={existingProfileHref}>View existing Profile</Link> : null}{claimHref ? <Link className="button secondary" href={claimHref}>Request ownership</Link> : null}</div> : null}{lastErrorRetryable ? <button className="button secondary" type="button" onClick={() => void createRecordAndRedirect(false)} disabled={savingProfile}>Retry safely</button> : null}</div> : null}
               <div className="create-wizard-actions">
                 <Link className="button secondary" href="/dashboard">Cancel</Link>
-                <button className="button" type="button" onClick={saveDraft} disabled={savingProfile}>{savingProfile ? "Creating Profile..." : "Create QRguitar Profile"}</button>
+                <button className="button" type="button" onClick={saveDraft} disabled={savingProfile}>{savingProfile ? "Creating Profile..." : getContentValue(content, "create.actions.submit")}</button>
               </div>
             </form>
 

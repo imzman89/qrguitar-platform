@@ -44,7 +44,7 @@ export function CollectibleRecordCard({
   const [failedImages, setFailedImages] = useState<number[]>([]);
   const railRef = useRef<HTMLDivElement | null>(null);
   const dragState = useRef({ pointerId: -1, startX: 0, scrollLeft: 0, moved: false });
-  const galleryImages = variant === "archive" ? card.images.slice(0, 1) : card.images;
+  const galleryImages = variant === "archive" || variant === "latest" ? card.images.slice(0, 1) : card.images;
   const showSecondaryAction = variant !== "latest" && secondaryHref && secondaryLabel;
   const showSecondaryText = variant !== "latest" && !secondaryHref && secondaryLabel;
   const summary = variant === "latest" || variant === "archive" ? "" : card.summary;
@@ -146,7 +146,7 @@ export function CollectibleRecordCard({
                       className="collectible-card-image"
                       src={imageUrl}
                       alt={`${card.title} photo ${index + 1} of ${galleryImages.length}`}
-                      loading={variant === "latest" && index === 0 ? "eager" : "lazy"}
+                      loading={index === 0 ? "eager" : "lazy"}
                       decoding="async"
                       draggable={false}
                       onError={() => setFailedImages((current) => current.includes(index) ? current : [...current, index])}

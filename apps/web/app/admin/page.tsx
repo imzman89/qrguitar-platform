@@ -992,7 +992,7 @@ export default function AdminPage() {
             <option value="lost">Reported Lost</option>
             <option value="stolen">Reported Stolen</option>
             <option value="recovered">Recovered</option>
-            <option value="has-proof">Has proof docs</option>
+            <option value="has-proof">Has evidence documents</option>
             <option value="has-service">Has service history</option>
           </select>
         ) : (
@@ -1046,7 +1046,7 @@ export default function AdminPage() {
                 {record.isOwnerRemoved ? " - Deleted by owner" : ""}
               </span>
               <small>
-                Owner {record.ownerEmail || "No email"} - Proof {record.proofDocumentCount} - Service {record.serviceEventCount} - Transfers {record.transferCount}
+                Owner {record.ownerEmail || "No email"} - Evidence {record.proofDocumentCount} - Service {record.serviceEventCount} - Transfers {record.transferCount}
               </small>
               <div className="admin-inline-badges">
                 <button type="button" onClick={() => goToSection("trust", record.verificationStatus === "Verified" ? "verified" : "unverified")}>{record.verificationStatus}</button>
@@ -1141,7 +1141,7 @@ export default function AdminPage() {
                     <span className={adminChipClass("status", user.accountStatus)}>{user.accountStatus}</span>
                     <span>{user.recordCount} records ({user.publicRecordCount} public / {user.privateRecordCount} private)</span>
                   </span>
-                  <small>Created {formatDate(user.createdAt)} - Last sign-in {formatDate(user.lastSignInAt)} - Proof {user.proofDocumentCount} - Service {user.serviceEventCount} - Transfers {user.transferCount}</small>
+                  <small>Created {formatDate(user.createdAt)} - Last sign-in {formatDate(user.lastSignInAt)} - Evidence {user.proofDocumentCount} - Service {user.serviceEventCount} - Transfers {user.transferCount}</small>
                   {user.hidePublicContent ? <small>Public content hidden by admin.</small> : null}
                   {user.adminNotes ? <small>Admin note saved.</small> : null}
                 </div>
@@ -1313,7 +1313,7 @@ export default function AdminPage() {
           <div className="admin-section-head">
             <div>
               <h2>Ownership Claims</h2>
-              <p>Review proof-based ownership requests. Evidence remains private and serial matches never transfer ownership automatically.</p>
+              <p>Review ownership requests and their private supporting evidence. Serial matches never transfer ownership automatically.</p>
             </div>
           </div>
           <div className="admin-table">
@@ -1362,7 +1362,7 @@ export default function AdminPage() {
         <section className="card admin-panel-card">
           <div className="admin-section-head">
             <div>
-              <h2>Proof Vault</h2>
+              <h2>Evidence</h2>
               <p>Document metadata only. Raw private storage paths are never shown.</p>
             </div>
           </div>
@@ -1372,7 +1372,7 @@ export default function AdminPage() {
               <div className="admin-row" key={document.id}>
                 <div>
                   <strong>{document.name || "Document"}</strong>
-                  <span>{document.document_type || "Proof"} - {document.is_public ? "Public" : "Private"} - {document.recordCode || document.guitar_id}</span>
+                  <span>{document.document_type || "Document"} - {document.is_public ? "Public" : "Private"} - {document.recordCode || document.guitar_id}</span>
                   <small>Owner {document.ownerEmail || "No email"} - {fileSizeLabel(document.file_size)} - Created {formatDate(document.created_at)}</small>
                 </div>
                 <div className="admin-row-actions">
@@ -1380,7 +1380,7 @@ export default function AdminPage() {
                   {document.is_public && document.recordCode ? <Link href={`/i/${document.recordCode}`}>Open Profile</Link> : null}
                 </div>
               </div>
-            )) : <p className="admin-empty">No proof documents match this view.</p>}
+            )) : <p className="admin-empty">No evidence documents match this view.</p>}
           </div>
         </section>
       );

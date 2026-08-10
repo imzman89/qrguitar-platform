@@ -28,14 +28,14 @@ export default async function ContactPage() {
           <div className="shell legal-page contact-page">
             <div className="contact-hero">
               <div>
-                <div className="eyebrow">Support</div>
+                <div className="eyebrow">{getContentValue(settings.content, "contact.hero.eyebrow")}</div>
                 <h1>{getContentValue(settings.content, "contact.hero.headline")}</h1>
                 <p>{getContentValue(settings.content, "contact.hero.body")}</p>
               </div>
               <div className="contact-direct-card">
-                <span>Public support inbox</span>
+                <span>Support email</span>
                 <a className="button" href="mailto:support@qrguitar.com">support@qrguitar.com</a>
-                <small>Use the email attached to your QRguitar account and include the QRguitar ID when the question is about a specific profile.</small>
+                <small>Use the email on your QRguitar account and include the QRguitar ID when your question is about a specific Profile.</small>
               </div>
             </div>
 
@@ -59,14 +59,14 @@ export default async function ContactPage() {
         <section className="section" style={sectionStyle("checklist")}>
           <div className="shell legal-page contact-page">
             <div className="legal-card contact-checklist">
-              <h2>What to include</h2>
+              <h2>{getContentValue(settings.content, "contact.support.heading")}</h2>
               <ul>
-                <li>QRguitar ID or profile link, if you have one.</li>
-                <li>The account email you used to create the profile.</li>
-                <li>Photos, receipts, service notes, or proof details relevant to the request.</li>
-                <li>A short note explaining what you need changed, reviewed, or fixed.</li>
+                <li>QRguitar ID or Profile link, if applicable</li>
+                <li>The email on your QRguitar account</li>
+                <li>Relevant photos, documents, or service information</li>
+                <li>A short description of what you need</li>
               </ul>
-              <p className="fine-print">Do not email card numbers, passwords, private reset links, or unrelated personal documents.</p>
+              <p className="fine-print">{getContentValue(settings.content, "contact.support.body")}</p>
             </div>
           </div>
         </section>

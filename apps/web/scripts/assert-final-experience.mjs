@@ -48,11 +48,12 @@ includes(homepage, 'event.pointerType !== "mouse"', "Native touch scrolling must
 includes(homepage, "home-archive-controls", "Mobile archive browsing must provide explicit navigation controls.");
 includes(drawerCss, "touch-action: pan-x pan-y pinch-zoom", "Profile rails must permit native horizontal touch movement.");
 
-includes(dashboard, "Open Print Suite", "Dashboard must expose one coherent Print Suite action.");
-includes(dashboard, "Add Supplemental Media", "Dashboard History actions must distinguish supplemental Media from photographs.");
+includes(dashboard, "Print handout &amp; labels", "Dashboard must expose one clear print action.");
+includes(dashboard, "Photos &amp; media", "Dashboard History actions must provide one clear media destination.");
 excludes(dashboard, ">Print Kit</Link><RecordShareButton", "The old competing Print Kit action must not remain.");
 includes(dashboard, "Start a secure handoff to the next owner.", "Ownership transfer must explain its action.");
-includes(dashboardCss, "repeat(auto-fit, minmax(min(170px, 100%), 1fr))", "Drawer action groups must collapse safely.");
+includes(dashboardCss, ".drawerSections section { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr))", "Desktop drawer actions must use a stable two-column layout.");
+includes(dashboardCss, ".drawerSections section { grid-template-columns: minmax(0, 1fr)", "Mobile drawer actions must collapse to one column.");
 includes(dashboardCss, "min-height: 44px", "Drawer controls must meet practical target sizing.");
 includes(drawerCss, "clamp(420px, 38vw, 540px)", "Desktop drawer width must be stable without compressing the card grid.");
 

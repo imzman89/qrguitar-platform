@@ -56,7 +56,7 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
   const [rows, setRows] = useState<BulkRow[]>([]);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
-  const [filter, setFilter] = useState<"all" | "ready" | "attention" | "duplicate" | "invalid" | "created">("all");
+  const [filter, setFilter] = useState<"all" | "ready" | "attention" | "duplicate" | "invalid" | "draft" | "created">("all");
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({});
   const [draftLoaded, setDraftLoaded] = useState(false);
 
@@ -65,7 +65,8 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
     || (filter === "ready" && !row.error && !row.result)
     || (filter === "attention" && Boolean(row.error || (row.result && row.result !== "Created")))
     || (filter === "duplicate" && Boolean(row.duplicateCode))
-    || (filter === "invalid" && Boolean(row.error) && !row.duplicateCode)
+    || (filter === "invalid" && bulkRowStatus(row) === "Invalid")
+    || (filter === "draft" && bulkRowStatus(row) === "Draft")
     || (filter === "created" && row.result === "Created"));
 
   useEffect(() => {
@@ -256,7 +257,7 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
   return (
     <section className="bulk-import-workspace">
       <header className="bulk-import-heading"><div><span className="eyebrow">Bulk Import</span><h1>{getContentValue(content, "bulkImport.hero.headline")}</h1><p>{getContentValue(content, "bulkImport.hero.body")}</p></div><button className="button secondary" type="button" onClick={() => void copyTemplate()}><Clipboard size={16} /> {getContentValue(content, "bulkImport.actions.template")}</button></header>
-      <ol className="import-steps" aria-label="Import workflow"><li className={text ? "is-complete" : "is-active"}><b>1</b><span>Add inventory</span></li><li className={rows.length ? "is-complete" : ""}><b>2</b><span>Map columns</span></li><li className={rows.length ? "is-active" : ""}><b>3</b><span>Preview & validate</span></li><li><b>4</b><span>Create private Profiles</span></li></ol>
+      <ol className="import-steps" aria-label="Import workflow"><li className={text ? "is-complete" : "is-active"}><b>1</b><span>Add inventory</span></li><li className={rows.length ? "is-complete" : ""}><b>2</b><span>Map columns</span></li><li className={rows.length ? "is-active" : ""}><b>3</b><span>Review rows</span></li><li><b>4</b><span>Create Private Profiles</span></li></ol>
       <div className="bulk-import-grid">
         <div className="bulk-import-intro">
           <h2>1. Add inventory</h2>
@@ -271,7 +272,7 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
           <button className="button secondary" type="button" onClick={() => { const mapping = autoColumnMapping(template); setText(template); setColumnMapping(mapping); setRows(parseRows(template, mapping)); }}>Load example</button>
           <button className="button secondary" type="button" onClick={() => void previewRows()}>Map & preview rows</button>
           <button className="button" type="button" onClick={() => void createProfiles()} disabled={saving || (rows.length > 0 && readyCount === 0)}>
-            <Upload size={16} /> {saving ? "Creating..." : "Create Ready Profiles"}
+            <Upload size={16} /> {saving ? "Creating..." : "Create Private Profiles"}
           </button>
         </div>
         {rows.length ? (
@@ -289,14 +290,14 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
                 ))}
               </div>
             </div>
-            <div className="bulk-preview-toolbar"><strong>{readyCount} ready / {rows.length} total</strong><div>{(["all", "ready", "attention", "duplicate", "invalid", "created"] as const).map((item) => <button className={filter === item ? "is-active" : ""} key={item} type="button" onClick={() => setFilter(item)}>{item === "attention" ? "Needs attention" : item}</button>)}</div></div>
+            <div className="bulk-preview-toolbar"><strong>{readyCount} ready / {rows.length} total</strong><div>{(["all", "ready", "attention", "duplicate", "invalid", "draft", "created"] as const).map((item) => <button className={filter === item ? "is-active" : ""} key={item} type="button" onClick={() => setFilter(item)}>{item === "attention" ? "Needs Attention" : item.charAt(0).toUpperCase() + item.slice(1)}</button>)}</div></div>
           <div className="bulk-preview-list" aria-label="Bulk import results">
             {visibleRows.map((row) => (
               <div className={row.error || (row.result && row.result !== "Created") ? "bulk-preview-row has-error" : "bulk-preview-row"} key={row.rowNumber}>
                 <strong>Row {row.rowNumber}: {row.brand || "Missing brand"} {row.model || "Missing model"}</strong>
                 <span>{[row.year, row.serial || "No Serial Number", row.serial ? qrCodeFromSerial(row.serial) : "QRguitar ID assigned at creation", "Private on creation", row.photo ? "Photo ready" : "Photo missing"].filter(Boolean).join(" / ")}</span>
                 {row.result !== "Created" ? <div className="bulk-row-editor"><input aria-label={`Row ${row.rowNumber} brand`} value={row.brand} onChange={(event) => updateRow(row.rowNumber, "brand", event.target.value)} placeholder="Brand" /><input aria-label={`Row ${row.rowNumber} model`} value={row.model} onChange={(event) => updateRow(row.rowNumber, "model", event.target.value)} placeholder="Model" /><input aria-label={`Row ${row.rowNumber} Serial Number`} value={row.serialNotUsed ? "No Serial" : row.serial} onChange={(event) => updateRow(row.rowNumber, "serial", event.target.value)} placeholder="Serial Number or No Serial" /><input aria-label={`Row ${row.rowNumber} type`} value={row.instrumentType} onChange={(event) => updateRow(row.rowNumber, "instrumentType", event.target.value)} placeholder="Type" /><input aria-label={`Row ${row.rowNumber} photo URL`} value={row.photo} onChange={(event) => updateRow(row.rowNumber, "photo", event.target.value)} placeholder="https:// photo URL" /></div> : null}
-                <small>{row.error || row.result || "Ready"}</small>
+                <small>{bulkRowStatus(row)}{row.error || row.result ? `: ${row.error || row.result}` : ""}</small>
                 {row.duplicateCode ? <a href={`/i/${row.duplicateCode}`} target="_blank" rel="noreferrer">Open existing Profile</a> : null}
               </div>
             ))}
@@ -304,6 +305,7 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
           </div>
         ) : null}
         {message ? <p className="form-message">{message}</p> : null}
+        <p className="fine-print">Imported Profiles start Private. Review each Profile before publishing it.</p>
       </div>
     </section>
   );
@@ -404,6 +406,14 @@ function validateBulkRow(row: Pick<BulkRow, "brand" | "model" | "serial" | "seri
     !row.photo.trim() ? "A real photo URL is required." : "",
     row.photo && !/^https?:\/\//i.test(row.photo) ? "Photo must use an http or https URL." : ""
   ].filter(Boolean);
+}
+
+function bulkRowStatus(row: Pick<BulkRow, "duplicateCode" | "error" | "result">) {
+  if (row.result === "Created") return "Created";
+  if (row.duplicateCode) return "Duplicate";
+  if (row.result) return "Needs Attention";
+  if (!row.error) return "Ready";
+  return /required|enter a Serial Number/i.test(row.error) ? "Draft" : "Invalid";
 }
 
 function normalizeHeader(value: string) {

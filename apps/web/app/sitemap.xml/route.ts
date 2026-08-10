@@ -36,6 +36,7 @@ export async function GET() {
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
     urlEntry("/", today, "weekly", "1.0"),
     urlEntry("/catalog", today, "weekly", "0.8"),
+    urlEntry("/collections", today, "weekly", "0.7"),
     urlEntry("/create", today, "monthly", "0.65"),
     urlEntry("/how-it-works", today, "monthly", "0.7"),
     urlEntry("/privacy", today, "yearly", "0.4"),

@@ -1879,7 +1879,7 @@ export async function PATCH(request: Request) {
 
     const existing = await supabase.from("guitars").select("id,owner_id,status,serial_number").eq("qr_code", qrCode).maybeSingle<GuitarRow>();
     if (existing.error || !existing.data) {
-      return NextResponse.json({ ok: false, message: "Instrument record was not found." }, { status: 404 });
+      return NextResponse.json({ ok: false, message: "QRguitar Profile was not found." }, { status: 404 });
     }
 
     const isRecordOwner = existing.data.owner_id === auth.user.id;
@@ -1966,7 +1966,7 @@ export async function PATCH(request: Request) {
       .eq("qr_code", qrCode)
       .maybeSingle<GuitarRow>();
     if (existing.error || !existing.data) {
-      return NextResponse.json({ ok: false, message: "Instrument record was not found." }, { status: 404 });
+      return NextResponse.json({ ok: false, message: "QRguitar Profile was not found." }, { status: 404 });
     }
 
     if (existing.data.owner_id !== auth.user.id) {
@@ -2074,7 +2074,7 @@ export async function PATCH(request: Request) {
   const ownerUser = auth.user;
   const existing = await supabase.from("guitars").select("id,owner_id,status,hero_image_path,serial_number").eq("qr_code", input.qrCode).maybeSingle<GuitarRow>();
   if (existing.error || !existing.data) {
-    return NextResponse.json({ ok: false, message: "Instrument record was not found." }, { status: 404 });
+    return NextResponse.json({ ok: false, message: "QRguitar Profile was not found." }, { status: 404 });
   }
 
   if (existing.data.owner_id !== ownerUser.id) {
@@ -2231,7 +2231,7 @@ export async function PATCH(request: Request) {
 
   const existingGuitar = existing.data;
   if (!existingGuitar) {
-    return NextResponse.json({ ok: false, message: "Instrument record was not found." }, { status: 404 });
+    return NextResponse.json({ ok: false, message: "QRguitar Profile was not found." }, { status: 404 });
   }
 
   const persistedMediaPaths: string[] = [];

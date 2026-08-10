@@ -155,7 +155,7 @@ export default function LoginPage() {
       <main className="section auth-page">
         <div className={isSignedIn ? "shell auth-layout is-signed-in" : "shell auth-layout"}>
           <section>
-            <div className="eyebrow">{isSignedIn ? "Account ready" : "Customer account"}</div>
+            <div className="eyebrow">{isSignedIn ? "Account ready" : getContentValue(content, "login.hero.eyebrow")}</div>
             <h1>{isSignedIn ? "Welcome back." : mode === "register" ? "Create your QRguitar account." : mode === "reset" ? "Reset your QRguitar password." : getContentValue(content, "login.hero.headline")}</h1>
             <p>
               {isSignedIn
@@ -168,7 +168,7 @@ export default function LoginPage() {
             </p>
             {!isSignedIn ? <div className="auth-tabs" role="tablist" aria-label="Account mode">
               <button className={mode === "login" ? "active" : ""} type="button" onClick={() => switchMode("login")}>
-                Login
+                Sign in
               </button>
               <button className={mode === "register" ? "active" : ""} type="button" onClick={() => switchMode("register")}>
                 {getContentValue(content, "login.actions.create")}
@@ -241,8 +241,8 @@ export default function LoginPage() {
 
                 {mode === "login" ? (
                   <div className="auth-switch-line">
-                    <span>Need an account?</span>
-                    <button className="link-button" type="button" onClick={() => switchMode("register")}>Create one</button>
+                    <span>New to QRguitar?</span>
+                    <button className="link-button" type="button" onClick={() => switchMode("register")}>{getContentValue(content, "login.actions.createLong")}</button>
                   </div>
                 ) : mode === "register" ? (
                   <div className="auth-switch-line">

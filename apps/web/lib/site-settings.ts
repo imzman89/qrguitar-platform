@@ -135,30 +135,34 @@ export const editorialIconAllowlist: EditorialIcon[] = ["qr", "history", "photo"
 export const defaultEditorialComposition: EditorialComposition = {
   home: {
     sections: [
-      { id: "hero", name: "Hero and latest Profile", visible: true, locked: true, blocks: [] },
+      { id: "hero", name: "Hero and newest Profile", visible: true, locked: true, blocks: [] },
+      { id: "archive", name: "Public Profile archive", visible: true, blocks: [] },
       { id: "lifecycle", name: "Profile lifecycle", visible: true, blocks: [
-        { id: "home-step-identity", name: "Create identity", title: "Create the identity", body: "Add one real photo and the instrument details you know.", icon: "qr", visible: true, protected: true },
-        { id: "home-step-history", name: "Build history", title: "Build the history", body: "Keep service, documents, photos, and ownership connected.", icon: "history", visible: true },
-        { id: "home-step-share", name: "Scan and share", title: "Scan and share", body: "Use the permanent QR code wherever the instrument goes.", icon: "photo", visible: true }
+        { id: "home-step-identity", name: "Identify", title: "Identify", body: "Serial Number, photos, specifications, and the permanent QRguitar ID.", icon: "qr", visible: true, protected: true },
+        { id: "home-step-history", name: "Document", title: "Document", body: "Service, documents, media, safety, and ownership history.", icon: "document", visible: true },
+        { id: "home-step-share", name: "Carry Forward", title: "Carry Forward", body: "Transfer the same Profile when the instrument changes hands.", icon: "transfer", visible: true }
       ] },
       { id: "anatomy", name: "Profile anatomy", visible: true, blocks: [
-        { id: "home-anatomy-identity", name: "Identity", title: "Identity", body: "Serial Number, specifications, visibility, and permanent QRguitar ID.", icon: "qr", visible: true, protected: true },
-        { id: "home-anatomy-proof", name: "Proof", title: "Proof", body: "Photos, selected documents, verification, and authenticity status.", icon: "shield", visible: true },
-        { id: "home-anatomy-history", name: "History", title: "History", body: "Service, Timeline events, ownership handoffs, and safety alerts.", icon: "history", visible: true }
+        { id: "home-anatomy-identity", name: "Identity", title: "Identity", body: "Serial Number, specifications, condition, and QRguitar ID.", icon: "qr", visible: true, protected: true },
+        { id: "home-anatomy-history", name: "History", title: "History", body: "Service, Timeline events, ownership, and safety.", icon: "history", visible: true },
+        { id: "home-anatomy-documents", name: "Documents", title: "Documents", body: "Receipts, appraisals, build sheets, and other files you choose to share.", icon: "document", visible: true }
       ] },
       { id: "roles", name: "Role and use cases", visible: true, blocks: [
-        { id: "home-role-player", name: "Players", title: "Players", body: "Keep an instrument's identity, photos, service, and ownership history together.", icon: "photo", visible: true, protected: true },
-        { id: "home-role-collector", name: "Collectors", title: "Collectors", body: "Preserve provenance and choose what becomes part of a public collection.", icon: "shield", visible: true },
-        { id: "home-role-shop", name: "Shops and builders", title: "Shops and builders", body: "Prepare Profiles, QR materials, service history, and customer handoffs.", icon: "store", visible: true }
+        { id: "home-role-owner", name: "Owners", title: "Owners", body: "Keep your instruments organized, control what's public, and hand the same Profile to the next owner.", ctaLabel: "Create a Profile", ctaUrl: "/create", icon: "photo", visible: true, protected: true },
+        { id: "home-role-collector", name: "Collectors", title: "Collectors", body: "Preserve photos, documents, service, and provenance without losing the story.", ctaLabel: "Open your collection", ctaUrl: "/dashboard", icon: "shield", visible: true },
+        { id: "home-role-shop", name: "Shops", title: "Shops", body: "Create or import inventory, print QR materials, and transfer Profiles to buyers.", ctaLabel: "See business tools", ctaUrl: "/how-it-works#who-it-is-for", icon: "store", visible: true },
+        { id: "home-role-builder", name: "Builders / Brands", title: "Builders / Brands", body: "Issue consistent Profiles for new builds and hand the same Profile to the first owner.", ctaLabel: "See business tools", ctaUrl: "/how-it-works#who-it-is-for", icon: "store", visible: true },
+        { id: "home-role-provider", name: "Luthiers / Technicians", title: "Luthiers / Technicians", body: "Submit completed service with private evidence for the owner to review.", ctaLabel: "See service workflow", ctaUrl: "/how-it-works#service-providers", icon: "wrench", visible: true },
+        { id: "home-role-buyer", name: "Buyers", title: "Buyers", body: "Review the public history, then receive the same Profile through a secure transfer or claim.", ctaLabel: "Open Claim Center", ctaUrl: "/ownership-claim", icon: "eye", visible: true }
       ] },
       { id: "continuity", name: "Service, ownership, and provenance", visible: true, blocks: [
-        { id: "home-continuity-service", name: "Service", title: "Document the work", body: "Keep owner-approved service entries and supporting details connected to the instrument.", icon: "wrench", visible: true, protected: true },
-        { id: "home-continuity-ownership", name: "Ownership", title: "Hand it off securely", body: "Use a reviewed claim or owner-initiated transfer when the instrument changes hands.", icon: "transfer", visible: true },
-        { id: "home-continuity-provenance", name: "Provenance", title: "Preserve what matters", body: "Carry verified identity, selected documents, and meaningful history forward without rewriting the past.", icon: "history", visible: true }
+        { id: "home-continuity-service", name: "Service", title: "Owner-approved service", body: "A provider can submit completed work and private evidence for the owner to review.", icon: "wrench", visible: true, protected: true },
+        { id: "home-continuity-ownership", name: "Ownership", title: "Secure ownership handoff", body: "The current owner, shop, or builder starts the transfer. A scan alone never changes ownership.", icon: "transfer", visible: true },
+        { id: "home-continuity-provenance", name: "Continuity", title: "The same Profile continues", body: "Approved history stays connected while the QRguitar ID and permanent link remain unchanged.", icon: "history", visible: true }
       ] },
       { id: "pricing", name: "Public beta pricing", visible: true, blocks: [
-        { id: "home-price-beta", name: "Free Public Beta", title: "Free Public Beta", label: "$0", body: "Create up to 25 Profiles during public beta without a hard paywall.", ctaLabel: "Create Free Profile", ctaUrl: "/create", items: ["Up to 25 Profiles during beta", "Public, Private, or Unlisted", "QR download included"], icon: "qr", visible: true, protected: true },
-        { id: "home-price-commercial", name: "Commercial and brand setup", title: "Commercial / Brand Setup", label: "From $99+", body: "For builders, retailers, repair shops, brands, and commercial accounts that need onboarding or bulk help.", ctaLabel: "Contact QRguitar", ctaUrl: "mailto:support@qrguitar.com", items: ["Builder, retailer, and shop onboarding", "Bulk Profile setup", "QR hardware and verification support"], icon: "store", visible: true }
+        { id: "home-price-beta", name: "Owners and collectors", title: "For owners and collectors", label: "$0 during public beta", body: "Create up to 25 Profiles with photos, specifications, privacy controls, history, and downloadable QR codes.", ctaLabel: "Create a Free Profile", ctaUrl: "/create", items: ["Up to 25 Profiles", "Public, Unlisted, or Private", "Downloadable QR codes", "Service and ownership history"], icon: "qr", visible: true, protected: true },
+        { id: "home-price-commercial", name: "Shops, builders, and brands", title: "For shops, builders & brands", label: "From $99", body: "Need help with bulk setup, QR hardware, verification, or a commercial rollout? We'll help you get started.", ctaLabel: "Talk to QRguitar", ctaUrl: "mailto:support@qrguitar.com", items: ["Bulk Profile setup", "Business onboarding", "QR hardware and print support", "Verification support"], icon: "store", visible: true }
       ] },
       { id: "finalCta", name: "Closing action", visible: true, blocks: [] }
     ]
@@ -167,37 +171,35 @@ export const defaultEditorialComposition: EditorialComposition = {
     sections: [
       { id: "hero", name: "Hero", visible: true, locked: true, blocks: [] },
       { id: "lifecycle", name: "Instrument lifecycle", visible: true, blocks: [
-        { id: "how-step-create", name: "Create or find", title: "Create or find the Profile", body: "Enter the Serial Number first. If a matching Profile exists, use transfer or a reviewed claim instead of creating a duplicate.", icon: "qr", visible: true, protected: true },
-        { id: "how-step-build", name: "Add identity", title: "Add identity, photos, and history", body: "Start with the instrument identity and one clear photo, then add the details and history you know.", icon: "photo", visible: true },
-        { id: "how-step-qr", name: "Use the QR", title: "Use the permanent QR", body: "Download, share, or print the QR for the instrument, case, counter card, or paperwork.", icon: "qr", visible: true },
-        { id: "how-step-maintain", name: "Maintain history", title: "Maintain service and ownership", body: "Add approved service, media, documents, and ownership changes to the same permanent Profile over time.", icon: "history", visible: true }
+        { id: "how-step-create", name: "Create or find", title: "Create or find the Profile", body: "Enter the Serial Number and basic details. If the instrument already has a Profile, use the transfer or claim process instead of creating another one.", icon: "qr", visible: true, protected: true },
+        { id: "how-step-build", name: "Add what you know", title: "Add what you know", body: "Upload real photos, specifications, service, documents, media, and history.", icon: "photo", visible: true },
+        { id: "how-step-qr", name: "Use the QR", title: "Use the QR", body: "Download or print the permanent QR for the instrument, case, tag, shop display, or paperwork.", icon: "qr", visible: true },
+        { id: "how-step-maintain", name: "Keep ownership current", title: "Keep ownership current", body: "When the instrument changes hands, transfer the same Profile. Scanning the QR alone never changes ownership.", icon: "transfer", visible: true }
+      ] },
+      { id: "features", name: "Feature map", visible: true, blocks: [
+        { id: "how-feature-identity", name: "Photos and details", title: "Photos & details", body: "Photos, condition, finish, hardware, electronics, weight, and other useful specifications.", icon: "photo", visible: true, protected: true },
+        { id: "how-feature-service", name: "Service History", title: "Service History", body: "Setups, repairs, restoration, maintenance, and owner-approved provider submissions.", icon: "wrench", visible: true },
+        { id: "how-feature-timeline", name: "Timeline and ownership", title: "Timeline & ownership", body: "Acquisitions, transfers, safety events, service, and other useful history.", icon: "history", visible: true },
+        { id: "how-feature-docs", name: "Documents", title: "Documents", body: "Receipts, appraisals, invoices, build sheets, manuals, and other files.", icon: "document", visible: true },
+        { id: "how-feature-media", name: "Supplemental Media", title: "Supplemental Media", body: "Video, audio, and approved external media when the Profile has it.", icon: "photo", visible: true },
+        { id: "how-feature-safety", name: "Lost or stolen", title: "Lost or stolen", body: "Show a clear public alert when the owner or authorized admin reports an instrument lost or stolen.", icon: "shield", visible: true }
       ] },
       { id: "identity", name: "Identity and privacy", visible: true, blocks: [] },
-      { id: "features", name: "Feature map", visible: true, blocks: [
-        { id: "how-feature-identity", name: "Identity and QR", title: "Identity and QR", body: "Keep the QRguitar ID, permitted Serial Number, and permanent Profile link together.", icon: "qr", visible: true, protected: true },
-        { id: "how-feature-media", name: "Photos and media", title: "Photos, specs, and media", body: "Show the instrument clearly with useful details, video, and audio.", icon: "photo", visible: true },
-        { id: "how-feature-service", name: "Timeline and service", title: "Timeline and service", body: "Record ownership milestones and owner-approved provider work.", icon: "wrench", visible: true },
-        { id: "how-feature-docs", name: "Documents and print", title: "Documents and print", body: "Keep private evidence, share selected documents, and print handouts or QR labels.", icon: "document", visible: true },
-        { id: "how-feature-privacy", name: "Visibility", title: "Public, Unlisted, or Private", body: "Choose how each Profile is discovered without changing its permanent identity.", icon: "eye", visible: true },
-        { id: "how-feature-safety", name: "Safety", title: "Safety and provenance", body: "Publish lost or stolen alerts and preserve reviewed historical evidence.", icon: "shield", visible: true },
-        { id: "how-feature-transfer", name: "Transfers and claims", title: "Transfers and claims", body: "Hand the same Profile to its next owner through a recipient-bound workflow.", icon: "transfer", visible: true },
-        { id: "how-feature-collections", name: "Collections and Bulk Import", title: "Collections and Bulk Import", body: "Opt into a public collection or prepare larger inventories privately before publishing.", icon: "store", visible: true }
-      ] },
       { id: "service", name: "Service and ownership", visible: true, blocks: [] },
       { id: "roles", name: "Role journeys", visible: true, blocks: [
-        { id: "how-role-player", name: "Players", title: "Players", body: "Document an instrument, maintain its history, share it, and transfer it when ownership changes.", ctaLabel: "Create a Profile", ctaUrl: "/create", icon: "photo", visible: true, protected: true },
-        { id: "how-role-collector", name: "Collectors", title: "Collectors", body: "Choose privacy per Profile, preserve provenance, and opt into a public collection when ready.", ctaLabel: "Create a Profile", ctaUrl: "/create", icon: "shield", visible: true },
-        { id: "how-role-shop", name: "Shops", title: "Shops", body: "Bulk import private inventory, refine Profiles, print materials, and transfer to customers.", ctaLabel: "Open inventory tools", ctaUrl: "/dashboard/import", icon: "store", visible: true },
-        { id: "how-role-builder", name: "Builders", title: "Builders", body: "Create build Profiles with official specifications, media, and a clean purchaser handoff.", ctaLabel: "Open inventory tools", ctaUrl: "/dashboard/import", icon: "store", visible: true },
-        { id: "how-role-brand", name: "Brands", title: "Brands", body: "Keep product identity consistent across new and used instruments while supporting larger rollouts.", ctaLabel: "Open inventory tools", ctaUrl: "/dashboard/import", icon: "store", visible: true },
-        { id: "how-role-provider", name: "Service providers", title: "Luthiers / Technicians", body: "Submit repair, restoration, setup, and service work for owner approval.", ctaLabel: "Set up provider tools", ctaUrl: "/account#service-provider", icon: "wrench", visible: true },
-        { id: "how-role-buyer", name: "Buyers", title: "Buyers", body: "Review public identity, history, trust signals, and seller collections before transfer or claim.", ctaLabel: "Open Claim Center", ctaUrl: "/ownership-claim", icon: "eye", visible: true }
+        { id: "how-role-player", name: "Players and Collectors", title: "Players and Collectors", body: "Keep instruments organized and preserve the history that matters.", ctaLabel: "Create a Profile", ctaUrl: "/create", icon: "photo", visible: true, protected: true },
+        { id: "how-role-shop", name: "Shops", title: "Shops", body: "Create or import inventory, print QR materials, and transfer Profiles after a sale.", ctaLabel: "Open inventory tools", ctaUrl: "/dashboard/import", icon: "store", visible: true },
+        { id: "how-role-builder", name: "Builders and Brands", title: "Builders and Brands", body: "Create consistent Profiles for new builds and hand them to the first owner.", ctaLabel: "Open inventory tools", ctaUrl: "/dashboard/import", icon: "store", visible: true },
+        { id: "how-role-provider", name: "Luthiers and Technicians", title: "Luthiers and Technicians", body: "Submit completed service for the owner to review and add to the Profile.", ctaLabel: "Set up provider tools", ctaUrl: "/account#service-provider", icon: "wrench", visible: true },
+        { id: "how-role-buyer", name: "Buyers", title: "Buyers", body: "Review the public Profile, then receive the same Profile through a secure transfer or claim.", ctaLabel: "Open Claim Center", ctaUrl: "/ownership-claim", icon: "eye", visible: true }
       ] },
       { id: "faq", name: "Common questions", visible: true, blocks: [
-        { id: "how-faq-serial", name: "Serial Number privacy", title: "Can I hide the Serial Number?", body: "Yes. The owner can keep the Serial Number in the private workspace while hiding it from public surfaces without changing the QRguitar ID.", icon: "help", visible: true, protected: true },
-        { id: "how-faq-no-serial", name: "No Serial Number", title: "What if there is no Serial Number?", body: "QRguitar assigns a unique six-digit ID. Trust approval requires QRguitar review.", icon: "help", visible: true },
-        { id: "how-faq-transfer", name: "Transfer safety", title: "Can scanning the QR transfer ownership?", body: "No. A scan only opens the Profile. The current owner or shop must start a secure, recipient-bound transfer.", icon: "help", visible: true },
-        { id: "how-faq-visibility", name: "Catalog privacy", title: "Can I keep a Profile out of the Catalog?", body: "Yes. Choose Unlisted for direct-link access or Private for owner and authorized admin access only.", icon: "help", visible: true }
+        { id: "how-faq-id", name: "QRguitar ID", title: "Does the QRguitar ID change?", body: "No. Editing details, adding history, or changing owners does not replace the QRguitar ID or Profile URL.", icon: "help", visible: true, protected: true },
+        { id: "how-faq-serial", name: "Serial Number privacy", title: "Can I hide the Serial Number?", body: "Yes. The owner can hide the separate public Serial Number field without changing the QRguitar ID or printed QR.", icon: "help", visible: true },
+        { id: "how-faq-existing", name: "Existing Profile", title: "What if the instrument already has a Profile?", body: "Do not create a duplicate. Use the transfer flow or submit an ownership claim.", icon: "help", visible: true },
+        { id: "how-faq-transfer", name: "Transfer safety", title: "Can someone claim an instrument by scanning the QR?", body: "No. A scan is view-only. Ownership requires a secure transfer or reviewed claim.", icon: "help", visible: true },
+        { id: "how-faq-visibility", name: "Profile visibility", title: "Can a Profile be private?", body: "Yes. Choose Public, Unlisted, or Private.", icon: "help", visible: true },
+        { id: "how-faq-sale", name: "Selling an instrument", title: "What happens when I sell the instrument?", body: "Transfer the existing Profile to the buyer so the QRguitar ID and history stay with the instrument.", icon: "help", visible: true }
       ] },
       { id: "finalCta", name: "Closing action", visible: true, blocks: [] }
     ]
@@ -208,21 +210,22 @@ export const defaultEditorialComposition: EditorialComposition = {
   ] },
   installers: { sections: [
     { id: "hero", name: "Installer introduction", visible: true, locked: true, blocks: [] },
+    { id: "apply", name: "Partner requirements", visible: true, blocks: [] },
     { id: "process", name: "Partner process", visible: true, blocks: [
-      { id: "installer-apply", name: "Apply", title: "Apply", body: "Submit shop details, service area, finish experience, and references.", icon: "store", visible: true, protected: true },
-      { id: "installer-verify", name: "Verify", title: "Verify", body: "QRguitar reviews the business and confirms qualified partners.", icon: "shield", visible: true },
-      { id: "installer-coordinate", name: "Coordinate", title: "Coordinate", body: "QRguitar connects approved shops and owners for installation or repair-linked documentation.", icon: "transfer", visible: true }
-    ] },
-    { id: "apply", name: "Partner application", visible: true, blocks: [] }
+      { id: "installer-apply", name: "Apply", title: "Apply", body: "Send your shop details and examples of your work.", icon: "store", visible: true, protected: true },
+      { id: "installer-review", name: "Review", title: "Review", body: "QRguitar reviews the business, experience, and installation process.", icon: "shield", visible: true },
+      { id: "installer-list", name: "Get listed", title: "Get listed", body: "Approved partners can be added when the public installer directory launches.", icon: "transfer", visible: true }
+    ] }
   ] },
   contact: { sections: [
     { id: "hero", name: "Support introduction", visible: true, locked: true, blocks: [] },
     { id: "categories", name: "Support categories", visible: true, blocks: [
-      { id: "contact-account", name: "Account help", title: "Account or login help", body: "Password reset, account access, Profile details, and session issues.", ctaLabel: "Email support", ctaUrl: "mailto:support@qrguitar.com?subject=QRguitar%20account%20help", icon: "help", visible: true, protected: true },
-      { id: "contact-profile", name: "Profile and QR help", title: "Profile or QR help", body: "Permanent IDs, photo uploads, QR downloads, visibility, and Profile edits.", ctaLabel: "Email support", ctaUrl: "mailto:support@qrguitar.com?subject=QRguitar%20Profile%20or%20QR%20help", icon: "qr", visible: true },
-      { id: "contact-verification", name: "Verification review", title: "Verification review", body: "Manual beta review for specifications, provenance, documents, Serial Numbers, and authenticity evidence.", ctaLabel: "Email support", ctaUrl: "mailto:support@qrguitar.com?subject=QRguitar%20verification%20review", icon: "shield", visible: true },
-      { id: "contact-ownership", name: "Ownership help", title: "Lost, stolen, or transfer help", body: "Safety alerts, transfers, claims, and edge cases that need manual support.", ctaLabel: "Email support", ctaUrl: "mailto:support@qrguitar.com?subject=QRguitar%20safety%20or%20transfer%20help", icon: "transfer", visible: true },
-      { id: "contact-commercial", name: "Commercial onboarding", title: "Shop, builder, or brand onboarding", body: "Bulk Profile planning, brand logos, QR installs, handouts, and commercial setup.", ctaLabel: "Email support", ctaUrl: "mailto:support@qrguitar.com?subject=QRguitar%20commercial%20onboarding", icon: "store", visible: true }
+      { id: "contact-account", name: "Account and login", title: "Account & login", body: "Password reset, account access, and session problems.", ctaLabel: "Email support", ctaUrl: "mailto:support@qrguitar.com?subject=QRguitar%20account%20help", icon: "help", visible: true, protected: true },
+      { id: "contact-profile", name: "Profile and QR", title: "Profile & QR", body: "Profile edits, photos, QR downloads, privacy, and Serial Number visibility.", ctaLabel: "Email support", ctaUrl: "mailto:support@qrguitar.com?subject=QRguitar%20Profile%20or%20QR%20help", icon: "qr", visible: true },
+      { id: "contact-verification", name: "Verification", title: "Verification", body: "Questions about QRguitar verification, authenticity, and supporting evidence.", ctaLabel: "Email support", ctaUrl: "mailto:support@qrguitar.com?subject=QRguitar%20verification%20review", icon: "shield", visible: true },
+      { id: "contact-ownership", name: "Lost, stolen, and ownership", title: "Lost, stolen & ownership", body: "Safety alerts, transfers, ownership claims, and handoff questions.", ctaLabel: "Email support", ctaUrl: "mailto:support@qrguitar.com?subject=QRguitar%20safety%20or%20transfer%20help", icon: "transfer", visible: true },
+      { id: "contact-commercial", name: "Business onboarding", title: "Business onboarding", body: "Bulk Import, brand logos, QR printing, shops, builders, and commercial setup.", ctaLabel: "Email support", ctaUrl: "mailto:support@qrguitar.com?subject=QRguitar%20commercial%20onboarding", icon: "store", visible: true },
+      { id: "contact-privacy", name: "Documents and privacy", title: "Documents & privacy", body: "Public documents, private files, receipts, appraisals, and privacy choices.", ctaLabel: "Email support", ctaUrl: "mailto:support@qrguitar.com?subject=QRguitar%20documents%20or%20privacy", icon: "document", visible: true }
     ] },
     { id: "checklist", name: "Support checklist", visible: true, blocks: [] }
   ] },
@@ -230,7 +233,7 @@ export const defaultEditorialComposition: EditorialComposition = {
     { id: "links", name: "Footer links", visible: true, locked: true, blocks: [
       { id: "footer-dashboard", name: "Dashboard", title: "Dashboard", body: "", ctaLabel: "Dashboard", ctaUrl: "/dashboard", icon: "link", visible: true, protected: true },
       { id: "footer-catalog", name: "Catalog", title: "Catalog", body: "", ctaLabel: "Catalog", ctaUrl: "/catalog", icon: "link", visible: true, protected: true },
-      { id: "footer-create", name: "Create", title: "Create", body: "", ctaLabel: "Create", ctaUrl: "/create", icon: "link", visible: true },
+      { id: "footer-create", name: "Create Profile", title: "Create Profile", body: "", ctaLabel: "Create Profile", ctaUrl: "/create", icon: "link", visible: true },
       { id: "footer-how", name: "How It Works", title: "How It Works", body: "", ctaLabel: "How It Works", ctaUrl: "/how-it-works", icon: "link", visible: true },
       { id: "footer-privacy", name: "Privacy", title: "Privacy", body: "", ctaLabel: "Privacy", ctaUrl: "/privacy", icon: "link", visible: true, protected: true },
       { id: "footer-terms", name: "Terms", title: "Terms", body: "", ctaLabel: "Terms", ctaUrl: "/terms", icon: "link", visible: true, protected: true },
@@ -338,17 +341,21 @@ function normalizeEditorialBlock(value: unknown, fallback?: EditorialBlock): Edi
   const icon = editorialIconAllowlist.includes(block.icon as EditorialIcon)
     ? block.icon as EditorialIcon
     : fallback?.icon;
+  const title = cleanEditorialText(block.title, fallback?.title || "");
+  const ctaLabel = cleanEditorialText(block.ctaLabel, fallback?.ctaLabel || "");
+  const upgradedTitle = fallback?.id === "footer-create" && title === "Create" ? fallback.title : title;
+  const upgradedCtaLabel = fallback?.id === "footer-create" && ctaLabel === "Create" ? fallback.ctaLabel || ctaLabel : ctaLabel;
   return {
     id: cleanEditorialText(block.id, fallback?.id || ""),
     name: cleanEditorialText(block.name, fallback?.name || "Untitled block"),
-    title: cleanEditorialText(block.title, fallback?.title || ""),
+    title: upgradedTitle,
     body: cleanEditorialText(block.body, fallback?.body || ""),
     ...(block.label !== undefined || fallback?.label !== undefined
       ? { label: cleanEditorialText(block.label, fallback?.label || "") }
       : {}),
     ...(icon ? { icon } : {}),
     ...(block.ctaLabel !== undefined || fallback?.ctaLabel !== undefined
-      ? { ctaLabel: cleanEditorialText(block.ctaLabel, fallback?.ctaLabel || "") }
+      ? { ctaLabel: upgradedCtaLabel }
       : {}),
     ...(block.ctaUrl !== undefined || fallback?.ctaUrl !== undefined
       ? { ctaUrl: cleanEditorialText(block.ctaUrl, fallback?.ctaUrl || "") }
@@ -359,6 +366,39 @@ function normalizeEditorialBlock(value: unknown, fallback?: EditorialBlock): Edi
     visible: typeof block.visible === "boolean" ? block.visible : fallback?.visible !== false,
     ...(fallback?.protected || block.protected ? { protected: true } : {})
   };
+}
+
+function shouldUpgradeLegacyEditorialBlocks(
+  pageKey: EditorialPageKey,
+  sectionId: string,
+  blocks: Array<Partial<EditorialBlock>>
+) {
+  const ids = new Set(blocks.map((block) => String(block?.id || "")));
+  const bodies = blocks.map((block) => String(block?.body || ""));
+
+  if (pageKey === "home") {
+    if (sectionId === "anatomy" && ids.has("home-anatomy-proof")) return true;
+    if (sectionId === "roles" && ids.has("home-role-player")) return true;
+    if (sectionId === "continuity" && bodies.some((body) => body === "Keep owner-approved service entries and supporting details connected to the instrument.")) return true;
+    if (sectionId === "pricing" && bodies.some((body) => body === "Create up to 25 Profiles during public beta without a hard paywall.")) return true;
+  }
+
+  if (pageKey === "howItWorks") {
+    if (sectionId === "lifecycle" && ids.has("how-step-build") && blocks.some((block) => block?.title === "Add identity, photos, and history")) return true;
+    if (sectionId === "features" && (ids.has("how-feature-privacy") || ids.has("how-feature-transfer") || ids.has("how-feature-collections"))) return true;
+    if (sectionId === "roles" && (ids.has("how-role-collector") || ids.has("how-role-brand"))) return true;
+    if (sectionId === "faq" && ids.has("how-faq-no-serial")) return true;
+  }
+
+  if (pageKey === "installers" && sectionId === "process") {
+    if (ids.has("installer-verify") || ids.has("installer-coordinate")) return true;
+  }
+
+  if (pageKey === "contact" && sectionId === "categories") {
+    if (!ids.has("contact-privacy") || blocks.some((block) => block?.title === "Account or login help")) return true;
+  }
+
+  return false;
 }
 
 export function normalizeEditorialComposition(value?: Partial<EditorialComposition> | null): EditorialComposition {
@@ -374,8 +414,12 @@ export function normalizeEditorialComposition(value?: Partial<EditorialCompositi
     const sections = orderedSections.map((section) => {
       const fallback = fallbackById.get(String(section?.id || ""));
       const fallbackBlocks = new Map((fallback?.blocks || []).map((block) => [block.id, block]));
-      const blocks = Array.isArray(section?.blocks)
-        ? section.blocks.map((block) => normalizeEditorialBlock(block, fallbackBlocks.get(String(block?.id || ""))))
+      const candidateBlocks = Array.isArray(section?.blocks) ? section.blocks : null;
+      const blockSource = candidateBlocks && !shouldUpgradeLegacyEditorialBlocks(pageKey, String(section?.id || ""), candidateBlocks)
+        ? candidateBlocks
+        : structuredClone(fallback?.blocks || []);
+      const blocks = blockSource
+        ? blockSource.map((block) => normalizeEditorialBlock(block, fallbackBlocks.get(String(block?.id || ""))))
         : structuredClone(fallback?.blocks || []);
       return {
         id: cleanEditorialText(section?.id, fallback?.id || ""),
@@ -472,14 +516,14 @@ function normalizePricingCards(cards: PricingPlanInput[]) {
     }));
 
   const defaultCards = defaultSiteSettings.sections.pricingCards;
-  const freePlan = defaultCards.find((plan) => plan.name.toLowerCase() === "free public beta");
-  const commercialPlan = defaultCards.find((plan) => plan.name.toLowerCase() === "commercial / brand setup");
+  const freePlan = defaultCards[0];
+  const commercialPlan = defaultCards[1];
   if (!freePlan || !commercialPlan) {
     return defaultCards;
   }
 
-  const existingFree = cleaned.find((item) => item.name.toLowerCase() === freePlan.name.toLowerCase());
-  const existingCommercial = cleaned.find((item) => item.name.toLowerCase() === commercialPlan.name.toLowerCase());
+  const existingFree = cleaned.find((item) => /free|owner|collector/i.test(item.name)) || cleaned[0];
+  const existingCommercial = cleaned.find((item, index) => index > 0 && /commercial|shop|builder|brand/i.test(item.name)) || cleaned[1];
 
   return [
     existingFree ? { ...freePlan, ...existingFree, name: freePlan.name } : freePlan,
@@ -489,6 +533,70 @@ function normalizePricingCards(cards: PricingPlanInput[]) {
 
 function normalizeProfileCopy(value: string) {
   const trimmedValue = value.trim();
+  const approvedDefaultUpgrades: Record<string, string> = {
+    "Permanent QRguitar Profiles for instruments, builders, shops, collectors, and future owners.": "One Profile for the life of an instrument.",
+    "Permanent QRguitar Profiles for guitars, amps, pedals, builders, shops, collectors, and future owners.": "One Profile for the life of an instrument.",
+    "Permanent identity for instruments": "FOR OWNERS, SHOPS, BUILDERS & COLLECTORS",
+    "FOR BUILDERS, SHOPS, COLLECTORS & PLAYERS": "FOR OWNERS, SHOPS, BUILDERS & COLLECTORS",
+    "Every instrument has a story. Keep it connected.": "One Profile for the life of an instrument.",
+    "Keep its identity, proof, and history together.": "One Profile for the life of an instrument.",
+    "Create a permanent QRguitar Profile with photos, specifications, service history, ownership records, and a QR code that stays with the instrument.": "Keep the photos, specs, service, documents, ownership, and permanent QR with the instrument.",
+    "Create one QRguitar Profile for photos, specs, service history, proof, ownership, and lost or stolen alerts. Its permanent QR link stays the same through every update and every owner.": "Keep the photos, specs, service, documents, ownership, and permanent QR with the instrument.",
+    "Create Profile": "Create a Profile",
+    "Start with the instrument. Build the history over time.": "Create it once. Keep it current.",
+    "Simple enough for one guitar. Useful enough for a whole shop.": "Create it once. Keep it current.",
+    "Add the facts you know today, then keep photos, service, documents, and ownership connected as the instrument changes hands.": "Start with the instrument. Add the history as it happens.",
+    "Start with the basic facts, put the QR where people will actually use it, then keep adding the things that usually get lost.": "Start with the instrument. Add the history as it happens.",
+    "Create the identity": "Identify",
+    "Add one real photo and the instrument details you know.": "Serial Number, photos, specifications, and the permanent QRguitar ID.",
+    "Build the history": "Document",
+    "Keep service, documents, photos, and ownership connected.": "Service, documents, media, safety, and ownership history.",
+    "Scan and share": "Carry Forward",
+    "Use the permanent QR code wherever the instrument goes.": "Transfer the same Profile when the instrument changes hands.",
+    "What each profile holds": "INSIDE A PROFILE",
+    "The details guitar people ask for, before they ask.": "See the details that matter.",
+    "A QRguitar Profile can be as simple or as deep as the instrument needs. Start with the basics, then add the bench notes, proof, media, and history that make the piece easier to sell, service, insure, or pass on.": "Photos, specifications, service, documents, and ownership stay attached to the same Profile.",
+    "Build a Profile": "Explore a Profile",
+    "Built for guitar people": "WHO USES QRGUITAR",
+    "For the bench, the sales floor, the collection room, and the next owner.": "One system. Different jobs.",
+    "History that stays useful": "SERVICE & OWNERSHIP",
+    "One Profile, through the work and every handoff.": "The history stays with the instrument.",
+    "QRguitar keeps the instrument's identity connected while owners decide which service, documents, and history become public.": "Approved service and completed ownership transfers update the same Profile. The QRguitar ID and link do not change.",
+    "See the full workflow": "See How It Works",
+    "The living archive": "PUBLIC PROFILES",
+    "Explore the archive": "See what's already documented.",
+    "Free Profiles during public beta.": "Start free. Get help when you need it.",
+    "Create QRguitar Profiles free. Commercial setup starts at $99+.": "Start free. Get help when you need it.",
+    "Create and maintain QRguitar Profiles without a hard paywall while the registry grows. Paid help is available separately.": "Create Profiles during public beta, or ask QRguitar for hands-on commercial setup.",
+    "During public beta, users can create instrument profiles without a hard paywall. Verification, QR hardware, install help, builder/shop onboarding, and commercial setup are available as paid services.": "Create Profiles during public beta, or ask QRguitar for hands-on commercial setup.",
+    "Free Public Beta": "For owners and collectors",
+    "$0": "$0 during public beta",
+    "Commercial / Brand Setup": "For shops, builders & brands",
+    "From $99+": "From $99",
+    "Give the next instrument a permanent place to live.": "Start with one instrument.",
+    "Create a Profile in minutes and keep improving it for years.": "Create the Profile now. Add the rest over time.",
+    "Ready when the instrument is": "READY TO BEGIN",
+    "Browse Profiles": "Explore the Catalog",
+    "The Catalog": "PUBLIC CATALOG",
+    "Explore QRguitar Profiles.": "Browse QRguitar Profiles",
+    "Search public Profiles by brand, model, year, availability, trust status, service history, and more.": "Search the Catalog by brand, model, year, availability, trust status, service history, and more.",
+    "Explore QRguitar Profiles by brand, category, trust status, availability, and history.": "Search the Catalog by brand, model, year, availability, trust status, service history, and more.",
+    "QR INSTALLS": "FOR SHOPS & SERVICE PROVIDERS",
+    "QR installs": "FOR SHOPS & SERVICE PROVIDERS",
+    "Put the Profile where people can use it.": "Turn service work into a Profile customers keep.",
+    "Explore QR stickers, tags, plates, and hands-on installation support for instruments and inventory.": "Create or update QRguitar Profiles with owner approval, add documented service, print scannable handouts, and help every instrument leave your shop with a clearer history.",
+    "Apply as a Founding Installer": "Apply to the Provider Network",
+    "How the program works": "How approval works",
+    "Reset filters": "Clear filters",
+    "One permanent Profile for every instrument.": "One Profile that stays with the instrument.",
+    "QRguitar Print Kit": "Print Suite",
+    "Owner dashboard": "Your instruments",
+    "Your collection": "Your Profiles",
+    "View Profile": "Open Profile"
+  };
+  if (approvedDefaultUpgrades[trimmedValue]) {
+    return approvedDefaultUpgrades[trimmedValue];
+  }
   if (trimmedValue === "Every instrument deserves a permanent QRguitar Profile.") {
     return siteCopy.hero.headline;
   }
@@ -714,6 +822,9 @@ export function applyThemeSettings(settings: EditableSiteSettings) {
   root.style.setProperty("--gold-2", settings.colors.gold);
   root.style.setProperty("--cream", settings.colors.cream);
   root.style.setProperty("--text", settings.colors.text);
+  root.style.setProperty("--warm-canvas", `color-mix(in srgb, ${settings.colors.cream} 68%, white)`);
+  root.style.setProperty("--light-surface", `color-mix(in srgb, ${settings.colors.cream} 34%, white)`);
+  root.style.setProperty("--dark-text", settings.colors.background);
 }
 
 export function buildEditableHomeCopy(settings: EditableSiteSettings) {
@@ -728,9 +839,9 @@ export function buildEditableHomeCopy(settings: EditableSiteSettings) {
       secondaryCta: getContentValue(settings.content, "home.hero.secondaryCta")
     },
     workflow: {
-      eyebrow: settings.sections.howEyebrow,
-      headline: settings.sections.howHeadline,
-      body: settings.sections.howBody,
+      eyebrow: getContentValue(settings.content, "home.lifecycle.eyebrow") || settings.sections.howEyebrow,
+      headline: getContentValue(settings.content, "home.lifecycle.headline") || settings.sections.howHeadline,
+      body: getContentValue(settings.content, "home.lifecycle.body") || settings.sections.howBody,
       cards: settings.sections.howCards.map((card, index) => ({
         ...card,
         icon: siteCopy.workflow.cards[index]?.icon || siteCopy.workflow.cards[0].icon
@@ -738,16 +849,16 @@ export function buildEditableHomeCopy(settings: EditableSiteSettings) {
       cta: siteCopy.workflow.cta
     },
     customization: {
-      eyebrow: settings.sections.detailsEyebrow,
-      headline: settings.sections.detailsHeadline,
-      body: settings.sections.detailsBody,
+      eyebrow: getContentValue(settings.content, "home.anatomy.eyebrow") || settings.sections.detailsEyebrow,
+      headline: getContentValue(settings.content, "home.anatomy.headline") || settings.sections.detailsHeadline,
+      body: getContentValue(settings.content, "home.anatomy.body") || settings.sections.detailsBody,
       checks: settings.sections.detailsChecks.map((copy) => ({ icon: CheckCircle2, copy })),
-      cta: settings.sections.detailsCta
+      cta: getContentValue(settings.content, "home.anatomy.cta") || settings.sections.detailsCta
     },
     audiences: {
-      eyebrow: settings.sections.audienceEyebrow,
-      headline: settings.sections.audienceHeadline,
-      body: settings.sections.audienceBody,
+      eyebrow: getContentValue(settings.content, "home.roles.eyebrow") || settings.sections.audienceEyebrow,
+      headline: getContentValue(settings.content, "home.roles.headline") || settings.sections.audienceHeadline,
+      body: getContentValue(settings.content, "home.roles.body"),
       cards: settings.sections.audienceCards.map((card, index) => ({
         ...card,
         icon: siteCopy.audiences.cards[index]?.icon || siteCopy.audiences.cards[0].icon
@@ -755,9 +866,9 @@ export function buildEditableHomeCopy(settings: EditableSiteSettings) {
       cta: settings.sections.audienceCta
     },
     pricing: {
-      eyebrow: settings.sections.pricingEyebrow,
+      eyebrow: getContentValue(settings.content, "home.pricing.eyebrow") || settings.sections.pricingEyebrow,
       headline: getContentValue(settings.content, "home.pricing.headline") || settings.sections.pricingHeadline,
-      body: getContentValue(settings.content, "home.pricing.body") || settings.sections.pricingBody,
+      body: getContentValue(settings.content, "home.pricing.body"),
       plans: settings.sections.pricingCards.map((plan) => ({
         ...plan,
         icon: siteCopy.workflow.cards[0].icon

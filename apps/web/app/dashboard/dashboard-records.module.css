@@ -215,10 +215,13 @@
 .drawerIdentity b { overflow-wrap: anywhere; font-size: 14px; }
 .drawerIdentity span { color: var(--muted); font-size: 12px; }
 .drawerSections { display: grid; gap: 12px; margin-top: 14px; }
-.drawerSections section { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); gap: 8px; padding: 14px; border: 1px solid rgba(248, 246, 242, .1); border-radius: 8px; background: rgba(255, 255, 255, .02); }
+.drawerSections section { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; padding: 14px; border: 1px solid rgba(248, 246, 242, .1); border-radius: 8px; background: rgba(255, 255, 255, .02); }
 .drawerSections section > b { grid-column: 1 / -1; color: var(--gold-2); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; }
-.drawerSections section a, .drawerSections section button { min-width: 0; min-height: 44px; display: grid; place-items: center; border: 1px solid rgba(248, 246, 242, .12); border-radius: 6px; padding: 9px 11px; cursor: pointer; color: var(--text); background: rgba(248, 246, 242, .035); font: inherit; font-size: 11px; font-weight: 800; line-height: 1.25; overflow-wrap: anywhere; text-align: center; text-decoration: none; }
+.drawerSections section a, .drawerSections section button { min-width: 0; min-height: 44px; display: flex; align-items: center; justify-content: flex-start; gap: 8px; border: 1px solid rgba(248, 246, 242, .12); border-radius: 6px; padding: 9px 11px; cursor: pointer; color: var(--text); background: rgba(248, 246, 242, .035); font: inherit; font-size: 11px; font-weight: 800; line-height: 1.25; overflow-wrap: anywhere; text-align: left; text-decoration: none; }
+.drawerSections section a:hover, .drawerSections section a:focus-visible, .drawerSections section button:hover, .drawerSections section button:focus-visible { border-color: rgba(240, 161, 43, .42); background: rgba(240, 161, 43, .055); outline: none; }
+.drawerSections section a svg, .drawerSections section button svg { flex: 0 0 auto; color: var(--gold-2); }
 .drawerSections section :global(.qr-download) { grid-column: 1 / -1; }
+.drawerSections section :global(.qr-download .button) { min-height: 44px; padding: 9px 11px; }
 .drawerSections .transferPanel { display: block; margin: 0; }
 .drawerDanger { border-color: rgba(229, 92, 82, .22) !important; }
 .transferPanel summary span { display: grid; gap: 4px; }
@@ -261,8 +264,8 @@
 }
 
 .qrPanel :global(.qr-download .button) {
-  min-height: 32px;
-  padding: 7px 9px;
+  min-height: 44px;
+  padding: 9px 11px;
   font-size: 11px;
 }
 
@@ -341,8 +344,13 @@
 
 .dashboardShare :global(.record-share-button) {
   width: 100%;
-  min-height: 34px;
+  min-height: 44px;
   border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding-inline: 11px;
 }
 
 .transferPanel {
@@ -490,9 +498,9 @@
 }
 
 .transferPanel {
-  width: fit-content;
+  width: 100%;
   max-width: 100%;
-  justify-self: start;
+  justify-self: stretch;
 }
 
 .transferPanel[open],
@@ -751,7 +759,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .drawerSections section { grid-template-columns: minmax(0, 1fr); }
+  .drawerSections section { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 12px; }
   .drawerIdentity { grid-template-columns: 88px minmax(0, 1fr); }
 }
 

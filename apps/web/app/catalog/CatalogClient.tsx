@@ -15,13 +15,17 @@ import { getServiceHistoryEntries } from "../../lib/instrument-profile-contract"
 import { getContentValue } from "../../lib/content-registry";
 import type { EditorialComposition } from "../../lib/site-settings";
 
-type ShowFilter = "All profiles" | "For Sale" | "Not for Sale" | "New" | "Used" | "Verified" | "Unverified" | "Authenticity Confirmed" | "Authenticity Unconfirmed" | "All Original" | "Modified" | "Safety Alerts" | "Service History";
-
-export function CatalogClient({ initialRecords, content, composition }: { initialRecords: DemoInstrument[]; content: Record<string, string>; composition: EditorialComposition["catalog"] }) {
+export function CatalogClient({ initialRecords, content }: { initialRecords: DemoInstrument[]; content: Record<string, string>; composition: EditorialComposition["catalog"] }) {
   const [records, setRecords] = useState<DemoInstrument[]>(dedupeByCodeAndDate(initialRecords));
   const [hasLoadedRecords, setHasLoadedRecords] = useState(initialRecords.length > 0);
   const [brand, setBrand] = useState("All brands");
-  const [showFilter, setShowFilter] = useState<ShowFilter>("All profiles");
+  const [availability, setAvailability] = useState("All availability");
+  const [condition, setCondition] = useState("All conditions");
+  const [trust, setTrust] = useState("All trust statuses");
+  const [authenticity, setAuthenticity] = useState("All authenticity statuses");
+  const [originality, setOriginality] = useState("All originality statuses");
+  const [safety, setSafety] = useState("All safety statuses");
+  const [service, setService] = useState("All service histories");
   const [query, setQuery] = useState("");
   const [exactMatchCode, setExactMatchCode] = useState("");
   const [serialLookupMessage, setSerialLookupMessage] = useState("");
@@ -73,65 +77,32 @@ export function CatalogClient({ initialRecords, content, composition }: { initia
 
   const brands = useMemo(() => ["All brands", ...unique(records.map((record) => record.brand).filter(Boolean))], [records]);
 
-  const hasFilterOrSearch = brand !== "All brands" || showFilter !== "All profiles" || query.trim().length > 0;
+  const hasFilterOrSearch = brand !== "All brands"
+    || availability !== "All availability"
+    || condition !== "All conditions"
+    || trust !== "All trust statuses"
+    || authenticity !== "All authenticity statuses"
+    || originality !== "All originality statuses"
+    || safety !== "All safety statuses"
+    || service !== "All service histories"
+    || query.trim().length > 0;
 
   const filtered = records
     .filter((record) => !exactMatchCode || record.qrCode === exactMatchCode)
     .filter((record) => Boolean(exactMatchCode) || brand === "All brands" || record.brand === brand)
     .filter((record) => {
-      if (exactMatchCode) {
-        return true;
-      }
-
-      if (showFilter === "Verified") {
-        return getInstrumentVerificationStatus(record) === "verified";
-      }
-
-      if (showFilter === "Unverified") {
-        return getInstrumentVerificationStatus(record) !== "verified";
-      }
-
-      if (showFilter === "Authenticity Confirmed") {
-        return record.authenticityStatus === "confirmed";
-      }
-
-      if (showFilter === "Authenticity Unconfirmed") {
-        return record.authenticityStatus !== "confirmed";
-      }
-
-      if (showFilter === "Safety Alerts") {
-        return record.safetyStatus === "lost" || record.safetyStatus === "stolen";
-      }
-
-      if (showFilter === "For Sale") {
-        return record.saleStatus === "for_sale";
-      }
-
-      if (showFilter === "Not for Sale") {
-        return record.saleStatus !== "for_sale";
-      }
-
-      if (showFilter === "New") {
-        return getInstrumentCondition(record) === "new";
-      }
-
-      if (showFilter === "Used") {
-        return getInstrumentCondition(record) === "used";
-      }
-
-      if (showFilter === "All Original") {
-        return record.originalityStatus === "all_original";
-      }
-
-      if (showFilter === "Modified") {
-        return record.originalityStatus === "modified";
-      }
-
-      if (showFilter === "Service History") {
-        return getServiceHistoryEntries(record).length > 0;
-      }
-
-      return true;
+      if (exactMatchCode) return true;
+      const verificationStatus = getInstrumentVerificationStatus(record);
+      const instrumentCondition = getInstrumentCondition(record);
+      const hasSafetyAlert = record.safetyStatus === "lost" || record.safetyStatus === "stolen";
+      const hasServiceHistory = getServiceHistoryEntries(record).length > 0;
+      return (trust === "All trust statuses" || (trust === "Verified" ? verificationStatus === "verified" : verificationStatus !== "verified"))
+        && (authenticity === "All authenticity statuses" || (authenticity === "Authenticity Confirmed" ? record.authenticityStatus === "confirmed" : record.authenticityStatus !== "confirmed"))
+        && (safety === "All safety statuses" || hasSafetyAlert)
+        && (availability === "All availability" || (availability === "For Sale" ? record.saleStatus === "for_sale" : record.saleStatus !== "for_sale"))
+        && (condition === "All conditions" || (condition === "New" ? instrumentCondition === "new" : instrumentCondition === "used"))
+        && (originality === "All originality statuses" || (originality === "All Original" ? record.originalityStatus === "all_original" : record.originalityStatus === "modified"))
+        && (service === "All service histories" || hasServiceHistory);
     })
     .filter((record) => {
       if (exactMatchCode) {
@@ -162,9 +133,16 @@ export function CatalogClient({ initialRecords, content, composition }: { initia
   });
 
   const visibleCount = visibleRecords.length;
-  const totalCount = records.length;
-  const guidance = composition.sections.find((section) => section.id === "guidance");
-  const guidanceBlock = guidance?.blocks.find((block) => block.visible);
+  const availableFilters = {
+    availability: records.some((record) => Boolean(record.saleStatus)),
+    condition: records.some((record) => Boolean(getInstrumentCondition(record))),
+    trust: records.length > 0,
+    authenticity: records.some((record) => Boolean(record.authenticityStatus)),
+    originality: records.some((record) => Boolean(record.originalityStatus)),
+    safety: records.some((record) => record.safetyStatus === "lost" || record.safetyStatus === "stolen"),
+    service: records.some((record) => getServiceHistoryEntries(record).length > 0)
+  };
+  const hasAdvancedFilters = Object.values(availableFilters).some(Boolean);
 
   async function searchExactSerial() {
     const serial = query.trim();
@@ -220,21 +198,15 @@ export function CatalogClient({ initialRecords, content, composition }: { initia
               <h1>{getContentValue(content, "catalog.hero.headline")}</h1>
               <p>{getContentValue(content, "catalog.hero.body")}</p>
             </div>
-            <Link className="button" href="/create">
-              Create Profile
-            </Link>
+            <div className="catalog-hero-actions">
+              <Link className="button" href="/create">{getContentValue(content, "catalog.actions.create")}</Link>
+              <Link className="text-link" href="/collections">Browse member collections</Link>
+            </div>
           </div>
-
-          {guidance?.visible && guidanceBlock ? (
-            <section className="catalog-guidance" aria-label="Catalog guidance">
-              <strong>{guidanceBlock.title}</strong>
-              <span>{guidanceBlock.body}</span>
-            </section>
-          ) : null}
 
           <section className="catalog-filters" aria-label="Catalog filters">
             <label className="catalog-search">
-              Search profiles
+              Search
               <span>
                 <Search size={16} />
                 <input
@@ -251,7 +223,7 @@ export function CatalogClient({ initialRecords, content, composition }: { initia
                       void searchExactSerial();
                     }
                   }}
-                  placeholder="Brand, model, or exact serial"
+                  placeholder={getContentValue(content, "catalog.search.placeholder")}
                 />
                 <button
                   type="button"
@@ -272,34 +244,6 @@ export function CatalogClient({ initialRecords, content, composition }: { initia
               </select>
             </label>
             <label>
-              Filter
-              <select value={showFilter} onChange={(event) => setShowFilter(event.target.value as ShowFilter)}>
-                <option>All profiles</option>
-                <optgroup label="Availability">
-                  <option>For Sale</option>
-                  <option>Not for Sale</option>
-                </optgroup>
-                <optgroup label="Condition">
-                  <option>New</option>
-                  <option>Used</option>
-                </optgroup>
-                <optgroup label="Trust">
-                  <option>Verified</option>
-                  <option>Unverified</option>
-                  <option>Authenticity Confirmed</option>
-                  <option>Authenticity Unconfirmed</option>
-                </optgroup>
-                <optgroup label="Originality">
-                  <option>All Original</option>
-                  <option>Modified</option>
-                </optgroup>
-                <optgroup label="History">
-                  <option>Safety Alerts</option>
-                  <option>Service History</option>
-                </optgroup>
-              </select>
-            </label>
-            <label>
               Sort
               <select value={sortMode} onChange={(event) => setSortMode(event.target.value as typeof sortMode)}>
                 <option>Newest</option>
@@ -309,6 +253,21 @@ export function CatalogClient({ initialRecords, content, composition }: { initia
               </select>
             </label>
           </section>
+
+          {hasAdvancedFilters ? (
+            <details className="catalog-more-filters">
+              <summary><SlidersHorizontal size={15} /> More filters</summary>
+              <div className="catalog-filter-grid">
+                {availableFilters.availability ? <label>Availability<select value={availability} onChange={(event) => setAvailability(event.target.value)}><option>All availability</option><option>For Sale</option><option>Not for Sale</option></select></label> : null}
+                {availableFilters.condition ? <label>Condition<select value={condition} onChange={(event) => setCondition(event.target.value)}><option>All conditions</option><option>New</option><option>Used</option></select></label> : null}
+                {availableFilters.trust ? <label>Trust<select value={trust} onChange={(event) => setTrust(event.target.value)}><option>All trust statuses</option><option>Verified</option><option>Unverified</option></select></label> : null}
+                {availableFilters.authenticity ? <label>Authenticity<select value={authenticity} onChange={(event) => setAuthenticity(event.target.value)}><option>All authenticity statuses</option><option>Authenticity Confirmed</option><option>Authenticity Unconfirmed</option></select></label> : null}
+                {availableFilters.originality ? <label>Originality<select value={originality} onChange={(event) => setOriginality(event.target.value)}><option>All originality statuses</option><option>All Original</option><option>Modified</option></select></label> : null}
+                {availableFilters.safety ? <label>Safety<select value={safety} onChange={(event) => setSafety(event.target.value)}><option>All safety statuses</option><option>Safety Alert</option></select></label> : null}
+                {availableFilters.service ? <label>Service History<select value={service} onChange={(event) => setService(event.target.value)}><option>All service histories</option><option>Has Service History</option></select></label> : null}
+              </div>
+            </details>
+          ) : null}
 
           {serialLookupMessage ? (
             <div className={exactMatchCode ? "catalog-lookup-result is-match" : "catalog-lookup-result"} role="status">
@@ -329,7 +288,13 @@ export function CatalogClient({ initialRecords, content, composition }: { initia
                   type="button"
                   onClick={() => {
                     setBrand("All brands");
-                    setShowFilter("All profiles");
+                    setAvailability("All availability");
+                    setCondition("All conditions");
+                    setTrust("All trust statuses");
+                    setAuthenticity("All authenticity statuses");
+                    setOriginality("All originality statuses");
+                    setSafety("All safety statuses");
+                    setService("All service histories");
                     setQuery("");
                     setExactMatchCode("");
                     setSerialLookupMessage("");
@@ -370,7 +335,9 @@ export function CatalogClient({ initialRecords, content, composition }: { initia
 }
 
 function formatResultLabel(template: string, count: number) {
-  return template.replace("{count}", String(count));
+  const resolved = template.replace("{count}", String(count));
+  if (count !== 1) return resolved;
+  return resolved.replace(/\bProfiles\b/, "Profile").replace(/\bResults\b/, "Result");
 }
 
 function unique(values: string[]) {

@@ -17,20 +17,20 @@ export default async function PrivacyPage() {
       copy: getContentValue(settings.content, "privacy.sections.dataCollected.body")
     },
     {
-      title: "Visibility choices",
-      copy: "Public profiles can appear in the catalog and can be opened by QR code or direct link. Private profiles stay out of public browsing. Unlisted profiles stay out of the catalog but can be opened by direct link when enabled."
+      title: getContentValue(settings.content, "privacy.sections.visibility.heading"),
+      copy: getContentValue(settings.content, "privacy.sections.visibility.body")
     },
     {
-      title: "Serial Number and document privacy",
-      copy: "Owners can hide a Serial Number from public display. Hidden Serial Numbers, private notes, private files, and private document paths do not appear on public Profile pages, public API responses, search metadata, or Catalog cards."
+      title: getContentValue(settings.content, "privacy.sections.serial.heading"),
+      copy: getContentValue(settings.content, "privacy.sections.serial.body")
     },
     {
-      title: "Documents and safety status",
-      copy: "Public documents are visible to people viewing the profile. Private proof documents stay restricted to the account owner and authorized admin tools. Lost/stolen alerts are shown only when set by the owner or an authorized admin."
+      title: getContentValue(settings.content, "privacy.sections.documents.heading"),
+      copy: getContentValue(settings.content, "privacy.sections.documents.body")
     },
     {
-      title: "Account and support data",
-      copy: "QRguitar uses account email, authentication data, and support messages to run login, password reset, profile ownership, transfer tools, safety review, and support. QRguitar does not sell private user data."
+      title: getContentValue(settings.content, "privacy.sections.security.heading"),
+      copy: getContentValue(settings.content, "privacy.sections.security.body")
     }
   ];
 
@@ -42,20 +42,16 @@ export default async function PrivacyPage() {
           <div className="shell legal-page">
             <div className="eyebrow">Privacy</div>
             <h1>{getContentValue(settings.content, "privacy.hero.headline")}</h1>
-            <p>
-              QRguitar is built around user-controlled instrument profiles. Some profile data is intended to be visible
-              when an owner makes a profile public or unlisted. Other data, including hidden serials and private proof
-              documents, is kept out of public views.
-            </p>
+            <p>{getContentValue(settings.content, "privacy.hero.intro")}</p>
             {sections.map((section) => (
               <div className="legal-card" key={section.title}>
                 <h2>{section.title}</h2>
                 <p>{section.copy}</p>
               </div>
             ))}
-            <div className="legal-card">
-              <h2>Beta limits</h2>
-              <p>Do not upload passwords, payment card numbers, reset links, unrelated personal documents, or anything you do not have the right to store or share. For privacy questions or removal requests, contact <a href="mailto:support@qrguitar.com">support@qrguitar.com</a>.</p>
+            <div className="legal-card legal-final-note">
+              <p>{getContentValue(settings.content, "privacy.finalNote")}</p>
+              <a href="mailto:support@qrguitar.com">support@qrguitar.com</a>
             </div>
           </div>
         </section>

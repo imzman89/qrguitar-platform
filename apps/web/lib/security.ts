@@ -14,9 +14,9 @@ export function validateInstrumentSubmission(input: InstrumentValidationInput, h
     return "Submission blocked.";
   }
 
-  const required = [input.brand, input.model, input.year].map((value) => value.trim());
+  const required = [input.brand, input.model].map((value) => value.trim());
   if (required.some((value) => !value)) {
-    return "Make, model, and year are required.";
+    return "Make and model are required.";
   }
 
   if (!input.serial.trim() && !input.serialNotUsed) {
@@ -35,8 +35,8 @@ export function validateInstrumentSubmission(input: InstrumentValidationInput, h
     return "Serial number can only use letters, numbers, dots, slashes, dashes, and underscores.";
   }
 
-  if (!/^(19|20)\d{2}$/.test(input.year.trim())) {
-    return "Enter a four-digit year.";
+  if (input.year.trim() && !/^(19|20)\d{2}$/.test(input.year.trim())) {
+    return "Enter a four-digit year, or leave year blank if it is unknown.";
   }
 
   return "";

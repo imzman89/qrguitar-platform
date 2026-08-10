@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Clock3,
   Database,
+  Eye,
   Fingerprint,
   Gem,
   Globe2,
@@ -25,78 +26,87 @@ import {
 
 export const siteCopy = {
   hero: {
-    eyebrow: "ONE PROFILE FOR THE LIFE OF THE INSTRUMENT",
-    headline: "Keep its identity, proof, and history together.",
+    eyebrow: "FOR OWNERS, SHOPS, BUILDERS & COLLECTORS",
+    headline: "One Profile for the life of an instrument.",
     body:
-      "Create one QRguitar Profile for photos, specs, service history, proof, ownership, and lost or stolen alerts. Its permanent QR link stays the same through every update and every owner.",
-    primaryCta: "Create Profile",
-    secondaryCta: "Browse QRguitar Profiles",
-    trust: ["Permanent QR identity", "Photos, specs, proof & history"]
+      "Keep the photos, specs, service, documents, ownership, and permanent QR with the instrument.",
+    primaryCta: "Create a Profile",
+    secondaryCta: "Explore the Catalog",
+    trust: ["Permanent QRguitar ID", "Owner-controlled privacy"]
   },
   workflow: {
-    eyebrow: "How it works",
-    headline: "Simple enough for one guitar. Useful enough for a whole shop.",
+    eyebrow: "HOW IT WORKS",
+    headline: "Create it once. Keep it current.",
     body:
-      "Start with the basic facts, put the QR where people will actually use it, then keep adding the things that usually get lost.",
+      "Start with the instrument. Add the history as it happens.",
     cards: [
       {
         icon: QrCode,
-        title: "Create the profile",
-        copy: "Add the make, model, serial number, year, photos, owner status, build notes, and anything already known about the instrument."
+        title: "Identify",
+        copy: "Serial Number, photos, specifications, and the permanent QRguitar ID."
       },
       {
-        icon: Smartphone,
-        title: "Attach or share the QR",
-        copy: "Use it on a hang tag, case card, sales listing, repair intake sheet, certificate, shipping paperwork, or under-finish install."
+        icon: ScrollText,
+        title: "Document",
+        copy: "Service, documents, media, safety, and ownership history."
       },
       {
-        icon: BadgeCheck,
-        title: "Update it for life",
-        copy: "Add setup notes, service history, fretwork, receipts, videos, warranty claims, sale notes, and manual owner-change notes as the years go on."
+        icon: Repeat2,
+        title: "Carry Forward",
+        copy: "Transfer the same Profile when the instrument changes hands."
       }
     ],
-    cta: "Create Your First Profile"
+    cta: "Create a Profile"
   },
   customization: {
-    eyebrow: "What each profile holds",
-    headline: "The details guitar people ask for, before they ask.",
+    eyebrow: "INSIDE A PROFILE",
+    headline: "See the details that matter.",
     body:
-      "A QRguitar Profile can be as simple or as deep as the instrument needs. Start with the basics, then add the bench notes, proof, media, and history that make the piece easier to sell, service, insure, or pass on.",
+      "Photos, specifications, service, documents, and ownership stay attached to the same Profile.",
     checks: [
-      { icon: CheckCircle2, copy: "Serial number, year, weight, finish, neck shape, pickup set, wiring, and build specs" },
-      { icon: CheckCircle2, copy: "Setup measurements, fretwork, repairs, mods, parts, service dates, and shop notes" },
-      { icon: CheckCircle2, copy: "Receipts, warranty info, certificates, appraisals, case candy, manuals, and documents" },
-      { icon: CheckCircle2, copy: "Photos, videos, sale notes, provenance, private notes, and beta owner-change support" }
+      { icon: CheckCircle2, copy: "Identity: Serial Number, specifications, condition, and QRguitar ID." },
+      { icon: CheckCircle2, copy: "History: service, Timeline events, ownership, and safety." },
+      { icon: CheckCircle2, copy: "Documents: receipts, appraisals, build sheets, and files you choose to share." }
     ],
-    cta: "Build a Profile"
+    cta: "Explore a Profile"
   },
   audiences: {
-    eyebrow: "Built for guitar people",
-    headline: "For the bench, the sales floor, the collection room, and the next owner.",
-    body: "Different people need different details. QRguitar keeps those details attached to the instrument instead of buried in texts, folders, binders, and old listings.",
+    eyebrow: "WHO USES QRGUITAR",
+    headline: "One system. Different jobs.",
+    body: "",
     cards: [
       {
-        icon: Wrench,
-        title: "Builders",
-        copy: "Ship every build with a clean digital spec sheet, warranty profile, photos, setup notes, and a QRguitar Profile the customer can keep."
-      },
-      {
-        icon: Store,
-        title: "Shops and Retailers",
-        copy: "Stop losing info between the bench, sales floor, website, and buyer. Keep serials, condition notes, service work, and sale notes together."
+        icon: UserRoundCheck,
+        title: "Owners",
+        copy: "Keep your instruments organized, control what's public, and hand the same Profile to the next owner."
       },
       {
         icon: Fingerprint,
         title: "Collectors",
-        copy: "Keep provenance, photos, values, receipts, insurance details, case candy, and private notes organized across the whole collection."
+        copy: "Preserve photos, documents, service, and provenance without losing the story."
       },
       {
-        icon: UserRoundCheck,
-        title: "Repair Shops",
-        copy: "Scan the instrument before touching it. See previous work, add intake photos, setup measurements, parts, repairs, and completion notes."
+        icon: Store,
+        title: "Shops",
+        copy: "Create or import inventory, print QR materials, and transfer Profiles to buyers."
+      },
+      {
+        icon: Building2,
+        title: "Builders / Brands",
+        copy: "Issue consistent Profiles for new builds and hand the same Profile to the first owner."
+      },
+      {
+        icon: Wrench,
+        title: "Luthiers / Technicians",
+        copy: "Submit completed service with private evidence for the owner to review."
+      },
+      {
+        icon: Eye,
+        title: "Buyers",
+        copy: "Review the public history, then receive the same Profile through a secure transfer or claim."
       }
     ],
-    cta: "Open the Dashboard"
+    cta: ""
   },
   vision: {
     eyebrow: "Daily use",
@@ -172,33 +182,30 @@ export const siteCopy = {
     cta: "Start a Commercial Plan"
   },
   pricing: {
-    eyebrow: "Public beta",
-    headline: "Create profiles free. Commercial setup starts at $99+.",
-    body:
-      "During public beta, users can create QRguitar Profiles without a hard paywall. Verification, QR hardware, install help, builder/shop onboarding, and commercial setup are available as paid services.",
+    eyebrow: "PUBLIC BETA",
+    headline: "Start free. Get help when you need it.",
+    body: "",
     plans: [
       {
-        name: "Free Public Beta",
-        price: "$0",
-        copy: "Create up to 25 profiles during public beta. Add photos, specs, documents, notes, visibility settings, and QR downloads without a hard paywall.",
+        name: "For owners and collectors",
+        price: "$0 during public beta",
+        copy: "Create up to 25 Profiles with photos, specifications, privacy controls, history, and downloadable QR codes.",
         features: [
-          "Up to 25 profiles during beta",
-          "Public, private, or unlisted",
-          "No verified badge included",
-          "Verify important profiles later",
-          "Photos, specs, documents, and notes",
+          "Up to 25 Profiles",
+          "Public, Unlisted, or Private",
+          "Downloadable QR codes",
+          "Service and ownership history"
         ]
       },
       {
-        name: "Commercial / Brand Setup",
-        price: "From $99+",
-        copy: "For builders, retailers, repair shops, brands, and commercial accounts that want onboarding help, bulk setup, QR hardware, verification support, or a branded rollout.",
+        name: "For shops, builders & brands",
+        price: "From $99",
+        copy: "Need help with bulk setup, QR hardware, verification, or a commercial rollout? We'll help you get started.",
         features: [
-          "Builder, retailer, and shop onboarding",
-          "Bulk record setup and inventory help",
-          "QR plates, tags, stickers, and install options",
-          "Verification support available",
-          "Custom pricing based on business needs"
+          "Bulk Profile setup",
+          "Business onboarding",
+          "QR hardware and print support",
+          "Verification support"
         ]
       }
     ],

@@ -59,7 +59,7 @@ export function QRGuitarBotPopup() {
     }
 
     if (label === "Verify Record") {
-      return "Tell me what proof is needed to verify an instrument record.";
+      return "Tell me what evidence is needed to verify a QRguitar Profile.";
     }
 
     return defaultPrompt;

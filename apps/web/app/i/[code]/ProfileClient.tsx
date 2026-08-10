@@ -7,7 +7,7 @@ import {
   Copy,
   FileText,
   Home,
-  Image,
+  Image as ImageIcon,
   MessageCircle,
   QrCode,
   Repeat2,
@@ -60,7 +60,8 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
   const galleryTouchStartX = useRef<number | null>(null);
   const heroPointerStartX = useRef<number | null>(null);
   const heroThumbnailRailRef = useRef<HTMLDivElement | null>(null);
-  const heroThumbnailDragRef = useRef<{ startX: number; scrollLeft: number } | null>(null);
+  const heroThumbnailDragRef = useRef<{ pointerId: number; startX: number; scrollLeft: number } | null>(null);
+  const heroThumbnailDidDragRef = useRef(false);
   const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
   const [brandLogos, setBrandLogos] = useState<Record<string, string>>({});
   const [publicContent, setPublicContent] = useState<Record<string, string>>({});
@@ -486,7 +487,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
         <section className="scan-shell">
           <section className="scan-tab-panel" aria-label="Loading profile">
             <h2>Loading instrument profile</h2>
-            <p>Checking the record now.</p>
+            <p>Checking the Profile now.</p>
           </section>
         </section>
       </main>
@@ -499,7 +500,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
         <section className="scan-shell">
           <section className="scan-tab-panel" aria-label="Profile not found">
             <h2>Instrument profile not found</h2>
-            <p>This QR code record has not been published yet.</p>
+            <p>This QRguitar Profile has not been published.</p>
             <div className="scan-actions">
               <Action icon={<Home />} label="Go to homepage" onClick={() => router.push("/")} />
               <Action icon={<Download />} label="Browse catalog" onClick={() => router.push("/catalog")} />
@@ -533,14 +534,14 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
   const trustItems = [
     showVerificationBadge && isVerifiedRecord
       ? {
-          label: "Verified by QRguitar",
-          note: instrument.publicVerificationNote || "QRguitar reviewed the profile evidence available at the time of verification."
+          label: getContentValue(publicContent, "profile.verification.title"),
+          note: instrument.publicVerificationNote || getContentValue(publicContent, "profile.verification.body")
         }
       : null,
     showAuthenticityBadge && isAuthenticityConfirmed
       ? {
-          label: "Authenticity Confirmed",
-          note: instrument.publicAuthenticityNote || "Available evidence was reviewed for consistency with the instrument's stated identity."
+          label: getContentValue(publicContent, "profile.authenticity.title"),
+          note: instrument.publicAuthenticityNote || getContentValue(publicContent, "profile.authenticity.body")
         }
       : null
   ].filter((item): item is { label: string; note: string } => Boolean(item));
@@ -660,8 +661,11 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
                   event.currentTarget.scrollLeft += event.deltaX;
                 }}
                 onPointerDown={(event) => {
+                  if (event.pointerType !== "mouse") return;
                   event.stopPropagation();
+                  heroThumbnailDidDragRef.current = false;
                   heroThumbnailDragRef.current = {
+                    pointerId: event.pointerId,
                     startX: event.clientX,
                     scrollLeft: event.currentTarget.scrollLeft
                   };
@@ -669,10 +673,14 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
                 }}
                 onPointerMove={(event) => {
                   const drag = heroThumbnailDragRef.current;
-                  if (!drag) return;
+                  if (!drag || drag.pointerId !== event.pointerId) return;
+                  if (Math.abs(event.clientX - drag.startX) > 6) {
+                    heroThumbnailDidDragRef.current = true;
+                  }
                   event.currentTarget.scrollLeft = drag.scrollLeft - (event.clientX - drag.startX);
                 }}
                 onPointerUp={(event) => {
+                  if (event.pointerType !== "mouse") return;
                   event.stopPropagation();
                   heroThumbnailDragRef.current = null;
                   if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -681,13 +689,20 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
                 }}
                 onPointerCancel={() => {
                   heroThumbnailDragRef.current = null;
+                  heroThumbnailDidDragRef.current = false;
                 }}
               >
                 {galleryImages.map((imageUrl, index) => (
                   <button
                     className={index === mediaIndex ? "active" : undefined}
                     type="button"
-                    onClick={() => setMediaIndex(index)}
+                    onClick={() => {
+                      if (heroThumbnailDidDragRef.current) {
+                        heroThumbnailDidDragRef.current = false;
+                        return;
+                      }
+                      setMediaIndex(index);
+                    }}
                     aria-label={`Show photo ${index + 1} of ${galleryImages.length}`}
                     aria-current={index === mediaIndex ? "true" : undefined}
                     key={`${imageUrl}-${index}`}
@@ -701,7 +716,6 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           <div className="scan-hero-info">
             <div className="builder-mark">
               <span>{instrument.brand || "QRguitar"}</span>
-              <strong>{instrument.model || instrument.instrumentType || "QRguitar Profile"}</strong>
             </div>
             <h1>{instrumentDisplayName(instrument)}</h1>
             {instrument.publicCollection ? (
@@ -735,6 +749,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
 
         <ProfileIdentity
           values={identityValues}
+          excludeLabels={["Make / Model"]}
           mediaSummary={[
             galleryImages.length ? `${galleryImages.length} ${galleryImages.length === 1 ? "photo" : "photos"}` : "",
             documentFiles.length ? `${documentFiles.length} ${documentFiles.length === 1 ? "document" : "documents"}` : ""
@@ -769,10 +784,10 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
         {!canEdit ? (
           <aside className="profile-claim-entry" aria-label="Ownership help">
             <div>
-              <strong>Is this your instrument?</strong>
-              <span>A QR scan never changes ownership. Start a private request if the current owner cannot send you a transfer.</span>
+              <strong>Need ownership help?</strong>
+              <span>Scanning the QR code never changes ownership. Start a private request when the current owner cannot send a transfer.</span>
             </div>
-            <Link className="button secondary" href={`/ownership-claim?code=${encodeURIComponent(instrument.qrCode)}`}>Claim or transfer ownership</Link>
+            <Link className="button secondary" href={`/ownership-claim?code=${encodeURIComponent(instrument.qrCode)}`}>Start ownership request</Link>
           </aside>
         ) : null}
 
@@ -804,7 +819,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
           <section className="scan-actions" aria-label="Service provider actions">
             <Action
               icon={<Wrench />}
-              label="Submit Service Work"
+              label="Submit service record"
               onClick={() => router.push(`/service-work/${instrument.qrCode}`)}
             />
           </section>
@@ -816,12 +831,12 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
               {actionNotice === "transfer" ? (
                 <>
                   <span className="scan-action-icon"><Share2 size={16} /> Ownership tools are in beta</span>
-                  <p>This record is ready for future owner-change support. For launch, contact support@qrguitar.com if you need manual help with an ownership change.</p>
+                  <p>Contact support@qrguitar.com if you need help with an ownership change.</p>
                 </>
               ) : null}
               {actionNotice === "documents" ? (
                 <>
-                  <span className="scan-action-icon"><FileText size={16} /> Documents and proof</span>
+                  <span className="scan-action-icon"><FileText size={16} /> Documents</span>
                   <p>Public files appear here for buyers and shops. The owner controls which files stay private and which are visible.</p>
                 </>
               ) : null}
@@ -1026,7 +1041,7 @@ function ProfilePanel({
 
     return (
       <section className="scan-tab-panel">
-        <PanelHeader icon={<SlidersHorizontal />} label="Specifications" title="Build details, setup notes, and Serial Number." />
+        <PanelHeader icon={<SlidersHorizontal />} label="Profile details" title="Specifications, setup notes, and Serial Number." />
         <div className="profile-data-grid">
           {visibleSpecs.map((spec) => (
             <span key={spec.label}><strong>{spec.label}</strong>{spec.value}</span>
@@ -1049,18 +1064,13 @@ function ProfilePanel({
 
     return (
       <section className="scan-tab-panel">
-        <PanelHeader icon={<Clock3 />} label="Timeline" title="The profile stays useful as the instrument moves through the world." />
+        <PanelHeader icon={<Clock3 />} label="Timeline" title="Events recorded for this instrument." />
         <div className="timeline-list">
           {publicTimelineEvents.map((entry) => (
             <TimelineItem
               date={formatTimelineEntryDate(entry)}
               title={entry.title}
-              copy={[
-                serviceSourceLabel(entry),
-                entry.category || entry.eventType,
-                entry.publicDescription,
-                [entry.shopName, entry.location].filter(Boolean).join(" / ")
-              ].filter(Boolean).join(" / ")}
+              copy={timelineEntryCopy(entry, false)}
               key={entry.id}
             />
           ))}
@@ -1084,7 +1094,7 @@ function ProfilePanel({
           ) : null}
           <div className="timeline-origin-marker">
             <Clock3 aria-hidden="true" />
-            <span><strong>Profile origin</strong>{createdDate}</span>
+            <span><strong>Profile created</strong>{createdDate}</span>
           </div>
         </div>
       </section>
@@ -1100,11 +1110,7 @@ function ProfilePanel({
             <TimelineItem
               date={formatTimelineEntryDate(entry)}
               title={entry.title}
-              copy={[
-                serviceSourceLabel(entry),
-                entry.publicDescription,
-                [entry.providerDisplayName || entry.shopName, entry.location].filter(Boolean).join(" / ")
-              ].filter(Boolean).join(" / ")}
+              copy={timelineEntryCopy(entry, true)}
               key={entry.id}
             />
           ))}
@@ -1135,7 +1141,7 @@ function ProfilePanel({
   if (activeTab === "media") {
     return (
       <section className="scan-tab-panel">
-        <PanelHeader icon={<Image />} label="Media" title="Public video, audio, and external media connected to this instrument." />
+        <PanelHeader icon={<ImageIcon />} label="Media" title="Public video, audio, and external media connected to this instrument." />
         <div className="external-media-grid">
           {externalMedia.map((item) => {
             const embedUrl = externalMediaEmbedUrl(item);
@@ -1214,7 +1220,7 @@ function ProfilePanel({
           </div>
         ) : (
           <div className="media-placeholder-grid">
-            <span>No public documents posted yet.</span>
+            <span>No public documents yet.</span>
             <span>Owners can mark certificates, receipts, or spec sheets as public later.</span>
           </div>
         )}
@@ -1296,7 +1302,7 @@ function EmptyPanel({ title, copy }: { title: string; copy: string }) {
   return (
     <div className="collaboration-thread compact">
       <div className="panel-header">
-        <span><MessageCircle size={18} /> Record note</span>
+        <span><MessageCircle size={18} /> Profile note</span>
         <h2>{title}</h2>
       </div>
       <p>{copy}</p>
@@ -1386,6 +1392,20 @@ function serviceSourceLabel(entry: ServiceHistoryEntry) {
     return labels.join(" - ");
   }
   return entry.isSystem ? "" : "Owner-reported service";
+}
+
+function timelineEntryCopy(entry: ServiceHistoryEntry, preferProvider: boolean) {
+  const source = serviceSourceLabel(entry);
+  const category = String(entry.category || entry.eventType || "").trim();
+  const provider = String((preferProvider ? entry.providerDisplayName : "") || entry.shopName || "").trim();
+  const location = String(entry.location || "").trim();
+  const attribution = [provider, location].filter(Boolean).join(" in ");
+  const context = [source, !/^other$/i.test(category) ? category : ""].filter(Boolean).join(" - ");
+
+  return [context, entry.publicDescription, attribution].filter(Boolean).map((part) => {
+    const value = String(part).trim();
+    return /[.!?]$/.test(value) ? value : `${value}.`;
+  }).join(" ");
 }
 
 function externalMediaEmbedUrl(item: ExternalMediaItem) {

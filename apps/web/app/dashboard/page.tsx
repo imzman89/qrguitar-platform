@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, Ellipsis, FileSpreadsheet, Mail, Repeat2, ShieldCheck, Wrench } from "lucide-react";
+import { BookOpenText, Copy, Ellipsis, EyeOff, FileSpreadsheet, FileText, ImagePlus, Mail, Printer, Repeat2, ShieldCheck, UsersRound, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ActionDrawer } from "../../components/ActionDrawer";
@@ -14,8 +14,6 @@ import { RecordShareButton } from "../../components/RecordShareButton";
 import styles from "./dashboard-records.module.css";
 import { defaultSiteSettings, fetchPublishedSiteSettings } from "../../lib/site-settings";
 import {
-  getAccountPlan,
-  getDisplayName,
   getInstrumentCondition,
   getInstrumentVerificationStatus,
   instrumentToProfileUrl,
@@ -202,14 +200,9 @@ export default function DashboardPage() {
   const pendingServiceRequests = serviceRequests.filter(
     (request) => request.status === "submitted" || request.status === "changes_requested"
   ).length;
-  const accountPlan = getAccountPlan(user);
-  const displayName = useMemo(() => getDisplayName(user), [user?.name, user?.email, user?.role]);
-  const accountSummary = accountPlan === "free" ? "Beta access." : `${accountPlan.charAt(0).toUpperCase()}${accountPlan.slice(1)} account.`;
   const publicRecords = instruments.filter((instrument) => instrument.visibility === "public").length;
   const privateRecords = instruments.filter((instrument) => instrument.visibility === "private").length;
   const unlistedRecords = instruments.filter((instrument) => instrument.visibility === "unlisted").length;
-  const safetyAlerts = instruments.filter((instrument) => instrument.safetyStatus === "lost" || instrument.safetyStatus === "stolen").length;
-
   const verifiedRecords = instruments.filter((instrument) => getInstrumentVerificationStatus(instrument) === "verified").length;
   const authenticityConfirmedRecords = instruments.filter((instrument) => instrument.authenticityStatus === "confirmed").length;
   const chronologicalInstruments = useMemo(
@@ -249,14 +242,13 @@ export default function DashboardPage() {
 
   const stats = useMemo(
     () => [
-      { label: "Total Profiles", value: String(instruments.length), filter: "all" as const, helper: "Every active Profile" },
-      { label: "Public in Catalog", value: String(publicRecords), filter: "public" as const, helper: "Discoverable Profiles" },
+      { label: "Profiles", value: String(instruments.length), filter: "all" as const, helper: "Active instruments" },
+      { label: "Public", value: String(publicRecords), filter: "public" as const, helper: "Listed in the Catalog" },
       { label: "Private / Unlisted", value: String(privateRecords + unlistedRecords), filter: "private" as const, helper: "Limited visibility" },
-      { label: "Pending Transfers / Claims", value: String(pendingTransfers), filter: "transfers" as const, helper: "Awaiting completion" },
-      { label: "Service Requests", value: String(pendingServiceRequests), filter: "service" as const, helper: "Awaiting your review" },
-      { label: "Lost / Stolen", value: String(safetyAlerts), filter: "safety" as const, helper: "Active safety alerts" }
+      { label: "Service Requests", value: String(pendingServiceRequests), filter: "service" as const, helper: "Awaiting review" },
+      { label: "Transfers & Claims", value: String(pendingTransfers), filter: "transfers" as const, helper: "Awaiting completion" }
     ],
-    [instruments.length, pendingServiceRequests, pendingTransfers, privateRecords, publicRecords, safetyAlerts, unlistedRecords]
+    [instruments.length, pendingServiceRequests, pendingTransfers, privateRecords, publicRecords, unlistedRecords]
   );
 
   async function updateSerialVisibility(instrument: DemoInstrument, showSerialPublic: boolean) {
@@ -400,22 +392,24 @@ export default function DashboardPage() {
         <div className="shell">
           <div className="dashboard-hero">
             <div>
-              <div className="eyebrow">{getContentValue(content, "dashboard.hero.headline")}</div>
-              <h1>{user ? `Welcome back, ${displayName}.` : "Your QRguitar workspace."}</h1>
-              <p>
-                {user
-                  ? `${getContentValue(content, "dashboard.hero.body")} ${accountSummary}`
-                  : "Create a profile, manage QR downloads, and keep ownership history attached to the same QRguitar Profile."}
-              </p>
+              <div className="eyebrow">Owner workspace</div>
+              <h1>{getContentValue(content, "dashboard.hero.headline")}</h1>
+              <p>{getContentValue(content, "dashboard.hero.body")}</p>
             </div>
             <div className="dashboard-buttons">
               <Link className="button" href="/create">{getContentValue(content, "dashboard.actions.create")}</Link>
               <Link className="button secondary" href="/dashboard/import"><FileSpreadsheet size={16} /> {getContentValue(content, "dashboard.actions.bulk")}</Link>
-              <button className="button secondary" type="button" onClick={() => setActiveFilter("service")}>Service Requests</button>
-              <Link className="button secondary" href="/ownership-claim">{getContentValue(content, "dashboard.actions.claims")}</Link>
-              {collectionHandle ? <Link className="button secondary" href={`/collections/${collectionHandle}`}>View Public Collection</Link> : null}
             </div>
           </div>
+          <nav className="dashboard-workspace-links" aria-label="Owner tools">
+            <button type="button" onClick={() => setActiveFilter("service")}><Wrench size={15} /> Service queue <span>{pendingServiceRequests}</span></button>
+            <Link href="/ownership-claim">Claims &amp; transfers <span>{pendingTransfers}</span></Link>
+            {collectionHandle ? (
+              <Link href={`/collections/${collectionHandle}`}><UsersRound size={15} /> View collection page</Link>
+            ) : (
+              <Link href="/account?section=collection" title="Create a shareable page for the public Profiles in your collection"><UsersRound size={15} /> Create collection page</Link>
+            )}
+          </nav>
           {dashboardMessage ? <div className="admin-message">{dashboardMessage}</div> : null}
 
           <div className="stats-grid dashboard-metric-grid" aria-label="Collection overview">
@@ -443,9 +437,9 @@ export default function DashboardPage() {
             <section className="card service-request-inbox" aria-labelledby="service-requests-title">
               <div className="service-request-inbox__header">
                 <div>
-                  <div className="eyebrow"><Wrench aria-hidden="true" /> Service records</div>
+                  <div className="eyebrow"><Wrench aria-hidden="true" /> Service</div>
                   <h3 id="service-requests-title">Service requests</h3>
-                  <p>Review provider-submitted work before it becomes part of the instrument's permanent history.</p>
+                  <p>Review provider-submitted work before it is added to the Profile.</p>
                 </div>
                 <span>{pendingServiceRequests} awaiting review</span>
               </div>
@@ -474,9 +468,7 @@ export default function DashboardPage() {
                 <div className="eyebrow">Your instruments</div>
                 <h3>{getContentValue(content, "dashboard.collection.title")}</h3>
               </div>
-              <Link className="button secondary" href="/create">
-                Add Guitar
-              </Link>
+              <Link className="button secondary" href="/create">Create Profile</Link>
             </div>
             <div className={styles.instrumentList}>
               {loadingRecords ? (
@@ -565,9 +557,24 @@ export default function DashboardPage() {
             <div><b>{actionRecord.qrCode}</b><span>{actionRecord.serial ? `Serial Number ${actionRecord.serial}` : "No Serial Number"}</span></div>
           </div>
           <div className={styles.drawerSections}>
-            <section><b>QR tools</b><QrDownload code={actionRecord.qrCode} label={dashboardRecordTitle(actionRecord)} qrStyle={actionRecord.qrStyle} showPrintHandout={false} onStyleChange={(qrStyle) => { setInstruments((current) => current.map((item) => item.qrCode === actionRecord.qrCode ? { ...item, qrStyle } : item)); setActionRecord((current) => current ? { ...current, qrStyle } : current); }} /><Link href={`/handout/${actionRecord.qrCode}`}>Open Print Suite</Link><RecordShareButton className={styles.dashboardShare} code={actionRecord.qrCode} title={dashboardRecordTitle(actionRecord)} showLabel /></section>
-            <section><b>History</b><Link href={`/edit/${actionRecord.qrCode}#timeline`}>Add Timeline Event</Link><Link href={`/edit/${actionRecord.qrCode}#service`}>Add Service Entry</Link><Link href={`/edit/${actionRecord.qrCode}#media`}>Add Supplemental Media</Link><Link href={`/edit/${actionRecord.qrCode}#documents`}>Add Document</Link></section>
-            <section><b>Privacy & safety</b>{actionRecord.serial ? <button type="button" onClick={() => void updateSerialVisibility(actionRecord, !actionRecord.showSerialPublic)}>{actionRecord.showSerialPublic ? "Hide Serial Number" : "Show Serial Number"}</button> : null}<Link href={`/edit/${actionRecord.qrCode}#privacy-safety`}>Visibility and safety</Link></section>
+            <section>
+              <b>QR, print &amp; sharing</b>
+              <QrDownload code={actionRecord.qrCode} label={dashboardRecordTitle(actionRecord)} qrStyle={actionRecord.qrStyle} showPrintHandout={false} onStyleChange={(qrStyle) => { setInstruments((current) => current.map((item) => item.qrCode === actionRecord.qrCode ? { ...item, qrStyle } : item)); setActionRecord((current) => current ? { ...current, qrStyle } : current); }} />
+              <Link href={`/handout/${actionRecord.qrCode}`}><Printer size={15} /> Print handout &amp; labels</Link>
+              <RecordShareButton className={styles.dashboardShare} code={actionRecord.qrCode} title={dashboardRecordTitle(actionRecord)} showLabel />
+            </section>
+            <section>
+              <b>History &amp; files</b>
+              <Link href={`/edit/${actionRecord.qrCode}#timeline`}><BookOpenText size={15} /> Timeline event</Link>
+              <Link href={`/edit/${actionRecord.qrCode}#service`}><Wrench size={15} /> Service entry</Link>
+              <Link href={`/edit/${actionRecord.qrCode}#media`}><ImagePlus size={15} /> Photos &amp; media</Link>
+              <Link href={`/edit/${actionRecord.qrCode}#documents`}><FileText size={15} /> Documents</Link>
+            </section>
+            <section>
+              <b>Privacy &amp; safety</b>
+              {actionRecord.serial ? <button type="button" onClick={() => void updateSerialVisibility(actionRecord, !actionRecord.showSerialPublic)}><EyeOff size={15} /> {actionRecord.showSerialPublic ? "Hide Serial Number" : "Show Serial Number"}</button> : null}
+              <Link href={`/edit/${actionRecord.qrCode}#privacy-safety`}><ShieldCheck size={15} /> Visibility &amp; safety</Link>
+            </section>
             <TransferPanel className={styles.transferPanel} bodyClassName={styles.transferPanelBody} instrument={actionRecord} user={user} allowBuyerCode={collectionAccountType === "shop" || collectionAccountType === "builder"} latestTransfer={latestTransferForInstrument(transfers, actionRecord.qrCode)} onTransferCreated={(transfer) => setTransfers((current) => [transfer, ...current.filter((item) => item.id !== transfer.id)])} onTransferChanged={refreshInstruments} />
             <section className={styles.drawerDanger}><b>Danger zone</b><button className={styles.dangerAction} type="button" onClick={() => void removeFromCollection(actionRecord)}>{getContentValue(content, "dashboard.card.remove")}</button></section>
           </div>

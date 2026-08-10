@@ -107,6 +107,48 @@ export async function sendServiceReviewEmail(input: {
   }
 }
 
+export async function sendCollectionInquiryEmail(input: {
+  to: string;
+  collectionName: string;
+  senderName: string;
+  senderEmail: string;
+  message: string;
+  profileContext?: string;
+}): Promise<EmailResult> {
+  const apiKey = String(process.env.BREVO_API_KEY || "").trim();
+  if (!apiKey) {
+    return { ok: false, status: "failed", message: "Member inquiries are temporarily unavailable." };
+  }
+
+  const subject = `QRguitar inquiry for ${String(input.collectionName || "your collection").replace(/[\r\n]+/g, " ").slice(0, 80)}`;
+  const safeCollection = escapeHtml(input.collectionName.slice(0, 80));
+  const safeSender = escapeHtml(input.senderName.slice(0, 80));
+  const safeMessage = escapeHtml(input.message.slice(0, 1200)).replace(/\n/g, "<br>");
+  const safeContext = escapeHtml(String(input.profileContext || "").slice(0, 160));
+  const htmlContent = `<!doctype html><html><head><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"><title>${escapeHtml(subject)}</title></head><body style="margin:0;background:#080d0f;color:#f6f2e8;font-family:Arial,sans-serif"><div style="max-width:620px;margin:0 auto;padding:36px 22px"><div style="font-size:26px;font-weight:800;margin-bottom:28px">QR<span style="color:#f59e0b">guitar</span></div><div style="background:#12191c;border:1px solid #293438;border-radius:8px;padding:28px"><p style="margin:0 0 10px;color:#f59e0b;font-size:12px;font-weight:800;text-transform:uppercase">Private member inquiry</p><h1 style="margin:0 0 16px;font-size:26px">A member contacted ${safeCollection}.</h1>${safeContext ? `<p style="margin:0 0 18px;color:#9fa9ad;font-size:13px">About: ${safeContext}</p>` : ""}<p style="margin:0 0 8px;color:#f6f2e8;font-weight:700">${safeSender} wrote:</p><p style="margin:0;line-height:1.65;color:#d8dddf">${safeMessage}</p><p style="margin:24px 0 0;color:#9fa9ad;font-size:12px;line-height:1.55">Reply to this email to continue the conversation. QRguitar did not expose your email address on the public collection page.</p></div><p style="font-size:12px;color:#7f898d;margin-top:20px">You received this because private inquiries are enabled for your QRguitar collection.</p></div></body></html>`;
+
+  try {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: { "api-key": apiKey, "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        sender: { name: "QRguitar", email: senderAddress() },
+        replyTo: { email: input.senderEmail, name: input.senderName },
+        to: [{ email: input.to }],
+        subject,
+        htmlContent
+      })
+    });
+    const payload = await response.json().catch(() => ({})) as { messageId?: string };
+    if (!response.ok) {
+      return { ok: false, status: "failed", message: "The inquiry could not be delivered. Try again later." };
+    }
+    return { ok: true, status: "sent", message: "Inquiry sent privately.", providerMessageId: payload.messageId };
+  } catch {
+    return { ok: false, status: "failed", message: "The inquiry could not be delivered. Try again later." };
+  }
+}
+
 function renderRegisteredTemplateValue(content: Record<string, string>, key: string, variables: Record<string, string>) {
   const entry = contentRegistryByKey.get(key);
   if (!entry || entry.area !== "Emails") throw new Error(`Email template field is not registered: ${key}`);

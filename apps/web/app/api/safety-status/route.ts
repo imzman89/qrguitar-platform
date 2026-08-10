@@ -128,7 +128,7 @@ export async function PATCH(request: Request) {
   }
 
   if (!loaded.guitar) {
-    return json({ ok: false, message: "Instrument record was not found." }, { status: 404 });
+    return json({ ok: false, message: "QRguitar Profile was not found." }, { status: 404 });
   }
 
   const access = await requireOwnerOrAdmin(request, loaded.guitar, supabase);

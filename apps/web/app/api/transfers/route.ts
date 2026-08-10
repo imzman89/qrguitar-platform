@@ -117,7 +117,7 @@ function mapTransfer(row: TransferRow, guitar?: GuitarRow | null, includePrivate
   return {
     id: row.id,
     guitarQrCode: guitar?.qr_code || "",
-    guitarName: guitar?.name || guitar?.model || "Instrument record",
+    guitarName: guitar?.name || guitar?.model || "QRguitar Profile",
     toName: includePrivate ? row.to_name || "" : "",
     toEmail: includePrivate ? row.to_email : "",
     status: transferStatus(row.status),
@@ -296,7 +296,7 @@ export async function POST(request: Request) {
     .maybeSingle<GuitarRow>();
 
   if (guitarResult.error || !guitarResult.data) {
-    return json({ ok: false, message: "Instrument record was not found." }, { status: 404 });
+    return json({ ok: false, message: "QRguitar Profile was not found." }, { status: 404 });
   }
 
   const isOwner = guitarResult.data.owner_id === auth.user.id;

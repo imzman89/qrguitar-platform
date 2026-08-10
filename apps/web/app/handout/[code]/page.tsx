@@ -128,7 +128,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
   const [printScope, setPrintScope] = useState<PrintScope>("public");
   const [printSize, setPrintSize] = useState<PrintSize>(requestedSize);
   const [orientation, setOrientation] = useState<PrintOrientation>(requestedOrientation);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [zoom, setZoom] = useState(82);
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
   const [includePhoto, setIncludePhoto] = useState(true);
@@ -151,7 +151,10 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
       setLoading(true);
       setMessage("");
 
-      const token = await getSupabaseAccessToken().catch(() => "");
+      const token = await Promise.race([
+        getSupabaseAccessToken().catch(() => ""),
+        new Promise<string>((resolve) => window.setTimeout(() => resolve(""), 2500))
+      ]);
       if (token) {
         const ownerResponse = await fetch(`/api/instruments?scope=mine&code=${encodeURIComponent(code)}`, {
           cache: "no-store",
@@ -298,7 +301,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
     const config = formatConfig[mode];
     setPrintSize(config.defaultSize);
     setOrientation(config.orientations[0]);
-    setTheme("light");
+    setTheme("dark");
     setIncludePhoto(config.photo);
     setIncludeSerial(true);
     setIncludeAvailability(config.availability);
@@ -353,9 +356,9 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                 <ArrowLeft size={15} />
                 Dashboard
               </Link>
-              <div className="eyebrow">{getContentValue(content, "printWorkspace.title")}</div>
-              <h1>Print the right piece.</h1>
-              <p>Choose one format, keep the public-safe default, and print only the piece you need.</p>
+              <div className="eyebrow">QR and print</div>
+              <h1>{getContentValue(content, "printWorkspace.title")}</h1>
+              <p>{getContentValue(content, "printWorkspace.body")}</p>
             </div>
             <div className="print-kit-toolbar-actions">
               <Link className="button secondary" href={`/i/${encodeURIComponent(canonicalCode)}`} target="_blank">
@@ -364,7 +367,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
               </Link>
               <button className="button" type="button" onClick={() => window.print()} disabled={!instrument || !qrDataUrl}>
                 <Printer size={16} />
-                {getContentValue(content, "printWorkspace.print")} {printModeLabel(mode)}
+                {getContentValue(content, "printWorkspace.print")}
               </button>
             </div>
           </div>
@@ -405,21 +408,21 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                 </div>
 
                 <div className={styles.controlGrid}>
-                  <label>Paper size<select value={printSize} onChange={(event) => setPrintSize(event.target.value as PrintSize)}>{activeFormat.sizes.map((size) => <option value={size} key={size}>{printSizeLabels[size]}</option>)}</select></label>
+                  <label>Paper<select value={printSize} onChange={(event) => setPrintSize(event.target.value as PrintSize)}>{activeFormat.sizes.map((size) => <option value={size} key={size}>{printSizeLabels[size]}</option>)}</select></label>
                   {activeFormat.orientations.length > 1 ? <label>Orientation<select value={orientation} onChange={(event) => setOrientation(event.target.value as PrintOrientation)}>{activeFormat.orientations.map((value) => <option value={value} key={value}>{value === "portrait" ? "Portrait" : "Landscape"}</option>)}</select></label> : null}
-                  <label>Theme<select value={theme} onChange={(event) => setTheme(event.target.value as "light" | "dark")}><option value="light">Light</option><option value="dark">Dark</option></select></label>
+                  <label>Appearance<select value={theme} onChange={(event) => setTheme(event.target.value as "light" | "dark")}><option value="light">Light</option><option value="dark">Dark</option></select></label>
                 </div>
 
                 <fieldset className={styles.controlSection}>
                   <legend className={styles.controlLabel}>Copy type</legend>
-                  <label className={styles.choice}><input type="radio" name="print-scope" checked={printScope === "public"} onChange={() => setPrintScope("public")} /><span><strong>Public-safe copy</strong><small>Only fields already safe for public display.</small></span></label>
-                  {ownerAuthorized ? <label className={styles.choice}><input type="radio" name="print-scope" checked={printScope === "owner"} onChange={() => setPrintScope("owner")} /><span><strong>Owner copy</strong><small>Add owner-visible fields you select.</small></span></label> : null}
+                  <label className={styles.choice}><input type="radio" name="print-scope" checked={printScope === "public"} onChange={() => setPrintScope("public")} /><span><strong>Public-safe copy</strong><small>Includes only information allowed on the public Profile.</small></span></label>
+                  {ownerAuthorized ? <label className={styles.choice}><input type="radio" name="print-scope" checked={printScope === "owner"} onChange={() => setPrintScope("owner")} /><span><strong>Owner copy</strong><small>Can include owner-visible information when you choose it.</small></span></label> : null}
                 </fieldset>
 
-                {mode === "service" ? <label className={styles.controlSection}><span className={styles.controlLabel}>Selected service</span><select value={selectedService?.id || ""} onChange={(event) => setSelectedServiceId(event.target.value)}>{printableServiceEntries.map((entry) => <option value={entry.id} key={entry.id}>{formatServiceDate(entry)} - {entry.title}</option>)}</select></label> : null}
+                {mode === "service" ? <label className={styles.controlSection}><span className={styles.controlLabel}>Service Entry</span><select value={selectedService?.id || ""} onChange={(event) => setSelectedServiceId(event.target.value)}>{printableServiceEntries.map((entry) => <option value={entry.id} key={entry.id}>{formatServiceDate(entry)} - {entry.title}</option>)}</select></label> : null}
 
                 <fieldset className={styles.controlSection}>
-                  <legend className={styles.controlLabel}>Field visibility</legend>
+                  <legend className={styles.controlLabel}>Fields</legend>
                   <div className={styles.toggleGrid}>
                     <label><input type="checkbox" checked={includeLogo} onChange={(event) => setIncludeLogo(event.target.checked)} /> Logo</label>
                     {activeFormat.photo && photoUrl ? <label><input type="checkbox" checked={includePhoto} onChange={(event) => setIncludePhoto(event.target.checked)} /> Photograph</label> : null}
@@ -428,12 +431,18 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                     {activeFormat.attribution && instrument.publicCollection?.publicName ? <label><input type="checkbox" checked={includeAttribution} onChange={(event) => setIncludeAttribution(event.target.checked)} /> Attribution</label> : null}
                     {activeFormat.specifications && printableSpecs.length ? <label><input type="checkbox" checked={includeSpecifications} onChange={(event) => setIncludeSpecifications(event.target.checked)} /> Specifications</label> : null}
                     {activeFormat.timeline && timelineEntries.length ? <label><input type="checkbox" checked={includeTimeline} onChange={(event) => setIncludeTimeline(event.target.checked)} /> Timeline summary</label> : null}
+                  </div>
+                </fieldset>
+
+                <fieldset className={styles.controlSection}>
+                  <legend className={styles.controlLabel}>QR</legend>
+                  <div className={styles.toggleGrid}>
                     <label><input type="checkbox" checked={includeUrlLabel} onChange={(event) => setIncludeUrlLabel(event.target.checked)} /> URL label</label>
                     <label><input type="checkbox" checked={includeScanInstruction} onChange={(event) => setIncludeScanInstruction(event.target.checked)} /> Scan instruction</label>
                   </div>
                 </fieldset>
 
-                <button type="button" className={styles.resetButton} onClick={resetPrintOptions}><RotateCcw size={14} /> Reset format</button>
+                <button type="button" className={styles.resetButton} onClick={resetPrintOptions}><RotateCcw size={14} /> {getContentValue(content, "printWorkspace.reset")}</button>
               </aside>
             ) : null}
 
@@ -464,12 +473,12 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
           {loading ? (
             <section className="card handout-status">
               <QrCode />
-              <h2>Preparing Print Kit...</h2>
+              <h2>Preparing Print Suite...</h2>
             </section>
           ) : !instrument ? (
             <section className="card handout-status">
               <FileText />
-              <h2>Print Kit unavailable.</h2>
+              <h2>Print Suite unavailable.</h2>
               <p>{message || "This QRguitar Profile could not be loaded."}</p>
             </section>
           ) : mode === "label" ? (
@@ -538,12 +547,12 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
               <header className="print-kit-header">
                 {includeLogo ? <div className="print-kit-wordmark">QR<span>guitar</span></div> : <div />}
                 <div>
-                  <span>Instrument Profile Handout</span>
+                  <span>QRguitar Profile Sheet</span>
                   <strong>{canonicalCode}</strong>
                 </div>
               </header>
 
-              <section className="print-kit-profile">
+              <section className={`print-kit-profile${includePhoto ? " has-photo" : ""}`}>
                 {includePhoto ? <div className="print-kit-photo">
                   {photoUrl ? (
                     <img

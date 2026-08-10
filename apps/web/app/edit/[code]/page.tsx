@@ -63,7 +63,7 @@ const documentTypeOptions = [
   "Insurance",
   "Manual",
   "Original Case Candy",
-  "Ownership Proof",
+  "Ownership Evidence",
   "Other"
 ];
 const oldVerifiedQrLabel = "Scan for verified QRguitar Profile";
@@ -932,13 +932,9 @@ export default function EditInstrumentPage() {
       <main className="section create-page">
         <div className="shell split create-layout">
           <div>
-            <div className="eyebrow">Edit QRguitar Profile</div>
+            <div className="eyebrow">Edit Profile</div>
             <h1>{getContentValue(content, "edit.hero.headline")}</h1>
             <p>{getContentValue(content, "edit.hero.body")}</p>
-            <p>
-              Update make, model, serial number, optional nickname, specs, links, photos, and QR appearance.
-              Admin-approved Serial Number corrections update the QRguitar ID while preserving previous QR links.
-            </p>
               <div className="permanent-id">
                 <span>QRguitar ID</span>
                 <strong>{qrCodeFromSerial(form.serial) || original?.qrCode || code}</strong>
@@ -1076,8 +1072,9 @@ export default function EditInstrumentPage() {
                   </label>
                   <label className="toggle-field">
                     <input type="checkbox" checked={showAuthenticityBadge} onChange={(event) => setShowAuthenticityBadge(event.target.checked)} />
-                    Show authenticity badge publicly
+                    Show authenticity status publicly
                   </label>
+                  {authenticityStatus === "confirmed" && !showAuthenticityBadge ? <p className="field-note custom-wide">Authenticity is confirmed, but the public badge is currently hidden. Turn this on and use Save Changes to publish it.</p> : null}
                 </div>
               </section>
               <section className="card verification-card" id="privacy-safety" aria-label="Lost or stolen alert">
@@ -1366,7 +1363,7 @@ export default function EditInstrumentPage() {
               {documents.length ? (
                 <section className="photo-manager proof-vault" aria-label="Proof Vault document manager">
                   <div className="photo-manager-header">
-                    <strong>Proof Vault / Documents</strong>
+                    <strong>Documents</strong>
                     <span>{documents.length}/10 files. Private documents can support QRguitar verification and authenticity review during beta.</span>
                   </div>
                   <div className="proof-vault-list">
@@ -1454,7 +1451,7 @@ export default function EditInstrumentPage() {
                             onChange={(event) =>
                               setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, privateNotes: event.target.value } : item))
                             }
-                            placeholder="Owner-only proof notes. Never shown on public profile."
+                            placeholder="Owner-only document notes. Never shown on the public Profile."
                           />
                         </div>
                         <div className="proof-vault-actions">

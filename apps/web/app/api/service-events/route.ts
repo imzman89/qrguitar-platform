@@ -215,7 +215,7 @@ export async function GET(request: Request) {
 
   const guitar = await loadGuitarByCode(supabase, qrCode);
   if (!guitar) {
-    return json({ ok: false, serviceEvents: [], message: "Instrument record was not found." }, { status: 404 });
+    return json({ ok: false, serviceEvents: [], message: "QRguitar Profile was not found." }, { status: 404 });
   }
 
   let includePrivate = false;
@@ -272,7 +272,7 @@ export async function POST(request: Request) {
   const qrCode = cleanText(body?.qrCode, 80).toUpperCase();
   const guitar = qrCode ? await loadGuitarByCode(supabase, qrCode) : null;
   if (!guitar) {
-    return json({ ok: false, message: "Instrument record was not found." }, { status: 404 });
+    return json({ ok: false, message: "QRguitar Profile was not found." }, { status: 404 });
   }
 
   const access = await requireOwnerOrAdmin(request, guitar, supabase);
@@ -349,7 +349,7 @@ export async function PATCH(request: Request) {
   const id = cleanText(body?.id, 80);
   const guitar = qrCode ? await loadGuitarByCode(supabase, qrCode) : null;
   if (!guitar || !id) {
-    return json({ ok: false, message: "Instrument record and service entry are required." }, { status: 400 });
+    return json({ ok: false, message: "QRguitar Profile and service entry are required." }, { status: 400 });
   }
 
   const access = await requireOwnerOrAdmin(request, guitar, supabase);
@@ -452,7 +452,7 @@ export async function DELETE(request: Request) {
   const id = cleanText(url.searchParams.get("id"), 80);
   const guitar = qrCode ? await loadGuitarByCode(supabase, qrCode) : null;
   if (!guitar || !id) {
-    return json({ ok: false, message: "Instrument record and service entry are required." }, { status: 400 });
+    return json({ ok: false, message: "QRguitar Profile and service entry are required." }, { status: 400 });
   }
 
   const access = await requireOwnerOrAdmin(request, guitar, supabase);
