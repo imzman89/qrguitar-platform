@@ -4,6 +4,7 @@ import { ArrowRight, Camera, ChevronLeft, ChevronRight, FileText, Globe2, Hash }
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  type MouseEvent,
   useEffect,
   useMemo,
   useRef,
@@ -101,6 +102,11 @@ export function CollectibleRecordCard({
     router.push(card.profileUrl);
   }
 
+  function handleContentClick(event: MouseEvent<HTMLDivElement>) {
+    if ((event.target as HTMLElement).closest("a, button")) return;
+    router.push(card.profileUrl);
+  }
+
   function handleWheel(event: WheelEvent<HTMLDivElement>) {
     if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
     event.preventDefault();
@@ -180,7 +186,7 @@ export function CollectibleRecordCard({
           ) : null}
         </div>
 
-        <div className="collectible-card-content">
+        <div className="collectible-card-content" onClick={handleContentClick}>
           <Link className="collectible-card-profile-link" href={card.profileUrl} aria-label={`Open ${card.title} Profile`}>
             <h3>{card.title}</h3>
             <p className="collectible-card-subtitle">{card.factLine}</p>

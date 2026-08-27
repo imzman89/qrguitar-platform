@@ -104,6 +104,7 @@ export function HomePageClient({
 
   function beginArchiveDrag(event: PointerEvent<HTMLDivElement>) {
     if (event.pointerType !== "mouse") return;
+    if ((event.target as HTMLElement).closest(".collectible-card")) return;
     const rail = archiveRailRef.current;
     if (!rail) return;
     archiveDrag.current = { pointerId: event.pointerId, startX: event.clientX, scrollLeft: rail.scrollLeft };

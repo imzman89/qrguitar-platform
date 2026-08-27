@@ -29,6 +29,7 @@ const instrumentApi = read("app/api/instruments/route.ts");
 const adminProfileApi = read("app/api/admin/records/[id]/route.ts");
 const account = read("app/account/page.tsx");
 const quickEdit = read("components/ProfileQuickEdit.tsx");
+const homePage = read("components/HomePageClient.tsx");
 
 const occurrences = (source, snippet) => source.split(snippet).length - 1;
 
@@ -71,6 +72,9 @@ includes(quickEdit, 'document.body.style.overflow = "hidden"', "Quick Edit must 
 includes(quickEdit, 'event.key === "Escape"', "Quick Edit must close with Escape.");
 includes(quickEdit, 'returnFocusRef.current?.focus()', "Quick Edit must restore focus to its trigger.");
 includes(quickEdit, 'event.key !== "Tab"', "Quick Edit must keep keyboard focus inside the modal.");
+includes(homePage, 'closest(".collectible-card")', "Homepage archive dragging must not capture clicks inside Profile cards.");
+includes(collectibleCard, "onClick={handleContentClick}", "Profile card bodies must open their Profile.");
+includes(collectibleCard, 'closest("a, button")', "Profile card body navigation must preserve nested actions.");
 
 const baseUrl = process.env.QRGUITAR_TEST_BASE_URL || "http://127.0.0.1:3003";
 async function get(route) {
