@@ -1,11 +1,11 @@
 import { execFileSync, spawnSync } from "node:child_process";
+import path from "node:path";
 
 function git(...args) {
   return execFileSync("git", args, { encoding: "utf8" }).trim();
 }
 
-function run(command, args, env) {
-  const executable = process.platform === "win32" ? `${command}.cmd` : command;
+function run(executable, args, env) {
   const result = spawnSync(executable, args, { env, stdio: "inherit" });
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status || 1);
@@ -20,6 +20,14 @@ if (dirtyFiles) {
 }
 
 const buildTimestamp = new Date().toISOString();
+const npmCli = process.env.npm_execpath;
+
+if (!npmCli) {
+  console.error("Run this release through npm run push:live.");
+  process.exit(1);
+}
+
+const npxCli = path.join(path.dirname(npmCli), "npx-cli.js");
 const releaseEnvironment = {
   QRGUITAR_BUILD_ENV: "production",
   QRGUITAR_GIT_SHA: gitSha,
@@ -35,5 +43,5 @@ const vercelEnvironmentArgs = Object.entries(releaseEnvironment).flatMap(([key, 
 ]);
 
 console.log(`Deploying committed QRguitar release ${gitSha}.`);
-run("npm", ["run", "build", "--workspace", "@qrguitar/web"], env);
-run("npx", ["--yes", "vercel@latest", "deploy", "--prod", "--yes", ...vercelEnvironmentArgs], env);
+run(process.execPath, [npmCli, "run", "build", "--workspace", "@qrguitar/web"], env);
+run(process.execPath, [npxCli, "--yes", "vercel@latest", "deploy", "--prod", "--yes", ...vercelEnvironmentArgs], env);
