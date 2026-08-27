@@ -36,7 +36,7 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHando
 
   const incomingStyle = useMemo(
     () => qrStyle ?? defaultQrStyle,
-    [qrStyle?.background, qrStyle?.foreground, qrStyle?.includeLabel, qrStyle?.labelText, qrStyle?.shape]
+    [qrStyle]
   );
 
   const profileUrl = useMemo(() => {
@@ -85,7 +85,7 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHando
     return () => {
       cancelled = true;
     };
-  }, [displayLabel, profileUrl, isTransparent, style.background, style.foreground, style.includeLabel, style.shape]);
+  }, [code, displayLabel, isTransparent, profileUrl, style]);
 
   useEffect(() => {
     if (!isLightboxOpen) {

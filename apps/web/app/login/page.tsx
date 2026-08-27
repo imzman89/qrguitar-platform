@@ -13,6 +13,7 @@ type LoginMode = "login" | "register" | "reset";
 
 export default function LoginPage() {
   const content = useSiteContent();
+  const sessionExpiredCopy = getContentValue(content, "login.sessionExpired");
   const router = useRouter();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [mode, setMode] = useState<LoginMode>("login");
@@ -30,7 +31,7 @@ export default function LoginPage() {
     setSafeNext(nextPath);
     const expiredMessage = window.localStorage.getItem(sessionExpiredMessageKey);
     if (params.get("reason") === "session-expired" || expiredMessage) {
-      setStatus(expiredMessage || getContentValue(content, "login.sessionExpired"));
+      setStatus(expiredMessage || sessionExpiredCopy);
       window.localStorage.removeItem(sessionExpiredMessageKey);
     }
 
@@ -48,7 +49,7 @@ export default function LoginPage() {
     });
 
     return () => listener.subscription.unsubscribe();
-  }, [router, supabase]);
+  }, [router, sessionExpiredCopy, supabase]);
 
   function switchMode(nextMode: LoginMode) {
     setMode(nextMode);

@@ -29,7 +29,7 @@ for (const marker of ["SiteCompositionEditor", "compositionPageKey", "settings.c
 for (const marker of ["draggable", "text/cms-section", "text/cms-block", "Move up", "Move down", "Duplicate", "Add item", "Remove", "Hide", "Show", "newBlockId"]) {
   if (!compositionEditor.includes(marker)) throw new Error(`Content Studio block control is missing ${marker}.`);
 }
-for (const marker of ["validateEditorialComposition", "Block IDs must be unique", "Protected block", "Unsafe HTML or script content is not allowed", "This required section must stay visible in its fixed position."]) {
+for (const marker of ["validateEditorialComposition", "Block IDs must be unique", "Protected block", "Unsafe HTML or script content is not allowed", "This required section must stay shown in its fixed position."]) {
   if (!settings.includes(marker)) throw new Error(`Content Studio composition validation is missing ${marker}.`);
 }
 for (const marker of ["issueDraftPreview", "<iframe", "Desktop preview", "Tablet preview", "Mobile preview", "Open full preview", "Draft", "Published"]) {

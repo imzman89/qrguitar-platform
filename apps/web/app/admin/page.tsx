@@ -261,15 +261,15 @@ const sections: Array<{ id: SectionId; label: string; group: string; icon: typeo
   { id: "safety", label: "Safety", group: "Review", icon: TriangleAlert },
   { id: "transfers", label: "Transfers", group: "Ownership", icon: Boxes },
   { id: "claims", label: "Claims", group: "Ownership", icon: FileCheck2 },
-  { id: "proof", label: "Evidence", group: "Records", icon: FileText },
-  { id: "service", label: "Service", group: "Records", icon: BookOpenText },
+  { id: "proof", label: "Evidence", group: "Profiles", icon: FileText },
+  { id: "service", label: "Service", group: "Profiles", icon: BookOpenText },
   { id: "brand-logos", label: "Brand Registry", group: "Platform", icon: ImageIcon },
   { id: "access", label: "Admin Access", group: "Platform", icon: KeyRound },
   { id: "audit", label: "Audit Log", group: "Platform", icon: FileClock },
   { id: "system", label: "System Health", group: "Platform", icon: Activity }
 ];
 
-const sectionGroups = ["Command", "Manage", "Review", "Ownership", "Records", "Platform"];
+const sectionGroups = ["Command", "Manage", "Review", "Ownership", "Profiles", "Platform"];
 
 const overviewLinks: Record<string, { section: SectionId; filter?: string }> = {
   totalUsers: { section: "users" },
@@ -352,14 +352,14 @@ function actionLabel(action: string) {
     restore_public_content: "Public content restored",
     change_role: "Role changed",
     admin_note: "Admin note saved",
-    record_archived: "Record archived",
-    record_restored: "Record restored",
-    record_visibility_updated: "Record visibility updated",
+    record_archived: "Profile archived",
+    record_restored: "Profile restored",
+    record_visibility_updated: "Profile visibility updated",
     trust_status_updated: "Trust status updated",
     authenticity_status_updated: "Authenticity status updated",
     trust_badge_visibility_updated: "Trust badge visibility updated",
     safety_status_updated: "Safety status updated",
-    record_removed_from_collection: "Record deleted from dashboard",
+    record_removed_from_collection: "Profile deleted from dashboard",
     record_restored_to_collection: "Historical recovery event"
   };
   return labels[action] || statLabel(action);
@@ -443,6 +443,7 @@ export default function AdminPage() {
     const activeOverlay = overlay;
 
     const returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const fallbackFocus = navButtonRef.current;
     const previousOverflow = document.body.style.overflow;
     const focusableSelector = [
       "a[href]",
@@ -500,7 +501,7 @@ export default function AdminPage() {
       document.body.style.overflow = previousOverflow;
       window.setTimeout(() => {
         if (returnFocus?.isConnected) returnFocus.focus();
-        else if (navButtonRef.current?.isConnected) navButtonRef.current.focus();
+        else if (fallbackFocus?.isConnected) fallbackFocus.focus();
       }, 0);
     };
   }, [overlayKind]);
@@ -708,7 +709,7 @@ export default function AdminPage() {
       body: JSON.stringify({ action, reason, ...extra })
     });
     const payload = await response.json().catch(() => ({}));
-    setMessage(payload.message || (response.ok ? "Record action saved." : "Record action failed."));
+    setMessage(payload.message || (response.ok ? "Profile action saved." : "Profile action failed."));
     setBusy("");
     if (response.ok) {
       await loadAdmin();
@@ -870,7 +871,7 @@ export default function AdminPage() {
     return list;
   }, [adminSearch, sortKey, userFilter, users]);
 
-  const records = recordsPayload?.records || [];
+  const records = useMemo(() => recordsPayload?.records || [], [recordsPayload?.records]);
   const usedBrands = useMemo(
     () => Array.from(new Set(records.map((record) => record.brand).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
     [records]
@@ -965,7 +966,7 @@ export default function AdminPage() {
             <option value="admin">Admins</option>
             <option value="normal">Normal users</option>
             <option value="empty">Empty users</option>
-            <option value="has-records">Users with records</option>
+            <option value="has-records">Users with Profiles</option>
           </select>
         ) : kind === "transfers" ? (
           <select value={transferFilter} onChange={(event) => setTransferFilter(event.target.value)} aria-label="Filter transfers">
@@ -976,7 +977,7 @@ export default function AdminPage() {
             <option value="expired">Expired</option>
           </select>
         ) : kind === "records" ? (
-          <select value={recordFilter} onChange={(event) => setRecordFilter(event.target.value)} aria-label="Filter records">
+          <select value={recordFilter} onChange={(event) => setRecordFilter(event.target.value)} aria-label="Filter Profiles">
             <option value="">Active records</option>
             <option value="archived">Archived</option>
             <option value="owner-removed">Owner Removed</option>
@@ -1012,7 +1013,7 @@ export default function AdminPage() {
                 <option value="email">Email</option>
                 <option value="status">Status</option>
                 <option value="role">Role</option>
-                <option value="records">Record count</option>
+                <option value="records">Profile count</option>
                 <option value="last-sign-in">Last sign-in</option>
               </>
             ) : kind === "records" ? (
@@ -1186,7 +1187,7 @@ export default function AdminPage() {
                 <div>
                   <strong>{record.qrCode} - {record.title}</strong>
                   <span>{record.verificationStatus} - {record.authenticityStatus}</span>
-                  <small>Verification badge {record.showVerificationBadge === false ? "hidden" : "visible"} - Authenticity badge {record.showAuthenticityBadge === false ? "hidden" : "visible"}</small>
+                  <small>Verification badge {record.showVerificationBadge === false ? "hidden" : "shown"} - Authenticity badge {record.showAuthenticityBadge === false ? "hidden" : "shown"}</small>
                 </div>
                 <div className="admin-row-actions">
                   <Link href={`/edit/${record.qrCode}`}>Full Editor</Link>

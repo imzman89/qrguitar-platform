@@ -158,7 +158,7 @@ function pagePurpose(selected: SelectedPage) {
   const purposes: Record<string, string> = {
     Homepage: "Shape the first impression and guide visitors toward creating or exploring a QRguitar Profile.",
     "How It Works": "Explain the complete QRguitar lifecycle in language customers can understand quickly.",
-    Catalog: "Control the discovery language surrounding visible QRguitar Profiles.",
+    Catalog: "Control the discovery language surrounding Public QRguitar Profiles.",
     Dashboard: "Guide owners through their collection, actions, and next steps.",
     Contact: "Keep support paths clear, direct, and useful.",
     Privacy: "Maintain the public privacy explanation without changing protected policy behavior.",
@@ -166,7 +166,7 @@ function pagePurpose(selected: SelectedPage) {
     Theme: "Tune approved visual tokens while preserving accessible contrast.",
     "Brand assets": "Manage shared QRguitar and instrument-brand presentation.",
     "Revision history": "Review prior publications and restore a safe version into the draft.",
-    "Copy coverage": "Review which visible surfaces are controlled by the Content Studio.",
+    "Copy coverage": "Review which customer-facing surfaces are controlled by the Content Studio.",
     "Advanced JSON": "Recovery tools for validated settings export and import."
   };
   return purposes[selected.page] || `Edit the approved customer-facing content for ${selected.page}.`;
@@ -273,7 +273,7 @@ export default function SiteEditorPage() {
 
   useEffect(() => {
     setOpenFieldSection(fieldGroups[0]?.[0] || "");
-  }, [selected.area, selected.page, query]);
+  }, [fieldGroups]);
 
   useEffect(() => {
     const updatePreviewLayout = () => {
@@ -865,7 +865,7 @@ export default function SiteEditorPage() {
       <div className="cms-theme-sample" style={{ background: settings.colors.background, color: settings.colors.text, borderColor: settings.colors.gold }}>
         <span style={{ color: settings.colors.gold }}>Live token preview</span>
         <h3>Clear, calm, unmistakably QRguitar.</h3>
-        <button type="button" style={{ background: settings.colors.cream, color: settings.colors.background }}>Primary action</button>
+        <span className="cms-theme-action-sample" style={{ background: settings.colors.cream, color: settings.colors.background }}>Primary action</span>
       </div>
     </section>
   );
@@ -913,7 +913,7 @@ export default function SiteEditorPage() {
     <div className="cms-fields">
       <section className="cms-field-group">
         <header><div><span>Content governance</span><h2>Copy coverage</h2></div><Code2 size={20} /></header>
-        <p className="cms-section-intro">Every application string is assigned to an editable, locked, data-derived, or browser-owned class. Locked copy is visible for review but cannot be weakened from Content Studio.</p>
+        <p className="cms-section-intro">Every application string is assigned to an editable, locked, data-derived, or browser-owned class. Locked copy is shown for review but cannot be weakened from Content Studio.</p>
         <div className="cms-coverage-summary">
           <div><strong>{contentCoverageSummary.totalKeys}</strong><span>registered fields</span></div>
           <div><strong>{contentCoverageSummary.editableStandard + contentCoverageSummary.editableAdvanced}</strong><span>editable fields</span></div>

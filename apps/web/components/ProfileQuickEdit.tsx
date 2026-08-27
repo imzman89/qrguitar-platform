@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getInstrumentCondition, getInstrumentVerificationStatus, type DemoInstrument } from "../lib/local-demo";
 import { getProfilePhotoUrls } from "../lib/instrument-profile-contract";
 import { getSupabaseAccessToken } from "../lib/supabase-browser";
@@ -29,7 +29,58 @@ export function ProfileQuickEdit({ record, onClose, onSaved }: {
   const [savedForm, setSavedForm] = useState<QuickEditForm>(() => toForm(record, photos));
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const dialogRef = useRef<HTMLElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const closeRef = useRef<() => void>(() => undefined);
   const dirty = JSON.stringify(form) !== JSON.stringify(savedForm);
+
+  closeRef.current = () => {
+    if (dirty && !window.confirm("Discard unsaved Quick Edit changes?")) return;
+    onClose();
+  };
+
+  useEffect(() => {
+    returnFocusRef.current = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    const previousPaddingRight = document.body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    if (scrollbarWidth > 0) {
+      const currentPaddingRight = Number.parseFloat(window.getComputedStyle(document.body).paddingRight) || 0;
+      document.body.style.paddingRight = `${currentPaddingRight + scrollbarWidth}px`;
+    }
+    document.body.style.overflow = "hidden";
+    dialogRef.current?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+      ));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.paddingRight = previousPaddingRight;
+      document.removeEventListener("keydown", handleKeyDown);
+      returnFocusRef.current?.focus();
+    };
+  }, []);
 
   useEffect(() => {
     const protect = (event: BeforeUnloadEvent) => {
@@ -42,8 +93,7 @@ export function ProfileQuickEdit({ record, onClose, onSaved }: {
   }, [dirty]);
 
   function close() {
-    if (dirty && !window.confirm("Discard unsaved Quick Edit changes?")) return;
-    onClose();
+    closeRef.current();
   }
 
   async function save() {
@@ -119,7 +169,7 @@ export function ProfileQuickEdit({ record, onClose, onSaved }: {
 
   return (
     <div className="quick-edit-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && close()}>
-      <section className="quick-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="quick-edit-title">
+      <section className="quick-edit-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="quick-edit-title" tabIndex={-1}>
         <header>
           <div><span className="eyebrow">Quick Edit</span><h2 id="quick-edit-title">{record.name || `${record.brand} ${record.model}`}</h2></div>
           <button className="icon-button" type="button" onClick={close} aria-label="Close Quick Edit"><X /></button>

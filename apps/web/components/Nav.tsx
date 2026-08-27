@@ -16,9 +16,6 @@ export function Nav() {
 
   async function logout() {
     const supabase = createBrowserSupabaseClient();
-    void fetchPublishedSiteSettings().then((settings) => {
-      if (settings) setContent(settings.content);
-    });
     await supabase.auth.signOut();
     clearQrGuitarSessionState();
     setIsSignedIn(false);
@@ -28,6 +25,9 @@ export function Nav() {
 
   useEffect(() => {
     const supabase = createBrowserSupabaseClient();
+    void fetchPublishedSiteSettings().then((settings) => {
+      if (settings) setContent(settings.content);
+    });
     supabase.auth.getSession().then(({ data }) => setIsSignedIn(Boolean(data.session?.user)));
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsSignedIn(Boolean(session?.user));

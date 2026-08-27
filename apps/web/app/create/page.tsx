@@ -549,7 +549,7 @@ export default function CreatePage() {
                 <Link className="button secondary" href={`/edit/${createdCode}?section=timeline`}>Add History</Link>
                 <Link className="button secondary" href={`/edit/${createdCode}?section=media`}>Add Media</Link>
                 <Link className="button secondary" href={`/edit/${createdCode}?section=documents`}>Add Documents</Link>
-                <Link className="button secondary" href={`/handout/${createdCode}`}>Print or Download QR</Link>
+                <Link className="button secondary" href={`/handout/${createdCode}`}>Open Print Suite</Link>
                 <Link className="button secondary" href="/dashboard">Back to Dashboard</Link>
               </div>
             </section>

@@ -147,7 +147,7 @@ export function SiteCompositionEditor({ pageKey, sections, onChange }: Props) {
               >
                 <GripVertical aria-hidden="true" className={section.locked ? "is-locked" : ""} size={18} />
                 <span><strong>{section.name}</strong><small>{section.blocks.length ? `${section.blocks.length} content ${section.blocks.length === 1 ? "item" : "items"}` : "Page copy and layout"}</small></span>
-                <span className={section.visible ? "cms-visibility is-visible" : "cms-visibility"}>{section.visible ? "Visible" : "Hidden"}</span>
+                <span className={section.visible ? "cms-visibility is-visible" : "cms-visibility"}>{section.visible ? "Shown" : "Hidden"}</span>
                 <ChevronDown className={isOpen ? "is-open" : ""} size={17} />
               </button>
               <div className="cms-order-actions">
@@ -182,14 +182,14 @@ export function SiteCompositionEditor({ pageKey, sections, onChange }: Props) {
                   >
                     <GripVertical size={15} aria-hidden="true" />
                     <span><strong>{block.name}</strong><small>{block.title}</small></span>
-                    <em>{block.visible ? "Visible" : "Hidden"}</em>
+                    <em>{block.visible ? "Shown" : "Hidden"}</em>
                   </button>
                 ))}
                   <button type="button" className="cms-add-block" disabled={section.blocks.length >= 12} onClick={() => addBlock(sectionIndex)}><Plus size={15} /> Add item</button>
                 </div>
                 {focusedBlock ? (
                   <section className="cms-focused-block" aria-label={`Edit ${focusedBlock.name}`}>
-                    <header><div><span>Selected item</span><h3>{focusedBlock.name}</h3></div><span className={focusedBlock.visible ? "cms-visibility is-visible" : "cms-visibility"}>{focusedBlock.visible ? "Visible" : "Hidden"}</span></header>
+                    <header><div><span>Selected item</span><h3>{focusedBlock.name}</h3></div><span className={focusedBlock.visible ? "cms-visibility is-visible" : "cms-visibility"}>{focusedBlock.visible ? "Shown" : "Hidden"}</span></header>
                       <div className="cms-block-actions">
                         <button type="button" disabled={focusedBlockIndex === 0} onClick={() => reorderBlock(sectionIndex, focusedBlockIndex, focusedBlockIndex - 1)}><ArrowUp size={14} /> Move up</button>
                         <button type="button" disabled={focusedBlockIndex === section.blocks.length - 1} onClick={() => reorderBlock(sectionIndex, focusedBlockIndex, focusedBlockIndex + 1)}><ArrowDown size={14} /> Move down</button>

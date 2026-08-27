@@ -14,6 +14,10 @@ const printSuite = read("app/handout/[code]/page.tsx");
 const printCss = read("app/handout/[code]/print-suite.module.css");
 const siteEditor = read("app/site-editor/page.tsx");
 const registry = read("lib/content-registry.ts");
+const middleware = read("middleware.ts");
+const nav = read("components/Nav.tsx");
+const layout = read("app/layout.tsx");
+const themeRuntime = read("components/ThemeRuntime.tsx");
 
 includes(homepage, "archiveRecords", "Homepage archive must use real public Profiles.");
 includes(homepage, "archiveImages.has(leadImage)", "Homepage must avoid duplicate archive photography.");
@@ -30,6 +34,12 @@ excludes(printSuite, "document.write", "Print Suite must not create copied popup
 includes(printCss, "@media print", "Print Suite must own scoped print rules.");
 excludes(siteEditor, "Checking owner access", "Site Editor must not show duplicate loading state.");
 includes(registry, '"printWorkspace.title"', "Print Suite copy must remain in Content Studio.");
+includes(middleware, 'request.headers.get("host")', "Local origin normalization must inspect the actual Host header.");
+excludes(middleware, 'request.nextUrl.hostname === "localhost"', "Local origin normalization must not self-redirect 127.0.0.1.");
+assert(/useEffect\(\(\) => \{\s+const supabase = createBrowserSupabaseClient\(\);\s+void fetchPublishedSiteSettings\(\)/.test(nav), "Navigation must load published Site Editor settings on mount.");
+includes(layout, "loadPublishedSiteSettings", "The published theme must be rendered on the server.");
+includes(layout, '"--bg": publishedSettings.colors.background', "The first paint must use the published background.");
+excludes(themeRuntime, "applyThemeSettings(defaultSiteSettings)", "Theme hydration must not flash bundled defaults over the published theme.");
 
 const baseUrl = process.env.QRGUITAR_TEST_BASE_URL || "http://127.0.0.1:3003";
 async function get(route, userAgent = "QRguitar-master-release/1.0") {

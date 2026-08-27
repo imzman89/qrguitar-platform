@@ -284,7 +284,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     () => instrument ? resolveInstrumentPresentation(instrument, "public") : null,
     [instrument]
   );
-  const galleryImages = presentation?.photos || [];
+  const galleryImages = useMemo(() => presentation?.photos || [], [presentation?.photos]);
   const documentFiles = presentation?.documents || [];
   const externalMedia = presentation?.supplementalMedia || [];
   const timelineEvents = presentation?.timelineEvents || [];
@@ -318,6 +318,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     externalMedia.length,
     instrument?.ownershipTransferCount,
     meaningfulTimelineEvents.length,
+    presentation?.counts.service,
     presentation?.tabs.documents,
     presentation?.tabs.media,
     presentation?.tabs.service,
@@ -340,21 +341,24 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     : [];
   const latestTransfer = latestTransfers[0];
 
+  const instrumentQrCode = instrument?.qrCode;
+  const instrumentPermanentPath = instrument?.permanentPath;
+
   useEffect(() => {
-    if (!instrument) {
+    if (!instrumentQrCode) {
       return;
     }
 
     setMediaIndex(0);
-  }, [instrument?.qrCode, galleryImages.length]);
+  }, [instrumentQrCode, galleryImages.length]);
 
   useEffect(() => {
-    if (!instrument || typeof window === "undefined") {
+    if (!instrumentPermanentPath || typeof window === "undefined") {
       return;
     }
 
-    setShareUrl(`${window.location.origin}${instrument.permanentPath}`);
-  }, [instrument?.permanentPath]);
+    setShareUrl(`${window.location.origin}${instrumentPermanentPath}`);
+  }, [instrumentPermanentPath]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -837,7 +841,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
               {actionNotice === "documents" ? (
                 <>
                   <span className="scan-action-icon"><FileText size={16} /> Documents</span>
-                  <p>Public files appear here for buyers and shops. The owner controls which files stay private and which are visible.</p>
+                  <p>Public files appear here for buyers and shops. The owner controls which files stay private and which are public.</p>
                 </>
               ) : null}
               {actionNotice === "owner" ? (

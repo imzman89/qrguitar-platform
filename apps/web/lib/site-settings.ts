@@ -465,7 +465,7 @@ export function validateEditorialComposition(composition: EditorialComposition) 
       const actualIndex = ids.indexOf(locked.id);
       const candidate = page.sections[actualIndex];
       if (actualIndex !== expectedIndex || candidate?.visible === false) {
-        errors[`${path}.${locked.id}`] = "This required section must stay visible in its fixed position.";
+        errors[`${path}.${locked.id}`] = "This required section must stay shown in its fixed position.";
       }
     }
     for (const section of page.sections) {

@@ -22,6 +22,7 @@
     "test:customer-ready": "node scripts/assert-customer-ready.mjs",
     "test:brand-experience": "node scripts/assert-brand-experience.mjs",
     "test:master-release": "node scripts/assert-master-release.mjs",
+    "test:customer-expectation": "node scripts/assert-customer-expectation.mjs",
     "test:final-signed-in-acceptance": "node scripts/assert-final-signed-in-acceptance.mjs",
     "test:content-coverage": "node scripts/assert-content-coverage.mjs",
     "test:admin": "node scripts/assert-admin.mjs",

@@ -48,7 +48,8 @@ includes(homepage, 'event.pointerType !== "mouse"', "Native touch scrolling must
 includes(homepage, "home-archive-controls", "Mobile archive browsing must provide explicit navigation controls.");
 includes(drawerCss, "touch-action: pan-x pan-y pinch-zoom", "Profile rails must permit native horizontal touch movement.");
 
-includes(dashboard, "Print handout &amp; labels", "Dashboard must expose one clear print action.");
+includes(dashboard, "Open Print Suite", "Dashboard must expose one clear Print Suite action.");
+excludes(dashboard, "Print handout &amp; labels", "Dashboard must not retain the legacy handout label.");
 includes(dashboard, "Photos &amp; media", "Dashboard History actions must provide one clear media destination.");
 excludes(dashboard, ">Print Kit</Link><RecordShareButton", "The old competing Print Kit action must not remain.");
 includes(dashboard, "Start a secure handoff to the next owner.", "Ownership transfer must explain its action.");

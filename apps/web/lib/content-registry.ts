@@ -314,7 +314,7 @@ const completionRegistry: ContentRegistryEntry[] = [
   field("account.actions.reset", "Product", "Account", "Actions", "Reset label", "Send password reset", { maxLength: 50, previewPath: "/account" }),
 
   field("collections.hero.body", "Product", "Public Collections", "Header", "Body", "Share your Public Profiles through one collection page you control.", { maxLength: 220, previewPath: "/account?section=collection" }),
-  field("collections.empty.title", "Product", "Public Collections", "Empty state", "Title", "No Profiles are visible in this collection yet.", { maxLength: 100, previewPath: "/account?section=collection" }),
+  field("collections.empty.title", "Product", "Public Collections", "Empty state", "Title", "No Public Profiles are in this collection yet.", { maxLength: 100, previewPath: "/account?section=collection" }),
   field("collections.empty.body", "Product", "Public Collections", "Empty state", "Body", "Choose which Public Profiles to feature from your account workspace.", { maxLength: 200, previewPath: "/account?section=collection" }),
   field("collections.results.count", "Product", "Public Collections", "Results", "Results count", "{count} Profiles", { allowedVariables: ["count"], maxLength: 60, previewPath: "/catalog" }),
   field("collections.empty.filteredTitle", "Product", "Public Collections", "Empty state", "Filtered empty title", "No Profiles match these filters.", { maxLength: 100, previewPath: "/catalog" }),
@@ -341,7 +341,7 @@ const completionRegistry: ContentRegistryEntry[] = [
 
   field("serviceProviders.hero.body", "Workflows", "Service Providers", "Header", "Body", "Send completed work to the Profile owner for review. Nothing is added to the public Profile until the owner approves it.", { maxLength: 250, previewPath: "/service-work/preview" }),
   field("serviceProviders.privateNote.label", "Workflows", "Service Providers", "Owner review", "Private note label", "Private provider note", { maxLength: 70, previewPath: "/service-work/preview" }),
-  field("serviceProviders.privateNote.help", "Workflows", "Service Providers", "Owner review", "Private note help", "Visible only to authorized participants and QRguitar admins.", { maxLength: 180, previewPath: "/service-work/preview" }),
+  field("serviceProviders.privateNote.help", "Workflows", "Service Providers", "Owner review", "Private note help", "Available only to authorized participants and QRguitar admins.", { maxLength: 180, previewPath: "/service-work/preview" }),
   field("serviceProviders.evidence.label", "Workflows", "Service Providers", "Evidence", "Evidence label", "Private evidence", { maxLength: 70, previewPath: "/service-work/preview" }),
   field("serviceProviders.evidence.help", "Workflows", "Service Providers", "Evidence", "Evidence help", "Upload invoices, before/after photos, or other files that help document the work. Evidence is not public by default.", { maxLength: 240, previewPath: "/service-work/preview" }),
   field("serviceProviders.actions.draft", "Workflows", "Service Providers", "Actions", "Draft label", "Save Draft", { maxLength: 40, previewPath: "/service-work/preview" }),

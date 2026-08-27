@@ -416,7 +416,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                 <fieldset className={styles.controlSection}>
                   <legend className={styles.controlLabel}>Copy type</legend>
                   <label className={styles.choice}><input type="radio" name="print-scope" checked={printScope === "public"} onChange={() => setPrintScope("public")} /><span><strong>Public-safe copy</strong><small>Includes only information allowed on the public Profile.</small></span></label>
-                  {ownerAuthorized ? <label className={styles.choice}><input type="radio" name="print-scope" checked={printScope === "owner"} onChange={() => setPrintScope("owner")} /><span><strong>Owner copy</strong><small>Can include owner-visible information when you choose it.</small></span></label> : null}
+                  {ownerAuthorized ? <label className={styles.choice}><input type="radio" name="print-scope" checked={printScope === "owner"} onChange={() => setPrintScope("owner")} /><span><strong>Owner copy</strong><small>Can include owner-only information when you choose it.</small></span></label> : null}
                 </fieldset>
 
                 {mode === "service" ? <label className={styles.controlSection}><span className={styles.controlLabel}>Service Entry</span><select value={selectedService?.id || ""} onChange={(event) => setSelectedServiceId(event.target.value)}>{printableServiceEntries.map((entry) => <option value={entry.id} key={entry.id}>{formatServiceDate(entry)} - {entry.title}</option>)}</select></label> : null}

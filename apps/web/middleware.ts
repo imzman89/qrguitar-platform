@@ -20,10 +20,10 @@ const LEGACY_HANDOUT_CODE = "QRG-E9DFA48DCC74";
 const CANONICAL_HANDOUT_CODE = "QRG-SI98092154";
 
 export function middleware(request: NextRequest) {
+  const requestHost = request.headers.get("host")?.toLowerCase();
   if (
     process.env.NODE_ENV !== "production"
-    && request.nextUrl.hostname === "localhost"
-    && request.nextUrl.port === "3003"
+    && requestHost === "localhost:3003"
   ) {
     const canonicalLocalUrl = request.nextUrl.clone();
     canonicalLocalUrl.hostname = "127.0.0.1";

@@ -44,7 +44,8 @@ includes(profile, 'activeTab === "service"', "Service tab must render canonical 
 includes(profile, "media-gallery-lightbox", "Fullscreen gallery must remain available.");
 includes(profile, 'event.key === "Escape"', "Fullscreen gallery must remain Escape-closeable.");
 includes(dashboard, 'file.visibility === "public"', "Dashboard public document counts must be exact.");
-includes(dashboard, "Print handout &amp; labels", "Dashboard must expose one clear print action.");
+includes(dashboard, "Open Print Suite", "Dashboard must expose one clear Print Suite action.");
+excludes(dashboard, "Print handout &amp; labels", "Dashboard must not retain the legacy handout label.");
 includes(qrDownload, "Open Print Suite", "QR actions must use the same Print Suite name.");
 excludes(qrDownload, "Print Handout", "Duplicate Print Handout terminology must be removed.");
 includes(session, "routeRequiresSession", "Expired-session redirects must be scoped to protected routes.");

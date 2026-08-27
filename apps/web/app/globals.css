@@ -14252,7 +14252,7 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 .cms-color-field i { width: 17px; height: 17px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 50%; }
 .cms-theme-sample { margin-top: 20px; border: 1px solid; border-radius: 8px; padding: 28px; }
 .cms-theme-sample h3 { max-width: 520px; margin: 8px 0 20px; font-size: 29px; }
-.cms-theme-sample button { border: 0; border-radius: 6px; padding: 10px 13px; font: inherit; font-weight: 850; }
+.cms-theme-action-sample { display: inline-flex; border: 0; border-radius: 6px; padding: 10px 13px; font: inherit; font-weight: 850; }
 .cms-contrast-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 16px; }
 .cms-contrast-grid > div { display: grid; gap: 3px; border: 1px solid rgba(239, 236, 228, .1); border-radius: 7px; padding: 11px; background: #091014; }
 .cms-contrast-grid span, .cms-contrast-grid small { color: var(--muted); font-size: 9px; text-transform: uppercase; }

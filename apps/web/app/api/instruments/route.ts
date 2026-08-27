@@ -1970,7 +1970,7 @@ export async function PATCH(request: Request) {
     }
 
     if (existing.data.owner_id !== auth.user.id) {
-      return NextResponse.json({ ok: false, message: "Only the owner can update this collection record." }, { status: 403 });
+      return NextResponse.json({ ok: false, message: "Only the owner can update this collection Profile." }, { status: 403 });
     }
 
     const trust = (await loadTrustSettingsMap(supabase, [qrCode])).get(qrCode) || defaultRecordTrustSettings;
@@ -1989,7 +1989,7 @@ export async function PATCH(request: Request) {
       ? {
           owner_removed_at: now,
           owner_removed_by: auth.user.id,
-          owner_removed_reason: reason || "Owner permanently deleted record from dashboard.",
+          owner_removed_reason: reason || "Owner permanently deleted Profile from dashboard.",
           visibility: "private",
           updated_at: now
         }
@@ -2020,7 +2020,7 @@ export async function PATCH(request: Request) {
       ok: true,
       qrCode,
       permanentPath: existing.data.permanent_path || `/i/${qrCode}`,
-      message: "Record permanently deleted from your dashboard. This cannot be undone."
+      message: "Profile permanently deleted from your dashboard. This cannot be undone."
     }, { status: 200 });
   }
 
@@ -2078,7 +2078,7 @@ export async function PATCH(request: Request) {
   }
 
   if (existing.data.owner_id !== ownerUser.id) {
-    return NextResponse.json({ ok: false, message: "Only the owner can edit this record." }, { status: 403 });
+    return NextResponse.json({ ok: false, message: "Only the owner can edit this Profile." }, { status: 403 });
   }
 
   const currentSerialNormalized = normalizeSerialBuildId(existing.data.serial_number || "");
@@ -2195,7 +2195,7 @@ export async function PATCH(request: Request) {
     .eq("owner_id", ownerUser.id);
 
   if (updateError) {
-    return NextResponse.json({ ok: false, message: updateError.message || "Could not update record." }, { status: 500 });
+    return NextResponse.json({ ok: false, message: updateError.message || "Could not update Profile." }, { status: 500 });
   }
 
   if (nextQrCode !== input.qrCode) {
@@ -2396,6 +2396,6 @@ export async function PATCH(request: Request) {
     ok: true,
     qrCode: nextQrCode,
     permanentPath: `/i/${nextQrCode}`,
-    message: mediaUploadErrors.length ? `${mediaUploadErrors.join(", ")} could not be uploaded. The record was saved.` : undefined
+    message: mediaUploadErrors.length ? `${mediaUploadErrors.join(", ")} could not be uploaded. The Profile was saved.` : undefined
   }, { status: 200 });
 }

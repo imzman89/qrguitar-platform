@@ -194,7 +194,7 @@ export default function TransferClaimPage() {
               <>
                 <div className="icon"><BadgeCheck /></div>
                 <h3>Ownership accepted.</h3>
-                <p>This record now belongs to the accepting account and keeps the same permanent QRguitar link.</p>
+                <p>This Profile now belongs to the accepting account and keeps the same permanent QRguitar link.</p>
                 <Link className="button" href={profileHref}>
                   View Profile
                 </Link>

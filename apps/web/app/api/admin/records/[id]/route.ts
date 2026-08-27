@@ -84,11 +84,11 @@ export async function PATCH(request: Request, context: { params: { id: string } 
     }>();
 
   if (existing.error) {
-    return adminJson({ ok: false, message: existing.error.message || "Could not load record." }, { status: 500 });
+    return adminJson({ ok: false, message: existing.error.message || "Could not load Profile." }, { status: 500 });
   }
 
   if (!existing.data) {
-    return adminJson({ ok: false, message: "Record was not found." }, { status: 404 });
+    return adminJson({ ok: false, message: "Profile was not found." }, { status: 404 });
   }
 
   const record = existing.data;
@@ -113,7 +113,7 @@ export async function PATCH(request: Request, context: { params: { id: string } 
     });
     auditAction = "record_restored";
   } else if (action === "restore_to_collection") {
-    return adminJson({ ok: false, message: "Deleted dashboard records cannot be restored. Create a new record instead." }, { status: 410 });
+    return adminJson({ ok: false, message: "Deleted dashboard Profiles cannot be restored. Create a new Profile instead." }, { status: 410 });
   } else if (action === "set_visibility") {
     const nextVisibility = cleanVisibility(body?.visibility);
     if (!nextVisibility) {
@@ -181,12 +181,12 @@ export async function PATCH(request: Request, context: { params: { id: string } 
     revalidatePath(`/i/${record.qr_code}`);
     return adminJson({ ok: true, message: "Trust settings updated.", record: { ...record, trust: nextTrust } });
   } else {
-    return adminJson({ ok: false, message: "Unsupported record action." }, { status: 400 });
+    return adminJson({ ok: false, message: "Unsupported Profile action." }, { status: 400 });
   }
 
   const saved = await supabase.from("guitars").update(updates).eq("id", record.id).select("id,qr_code,permanent_path,status,visibility,safety_status,public_safety_note,updated_at").maybeSingle();
   if (saved.error) {
-    return adminJson({ ok: false, message: saved.error.message || "Could not update record." }, { status: 500 });
+    return adminJson({ ok: false, message: saved.error.message || "Could not update Profile." }, { status: 500 });
   }
 
   if (action === "set_verification" && ["internalVerificationNote", "publicVerificationNote", "internalAuthenticityNote", "publicAuthenticityNote"].some((key) => hasBodyField(body, key as keyof Body))) {
@@ -230,5 +230,5 @@ export async function PATCH(request: Request, context: { params: { id: string } 
   revalidatePath(`/i/${record.qr_code}`);
   revalidatePath("/api/instruments");
 
-  return adminJson({ ok: true, message: "Record updated.", record: saved.data });
+  return adminJson({ ok: true, message: "Profile updated.", record: saved.data });
 }

@@ -53,6 +53,7 @@ export default function AccountPage() {
   const [stats, setStats] = useState({ records: 0, publicRecords: 0, privateRecords: 0, unlistedRecords: 0, recordsWithPhotos: 0 });
   const [status, setStatus] = useState("");
   const [signedIn, setSignedIn] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
   const [isWorking, setIsWorking] = useState(false);
   const [publicCollection, setPublicCollection] = useState<PublicCollectionSettings>(defaultPublicCollectionSettings);
   const [activeSection, setActiveSection] = useState<AccountSection>("overview");
@@ -61,40 +62,49 @@ export default function AccountPage() {
     let cancelled = false;
 
     async function loadAccount() {
-      const token = await getSupabaseAccessToken();
-      if (!token) {
+      try {
+        const token = await getSupabaseAccessToken();
+        if (!token) {
+          if (!cancelled) {
+            setSignedIn(false);
+            setStatus("");
+          }
+          return;
+        }
+
+        const response = await fetch("/api/account", {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store"
+        });
+        const payload = (await response.json().catch(() => null)) as AccountPayload | null;
+
+        if (cancelled) {
+          return;
+        }
+
+        if (!response.ok || !payload?.ok || !payload.account) {
+          setSignedIn(false);
+          setStatus(payload?.message || "Could not load account.");
+          return;
+        }
+
+        setSignedIn(true);
+        setEmail(payload.account.email);
+        setDisplayName(payload.account.displayName);
+        setRole(payload.account.role);
+        setPlan(payload.account.plan);
+        setAccountStatus(payload.account.accountStatus);
+        setPublicCollection(payload.account.publicCollection || { ...defaultPublicCollectionSettings, publicName: payload.account.displayName });
+        setStats(payload.account.stats || { records: 0, publicRecords: 0, privateRecords: 0, unlistedRecords: 0, recordsWithPhotos: 0 });
+        setStatus("");
+      } catch {
         if (!cancelled) {
           setSignedIn(false);
-          setStatus("");
+          setStatus("Could not load account. Check your connection and try again.");
         }
-        return;
+      } finally {
+        if (!cancelled) setAuthReady(true);
       }
-
-      const response = await fetch("/api/account", {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: "no-store"
-      });
-      const payload = (await response.json().catch(() => null)) as AccountPayload | null;
-
-      if (cancelled) {
-        return;
-      }
-
-      if (!response.ok || !payload?.ok || !payload.account) {
-        setSignedIn(false);
-        setStatus(payload?.message || "Could not load account.");
-        return;
-      }
-
-      setSignedIn(true);
-      setEmail(payload.account.email);
-      setDisplayName(payload.account.displayName);
-      setRole(payload.account.role);
-      setPlan(payload.account.plan);
-      setAccountStatus(payload.account.accountStatus);
-      setPublicCollection(payload.account.publicCollection || { ...defaultPublicCollectionSettings, publicName: payload.account.displayName });
-      setStats(payload.account.stats || { records: 0, publicRecords: 0, privateRecords: 0, unlistedRecords: 0, recordsWithPhotos: 0 });
-      setStatus("");
     }
 
     void loadAccount();
@@ -163,6 +173,24 @@ export default function AccountPage() {
     clearQrGuitarSessionState();
     window.dispatchEvent(new CustomEvent("qrguitar:auth"));
     window.location.href = "/";
+  }
+
+  if (!authReady) {
+    return (
+      <>
+        <Nav />
+        <main className="section auth-page">
+          <div className="shell auth-layout">
+            <section className="card auth-card sign-in-required-card" aria-live="polite" aria-busy="true">
+              <div className="eyebrow">Account</div>
+              <h1>Loading your account...</h1>
+              <p>Checking your QRguitar session and owner workspace.</p>
+            </section>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
   }
 
   if (!signedIn) {

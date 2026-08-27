@@ -42,8 +42,7 @@ type ServiceRequestSummary = {
   provider?: { publicDisplayName?: string; businessName?: string; verificationStatus?: "verified" | "unverified" } | null;
 };
 
-function mergeDashboardRecords(records: DemoInstrument[], user: DemoUser | null) {
-  void user;
+function mergeDashboardRecords(records: DemoInstrument[]) {
   return records;
 }
 
@@ -55,11 +54,12 @@ function DashboardInstrumentThumb({ sources, title }: { sources: string[]; title
   const [imageIndex, setImageIndex] = useState(0);
   const [failedAllImages, setFailedAllImages] = useState(false);
   const imageUrl = imageSources[imageIndex] || "";
+  const imageSourceKey = imageSources.join("|");
 
   useEffect(() => {
     setImageIndex(0);
     setFailedAllImages(false);
-  }, [imageSources.join("|")]);
+  }, [imageSourceKey]);
 
   return (
     <div className={styles.instrumentThumb} aria-hidden="true">
@@ -166,7 +166,7 @@ export default function DashboardPage() {
       ]);
 
       if (!cancelled) {
-        setInstruments(mergeDashboardRecords(records, user));
+        setInstruments(mergeDashboardRecords(records));
         setTransfers(transferRecords);
         setServiceRequests(requests);
       }
@@ -234,7 +234,7 @@ export default function DashboardPage() {
         return { records, transferRecords, requests };
       })
       .then(({ records, transferRecords, requests }) => {
-        setInstruments(mergeDashboardRecords(records, user));
+        setInstruments(mergeDashboardRecords(records));
         setTransfers(transferRecords);
         setServiceRequests(requests);
       });
@@ -305,7 +305,7 @@ export default function DashboardPage() {
       body: JSON.stringify({
         qrCode: instrument.qrCode,
         action: "remove_from_collection",
-        reason: "Owner permanently deleted record from dashboard."
+        reason: "Owner permanently deleted Profile from dashboard."
       })
     });
     const payload = await response.json().catch(() => ({}));
@@ -560,7 +560,7 @@ export default function DashboardPage() {
             <section>
               <b>QR, print &amp; sharing</b>
               <QrDownload code={actionRecord.qrCode} label={dashboardRecordTitle(actionRecord)} qrStyle={actionRecord.qrStyle} showPrintHandout={false} onStyleChange={(qrStyle) => { setInstruments((current) => current.map((item) => item.qrCode === actionRecord.qrCode ? { ...item, qrStyle } : item)); setActionRecord((current) => current ? { ...current, qrStyle } : current); }} />
-              <Link href={`/handout/${actionRecord.qrCode}`}><Printer size={15} /> Print handout &amp; labels</Link>
+              <Link href={`/handout/${actionRecord.qrCode}`}><Printer size={15} /> Open Print Suite</Link>
               <RecordShareButton className={styles.dashboardShare} code={actionRecord.qrCode} title={dashboardRecordTitle(actionRecord)} showLabel />
             </section>
             <section>

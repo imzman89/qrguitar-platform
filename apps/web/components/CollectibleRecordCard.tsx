@@ -157,7 +157,7 @@ export function CollectibleRecordCard({
             ) : (
               <div className="collectible-card-empty-media">
                 <span>QRguitar</span>
-                <strong>No visible photo</strong>
+                <strong>Photo unavailable</strong>
               </div>
             )}
             <div className="collectible-card-topline">

@@ -250,12 +250,12 @@ export default function EditInstrumentPage() {
 
         if (!cancelled) {
           setForbidden(response.status === 403 || response.status === 404);
-          setMessage(payload?.message || "This record was not found for your account.");
+          setMessage(payload?.message || "This Profile was not found for your account.");
           setReady(true);
         }
       } catch {
         if (!cancelled) {
-          setMessage("Could not load this record. Check your connection and try again.");
+          setMessage("Could not load this Profile. Check your connection and try again.");
           setReady(true);
         }
       }
@@ -736,7 +736,7 @@ export default function EditInstrumentPage() {
       const payload = (await response.json().catch(() => null)) as { ok?: boolean; qrCode?: string; permanentPath?: string; message?: string } | null;
 
       if (!response.ok || !payload?.ok) {
-        setMessage(`Record details failed: ${payload?.message || "Could not save record."}`);
+        setMessage(`Profile details failed: ${payload?.message || "Could not save the Profile."}`);
         return;
       }
 
@@ -804,7 +804,7 @@ export default function EditInstrumentPage() {
         router.replace(`/edit/${savedQrCode}`);
       }
     } catch {
-      setMessage("Record details failed: check your connection and file sizes, then try again.");
+      setMessage("Profile details failed: check your connection and file sizes, then try again.");
     } finally {
       setSavingRecord(false);
     }
@@ -812,7 +812,7 @@ export default function EditInstrumentPage() {
 
   async function saveVerificationSettings(token: string, recordQrCode = original?.qrCode || code) {
     if (!original) {
-      return { ok: false, message: "Record was not loaded." };
+      return { ok: false, message: "Profile was not loaded." };
     }
 
     try {
@@ -886,7 +886,7 @@ export default function EditInstrumentPage() {
 
   async function saveSafetySettings(token: string, recordQrCode = original?.qrCode || code) {
     if (!original) {
-      return { ok: false, message: "Record was not loaded." };
+      return { ok: false, message: "Profile was not loaded." };
     }
 
     setSavingSafety(true);
@@ -1006,7 +1006,7 @@ export default function EditInstrumentPage() {
                   <h3>{verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"}</h3>
                   <p>
                     {verificationStatus === "verified"
-                      ? "This record is verified by QRguitar."
+                      ? "This Profile is verified by QRguitar."
                       : "Verified Profiles are available with paid QRguitar verification. Paid verification is handled manually during beta."}
                   </p>
                   <p>
@@ -1741,7 +1741,7 @@ export default function EditInstrumentPage() {
         <div className="shell">
           <section className="card auth-card">
             <div className="eyebrow">Edit instrument</div>
-            <h2>{!ready ? "Checking account..." : forbidden ? "Owner access required." : "Sign in to edit this record."}</h2>
+            <h2>{!ready ? "Checking account..." : forbidden ? "Owner access required." : "Sign in to edit this Profile."}</h2>
             <p>
               {!ready
                 ? "Checking your Supabase session now."
