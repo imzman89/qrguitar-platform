@@ -9,7 +9,7 @@
     "lint": "npm --workspaces run lint",
     "typecheck": "npm --workspaces run typecheck",
     "deploy:web": "npm run build --workspace @qrguitar/web && npx --yes vercel@latest --prod",
-    "push:live": "npm run build --workspace @qrguitar/web && npx --yes vercel@latest deploy --prod --yes"
+    "push:live": "node scripts/push-live.mjs"
   },
   "workspaces": [
     "apps/*",
