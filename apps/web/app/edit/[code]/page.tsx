@@ -144,7 +144,8 @@ export default function EditInstrumentPage() {
   const [publicSafetyNote, setPublicSafetyNote] = useState("");
   const [safetyNote, setSafetyNote] = useState("");
   const [savingSafety, setSavingSafety] = useState(false);
-  const [savingRecord, setSavingRecord] = useState(false);
+  const [recordSaveAction, setRecordSaveAction] = useState<"save" | "view" | null>(null);
+  const savingRecord = recordSaveAction !== null;
   const [serviceEvents, setServiceEvents] = useState<ServiceHistoryEntry[]>([]);
   const [serviceForm, setServiceForm] = useState(emptyServiceForm);
   const [editingServiceId, setEditingServiceId] = useState("");
@@ -672,13 +673,12 @@ export default function EditInstrumentPage() {
       return;
     }
 
-    setSavingRecord(true);
+    setRecordSaveAction(preview ? "view" : "save");
     setMessage("");
 
     try {
       if (!form.heroImageDataUrl && !galleryImages.length) {
         setMessage("Every QRguitar Profile needs at least one photo.");
-        setSavingRecord(false);
         return;
       }
 
@@ -806,7 +806,7 @@ export default function EditInstrumentPage() {
     } catch {
       setMessage("Profile details failed: check your connection and file sizes, then try again.");
     } finally {
-      setSavingRecord(false);
+      setRecordSaveAction(null);
     }
   }
 
@@ -1695,11 +1695,13 @@ export default function EditInstrumentPage() {
               </section>
               {message ? <p className="form-message">{message}</p> : null}
               <div className="form-actions editor-save-bar">
-                <button className="button" type="button" onClick={() => void saveChanges(false)} disabled={savingRecord || savingSafety}>
-                  {savingRecord ? "Saving..." : getContentValue(content, "edit.actions.save")}
+                <button className="button" type="button" onClick={() => void saveChanges(false)} disabled={savingRecord || savingSafety} aria-busy={recordSaveAction === "save"}>
+                  {recordSaveAction === "save" ? "Saving changes..." : getContentValue(content, "edit.actions.save")}
                 </button>
-                <button className="button" type="button" onClick={() => void saveChanges(true)} disabled={savingRecord || savingSafety}>
-                  {savingRecord ? "Saving..." : form.visibility === "public" ? getContentValue(content, "edit.actions.saveView") : "Save and Return to Dashboard"}
+                <button className="button secondary" type="button" onClick={() => void saveChanges(true)} disabled={savingRecord || savingSafety} aria-busy={recordSaveAction === "view"}>
+                  {recordSaveAction === "view"
+                    ? form.visibility === "public" ? "Saving and opening..." : "Saving and returning..."
+                    : form.visibility === "public" ? getContentValue(content, "edit.actions.saveView") : "Save and Return to Dashboard"}
                 </button>
                 <Link className="button secondary" href="/dashboard">
                   Back to Dashboard

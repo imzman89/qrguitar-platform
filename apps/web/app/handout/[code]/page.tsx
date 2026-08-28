@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, CheckCircle2, ExternalLink, FileText, Printer, QrCode, RotateCcw, ShieldCheck, Siren, SlidersHorizontal, Wrench, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ExternalLink, FileText, Printer, QrCode, RotateCcw, ShieldCheck, Siren, SlidersHorizontal, Wrench, X, ZoomIn, ZoomOut } from "lucide-react";
 import QRCode from "qrcode";
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -47,10 +47,10 @@ type FormatConfig = {
 const modeOrder: PrintMode[] = ["label", "hangtag", "handout", "service"];
 
 const modeDescriptions: Record<PrintMode, string> = {
-  label: "A compact label for an instrument case, hang tag, or paperwork.",
-  hangtag: "An image-led counter card for a case, display, or service handoff.",
-  handout: "A one-page Profile sheet for an owner, buyer, or service customer.",
-  service: "A one-page summary of one canonical service-history entry."
+  label: "A small QR label for a case, hang tag, or instrument paperwork.",
+  hangtag: "A photo, identity, and QR card for a counter, case, or retail display.",
+  handout: "A complete one-page customer handout with photo, facts, status, and QR.",
+  service: "A printable summary of one approved service-history entry."
 };
 
 const formatConfig: Record<PrintMode, FormatConfig> = {
@@ -296,6 +296,18 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
     if (!config.attribution) setIncludeAttribution(false);
   }, [mode, orientation, printSize]);
 
+  function selectPrintMode(nextMode: PrintMode) {
+    const config = formatConfig[nextMode];
+    setMode(nextMode);
+    setPrintSize(config.defaultSize);
+    setOrientation(config.orientations[0]);
+    setIncludePhoto(config.photo);
+    setIncludeAvailability(config.availability);
+    setIncludeAttribution(config.attribution);
+    setIncludeSpecifications(config.specifications);
+    setIncludeTimeline(config.timeline);
+  }
+
   function resetPrintOptions() {
     setPrintScope("public");
     const config = formatConfig[mode];
@@ -367,7 +379,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
               </Link>
               <button className="button" type="button" onClick={() => window.print()} disabled={!instrument || !qrDataUrl}>
                 <Printer size={16} />
-                {getContentValue(content, "printWorkspace.print")}
+                {instrument && qrDataUrl ? "Print " + printModeLabel(mode) : getContentValue(content, "printWorkspace.print")}
               </button>
             </div>
           </div>
@@ -383,9 +395,15 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
             {mobileControlsOpen ? "Close print options" : "Print options"}
           </button>
 
+          {mobileControlsOpen ? <button type="button" className={`${styles.mobileControlsBackdrop} no-print`} aria-label="Close print options" onClick={() => setMobileControlsOpen(false)} /> : null}
+
           <div className={styles.workspace} data-print-frame>
             {instrument ? (
               <aside className={`${styles.controlRail} ${mobileControlsOpen ? styles.controlRailOpen : ""} no-print`} id="print-suite-controls" aria-label="Print Suite controls">
+                <div className={styles.mobileControlsHeader}>
+                  <strong>Print options</strong>
+                  <button type="button" aria-label="Close print options" onClick={() => setMobileControlsOpen(false)}><X size={17} /></button>
+                </div>
                 <div className={styles.controlSection}>
                   <span className={styles.controlLabel}>Format</span>
                   <div className={styles.formatList} role="group" aria-label="Print format">
@@ -395,10 +413,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                         type="button"
                         className={mode === key ? styles.selectedFormat : ""}
                         aria-pressed={mode === key}
-                        onClick={() => {
-                          setMode(key);
-                          setMobileControlsOpen(false);
-                        }}
+                        onClick={() => selectPrintMode(key)}
                       >
                         <strong>{printModeLabel(key)}</strong>
                         <span>{modeDescriptions[key]}</span>
@@ -413,11 +428,13 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                   <label>Appearance<select value={theme} onChange={(event) => setTheme(event.target.value as "light" | "dark")}><option value="light">Light</option><option value="dark">Dark</option></select></label>
                 </div>
 
-                <fieldset className={styles.controlSection}>
-                  <legend className={styles.controlLabel}>Copy type</legend>
-                  <label className={styles.choice}><input type="radio" name="print-scope" checked={printScope === "public"} onChange={() => setPrintScope("public")} /><span><strong>Public-safe copy</strong><small>Includes only information allowed on the public Profile.</small></span></label>
-                  {ownerAuthorized ? <label className={styles.choice}><input type="radio" name="print-scope" checked={printScope === "owner"} onChange={() => setPrintScope("owner")} /><span><strong>Owner copy</strong><small>Can include owner-only information when you choose it.</small></span></label> : null}
-                </fieldset>
+                {ownerAuthorized ? (
+                  <fieldset className={styles.controlSection}>
+                    <legend className={styles.controlLabel}>Copy type</legend>
+                    <label className={styles.choice}><input type="radio" name="print-scope" checked={printScope === "public"} onChange={() => setPrintScope("public")} /><span><strong>Public-safe copy</strong><small>Includes only information allowed on the public Profile.</small></span></label>
+                    <label className={styles.choice}><input type="radio" name="print-scope" checked={printScope === "owner"} onChange={() => setPrintScope("owner")} /><span><strong>Owner copy</strong><small>Can include owner-only information when you choose it.</small></span></label>
+                  </fieldset>
+                ) : null}
 
                 {mode === "service" ? <label className={styles.controlSection}><span className={styles.controlLabel}>Service Entry</span><select value={selectedService?.id || ""} onChange={(event) => setSelectedServiceId(event.target.value)}>{printableServiceEntries.map((entry) => <option value={entry.id} key={entry.id}>{formatServiceDate(entry)} - {entry.title}</option>)}</select></label> : null}
 
@@ -442,7 +459,10 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
                   </div>
                 </fieldset>
 
-                <button type="button" className={styles.resetButton} onClick={resetPrintOptions}><RotateCcw size={14} /> {getContentValue(content, "printWorkspace.reset")}</button>
+                <div className={styles.controlActions}>
+                  <button type="button" className={styles.resetButton} onClick={resetPrintOptions}><RotateCcw size={14} /> {getContentValue(content, "printWorkspace.reset")}</button>
+                  <button type="button" className={styles.doneButton} onClick={() => setMobileControlsOpen(false)}>Done</button>
+                </div>
               </aside>
             ) : null}
 

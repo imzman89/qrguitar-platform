@@ -162,6 +162,7 @@
 }
 
 .resetButton,
+.doneButton,
 .mobileControlsButton,
 .zoomControls button {
   border: 1px solid rgba(248, 246, 242, .12);
@@ -172,9 +173,14 @@
   cursor: pointer;
 }
 
-.resetButton {
+.controlActions {
+  display: grid;
+  gap: 8px;
+}
+
+.resetButton,
+.doneButton {
   min-height: 40px;
-  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
@@ -182,6 +188,13 @@
   font-weight: 850;
 }
 
+.resetButton {
+  display: inline-flex;
+}
+
+.doneButton,
+.mobileControlsHeader,
+.mobileControlsBackdrop,
 .mobileControlsButton {
   display: none;
 }
@@ -327,17 +340,77 @@
     font-weight: 850;
   }
 
+  .mobileControlsBackdrop {
+    position: fixed;
+    z-index: 1190;
+    inset: 0;
+    display: block;
+    border: 0;
+    background: rgba(0, 0, 0, .62);
+    backdrop-filter: blur(3px);
+  }
+
   .controlRail {
     position: fixed;
     z-index: 1200;
-    inset: auto 12px 12px;
-    max-height: calc(100dvh - 84px);
+    inset: 72px 12px 12px;
+    max-height: none;
     display: none;
+    overscroll-behavior: contain;
     box-shadow: 0 28px 80px rgba(0, 0, 0, .58);
   }
 
   .controlRailOpen {
     display: grid;
+  }
+
+  .mobileControlsHeader {
+    position: sticky;
+    z-index: 2;
+    top: -16px;
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: -16px -16px 0;
+    border-bottom: 1px solid rgba(248, 246, 242, .1);
+    padding: 10px 12px 10px 16px;
+    color: #f8f6f2;
+    background: #11191d;
+  }
+
+  .mobileControlsHeader strong {
+    font-size: 13px;
+  }
+
+  .mobileControlsHeader button {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(248, 246, 242, .12);
+    border-radius: 7px;
+    color: #f8f6f2;
+    background: rgba(248, 246, 242, .04);
+  }
+
+  .controlActions {
+    position: sticky;
+    z-index: 2;
+    bottom: -16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 0 -16px -16px;
+    border-top: 1px solid rgba(248, 246, 242, .1);
+    padding: 12px 16px 16px;
+    background: #11191d;
+  }
+
+  .doneButton {
+    display: inline-flex;
+    border-color: #f0a12b;
+    color: #071014;
+    background: #f0a12b;
   }
 
   .pageCanvas {
