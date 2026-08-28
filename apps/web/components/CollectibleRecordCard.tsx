@@ -43,6 +43,7 @@ export function CollectibleRecordCard({
   const card = useMemo(() => resolveCollectibleCard(record), [record]);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [failedImages, setFailedImages] = useState<number[]>([]);
+  const [loadedImages, setLoadedImages] = useState<number[]>([]);
   const railRef = useRef<HTMLDivElement | null>(null);
   const dragState = useRef({ pointerId: -1, startX: 0, scrollLeft: 0, moved: false });
   const galleryImages = variant === "archive" || variant === "latest" ? card.images.slice(0, 1) : card.images;
@@ -55,6 +56,7 @@ export function CollectibleRecordCard({
   useEffect(() => {
     setActiveImageIndex(0);
     setFailedImages([]);
+    setLoadedImages([]);
   }, [record.qrCode]);
 
   function moveGallery(direction: -1 | 1) {
@@ -148,15 +150,20 @@ export function CollectibleRecordCard({
                   {failedImages.includes(index) ? (
                     <div className="collectible-card-empty-media"><span>QRguitar</span><strong>Photo unavailable</strong></div>
                   ) : (
-                    <img
-                      className="collectible-card-image"
-                      src={imageUrl}
-                      alt={`${card.title} photo ${index + 1} of ${galleryImages.length}`}
-                      loading={index === 0 ? "eager" : "lazy"}
-                      decoding="async"
-                      draggable={false}
-                      onError={() => setFailedImages((current) => current.includes(index) ? current : [...current, index])}
-                    />
+                    <>
+                      {!loadedImages.includes(index) ? <div className="collectible-card-loading-media" aria-hidden="true">Loading photo...</div> : null}
+                      <img
+                        className={`collectible-card-image ${loadedImages.includes(index) ? "is-loaded" : ""}`}
+                        src={imageUrl}
+                        alt={`${card.title} photo ${index + 1} of ${galleryImages.length}`}
+                        loading={index === 0 ? "eager" : "lazy"}
+                        fetchPriority={index === 0 ? "high" : "auto"}
+                        decoding="async"
+                        draggable={false}
+                        onLoad={() => setLoadedImages((current) => current.includes(index) ? current : [...current, index])}
+                        onError={() => setFailedImages((current) => current.includes(index) ? current : [...current, index])}
+                      />
+                    </>
                   )}
                 </div>
               ))

@@ -18315,6 +18315,29 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 
 /* Product-wide interaction and scale coherence. */
 @media screen {
+  .collectible-card-loading-media {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    display: grid;
+    place-items: center;
+    color: rgba(245, 241, 232, .56);
+    background: #111719;
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .collectible-card-image {
+    position: relative;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity .18s ease;
+  }
+
+  .collectible-card-image.is-loaded {
+    opacity: 1;
+  }
+
   .nav-toggle,
   .nav-account-button,
   .scan-share-button,
