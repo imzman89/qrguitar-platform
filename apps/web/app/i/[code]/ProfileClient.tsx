@@ -2,6 +2,7 @@
 
 import {
   ArrowLeft,
+  ArrowRight,
   Clock3,
   Download,
   Copy,
@@ -650,7 +651,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
                     <ArrowLeft size={18} />
                   </button>
                   <button type="button" onClick={() => moveHeroPhoto(1)} aria-label={getContentValue(publicContent, "profile.gallery.next")}>
-                    <ArrowLeft size={18} />
+                    <ArrowRight size={18} />
                   </button>
                 </div>
               ) : null}

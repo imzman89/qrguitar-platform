@@ -155,7 +155,7 @@ export default function LoginPage() {
       <Nav />
       <main className="section auth-page">
         <div className={isSignedIn ? "shell auth-layout is-signed-in" : "shell auth-layout"}>
-          <section>
+          <section className="auth-intro">
             <div className="eyebrow">{isSignedIn ? "Account ready" : getContentValue(content, "login.hero.eyebrow")}</div>
             <h1>{isSignedIn ? "Welcome back." : mode === "register" ? "Create your QRguitar account." : mode === "reset" ? "Reset your QRguitar password." : getContentValue(content, "login.hero.headline")}</h1>
             <p>
@@ -167,19 +167,6 @@ export default function LoginPage() {
                   ? "Enter your account email and QRguitar will send a secure password reset link."
                 : getContentValue(content, "login.hero.body")}
             </p>
-            {!isSignedIn ? <div className="auth-tabs" role="tablist" aria-label="Account mode">
-              <button className={mode === "login" ? "active" : ""} type="button" onClick={() => switchMode("login")}>
-                Sign in
-              </button>
-              <button className={mode === "register" ? "active" : ""} type="button" onClick={() => switchMode("register")}>
-                {getContentValue(content, "login.actions.create")}
-              </button>
-            </div> : null}
-            {!isSignedIn && mode === "login" ? (
-              <button className="link-button auth-inline-link" type="button" onClick={() => switchMode("reset")}>
-                {getContentValue(content, "login.actions.forgot")}
-              </button>
-            ) : null}
           </section>
 
           <section className="card auth-card">
@@ -198,9 +185,19 @@ export default function LoginPage() {
               </>
             ) : (
               <>
+                {mode !== "reset" ? (
+                  <div className="auth-mode-switch" role="tablist" aria-label="Account access">
+                    <button className={mode === "login" ? "active" : ""} type="button" role="tab" aria-selected={mode === "login"} onClick={() => switchMode("login")}>
+                      Sign in
+                    </button>
+                    <button className={mode === "register" ? "active" : ""} type="button" role="tab" aria-selected={mode === "register"} onClick={() => switchMode("register")}>
+                      Create account
+                    </button>
+                  </div>
+                ) : null}
                 <div className="auth-card-head">
-                  <span>{mode === "register" ? "New account" : "Account access"}</span>
-                  <strong>{mode === "register" ? "Create a QRguitar login." : mode === "reset" ? "Get a secure reset link." : "Welcome back."}</strong>
+                  <span>{mode === "register" ? "New account" : mode === "reset" ? "Account recovery" : "Secure access"}</span>
+                  <strong>{mode === "register" ? "Create your account." : mode === "reset" ? "Get a reset link." : "Sign in to continue."}</strong>
                 </div>
 
                 {mode === "register" ? (
@@ -240,22 +237,16 @@ export default function LoginPage() {
                   ) : null}
                 </div>
 
-                {mode === "login" ? (
-                  <div className="auth-switch-line">
-                    <span>New to QRguitar?</span>
-                    <button className="link-button" type="button" onClick={() => switchMode("register")}>{getContentValue(content, "login.actions.createLong")}</button>
-                  </div>
-                ) : mode === "register" ? (
-                  <div className="auth-switch-line">
-                    <span>Already have an account?</span>
-                    <button className="link-button" type="button" onClick={() => switchMode("login")}>Sign in</button>
-                  </div>
-                ) : (
-                  <div className="auth-switch-line">
-                    <span>Remembered it?</span>
+                <div className="auth-card-link-row">
+                  {mode === "login" ? (
+                    <button className="link-button" type="button" onClick={() => switchMode("reset")}>
+                      {getContentValue(content, "login.actions.forgot")}
+                    </button>
+                  ) : null}
+                  {mode === "reset" ? (
                     <button className="link-button" type="button" onClick={() => switchMode("login")}>Back to sign in</button>
-                  </div>
-                )}
+                  ) : null}
+                </div>
               </>
             )}
 

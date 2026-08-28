@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut, UserRound } from "lucide-react";
+import { LogOut, Menu, UserRound, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { BrandLogo } from "./BrandLogo";
 import { clearQrGuitarSessionState, createBrowserSupabaseClient } from "../lib/supabase-browser";
@@ -43,8 +43,16 @@ export function Nav() {
       <Link className="brand" href="/" aria-label="QRguitar homepage">
         <BrandLogo className="brand-logo brand-logo--header" />
       </Link>
-      <button className="nav-toggle" type="button" onClick={() => setIsOpen((open) => !open)} aria-expanded={isOpen} aria-controls="primary-navigation">
-        Menu
+      <button
+        className="nav-toggle"
+        type="button"
+        onClick={() => setIsOpen((open) => !open)}
+        aria-expanded={isOpen}
+        aria-controls="primary-navigation"
+        aria-label={isOpen ? "Close navigation" : "Open navigation"}
+      >
+        {isOpen ? <X size={19} aria-hidden="true" /> : <Menu size={19} aria-hidden="true" />}
+        <span className="sr-only">{isOpen ? "Close navigation" : "Open navigation"}</span>
       </button>
       <nav className={isOpen ? "nav-links open" : "nav-links"} id="primary-navigation" aria-label="Primary navigation">
         <Link href="/dashboard">{getContentValue(content, "global.navigation.dashboard")}</Link>

@@ -18312,3 +18312,422 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
     line-height: 1.08;
   }
 }
+
+/* Product-wide interaction and scale coherence. */
+@media screen {
+  .nav-toggle,
+  .nav-account-button,
+  .scan-share-button,
+  .scan-hero-gallery-controls button,
+  .media-gallery-nav,
+  .media-overlay-close {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .auth-intro {
+    align-self: center;
+    max-width: 620px;
+  }
+
+  .auth-intro h1 {
+    text-wrap: balance;
+  }
+
+  .auth-mode-switch {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    border: 1px solid rgba(245, 241, 232, .13);
+    border-radius: 7px;
+    padding: 4px;
+    background: #0a1012;
+  }
+
+  .auth-mode-switch button {
+    min-height: 42px;
+    border: 0;
+    border-radius: 5px;
+    padding: 9px 12px;
+    color: #9fa9ad;
+    background: transparent;
+    font-size: 12px;
+    font-weight: 850;
+    cursor: pointer;
+  }
+
+  .auth-mode-switch button:hover,
+  .auth-mode-switch button:focus-visible {
+    color: #f5f1e8;
+    background: rgba(245, 241, 232, .05);
+  }
+
+  .auth-mode-switch button.active {
+    color: #0a0f11;
+    background: #f5f1e8;
+  }
+
+  .auth-card-link-row {
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    border-top: 1px solid rgba(245, 241, 232, .1);
+    padding-top: 10px;
+  }
+
+  .auth-card-link-row:empty {
+    display: none;
+  }
+
+  .auth-card-link-row .link-button {
+    min-height: 36px;
+    padding: 8px 0;
+    color: var(--gold-2);
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .collectible-card:hover .collectible-card-image,
+  .collectible-card:focus-within .collectible-card-image {
+    transform: none;
+  }
+
+  .collectible-card h3 {
+    max-width: 100%;
+    font-size: 22px;
+    line-height: 1.12;
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
+
+  .collectible-card--latest h3 {
+    max-width: 16ch;
+    font-size: 27px;
+    line-height: 1.08;
+  }
+
+  .collectible-card-subtitle {
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .collectible-card-cta {
+    min-height: 40px;
+  }
+
+  .home-archive-rail {
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .home-archive-rail > .collectible-card {
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+
+  .scan-hero h1 {
+    max-width: 15ch;
+    font-family: inherit;
+    font-size: 42px;
+    font-weight: 850;
+    line-height: 1.06;
+    letter-spacing: 0;
+    text-wrap: balance;
+  }
+
+  .scan-hero-thumbnails button {
+    min-height: 64px;
+    cursor: pointer;
+  }
+
+  .dashboard-page .dashboard-hero h1 {
+    font-size: 40px;
+    line-height: 1.06;
+  }
+
+  .dashboard-workspace-links a,
+  .dashboard-workspace-links button {
+    min-height: 44px;
+  }
+
+  .dashboard-metric {
+    min-height: 88px;
+  }
+
+  .admin-stat-card,
+  .admin-panel-card,
+  .admin-row,
+  .admin-attention-row,
+  .cms-field-group,
+  .cms-section-editor,
+  .cms-block-row,
+  .cms-focused-block {
+    min-width: 0;
+  }
+
+  .admin-stat-card h2,
+  .admin-stat-card h3,
+  .admin-panel-card h2,
+  .admin-panel-card h3,
+  .admin-row strong,
+  .cms-section-editor strong,
+  .cms-block-row strong,
+  .cms-focused-block h3 {
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
+}
+
+@media screen and (max-width: 900px) {
+  .nav-toggle {
+    width: 44px;
+    height: 44px;
+    border-radius: 6px;
+    padding: 0;
+  }
+
+  .nav-links {
+    width: min(300px, calc(100vw - 24px));
+    border-radius: 8px;
+  }
+
+  .nav-links a,
+  .nav-links button,
+  .nav-account-button {
+    min-height: 44px;
+  }
+
+  .auth-layout {
+    gap: 18px;
+  }
+
+  .auth-intro {
+    max-width: 100%;
+  }
+
+  .auth-card {
+    gap: 16px;
+  }
+
+  .collectible-card-share .record-share-button,
+  .collectible-card-gallery-controls button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .collectible-card-gallery-controls {
+    right: 10px;
+    bottom: 10px;
+  }
+}
+
+@media screen and (max-width: 760px) {
+  .hero-copy h1,
+  .catalog-page h1,
+  .auth-page h1,
+  .dashboard-page .dashboard-hero h1,
+  .create-wizard-page .create-wizard-hero h1,
+  .installer-hero h1,
+  .product-guide-hero h1,
+  .collection-directory-hero h1,
+  .contact-page h1,
+  .legal-page h1,
+  .claim-center-hero h1,
+  .print-kit-toolbar h1 {
+    font-size: 32px;
+    line-height: 1.08;
+  }
+
+  .hero-copy > p,
+  .catalog-page .dashboard-hero p,
+  .collection-directory-hero p,
+  .auth-intro p {
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  .scan-hero h1 {
+    max-width: none;
+    font-size: 30px;
+    line-height: 1.08;
+  }
+
+  .scan-hero-info {
+    padding: 18px 16px 20px;
+  }
+
+  .collectible-card h3,
+  .collectible-card--latest h3 {
+    max-width: 100%;
+    font-size: 21px;
+    line-height: 1.12;
+  }
+
+  .collectible-card-content {
+    gap: 10px;
+    padding: 17px;
+  }
+
+  .record-badge,
+  .collectible-card-facts > span {
+    font-size: 9.5px;
+  }
+
+  .dashboard-workspace-links {
+    gap: 6px;
+  }
+
+  .dashboard-workspace-links a,
+  .dashboard-workspace-links button {
+    min-height: 46px;
+    padding: 10px 11px;
+    font-size: 11px;
+  }
+
+  .dashboard-metric {
+    min-height: 82px;
+    padding: 13px;
+  }
+
+  .dashboard-metric strong {
+    font-size: 22px;
+  }
+
+  .pricing-grid {
+    gap: 10px;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .price-card,
+  .price-card.featured,
+  .pricing-card {
+    border: 1px solid rgba(245, 241, 232, .13);
+    border-radius: 7px;
+    padding: 18px;
+    background: #111719;
+  }
+
+  .cms-commandbar,
+  .cms-editor-heading,
+  .admin-section-head {
+    min-width: 0;
+  }
+
+  .cms-command-actions .button,
+  .admin-row-actions .button,
+  .admin-row-actions button {
+    min-height: 42px;
+  }
+}
+
+@media screen and (max-width: 430px) {
+  .shell {
+    width: min(100% - 22px, var(--content-wide));
+  }
+
+  .auth-card,
+  .dashboard-signin-card,
+  .account-settings-card {
+    padding: 18px;
+  }
+
+  .auth-mode-switch button {
+    padding-inline: 8px;
+    font-size: 11px;
+  }
+
+  .catalog-hero-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .catalog-hero-actions .button,
+  .catalog-hero-actions .text-link {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .home-archive-rail > .collectible-card {
+    flex-basis: calc(100% - 14px);
+  }
+
+  .scan-hero-thumbnails button {
+    flex-basis: 68px;
+    width: 68px;
+    height: 54px;
+    min-height: 54px;
+  }
+}
+
+/* Accessible touch targets without oversized visual chrome. */
+@media screen {
+  .auth-card-link-row .link-button {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    cursor: pointer;
+  }
+
+  .auth-card-link-row .link-button,
+  .print-kit-back-link,
+  .footer-links a,
+  .footer-links button {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .profile-trust-summary details > summary {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+  }
+
+  .fine-print a,
+  .legal-card a {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .brand {
+    min-height: 44px;
+  }
+
+  .home-archive-controls button,
+  .catalog-exact-search,
+  .scan-tabs button {
+    min-width: 42px;
+    min-height: 42px;
+  }
+
+  main .text-link {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+@media screen and (max-width: 760px) {
+  .home-archive-controls button,
+  .catalog-exact-search,
+  .scan-tabs button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  main .text-link {
+    min-height: 44px;
+  }
+
+  .product-guide-hero h1,
+  .installer-hero h1,
+  .collection-directory-hero h1 {
+    font-size: 30px;
+  }
+}

@@ -402,12 +402,12 @@ export default function DashboardPage() {
             </div>
           </div>
           <nav className="dashboard-workspace-links" aria-label="Owner tools">
-            <button type="button" onClick={() => setActiveFilter("service")}><Wrench size={15} /> Service queue <span>{pendingServiceRequests}</span></button>
+            <button type="button" onClick={() => setActiveFilter("service")}><Wrench size={15} /> Service requests <span>{pendingServiceRequests}</span></button>
             <Link href="/ownership-claim">Claims &amp; transfers <span>{pendingTransfers}</span></Link>
             {collectionHandle ? (
               <Link href={`/collections/${collectionHandle}`}><UsersRound size={15} /> View collection page</Link>
             ) : (
-              <Link href="/account?section=collection" title="Create a shareable page for the public Profiles in your collection"><UsersRound size={15} /> Create collection page</Link>
+              <Link href="/account?section=collection" title="Choose a public collection name and share your public Profiles"><UsersRound size={15} /> Share your collection</Link>
             )}
           </nav>
           {dashboardMessage ? <div className="admin-message">{dashboardMessage}</div> : null}
