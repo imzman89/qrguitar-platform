@@ -34,7 +34,7 @@ type AccountSection = "overview" | "profile" | "collection" | "security" | "noti
 
 const accountSections: Array<{ id: AccountSection; label: string }> = [
   { id: "overview", label: "Overview" },
-  { id: "collection", label: "Collection Page" },
+  { id: "collection", label: "Public Collection" },
   { id: "profile", label: "Profile & Identity" },
   { id: "security", label: "Security" },
   { id: "notifications", label: "Notifications" },
@@ -280,7 +280,7 @@ export default function AccountPage() {
                 <p className="account-card-copy">Manage your identity, public collection, access, and privacy without leaving your owner workspace.</p>
                 <div className="account-overview-actions">
                   <button type="button" onClick={() => setActiveSection("profile")}><UserRound size={17} aria-hidden="true" /><span><b>Profile details</b><small>Update the name connected to your Profiles.</small></span></button>
-                  <button type="button" onClick={() => setActiveSection("collection")}><UsersRound size={17} aria-hidden="true" /><span><b>Collection page</b><small>Share your public Profiles from one link.</small></span></button>
+                  <button type="button" onClick={() => setActiveSection("collection")}><UsersRound size={17} aria-hidden="true" /><span><b>Public collection</b><small>Group your public Profiles under one shareable link.</small></span></button>
                   <button type="button" onClick={() => setActiveSection("security")}><LockKeyhole size={17} aria-hidden="true" /><span><b>Security</b><small>Reset your password or sign out securely.</small></span></button>
                   <Link href="/dashboard"><ShieldCheck size={17} aria-hidden="true" /><span><b>Profile controls</b><small>Manage visibility, serial display, documents, and QR tools.</small></span></Link>
                 </div>
@@ -314,18 +314,18 @@ export default function AccountPage() {
 
             {activeSection === "collection" ? <section className="card auth-card account-settings-card" id="public-collection">
               <div className="auth-card-head">
-                <span>Collection page</span>
-                <strong><UsersRound size={18} aria-hidden="true" /> Share your collection</strong>
+                <span>Public collection</span>
+                <strong><UsersRound size={18} aria-hidden="true" /> Your public collection</strong>
               </div>
               <p className="account-card-copy">Create one shareable page for your public QRguitar Profiles. Private and unlisted Profiles never appear there.</p>
               <label className="toggle-field">
                 <input type="checkbox" checked={publicCollection.enabled} onChange={(event) => setPublicCollection((current) => ({ ...current, enabled: event.target.checked }))} />
-                Publish my collection page
+                Show my public Profiles together on a public collection page
               </label>
               <div className="form-grid compact">
                 <label className="field"><span>Public name</span><input value={publicCollection.publicName} onChange={(event) => setPublicCollection((current) => ({ ...current, publicName: event.target.value }))} placeholder={displayName} /></label>
-                <label className="field"><span>Collection handle</span><input value={publicCollection.handle} onChange={(event) => setPublicCollection((current) => ({ ...current, handle: event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") }))} placeholder="my-collection" /></label>
-                <label className="field"><span>Account type</span><select value={publicCollection.accountType} onChange={(event) => setPublicCollection((current) => ({ ...current, accountType: event.target.value as PublicCollectionSettings["accountType"] }))}><option value="player">Player</option><option value="collector">Collector</option><option value="shop">Shop / retailer</option><option value="builder">Builder / brand</option><option value="luthier">Luthier / technician</option><option value="other">Other</option></select></label>
+                <label className="field"><span>Public link</span><input value={publicCollection.handle} onChange={(event) => setPublicCollection((current) => ({ ...current, handle: event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") }))} placeholder="my-collection" /></label>
+                <label className="field"><span>Collection type</span><select value={publicCollection.accountType} onChange={(event) => setPublicCollection((current) => ({ ...current, accountType: event.target.value as PublicCollectionSettings["accountType"] }))}><option value="player">Player</option><option value="collector">Collector</option><option value="shop">Shop / retailer</option><option value="builder">Builder / brand</option><option value="luthier">Luthier / technician</option><option value="other">Other</option></select></label>
                 <label className="field"><span>Location (optional)</span><input value={publicCollection.location} onChange={(event) => setPublicCollection((current) => ({ ...current, location: event.target.value }))} placeholder="City, region, country" /></label>
                 <label className="field custom-wide"><span>Short bio</span><textarea rows={3} value={publicCollection.bio} onChange={(event) => setPublicCollection((current) => ({ ...current, bio: event.target.value }))} placeholder="What you collect, build, repair, or sell." /></label>
                 <label className="field"><span>Website (optional)</span><input type="url" value={publicCollection.websiteUrl} onChange={(event) => setPublicCollection((current) => ({ ...current, websiteUrl: event.target.value }))} placeholder="https://" /></label>
@@ -338,8 +338,8 @@ export default function AccountPage() {
               </label>
               <p className="field-note">Your email stays private. QRguitar relays the first message, and you decide whether to reply.</p>
               <div className="form-actions">
-                <button className="button" type="button" onClick={saveAccount} disabled={isWorking}>{isWorking ? "Saving..." : "Save collection page"}</button>
-                {publicCollection.enabled && publicCollection.handle ? <Link className="button secondary" href={`/collections/${publicCollection.handle}`} target="_blank">Open collection page <ExternalLink size={15} /></Link> : null}
+                <button className="button" type="button" onClick={saveAccount} disabled={isWorking}>{isWorking ? "Saving..." : "Save public collection"}</button>
+                {publicCollection.enabled && publicCollection.handle ? <Link className="button secondary" href={`/collections/${publicCollection.handle}`} target="_blank">View public collection <ExternalLink size={15} /></Link> : null}
               </div>
             </section> : null}
 

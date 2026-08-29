@@ -18754,3 +18754,107 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
     font-size: 30px;
   }
 }
+
+/* Final workflow clarity: inventory filters stay separate from owner work queues. */
+@media screen {
+  .dashboard-metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .collection-directory-empty {
+    max-width: 760px;
+    display: grid;
+    gap: 10px;
+    margin: 34px auto 0;
+    border: 1px solid rgba(245, 241, 232, .13);
+    border-radius: 8px;
+    padding: clamp(22px, 4vw, 40px);
+    color: var(--dark-text);
+    background: #11181b;
+  }
+
+  .collection-directory-empty h2,
+  .collection-directory-empty p {
+    margin: 0;
+  }
+
+  .collection-directory-empty h2 {
+    color: var(--dark-text);
+    font-size: clamp(25px, 3vw, 34px);
+  }
+
+  .collection-directory-empty .form-actions {
+    margin-top: 8px;
+  }
+}
+
+@media screen and (max-width: 760px) {
+  .catalog-page {
+    padding-block: 24px 56px;
+  }
+
+  .catalog-page .dashboard-hero {
+    gap: 14px;
+    margin-bottom: 14px;
+    padding-bottom: 18px;
+  }
+
+  .catalog-page .dashboard-hero h1 {
+    margin-block: 6px 9px;
+  }
+
+  .catalog-hero-actions {
+    gap: 8px;
+  }
+
+  .catalog-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+    margin-bottom: 10px;
+    padding: 11px;
+  }
+
+  .catalog-search {
+    grid-column: 1 / -1;
+  }
+
+  .catalog-filters label {
+    min-width: 0;
+    gap: 5px;
+  }
+
+  .catalog-filters input,
+  .catalog-filters select,
+  .catalog-search span {
+    min-height: 44px;
+  }
+
+  .catalog-more-filters {
+    margin-bottom: 10px;
+  }
+
+  .catalog-summary {
+    margin-bottom: 12px;
+    padding-block: 10px;
+  }
+
+  .collection-directory-empty {
+    margin-top: 22px;
+  }
+}
+
+@media screen and (max-width: 430px) {
+  .dashboard-metric-grid > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+
+@media screen and (max-width: 360px) {
+  .catalog-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .catalog-search {
+    grid-column: auto;
+  }
+}

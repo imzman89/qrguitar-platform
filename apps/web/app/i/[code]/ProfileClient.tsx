@@ -667,6 +667,11 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
                 }}
                 onPointerDown={(event) => {
                   if (event.pointerType !== "mouse") return;
+                  if ((event.target as HTMLElement).closest("button")) {
+                    heroThumbnailDragRef.current = null;
+                    heroThumbnailDidDragRef.current = false;
+                    return;
+                  }
                   event.stopPropagation();
                   heroThumbnailDidDragRef.current = false;
                   heroThumbnailDragRef.current = {

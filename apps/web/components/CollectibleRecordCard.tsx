@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   type MouseEvent,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -58,6 +59,15 @@ export function CollectibleRecordCard({
     setFailedImages([]);
     setLoadedImages([]);
   }, [record.qrCode]);
+
+  const markImageReady = useCallback((index: number, node: HTMLImageElement | null) => {
+    if (!node?.complete) return;
+    if (node.naturalWidth > 0) {
+      setLoadedImages((current) => current.includes(index) ? current : [...current, index]);
+      return;
+    }
+    setFailedImages((current) => current.includes(index) ? current : [...current, index]);
+  }, []);
 
   function moveGallery(direction: -1 | 1) {
     const rail = railRef.current;
@@ -153,6 +163,7 @@ export function CollectibleRecordCard({
                     <>
                       {!loadedImages.includes(index) ? <div className="collectible-card-loading-media" aria-hidden="true">Loading photo...</div> : null}
                       <img
+                        ref={(node) => markImageReady(index, node)}
                         className={`collectible-card-image ${loadedImages.includes(index) ? "is-loaded" : ""}`}
                         src={imageUrl}
                         alt={`${card.title} photo ${index + 1} of ${galleryImages.length}`}
@@ -160,7 +171,7 @@ export function CollectibleRecordCard({
                         fetchPriority={index === 0 ? "high" : "auto"}
                         decoding="async"
                         draggable={false}
-                        onLoad={() => setLoadedImages((current) => current.includes(index) ? current : [...current, index])}
+                        onLoad={(event) => markImageReady(index, event.currentTarget)}
                         onError={() => setFailedImages((current) => current.includes(index) ? current : [...current, index])}
                       />
                     </>

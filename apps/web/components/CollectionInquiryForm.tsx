@@ -53,9 +53,9 @@ export function CollectionInquiryForm({ handle, publicName, profiles }: { handle
   return (
     <section className="collection-inquiry" aria-labelledby="collection-inquiry-title">
       <div>
-        <div className="eyebrow">Private inquiry</div>
-        <h2 id="collection-inquiry-title">Contact {publicName}</h2>
-        <p>Ask about an instrument, availability, service, or a possible transfer. The collection owner&apos;s email stays private.</p>
+        <div className="eyebrow">Member message</div>
+        <h2 id="collection-inquiry-title">Message {publicName}</h2>
+        <p>Ask about an instrument, availability, service, or a possible transfer. QRguitar relays the message while both email addresses stay private.</p>
       </div>
       <div className="collection-inquiry-form">
         {profiles.length ? <label><span>Profile (optional)</span><select value={profileCode} onChange={(event) => setProfileCode(event.target.value)}><option value="">General collection inquiry</option>{profiles.map((profile) => <option value={profile.code} key={profile.code}>{profile.title}</option>)}</select></label> : null}

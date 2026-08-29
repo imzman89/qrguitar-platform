@@ -27,7 +27,7 @@ import { getProfilePhotoUrls, getServiceHistoryEntries } from "../../lib/instrum
 import { getContentValue } from "../../lib/content-registry";
 import { useSiteContent } from "../../lib/use-site-content";
 
-type DashboardFilter = "all" | "public" | "private" | "transfers" | "service" | "safety";
+type DashboardFilter = "all" | "public" | "private";
 
 type ServiceRequestSummary = {
   id: string;
@@ -214,8 +214,8 @@ export default function DashboardPage() {
     [chronologicalInstruments]
   );
   const displayedInstruments = useMemo(
-    () => chronologicalInstruments.filter((instrument) => matchesDashboardFilter(instrument, activeFilter, transfers)),
-    [activeFilter, chronologicalInstruments, transfers]
+    () => chronologicalInstruments.filter((instrument) => matchesDashboardFilter(instrument, activeFilter)),
+    [activeFilter, chronologicalInstruments]
   );
 
   function refreshInstruments() {
@@ -240,15 +240,22 @@ export default function DashboardPage() {
       });
   }
 
+  function focusServiceRequests() {
+    setDashboardMessage("");
+    if (!pendingServiceRequests) {
+      setDashboardMessage("No service requests need review.");
+      return;
+    }
+    document.getElementById("service-requests")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   const stats = useMemo(
     () => [
       { label: "Profiles", value: String(instruments.length), filter: "all" as const, helper: "Active instruments" },
       { label: "Public", value: String(publicRecords), filter: "public" as const, helper: "Listed in the Catalog" },
-      { label: "Private / Unlisted", value: String(privateRecords + unlistedRecords), filter: "private" as const, helper: "Limited visibility" },
-      { label: "Service Requests", value: String(pendingServiceRequests), filter: "service" as const, helper: "Awaiting review" },
-      { label: "Transfers & Claims", value: String(pendingTransfers), filter: "transfers" as const, helper: "Awaiting completion" }
+      { label: "Private / Unlisted", value: String(privateRecords + unlistedRecords), filter: "private" as const, helper: "Limited visibility" }
     ],
-    [instruments.length, pendingServiceRequests, pendingTransfers, privateRecords, publicRecords, unlistedRecords]
+    [instruments.length, privateRecords, publicRecords, unlistedRecords]
   );
 
   async function updateSerialVisibility(instrument: DemoInstrument, showSerialPublic: boolean) {
@@ -402,13 +409,9 @@ export default function DashboardPage() {
             </div>
           </div>
           <nav className="dashboard-workspace-links" aria-label="Owner tools">
-            <button type="button" onClick={() => setActiveFilter("service")}><Wrench size={15} /> Service requests <span>{pendingServiceRequests}</span></button>
+            <button type="button" onClick={focusServiceRequests}><Wrench size={15} /> Service review <span>{pendingServiceRequests}</span></button>
             <Link href="/ownership-claim">Claims &amp; transfers <span>{pendingTransfers}</span></Link>
-            {collectionHandle ? (
-              <Link href={`/collections/${collectionHandle}`}><UsersRound size={15} /> View collection page</Link>
-            ) : (
-              <Link href="/account?section=collection" title="Choose a public collection name and share your public Profiles"><UsersRound size={15} /> Share your collection</Link>
-            )}
+            <Link href="/account?section=collection" title="Publish your public Profiles together and control member inquiries"><UsersRound size={15} /> Collection &amp; inquiries <span>{collectionHandle ? "Live" : "Set up"}</span></Link>
           </nav>
           {dashboardMessage ? <div className="admin-message">{dashboardMessage}</div> : null}
 
@@ -434,7 +437,7 @@ export default function DashboardPage() {
           </div>
 
           {serviceRequests.length ? (
-            <section className="card service-request-inbox" aria-labelledby="service-requests-title">
+            <section className="card service-request-inbox" id="service-requests" aria-labelledby="service-requests-title">
               <div className="service-request-inbox__header">
                 <div>
                   <div className="eyebrow"><Wrench aria-hidden="true" /> Service</div>
@@ -849,17 +852,9 @@ function TransferPanel({
   );
 }
 
-function matchesDashboardFilter(instrument: DemoInstrument, filter: DashboardFilter, transfers: DemoTransfer[]) {
+function matchesDashboardFilter(instrument: DemoInstrument, filter: DashboardFilter) {
   if (filter === "public") return instrument.visibility === "public";
   if (filter === "private") return instrument.visibility === "private" || instrument.visibility === "unlisted";
-  if (filter === "service") return getServiceHistoryEntries(instrument).length > 0;
-  if (filter === "safety") return instrument.safetyStatus === "lost" || instrument.safetyStatus === "stolen";
-
-  if (filter === "transfers") {
-    return transfers.some((transfer) =>
-      transfer.status === "sent" && transfer.guitarQrCode.toUpperCase() === instrument.qrCode.toUpperCase()
-    );
-  }
   return true;
 }
 
