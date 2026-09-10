@@ -16,18 +16,19 @@ Take an appropriate database backup and record the currently deployed revision. 
 
 Apply the reviewed candidate migrations in this order after their historical prerequisites:
 
-1. `20260910220000_atomic_instrument_profile_save.sql`
-2. `20260910230000_atomic_instrument_create.sql`
-3. `20260910233000_staged_upload_registry.sql`
-4. `20260910235900_server_data_boundary.sql`
-5. `20260911001000_atomic_account_settings.sql`
-6. `20260911001500_atomic_ownership_transfers.sql`
-7. `20260911002000_atomic_service_evidence.sql`
-8. `20260911002100_atomic_external_media.sql`
-9. `20260911003000_atomic_instrument_controls.sql`
-10. `20260911003500_atomic_site_editor.sql`
-11. `20260911004000_beta_plan_quota.sql`
-12. `20260911004500_release_readiness.sql`
+1. `20260910210000_reconcile_serial_alias_contract.sql`
+2. `20260910220000_atomic_instrument_profile_save.sql`
+3. `20260910230000_atomic_instrument_create.sql`
+4. `20260910233000_staged_upload_registry.sql`
+5. `20260910235900_server_data_boundary.sql`
+6. `20260911001000_atomic_account_settings.sql`
+7. `20260911001500_atomic_ownership_transfers.sql`
+8. `20260911002000_atomic_service_evidence.sql`
+9. `20260911002100_atomic_external_media.sql`
+10. `20260911003000_atomic_instrument_controls.sql`
+11. `20260911003500_atomic_site_editor.sql`
+12. `20260911004000_beta_plan_quota.sql`
+13. `20260911004500_release_readiness.sql`
 
 The staged-upload wrapper and its private backing function must be installed together. Quota04000 patches the private backing function without enabling direct invocation. Do not restore old API-role grants afterward.
 
