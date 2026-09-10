@@ -1,0 +1,456 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { randomUUID, randomBytes, createHash, createCipheriv, createDecipheriv } from 'node:crypto';
+const require = createRequire(import.meta.url);
+const ts = require('typescript');
+const lib = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/lib');
+const cache = new Map();
+function load(name) {
+  if (cache.has(name)) return cache.get(name);
+  const output = ts.transpileModule(fs.readFileSync(path.join(lib, name + '.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const module = { exports: {} }; cache.set(name, module.exports);
+  const mockedRequire = id => {
+    if (id.startsWith('./')) return load(id.slice(2));
+    if (id === 'react-native-url-polyfill/auto') return {};
+    if (id === 'react-native') return { Platform: { OS: 'android' }, AppState: {} };
+    if (id === 'expo-crypto') return { randomUUID };
+    if (id === 'expo-secure-store' || id === 'expo-file-system') return {};
+    if (id === '@supabase/supabase-js') return { createClient() { throw new Error('Use an injected auth client in unit tests.'); } };
+    return require(id);
+  };
+  new Function('require', 'module', 'exports', output)(mockedRequire, module, module.exports);
+  cache.set(name, module.exports); return module.exports;
+}
+const authLib = load('auth');
+const apiLib = load('api');
+const draftLib = load('profile-draft');
+const { createEncryptedStorage, createNativeAuth, NativeSessionChangedError } = authLib;
+const { createNativeApi, NativeApiError } = apiLib;
+const tick = () => new Promise(resolve => setImmediate(resolve));
+const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
+const actor = '11111111-1111-4111-8111-111111111111';
+const otherActor = '22222222-2222-4222-8222-222222222222';
+const session = id => ({ user: { id, email: id + '@example.com' }, access_token: 'token-' + id });
+function memoryStorage() {
+  const values = new Map();
+  return { values, getItem: async key => values.get(key) ?? null, setItem: async (key, value) => { values.set(key, value); }, removeItem: async key => { values.delete(key); } };
+}
+function encryptedFixture() {
+  const pointers = new Map(), files = new Map(), events = [];
+  const backend = {
+    digest: async value => createHash('sha256').update(value).digest('hex'), randomId: randomUUID,
+    seal: async value => {
+      const key = randomBytes(32), iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', key, iv);
+      return { key: key.toString('hex'), ciphertext: Buffer.concat([iv, cipher.update(value, 'utf8'), cipher.final(), cipher.getAuthTag()]) };
+    },
+    open: async (bytes, key) => {
+      const raw = Buffer.from(bytes), decipher = createDecipheriv('aes-256-gcm', Buffer.from(key, 'hex'), raw.subarray(0, 12));
+      decipher.setAuthTag(raw.subarray(-16)); return Buffer.concat([decipher.update(raw.subarray(12, -16)), decipher.final()]).toString('utf8');
+    },
+    readPointer: async key => pointers.get(key) ?? null,
+    writePointer: async (key, value) => { events.push('pointer'); pointers.set(key, value); },
+    removePointer: async key => { events.push('remove-pointer'); pointers.delete(key); },
+    readFile: async id => { if (!files.has(id)) throw new Error('Missing encrypted file'); return files.get(id); },
+    writeFile: async (id, value) => { events.push('file'); files.set(id, Buffer.from(value)); },
+    removeFile: async id => { events.push('remove-file'); files.delete(id); }
+  };
+  return { backend, pointers, files, events, storage: createEncryptedStorage(backend) };
+}
+test('encrypted storage round trips a large session and Unicode without plaintext or oversized SecureStore entries', async () => {
+  const f = encryptedFixture(); const secret = JSON.stringify({ access_token: 'secret'.repeat(9000), name: 'José 🎸 世界' });
+  await f.storage.setItem('session', secret);
+  assert.equal(await f.storage.getItem('session'), secret);
+  assert.ok([...f.pointers.values()].every(value => value.length < 2048 && !value.includes('secret')));
+  assert.ok([...f.files.values()].every(value => !value.includes(Buffer.from('secretsecret'))));
+  assert.deepEqual(f.events, ['file', 'pointer']);
+});
+test('failed pointer write preserves previous data and encrypted candidate', async () => {
+  const f = encryptedFixture(); await f.storage.setItem('session', 'old');
+  f.backend.writePointer = async () => { throw new Error('SecureStore full'); };
+  await assert.rejects(f.storage.setItem('session', 'new'), /full/);
+  assert.equal(await f.storage.getItem('session'), 'old'); assert.equal(f.files.size, 2);
+});
+test('pointer write that commits then throws keeps the new readable file', async () => {
+  const f = encryptedFixture(); const write = f.backend.writePointer;
+  f.backend.writePointer = async (...args) => { await write(...args); throw new Error('native bridge lost response'); };
+  await assert.rejects(f.storage.setItem('session', 'new'), /lost response/);
+  assert.equal(await f.storage.getItem('session'), 'new');
+});
+test('corrupt or missing ciphertext fails explicitly, not as an empty session', async () => {
+  const f = encryptedFixture(); await f.storage.setItem('session', 'private');
+  const id = [...f.files.keys()][0]; f.files.get(id)[20] ^= 1;
+  await assert.rejects(f.storage.getItem('session'));
+  f.files.delete(id); await assert.rejects(f.storage.getItem('session'), /Missing/);
+});
+test('committed pointer update/delete survives cleanup failure', async () => {
+  const f = encryptedFixture(); await f.storage.setItem('session', 'old');
+  f.backend.removeFile = async () => { throw new Error('cleanup failed'); };
+  await f.storage.setItem('session', 'new'); assert.equal(await f.storage.getItem('session'), 'new');
+  await f.storage.removeItem('session'); assert.equal(await f.storage.getItem('session'), null);
+});
+test('writes serialize with logout and no late encrypted write resurrects the session', async () => {
+  const f = encryptedFixture(); const gate = deferred(); const original = f.backend.writeFile;
+  f.backend.writeFile = async (...args) => { await gate.promise; await original(...args); };
+  const save = f.storage.setItem('session', 'old-refresh'); const remove = f.storage.removeItem('session');
+  gate.resolve(); await Promise.all([save, remove]); assert.equal(await f.storage.getItem('session'), null);
+});
+test('UTF-8 adapter handles large ASCII, Unicode and malformed ciphertext encoding', () => {
+  const text = 'photo'.repeat(100000) + 'é世界🎸';
+  assert.equal(authLib.decodeUtf8(authLib.encodeUtf8(text)), text);
+  assert.throws(() => authLib.decodeUtf8(Uint8Array.of(0xc0, 0x80)), /encoding/);
+});
+function authFixture(options = {}) {
+  const storage = options.storage || memoryStorage(); const clients = []; let appListener;
+  const appState = { currentState: 'active', addEventListener(_event, listener) { appListener = listener; return { remove() { appListener = null; } }; } };
+  const auth = createNativeAuth({ storage, appState, timeoutMs: options.timeoutMs || 60, clientFactory(scopedStorage) {
+    let listener; let currentSession = options.initialSession ?? null;
+    const c = { storage: scopedStorage, starts: 0, stops: 0, emit(value) { currentSession = value; listener?.('TOKEN_REFRESHED', value); }, auth: {
+      getSession: () => options.getSession ? options.getSession() : Promise.resolve({ data: { session: currentSession }, error: null }),
+      onAuthStateChange(callback) { listener = callback; return { data: { subscription: { unsubscribe() { listener = null; } } } }; },
+      startAutoRefresh: async () => { c.starts++; }, stopAutoRefresh: async () => { c.stops++; },
+      signInWithPassword: async () => ({ data: { session: session(actor) }, error: null }),
+      signUp: async () => ({ data: { session: null }, error: null }),
+      signOut: async () => ({ error: null })
+    }};
+    clients.push(c); return c;
+  }});
+  return { auth, storage, clients, background: value => appListener?.(value) };
+}
+test('auth starts refresh only active, stops in background, and subscribes once for two consumers', async () => {
+  const f = authFixture({ initialSession: session(actor) }); const stop1 = f.auth.start(); const stop2 = f.auth.start(); await tick();
+  assert.equal(f.clients.length, 1); assert.equal(f.auth.getSnapshot().status, 'signed-in');
+  f.background('background'); f.background('active'); assert.equal(f.clients[0].starts, 2); assert.equal(f.clients[0].stops, 1);
+  stop1(); assert.equal(f.clients[0].stops, 1); stop2(); assert.equal(f.clients[0].stops, 2);
+});
+test('late initial session success cannot restore the previous account after logout', async () => {
+  const pending = deferred(); const f = authFixture({ getSession: () => pending.promise }); const stop = f.auth.start();
+  await f.auth.signOut(); pending.resolve({ data: { session: session(actor) }, error: null }); await tick();
+  assert.equal(f.auth.getSnapshot().status, 'signed-out'); stop();
+});
+test('late initial session rejection cannot replace successful logout with a stale error', async () => {
+  const pending = deferred(); const f = authFixture({ getSession: () => pending.promise }); const stop = f.auth.start();
+  await f.auth.signOut(); pending.reject(new Error('old storage error')); await tick();
+  assert.equal(f.auth.getSnapshot().status, 'signed-out'); stop();
+});
+test('logout invalidates API leases and prevents retired clients persisting late refresh tokens', async () => {
+  const f = authFixture({ initialSession: session(actor) }); const stop = f.auth.start(); await tick();
+  const lease = await f.auth.acquireSession(); const old = f.clients[0]; await f.auth.signOut();
+  await old.storage.setItem('qrguitar.auth.session', 'old credentials');
+  assert.equal(f.auth.isCurrent(lease), false); assert.equal(await f.storage.getItem('qrguitar.auth.session'), null); stop();
+});
+test('token refresh for same actor retains lease; account switch invalidates it', async () => {
+  const f = authFixture({ initialSession: session(actor) }); const stop = f.auth.start(); await tick();
+  const lease = await f.auth.acquireSession(); f.clients[0].emit({ ...session(actor), access_token: 'fresh' }); assert.ok(f.auth.isCurrent(lease));
+  f.clients[0].emit(session(otherActor)); assert.equal(f.auth.isCurrent(lease), false); stop();
+});
+test('session acquisition checks account changes even when the old token lookup rejects', async () => {
+  const f = authFixture({ initialSession: session(actor) }); const stop = f.auth.start(); await tick();
+  const pending = deferred(); f.clients[0].auth.getSession = () => pending.promise;
+  const request = f.auth.acquireSession(); f.clients[0].emit(session(otherActor)); pending.reject(new Error('old auth failure'));
+  await assert.rejects(request, NativeSessionChangedError); stop();
+});
+test('sign-up without a session reports email confirmation, never a signed-in account', async () => {
+  const f = authFixture(); const stop = f.auth.start(); await tick();
+  assert.deepEqual(await f.auth.signUp('person@example.com', 'password-long', 'Person'), { requiresEmailConfirmation: true });
+  assert.equal(f.auth.getSnapshot().status, 'signed-out'); stop();
+});
+test('timed-out sign-in retires client so late auth events and persistence cannot sign the user in', async () => {
+  const f = authFixture({ timeoutMs: 10 }); const stop = f.auth.start(); await tick(); const pending = deferred();
+  f.clients[0].auth.signInWithPassword = () => pending.promise;
+  const old = f.clients[0]; await assert.rejects(f.auth.signIn('a@example.com', 'password'), /timed out/);
+  old.emit(session(actor)); await old.storage.setItem('qrguitar.auth.session', 'stale'); pending.resolve({ data: { session: session(actor) }, error: null }); await tick();
+  assert.notEqual(f.auth.getSnapshot().status, 'signed-in'); assert.equal(f.storage.values.size, 0); stop();
+});
+test('local logout storage failure remains visible and requires retry instead of claiming durable logout', async () => {
+  const f = authFixture({ initialSession: session(actor) }); const stop = f.auth.start(); await tick();
+  f.storage.removeItem = async () => { throw new Error('keychain locked'); };
+  await assert.rejects(f.auth.signOut(), /could not be saved/); assert.equal(f.auth.getSnapshot().status, 'error'); assert.equal(f.auth.getSnapshot().session, null); stop();
+});
+function simpleAuth() {
+  let id = actor, revision = 1; const listeners = new Set();
+  return { getSnapshot: () => ({ status: id ? 'signed-in' : 'signed-out', session: id ? session(id) : null, revision, message: '' }), subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+    acquireSession: async expected => { if (!id || expected && id !== expected) throw new NativeSessionChangedError(); return { actorId: id, revision, accessToken: 'private-token' }; },
+    isCurrent: lease => lease.actorId === id && lease.revision === revision,
+    change(next) { id = next; revision++; for (const listener of listeners) listener(this.getSnapshot()); }
+  };
+}
+const instrument = (overrides = {}) => ({ qrCode: 'QRG-123ABC', name: 'Example guitar', brand: 'Example', model: 'Model', visibility: 'public', ...overrides });
+const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+function apiFixture(fetcher, opts = {}) { const auth = opts.auth || simpleAuth(); return { auth, api: createNativeApi({ auth, fetch: fetcher, origin: 'https://qrguitar.com', storageOrigin: 'https://project.supabase.co', timeoutMs: opts.timeoutMs || 50 }) }; }
+test('API honors empty successful collection and distinguishes outage/auth/malformed envelopes', async () => {
+  const results = [json({ ok: true, instruments: [], count: 0 }), json({ ok: false, message: 'Unavailable' }, 503), json({ ok: false, instruments: [] }, 401), json({ ok: true }), json({ ok: true, instruments: [null] })];
+  const f = apiFixture(async () => results.shift());
+  assert.deepEqual(await f.api.listPublic(), []);
+  await assert.rejects(f.api.listPublic(), error => error.status === 503);
+  await assert.rejects(f.api.listMine(), error => error.status === 401);
+  await assert.rejects(f.api.listPublic(), /incomplete/); await assert.rejects(f.api.listPublic(), /unreadable/);
+});
+test('owner reads use scoped API endpoints with bearer token; public reads omit credentials', async () => {
+  const calls = []; const f = apiFixture(async (url, options) => { calls.push([url, options]); return json(url.includes('code=') ? { ok: true, instrument: instrument() } : { ok: true, instruments: [] }); });
+  await f.api.listPublic(); await f.api.listMine(); await f.api.readMine('qrg-123abc');
+  assert.equal(calls[0][1].headers.Authorization, undefined); assert.equal(calls[1][1].headers.Authorization, 'Bearer private-token');
+  assert.equal(calls[2][0], 'https://qrguitar.com/api/instruments?scope=mine&code=QRG-123ABC');
+  assert.equal(calls[2][1].redirect, 'error'); assert.equal(calls[2][1].credentials, 'omit');
+});
+test('public catalog rejects private/unlisted and public detail rejects private; unlisted direct detail works', async () => {
+  for (const visibility of ['private', 'unlisted']) {
+    const f = apiFixture(async () => json({ ok: true, instruments: [instrument({ visibility })] })); await assert.rejects(f.api.listPublic(), /restricted/);
+  }
+  let visibility = 'private'; const f = apiFixture(async () => json({ ok: true, instrument: instrument({ visibility }) }));
+  await assert.rejects(f.api.readPublic('QRG-123ABC'), /private/); visibility = 'unlisted'; assert.equal((await f.api.readPublic('QRG-123ABC')).visibility, 'unlisted');
+});
+test('late owner response and late JSON rejection are guarded after account switch', async () => {
+  for (const failure of [false, true]) {
+    const pending = deferred(); const auth = simpleAuth();
+    const f = apiFixture(async () => ({ ok: true, status: 200, url: '', redirected: false, json: () => pending.promise }), { auth });
+    const request = f.api.listMine(); await tick(); auth.change(otherActor);
+    if (failure) pending.reject(new Error('old JSON')); else pending.resolve({ ok: true, instruments: [instrument()] });
+    await assert.rejects(request, NativeSessionChangedError);
+  }
+});
+test('fetch that ignores abort and JSON parsing that never settles are bounded', async () => {
+  for (const fetcher of [() => new Promise(() => {}), async () => ({ ok: true, status: 200, json: () => new Promise(() => {}) })]) {
+    const f = apiFixture(fetcher, { timeoutMs: 10 }); await assert.rejects(f.api.listPublic(), error => error.code === 'timeout');
+  }
+});
+test('create response malformed, network failure or timeout retains an uncertain outcome', async () => {
+  for (const fetcher of [async () => { throw new Error('offline'); }, async () => json({ ok: true }), async () => new Response('<html>error</html>'), async () => json(null)]) {
+    const f = apiFixture(fetcher); await assert.rejects(f.api.createProfile(actor, '{}'), error => error.uncertain === true);
+  }
+});
+test('create confirms only the exact route success shape and strict reset response', async () => {
+  let response = json({ ok: true, qrCode: 'QRG-ABC', permanentPath: '/i/QRG-ABC', message: 'Created' });
+  const f = apiFixture(async () => response);
+  assert.equal((await f.api.createProfile(actor, '{}')).qrCode, 'QRG-ABC');
+  response = json({ ok: false, code: 'upload_session_changed', resetUploads: true, retryable: true }, 409);
+  await assert.rejects(f.api.createProfile(actor, '{}'), error => error.resetUploads && !error.uncertain);
+  response = json({ ok: false, code: 'create_unconfirmed', resetUploads: true }, 502);
+  await assert.rejects(f.api.createProfile(actor, '{}'), error => !error.resetUploads && error.uncertain);
+});
+test('safe native URLs reject executable, local, credentials, protocol-relative and storage paths', () => {
+  for (const value of ['javascript:alert(1)', 'data:image/svg+xml,a', 'file:///private/a', 'http://example.com/a', '//evil.com/a', 'https://127.0.0.1/a', 'https://[::1]/a', 'https://user:pass@example.com/a', 'https://device.local/a', actor + '/profile-uploads/a/image.jpg']) assert.equal(apiLib.safeNativeImageUrl(value), undefined, value);
+  assert.equal(apiLib.safeNativeImageUrl('https://project.supabase.co/storage/v1/object/sign/images/a?token=abc'), 'https://project.supabase.co/storage/v1/object/sign/images/a?token=abc');
+  assert.equal(apiLib.safeNativeReferenceUrl('/api/instruments/documents/example'), 'https://qrguitar.com/api/instruments/documents/example');
+});
+test('API origin allows only production hosts, plus exact local web development proxy', () => {
+  assert.equal(apiLib.resolveNativeApiOrigin(undefined, false, 'android'), 'https://www.qrguitar.com');
+  assert.equal(apiLib.resolveNativeApiOrigin('https://qrguitar.com', false, 'android'), 'https://www.qrguitar.com');
+  assert.equal(apiLib.resolveNativeApiOrigin('https://www.qrguitar.com/', false, 'ios'), 'https://www.qrguitar.com');
+  assert.equal(apiLib.resolveNativeApiOrigin('http://127.0.0.1:3014', true, 'web'), 'http://127.0.0.1:3014');
+  for (const [origin, development, platform] of [['http://127.0.0.1:3014', false, 'web'], ['http://127.0.0.1:3014', true, 'ios'], ['https://evil.com', true, 'web'], ['https://qrguitar.com.evil.com', false, 'android']]) assert.throws(() => apiLib.resolveNativeApiOrigin(origin, development, platform), /invalid/);
+});
+const photo = (id = randomUUID()) => ({ id, dataUrl: 'data:image/jpeg;base64,' + Buffer.from([255,216,255,224,0,16,74,70,73,70,0,1,2,3,4,5]).toString('base64') });
+const input = { brand: 'Example', model: 'Model', serial: 'SN1234', serialNotUsed: false, instrumentType: 'Electric guitar', visibility: 'private' };
+const result = { qrCode: 'QRG-NEW123', permanentPath: '/i/QRG-NEW123', message: 'Created' };
+function draftFixture(options = {}) {
+  const auth = options.auth || simpleAuth(), storage = options.storage || memoryStorage(), calls = [];
+  const api = {
+    uploadPhoto: async (id, uploadId, _photo, index) => { calls.push(['upload', index]); return id + '/profile-uploads/' + uploadId + '/image-' + index + '-' + randomUUID() + '.jpg'; },
+    createProfile: async (id, body) => { calls.push(['create', id, body]); return result; }, ...options.api
+  };
+  const controller = draftLib.makeProfileDraftController(actor, { auth, storage, api, randomId: randomUUID });
+  return { auth, storage, api, calls, controller };
+}
+test('draft uploads all photos, defaults serial private, and persists confirmation with exact contract', async () => {
+  const f = draftFixture(); assert.deepEqual(await f.controller.createOrRetry(input, [photo(), photo()]), result);
+  const body = JSON.parse(f.calls.find(call => call[0] === 'create')[2]);
+  assert.equal(body.photos.length, 2); assert.equal(body.heroImagePath, body.photos[0]); assert.equal(body.showSerialPublic, false); assert.equal(body.visibility, 'private');
+  assert.equal(f.controller.getState().draft.result.qrCode, result.qrCode);
+  await f.controller.createOrRetry(); assert.equal(f.calls.filter(call => call[0] === 'create').length, 1);
+});
+test('partial upload failure resumes after the last durable photo', async () => {
+  const f = draftFixture(); const upload = f.api.uploadPhoto; let fail = true;
+  f.api.uploadPhoto = async (...args) => { if (args[3] === 1 && fail) { fail = false; throw new Error('upload interrupted'); } return upload(...args); };
+  await assert.rejects(f.controller.createOrRetry(input, [photo(), photo()]), /interrupted/);
+  assert.equal(f.controller.getState().draft.stagedPaths.length, 1);
+  await f.controller.createOrRetry(); assert.deepEqual(f.calls.filter(call => call[0] === 'upload').map(call => call[1]), [0, 1]);
+});
+test('uncertain create survives restart with identical body, keys, uploaded paths and no reupload', async () => {
+  const f = draftFixture(); let sent;
+  f.api.createProfile = async (_actor, body) => { sent = body; throw new NativeApiError('lost response', { uncertain: true, retryable: true }); };
+  await assert.rejects(f.controller.createOrRetry(input, [photo()]), /lost/);
+  const restarted = draftFixture({ storage: f.storage, api: { uploadPhoto: async () => { throw new Error('must not reupload'); }, createProfile: async (_actor, body) => { assert.equal(body, sent); return result; } } });
+  const saved = await restarted.controller.loadDraft(); assert.equal(saved.uncertain, true);
+  await assert.rejects(restarted.controller.saveDraft({ ...input, model: 'Changed' }, [photo()]), /Retry/);
+  await assert.rejects(restarted.controller.discardDraft(), /unconfirmed/);
+  assert.deepEqual(await restarted.controller.createOrRetry(), result);
+});
+test('duplicate create clicks cannot upload or submit twice', async () => {
+  const gate = deferred(); const f = draftFixture(); const create = f.api.createProfile;
+  f.api.createProfile = async (...args) => { await gate.promise; return create(...args); };
+  const first = f.controller.createOrRetry(input, [photo()]);
+  await assert.rejects(f.controller.createOrRetry(input, [photo()]), /already/); gate.resolve(); await first;
+  assert.equal(f.calls.filter(call => call[0] === 'create').length, 1);
+});
+test('definitive upload reset clears only frozen body and paths, retaining original input and identities', async () => {
+  const f = draftFixture(); f.api.createProfile = async () => { throw new NativeApiError('reset', { status: 409, code: 'upload_session_changed', resetUploads: true }); };
+  await f.controller.saveDraft(input, [photo()]); const original = f.controller.getState().draft;
+  await assert.rejects(f.controller.createOrRetry(), /reset/); const after = f.controller.getState().draft;
+  assert.equal(after.uploadId, original.uploadId); assert.equal(after.idempotencyKey, original.idempotencyKey); assert.deepEqual(after.input, original.input); assert.deepEqual(after.photos, original.photos);
+  assert.equal(after.frozenBody, null); assert.deepEqual(after.stagedPaths, []); assert.equal(after.uncertain, false);
+});
+test('an earlier unknown create remains frozen after a later early validation or unauthorized response', async () => {
+  const f = draftFixture(); f.api.createProfile = async () => { throw new NativeApiError('lost', { uncertain: true }); };
+  await assert.rejects(f.controller.createOrRetry(input, [photo()])); const body = f.controller.getState().draft.frozenBody;
+  f.api.createProfile = async () => { throw new NativeApiError('sign in', { status: 401, code: 'auth_required' }); };
+  await assert.rejects(f.controller.createOrRetry()); assert.equal(f.controller.getState().draft.frozenBody, body); assert.equal(f.controller.getState().draft.uncertain, true);
+});
+test('definitive first-attempt validation rejection allows correction without a new identity', async () => {
+  const f = draftFixture(); f.api.createProfile = async () => { throw new NativeApiError('Brand spelling', { status: 409, code: 'brand_spelling_conflict' }); };
+  await assert.rejects(f.controller.createOrRetry(input, [photo()])); const before = f.controller.getState().draft;
+  assert.equal(before.uncertain, false); assert.equal(before.frozenBody, null);
+  await f.controller.saveDraft({ ...input, brand: 'Corrected' }, before.photos); assert.equal(f.controller.getState().draft.idempotencyKey, before.idempotencyKey);
+});
+test('local persistence failure before dispatch prevents any create request', async () => {
+  const f = draftFixture(); const save = f.storage.setItem;
+  f.storage.setItem = async (key, value) => { if (JSON.parse(value).draft.uncertain) throw new Error('device storage full'); await save(key, value); };
+  await assert.rejects(f.controller.createOrRetry(input, [photo()]), /storage full/);
+  assert.equal(f.calls.filter(call => call[0] === 'create').length, 0);
+});
+test('server-confirmed create stays successful when local confirmation persistence fails', async () => {
+  const f = draftFixture(); const save = f.storage.setItem;
+  f.storage.setItem = async (key, value) => { if (JSON.parse(value).draft.result) throw new Error('device storage full'); await save(key, value); };
+  assert.deepEqual(await f.controller.createOrRetry(input, [photo()]), result);
+  assert.match(f.controller.getState().error, /Profile created/); assert.deepEqual(f.controller.getState().draft.result, result);
+  const persisted = JSON.parse([...f.storage.values.values()][0]).draft; assert.equal(persisted.uncertain, true); assert.equal(persisted.result, null);
+});
+test('account switch during upload hides draft and prevents sending create for a different actor', async () => {
+  const gate = deferred(); const f = draftFixture(); const upload = f.api.uploadPhoto;
+  f.api.uploadPhoto = async (...args) => { await gate.promise; return upload(...args); };
+  const pending = f.controller.createOrRetry(input, [photo()]); await tick(); f.auth.change(otherActor); gate.resolve();
+  await assert.rejects(pending, NativeSessionChangedError); assert.equal(f.controller.getState().draft, null); assert.equal(f.calls.filter(call => call[0] === 'create').length, 0);
+});
+test('tampered frozen request and wrong actor data fail explicitly and remain stored', async () => {
+  const f = draftFixture(); f.api.createProfile = async () => { throw new NativeApiError('lost', { uncertain: true }); };
+  await assert.rejects(f.controller.createOrRetry(input, [photo()]));
+  const key = [...f.storage.values.keys()][0]; const saved = JSON.parse(f.storage.values.get(key)); saved.draft.frozenBody = saved.draft.frozenBody.replace('Example', 'Other'); f.storage.values.set(key, JSON.stringify(saved));
+  const restarted = draftFixture({ storage: f.storage }); await assert.rejects(restarted.controller.loadDraft(), /request has changed/); assert.ok(f.storage.values.has(key));
+});
+test('picker MIME is derived from bytes, rejects missing base64 and enforces 12 MiB before direct API transport', async () => {
+  const valid = photo(); assert.ok(draftLib.photoFromPickerAsset({ base64: valid.dataUrl.split(',')[1], mimeType: 'image/heic' }).dataUrl.startsWith('data:image/jpeg;'));
+  assert.throws(() => draftLib.photoFromPickerAsset({ uri: 'file://private/a' }), /could not be read/);
+  const oversized = { id: randomUUID(), dataUrl: 'data:image/jpeg;base64,' + Buffer.concat([Buffer.from([255,216,255]), Buffer.alloc(draftLib.MAX_NATIVE_IMAGE_BYTES)]).toString('base64') };
+  assert.throws(() => draftLib.validateNativeProfile(input, [oversized]), /12 MiB/);
+  let called = false; const f = apiFixture(async () => { called = true; return json({}); });
+  await assert.rejects(f.api.uploadPhoto(actor, randomUUID(), oversized.dataUrl, 0), /12 MiB/); assert.equal(called, false);
+});
+test('partial form and zero photos autosave and restore without invoking transport', async () => {
+  const f = draftFixture(); const partial = { ...input, brand: '', model: '', serial: '', instrumentType: '' };
+  await f.controller.saveDraft(partial, []); f.controller.dispose();
+  const reopened = draftFixture({ storage: f.storage }); const draft = await reopened.controller.loadDraft();
+  assert.deepEqual(draft.input, { ...partial, showSerialPublic: false }); assert.deepEqual(draft.photos, []); assert.equal(reopened.calls.length, 0);
+});
+test('incomplete create rejects before uploading while preserving the partial draft', async () => {
+  const f = draftFixture(); await assert.rejects(f.controller.createOrRetry({ ...input, brand: '' }, []), /brand/);
+  assert.equal(f.calls.length, 0); assert.equal(f.controller.getState().draft.input.brand, '');
+  await f.controller.saveDraft(input, []); await assert.rejects(f.controller.createOrRetry(), /at least one photo/); assert.equal(f.calls.length, 0);
+});
+test('dispose during create removes observers and visible callbacks, preserving durable unknown attempt', async () => {
+  const gate = deferred(); const f = draftFixture(); f.api.createProfile = () => gate.promise;
+  let events = 0; f.controller.subscribe(() => { events++; });
+  const pending = f.controller.createOrRetry(input, [photo()]); await tick();
+  const persisted = JSON.parse([...f.storage.values.values()][0]).draft; assert.equal(persisted.uncertain, true);
+  f.controller.dispose(); const before = events; gate.resolve(result); await assert.rejects(pending, NativeSessionChangedError);
+  assert.equal(events, before); assert.equal(f.controller.getState().draft, null);
+  const reopened = draftFixture({ storage: f.storage }); assert.equal((await reopened.controller.loadDraft()).uncertain, true);
+});
+test('disposing idle draft controller removes account subscription and rejects further mutation', async () => {
+  const auth = simpleAuth(); const subscribe = auth.subscribe; let active = 0;
+  auth.subscribe = fn => { active++; const cleanup = subscribe.call(auth, fn); return () => { active--; cleanup(); }; };
+  const f = draftFixture({ auth }); assert.equal(active, 1); f.controller.dispose(); assert.equal(active, 0);
+  await assert.rejects(f.controller.saveDraft(input, [photo()]), NativeSessionChangedError);
+});
+const stableFileId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const stableUploadId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const signedPath = actor + '/profile-uploads/' + stableUploadId + '/image-' + stableFileId + '.jpg';
+const signedUrl = 'https://project.supabase.co/storage/v1/object/upload/sign/instrument-media/' + signedPath + '?token=upload-only';
+test('direct upload handshake uses stable identity, tiny JSON and raw bytes without bearer credentials', async () => {
+  const calls = [];
+  const f = apiFixture(async (url, options) => {
+    calls.push([url, options]);
+    if (options.method === 'PUT') return new Response('', { status: 200 });
+    const body = JSON.parse(options.body);
+    return json({ ok: true, phase: body.action === 'prepare' ? 'upload' : 'complete', storagePath: signedPath, kind: 'image', signedUrl });
+  });
+  const selected = photo(); assert.equal(await f.api.uploadPhoto(actor, stableUploadId, selected.dataUrl, 0, stableFileId), signedPath);
+  assert.equal(calls.length, 3);
+  const prepare = JSON.parse(calls[0][1].body); assert.equal(prepare.expectedOwnerId, actor); assert.equal(prepare.fileId, stableFileId); assert.equal(prepare.size, 16); assert.ok(calls[0][1].body.length < 1024);
+  assert.equal(calls[1][1].headers.Authorization, undefined); assert.equal(calls[1][1].headers.apikey, undefined); assert.equal(calls[1][1].credentials, 'omit'); assert.equal(calls[1][1].headers['x-upsert'], 'false');
+  assert.ok(calls[1][1].body instanceof ArrayBuffer); assert.deepEqual(Buffer.from(calls[1][1].body), Buffer.from(selected.dataUrl.split(',')[1], 'base64'));
+  assert.equal(JSON.parse(calls[2][1].body).action, 'complete');
+});
+test('already registered stable photo resumes without uploading the bytes twice', async () => {
+  let calls = 0; const f = apiFixture(async (_url, options) => { calls++; assert.equal(options.method, 'POST'); return json({ ok: true, phase: 'complete', storagePath: signedPath, kind: 'image' }); });
+  assert.equal(await f.api.uploadPhoto(actor, stableUploadId, photo().dataUrl, 0, stableFileId), signedPath); assert.equal(calls, 1);
+});
+test('lost PUT response is reconciled through complete before reporting a failure', async () => {
+  const actions = []; const f = apiFixture(async (_url, options) => {
+    if (options.method === 'PUT') throw new Error('lost network response');
+    const action = JSON.parse(options.body).action; actions.push(action);
+    return json({ ok: true, phase: action === 'prepare' ? 'upload' : 'complete', storagePath: signedPath, kind: 'image', signedUrl });
+  });
+  assert.equal(await f.api.uploadPhoto(actor, stableUploadId, photo().dataUrl, 0, stableFileId), signedPath); assert.deepEqual(actions, ['prepare', 'complete']);
+});
+test('unconfirmed direct upload retries with identical file metadata and never issues cleanup DELETE', async () => {
+  const calls = []; let retry = false; const f = apiFixture(async (_url, options) => {
+    calls.push(options);
+    if (options.method === 'PUT') throw new Error('unknown PUT');
+    const body = JSON.parse(options.body);
+    if (body.action === 'complete' && !retry) return json({ ok: false, message: 'Upload not found yet', retryable: true }, 503);
+    return json({ ok: true, phase: retry ? 'complete' : 'upload', storagePath: signedPath, kind: 'image', signedUrl });
+  });
+  await assert.rejects(f.api.uploadPhoto(actor, stableUploadId, photo().dataUrl, 0, stableFileId), /not found/); retry = true;
+  await f.api.uploadPhoto(actor, stableUploadId, photo().dataUrl, 0, stableFileId);
+  const prepares = calls.filter(call => call.method === 'POST' && JSON.parse(call.body).action === 'prepare'); assert.equal(prepares[0].body, prepares[1].body); assert.ok(calls.every(call => call.method !== 'DELETE'));
+});
+test('signed URL validation rejects host/path/token substitution before any customer bytes leave', async () => {
+  for (const bad of [signedUrl.replace('project.supabase.co', 'attacker.example'), signedUrl.replace(actor, otherActor), signedUrl + '&token=second', signedUrl + '#fragment', signedUrl.replace('?token=upload-only', ''), signedUrl.replace('https://', 'http://')]) {
+    let puts = 0; const f = apiFixture(async (_url, options) => { if (options.method === 'PUT') puts++; return json({ ok: true, phase: 'upload', storagePath: signedPath, kind: 'image', signedUrl: bad }); });
+    await assert.rejects(f.api.uploadPhoto(actor, stableUploadId, photo().dataUrl, 0, stableFileId), /address is invalid/); assert.equal(puts, 0);
+  }
+});
+test('account switch during upload preparation prevents raw transfer and completion for the prior actor', async () => {
+  const gate = deferred(); const auth = simpleAuth(); let calls = 0;
+  const f = apiFixture(async () => { calls++; return gate.promise; }, { auth });
+  const pending = f.api.uploadPhoto(actor, stableUploadId, photo().dataUrl, 0, stableFileId); await tick(); auth.change(otherActor);
+  gate.resolve(json({ ok: true, phase: 'upload', storagePath: signedPath, kind: 'image', signedUrl }));
+  await assert.rejects(pending, NativeSessionChangedError); assert.equal(calls, 1);
+});
+test('new auth event supersedes a late initial session read rejection', async () => {
+  const gate = deferred(); const f = authFixture({ getSession: () => gate.promise }); const stop = f.auth.start();
+  f.clients[0].emit(session(actor)); gate.reject(new Error('stale initialization failure')); await tick();
+  assert.equal(f.auth.getSnapshot().status, 'signed-in'); stop();
+});
+test('definitive staging reset rotates upload incarnations while preserving photo selection identity', async () => {
+  const f = draftFixture(); f.api.createProfile = async () => { throw new NativeApiError('reset', { status: 409, code: 'upload_session_changed', resetUploads: true }); };
+  await f.controller.saveDraft(input, [photo()]); const initial = f.controller.getState().draft;
+  await assert.rejects(f.controller.createOrRetry(), /reset/); const reset = f.controller.getState().draft;
+  assert.notEqual(reset.uploadFileIds[0], initial.uploadFileIds[0]); assert.equal(reset.photos[0].id, initial.photos[0].id); assert.equal(reset.photos[0].dataUrl, initial.photos[0].dataUrl);
+  const seen = []; f.api.uploadPhoto = async (_actor, uploadId, _data, _index, fileId) => { seen.push(fileId); return actor + '/profile-uploads/' + uploadId + '/image-' + fileId + '.jpg'; }; f.api.createProfile = async () => result;
+  await f.controller.createOrRetry(); assert.deepEqual(seen, reset.uploadFileIds);
+});
+test('uncertain retry never rotates upload file IDs, even after restart', async () => {
+  const f = draftFixture(); await f.controller.saveDraft(input, [photo()]); const initial = f.controller.getState().draft.uploadFileIds;
+  f.api.createProfile = async () => { throw new NativeApiError('unknown', { uncertain: true }); }; await assert.rejects(f.controller.createOrRetry());
+  f.controller.dispose(); const reopened = draftFixture({ storage: f.storage }); assert.deepEqual((await reopened.controller.loadDraft()).uploadFileIds, initial);
+});
+test('new same-actor controller serializes behind a disposed pending encrypted save and keeps the latest edit', async () => {
+  const encrypted = encryptedFixture(); const gate = deferred(); const originalWrite = encrypted.backend.writeFile;
+  encrypted.backend.writeFile = async (...args) => { await gate.promise; return originalWrite(...args); };
+  const first = draftFixture({ storage: encrypted.storage });
+  const oldSave = first.controller.saveDraft({ ...input, model: 'Old partial form' }, []); await tick(); first.controller.dispose();
+  const next = draftFixture({ storage: encrypted.storage }); let restored = false;
+  const read = next.controller.loadDraft().then(draft => { restored = true; return draft; }); await tick(); assert.equal(restored, false);
+  gate.resolve(); await assert.rejects(oldSave, NativeSessionChangedError); assert.equal((await read).input.model, 'Old partial form');
+  await next.controller.saveDraft({ ...input, model: 'Latest form' }, []);
+  const durable = await encrypted.storage.getItem('qrguitar.profile-draft.v1.' + actor);
+  assert.equal(JSON.parse(durable).draft.input.model, 'Latest form');
+});
+test('contradictory reset/uncertain response fails closed and never authorizes staging reset', async () => {
+  const f = apiFixture(async () => json({ ok: false, code: 'upload_session_changed', resetUploads: true, uncertain: true }, 409));
+  await assert.rejects(f.api.createProfile(actor, '{}'), error => error.resetUploads === false && error.uncertain === true);
+});

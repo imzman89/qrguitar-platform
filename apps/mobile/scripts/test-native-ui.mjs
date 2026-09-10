@@ -1,0 +1,247 @@
+// Executes real React 19 components with mocked native bridges. Device/layout acceptance is separate.
+import test, { afterEach } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+const require=createRequire(import.meta.url),React=require('react'),ts=require('typescript');
+const rendererRequire=createRequire(require.resolve('react-test-renderer/package.json'));
+const rendererModule={exports:{}};
+new Function('require','module','exports',fs.readFileSync(path.join(path.dirname(rendererRequire.resolve('react-test-renderer/package.json')),'cjs/react-test-renderer.development.js'),'utf8'))(id=>id==='react'?React:rendererRequire(id),rendererModule,rendererModule.exports);
+const Renderer=rendererModule.exports;
+const {act}=React;
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const base=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../src');
+const mounted=new Set();
+afterEach(async()=>{for(const view of mounted)await act(()=>view.unmount());mounted.clear();});
+const tick=()=>new Promise(resolve=>setImmediate(resolve));
+const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return {resolve,reject,promise};};
+async function render(Component,props={}){let view;await act(async()=>{view=Renderer.create(React.createElement(Component,props));await tick();});mounted.add(view);return view;}
+async function flush(){await act(tick);}
+async function invoke(fn,...args){await act(async()=>{fn(...args);await tick();});}
+const action=(view,title)=>view.root.findAllByType('Action').find(x=>x.props.title===title);
+const field=(view,label)=>view.root.findAllByType('Field').find(x=>x.props.label===label);
+const notices=view=>view.root.findAllByType('Notice').map(x=>x.props.message).join(' ');
+// Native bridge stubs expose visible labels as string props; never serialize embedded React elements/fibers.
+const text=view=>{
+ const parts=[];const visit=node=>{
+  if(node==null)return;if(typeof node==='string'||typeof node==='number'){parts.push(String(node));return;}
+  if(Array.isArray(node)){node.forEach(visit);return;}
+  for(const key of ['title','copy','eyebrow','message','label','value','accessibilityLabel'])if(typeof node.props?.[key]==='string')parts.push(node.props[key]);
+  visit(node.children);
+ };visit(view.toJSON());return parts.join(' ');
+};
+function fixture(options={}){
+ const events=new Set(),authListeners=new Set(),permissionListeners=new Set();
+ const calls={signIn:[],signUp:[],create:[],save:[],discard:0,dispose:0,requestPermission:0,picker:0,links:[],profiles:[]};
+ let snapshot=options.snapshot||{status:'signed-in',session:{user:{id:'owner-111111111111',email:'owner@example.invalid',user_metadata:{display_name:'Owner'}}},revision:1,message:''};
+ let permission=options.permission||{granted:false,canAskAgain:true};
+ const appState={currentState:'active',addEventListener(_event,fn){events.add(fn);return {remove(){events.delete(fn);}};}};
+ const alerts=[];
+ const auth={getSnapshot:()=>snapshot,start:()=>()=>{},subscribe(fn){authListeners.add(fn);return()=>authListeners.delete(fn);},
+  signIn:async(...args)=>{calls.signIn.push(args);return options.signIn?.(...args);},
+  signUp:async(...args)=>{calls.signUp.push(args);return options.signUp?options.signUp(...args):{requiresEmailConfirmation:true};},
+  signOut:async()=>{snapshot={...snapshot,status:'signed-out',session:null,revision:snapshot.revision+1};authListeners.forEach(fn=>fn(snapshot));},
+  retry:async()=>{}};
+ let state={draft:options.draft||null,busy:false,error:''};const listeners=new Set();
+ const emit=patch=>{state={...state,...patch};listeners.forEach(fn=>fn(state));};
+ const draft={getState:()=>state,subscribe(fn){listeners.add(fn);return()=>listeners.delete(fn);},loadDraft:async()=>state.draft,
+  saveDraft:async(input,photos)=>{calls.save.push([input,photos]);emit({busy:true});try{await options.saveDraft?.(input,photos);const next={actorId:snapshot.session?.user.id,input,photos,frozenBody:null,uncertain:false,result:null};emit({draft:next});return next;}finally{emit({busy:false});}},
+  createOrRetry:async(...args)=>{calls.create.push(args);emit({busy:true});try{return options.create?await options.create(...args):{qrCode:'QRG-NEW123',permanentPath:'/i/QRG-NEW123',message:'Saved'};}finally{emit({busy:false});}},
+  discardDraft:async()=>{calls.discard++;emit({draft:null});},dispose:()=>{calls.dispose++;listeners.clear();}};
+ const requestPermission=async()=>{calls.requestPermission++;permission=options.requestPermission?await options.requestPermission():{granted:false,canAskAgain:false};permissionListeners.forEach(fn=>fn(permission));return permission;};
+ const getPermission=async()=>permission;
+ const api={listPublic:async()=>[],listMine:async()=>[],readPublic:async()=>options.record,readMine:async()=>options.record,...options.api};
+ const bridge={AppState:appState,Platform:{OS:'android'},Alert:{alert:(...args)=>alerts.push(args)},Linking:{openURL:async url=>calls.links.push(url),openSettings:async()=>calls.links.push('settings'),getInitialURL:async()=>options.initialUrl||null,addEventListener:()=>({remove(){}})},BackHandler:{addEventListener:()=>({remove(){}})},Share:{share:async()=>{}},StyleSheet:{create:x=>x,absoluteFill:{position:'absolute'}}};
+ for(const name of ['ActivityIndicator','KeyboardAvoidingView','Modal','Pressable','RefreshControl','ScrollView','Switch','Text','View'])bridge[name]=name;
+ const mocks={'react':React,'react-native':bridge,'react-native-safe-area-context':{SafeAreaProvider:'SafeAreaProvider',SafeAreaView:'SafeAreaView'},'expo-status-bar':{StatusBar:'StatusBar'},'expo-image':{Image:'Image'},
+  'expo-image-picker':{launchImageLibraryAsync:async()=>{calls.picker++;return options.picker?options.picker():{canceled:true};}},
+  'expo-camera':{CameraView:'CameraView',useCameraPermissions(){const [p,set]=React.useState(permission);React.useEffect(()=>{permissionListeners.add(set);return()=>permissionListeners.delete(set);},[]);return [p,requestPermission,getPermission];}},
+  'auth':{getNativeAuth:()=>auth},'api':{getNativeApi:()=>api,safeNativeImageUrl:value=>typeof value==='string'&&value.startsWith('https://')?value:null},
+  'profile-draft':{createProfileDraftController:()=>draft,photoFromPickerAsset:asset=>({id:asset.id||'photo-111111111111',dataUrl:'data:image/jpeg;base64,'+asset.base64}),MAX_NATIVE_PHOTOS:8,MAX_NATIVE_IMAGE_BYTES:12*1024*1024},
+  'ui':{Action:'Action',Field:'Field',Heading:'Heading',Notice:'Notice',colors:{gold:'gold',background:'black'},styles:{}}};
+ const cache=new Map();
+ function load(file){
+  if(cache.has(file))return cache.get(file);let source=fs.readFileSync(path.join(base,file),'utf8');
+  if(file==='App.tsx')source+='\nexport {Login,Create,Profile,Photo,useResource,OwnedRecords};';
+  const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.React,esModuleInterop:true}}).outputText;
+  const module={exports:{}};cache.set(file,module.exports);
+  const scopedRequire=id=>{if(mocks[id])return mocks[id];const key=id.split('/').at(-1);if(mocks[key])return mocks[key];if(id.startsWith('.')){const candidate=path.posix.normalize(path.posix.join(path.posix.dirname(file),id));return load(fs.existsSync(path.join(base,candidate+'.tsx'))?candidate+'.tsx':candidate+'.ts');}return require(id);};
+  new Function('require','module','exports',output)(scopedRequire,module,module.exports);cache.set(file,module.exports);return module.exports;
+ }
+ return {App:load('App.tsx'),Scanner:load('components/Scanner.tsx').Scanner,helpers:load('lib/ui-actions.ts'),calls,alerts,draft,emit,auth,
+  async background(value){appState.currentState=value;await invoke(()=>events.forEach(fn=>fn(value)));},
+  async changeAccount(next){snapshot=next;await invoke(()=>authListeners.forEach(fn=>fn(snapshot)));},
+  async setPermission(next){permission=next;await invoke(()=>permissionListeners.forEach(fn=>fn(next)));},
+  createProps:{actorId:'owner-111111111111',displayName:'Owner',onCreated:code=>calls.profiles.push(code),leaveGuardRef:{current:null}}};
+}
+test('renderer uses precisely the mobile React runtime',()=>{assert.equal(React.version,'19.2.3');assert.equal(Renderer.version,React.version);});
+test('scanner does not request camera on mount and manual URL opens only the permanent identity',async()=>{
+ const f=fixture(),v=await render(f.Scanner,{onProfile:code=>f.calls.profiles.push(code)});assert.equal(f.calls.requestPermission,0);
+ await invoke(field(v,'QRguitar ID or Profile link').props.onChangeText,'https://qrguitar.com/i/QRG-ABC123?ignored=yes#photo');
+ await invoke(action(v,'Open Profile').props.onPress);assert.deepEqual(f.calls.profiles,['QRG-ABC123']);assert.deepEqual(f.calls.links,[]);
+});
+test('scanner ignores repeated camera events and lets a rejected scan rearm',async()=>{
+ const f=fixture({permission:{granted:true,canAskAgain:true}}),v=await render(f.Scanner,{onProfile:code=>f.calls.profiles.push(code)});
+ const scan=v.root.findByType('CameraView').props.onBarcodeScanned;await invoke(()=>{scan({data:'https://evil.invalid/i/QRG-ABC123'});scan({data:'QRG-ABC123'});});assert.equal(f.calls.profiles.length,0);assert.match(notices(v),/not a QRguitar/);
+ await invoke(action(v,'Scan again').props.onPress);const valid=v.root.findByType('CameraView').props.onBarcodeScanned;
+ await invoke(()=>{valid({data:'QRG-ABC123'});valid({data:'QRG-OTHER'});});assert.deepEqual(f.calls.profiles,['QRG-ABC123']);
+});
+test('denied camera still has manual entry and explicit settings fallback',async()=>{
+ const f=fixture(),v=await render(f.Scanner,{onProfile:()=>{}});await invoke(action(v,'Enable camera').props.onPress);
+ assert.match(notices(v),/not granted/);assert.ok(field(v,'QRguitar ID or Profile link'));await invoke(action(v,'Open device settings').props.onPress);assert.deepEqual(f.calls.links,['settings']);
+});
+test('camera leaves the native tree in background and returns only when active',async()=>{
+ const f=fixture({permission:{granted:true,canAskAgain:true}}),v=await render(f.Scanner,{onProfile:()=>{}});
+ assert.equal(v.root.findAllByType('CameraView').length,1);await f.background('background');assert.equal(v.root.findAllByType('CameraView').length,0);
+ await f.background('active');assert.equal(v.root.findAllByType('CameraView').length,1);
+ await invoke(v.root.findByType('CameraView').props.onMountError);assert.equal(v.root.findAllByType('CameraView').length,0);assert.match(notices(v),/could not start/);
+});
+test('login validates and suppresses a second submission until first resolves',async()=>{
+ const pending=deferred(),f=fixture({signIn:()=>pending.promise}),v=await render(f.App.Login);
+ await invoke(action(v,'Sign in').props.onPress);assert.equal(f.calls.signIn.length,0);
+ await invoke(field(v,'Email').props.onChangeText,'owner@example.invalid');await invoke(field(v,'Password').props.onChangeText,'password123');
+ const submit=v.root.findAllByType('Action').filter(x=>x.props.title==='Sign in').at(-1).props.onPress;await invoke(()=>{submit();submit();});
+ assert.equal(f.calls.signIn.length,1);assert.equal(field(v,'Password').props.editable,false);pending.resolve();await flush();assert.equal(field(v,'Password').props.editable,true);
+});
+test('registration requires consent and reports confirmation without pretending to sign in',async()=>{
+ const f=fixture(),v=await render(f.App.Login);await invoke(action(v,'Create account').props.onPress);
+ await invoke(field(v,'Display name').props.onChangeText,'Owner');await invoke(field(v,'Email').props.onChangeText,'owner@example.invalid');await invoke(field(v,'Password').props.onChangeText,'password123');
+ const submit=()=>v.root.findAllByType('Action').filter(x=>x.props.title==='Create account').at(-1).props.onPress;
+ await invoke(submit());assert.equal(f.calls.signUp.length,0);assert.match(notices(v),/accept the Terms/);
+ await invoke(v.root.findByType('Switch').props.onValueChange,true);await invoke(submit());assert.equal(f.calls.signUp.length,1);assert.match(notices(v),/Check your email/);assert.equal(field(v,'Password').props.value,'');assert.equal(f.calls.signIn.length,0);
+});
+
+const draftInput=(extra={})=>({brand:'Fender',model:'Stratocaster',serial:'',serialNotUsed:true,instrumentType:'Guitar',year:'',condition:'used',visibility:'private',showSerialPublic:false,location:'',summary:'',ownerName:'Owner',...extra});
+const selectedPhoto={id:'photo-111111111111',dataUrl:'data:image/jpeg;base64,cGhvdG8='};
+const savedDraft=(extra={})=>({actorId:'owner-111111111111',input:draftInput(),photos:[selectedPhoto],frozenBody:null,uncertain:false,result:null,...extra});
+const record=(extra={})=>({qrCode:'QRG-ABC123',name:'Private instrument',brand:'Fender',model:'Stratocaster',serial:'PRIVATE-SERIAL-42',visibility:'private',heroImageDataUrl:'https://synthetic.supabase.co/private-image.jpg',galleryImageDataUrls:[],...extra});
+const submitAction=(view,title)=>view.root.findAllByType('Action').filter(node=>node.props.title===title).at(-1);
+async function elapse(ms){await act(async()=>{await new Promise(resolve=>setTimeout(resolve,ms));await tick();});}
+async function update(view,Component,props){await act(async()=>{view.update(React.createElement(Component,props));await tick();});}
+async function unmount(view){await act(()=>view.unmount());mounted.delete(view);}
+
+test('leaving Create saves a partial draft before changing the actual root route',async()=>{
+ const pending=deferred(),f=fixture({saveDraft:()=>pending.promise}),v=await render(f.App.default);
+ await invoke(action(v,'Create Profile').props.onPress);await invoke(field(v,'Brand').props.onChangeText,'Partial brand');
+ const destination=v.root.findAllByType('Pressable').filter(node=>node.props.accessibilityRole==='tab')[2];
+ await invoke(destination.props.onPress);assert.equal(f.calls.save.length,1);assert.equal(f.calls.save[0][0].brand,'Partial brand');assert.equal(f.calls.save[0][0].model,'');assert.deepEqual(f.calls.save[0][1],[]);
+ assert.ok(field(v,'Brand'));assert.equal(field(v,'Brand').props.editable,false);assert.equal(f.calls.dispose,0);
+ pending.resolve();await flush();assert.equal(field(v,'Brand'),undefined);assert.equal(f.calls.dispose,1);assert.equal(f.calls.create.length,0);assert.match(text(v),/Your instruments/);
+});
+test('Create waits for a busy controller and ignores a double tap while awaiting confirmation',async()=>{
+ const pending=deferred(),f=fixture({draft:savedDraft(),create:()=>pending.promise}),v=await render(f.App.Create,f.createProps);
+ await invoke(()=>f.emit({busy:true}));const save=action(v,'Create Profile').props.onPress;
+ await invoke(()=>{save();save();});assert.equal(f.calls.create.length,0);assert.equal(field(v,'Brand').props.editable,false);
+ await invoke(()=>f.emit({busy:false}));assert.equal(f.calls.create.length,1);assert.equal(f.calls.create[0].length,2);assert.equal(f.calls.create[0][0].brand,'Fender');
+ pending.resolve({qrCode:'QRG-CONFIRMED',message:'Saved'});await flush();assert.deepEqual(f.calls.profiles,['QRG-CONFIRMED']);
+});
+test('uncertain Create retries with no replacement input or photos',async()=>{
+ const original=savedDraft({frozenBody:{name:'Exact saved request'},uncertain:true}),f=fixture({draft:original}),v=await render(f.App.Create,f.createProps);
+ assert.equal(field(v,'Brand').props.editable,false);assert.equal(action(v,'Choose photos').props.disabled,true);assert.equal(action(v,'Discard draft').props.disabled,true);
+ await invoke(action(v,'Retry the same save').props.onPress);assert.deepEqual(f.calls.create,[[]]);assert.deepEqual(f.calls.save,[]);
+});
+test('confirmed draft starts another only after pending work finishes and preserves the saved result',async()=>{
+ const original=savedDraft({frozenBody:{name:'Committed'},result:{qrCode:'QRG-SAVED123',message:'Confirmed'}}),f=fixture({draft:original}),v=await render(f.App.Create,f.createProps);
+ await invoke(()=>f.emit({busy:true}));const start=action(v,'Start another Profile').props.onPress;await invoke(()=>{start();start();});assert.equal(f.calls.discard,0);assert.equal(action(v,'Start another Profile').props.loading,true);
+ await invoke(()=>f.emit({busy:false}));assert.equal(f.calls.discard,1);assert.equal(field(v,'Brand').props.value,'');assert.equal(v.root.findAllByType('Image').length,0);assert.equal(original.result.qrCode,'QRG-SAVED123');assert.equal(f.calls.create.length,0);
+});
+test('confirmed Discard waits for busy draft work and suppresses a repeated confirmation',async()=>{
+ const f=fixture({draft:savedDraft()}),v=await render(f.App.Create,f.createProps);await invoke(()=>f.emit({busy:true}));await invoke(action(v,'Discard draft').props.onPress);
+ const discard=f.alerts.at(-1)[2].find(button=>button.text==='Discard').onPress;await invoke(()=>{discard();discard();});assert.equal(f.calls.discard,0);assert.equal(field(v,'Brand').props.editable,false);
+ await invoke(()=>f.emit({busy:false}));assert.equal(f.calls.discard,1);assert.equal(field(v,'Brand').props.value,'');assert.equal(v.root.findAllByType('Image').length,0);
+});
+test('a slow autosave cannot overwrite the next edit and the next edit saves after idle',async()=>{
+ const first=deferred(),f=fixture({saveDraft:input=>input.brand==='First edit'?first.promise:undefined}),v=await render(f.App.Create,f.createProps);
+ await invoke(field(v,'Brand').props.onChangeText,'First edit');await elapse(650);assert.equal(f.calls.save.length,1);assert.equal(f.draft.getState().busy,true);
+ await invoke(field(v,'Brand').props.onChangeText,'Second edit');await elapse(650);assert.equal(f.calls.save.length,1);assert.equal(field(v,'Brand').props.value,'Second edit');
+ first.resolve();await flush();assert.equal(f.calls.save.length,2);assert.equal(f.calls.save[1][0].brand,'Second edit');assert.equal(f.draft.getState().draft.input.brand,'Second edit');assert.equal(field(v,'Brand').props.value,'Second edit');
+});
+test('leave guard locks editing immediately and saves the latest immutable snapshot',async()=>{
+ const pending=deferred(),f=fixture({draft:savedDraft(),saveDraft:()=>pending.promise}),v=await render(f.App.Create,f.createProps);
+ await invoke(field(v,'Brand').props.onChangeText,'Before navigation');const staleChange=field(v,'Brand').props.onChangeText;let leaving;
+ await invoke(()=>{leaving=f.createProps.leaveGuardRef.current();staleChange('Blocked edit');});assert.equal(field(v,'Brand').props.editable,false);assert.equal(field(v,'Brand').props.value,'Before navigation');assert.equal(f.calls.save[0][0].brand,'Before navigation');
+ pending.resolve();await act(async()=>{await leaving;await tick();});assert.equal(field(v,'Brand').props.editable,true);
+});
+test('submit and leave guard serialize while an earlier autosave holds the controller busy',async()=>{
+ const upload=deferred(),f=fixture({draft:savedDraft(),create:async()=>{await upload.promise;const result={qrCode:'QRG-QUEUE123',message:'Saved'};f.emit({draft:savedDraft({frozenBody:{exact:true},result})});return result;}}),v=await render(f.App.Create,f.createProps);
+ await invoke(()=>f.emit({busy:true}));let leaving,finished=false;const save=action(v,'Create Profile').props.onPress;
+ await invoke(()=>{save();leaving=f.createProps.leaveGuardRef.current().then(()=>{finished=true;});});assert.equal(f.calls.create.length,0);assert.equal(f.calls.save.length,0);assert.equal(finished,false);
+ await invoke(()=>f.emit({busy:false}));assert.equal(f.calls.create.length,1);assert.equal(f.calls.save.length,0);assert.equal(finished,false);assert.equal(field(v,'Brand').props.editable,false);
+ await invoke(save);assert.equal(f.calls.create.length,1);upload.resolve();await act(async()=>{await leaving;await tick();});assert.equal(finished,true);assert.equal(f.calls.save.length,0);assert.deepEqual(f.calls.profiles,['QRG-QUEUE123']);
+});
+test('photo picker cancellation keeps existing photos and double taps launch only once',async()=>{
+ const pending=deferred(),f=fixture({draft:savedDraft(),picker:()=>pending.promise}),v=await render(f.App.Create,f.createProps);const choose=action(v,'Choose photos').props.onPress;
+ await invoke(()=>{choose();choose();});assert.equal(f.calls.picker,1);assert.equal(action(v,'Choose photos').props.loading,true);assert.equal(action(v,'Create Profile').props.disabled,true);
+ pending.resolve({canceled:true});await flush();assert.equal(action(v,'Choose photos').props.loading,false);assert.equal(v.root.findAllByType('Image').length,1);assert.equal(notices(v),'');assert.equal(f.calls.create.length,0);
+});
+test('photo picker results arriving after unmount cannot save or create a draft',async()=>{
+ const pending=deferred(),f=fixture({picker:()=>pending.promise}),v=await render(f.App.Create,f.createProps);
+ await invoke(action(v,'Choose photos').props.onPress);await unmount(v);assert.equal(f.calls.dispose,1);assert.equal(f.createProps.leaveGuardRef.current,null);
+ pending.resolve({canceled:false,assets:[{id:'photo-late-123',base64:'bGF0ZQ=='}]});await flush();assert.equal(f.calls.save.length,0);assert.equal(f.calls.create.length,0);assert.equal(f.calls.picker,1);
+});
+test('backgrounding the root hides private Create content without losing its photos or inputs',async()=>{
+ const f=fixture({picker:async()=>({canceled:false,assets:[{id:'selected-111111111',base64:'cGhvdG8='}]})}),v=await render(f.App.default);
+ await invoke(action(v,'Create Profile').props.onPress);await invoke(field(v,'Brand').props.onChangeText,'Background draft');await invoke(action(v,'Choose photos').props.onPress);
+ assert.equal(v.root.findAllByType('Image').length,1);await f.background('background');assert.equal(f.calls.dispose,0);assert.equal(field(v,'Brand').props.value,'Background draft');assert.equal(v.root.findAllByType('Image').length,1);
+ assert.equal(v.root.findByType('KeyboardAvoidingView').props.accessibilityElementsHidden,true);assert.match(text(v),/Return to the app/);
+ await f.background('active');assert.equal(f.calls.dispose,0);assert.equal(field(v,'Brand').props.value,'Background draft');assert.equal(v.root.findAllByType('Image').length,1);assert.equal(v.root.findByType('KeyboardAvoidingView').props.accessibilityElementsHidden,false);
+});
+test('failed owner Profile refresh removes cached private record and photos',async()=>{
+ let reads=0;const privateRecord=record(),f=fixture({api:{readMine:async()=>{if(++reads===1)return privateRecord;throw Error('Owner read failed');}}});
+ const props={code:privateRecord.qrCode,mine:true,snapshot:f.auth.getSnapshot(),active:true,onLibrary:()=>{}},v=await render(f.App.Profile,props);
+ assert.match(text(v),/PRIVATE-SERIAL-42/);assert.ok(v.root.findAllByType('Image').length);
+ await invoke(action(v,'Refresh Profile').props.onPress);assert.equal(reads,2);assert.doesNotMatch(text(v),/PRIVATE-SERIAL-42|Private instrument|private-image/);assert.equal(v.root.findAllByType('Image').length,0);assert.match(text(v),/Profile unavailable/);
+});
+test('failed owner library refresh removes cached instrument cards',async()=>{
+ let reads=0;const f=fixture({api:{listMine:async()=>{if(++reads===1)return[record()];throw Error('Collection read failed');}}});
+ const v=await render(f.App.OwnedRecords,{actorId:'owner-111111111111',revision:1,onOpen:()=>{}});assert.match(text(v),/Private instrument/);
+ await invoke(action(v,'Refresh').props.onPress);assert.equal(reads,2);assert.doesNotMatch(text(v),/Private instrument|private-image/);assert.match(notices(v),/Collection read failed/);
+});
+test('private gallery Modal is hidden whenever active is false and uses no image cache',async()=>{
+ const f=fixture({record:record()}),props={code:'QRG-ABC123',mine:true,snapshot:f.auth.getSnapshot(),active:true,onLibrary:()=>{}},v=await render(f.App.Profile,props);
+ await invoke(v.root.findAllByType('Pressable').find(node=>node.props.accessibilityLabel==='Open photo gallery').props.onPress);assert.equal(v.root.findByType('Modal').props.visible,true);
+ assert.ok(v.root.findAllByType('Image').every(node=>node.props.cachePolicy==='none'));
+ await update(v,f.App.Profile,{...props,active:false});assert.equal(v.root.findByType('Modal').props.visible,false);
+ await update(v,f.App.Profile,props);assert.equal(v.root.findByType('Modal').props.visible,true);
+});
+test('Login error survives root auth revision changes during sign-in',async()=>{
+ const pending=deferred(),signedOut={status:'signed-out',session:null,revision:1,message:''},f=fixture({snapshot:signedOut,signIn:()=>pending.promise}),v=await render(f.App.default);
+ await invoke(action(v,'Create Profile').props.onPress);await invoke(field(v,'Email').props.onChangeText,'owner@example.invalid');await invoke(field(v,'Password').props.onChangeText,'password123');
+ await invoke(submitAction(v,'Sign in').props.onPress);await f.changeAccount({...signedOut,revision:2,status:'error',message:'Session request failed'});
+ assert.equal(field(v,'Email').props.value,'owner@example.invalid');pending.reject(Error('Incorrect password'));await flush();assert.match(notices(v),/Incorrect password/);assert.equal(field(v,'Password').props.editable,true);assert.equal(f.calls.signIn.length,1);
+});
+test('registration confirmation survives root auth revision changes without false login',async()=>{
+ const pending=deferred(),signedOut={status:'signed-out',session:null,revision:1,message:''},f=fixture({snapshot:signedOut,signUp:()=>pending.promise}),v=await render(f.App.default);
+ await invoke(action(v,'Create Profile').props.onPress);await invoke(action(v,'Create account').props.onPress);
+ await invoke(field(v,'Display name').props.onChangeText,'Owner');await invoke(field(v,'Email').props.onChangeText,'owner@example.invalid');await invoke(field(v,'Password').props.onChangeText,'password123');await invoke(v.root.findByType('Switch').props.onValueChange,true);
+ await invoke(submitAction(v,'Create account').props.onPress);await f.changeAccount({...signedOut,revision:2});pending.resolve({requiresEmailConfirmation:true});await flush();
+ assert.match(notices(v),/Check your email/);assert.equal(field(v,'Password').props.value,'');assert.equal(field(v,'Email').props.value,'owner@example.invalid');assert.equal(f.calls.signUp.length,1);assert.equal(f.calls.signIn.length,0);
+});
+test('initial auth restoration preserves a public deep-linked Profile',async()=>{
+ let reads=0;const publicRecord=record({name:'Public deep-link instrument',visibility:'public',serial:''}),f=fixture({snapshot:{status:'loading',session:null,revision:0,message:''},initialUrl:'https://qrguitar.com/i/QRG-ABC123',api:{readPublic:async()=>{reads++;return publicRecord;},readMine:async()=>{throw Error('Unexpected owner read');}}}),v=await render(f.App.default);
+ await flush();assert.match(text(v),/Public deep-link instrument/);
+ await f.changeAccount({status:'signed-in',session:{user:{id:'owner-111111111111',email:'owner@example.invalid',user_metadata:{display_name:'Owner'}}},revision:1,message:''});await flush();
+ assert.match(text(v),/Public deep-link instrument/);assert.equal(action(v,'Full Profile').props.title,'Full Profile');assert.equal(action(v,'Edit in browser'),undefined);assert(reads>=1);
+});
+function busySource(initial=true,{synchronousIdle=false}={}){
+ let busy=initial,removed=0,subscriptions=0;const listeners=new Set();
+ return {getState:()=>({busy}),subscribe(fn){subscriptions++;listeners.add(fn);if(synchronousIdle){busy=false;fn();}return()=>{removed++;listeners.delete(fn);};},set(next){busy=next;for(const fn of[...listeners])fn();},stats:()=>({listeners:listeners.size,removed,subscriptions})};
+}
+test('idle wait unsubscribes after completion and handles synchronous subscribe emission',async()=>{
+ const helper=fixture().helpers.waitForDraftIdle,source=busySource(),abort=new AbortController();const pending=helper(source,abort.signal,1000);assert.equal(source.stats().listeners,1);source.set(false);await pending;abort.abort();assert.deepEqual(source.stats(),{listeners:0,removed:1,subscriptions:1});
+ const synchronous=busySource(true,{synchronousIdle:true});await helper(synchronous,undefined,1000);assert.deepEqual(synchronous.stats(),{listeners:0,removed:1,subscriptions:1});
+ const idle=busySource(false);await helper(idle);assert.equal(idle.stats().subscriptions,0);
+});
+test('idle wait abort and timeout remove subscriptions and reject without hanging',async()=>{
+ const helper=fixture().helpers.waitForDraftIdle,source=busySource(),abort=new AbortController();const pending=helper(source,abort.signal,1000);const rejected=assert.rejects(pending,/no longer active/);abort.abort();await rejected;assert.equal(source.stats().listeners,0);assert.equal(source.stats().removed,1);
+ const expired=busySource();await assert.rejects(helper(expired,undefined,15),/still being saved/);assert.equal(expired.stats().listeners,0);assert.equal(expired.stats().removed,1);
+ const stopped=busySource();await assert.rejects(helper(stopped,AbortSignal.abort()),/no longer active/);assert.equal(stopped.stats().subscriptions,0);
+});
+test('mutation queue keeps later work locked through a rejected predecessor',async()=>{
+ const queue=fixture().helpers.createUiMutationQueue(),first=deferred(),second=deferred(),events=[];let changes=0;const unsub=queue.subscribe(()=>changes++);
+ const one=queue.run(async()=>{events.push('first');await first.promise;});const rejected=assert.rejects(one,/synthetic failure/);const two=queue.run(async()=>{events.push('second');await second.promise;});assert.equal(queue.getBusy(),true);await tick();assert.deepEqual(events,['first']);
+ first.reject(Error('synthetic failure'));await rejected;await tick();assert.deepEqual(events,['first','second']);assert.equal(queue.getBusy(),true);second.resolve();await two;assert.equal(queue.getBusy(),false);assert.equal(changes,4);unsub();
+});
+

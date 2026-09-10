@@ -1,5 +1,9 @@
-import assert from"node:assert/strict";import fs from"node:fs";import os from"node:os";import path from"node:path";import{pathToFileURL}from"node:url";import ts from"typescript";import{readRepo}from"./atomic-test-support.mjs";
-const runtime=fs.mkdtempSync(path.join(os.tmpdir(),"qrguitar-registry-api-"));
+import assert from"node:assert/strict";import fs from"node:fs";import os from"node:os";import path from"node:path";import{pathToFileURL}from"node:url";import{createRequire}from"node:module";import{fileURLToPath}from"node:url";
+const testRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"../../..");
+const sourceRoot=process.env.QRGUITAR_SOURCE_ROOT||testRoot;
+const ts=createRequire(path.join(sourceRoot,"package.json"))("typescript");
+const readRepo=relative=>fs.readFileSync(fs.existsSync(path.join(testRoot,relative))?path.join(testRoot,relative):path.join(sourceRoot,relative),"utf8");
+const runtime=fs.mkdtempSync(path.join(process.env.QRGUITAR_TEST_RUNTIME||os.tmpdir(),"qrguitar-registry-api-"));
 function compile(source,name){const file=path.join(runtime,name+".mjs");fs.writeFileSync(file,ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText);return pathToFileURL(file).href;}
 const{removeUnreferencedStagedUploads}=await import(compile(readRepo("apps/web/lib/staged-upload-cleanup.ts"),"cleanup-helper"));
 const owner="10000000-0000-4000-8000-000000000001",upload="registry-session-1234",photo=owner+"/profile-uploads/"+upload+"/image-01-test.jpg",doc=owner+"/profile-uploads/"+upload+"/document-01-test.pdf";
@@ -31,9 +35,12 @@ await test("malformed or broadened cleanup response never broadens authorization
 await test("Storage failure reports failure without reversing the tombstone",async()=>{
  const db=backend({removeError:{message:"HTTP timeout"}});assert.equal(await removeUnreferencedStagedUploads(db,owner,upload,[photo],[]),false);assert.deepEqual(db.events.map(e=>e.kind),["rpc","remove"]);
 });
+const protocolUrl=compile(readRepo("apps/web/lib/profile-upload-protocol.ts"),"profile-upload-protocol");
 const uploaderSource=readRepo("apps/web/app/api/instruments/uploads/route.ts").replace(/^import .*$/gm,"");
 const prelude=`
 import{isOwnedStagedPath,removeUnreferencedStagedUploads}from"./cleanup-helper.mjs";
+import{MAX_PROFILE_UPLOAD_BYTES,MAX_INLINE_PROFILE_UPLOAD_BYTES,MAX_PROFILE_UPLOAD_JSON_BYTES,MAX_PROFILE_UPLOAD_CONTROL_BYTES,cleanProfileUploadId,cleanProfileFileId,allowedProfileUpload,profileUploadBucket,profileUploadPath,profileUploadExtension,validProfileSignedUploadUrl}from"${protocolUrl}";
+const getSupabaseEnvStatus=()=>({supabaseUrl:"https://synthetic.supabase.co"});
 let current;export function setBackend(db){current=db;}
 const randomUUID=()=>"generated-unique-file";
 const NextResponse={json:(body,options={})=>({body,status:options.status||200})};
@@ -46,7 +53,7 @@ function uploadBackend({uploadError=null,registrationError=null,registrationThro
  const events=[];return{events,storage:{from(bucket){return{async upload(path,bytes,options){events.push({kind:"upload",bucket,path});return{error:uploadError};},remove(){throw new Error("Registration failure must retain the object");}}}},
  async rpc(name,args){events.push({kind:"register",name,args});if(registrationThrows)throw new Error("timeout");return{error:registrationError,data:{ok:true,state:"staged"}};}};
 }
-async function uploadRequest(db){uploader.setBackend(db);return uploader.POST({json:async()=>({uploadId:upload,kind:"image",dataUrl:"data:image/jpeg;base64,/9j/4A==",index:0})});}
+async function uploadRequest(db){uploader.setBackend(db);return uploader.POST(new Request("https://qrguitar.invalid/api/instruments/uploads",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({uploadId:upload,kind:"image",dataUrl:"data:image/jpeg;base64,/9j/4A==",index:0})}));}
 await test("upload response is successful only after object upload and registry registration",async()=>{
  const db=uploadBackend(),result=await uploadRequest(db);assert.equal(result.body.ok,true);assert.deepEqual(db.events.map(e=>e.kind),["upload","register"]);
  assert.equal(db.events[1].name,"register_staged_instrument_upload");assert.equal(db.events[1].args.p_storage_path,result.body.storagePath);

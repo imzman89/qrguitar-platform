@@ -1,10 +1,11 @@
 "use client";
 
+import { uploadProfileFile, dataUrlToProfileFile } from "../../lib/profile-upload-client";
 import { ownerProfileHref } from "../../lib/owner-profile";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { InstrumentPreview } from "../../components/InstrumentPreview";
 import { Nav } from "../../components/Nav";
@@ -74,10 +75,11 @@ function makeClientKey() {
 export default function CreatePage() {
   const content = useSiteContent();
   const router = useRouter();
+  const uploadFileIds = useRef(new Map<string,string>());
   const [message, setMessage] = useState("");
   const [honeypot, setHoneypot] = useState("");
   const [authChecked, setAuthChecked] = useState(false);
-  const [user, setUser] = useState<{ email?: string; user_metadata?: Record<string, unknown> } | null>(null);
+  const [user, setUser] = useState<{ id: string; email?: string; user_metadata?: Record<string, unknown> } | null>(null);
   const [form, setForm] = useState({
     name: "",
     brand: "",
@@ -266,6 +268,7 @@ export default function CreatePage() {
   }
 
   function removePhoto(imageUrl: string) {
+    uploadFileIds.current.delete("image:" + imageUrl);
     const stagedPath = photoUploads[imageUrl]?.storagePath;
     setGalleryImages((current) => {
       const next = current.filter((item) => item !== imageUrl);
@@ -303,18 +306,18 @@ export default function CreatePage() {
     }).catch(() => null);
   }
 
-  async function uploadStagedFile(kind: "image" | "document", dataUrl: string, index: number) {
-    const token = await getSupabaseAccessToken();
-    const response = await fetch("/api/instruments/uploads", {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-      body: JSON.stringify({ uploadId, kind, dataUrl, index })
-    });
-    const result = await response.json().catch(() => null) as { ok?: boolean; storagePath?: string; message?: string; code?: string } | null;
-    if (!response.ok || !result?.ok || !result.storagePath) {
-      throw new Error(result?.message || (response.status === 401 ? "Your session expired. Sign in again, then retry." : "Upload failed. Retry this file."));
-    }
-    return result.storagePath;
+  async function uploadStagedFile(kind: "image" | "document", dataUrl: string, _index: number) {
+    const expectedOwnerId = user?.id;
+    if (!expectedOwnerId) throw new Error("Sign in again before uploading.");
+    const identity = kind + ":" + dataUrl;
+    let fileId = uploadFileIds.current.get(identity);
+    if (!fileId) { fileId = crypto.randomUUID(); uploadFileIds.current.set(identity,fileId); }
+    return uploadProfileFile({file:dataUrlToProfileFile(dataUrl),uploadId,fileId,kind,expectedOwnerId,
+      tokenForOwner:async()=>{
+        const {data} = await createBrowserSupabaseClient().auth.getSession();
+        if (data.session?.user.id !== expectedOwnerId) throw new Error("The account changed. Return to the original account before retrying.");
+        return data.session.access_token;
+      }});
   }
 
   async function uploadWithConcurrency<T>(items: T[], worker: (item: T, index: number) => Promise<void>, concurrency = 3) {
@@ -368,6 +371,7 @@ export default function CreatePage() {
   }
 
   function clearStagedPathsAfterServerCleanup() {
+    uploadFileIds.current.clear();
     setPhotoUploads((current) => Object.fromEntries(Object.entries(current).map(([key]) => [key, { state: "ready" }])));
     setDocuments((current) => current.map((document) => ({ ...document, storagePath: undefined, uploadState: "ready", uploadMessage: undefined })));
   }
@@ -682,7 +686,7 @@ export default function CreatePage() {
                       {fieldErrors.customLinks ? <span className="field-error" role="alert">{fieldErrors.customLinks}</span> : null}
                     </div>
                     <label className="create-photo-drop compact" htmlFor="profileDocuments"><strong>Add documents (optional)</strong><span>Receipts, appraisals, invoices, build sheets, or service slips. New documents stay private by default.</span><input id="profileDocuments" type="file" accept="application/pdf,image/png,image/jpeg,image/webp" multiple onChange={(event) => void addDocuments(event.target.files)} /></label>
-                    {documents.length ? <div className="create-document-list">{documents.map((document) => <div key={document.id}><div><strong>{document.name}</strong><span>{document.uploadMessage || (document.visibility === "public" ? "Public document" : "Private document")}</span></div><select aria-label={`${document.name} visibility`} value={document.visibility} onChange={(event) => setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, visibility: event.target.value as "public" | "hidden" } : item))}><option value="hidden">Private</option><option value="public">Public</option></select><button type="button" onClick={() => { if (document.storagePath) void cleanupStagedPaths([document.storagePath]); setDocuments((current) => current.filter((item) => item.id !== document.id)); }}>Remove</button></div>)}</div> : null}
+                    {documents.length ? <div className="create-document-list">{documents.map((document) => <div key={document.id}><div><strong>{document.name}</strong><span>{document.uploadMessage || (document.visibility === "public" ? "Public document" : "Private document")}</span></div><select aria-label={`${document.name} visibility`} value={document.visibility} onChange={(event) => setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, visibility: event.target.value as "public" | "hidden" } : item))}><option value="hidden">Private</option><option value="public">Public</option></select><button type="button" onClick={() => { uploadFileIds.current.delete("document:" + document.dataUrl); if (document.storagePath) void cleanupStagedPaths([document.storagePath]); setDocuments((current) => current.filter((item) => item.id !== document.id)); }}>Remove</button></div>)}</div> : null}
                   </details>
                   <p className="fine-print">Originality describes disclosed modification status. It does not mean QRguitar verification or authenticity confirmation.</p>
                 </section>

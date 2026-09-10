@@ -93,8 +93,9 @@ ok(migration.indexOf("insert into public.guitar_timeline_events") < migration.in
 
 // Structural UI smoke checks. Atomic rollback, idempotency and authorization are
 // exercised against actual route code and SQL by test:atomic-profiles in CI.
+// Signed upload bounds, capabilities and retry outcomes execute in test:signed-uploads.
 ok(uploadApi.includes('export async function POST') && uploadApi.includes('export async function DELETE'), "Staged upload create/cleanup routes missing");
-ok(uploadApi.includes("assertAccountCanWrite") && uploadApi.includes("MAX_STAGED_FILE_BYTES") && uploadApi.includes("profile-uploads"), "Staged upload authorization or limits missing");
+ok(uploadApi.includes("assertAccountCanWrite") && uploadApi.includes("MAX_PROFILE_UPLOAD_BYTES") && uploadApi.includes("MAX_PROFILE_UPLOAD_JSON_BYTES") && uploadApi.includes("boundedBody") && uploadApi.includes("profile-uploads"), "Staged upload authorization or limits missing");
 ok(createPage.includes("uploadWithConcurrency") && createPage.includes("concurrency = 3") && createPage.includes("stageSelectedFiles") && createPage.includes("cleanupUploads"), "Create upload orchestration missing");
 ok(createPage.includes("PhotoOrganizer") && createPage.includes("Add at least one clear instrument photo") && createPage.includes("no more than 20 photos"), "Create photo requirements missing");
 ok(!createPage.includes("QR customization"), "Create still includes premature QR customization");

@@ -14,7 +14,7 @@ export type BulkRequest = {
 export type BulkAttempt = {
   uploadId: string; idempotencyKey: string;
   phase: "prepared" | "submitting" | "uncertain" | "failed" | "complete";
-  body?: BulkRequest; qrCode?: string;
+  body?: BulkRequest; qrCode?: string; uploadGeneration?: number;
 };
 export type BulkRow = {
   rowNumber: number; brand: string; model: string; serial: string; serialNotUsed: boolean;
@@ -226,7 +226,7 @@ export async function runBulkImport(initialRows: BulkRow[], ports: ImportPorts) 
       const nextAttempt: BulkAttempt = { ...attempt, phase: uncertain ? "uncertain" : "failed" };
       // This 409 guarantees no commit. Keep both keys and row data; retry stages the photo again.
       // Generic cleanup hints, timeouts and unknown outcomes keep the exact submitted body.
-      if (resetUploads) delete nextAttempt.body;
+      if (resetUploads) { delete nextAttempt.body; nextAttempt.uploadGeneration = (attempt.uploadGeneration || 0) + 1; }
       save(index, { ...row, attempt: nextAttempt, result: result.message || "Could not create this Profile. Retry this row." });
       if (uncertain) { stoppedReason = "One request still needs confirmation. Retry to check it before continuing the remaining rows."; break; }
     }
@@ -243,6 +243,7 @@ export function readBulkDraft(serialized: string, ownerId: string): BulkDraft {
     if (!row || !Number.isInteger(row.rowNumber) || strings.some((key) => typeof row[key] !== "string") || typeof row.serialNotUsed !== "boolean" || typeof row.showSerialPublic !== "boolean" || row.visibility !== "private") throw new Error("The saved import contains an invalid row. Keep the draft and contact QRguitar before retrying it.");
     if (row.attempt) {
       const { attempt } = row;
+      if (attempt.uploadGeneration !== undefined && (!Number.isSafeInteger(attempt.uploadGeneration) || attempt.uploadGeneration < 0 || attempt.uploadGeneration >= Number.MAX_SAFE_INTEGER)) throw new Error("The saved upload retry identity is invalid. Keep this draft before retrying.");
       if (!/^[a-zA-Z0-9-]{12,80}$/.test(attempt.uploadId) || !/^[a-zA-Z0-9-]{12,100}$/.test(attempt.idempotencyKey) || !["prepared", "submitting", "uncertain", "failed", "complete"].includes(attempt.phase)) throw new Error("The saved import is missing a valid retry identity. Keep the draft and contact QRguitar before retrying it.");
       if ((isUncertain(row) || attempt.phase === "complete") && !attempt.body) throw new Error("A submitted row is missing its original request. Keep the draft and contact QRguitar before retrying it.");
       if (attempt.body && (attempt.body.uploadId !== attempt.uploadId || attempt.body.idempotencyKey !== attempt.idempotencyKey || attempt.body.visibility !== "private")) throw new Error("The saved request identity does not match its row. Keep the draft and contact QRguitar before retrying it.");

@@ -1,5 +1,6 @@
 "use client";
 
+import { uploadProfileFile, profileFileId } from "../lib/profile-upload-client";
 import { Clipboard, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DemoInstrument } from "../lib/local-demo";
@@ -206,15 +207,9 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
           catch (error) { setStorageError(error instanceof Error ? error.message : "Import progress could not be saved."); throw error; }
         },
         upload: async (row, uploadId) => {
-          const dataUrl = await remoteImageToDataUrl(row.photo);
-          const token = await tokenForOwner();
-          const response = await fetch("/api/instruments/uploads", {
-            method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-            body: JSON.stringify({ uploadId, kind: "image", dataUrl, index: 0 })
-          });
-          const payload = await response.json().catch(() => null) as { ok?: boolean; storagePath?: string; message?: string } | null;
-          if (!response.ok || !payload?.ok || !payload.storagePath) throw new Error(payload?.message || "The photo could not be staged. Retry this row.");
-          return payload.storagePath;
+          const file = await remoteImageToBlob(row.photo);
+          const fileId = await profileFileId(file,String(row.attempt?.uploadGeneration || 0));
+          return uploadProfileFile({file,uploadId,fileId,kind:"image",expectedOwnerId:ownerId,tokenForOwner});
         },
         create: async (body) => {
           const token = await tokenForOwner();
@@ -327,7 +322,7 @@ function createClientKey() {
     : `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
 }
 
-async function remoteImageToDataUrl(url: string) {
+async function remoteImageToBlob(url: string) {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) throw new Error("The photo URL could not be downloaded.");
   const blob = await response.blob();
@@ -335,10 +330,5 @@ async function remoteImageToDataUrl(url: string) {
     throw new Error("Photo URLs must point to a JPG, PNG, or WebP image.");
   }
   if (blob.size > 12 * 1024 * 1024) throw new Error("Use a photo smaller than 12MB.");
-  return await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(new Error("The photo could not be read."));
-    reader.readAsDataURL(blob);
-  });
+  return blob;
 }

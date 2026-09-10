@@ -34,7 +34,7 @@
     "test:bulk-concurrency": "node scripts/test-bulk-import-concurrency.mjs",
     "test:workflow-security": "node scripts/security/workflow-races.test.mjs && node scripts/security/public-file.test.mjs",
     "test:atomic-profiles": "node scripts/test-atomic-create-db.mjs && node scripts/test-atomic-create-api.mjs && node scripts/test-atomic-edit-db.mjs && node scripts/test-atomic-edit-assets.mjs && node scripts/test-instrument-api-boundaries.mjs",
-    "test:behavior": "npm run test:core-behavior && npm run test:public-data-reliability && npm run test:bulk-import && npm run test:bulk-concurrency && npm run test:security && npm run test:workflow-security && npm run test:atomic-profiles && npm run test:account && npm run test:owner-reads && npm run test:upload-registry && npm run test:transfer-client && npm run test:owner-preview && npm run test:pwa && npm run test:dashboard-client && npm run test:atomic-transfers && npm run test:auxiliary-security && npm run test:instrument-controls && npm run test:release-gate && npm run test:beta-entitlements && npm run test:site-editor-transactions && npm run test:release-readiness && npm run test:dashboard-transfer-regressions && npm run test:preview-sessions",
+    "test:behavior": "npm run test:core-behavior && npm run test:public-data-reliability && npm run test:bulk-import && npm run test:bulk-concurrency && npm run test:security && npm run test:workflow-security && npm run test:atomic-profiles && npm run test:account && npm run test:owner-reads && npm run test:upload-registry && npm run test:transfer-client && npm run test:owner-preview && npm run test:pwa && npm run test:dashboard-client && npm run test:atomic-transfers && npm run test:auxiliary-security && npm run test:instrument-controls && npm run test:release-gate && npm run test:beta-entitlements && npm run test:site-editor-transactions && npm run test:release-readiness && npm run test:dashboard-transfer-regressions && npm run test:preview-sessions && npm run test:signed-uploads",
     "test:account": "node scripts/security/account-route.test.mjs && node scripts/security/account-client.test.mjs && node scripts/security/account-transaction.test.mjs",
     "test:owner-reads": "node --test scripts/test-owner-reads.mjs scripts/test-handout-load.mjs",
     "test:upload-registry": "node scripts/test-staged-upload-registry.mjs && node scripts/test-staged-upload-registry-api.mjs",
@@ -50,7 +50,8 @@
     "test:site-editor-transactions": "node scripts/security/site-editor-transaction.test.mjs && node scripts/security/site-editor-client.test.mjs",
     "test:release-readiness": "node scripts/test-release-readiness-db.mjs",
     "test:dashboard-transfer-regressions": "node scripts/test-dashboard-transfer-regressions.mjs",
-    "test:preview-sessions": "node scripts/security/site-preview-session.test.mjs ../.. && node scripts/security/server-fetch-timeout.test.mjs ../.."
+    "test:preview-sessions": "node scripts/security/site-preview-session.test.mjs ../.. && node scripts/security/server-fetch-timeout.test.mjs ../..",
+    "test:signed-uploads": "node scripts/security/signed-profile-upload.test.mjs"
   },
   "dependencies": {
     "@qrguitar/shared": "*",

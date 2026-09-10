@@ -8,10 +8,57 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.qrguitar.app"
+      "bundleIdentifier": "com.qrguitar.app",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false,
+          "NSAllowsLocalNetworking": true
+        }
+      }
     },
     "android": {
-      "package": "com.qrguitar.app"
-    }
+      "package": "com.qrguitar.app",
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      "expo-status-bar",
+      "expo-image",
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true,
+          "faceIDPermission": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose instrument photos for your QRguitar profile.",
+          "cameraPermission": "Allow QRguitar to scan instrument QR codes.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow QRguitar to scan instrument QR codes.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ],
+      "expo-system-ui"
+    ],
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/qrguitar-icon.png"
+    },
+    "experiments": {
+      "autolinkingModuleResolution": true
+    },
+    "icon": "./assets/qrguitar-icon.png"
   }
 }

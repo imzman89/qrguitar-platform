@@ -1,0 +1,13 @@
+{
+  "baselineXcode": "3.0.1",
+  "baselineUuid": "7.0.3",
+  "untouchedSha256": "bbe95d37258a109611e5fa43adb97b268b2ac7ca1a178954e1ca29a25e36b29e",
+  "operations": {
+    "source file add": "1dae7a49c4996fdfc3010765c4a525746e2cc190fccc8d01ea7a8cb3ea0fa9f3",
+    "resource file add": "3f4bb8a244b56b7d647b87a305ad4d39276cddad186497fd1890841bb166ff8d",
+    "framework add": "4cb0baf8d8bd4ab07515324f13f2216f84f9e7679fee311de032b81cfcf6d07e",
+    "group with source files add": "488928a7c0ef102523129e3fd9e93688a8d43c93d0f13c8c59b363de4207b30e",
+    "source file add/remove": "b1aac003aa66bc7db159b686254b9d72b558dced620b6b1f4a93b7abc8f98d4d",
+    "resource file add/remove": "b1aac003aa66bc7db159b686254b9d72b558dced620b6b1f4a93b7abc8f98d4d"
+  }
+}
