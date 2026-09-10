@@ -43,6 +43,12 @@
 .home :global(.collectible-card--archive .collectible-card-facts strong) { color: #253327; }
 .home :global(.collectible-card--archive .collectible-card-cta) { color: #253327; }
 .home :global(.collectible-card--archive .collectible-card-actions) { border-color: #c4c3b3; }
+.home :global(.collectible-card--archive .collectible-card-facts span) { color: #62695d; }
+.home :global(.collectible-card--archive .collectible-card-collection-link) { color: #4e6248; }
+.home :global(.collectible-card--archive .record-badge) { --badge-text: #4b5c46; }
+.home :global(.collectible-card--archive .record-badge--verified), .home :global(.collectible-card--archive .record-badge--auth-confirmed) { --badge-text: #2f633c; }
+.home :global(.collectible-card--archive .record-badge--safety) { --badge-text: #a12f29; }
+.home :global(.collectible-card--archive .record-badge--unverified), .home :global(.collectible-card--archive .record-badge--auth-unconfirmed), .home :global(.collectible-card--archive .record-badge--sale) { --badge-text: #796038; }
 .home :global(.home-lifecycle-section) { background: #111b17; }
 .home :global(.home-lifecycle-section .grid.three) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border-block: 1px solid #b8c0ae33; counter-reset: process; }
 .home :global(.home-lifecycle-section .card) { counter-increment: process; position: relative; padding: 30px; border: 0; border-right: 1px solid #b8c0ae33; border-radius: 0; background: transparent; box-shadow: none; }
