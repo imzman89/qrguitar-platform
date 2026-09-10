@@ -3,6 +3,8 @@ on:
   push:
     branches: [master]
   pull_request:
+permissions:
+  contents: read
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -18,3 +20,26 @@ jobs:
       - run: npm run test:launch --workspace @qrguitar/web
       - run: npm run test:behavior --workspace @qrguitar/web
       - run: npm audit --workspace @qrguitar/web --audit-level=low --include=dev --include=optional --include=peer
+
+  native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck --workspace @qrguitar/mobile
+      - run: npm run lint --workspace @qrguitar/mobile
+      - run: npm test --workspace @qrguitar/mobile
+      - run: npm audit --audit-level=low --include=dev --include=optional --include=peer
+      - name: Compile native runtimes with non-deployable fixture configuration
+        run: npm run export:all --workspace @qrguitar/mobile -- --source-maps --max-workers 2
+        env:
+          CI: "1"
+          EXPO_NO_TELEMETRY: "1"
+          EXPO_PUBLIC_SUPABASE_URL: https://build-only.supabase.co
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CI_fixture_only_not_for_deployment
+          EXPO_PUBLIC_API_ORIGIN: https://www.qrguitar.com
+      - run: npm run test:runtime-bundles --workspace @qrguitar/mobile
