@@ -53,7 +53,7 @@ function fixture(options={}){
  const requestPermission=async()=>{calls.requestPermission++;permission=options.requestPermission?await options.requestPermission():{granted:false,canAskAgain:false};permissionListeners.forEach(fn=>fn(permission));return permission;};
  const getPermission=async()=>permission;
  const api={listPublic:async()=>[],listMine:async()=>[],readPublic:async()=>options.record,readMine:async()=>options.record,...options.api};
- const bridge={AppState:appState,Platform:{OS:'android'},Alert:{alert:(...args)=>alerts.push(args)},Linking:{openURL:async url=>calls.links.push(url),openSettings:async()=>calls.links.push('settings'),getInitialURL:async()=>options.initialUrl||null,addEventListener:()=>({remove(){}})},BackHandler:{addEventListener:()=>({remove(){}})},Share:{share:async()=>{}},StyleSheet:{create:x=>x,absoluteFill:{position:'absolute'}}};
+ const bridge={AppState:appState,Platform:{OS:options.platform||'android'},Alert:{alert:(...args)=>alerts.push(args)},Linking:{openURL:async url=>calls.links.push(url),openSettings:async()=>calls.links.push('settings'),getInitialURL:async()=>options.initialUrl||null,addEventListener:()=>({remove(){}})},BackHandler:{addEventListener:()=>{calls.backHandlers=(calls.backHandlers||0)+1;return{remove(){}};}},Share:{share:async()=>{}},StyleSheet:{create:x=>x,absoluteFill:{position:'absolute'}}};
  for(const name of ['ActivityIndicator','KeyboardAvoidingView','Modal','Pressable','RefreshControl','ScrollView','Switch','Text','View'])bridge[name]=name;
  const mocks={'react':React,'react-native':bridge,'react-native-safe-area-context':{SafeAreaProvider:'SafeAreaProvider',SafeAreaView:'SafeAreaView'},'expo-status-bar':{StatusBar:'StatusBar'},'expo-image':{Image:'Image'},
   'expo-image-picker':{launchImageLibraryAsync:async()=>{calls.picker++;return options.picker?options.picker():{canceled:true};}},
@@ -244,3 +244,5 @@ test('mutation queue keeps later work locked through a rejected predecessor',asy
  const one=queue.run(async()=>{events.push('first');await first.promise;});const rejected=assert.rejects(one,/synthetic failure/);const two=queue.run(async()=>{events.push('second');await second.promise;});assert.equal(queue.getBusy(),true);await tick();assert.deepEqual(events,['first']);
  first.reject(Error('synthetic failure'));await rejected;await tick();assert.deepEqual(events,['first','second']);assert.equal(queue.getBusy(),true);second.resolve();await two;assert.equal(queue.getBusy(),false);assert.equal(changes,4);unsub();
 });
+
+test('hardware Back handling registers only on Android, without browser or iOS warnings',async()=>{for(const platform of ['web','ios','android']){const f=fixture({platform});await render(f.App.default);assert.equal(f.calls.backHandlers||0,platform==='android'?1:0);}});

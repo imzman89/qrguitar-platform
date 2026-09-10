@@ -1486,6 +1486,7 @@ export default function App() {
     };
   }, [setRoute]);
   useEffect(() => {
+    if (Platform.OS !== "android") return;
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
       if (routeRef.current.name === "browse") return false;
       setRoute({
