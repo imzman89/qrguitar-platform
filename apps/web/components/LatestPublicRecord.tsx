@@ -4,13 +4,14 @@ import { Globe2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { DemoInstrument } from "../lib/local-demo";
 import { CollectibleRecordCard } from "./CollectibleRecordCard";
+import { HomeProfileShowcase } from "./HomeProfileShowcase";
 
 type InstrumentsResponse = {
   ok?: boolean;
   instruments?: DemoInstrument[];
 };
 
-export function LatestPublicRecord({ initialRecord = null, content }: { initialRecord?: DemoInstrument | null; content?: Record<string, string> }) {
+export function LatestPublicRecord({ initialRecord = null, content, presentation = "card" }: { initialRecord?: DemoInstrument | null; content?: Record<string, string>; presentation?: "card" | "showcase" }) {
   const [latest, setLatest] = useState<DemoInstrument | null>(initialRecord);
   const [loaded, setLoaded] = useState(Boolean(initialRecord));
 
@@ -52,6 +53,8 @@ export function LatestPublicRecord({ initialRecord = null, content }: { initialR
       </article>
     );
   }
+
+  if (presentation === "showcase") return <HomeProfileShowcase key={latest.qrCode} record={latest} />;
 
   return (
     <CollectibleRecordCard

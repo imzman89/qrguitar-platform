@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Fingerprint, ShieldCheck, RefreshCw } from "lucide-react";
 import { Fragment, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CollectibleRecordCard } from "./CollectibleRecordCard";
@@ -165,12 +165,17 @@ export function HomePageClient({
             <h1>{copy.hero.headline}</h1>
             <p>{copy.hero.body}</p>
             <div className="hero-actions">
-              <Link className="button" href="/create">{copy.hero.primaryCta}</Link>
+              <Link className="button" href="/create">{copy.hero.primaryCta}<ArrowRight size={17} aria-hidden="true" /></Link>
               <Link className="button secondary" href="/catalog">{copy.hero.secondaryCta}</Link>
             </div>
             <a className={styles.betaNote} href="#pricing">Free during public beta · View plans</a>
           </div>
-          <LatestPublicRecord initialRecord={initialLatestRecord} content={settings?.content} />
+          <div className={styles.heroShowcase}><LatestPublicRecord initialRecord={initialLatestRecord} content={settings?.content} presentation="showcase" /></div>
+        </div>
+        <div className={"shell " + styles.valueStrip} aria-label="What stays with your instrument">
+          <div><Fingerprint size={24} strokeWidth={1.4} aria-hidden="true" /><span><strong>One permanent identity</strong><small>The same Profile. Every chapter.</small></span></div>
+          <div><ShieldCheck size={24} strokeWidth={1.4} aria-hidden="true" /><span><strong>Your privacy, your choice</strong><small>Public, unlisted, or just for you.</small></span></div>
+          <div><RefreshCw size={24} strokeWidth={1.4} aria-hidden="true" /><span><strong>A history that carries forward</strong><small>Service and ownership, connected.</small></span></div>
         </div>
       </section>
     ),
