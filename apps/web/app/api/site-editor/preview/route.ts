@@ -1,81 +1,42 @@
 import { NextResponse } from "next/server";
 import { getAdminContext } from "../../../../lib/admin-auth";
-import {
-  createSitePreviewToken,
-  safePreviewPath,
-  sitePreviewCookie,
-  sitePreviewMaxAge,
-  verifySitePreviewToken
-} from "../../../../lib/site-preview";
+import { createSitePreviewToken, safePreviewPath, sitePreviewCookie, sitePreviewMaxAge } from "../../../../lib/site-preview";
+import { isSitePreviewAuthorized } from "../../../../lib/site-preview-server";
+import { createServerSupabaseClient } from "../../../../lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
 const noStoreHeaders = { "Cache-Control": "no-store, no-cache, must-revalidate", "X-Robots-Tag": "noindex, nofollow" };
-const previewFrameHeaders = {
-  "Content-Security-Policy": "frame-ancestors 'self'",
-  "X-Frame-Options": "SAMEORIGIN"
-};
-
-function getBrowserOrigin(request: Request, fallback: URL) {
-  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
-  const host = forwardedHost || request.headers.get("host");
-  if (!host || !/^[a-z0-9.-]+(?::\d{1,5})?$/i.test(host)) return fallback.origin;
-  const forwardedProtocol = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
-  const protocol = forwardedProtocol === "https" || forwardedProtocol === "http"
-    ? forwardedProtocol
-    : fallback.protocol.replace(":", "");
-  return `${protocol}://${host}`;
+function cookieOptions(request: Request, maxAge: number) {
+  return { httpOnly: true, sameSite: "strict" as const, secure: new URL(request.url).protocol === "https:", path: "/", maxAge };
 }
-
+function crossOrigin(request: Request) {
+  const origin = request.headers.get("origin");
+  return request.headers.get("sec-fetch-site") === "cross-site" || Boolean(origin && origin !== new URL(request.url).origin);
+}
 export async function POST(request: Request) {
+  if (crossOrigin(request)) return NextResponse.json({ ok: false, message: "Same-origin preview request required." }, { status: 403, headers: noStoreHeaders });
   const admin = await getAdminContext(request);
-  if (!admin.ok || !admin.user) {
-    return NextResponse.json({ ok: false, message: admin.message }, { status: admin.status, headers: noStoreHeaders });
-  }
+  if (!admin.ok || !admin.user) return NextResponse.json({ ok: false, message: admin.message }, { status: admin.status, headers: noStoreHeaders });
+  const body = await request.json().catch(() => null) as { expectedActorId?: string; path?: string } | null;
+  if (body?.expectedActorId !== admin.user.id) return NextResponse.json({ ok: false, message: "The signed-in editor changed. Reload Site Editor." }, { status: 403, headers: noStoreHeaders });
   const token = createSitePreviewToken(admin.user.id);
-  if (!token) {
-    return NextResponse.json({ ok: false, message: "Secure preview signing is unavailable." }, { status: 503, headers: noStoreHeaders });
+  if (!token) return NextResponse.json({ ok: false, message: "Secure preview signing is unavailable." }, { status: 503, headers: noStoreHeaders });
+  if (!await isSitePreviewAuthorized(token, createServerSupabaseClient(), admin.user.id)) {
+    return NextResponse.json({ ok: false, message: "Preview access could not be confirmed. Reload Site Editor." }, { status: 403, headers: noStoreHeaders });
   }
-  return NextResponse.json({ ok: true, token, expiresIn: sitePreviewMaxAge }, { headers: noStoreHeaders });
+  // The signed capability is only an HttpOnly cookie, never response JSON or a query URL.
+  const response = NextResponse.json({ ok: true, path: safePreviewPath(body?.path), editorActorId: admin.user.id, expiresIn: sitePreviewMaxAge }, { headers: noStoreHeaders });
+  response.cookies.set(sitePreviewCookie, token, cookieOptions(request, sitePreviewMaxAge));
+  return response;
 }
-
 export async function DELETE(request: Request) {
-  const admin = await getAdminContext(request);
-  if (!admin.ok || !admin.user) {
-    return NextResponse.json({ ok: false, message: admin.message }, { status: admin.status, headers: noStoreHeaders });
-  }
+  if (crossOrigin(request)) return NextResponse.json({ ok: false }, { status: 403, headers: noStoreHeaders });
+  // Clearing one's own browser cookie must work after signout or editor revocation.
   const response = NextResponse.json({ ok: true }, { headers: noStoreHeaders });
-  response.cookies.set(sitePreviewCookie, "published", {
-    httpOnly: true,
-    sameSite: "strict",
-    secure: new URL(request.url).protocol === "https:",
-    path: "/",
-    maxAge: sitePreviewMaxAge
-  });
+  response.cookies.set(sitePreviewCookie, "", cookieOptions(request, 0));
   return response;
 }
-
-export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const token = url.searchParams.get("token");
-  if (!verifySitePreviewToken(token)) {
-    return new NextResponse("Preview link expired. Refresh it from Site Editor.", { status: 401, headers: noStoreHeaders });
-  }
-  const path = safePreviewPath(url.searchParams.get("path"));
-  const response = url.searchParams.get("prepare") === "1"
-    ? NextResponse.json({ ok: true, path }, { headers: noStoreHeaders })
-    : NextResponse.redirect(new URL(`${path}?cmsPreview=draft`, getBrowserOrigin(request, url)), 307);
-  response.headers.set("Cache-Control", noStoreHeaders["Cache-Control"]);
-  response.headers.set("X-Robots-Tag", noStoreHeaders["X-Robots-Tag"]);
-  response.headers.set("Content-Security-Policy", previewFrameHeaders["Content-Security-Policy"]);
-  response.headers.set("X-Frame-Options", previewFrameHeaders["X-Frame-Options"]);
-  response.cookies.set(sitePreviewCookie, token || "", {
-    httpOnly: true,
-    sameSite: "strict",
-    secure: url.protocol === "https:",
-    path: "/",
-    maxAge: sitePreviewMaxAge
-  });
-  return response;
+export async function GET() {
+  return NextResponse.json({ ok: false, message: "Open previews from the signed-in Site Editor." }, { status: 410, headers: noStoreHeaders });
 }

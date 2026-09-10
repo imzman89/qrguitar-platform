@@ -1,9 +1,11 @@
+import { PUT as mutateEditor } from "../site-editor/route";
 import { NextResponse } from "next/server";
 import { revalidatePath, unstable_noStore as noStore } from "next/cache";
 import { createServerSupabaseClient, createServerSupabaseClientWithTimeout, getSupabaseEnvStatus } from "../../../lib/supabase-server";
 import { defaultSiteSettings, mergeSiteSettings, publishedSiteSettingsKey, type EditableSiteSettings } from "../../../lib/site-settings";
 import { getAdminContext } from "../../../lib/admin-auth";
-import { sitePreviewCookie, sitePreviewDraftKey, verifySitePreviewToken } from "../../../lib/site-preview";
+import { isSitePreviewAuthorized } from "../../../lib/site-preview-server";
+import { sitePreviewTokenFromCookie, sitePreviewDraftKey } from "../../../lib/site-preview";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -39,9 +41,7 @@ export async function GET(request: Request) {
     });
   }
 
-  const cookieHeader = request.headers.get("cookie") || "";
-  const previewToken = cookieHeader.match(new RegExp(`(?:^|;\\s*)${sitePreviewCookie}=([^;]+)`))?.[1];
-  const preview = verifySitePreviewToken(previewToken ? decodeURIComponent(previewToken) : "");
+  const preview = await isSitePreviewAuthorized(sitePreviewTokenFromCookie(request.headers.get("cookie") || ""), supabase);
   const { data, error } = await supabase
     .from("site_content")
     .select("content_value")
@@ -59,44 +59,13 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  noStore();
-  const supabase = createServerSupabaseClient();
-  if (!supabase) {
-    return noStoreJson({ ok: false, message: "Supabase site settings are not configured." }, { status: 503 });
-  }
-
-  const admin = await getAdminContext(request);
-  if (!admin.ok) {
-    return noStoreJson({ ok: false, message: admin.message }, { status: admin.status });
-  }
-
-  let body: { settings?: Partial<EditableSiteSettings> };
-  try {
-    body = (await request.json()) as { settings?: Partial<EditableSiteSettings> };
-  } catch {
-    return noStoreJson({ ok: false, message: "Invalid settings payload." }, { status: 400 });
-  }
-
-  const settings = mergeSiteSettings(body.settings);
-  const { error: saveError } = await supabase.from("site_content").upsert(
-    {
-      content_key: publishedSiteSettingsKey,
-      content_value: settings,
-      updated_at: new Date().toISOString()
-    },
-    { onConflict: "content_key" }
-  );
-
-  if (saveError) {
-    return noStoreJson({ ok: false, message: `Could not publish site settings: ${saveError.message}` }, { status: 500 });
-  }
-
-  revalidatePath("/");
-  revalidatePath("/api/site-settings");
-
-  return noStoreJson({ ok: true, message: "Published globally.", contentKey: publishedSiteSettingsKey, settings });
+  let body: Record<string, unknown>;
+  try { body = await request.json(); if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error(); }
+  catch { return noStoreJson({ ok: false, uncertain: false, message: "Invalid settings payload." }, { status: 400 }); }
+  // Legacy clients without versions fail closed in the shared editor endpoint.
+  const response = await mutateEditor(new Request(request.url, { method: "PUT", headers: request.headers,
+    body: JSON.stringify({ ...body, action: "publish", source: "brand_logo_admin" }) }));
+  const payload = await response.json();
+  return noStoreJson({ ...payload, ...(payload.ok === true ? { settings: payload.published } : {}) }, { status: response.status });
 }
-
-export async function PATCH(request: Request) {
-  return PUT(request);
-}
+export async function PATCH(request: Request) { return PUT(request); }

@@ -31,11 +31,16 @@ export async function POST(request: Request) {
   }
 
   const handleRow = await supabase.from("site_content").select("content_value").eq("content_key", publicCollectionHandleKey(handle)).maybeSingle<{ content_value?: { ownerId?: string } }>();
+  if (handleRow.error) return json({ ok: false, message: "This collection is temporarily unavailable." }, 503);
   const ownerId = String(handleRow.data?.content_value?.ownerId || "");
   if (!ownerId) return json({ ok: false, message: "This collection is unavailable." }, 404);
   if (ownerId === auth.user.id) return json({ ok: false, message: "This is your collection. Use Account to manage its contact settings." }, 400);
 
   const ownerRow = await supabase.from("site_content").select("content_value").eq("content_key", publicCollectionOwnerKey(ownerId)).maybeSingle<{ content_value?: Record<string, unknown> }>();
+  if (ownerRow.error) return json({ ok: false, message: "This collection is temporarily unavailable." }, 503);
+  const ownerProfile = await supabase.from("profiles").select("account_status,hide_public_content").eq("id", ownerId).maybeSingle<{ account_status?: string | null; hide_public_content?: boolean | null }>();
+  if (ownerProfile.error) return json({ ok: false, message: "This collection is temporarily unavailable." }, 503);
+  if (ownerProfile.data?.hide_public_content || ["banned", "removed"].includes(ownerProfile.data?.account_status || "")) return json({ ok: false, message: "This collection is unavailable." }, 404);
   const collection = cleanPublicCollection({ ...(ownerRow.data?.content_value || {}), ownerId });
   if (!collection.enabled || collection.handle !== handle || !collection.allowMessages) {
     return json({ ok: false, message: "Private inquiries are not enabled for this collection." }, 403);
@@ -51,7 +56,7 @@ export async function POST(request: Request) {
 
   let profileContext = "";
   if (/^QRG-[A-Z0-9-]{4,40}$/.test(profileCode)) {
-    const record = await supabase.from("guitars").select("qr_code,name,brand,model").eq("qr_code", profileCode).eq("owner_id", ownerId).eq("visibility", "public").is("owner_removed_at", null).maybeSingle<{ qr_code?: string; name?: string | null; brand?: string | null; model?: string | null }>();
+    const record = await supabase.from("guitars").select("qr_code,name,brand,model").eq("qr_code", profileCode).eq("owner_id", ownerId).eq("visibility", "public").is("owner_removed_at", null).is("admin_archived_at", null).maybeSingle<{ qr_code?: string; name?: string | null; brand?: string | null; model?: string | null }>();
     if (record.data?.qr_code) profileContext = `${record.data.name || [record.data.brand, record.data.model].filter(Boolean).join(" ") || "QRguitar Profile"} (${record.data.qr_code})`;
   }
 

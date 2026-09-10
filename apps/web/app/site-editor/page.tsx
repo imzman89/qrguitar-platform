@@ -53,7 +53,9 @@ import {
   type EditableSiteSettings,
   type EditorialPageKey
 } from "../../lib/site-settings";
-import { getSupabaseAccessToken } from "../../lib/supabase-browser";
+import { createEditorMutationController, EditorMutationError, shouldReplaceEditorContent, type EditorMutationPayload } from "../../lib/site-editor-client";
+import { clearSitePreviewCookie, openSiteDraftPreview, sitePreviewGeneration, sitePreviewInvalidatedEvent } from "../../lib/site-preview-client";
+import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
 
 type PreviewDevice = "desktop" | "tablet" | "mobile";
 type PreviewSource = "draft" | "published";
@@ -73,6 +75,7 @@ type Revision = {
 };
 
 type SiteEditorPayload = {
+  editorActorId?: string; publishedVersion?: string; draftVersion?: string; committed?: boolean; requestId?: string; superseded?: boolean;
   ok?: boolean;
   message?: string;
   published?: EditableSiteSettings;
@@ -209,7 +212,21 @@ function emailPreviewValue(value: string) {
 
 export default function SiteEditorPage() {
   const [selected, setSelected] = useState<SelectedPage>({ area: "Marketing", page: "Homepage" });
-  const [settings, setSettings] = useState<EditableSiteSettings>(defaultSiteSettings);
+  const [settings, setSettingsState] = useState<EditableSiteSettings>(defaultSiteSettings);
+  const settingsRef = useRef(settings);
+  function setSettings(next: EditableSiteSettings | ((current: EditableSiteSettings) => EditableSiteSettings)) {
+    const value = typeof next === "function" ? next(settingsRef.current) : next;
+    settingsRef.current = value; setSettingsState(value);
+  }
+  const versionsRef = useRef({ publishedVersion: "", draftVersion: "" });
+  const actorRef = useRef("");
+  const mutationsRef = useRef<ReturnType<typeof createEditorMutationController> | null>(null);
+  const writeTask = useRef<Promise<void> | null>(null);
+  const manualPending = useRef(false);
+  const [writeBusy, setWriteBusy] = useState(false);
+  const [editorIssue, setEditorIssueState] = useState<"" | "conflict" | "uncertain" | "error">("");
+  const issueRef = useRef(editorIssue);
+  function setEditorIssue(value: typeof editorIssue) { issueRef.current = value; setEditorIssueState(value); }
   const [published, setPublished] = useState<EditableSiteSettings>(defaultSiteSettings);
   const [publishedAt, setPublishedAt] = useState("");
   const [draftMeta, setDraftMeta] = useState<SiteEditorPayload["draftMeta"]>(null);
@@ -285,94 +302,143 @@ export default function SiteEditorPage() {
     return () => window.removeEventListener("resize", updatePreviewLayout);
   }, []);
 
-  function applyPayload(payload: SiteEditorPayload, preferDraft = true) {
-    if (payload.published) {
-      const nextPublished = hydrateLegacyContent(mergeSiteSettings(payload.published));
-      setPublished(nextPublished);
-      setPublishedAt(payload.publishedAt || "");
-      const next = preferDraft && payload.draft ? hydrateLegacyContent(mergeSiteSettings(payload.draft)) : nextPublished;
-      setSettings(next);
-      setAdvancedJson(JSON.stringify(next, null, 2));
-      lastServerDraft.current = payload.draft ? JSON.stringify(next) : "";
-      applyThemeSettings(next);
+  function applyPayload(payload: SiteEditorPayload, preferDraft = true, submittedSnapshot?: string) {
+    if (typeof payload.publishedVersion !== "string" || typeof payload.draftVersion !== "string" || !payload.published) throw new Error("Incomplete editor snapshot.");
+    versionsRef.current = { publishedVersion: payload.publishedVersion, draftVersion: payload.draftVersion };
+    const nextPublished = hydrateLegacyContent(mergeSiteSettings(payload.published));
+    const nextDraft = payload.draft ? hydrateLegacyContent(mergeSiteSettings(payload.draft)) : null;
+    setPublished(nextPublished);
+    setPublishedAt(payload.publishedAt || "");
+    const next = preferDraft && nextDraft ? nextDraft : nextPublished;
+    lastServerDraft.current = nextDraft ? JSON.stringify(nextDraft) : "";
+    if (submittedSnapshot === undefined || shouldReplaceEditorContent(JSON.stringify(settingsRef.current), submittedSnapshot)) {
+      setSettings(next); setAdvancedJson(JSON.stringify(next, null, 2)); applyThemeSettings(next);
     }
-    setDraftMeta(payload.draftMeta || null);
-    setRevisions(payload.revisions || []);
+    setDraftMeta(payload.draftMeta || null); setRevisions(payload.revisions || []);
   }
 
-  async function api(action?: string, body: Record<string, unknown> = {}) {
+  async function api() {
     const token = await getSupabaseAccessToken();
     if (!token) throw new Error("Sign in with an authorized admin account.");
-    const response = await fetch("/api/site-editor", {
-      method: action ? "PUT" : "GET",
-      headers: { Authorization: `Bearer ${token}`, ...(action ? { "Content-Type": "application/json" } : {}) },
-      cache: "no-store",
-      body: action ? JSON.stringify({ action, ...body }) : undefined
-    });
+    const response = await fetch("/api/site-editor", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
     const payload = (await response.json().catch(() => ({}))) as SiteEditorPayload;
-    if (!response.ok) {
-      const error = new Error(payload.message || "Site Editor request failed.") as Error & { payload?: SiteEditorPayload };
-      error.payload = payload;
-      throw error;
-    }
+    if (!response.ok || payload.ok !== true || typeof payload.editorActorId !== "string") throw new Error(payload.message || "Could not load Site Editor state.");
     return payload;
   }
 
-  async function saveDraft(nextSettings: EditableSiteSettings) {
-    return api("save_draft", {
-      settings: nextSettings,
-      basePublishedAt: draftMeta?.basePublishedAt || publishedAt,
-      note: "Autosaved draft",
-      area: `${selected.area} / ${selected.page}`
+  function initializeMutations(actorId: string) {
+    actorRef.current = actorId;
+    const controller = createEditorMutationController({ actorId, storage: window.sessionStorage, uuid: () => crypto.randomUUID(),
+      send: async (body) => {
+        const token = await getSupabaseAccessToken();
+        if (!token) return { status: 401, payload: { ok: false, uncertain: false, message: "Sign in with an authorized admin account." } };
+        const abort = new AbortController(); const timer = window.setTimeout(() => abort.abort(), 20000);
+        try {
+          const response = await fetch("/api/site-editor", { method: "PUT", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, cache: "no-store", body, signal: abort.signal });
+          return { status: response.status, payload: await response.json().catch(() => ({})) as EditorMutationPayload };
+        } finally { window.clearTimeout(timer); }
+      }
     });
+    mutationsRef.current = controller;
+    if (controller.pending) {
+      let recovered = controller.pending.localSnapshot;
+      try { recovered = window.localStorage.getItem(`${crashRecoveryKey}:${actorId}`) || recovered; } catch { /* request snapshot remains available */ }
+      try { setSettings(hydrateLegacyContent(mergeSiteSettings(JSON.parse(recovered)))); } catch { /* keep server copy visible */ }
+      setEditorIssue("uncertain"); setStatus("error"); setMessage("A previous save needs confirmation. Retry it before making another change.");
+    } else if (controller.storageProblem) {
+      setEditorIssue("error"); setStatus("error"); setMessage("Recovery storage is unavailable. Export your local changes before reloading.");
+    }
+  }
+
+  async function executeEditor(action: string, body: Record<string, unknown> = {}, manual = false, retry = false) {
+    if (manual && manualPending.current) return;
+    if (manual) manualPending.current = true;
+    try {
+      if (writeTask.current) {
+        if (!manual) return;
+        await writeTask.current;
+      }
+      const controller = mutationsRef.current;
+      if (!controller || (issueRef.current && !retry)) return;
+      const localSnapshot = retry ? controller.pending?.localSnapshot || JSON.stringify(settingsRef.current) : JSON.stringify(settingsRef.current);
+      const submitted = settingsRef.current;
+      if (!retry && action === "publish") {
+        const validation = validateContentValues(submitted.content);
+        const text = contrastRatio(submitted.colors.text, submitted.colors.background);
+        const buttons = contrastRatio(submitted.colors.background, submitted.colors.cream);
+        setErrors(validation);
+        if (Object.keys(validation).length || text === null || buttons === null || text < 4.5 || buttons < 4.5) {
+          setStatus("error"); setMessage("Fix highlighted content and ensure primary text and actions meet 4.5:1 contrast before publishing."); return;
+        }
+      }
+      const operation = (async () => {
+        setWriteBusy(true); setStatus("saving");
+        try {
+          const payload = await (retry ? controller.retry() : controller.mutate({ action, ...body, ...(["save_draft", "publish"].includes(action) ? { settings: submitted } : {}) }, versionsRef.current, localSnapshot)) as SiteEditorPayload;
+          if (mutationsRef.current !== controller) return;
+          applyPayload(payload, true, localSnapshot);
+          const serverSnapshot = JSON.stringify(payload.draft ? hydrateLegacyContent(mergeSiteSettings(payload.draft)) : hydrateLegacyContent(mergeSiteSettings(payload.published)));
+          const newerEdits = JSON.stringify(settingsRef.current) !== serverSnapshot;
+          if (payload.superseded) {
+            setEditorIssue("conflict"); setStatus("error"); setMessage("Your previous change was saved. Another edit followed it; export local changes and reload before continuing.");
+          } else {
+            setEditorIssue(""); setStatus(newerEdits ? "dirty" : "saved");
+            setMessage((payload.message || "Saved successfully.") + (newerEdits ? " Newer local edits are waiting to save." : ""));
+          }
+          if (!newerEdits) { try { window.localStorage.removeItem(`${crashRecoveryKey}:${actorRef.current}`); } catch { /* already committed */ } }
+          setPreviewVersion((value) => value + 1);
+        } catch (error) {
+          if (mutationsRef.current !== controller) return;
+          const failure = error instanceof EditorMutationError ? error : null;
+          setEditorIssue(failure?.uncertain ? "uncertain" : failure?.payload.conflict ? "conflict" : "error");
+          setErrors(failure?.payload.errors || {}); setStatus("error");
+          setMessage(error instanceof Error ? error.message : "The save could not be confirmed.");
+        } finally { setWriteBusy(false); }
+      })();
+      writeTask.current = operation;
+      await operation;
+      if (writeTask.current === operation) writeTask.current = null;
+    } finally { if (manual) manualPending.current = false; }
+  }
+
+  function exportLocalChanges() {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(settingsRef.current, null, 2)], { type: "application/json" }));
+    const anchor = document.createElement("a"); anchor.href = url; anchor.download = "qrguitar-editor-local-changes.json"; anchor.click(); URL.revokeObjectURL(url);
   }
 
   async function issueDraftPreview(path: string) {
-    const token = await getSupabaseAccessToken();
-    if (!token) throw new Error("Sign in with an authorized admin account.");
-    const response = await fetch("/api/site-editor/preview", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store"
+    return openSiteDraftPreview(path, actorRef.current, async () => {
+      const { data } = await createBrowserSupabaseClient().auth.getSession();
+      return { userId: data.session?.user.id || "", accessToken: data.session?.access_token || "" };
     });
-    const payload = (await response.json().catch(() => ({}))) as { ok?: boolean; token?: string; message?: string };
-    if (!response.ok || !payload.token) throw new Error(payload.message || "Could not authorize the draft preview.");
-    const authorizationUrl = `/api/site-editor/preview?prepare=1&token=${encodeURIComponent(payload.token)}&path=${encodeURIComponent(path)}`;
-    const authorization = await fetch(authorizationUrl, {
-      cache: "no-store",
-      credentials: "same-origin"
-    });
-    const authorizedPreview = (await authorization.json().catch(() => ({}))) as { ok?: boolean; path?: string };
-    if (!authorization.ok || !authorizedPreview.ok || !authorizedPreview.path) {
-      throw new Error("Could not open the authorized draft preview.");
-    }
-    return `${authorizedPreview.path}${authorizedPreview.path.includes("?") ? "&" : "?"}cmsPreview=draft`;
   }
+  async function clearDraftPreview() { await clearSitePreviewCookie(); }
 
-  async function clearDraftPreview() {
-    const token = await getSupabaseAccessToken();
-    if (!token) throw new Error("Sign in with an authorized admin account.");
-    const response = await fetch("/api/site-editor/preview", {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store"
-    });
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => ({}))) as { message?: string };
-      throw new Error(payload.message || "Could not load the published preview.");
-    }
-  }
+  useEffect(() => {
+    const invalidate = () => {
+      actorRef.current = ""; mutationsRef.current = null; loaded.current = false;
+      setAuthorized(false); setPreviewUrl(""); setPreviewOpen(false);
+      setSettings(defaultSiteSettings); setPublished(defaultSiteSettings); setAdvancedJson("");
+      setDraftMeta(null); setRevisions([]); setNote(""); setConfirmAction(null);
+      setPreviewError("The signed-in account changed. Reload Site Editor before previewing.");
+      setStatus("error"); setMessage("Your account changed. Reload Site Editor to continue.");
+    };
+    window.addEventListener(sitePreviewInvalidatedEvent, invalidate);
+    return () => window.removeEventListener(sitePreviewInvalidatedEvent, invalidate);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
+    const started = sitePreviewGeneration();
     void api()
       .then((payload) => {
-        if (cancelled) return;
+        if (cancelled || started !== sitePreviewGeneration()) return;
         applyPayload(payload, true);
         setAuthorized(true);
         setStatus("saved");
         setMessage(payload.draft ? "Server draft loaded." : "Published content loaded.");
         loaded.current = true;
+        initializeMutations(payload.editorActorId!);
       })
       .catch((error) => {
         if (cancelled) return;
@@ -418,49 +484,19 @@ export default function SiteEditorPage() {
 
   useEffect(() => {
     if (!loaded.current || !authorized) return;
-    window.localStorage.setItem(crashRecoveryKey, JSON.stringify(settings));
+    try { window.localStorage.setItem(`${crashRecoveryKey}:${actorRef.current}`, JSON.stringify(settings)); } catch { /* mutation recovery is independently persisted before send */ }
+    if (writeBusy || editorIssue || manualPending.current) return;
     if (JSON.stringify(settings) !== lastServerDraft.current && hasChanges) setStatus("dirty");
     const timer = window.setTimeout(() => {
+      if (writeTask.current || manualPending.current || issueRef.current) return;
       if (!hasChanges) {
-        if (!draftMeta) return;
-        setStatus("saving");
-        void api("discard_draft", { note: "Draft matched the published version" })
-          .then((payload) => {
-            applyPayload(payload, false);
-            window.localStorage.removeItem(crashRecoveryKey);
-            setStatus("saved");
-            setMessage("All changes restored to the published version.");
-            setPreviewVersion((value) => value + 1);
-          })
-          .catch((error) => {
-            setStatus("error");
-            setMessage(error instanceof Error ? error.message : "Could not clear the restored draft.");
-          });
-        return;
+        if (draftMeta) void executeEditor("discard_draft", { note: "Draft matched the published version" });
+      } else if (JSON.stringify(settingsRef.current) !== lastServerDraft.current) {
+        void executeEditor("save_draft", { note: "Autosaved draft", area: `${selected.area} / ${selected.page}` });
       }
-      if (JSON.stringify(settings) === lastServerDraft.current) return;
-      const savedDraft = JSON.stringify(settings);
-      setStatus("saving");
-      void saveDraft(settings)
-        .then((payload) => {
-          if (payload.published) {
-            setPublished(hydrateLegacyContent(mergeSiteSettings(payload.published)));
-            setPublishedAt(payload.publishedAt || "");
-          }
-          setDraftMeta(payload.draftMeta || null);
-          setRevisions(payload.revisions || []);
-          lastServerDraft.current = savedDraft;
-          setStatus("saved");
-          setMessage("Draft autosaved on the server.");
-          setPreviewVersion((value) => value + 1);
-        })
-        .catch((error) => {
-          setStatus("error");
-          setMessage(error instanceof Error ? error.message : "Autosave failed.");
-        });
     }, 1800);
     return () => window.clearTimeout(timer);
-  }, [authorized, draftMeta, hasChanges, publishedAt, selected.area, selected.page, settings]);
+  }, [authorized, draftMeta, hasChanges, selected.area, selected.page, settings, writeBusy, editorIssue]);
 
   useEffect(() => {
     if (!confirmAction) return;
@@ -483,71 +519,9 @@ export default function SiteEditorPage() {
     setErrors((current) => ({ ...current, [key]: "" }));
   }
 
-  async function publish() {
-    const validation = validateContentValues(settings.content);
-    setErrors(validation);
-    if (Object.keys(validation).length) {
-      setStatus("error");
-      setMessage("Fix the highlighted fields before publishing.");
-      return;
-    }
-    if (textContrast === null || actionContrast === null || textContrast < 4.5 || actionContrast < 4.5) {
-      setStatus("error");
-      setMessage("Publishing blocked: primary text and primary actions must meet 4.5:1 contrast.");
-      return;
-    }
-    setStatus("saving");
-    try {
-      const payload = await api("publish", {
-        settings,
-        basePublishedAt: draftMeta?.basePublishedAt || publishedAt,
-        note,
-        area: `${selected.area} / ${selected.page}`
-      });
-      applyPayload(payload, false);
-      window.localStorage.removeItem(crashRecoveryKey);
-      setStatus("saved");
-      setMessage("Published globally.");
-      setNote("");
-      setPreviewVersion((value) => value + 1);
-    } catch (error) {
-      const payload = (error as Error & { payload?: SiteEditorPayload }).payload;
-      setErrors(payload?.errors || {});
-      setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Publish failed.");
-    }
-  }
-
-  async function discardDraft() {
-    setStatus("saving");
-    try {
-      const payload = await api("discard_draft", { note: "Discarded from Content Studio" });
-      applyPayload(payload, false);
-      window.localStorage.removeItem(crashRecoveryKey);
-      setStatus("saved");
-      setMessage("Draft discarded. Published content restored.");
-    } catch (error) {
-      setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Could not discard draft.");
-    }
-  }
-
-  async function restoreRevision(revision: Revision) {
-    setStatus("saving");
-    try {
-      const payload = await api("restore_revision", {
-        revisionId: revision.id,
-        note: `Restored revision from ${revision.publishedAt}`,
-        area: "Revision history"
-      });
-      applyPayload(payload, true);
-      setStatus("saved");
-      setMessage("Revision restored to draft. Review before publishing.");
-    } catch (error) {
-      setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Could not restore revision.");
-    }
-  }
+  async function publish() { await executeEditor("publish", { note, area: `${selected.area} / ${selected.page}` }, true); }
+  async function discardDraft() { await executeEditor("discard_draft", { note: "Discarded from Content Studio" }, true); }
+  async function restoreRevision(revision: Revision) { await executeEditor("restore_revision", { revisionId: revision.id, note: `Restored revision from ${revision.publishedAt}`, area: "Revision history" }, true); }
 
   function loadAdvancedJson() {
     if (!advancedUnlocked) {
@@ -966,6 +940,7 @@ export default function SiteEditorPage() {
           <div className={`cms-save-state is-${status}`} aria-live="polite">
             {status === "saving" ? <RefreshCw size={14} className="spin" /> : status === "saved" ? <Check size={14} /> : status === "error" ? <X size={14} /> : <Cloud size={14} />}
             <span>{status === "dirty" ? `${changedKeys.length || 1} unpublished ${changedKeys.length === 1 ? "change" : "changes"}` : status === "saving" ? "Saving draft…" : message}</span>
+            {editorIssue ? <div role="alert"><button type="button" onClick={exportLocalChanges}>Export local changes</button>{editorIssue === "uncertain" ? <button type="button" disabled={writeBusy} onClick={() => void executeEditor("", {}, true, true)}>Retry the same save</button> : null}{editorIssue === "error" && !mutationsRef.current?.storageProblem ? <button type="button" disabled={writeBusy} onClick={() => { setEditorIssue(""); setStatus("dirty"); }}>Resume saving</button> : null}<button type="button" disabled={writeBusy} onClick={() => { exportLocalChanges(); window.location.reload(); }}>Export and reload latest</button></div> : null}
           </div>
           <div className="cms-command-actions">
             <button type="button" className="button secondary" onClick={() => setConfirmAction({ kind: "discard" })} disabled={!draftMeta && !hasChanges}>Discard draft</button>

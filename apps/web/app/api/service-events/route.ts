@@ -3,6 +3,7 @@ import type { User } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient, getAuthenticatedUser } from "../../../lib/supabase-server";
 import { assertAccountCanWrite, isAdminRole, normalizeEmail, readAdminEmailList } from "../../../lib/admin-auth";
+import { isEligiblePublicProfile } from "../../../lib/public-profile-eligibility";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -37,6 +38,9 @@ type GuitarRow = {
   owner_id: string | null;
   qr_code: string;
   permanent_path: string | null;
+  visibility: string | null;
+  admin_archived_at: string | null;
+  owner_removed_at: string | null;
 };
 
 type ServiceEventRow = {
@@ -168,7 +172,7 @@ async function canAdminister(supabase: ServerSupabaseClient, user: User) {
 async function loadGuitarByCode(supabase: ServerSupabaseClient, qrCode: string) {
   const result = await supabase
     .from("guitars")
-    .select("id,owner_id,qr_code,permanent_path")
+    .select("id,owner_id,qr_code,permanent_path,visibility,admin_archived_at,owner_removed_at")
     .eq("qr_code", qrCode)
     .maybeSingle<GuitarRow>();
 
@@ -229,6 +233,22 @@ export async function GET(request: Request) {
     includePrivate = true;
     ownerUserId = access.user?.id || "";
     ownerIsAdmin = access.isAdmin;
+  }
+
+  if (!includePrivate) {
+    if (!isEligiblePublicProfile(guitar, { allowUnlisted: true })) {
+      return json({ ok: false, serviceEvents: [], message: "QRguitar Profile was not found." }, { status: 404 });
+    }
+    if (guitar.owner_id) {
+      const owner = await supabase.from("profiles").select("account_status,hide_public_content").eq("id", guitar.owner_id)
+        .maybeSingle<{ account_status?: string | null; hide_public_content?: boolean | null }>();
+      if (owner.error) {
+        return json({ ok: false, serviceEvents: [], message: "Service history is temporarily unavailable." }, { status: 503 });
+      }
+      if (!isEligiblePublicProfile(guitar, { allowUnlisted: true, ownerProfile: owner.data })) {
+        return json({ ok: false, serviceEvents: [], message: "QRguitar Profile was not found." }, { status: 404 });
+      }
+    }
   }
 
   let query = supabase

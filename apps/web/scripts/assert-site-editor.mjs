@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
@@ -17,10 +18,10 @@ const layout = read("app/layout.tsx");
 const metadata = read("lib/site-metadata.ts");
 const themeRuntime = read("components/ThemeRuntime.tsx");
 
-for (const marker of ["site-editor:draft", "site-editor:revision:", "save_draft", "restore_revision", "basePublishedAt", "conflict: true", "validateContentValues", "logAdminAuditEvent"]) {
+for (const marker of ["site-editor:draft", "site-editor:revision:", "save_draft", "restore_revision", "validateContentValues", "mutate_site_editor", "read_site_editor_state"]) {
   if (!route.includes(marker)) throw new Error(`Site Editor API is missing ${marker}.`);
 }
-for (const marker of ["crashRecovery", "saveDraft", "publish", "restoreRevision", "discardDraft", "previewPath", "Revision history", "Advanced JSON", "Read-only by default", "Unlock editor", "Download backup", "Publishing blocked: primary text and primary actions must meet 4.5:1 contrast.", "Send test to my admin email", "/api/site-editor/test-email"]) {
+for (const marker of ["crashRecovery", "executeEditor", "publish", "restoreRevision", "discardDraft", "previewPath", "Revision history", "Advanced JSON", "Read-only by default", "Unlock editor", "Download backup", "Fix highlighted content and ensure primary text and actions meet 4.5:1 contrast before publishing.", "Send test to my admin email", "/api/site-editor/test-email"]) {
   if (!page.includes(marker)) throw new Error(`Content Studio is missing ${marker}.`);
 }
 for (const marker of ["SiteCompositionEditor", "compositionPageKey", "settings.composition"]) {
@@ -35,13 +36,13 @@ for (const marker of ["validateEditorialComposition", "Block IDs must be unique"
 for (const marker of ["issueDraftPreview", "<iframe", "Desktop preview", "Tablet preview", "Mobile preview", "Open full preview", "Draft", "Published"]) {
   if (!page.includes(marker)) throw new Error(`Content Studio actual-page preview is missing ${marker}.`);
 }
-for (const marker of ["getAdminContext", "createSitePreviewToken", "verifySitePreviewToken", "safePreviewPath", "httpOnly", "X-Robots-Tag", "noindex, nofollow"]) {
+for (const marker of ["getAdminContext", "createSitePreviewToken", "isSitePreviewAuthorized", "safePreviewPath", "httpOnly", "X-Robots-Tag", "noindex, nofollow"]) {
   if (!previewRoute.includes(marker)) throw new Error(`Site Editor preview route is missing ${marker}.`);
 }
 for (const marker of ["createHmac", "timingSafeEqual", "PREVIEW_TTL_SECONDS", "verifySitePreviewToken"]) {
   if (!preview.includes(marker)) throw new Error(`Site Editor preview authorization is missing ${marker}.`);
 }
-for (const marker of ["sitePreviewCookie", "sitePreviewDraftKey", "verifySitePreviewToken"]) {
+for (const marker of ["sitePreviewCookie", "sitePreviewDraftKey", "isSitePreviewAuthorized"]) {
   if (!settingsServer.includes(marker)) throw new Error(`Draft preview content source is missing ${marker}.`);
 }
 for (const marker of ["qrguitar_site_preview", "X-Robots-Tag", "noindex, nofollow", "no-store"]) {
@@ -64,6 +65,10 @@ if (metadata.includes('template: "%s | QRguitar"')) {
 }
 if (!route.includes('errors["seo.canonicalUrl"]') || !route.includes('canonical.hostname !== "www.qrguitar.com"')) {
   throw new Error("Invalid external canonical URLs are not rejected.");
+}
+
+for (const test of ["site-editor-transaction.test.mjs", "site-editor-client.test.mjs"]) {
+  execFileSync(process.execPath, [path.join(root, "scripts/security", test)], { stdio: "inherit" });
 }
 
 const origin = process.env.QRGUITAR_TEST_ORIGIN || "http://127.0.0.1:3003";

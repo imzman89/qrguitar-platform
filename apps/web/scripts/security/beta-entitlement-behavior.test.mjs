@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
+import {createRequire} from 'node:module';
+import {fileURLToPath} from 'node:url';
+const repo=path.resolve(process.env.QRGUITAR_REPO || process.argv[2] || path.join(path.dirname(fileURLToPath(import.meta.url)),'../../../..'));
+const proposal=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../../..');
+const ts=createRequire(path.join(repo,'apps/web/package.json'))('typescript');
+const source=fs.readFileSync(path.join(process.argv.includes('--baseline')?repo:proposal,'apps/web/lib/local-demo.ts'),'utf8');
+const module={exports:{}};const storage=new Map();
+vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module,exports:module.exports,require:()=>({formatRecordLocation:()=>''}),window:{localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},dispatchEvent:()=>{}},CustomEvent:class{}});
+const api=module.exports;let passed=0;
+function test(name,fn){fn();console.log('PASS '+name);passed++;}
+for(const plan of ['free','paid','brand','commercial'])test(plan+' does not imply account or instrument verification',()=>{assert.equal(api.getAccountVerificationStatus({plan}),'unverified');assert.equal(api.getAccountVerificationStatus({plan,verificationStatus:'unverified'}),'unverified');assert.equal(api.getDefaultInstrumentVerificationStatus({plan}),'unverified');});
+test('explicit verified and flagged states are preserved independently from plan',()=>{for(const plan of ['free','paid','brand','commercial']){assert.equal(api.getAccountVerificationStatus({plan,verificationStatus:'verified'}),'verified');assert.equal(api.getAccountVerificationStatus({plan,verificationStatus:'flagged'}),'flagged');}});
+test('browser save and reload do not upgrade paid account context',()=>{api.saveDemoUser({name:'Paid',email:'paid@example.test',role:'owner',plan:'paid'});assert.equal(api.getDemoUser().verificationStatus,'unverified');});
+test('explicit record trust remains independent of account plan',()=>{assert.equal(api.getInstrumentVerificationStatus({verificationStatus:'verified'}),'verified');assert.equal(api.getInstrumentVerificationStatus({verificationStatus:'unverified'}),'unverified');});
+for(const plan of ['free','paid'])test(plan+' helper enforces public beta25',()=>{const user={name:'User',email:'u@example.test',role:'owner',plan};const records=Array.from({length:25},(_,i)=>({id:'live-'+i,qrCode:'QRG-LIVE-'+i}));assert.equal(api.isFreeInstrumentLimitReached(user,records),true);assert.equal(api.isFreeInstrumentLimitReached(user,records.slice(0,24)),false);});
+test('commercial helper access remains available',()=>{for(const plan of ['brand','commercial'])assert.equal(api.isFreeInstrumentLimitReached({plan},Array.from({length:25},(_,i)=>({id:'live-'+i,qrCode:'QRG-LIVE-'+i}))),false);});
+console.log('Completed '+passed+' beta entitlement behavior tests.');

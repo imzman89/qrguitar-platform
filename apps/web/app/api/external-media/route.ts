@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
 import { assertAccountCanWrite, isAdminRole, normalizeEmail, readAdminEmailList } from "../../../lib/admin-auth";
+import { isEligiblePublicProfile } from "../../../lib/public-profile-eligibility";
 import { createServerSupabaseClient, getAuthenticatedUser } from "../../../lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +11,7 @@ export const fetchCache = "force-no-store";
 const HEADERS = { "Cache-Control": "no-store, no-cache, must-revalidate" };
 type Client = NonNullable<ReturnType<typeof createServerSupabaseClient>>;
 
-type Guitar = { id: string; owner_id: string | null; visibility: string; admin_archived_at?: string | null; owner_removed_at?: string | null };
+type Guitar = { id: string; qr_code: string; owner_id: string | null; visibility: string; admin_archived_at?: string | null; owner_removed_at?: string | null };
 type MediaRow = {
   id: string;
   guitar_id: string;
@@ -90,8 +91,18 @@ function parseMediaUrl(input: unknown) {
   return { provider, providerId: providerId || null, canonicalUrl };
 }
 
+async function mutateMedia(client: Client, guitarId: string, actorId: string, admin: boolean, action: string, id: string | null, values: Record<string, unknown> = {}) {
+  try { return await client.rpc("mutate_external_media", { p_guitar_id: guitarId, p_actor_id: actorId, p_is_admin: admin, p_action: action, p_media_id: id, p_values: values }); }
+  catch { return { data: null, error: { code: "", message: "Unconfirmed media change" } }; }
+}
+function mutationFailure(error: { code?: string; message?: string } | null) {
+  if (!error?.code) return json({ ok: false, commitStatus: "unknown", message: "Could not confirm the media change. Reload before trying again." }, 503);
+  const status = error.code === "42501" ? 403 : error.code === "P0002" ? 404 : error.code === "23505" ? 409 : 503;
+  return json({ ok: false, message: status === 403 ? "Profile ownership or account access changed. Reload before editing media."
+    : status === 404 ? "Profile or media item was not found." : status === 409 ? "This media URL is already attached." : "Could not save media. Please try again." }, status);
+}
 async function loadGuitar(client: Client, code: string) {
-  const result = await client.from("guitars").select("id,owner_id,visibility,admin_archived_at,owner_removed_at").eq("qr_code", code).maybeSingle<Guitar>();
+  const result = await client.from("guitars").select("id,qr_code,owner_id,visibility,admin_archived_at,owner_removed_at").eq("qr_code", code).maybeSingle<Guitar>();
   if (result.error) throw new Error(result.error.message);
   return result.data || null;
 }
@@ -121,8 +132,14 @@ export async function GET(request: Request) {
   const guitar = code ? await loadGuitar(client, code) : null;
   if (!guitar) return json({ ok: false, mediaItems: [], message: "QRguitar Profile not found." }, 404);
 
-  if (!ownerScope && (guitar.visibility === "private" || guitar.admin_archived_at || guitar.owner_removed_at)) {
-    return json({ ok: false, mediaItems: [], message: "QRguitar Profile not found." }, 404);
+  if (!ownerScope) {
+    if (!isEligiblePublicProfile(guitar, { allowUnlisted: true })) return json({ ok: false, mediaItems: [], message: "QRguitar Profile not found." }, 404);
+    if (guitar.owner_id) {
+      const owner = await client.from("profiles").select("account_status,hide_public_content").eq("id", guitar.owner_id)
+        .maybeSingle<{ account_status?: string | null; hide_public_content?: boolean | null }>();
+      if (owner.error) return json({ ok: false, mediaItems: [], message: "Media is temporarily unavailable." }, 503);
+      if (!isEligiblePublicProfile(guitar, { allowUnlisted: true, ownerProfile: owner.data })) return json({ ok: false, mediaItems: [], message: "QRguitar Profile not found." }, 404);
+    }
   }
   if (ownerScope) {
     const access = await requireManager(request, client, guitar);
@@ -152,18 +169,12 @@ export async function POST(request: Request) {
   const title = clean(body?.title, 180);
   if (!title) return json({ ok: false, message: "Media title is required." }, 400);
 
-  const created = await client.from("guitar_external_media").insert({
-    guitar_id: guitar.id,
-    provider: parsed.provider,
-    canonical_url: parsed.canonicalUrl,
-    provider_id: parsed.providerId,
-    title,
-    caption: clean(body?.caption, 1000),
-    is_public: body?.isPublic === true,
-    sort_order: Math.max(0, Number(body?.sortOrder || 0)),
-    created_by: access.user.id
-  }).select("id,guitar_id,provider,canonical_url,provider_id,title,caption,thumbnail_url,is_public,sort_order,created_at").single<MediaRow>();
-  if (created.error || !created.data) return json({ ok: false, message: created.error?.message || "Could not add media." }, 500);
+  const created = await mutateMedia(client, guitar.id, access.user.id, access.admin, "insert", null, {
+    provider: parsed.provider, canonical_url: parsed.canonicalUrl, provider_id: parsed.providerId,
+    title, caption: clean(body?.caption, 1000), is_public: body?.isPublic === true,
+    sort_order: Number.isFinite(Number(body?.sortOrder)) ? Math.max(0, Math.floor(Number(body?.sortOrder))) : 0
+  });
+  if (created.error || !created.data) return mutationFailure(created.error);
   return json({ ok: true, mediaItem: mapRow(created.data), message: "Media added." });
 }
 
@@ -191,9 +202,8 @@ export async function PATCH(request: Request) {
   if (Number.isFinite(Number(body?.sortOrder))) updates.sort_order = Math.max(0, Math.floor(Number(body?.sortOrder)));
   if (!Object.keys(updates).length) return json({ ok: false, message: "No media changes were provided." }, 400);
 
-  const updated = await client.from("guitar_external_media").update(updates).eq("id", id).eq("guitar_id", guitar.id)
-    .select("id,guitar_id,provider,canonical_url,provider_id,title,caption,thumbnail_url,is_public,sort_order,created_at").maybeSingle<MediaRow>();
-  if (updated.error || !updated.data) return json({ ok: false, message: updated.error?.message || "Could not update media." }, 500);
+  const updated = await mutateMedia(client, guitar.id, auth.user.id, access.admin, "update", id, updates);
+  if (updated.error || !updated.data) return mutationFailure(updated.error);
   return json({ ok: true, mediaItem: mapRow(updated.data), message: "Media updated." });
 }
 
@@ -209,7 +219,7 @@ export async function DELETE(request: Request) {
   if (!guitar || !id) return json({ ok: false, message: "Profile and media item are required." }, 400);
   const access = await requireManager(request, client, guitar);
   if (access.error) return json({ ok: false, message: access.error }, access.status);
-  const deleted = await client.from("guitar_external_media").delete().eq("id", id).eq("guitar_id", guitar.id);
-  if (deleted.error) return json({ ok: false, message: deleted.error.message }, 500);
+  const deleted = await mutateMedia(client, guitar.id, auth.user.id, access.admin, "delete", id);
+  if (deleted.error || !deleted.data) return mutationFailure(deleted.error);
   return json({ ok: true, message: "Media removed." });
 }

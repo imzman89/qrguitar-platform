@@ -2,24 +2,30 @@
   "name": "qrguitar-platform",
   "private": true,
   "version": "0.1.0",
-  "description": "QRguitar SaaS platform starter: web, mobile, shared types, and Supabase schema.",
+  "description": "QRguitar instrument Profiles, ownership history, QR tools, and installable web app.",
   "scripts": {
     "dev:web": "npm --workspace apps/web run dev",
     "dev:mobile": "npm --workspace apps/mobile run start",
     "lint": "npm --workspaces run lint",
     "typecheck": "npm --workspaces run typecheck",
-    "deploy:web": "npm run build --workspace @qrguitar/web && npx --yes vercel@latest --prod",
-    "push:live": "node scripts/push-live.mjs"
+    "deploy:web": "npm run push:live",
+    "push:live": "node scripts/push-live.mjs",
+    "release:database": "node scripts/check-release-readiness.mjs"
   },
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
-  "overrides": {
-    "react": "18.2.0",
-    "react-dom": "18.2.0"
-  },
   "engines": {
-    "node": ">=20"
+    "node": "24.x"
+  },
+  "overrides": {
+    "postcss": "8.5.28"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   }
 }

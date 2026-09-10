@@ -1,5 +1,6 @@
 "use client";
 
+import { invalidateSitePreviewSession } from "./site-preview-client";
 import { createClient } from "@supabase/supabase-js";
 
 let browserClient: ReturnType<typeof createClient> | null = null;
@@ -13,6 +14,7 @@ export function clearQrGuitarSessionState() {
     return;
   }
 
+  void invalidateSitePreviewSession().catch(() => undefined);
   window.localStorage.removeItem(sessionStartedAtKey);
   window.localStorage.removeItem(lastActivityAtKey);
   window.localStorage.removeItem("qrguitar.siteEditorUnlocked");
@@ -38,6 +40,13 @@ export function createBrowserSupabaseClient() {
     }
   });
 
+  let previewActor: string | undefined;
+  browserClient.auth.onAuthStateChange((event, session) => {
+    const next = session?.user.id || "";
+    const changed = event === "SIGNED_OUT" || (previewActor !== undefined && next !== previewActor);
+    previewActor = next;
+    if (changed) void invalidateSitePreviewSession().catch(() => undefined);
+  });
   return browserClient;
 }
 

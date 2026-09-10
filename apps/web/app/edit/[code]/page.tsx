@@ -1,5 +1,7 @@
 "use client";
 
+import { ownerProfileHref } from "../../../lib/owner-profile";
+
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -270,7 +272,7 @@ export default function EditInstrumentPage() {
   }, [code, router]);
 
   const profileHref = useMemo(() => {
-    return original ? instrumentToProfileUrl(original) : `/i/${code}`;
+    return original ? ownerProfileHref(original) : "/dashboard/profile/" + encodeURIComponent(code);
   }, [code, original]);
 
   function updateField(field: keyof typeof form, value: string) {

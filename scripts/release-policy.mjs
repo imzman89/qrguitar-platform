@@ -1,0 +1,92 @@
+import { RELEASE_VERSION, REQUIRED_DATABASE_CHECKS, isReleaseReady } from "../apps/web/lib/release-readiness.ts";
+export { RELEASE_VERSION, REQUIRED_DATABASE_CHECKS };
+export const RELEASE_CHECKS = [
+  ["run", "build", "--workspace", "@qrguitar/web"],
+  ["run", "typecheck", "--workspace", "@qrguitar/web"],
+  ["run", "test:launch", "--workspace", "@qrguitar/web"],
+  ["run", "test:behavior", "--workspace", "@qrguitar/web"],
+  ["audit", "--workspace", "@qrguitar/web", "--audit-level=low", "--include=dev", "--include=optional", "--include=peer"]
+];
+
+export async function runReleaseChecks(run, checkBackend) {
+  for (const args of RELEASE_CHECKS) await run(args);
+  return await checkBackend();
+}
+
+export function validateReadiness(value) {
+  if (!isReleaseReady(value)) {
+    const failed = Array.isArray(value?.checks) ? value.checks.filter(check => check?.ok !== true)
+      .map(check => /^[a-z0-9_.:-]{1,100}$/i.test(check?.name || "") ? check.name : "invalid_check").join(", ") : "";
+    throw new Error("Database is not ready for QRguitar release " + RELEASE_VERSION + (failed ? ": " + failed : ". Apply and verify all release migrations."));
+  }
+  return value;
+}
+
+export async function checkBackendReadiness({ url, serviceKey, fetchImpl = fetch }) {
+  let origin;
+  try { origin = new URL(url); } catch { throw new Error("Release check requires NEXT_PUBLIC_SUPABASE_URL."); }
+  if (origin.protocol !== "https:" || origin.username || origin.password || origin.pathname !== "/" || !serviceKey) {
+    throw new Error("Release check requires the HTTPS Supabase project URL and server-only service key.");
+  }
+  let response;
+  try {
+    response = await fetchImpl(new URL("/rest/v1/rpc/qrguitar_release_readiness", origin), {
+      method: "POST", headers: { apikey: serviceKey, Authorization: "Bearer " + serviceKey, "Content-Type": "application/json" },
+      body: "{}", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(15000)
+    });
+  } catch { throw new Error("Could not reach the database readiness check. Deployment was not started."); }
+  if (!response.ok) throw new Error("Database readiness check is unavailable (HTTP " + response.status + "). Verify management access and apply the release migrations.");
+  let value;
+  try { value = await response.json(); } catch { throw new Error("Database readiness returned an invalid response."); }
+  return validateReadiness(value);
+}
+
+export async function verifyProduction({ sha, origin = "https://qrguitar.com", staged = false, fetchImpl = fetch }) {
+  const response = await fetchImpl(new URL("/api/build-info?release=" + encodeURIComponent(sha), origin), {
+    cache: "no-store", signal: AbortSignal.timeout(20000)
+  });
+  if (!response.ok) throw new Error("Production identity endpoint returned HTTP " + response.status + ".");
+  const identity = await response.json();
+  if (identity.gitCommitSha !== sha || identity.environment !== "production" || identity.dirtyWorkingTree === true ||
+      !(staged ? [new URL(origin).origin] : ["https://qrguitar.com", "https://www.qrguitar.com"]).includes(identity.origin)) {
+    throw new Error("Production has not confirmed the expected committed release. Inspect the Vercel deployment before announcing completion.");
+  }
+  const health = await fetchImpl(new URL("/api/health", identity.origin), { cache: "no-store", signal: AbortSignal.timeout(15000) });
+  const healthState = health.ok ? await health.json() : null;
+  if (healthState?.status !== "ready" || healthState?.releaseVersion !== RELEASE_VERSION) throw new Error("Production database readiness failed. Inspect the deployed environment and migrations.");
+  for (const [pathname, contentType] of [["/", "text/html"], ["/manifest.webmanifest", "application/manifest+json"], ["/sw.js", "javascript"], ["/offline.html", "text/html"]]) {
+    const result = await fetchImpl(new URL(pathname, identity.origin), { cache: "no-store", signal: AbortSignal.timeout(20000) });
+    if (!result.ok || !result.headers.get("content-type")?.includes(contentType)) {
+      throw new Error("Production smoke check failed for " + pathname + ".");
+    }
+  }
+  return identity;
+}
+
+export function assertSameCommit(actual, expected) {
+  if (actual !== expected) throw new Error("The reviewed commit changed during release checks. Run the release again from the intended commit.");
+}
+export function deploymentUrl(stdout) {
+  let url;
+  try { url = new URL(stdout.trim()); } catch { throw new Error("Vercel did not return a single staged deployment URL."); }
+  if (url.protocol !== "https:" || !url.hostname.endsWith(".vercel.app") || url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
+    throw new Error("Vercel returned an unexpected deployment URL.");
+  }
+  return url.origin;
+}
+export function parseCurlProbe(output) {
+  const matched = output.match(/\n__QRG_STATUS__:(\d{3})\r?\n__QRG_TYPE__:([^\r\n]*)\r?\n?$/);
+  if (!matched) throw new Error("Staged deployment probe returned an invalid response.");
+  const status = Number(matched[1]);
+  if (status < 200 || status > 599) throw new Error("Staged deployment probe returned an invalid status.");
+  return new Response(output.slice(0, matched.index), { status, headers: { "Content-Type": matched[2] } });
+}
+export async function stageAndPromote({ unchanged, stage, verify, promote }) {
+  await unchanged();
+  const url = await stage();
+  await unchanged();
+  await verify(url);
+  await unchanged();
+  await promote(url);
+  return url;
+}

@@ -1,0 +1,95 @@
+.home { color: var(--text); }
+.home :global(.hero) { padding: 64px 0 72px; min-height: auto; background: var(--bg); }
+.home :global(.hero-grid) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.06fr); align-items: center; gap: clamp(32px, 5vw, 80px); }
+.home :global(.hero-copy) { max-width: 580px; padding: 0; text-align: left; }
+.home :global(.hero-copy h1) { max-width: 17ch; margin: 22px 0; color: var(--text); font-size: clamp(42px, 4.8vw, 68px); line-height: 1.06; letter-spacing: -.04em; font-weight: 650; text-wrap: balance; }
+.home :global(.hero-copy > p) { max-width: 43ch; margin: 0; font-size: 1.125rem; line-height: 1.7; color: var(--muted-strong); }
+.home :global(.hero-actions) { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+.home :global(.hero-actions .button) { min-height: 50px; font-size: .9375rem; padding: 14px 22px; }
+.home :global(.hero-actions .button:not(.secondary)) { background: var(--gold); border-color: var(--gold); color: #14100a; }
+.betaNote { display: inline-flex; margin-top: 20px; padding-block: 6px; font-size: .875rem; color: var(--muted); text-decoration: underline; text-underline-offset: 4px; }
+.home :global(.collectible-card--latest) { width: 100%; max-width: none; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--panel); box-shadow: 0 28px 70px #0005; transform: none; }
+.home :global(.collectible-card--latest .collectible-card-link) { display: grid; grid-template-columns: minmax(0,1fr); }
+.home :global(.collectible-card--latest .collectible-card-media),
+.home :global(.collectible-card--latest .collectible-card-media-rail),
+.home :global(.collectible-card--latest .collectible-card-media-slide) { height: 320px; min-height: 0; aspect-ratio: auto; }
+.home :global(.collectible-card--latest .collectible-card-image) { object-fit: cover; object-position: center; height: 100%; width: 100%; }
+.home :global(.collectible-card--latest .collectible-card-content) { min-height: 0; padding: 24px; display: grid; gap: 14px; }
+.home :global(.collectible-card--latest h3) { font-size: 1.625rem; line-height: 1.2; margin: 0 0 8px; max-width: none; letter-spacing: -.02em; }
+.home :global(.collectible-card--latest .collectible-card-subtitle) { font-size: .9375rem; line-height: 1.5; }
+.home :global(.collectible-card--latest .record-badge) { font-size: .6875rem; line-height: 1.5; }
+.home :global(.collectible-card--latest .collectible-card-facts) { display: none; }
+.home :global(.collectible-card--latest .collectible-card-action) { font-size: .875rem; min-height: 44px; }
+.home :global(.section) { padding-block: 80px; background: var(--bg); color: var(--text); }
+.home :global(.section h2) { max-width: 24ch; margin: 12px 0 16px; color: var(--text); font-size: clamp(30px, 3.3vw, 44px); font-weight: 620; line-height: 1.12; letter-spacing: -.025em; text-wrap: balance; }
+.home :global(.section p) { font-size: 1rem; line-height: 1.7; color: var(--muted-strong); }
+.home :global(.eyebrow) { font-size: .75rem; letter-spacing: .12em; line-height: 1.6; color: var(--gold); font-weight: 650; }
+.home :global(.section-header) { max-width: 700px; margin-bottom: 36px; }
+.home :global(.section-header h2) { margin-inline: auto; }
+.home :global(.home-archive-section) { border-block: 1px solid var(--line); background: var(--surface-soft); }
+.home :global(.home-archive-heading) { align-items: end; margin-bottom: 28px; }
+.home :global(.home-archive-heading h2) { max-width: none; }
+.home :global(.home-archive-heading p) { margin-bottom: 0; }
+.home :global(.home-archive-rail) { gap: 24px; }
+.home :global(.collectible-card--archive) { border-radius: 10px; background: var(--panel); }
+.home :global(.collectible-card--archive h3) { font-size: 1.375rem; line-height: 1.25; }
+.home :global(.collectible-card--archive .collectible-card-content) { padding: 24px; }
+.home :global(.home-lifecycle-section .card) { padding: 28px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.home :global(.home-lifecycle-section h3) { color: var(--text); font-size: 1.375rem; }
+.home :global(.record-holds-section) { padding-top: 0; }
+.home :global(.record-holds-layout) { border-top: 1px solid var(--line); padding-top: 72px; gap: 60px; }
+.home :global(.record-holds-copy h2) { max-width: 17ch; }
+.home :global(.record-holds-visual) { border-radius: 12px; border-color: var(--line); background: var(--panel); }
+.home :global(.record-holds-facts strong) { font-size: 1rem; color: var(--text); }
+.home :global(.record-holds-facts p) { font-size: .9375rem; }
+.home :global(.home-roles-section) { background: var(--surface-soft); border-block: 1px solid var(--line); }
+.home :global(.audience-tabs) { gap: 8px; flex-wrap: wrap; }
+.home :global(.audience-tabs button) { min-height: 48px; font-size: .9375rem; padding: 12px 18px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted-strong); }
+.home :global(.audience-tabs button.is-active) { color: var(--gold); border-color: var(--gold); background: rgba(240,161,43,.07); }
+.home :global(.audience-panel) { border: 0; background: transparent; padding: 32px 0 0; gap: 24px; }
+.home :global(.audience-panel h3) { color: var(--text); font-size: 1.5rem; }
+.home :global(.continuity-list article) { background: var(--panel); border-color: var(--line); border-radius: 8px; padding: 24px; }
+.home :global(.continuity-list h3) { font-size: 1.125rem; color: var(--text); }
+.home :global(.pricing-section) { background: var(--surface-soft); border-top: 1px solid var(--line); }
+.home :global(.pricing-grid) { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; background: transparent; border: 0; box-shadow: none; max-width: 1000px; margin-inline: auto; }
+.home :global(.price-card) { display: flex; flex-direction: column; padding: 36px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--panel); color: var(--text); }
+.home :global(.price-card h3) { color: var(--text); font-size: 1.125rem; }
+.home :global(.price-card .price) { color: var(--text); font-size: 2.25rem; letter-spacing: -.035em; }
+.home :global(.price-card li) { font-size: .9375rem; line-height: 1.7; color: var(--muted-strong); }
+.home :global(.price-card .button) { margin-top: auto; }
+.home :global(.home-final-cta) { border-bottom: 1px solid var(--line); padding-block: 72px; }
+.home :global(.home-final-cta .section-header) { margin-inline: auto; margin-bottom: 24px; }
+.home :global(.home-final-cta h2) { max-width: none; }
+.home :global(.home-final-cta .section-cta) { margin-top: 0; }
+@media (max-width: 1000px) {
+  .home :global(.hero-grid) { gap: 28px; }
+  .home :global(.hero-copy h1) { font-size: 48px; }
+  .home :global(.collectible-card--latest .collectible-card-media),
+  .home :global(.collectible-card--latest .collectible-card-media-rail),
+  .home :global(.collectible-card--latest .collectible-card-media-slide) { height: 280px; }
+}
+@media (max-width: 760px) {
+  .home :global(.hero) { padding-block: 40px 48px; }
+  .home :global(.hero-grid) { grid-template-columns: minmax(0,1fr); gap: 36px; }
+  .home :global(.hero-copy) { text-align: left; max-width: 580px; }
+  .home :global(.hero-copy h1) { font-size: clamp(38px, 7vw, 52px); max-width: 19ch; margin: 16px 0 20px; }
+  .home :global(.hero-copy > p) { font-size: 1.0625rem; }
+  .home :global(.hero-actions) { margin-top: 24px; }
+  .home :global(.hero-actions .button) { flex: 1 1 auto; }
+  .home :global(.collectible-card--latest .collectible-card-media),
+  .home :global(.collectible-card--latest .collectible-card-media-rail),
+  .home :global(.collectible-card--latest .collectible-card-media-slide) { height: clamp(250px, 62vw, 380px); }
+  .home :global(.collectible-card--latest .collectible-card-content) { padding: 22px; }
+  .home :global(.section) { padding-block: 48px; }
+  .home :global(.section h2) { font-size: 32px; }
+  .home :global(.home-archive-heading) { align-items: start; }
+  .home :global(.home-archive-rail) { gap: 16px; }
+  .home :global(.record-holds-section) { padding-top: 0; }
+  .home :global(.record-holds-layout) { padding-top: 48px; gap: 28px; }
+  .home :global(.audience-tabs) { display: flex; overflow: visible; }
+  .home :global(.audience-tabs button) { flex: 1 1 auto; padding: 10px 12px; }
+  .home :global(.audience-panel) { grid-template-columns: minmax(0,1fr); }
+  .home :global(.pricing-grid) { grid-template-columns: minmax(0,1fr); }
+  .home :global(.price-card) { padding: 28px; }
+}
+@media (prefers-reduced-motion: reduce) { .home :global(*) { scroll-behavior: auto; } }

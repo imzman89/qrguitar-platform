@@ -20,9 +20,10 @@ function notFound() {
 
 export async function GET(
   _request: Request,
-  { params }: { params: { code: string; kind: string; token: string } }
+  { params: paramsPromise }: { params: Promise<{ code: string; kind: string; token: string }> }
 ) {
   noStore();
+  const params = await paramsPromise;
   const code = normalizePublicProfileCode(params.code);
   const kind = params.kind === "media" || params.kind === "document" ? params.kind as PublicFileKind : null;
   if (!code || !kind || isRetiredPublicProfileCode(code)) return notFound();

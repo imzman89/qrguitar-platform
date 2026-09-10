@@ -1,5 +1,7 @@
 "use client";
 
+import { PwaInstall } from "../../components/PwaInstall";
+
 import Link from "next/link";
 import { ExternalLink, LockKeyhole, LogOut, ShieldCheck, UserRound, UsersRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -124,28 +126,30 @@ export default function AccountPage() {
   async function saveAccount() {
     setIsWorking(true);
     setStatus("");
-    const token = await getSupabaseAccessToken();
-    const response = await fetch("/api/account", {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ displayName, publicCollection })
-    });
-    const payload = (await response.json().catch(() => null)) as AccountPayload | null;
-    setIsWorking(false);
-
-    if (!response.ok || !payload?.ok) {
-      setStatus(payload?.message || "Could not save account.");
-      return;
+    try {
+      const token = await getSupabaseAccessToken();
+      const response = await fetch("/api/account", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ displayName, publicCollection })
+      });
+      const payload = (await response.json().catch(() => null)) as AccountPayload | null;
+      if (!response.ok || !payload?.ok) {
+        setStatus(payload?.message || "Could not confirm the save. Reload your account before trying again.");
+        return;
+      }
+      setStatus(payload.message || "Account updated.");
+      if (payload.account?.publicCollection) setPublicCollection(payload.account.publicCollection);
+      window.dispatchEvent(new CustomEvent("qrguitar:auth"));
+    } catch {
+      setStatus("Could not confirm the save. Check your connection and reload your account before trying again.");
+    } finally {
+      setIsWorking(false);
     }
-
-    setStatus(payload.message || "Account updated.");
-    if (payload.account?.publicCollection) setPublicCollection(payload.account.publicCollection);
-    window.dispatchEvent(new CustomEvent("qrguitar:auth"));
   }
-
   async function sendPasswordReset() {
     if (!email) {
       setStatus("Account email is missing.");
@@ -205,7 +209,7 @@ export default function AccountPage() {
               <p>Update your display name, password access, and account details from one place.</p>
               <div className="form-actions">
                 <Link className="button" href="/login?next=/account">Sign in</Link>
-                <Link className="button secondary" href="/login?next=/account">Create account</Link>
+                <Link className="button secondary" href="/login?mode=register&next=/account">Create account</Link>
               </div>
               {status ? <p className="form-message">{status}</p> : null}
             </section>
@@ -270,6 +274,8 @@ export default function AccountPage() {
                 </button>
               ))}
             </nav>
+
+            {activeSection === "overview" ? <PwaInstall /> : null}
 
             {activeSection === "overview" ? (
               <section className="card auth-card account-settings-card account-overview-card">

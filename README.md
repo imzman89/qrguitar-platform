@@ -1,6 +1,6 @@
 # QRguitar Platform
 
-Free-tier MVP for QRguitar: permanent digital records for guitars, amps, pedals, builders, shops, collectors, and future owners.
+QRguitar public beta: permanent digital records for guitars, amps, pedals, builders, shops, collectors, and future owners.
 
 ## What This Includes
 
@@ -22,7 +22,7 @@ Payments are not active in this MVP. When payments are added, QRguitar must use 
 
 ## Quick Start
 
-1. Install Node.js 20+.
+1. Install Node.js 24.
 2. Create a free Supabase project.
 3. Run the launch SQL in Supabase SQL Editor.
 4. Copy `apps/web/.env.example` to `apps/web/.env.local`.
@@ -30,7 +30,7 @@ Payments are not active in this MVP. When payments are added, QRguitar must use 
 6. Install dependencies:
 
 ```bash
-npm install
+npm ci
 ```
 
 7. Build, verify, and run the canonical production-style local review app:
@@ -45,58 +45,29 @@ npm run local:qa --workspace @qrguitar/web
 http://127.0.0.1:3003
 ```
 
-## Push to production with one cmd line flow
+## Production release
 
-From PowerShell/Command Prompt:
+Read [the release runbook](docs/RELEASE_2026_09.md) before deploying. This release requires coordinated database migrations; a new application build by itself is insufficient.
 
-```bash
-cd "C:\\Users\\mrgar\\Documents\\Codex\\2026-06-22\\i-need-you-to-finish-and\\work\\qrguitar-platform-recovered"
-
-# 1) Make sure the build is clean
-npm run typecheck --workspace @qrguitar/web
-npm run build --workspace @qrguitar/web
-
-# 2) Deploy with Vercel (first time)
-npx --yes vercel@latest login
-npx --yes vercel@latest --prod
-```
-
-If you already linked this folder to a Vercel project (GitHub-backed), the first command is enough to push:
+After management access is current, the release migrations are applied, and the reviewed changes are committed:
 
 ```bash
-npx --yes vercel@latest --prod
+npm run push:live
 ```
 
-## One-click live push on Windows
+This command requires Node.js 24, a clean committed tree, and the existing QRguitar Vercel project link. It runs the production build, typecheck, launch assertions, behavior suite, web dependency audit, and a service-only database readiness check before staging. It uploads an immutable commit, verifies the staged production deployment against its actual database, then promotes it and checks the live commit identity and public web-app resources. A failed check stops the command; a failure after Vercel deployment requires inspecting the live deployment.
 
-This repo now includes:
+`npm run deploy:web` and `push-live.cmd` use this same guarded command. Credentials stay in the server environment or ignored local environment file; the launcher does not rewrite them or put service keys into CLI arguments.
 
-```text
-push-live.cmd
-start-local.cmd
+## Local review on Windows
+
+Run `start-local.cmd` or:
+
+```bash
+npm run local:qa --workspace @qrguitar/web
 ```
 
-Double-click that file from the project root and it will:
-
-1. Build the web app
-2. Stop if the build fails
-3. Push the working build to Vercel production
-
-If Vercel ever asks you to sign in on this computer, do that once and then the same button can be used again for later pushes.
-
-For owner review, run:
-
-```text
-start-local.cmd
-```
-
-That builds and typechecks before opening the sole approved local review origin:
-
-```text
-http://127.0.0.1:3003
-```
-
-`localhost` and alternate ports are not interchangeable with this origin because browser sessions, local drafts, and caches are origin-specific. Use `127.0.0.1:3003` for all owner review. The launcher refuses to replace an unrelated process already using port 3003 and records the active PID and build identity under `%LOCALAPPDATA%\QRguitar\local-qa\state.json`.
+The launcher builds and typechecks, then serves the review at `http://127.0.0.1:3003`. It refuses to replace an unrelated process on that port. Sessions, drafts, and caches are origin-specific; use this same origin throughout review.
 
 Optional environment variables to set in Vercel:
 
@@ -156,10 +127,10 @@ Use these settings when importing the project into Vercel:
 ```text
 Root Directory: apps/web
 Framework Preset: Next.js
-Install Command: npm install
+Install Command: npm ci
 Build Command: npm run build --workspace @qrguitar/web
 Output Directory: .next
-Node Version: 20.x
+Node Version: 24.x
 ```
 
 Required Vercel environment variables:

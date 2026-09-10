@@ -10,9 +10,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run build --workspace @qrguitar/web
       - run: npm run typecheck --workspace @qrguitar/web
       - run: npm run test:launch --workspace @qrguitar/web
+      - run: npm run test:behavior --workspace @qrguitar/web
+      - run: npm audit --workspace @qrguitar/web --audit-level=low --include=dev --include=optional --include=peer

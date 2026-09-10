@@ -12,6 +12,7 @@ const EVIDENCE_BUCKET = "instrument-documents";
 const MAX_EVIDENCE_FILES = 3;
 const MAX_EVIDENCE_BYTES = 10 * 1024 * 1024;
 const HEADERS = { "Cache-Control": "no-store, no-cache, must-revalidate" };
+class ClaimStateConflict extends Error {}
 const ALLOWED_EVIDENCE_TYPES = new Map([
   ["application/pdf", "pdf"],
   ["image/jpeg", "jpg"],
@@ -303,7 +304,7 @@ export async function PATCH(request: Request) {
   };
   const id = cleanText(body.id, 80);
   const action = body.action;
-  if (!id || !action) return json({ ok: false, message: "Ownership request and action are required." }, 400);
+  if (!id || !action || !["cancel", "approve", "deny", "request_information", "expire", "resubmit"].includes(action)) return json({ ok: false, message: "A valid ownership request action is required." }, 400);
   const claimResult = await supabase.from("ownership_claims").select("*").eq("id", id).maybeSingle<ClaimRow>();
   const claim = claimResult.data;
   if (claimResult.error || !claim) return json({ ok: false, message: "Ownership request not found." }, 404);
@@ -341,8 +342,9 @@ export async function PATCH(request: Request) {
         if (inserted.error) throw inserted.error;
       }
       const nextStatus = claim.current_owner_id ? "awaiting_owner" : "admin_review";
-      const updated = await supabase.from("ownership_claims").update({ status: nextStatus, admin_review_note: null, updated_at: new Date().toISOString() }).eq("id", id);
+      const updated = await supabase.from("ownership_claims").update({ status: nextStatus, admin_review_note: null, updated_at: new Date().toISOString() }).eq("id", id).eq("status", claim.status).select("id").maybeSingle<{ id: string }>();
       if (updated.error) throw updated.error;
+      if (!updated.data) throw new ClaimStateConflict("This ownership request changed while you were reviewing it. Refresh and try again.");
       await supabase.from("ownership_claim_events").insert({ claim_id: id, actor_user_id: auth.user.id, action: "evidence_resubmitted", note: note || "Additional private evidence submitted.", metadata: { evidence_count: evidence.length } });
       return json({ ok: true, status: nextStatus, message: nextStatus === "awaiting_owner" ? "Evidence sent to the current owner for review." : "Evidence returned to QRguitar for review." });
     } catch (error) {
@@ -350,25 +352,29 @@ export async function PATCH(request: Request) {
         await supabase.storage.from(EVIDENCE_BUCKET).remove(uploadedPaths);
         await supabase.from("ownership_claim_evidence").delete().in("storage_path", uploadedPaths);
       }
-      return json({ ok: false, message: error instanceof Error ? error.message : "Could not submit the requested evidence." }, 500);
+      return json({ ok: false, message: error instanceof Error ? error.message : "Could not submit the requested evidence." }, error instanceof ClaimStateConflict ? 409 : 500);
     }
   } else if (action === "cancel") {
     if (claim.claimant_user_id !== auth.user.id) return json({ ok: false, message: "Only the claimant can cancel this request." }, 403);
-    const result = await supabase.from("ownership_claims").update({ status: "cancelled", decided_at: new Date().toISOString(), decided_by: auth.user.id, updated_at: new Date().toISOString() }).eq("id", id);
+    const result = await supabase.from("ownership_claims").update({ status: "cancelled", decided_at: new Date().toISOString(), decided_by: auth.user.id, updated_at: new Date().toISOString() }).eq("id", id).eq("status", claim.status).select("id").maybeSingle<{ id: string }>();
     if (result.error) return json({ ok: false, message: result.error.message || "Could not cancel the ownership request." }, 409);
+    if (!result.data) return json({ ok: false, message: "This ownership request changed while you were reviewing it. Refresh and try again." }, 409);
   } else if (action === "deny") {
     if (claim.current_owner_id !== auth.user.id && !isAdmin) return json({ ok: false, message: "Current owner or admin review is required." }, 403);
-    const result = await supabase.from("ownership_claims").update({ status: "denied", owner_response_note: note || null, decided_at: new Date().toISOString(), decided_by: auth.user.id, updated_at: new Date().toISOString() }).eq("id", id);
+    const result = await supabase.from("ownership_claims").update({ status: "denied", owner_response_note: note || null, decided_at: new Date().toISOString(), decided_by: auth.user.id, updated_at: new Date().toISOString() }).eq("id", id).eq("status", claim.status).select("id").maybeSingle<{ id: string }>();
     if (result.error) return json({ ok: false, message: result.error.message || "Could not deny the ownership request." }, 409);
+    if (!result.data) return json({ ok: false, message: "This ownership request changed while you were reviewing it. Refresh and try again." }, 409);
   } else if (action === "request_information") {
     if (!isAdmin) return json({ ok: false, message: "Admin review is required to request more information." }, 403);
     if (!note) return json({ ok: false, message: "Explain what additional evidence is required." }, 400);
-    const result = await supabase.from("ownership_claims").update({ status: "awaiting_claimant", admin_review_note: note, updated_at: new Date().toISOString() }).eq("id", id);
+    const result = await supabase.from("ownership_claims").update({ status: "awaiting_claimant", admin_review_note: note, updated_at: new Date().toISOString() }).eq("id", id).eq("status", claim.status).select("id").maybeSingle<{ id: string }>();
     if (result.error) return json({ ok: false, message: result.error.message || "Could not request more information." }, 409);
+    if (!result.data) return json({ ok: false, message: "This ownership request changed while you were reviewing it. Refresh and try again." }, 409);
   } else if (action === "expire") {
     if (!isAdmin) return json({ ok: false, message: "Admin review is required to expire an ownership request." }, 403);
-    const result = await supabase.from("ownership_claims").update({ status: "expired", admin_review_note: note || null, decided_at: new Date().toISOString(), decided_by: auth.user.id, updated_at: new Date().toISOString() }).eq("id", id);
+    const result = await supabase.from("ownership_claims").update({ status: "expired", admin_review_note: note || null, decided_at: new Date().toISOString(), decided_by: auth.user.id, updated_at: new Date().toISOString() }).eq("id", id).eq("status", claim.status).select("id").maybeSingle<{ id: string }>();
     if (result.error) return json({ ok: false, message: result.error.message || "Could not expire the ownership request." }, 409);
+    if (!result.data) return json({ ok: false, message: "This ownership request changed while you were reviewing it. Refresh and try again." }, 409);
   } else {
     if (claim.current_owner_id !== auth.user.id && !isAdmin) return json({ ok: false, message: "Current owner or admin review is required." }, 403);
     const approved = await supabase.rpc("approve_ownership_claim", { p_claim_id: id, p_decided_by: auth.user.id, p_decision_note: note || null });

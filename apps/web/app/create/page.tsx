@@ -1,5 +1,7 @@
 "use client";
 
+import { ownerProfileHref } from "../../lib/owner-profile";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -56,6 +58,8 @@ type CreateErrorResponse = {
   fieldErrors?: Record<string, string>;
   retryable?: boolean;
   cleanupUploads?: boolean;
+  resetUploads?: boolean;
+  uncertain?: boolean;
   existingProfileFound?: boolean;
   existingProfileHref?: string;
   claimHref?: string;
@@ -475,7 +479,7 @@ export default function CreatePage() {
       const result = (await response.json().catch(() => null)) as CreateErrorResponse | null;
 
       if (!response.ok || !result?.ok) {
-        if (result?.cleanupUploads) clearStagedPathsAfterServerCleanup();
+        if (response.status === 409 && result?.ok === false && result?.code === "upload_session_changed" && result?.resetUploads === true && result?.uncertain !== true) clearStagedPathsAfterServerCleanup();
         setFieldErrors(result?.fieldErrors || {});
         setLastErrorRetryable(Boolean(result?.retryable));
         setExistingProfileHref(result?.existingProfileHref || "");
@@ -506,7 +510,7 @@ export default function CreatePage() {
       setMessage("QRguitar Profile created.");
 
       if (showProfile) {
-        router.push(`/i/${finalCode}`);
+        router.push(ownerProfileHref({ qrCode: finalCode, visibility: form.visibility as "public" | "private" }));
       }
     } catch (error) {
       setLastErrorRetryable(true);
@@ -545,7 +549,7 @@ export default function CreatePage() {
               <p>The Profile can keep growing with history, media, documents, service, and ownership while its QRguitar ID and URL stay the same.</p>
               <div className="create-success-id"><span>QRguitar ID</span><strong>{createdCode}</strong></div>
               <div className="create-success-actions">
-                <Link className="button" href={`/i/${createdCode}`}>View Profile</Link>
+                <Link className="button" href={ownerProfileHref({ qrCode: createdCode, visibility: form.visibility as "public" | "private" })}>View Profile</Link>
                 <Link className="button secondary" href={`/edit/${createdCode}?section=timeline`}>Add History</Link>
                 <Link className="button secondary" href={`/edit/${createdCode}?section=media`}>Add Media</Link>
                 <Link className="button secondary" href={`/edit/${createdCode}?section=documents`}>Add Documents</Link>
@@ -718,16 +722,16 @@ export default function CreatePage() {
     <>
       <Nav />
       <main className="section auth-page">
-        <div className="shell">
+        <div className="shell create-welcome">
           <section className="card auth-card">
             <div className="eyebrow">Create instrument</div>
-            <h2>Sign in to create your first QRguitar Profile.</h2>
+            <h1>Give your instrument a permanent home.</h1>
             <p>Create QRguitar Profiles from your account so the QR, photos, documents, and ownership stay tied to the right owner.</p>
             <div className="form-actions">
               <Link className="button" href={`/login?next=${encodeURIComponent("/create")}`}>
                 Sign in
               </Link>
-              <Link className="button secondary" href={`/login?next=${encodeURIComponent("/create")}`}>
+              <Link className="button secondary" href={`/login?mode=register&next=${encodeURIComponent("/create")}`}>
                 Create account
               </Link>
               <Link className="button secondary" href="/catalog">

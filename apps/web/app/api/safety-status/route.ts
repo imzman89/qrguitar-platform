@@ -118,6 +118,10 @@ export async function PATCH(request: Request) {
     return json({ ok: false, message: "QRguitar ID is required." }, { status: 400 });
   }
 
+  if (!SAFETY_STATUSES.has(cleanText(body?.safetyStatus, 20).toLowerCase())) {
+    return json({ ok: false, message: "Choose a valid safety status." }, { status: 400 });
+  }
+
   const loaded = await loadGuitarByCode(supabase, qrCode);
   if (loaded.migrationRequired) {
     return json({ ok: false, message: "Safety status database update required. Run supabase/lost-stolen-safety-status.sql." }, { status: 503 });
@@ -145,7 +149,7 @@ export async function PATCH(request: Request) {
 
   const now = new Date().toISOString();
   const safetyStatus = cleanSafetyStatus(body?.safetyStatus);
-  const result = await supabase
+  let update = supabase
     .from("guitars")
     .update({
       safety_status: safetyStatus,
@@ -155,8 +159,9 @@ export async function PATCH(request: Request) {
       safety_status_updated_by: access.user?.id || null,
       updated_at: now
     })
-    .eq("id", loaded.guitar.id)
-    .select("qr_code,permanent_path,safety_status,safety_status_updated_at,public_safety_note")
+    .eq("id", loaded.guitar.id);
+  if (!access.isAdmin) update = update.eq("owner_id", auth.user.id);
+  const result = await update.select("qr_code,permanent_path,safety_status,safety_status_updated_at,public_safety_note")
     .maybeSingle<Pick<GuitarRow, "qr_code" | "permanent_path" | "safety_status" | "safety_status_updated_at" | "public_safety_note">>();
 
   if (result.error) {
@@ -167,15 +172,18 @@ export async function PATCH(request: Request) {
     return json({ ok: false, message: result.error.message || "Could not update safety status." }, { status: 500 });
   }
 
-  revalidateRecord(qrCode);
+  if (!result.data) return json({ ok: false, message: "Profile ownership changed or the Profile is unavailable. Reload before trying again." }, { status: 409 });
+
+  let refreshPending = false;
+  try { revalidateRecord(qrCode); } catch { refreshPending = true; }
 
   return json({
-    ok: true,
+    ok: true, committed: true, refreshPending,
     qrCode,
     permanentPath: loaded.guitar.permanent_path || `/i/${qrCode}`,
     safetyStatus: result.data?.safety_status || "clear",
     publicSafetyNote: result.data?.public_safety_note || "",
     safetyStatusUpdatedAt: result.data?.safety_status_updated_at || "",
-    message: "Safety status updated."
+    message: refreshPending ? "Safety status saved. Reload the Profile to see the change." : "Safety status updated."
   });
 }

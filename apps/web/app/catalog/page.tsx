@@ -8,7 +8,7 @@ export const revalidate = 0;
 
 export default async function CatalogPage() {
   noStore();
-  const [initialRecords, settings] = await Promise.all([getPublicInstruments().catch(() => []), loadPublishedSiteSettings()]);
+  const [initialRecords, settings] = await Promise.all([getPublicInstruments(), loadPublishedSiteSettings()]);
 
   return <CatalogClient initialRecords={initialRecords} content={settings.content} composition={settings.composition.catalog} />;
 }

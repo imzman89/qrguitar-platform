@@ -237,8 +237,9 @@ export async function PATCH(request: Request) {
         updated_at: now
       };
       if ((action === "submit" || action === "revise") && (!patch.service_date || !patch.title || !patch.work_performed)) return json({ ok: false, message: "Service date, title, and work performed are required before owner review." }, 400);
-      const updated = await supabase.from("service_submissions").update(patch).eq("id", id).eq("provider_user_id", auth.user.id).select("*").single<ServiceSubmissionRow>();
+      const updated = await supabase.from("service_submissions").update(patch).eq("id", id).eq("provider_user_id", auth.user.id).eq("status", submission.status).select("*").maybeSingle<ServiceSubmissionRow>();
       if (updated.error) return errorResponse(updated.error.message, /duplicate key/i.test(updated.error.message) ? 409 : 500);
+      if (!updated.data) return json({ ok: false, message: "This service request changed while you were editing it. Refresh and try again." }, 409);
       const revisionMetadata = action === "revise" ? {
         priorVersion: {
           serviceDate: submission.service_date,
@@ -282,8 +283,9 @@ export async function PATCH(request: Request) {
     if (action === "cancel") {
       if (!provider && !admin) return json({ ok: false, message: "Only the submitting provider or QRguitar admin can cancel this request." }, 403);
       if (["approved", "declined", "cancelled", "expired"].includes(submission.status)) return json({ ok: false, message: "This request is already closed." }, 409);
-      const updated = await supabase.from("service_submissions").update({ status: "cancelled", cancelled_at: now, updated_at: now }).eq("id", id).select("*").single<ServiceSubmissionRow>();
+      const updated = await supabase.from("service_submissions").update({ status: "cancelled", cancelled_at: now, updated_at: now }).eq("id", id).eq("status", submission.status).select("*").maybeSingle<ServiceSubmissionRow>();
       if (updated.error) return errorResponse(updated.error.message);
+      if (!updated.data) return json({ ok: false, message: "This service request changed while you were reviewing it. Refresh and try again." }, 409);
       await addActivity(supabase, id, auth.user.id, "cancelled", cleanServiceText(body?.note, 2000));
       await addNotification(supabase, id, provider ? submission.owner_user_id : submission.provider_user_id, "cancelled", "The service submission was cancelled. Nothing was published.");
       return json({ ok: true, submission: (await serializeSubmissions(supabase, [updated.data]))[0], message: "Service submission cancelled. Nothing was published." });

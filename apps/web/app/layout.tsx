@@ -1,5 +1,7 @@
 import "./globals.css";
-import type { Metadata } from "next";
+import "./product.css";
+import type { Metadata, Viewport } from "next";
+import { PwaRuntime } from "../components/PwaRuntime";
 import type { CSSProperties, ReactNode } from "react";
 import { ThemeRuntime } from "../components/ThemeRuntime";
 import { SessionLifecycle } from "../components/SessionLifecycle";
@@ -8,8 +10,14 @@ import { buildManagedSiteMetadata } from "../lib/site-metadata";
 import { loadPublishedSiteSettings } from "../lib/site-settings-server";
 
 export async function generateMetadata(): Promise<Metadata> {
-  return buildManagedSiteMetadata();
+  return {
+    ...await buildManagedSiteMetadata(),
+    applicationName: "QRguitar",
+    appleWebApp: { capable: true, title: "QRguitar", statusBarStyle: "default" }
+  };
 }
+
+export const viewport: Viewport = { themeColor: "#0c1718" };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const organizationJsonLd = buildOrganizationJsonLd();
@@ -38,7 +46,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
         />
-        {children}
+        <PwaRuntime>{children}</PwaRuntime>
       </body>
     </html>
   );

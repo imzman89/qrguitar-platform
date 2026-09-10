@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -62,7 +63,7 @@ ok(submissions.includes("priorVersion") && submissions.includes("revisedToVersio
 ok(evidence.includes('from("service-evidence")') && evidence.includes("createSignedUrl"), "Evidence is not served through short-lived signed URLs");
 ok(evidence.includes("SERVICE_EVIDENCE_MAX_BYTES") && workflow.includes("15 * 1024 * 1024"), "Evidence size limit missing");
 ok(evidence.includes("writeAllowed") && evidence.includes('submission.status === "changes_requested"'), "Evidence write-state guard missing");
-ok((evidence.match(/const earlyAuth = await getAuthenticatedUser\(request\)/g) || []).length === 3, "Evidence routes do not authenticate before lookup or parsing");
+execFileSync(process.execPath, [path.join(root, "scripts/security/auxiliary-routes.test.mjs"), "--match", "evidence signed-out"], { stdio: "inherit" });
 
 ok(serviceEvents.includes('source_kind: "owner_reported"'), "Owner service provenance missing");
 ok(serviceEvents.includes('source_kind === "provider_submitted_owner_approved"'), "Approved provider history protection missing");

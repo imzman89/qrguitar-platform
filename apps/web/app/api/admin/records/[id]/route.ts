@@ -46,14 +46,14 @@ function hasBodyField(body: Body | null, key: keyof Body) {
   return Boolean(body && Object.prototype.hasOwnProperty.call(body, key));
 }
 
-export async function PATCH(request: Request, context: { params: { id: string } }) {
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const access = await requireAdmin(request);
   if (!access.ok) {
     return access.response;
   }
 
   const { supabase, admin } = access;
-  const recordId = cleanText(context.params.id, 100);
+  const recordId = cleanText((await context.params).id, 100);
   const body = (await request.json().catch(() => null)) as Body | null;
   const action = cleanText(body?.action, 60);
   const reason = cleanText(body?.reason, 1000);

@@ -26,19 +26,25 @@ export function createSitePreviewToken(userId: string) {
   return `${payload}.${sign(payload)}`;
 }
 
-export function verifySitePreviewToken(token?: string | null) {
-  if (!token || !previewSecret()) return false;
-  const [payload, signature] = token.split(".");
-  if (!payload || !signature) return false;
+export function readSitePreviewPayload(token?: string | null): PreviewPayload | null {
+  if (!token || token.length > 2048 || !previewSecret()) return null;
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const [payload, signature] = parts;
+  if (!payload || !/^[A-Za-z0-9_-]{43}$/.test(signature)) return null;
   const expected = sign(payload);
-  if (!expected || expected.length !== signature.length) return false;
-  if (!timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return false;
+  if (!expected || expected.length !== signature.length) return null;
+  if (!timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
   try {
     const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as PreviewPayload;
-    return Boolean(decoded.sub && decoded.exp > Math.floor(Date.now() / 1000));
-  } catch {
-    return false;
-  }
+    return typeof decoded.sub === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(decoded.sub) &&
+      Number.isSafeInteger(decoded.exp) && decoded.exp > Math.floor(Date.now() / 1000) ? decoded : null;
+  } catch { return null; }
+}
+export function verifySitePreviewToken(token?: string | null) { return Boolean(readSitePreviewPayload(token)); }
+export function sitePreviewTokenFromCookie(header: string) {
+  const raw = header.split(";").map(item => item.trim()).find(item => item.startsWith(sitePreviewCookie + "="))?.slice(sitePreviewCookie.length + 1);
+  try { return raw ? decodeURIComponent(raw) : ""; } catch { return ""; }
 }
 
 export function safePreviewPath(value?: string | null) {

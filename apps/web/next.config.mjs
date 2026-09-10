@@ -9,6 +9,7 @@ const securityHeaders = [
       "img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co",
       "font-src 'self' data:",
       "connect-src 'self' https://*.supabase.co",
+      "frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",

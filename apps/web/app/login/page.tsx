@@ -9,6 +9,8 @@ import { clearQrGuitarSessionState, createBrowserSupabaseClient, sessionExpiredM
 import { getContentValue } from "../../lib/content-registry";
 import { useSiteContent } from "../../lib/use-site-content";
 
+import { safeAuthRedirect } from "../../lib/auth-redirect";
+
 type LoginMode = "login" | "register" | "reset";
 
 export default function LoginPage() {
@@ -27,8 +29,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const nextPath = sanitizeNext(params.get("next"));
+    const nextPath = safeAuthRedirect(params.get("next"));
     setSafeNext(nextPath);
+    if (params.get("mode") === "register" || params.get("mode") === "reset") setMode(params.get("mode") as LoginMode);
     const expiredMessage = window.localStorage.getItem(sessionExpiredMessageKey);
     if (params.get("reason") === "session-expired" || expiredMessage) {
       setStatus(expiredMessage || sessionExpiredCopy);
@@ -55,11 +58,32 @@ export default function LoginPage() {
     setMode(nextMode);
     setStatus("");
     setPassword("");
+    const url = new URL(window.location.href);
+    url.searchParams.set("mode", nextMode);
+    window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+  }
+
+  async function submitAccountAction() {
+    if (isWorking) return;
+    try {
+      if (mode === "register") await register();
+      else if (mode === "reset") await sendPasswordReset();
+      else await login();
+    } catch {
+      setStatus("We couldn't connect. Check your connection and try again.");
+    } finally {
+      setIsWorking(false);
+    }
   }
 
   async function register() {
     if (!name.trim() || !email.trim() || !password.trim()) {
       setStatus("Name, email, and password are required.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setStatus("Use at least 8 characters for your password.");
       return;
     }
 
@@ -200,43 +224,46 @@ export default function LoginPage() {
                   <strong>{mode === "register" ? "Create your account." : mode === "reset" ? "Get a reset link." : "Sign in to continue."}</strong>
                 </div>
 
+                <form onSubmit={(event) => { event.preventDefault(); void submitAccountAction(); }} aria-busy={isWorking}>
                 {mode === "register" ? (
                   <div className="field">
                     <label htmlFor="name">Display name</label>
-                    <input id="name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Owner, builder, or shop name" />
+                    <input id="name" name="name" autoComplete="nickname" required value={name} onChange={(event) => setName(event.target.value)} placeholder="Owner, builder, or shop name" />
                   </div>
                 ) : null}
 
                 <div className="field">
                   <label htmlFor="email">Email</label>
-                  <input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder="you@example.com" />
+                  <input id="email" name="email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder="you@example.com" />
                 </div>
 
                 {mode !== "reset" ? (
                   <div className="field">
                     <label htmlFor="password">Password</label>
-                    <input id="password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "register" ? "new-password" : "current-password"} placeholder={mode === "register" ? "Create a password" : "Enter your password"} />
+                    <input id="password" name="password" type="password" required minLength={mode === "register" ? 8 : undefined} aria-describedby={mode === "register" ? "password-hint" : undefined} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "register" ? "new-password" : "current-password"} placeholder={mode === "register" ? "Create a password" : "Enter your password"} />
+                    {mode === "register" ? <p className="fine-print" id="password-hint">Use at least 8 characters.</p> : null}
                   </div>
                 ) : null}
 
                 <div className="form-actions">
                   {mode === "login" ? (
-                    <button className="button" type="button" onClick={login} disabled={isWorking}>
-                      {getContentValue(content, "login.actions.submit")}
+                    <button className="button" type="submit" disabled={isWorking}>
+                      {isWorking ? "Signing in..." : getContentValue(content, "login.actions.submit")}
                     </button>
                   ) : null}
                   {mode === "register" ? (
-                    <button className="button" type="button" onClick={register} disabled={isWorking}>
-                      {getContentValue(content, "login.actions.create")}
+                    <button className="button" type="submit" disabled={isWorking}>
+                      {isWorking ? "Creating account..." : getContentValue(content, "login.actions.create")}
                     </button>
                   ) : null}
                   {mode === "reset" ? (
-                    <button className="button" type="button" onClick={sendPasswordReset} disabled={isWorking}>
+                    <button className="button" type="submit" disabled={isWorking}>
                       {isWorking ? "Sending..." : "Send reset link"}
                     </button>
                   ) : null}
                 </div>
 
+                </form>
                 <div className="auth-card-link-row">
                   {mode === "login" ? (
                     <button className="link-button" type="button" onClick={() => switchMode("reset")}>
@@ -250,7 +277,7 @@ export default function LoginPage() {
               </>
             )}
 
-            {status ? <p className="form-message">{status}</p> : null}
+            {status ? <p className="form-message" role="status" aria-live="polite">{status}</p> : null}
             <p className="fine-print">
               <Link href="/">Back to homepage</Link>
             </p>
@@ -260,14 +287,6 @@ export default function LoginPage() {
       <Footer />
     </>
   );
-}
-
-function sanitizeNext(path: string | null) {
-  if (!path || path === "/login") {
-    return "/dashboard";
-  }
-
-  return path.startsWith("/") ? path : "/dashboard";
 }
 
 function cleanAuthError(message: string) {

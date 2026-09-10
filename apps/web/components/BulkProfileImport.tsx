@@ -1,54 +1,22 @@
 "use client";
 
-import { Clipboard, FileSpreadsheet, Upload } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Clipboard, Upload } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DemoInstrument } from "../lib/local-demo";
-import { canonicalInstrumentBrand } from "../lib/instrument-brands";
 import { qrCodeFromSerial } from "../lib/qrguitar-id";
-import { getSupabaseAccessToken } from "../lib/supabase-browser";
+import { createBrowserSupabaseClient } from "../lib/supabase-browser";
 import { getContentValue } from "../lib/content-registry";
 import { useSiteContent } from "../lib/use-site-content";
+import { acquireBulkImportLease, type BulkImportLease } from "../lib/bulk-import-lock";
+import {
+  autoColumnMapping, bulkDraftKey, bulkHeaders, bulkRowStatus, getSourceHeaders,
+  isUncertain, mergeAutoColumnMapping, normalizeHeader, parseRows, readBulkDraft, readBulkCreateResponse, runBulkImport, validateBulkRow,
+  type BulkDraft, type BulkRow, type ColumnMapping
+} from "../lib/bulk-import";
 
-type BulkProfileImportProps = {
-  onComplete?: () => void;
-  ownerName?: string;
-};
-
-type BulkRow = {
-  rowNumber: number;
-  brand: string;
-  model: string;
-  serial: string;
-  serialNotUsed: boolean;
-  year: string;
-  instrumentType: string;
-  condition: "new" | "used";
-  saleStatus: "for_sale" | "not_for_sale";
-  originalityStatus: "all_original" | "modified" | "unknown";
-  location: string;
-  visibility: "public" | "private" | "unlisted";
-  photo: string;
-  summary: string;
-  seller: string;
-  acquisitionDate: string;
-  showSerialPublic: boolean;
-  error: string;
-  result: string;
-  duplicateCode: string;
-};
-
-const headers = ["brand", "model", "serial", "year", "type", "condition", "sale_status", "originality", "location", "visibility", "photo", "summary", "show_serial", "seller", "acquisition_date"];
-
-const template = [
-  headers.join("\t"),
-  ["Fender", "Stratocaster", "ABC123", "2005", "Electric Guitar", "used", "not_for_sale", "all_original", "Cranston, RI", "private", "https://example.com/photo.jpg", "Owned since 2024", "yes", "Example Shop", "2024-01-15"].join("\t")
-].join("\n");
-
-const importDraftKey = "qrguitar.bulkImportDraft.v1";
-
-type ColumnMapping = Record<string, string>;
-
-const importTargets = ["", ...headers] as const;
+type BulkProfileImportProps = { onComplete?: () => void; ownerName?: string };
+const template = [bulkHeaders.join("\t"), ["Fender", "Stratocaster", "ABC123", "2005", "Electric Guitar", "used", "not_for_sale", "all_original", "Cranston, RI", "private", "https://example.com/photo.jpg", "Owned since 2024", "no", "Example Shop", "2024-01-15"].join("\t")].join("\n");
+const importTargets = ["", ...bulkHeaders];
 
 export function BulkProfileImport({ onComplete = () => undefined, ownerName = "" }: BulkProfileImportProps) {
   const content = useSiteContent();
@@ -56,13 +24,22 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
   const [rows, setRows] = useState<BulkRow[]>([]);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const [filter, setFilter] = useState<"all" | "ready" | "attention" | "duplicate" | "invalid" | "draft" | "created">("all");
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({});
   const [draftLoaded, setDraftLoaded] = useState(false);
-
-  const readyCount = useMemo(() => rows.filter((row) => !row.error).length, [rows]);
+  const [ownerId, setOwnerId] = useState("");
+  const [storageError, setStorageError] = useState("");
+  const [parseError, setParseError] = useState("");
+  const activeAccount = useRef("");
+  const running = useRef(false);
+  const draftLease = useRef<BulkImportLease | null>(null);
+  const [leaseState, setLeaseState] = useState<"waiting" | "owned" | "unsupported" | "error" | "signed-out">("waiting");
+  const readyCount = useMemo(() => rows.filter((row) => !row.error && row.result !== "Created" && row.attempt?.phase !== "complete").length, [rows]);
+  const controlsLocked = leaseState !== "owned" || !draftLoaded || Boolean(storageError) || saving || previewing || rows.some((row) => Boolean(row.attempt));
+  const hasUncertain = rows.some(isUncertain);
   const visibleRows = rows.filter((row) => filter === "all"
-    || (filter === "ready" && !row.error && !row.result)
+    || (filter === "ready" && !row.error && row.result !== "Created")
     || (filter === "attention" && Boolean(row.error || (row.result && row.result !== "Created")))
     || (filter === "duplicate" && Boolean(row.duplicateCode))
     || (filter === "invalid" && bulkRowStatus(row) === "Invalid")
@@ -70,188 +47,215 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
     || (filter === "created" && row.result === "Created"));
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(importDraftKey);
-    if (saved) {
-      try {
-        const draft = JSON.parse(saved) as { text?: string; rows?: BulkRow[]; columnMapping?: ColumnMapping };
-        setText(String(draft.text || ""));
-        setRows(Array.isArray(draft.rows) ? draft.rows : []);
-        setColumnMapping(draft.columnMapping || {});
-      } catch {
-        setText(saved);
-      }
-    }
-    setDraftLoaded(true);
+    let alive = true;
+    const supabase = createBrowserSupabaseClient();
+    const changeAccount = (nextOwner: string) => {
+      if (!alive || (activeAccount.current === nextOwner && nextOwner)) return;
+      activeAccount.current = nextOwner;
+      draftLease.current?.release(); draftLease.current = null;
+      setOwnerId(nextOwner); setDraftLoaded(false); setStorageError(""); setParseError("");
+      setText(""); setRows([]); setColumnMapping({}); setMessage("");
+      setLeaseState(nextOwner ? "waiting" : "signed-out");
+      if (!nextOwner) setMessage("Sign in to restore your import.");
+    };
+    void supabase.auth.getSession().then(({ data }) => changeAccount(data.session?.user.id || ""));
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => changeAccount(session?.user.id || ""));
+    return () => { alive = false; data.subscription.unsubscribe(); draftLease.current?.release(); };
   }, []);
 
   useEffect(() => {
-    if (!draftLoaded) return;
-    if (text.trim()) window.localStorage.setItem(importDraftKey, JSON.stringify({ text, rows, columnMapping }));
-    else window.localStorage.removeItem(importDraftKey);
-  }, [columnMapping, draftLoaded, rows, text]);
+    if (!ownerId) return;
+    let alive = true;
+    setDraftLoaded(false); setLeaseState("waiting");
+    if (!navigator.locks) {
+      setLeaseState("unsupported");
+      setMessage("This browser cannot coordinate import drafts safely. Open QRguitar in a browser with Web Locks support to continue your saved import.");
+      return;
+    }
+    const lease = acquireBulkImportLease(navigator.locks, ownerId);
+    draftLease.current = lease;
+    void lease.ready.then(() => {
+      if (!alive || draftLease.current !== lease || activeAccount.current !== ownerId) return;
+      // Read only after acquiring ownership: another tab may have completed rows while this tab waited.
+      try {
+        lease.assertOwned();
+        const saved = window.localStorage.getItem(bulkDraftKey(ownerId));
+        if (saved) {
+          const draft = readBulkDraft(saved, ownerId);
+          setText(draft.text); setRows(draft.rows); setColumnMapping(draft.columnMapping);
+          setMessage(draft.rows.some(isUncertain) ? "An earlier request needs confirmation. Retry to check it before continuing." : "Your saved import is ready to continue.");
+        } else if (window.localStorage.getItem("qrguitar.bulkImportDraft.v1")) {
+          setMessage("An older import draft is still saved in this browser. It cannot be resumed safely because it has no account or request identifiers. Review your collection before starting a replacement import.");
+        }
+      } catch (error) {
+        setStorageError(error instanceof Error ? error.message : "The saved import could not be read. It has been preserved.");
+      }
+      setDraftLoaded(true); setLeaseState("owned");
+    }).catch((error) => {
+      if (!alive || draftLease.current !== lease || activeAccount.current !== ownerId) return;
+      setLeaseState("error");
+      setMessage(error instanceof Error ? error.message : "This tab could not open the import workspace. Reload to retry.");
+    });
+    return () => {
+      alive = false;
+      lease.release();
+      if (draftLease.current === lease) draftLease.current = null;
+    };
+  }, [ownerId]);
 
-  const sourceHeaders = useMemo(() => getSourceHeaders(text), [text]);
+  function assertDraftOwnership() {
+    if (!ownerId || activeAccount.current !== ownerId || draftLease.current?.ownerId !== ownerId) throw new Error("Your account changed. Sign in with the original account to resume its import.");
+    draftLease.current.assertOwned();
+  }
+
+  function persistRows(nextRows: BulkRow[]) {
+    assertDraftOwnership();
+    const draft: BulkDraft = { version: 2, ownerId, text, rows: nextRows, columnMapping };
+    try { window.localStorage.setItem(bulkDraftKey(ownerId), JSON.stringify(draft)); }
+    catch { throw new Error("This browser could not save your import progress. Free browser storage and retry before importing any more rows."); }
+    setRows(nextRows);
+  }
+
+  useEffect(() => {
+    if (!draftLoaded || !ownerId || storageError || running.current || leaseState !== "owned" || draftLease.current?.ownerId !== ownerId || !draftLease.current.isOwned()) return;
+    try {
+      const draft: BulkDraft = { version: 2, ownerId, text, rows, columnMapping };
+      window.localStorage.setItem(bulkDraftKey(ownerId), JSON.stringify(draft));
+    } catch { setStorageError("This browser could not save your import progress. Free browser storage before continuing."); }
+  }, [columnMapping, draftLoaded, leaseState, ownerId, rows, storageError, text]);
+
+  const sourceHeaders = useMemo(() => {
+    try { return getSourceHeaders(text); } catch { return []; }
+  }, [text]);
+
+  async function tokenForOwner() {
+    assertDraftOwnership();
+    const { data } = await createBrowserSupabaseClient().auth.getSession();
+    if (!data.session || data.session.user.id !== ownerId || activeAccount.current !== ownerId) throw new Error("Sign in with the original account to continue this saved import.");
+    assertDraftOwnership();
+    return data.session.access_token;
+  }
+
+  function parseSource(source: string, mapping: ColumnMapping) {
+    try { const parsed = parseRows(source, mapping); setParseError(""); return parsed; }
+    catch (error) { setParseError(error instanceof Error ? error.message : "This file could not be read."); return null; }
+  }
 
   async function loadFile(file?: File) {
-    if (!file) return;
+    if (!file || controlsLocked) return;
     if (file.size > 2_000_000) { setMessage("Choose a CSV or TSV file smaller than 2 MB."); return; }
-    const source = await file.text();
-    const mapping = autoColumnMapping(source);
-    setText(source);
-    setColumnMapping(mapping);
-    const parsed = parseRows(source, mapping);
-    setRows(parsed);
-    setMessage(`${file.name}: ${parsed.length} row${parsed.length === 1 ? "" : "s"} reviewed.`);
+    try {
+      const lease = draftLease.current;
+      const source = await file.text();
+      if (lease !== draftLease.current || !lease?.isOwned()) return;
+      assertDraftOwnership();
+      setText(source); setRows([]); setMessage("");
+      const mapping = autoColumnMapping(source);
+      setColumnMapping(mapping);
+      const parsed = parseSource(source, mapping);
+      if (parsed) { setRows(parsed); setMessage(`${file.name}: ${parsed.length} row${parsed.length === 1 ? "" : "s"} reviewed.`); }
+    } catch (error) { setParseError(error instanceof Error ? error.message : "The file could not be read."); }
+  }
+
+  async function checkDuplicates(input: BulkRow[]) {
+    const token = await tokenForOwner();
+    const response = await fetch("/api/instruments?scope=mine", { headers: { authorization: `Bearer ${token}` }, cache: "no-store" });
+    const payload = await response.json().catch(() => null) as { ok?: boolean; instruments?: DemoInstrument[] } | null;
+    assertDraftOwnership();
+    if (!response.ok || !payload?.ok || !Array.isArray(payload.instruments)) throw new Error("Your collection could not be checked. Retry before importing.");
+    const existingBySerial = new Map(payload.instruments.filter((item) => item.serial).map((item) => [item.serial.trim().toLowerCase(), item.qrCode]));
+    return input.map((row) => {
+      // A prior POST must replay its own key before a serial lookup can classify it as a duplicate.
+      if (row.attempt || row.result === "Created") return row;
+      const duplicateCode = row.serial ? existingBySerial.get(row.serial.toLowerCase()) || "" : "";
+      return { ...row, duplicateCode, error: [...validateBulkRow(row), duplicateCode ? `Serial Number already belongs to ${duplicateCode}. Use transfer or claim instead.` : ""].filter(Boolean).join(" ") };
+    });
   }
 
   async function previewRows() {
-    const mapping = sourceHeaders.length ? mergeAutoColumnMapping(sourceHeaders, columnMapping) : {};
-    setColumnMapping(mapping);
-    let parsed = parseRows(text, mapping);
-    const token = await getSupabaseAccessToken();
-    if (token) {
-      const response = await fetch("/api/instruments?scope=mine", { headers: { authorization: `Bearer ${token}` }, cache: "no-store" });
-      const payload = await response.json().catch(() => null) as { instruments?: DemoInstrument[] } | null;
-      const existingBySerial = new Map((payload?.instruments || []).filter((item) => item.serial).map((item) => [item.serial.trim().toLowerCase(), item.qrCode]));
-      parsed = parsed.map((row) => {
-        const duplicateCode = row.serial ? existingBySerial.get(row.serial.toLowerCase()) || "" : "";
-        return duplicateCode ? { ...row, duplicateCode, error: [row.error, `Serial Number already belongs to ${duplicateCode}. Use transfer or claim instead.`].filter(Boolean).join(" ") } : row;
-      });
-    }
-    setRows(parsed);
-    setMessage(parsed.length ? String(parsed.length) + " row" + (parsed.length === 1 ? "" : "s") + " reviewed. " + String(parsed.filter((row) => !row.error).length) + " ready." : "Paste a header row and at least one instrument row.");
+    if (controlsLocked || running.current) return;
+    running.current = true; setPreviewing(true);
+    try {
+      const mapping = mergeAutoColumnMapping(sourceHeaders, columnMapping);
+      setColumnMapping(mapping);
+      const parsed = rows.length ? rows : parseSource(text, mapping);
+      if (!parsed) return;
+      const checked = await checkDuplicates(parsed);
+      setRows(checked);
+      setMessage(checked.length ? `${checked.length} rows reviewed. ${checked.filter((row) => !row.error).length} ready.` : "Paste a header row and at least one instrument row.");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Preview could not be completed. Retry."); }
+    finally { running.current = false; setPreviewing(false); }
   }
 
   async function copyTemplate() {
-    try {
-      if (!navigator.clipboard) throw new Error("Clipboard unavailable");
-      await navigator.clipboard.writeText(template);
-      setMessage("Template copied.");
-    } catch {
-      setMessage("Could not copy automatically. Select the template above and copy it manually.");
-    }
+    try { await navigator.clipboard.writeText(template); setMessage("Template copied."); }
+    catch { setMessage("Could not copy automatically. Select the template above and copy it manually."); }
   }
 
   async function createProfiles() {
-    let parsed = rows.length ? rows : parseRows(text, columnMapping);
-    const token = await getSupabaseAccessToken();
-    if (!token) {
-      setMessage("Your session expired. Sign in again before importing.");
-      return;
-    }
-
-    const existingResponse = await fetch("/api/instruments?scope=mine", { headers: { authorization: `Bearer ${token}` }, cache: "no-store" });
-    const existingPayload = await existingResponse.json().catch(() => null) as { instruments?: DemoInstrument[] } | null;
-    const existingBySerial = new Map((existingPayload?.instruments || []).filter((item) => item.serial).map((item) => [item.serial.trim().toLowerCase(), item.qrCode]));
-    parsed = parsed.map((row) => {
-      if (!row.serial) return row;
-      const duplicateCode = existingBySerial.get(row.serial.toLowerCase()) || "";
-      return duplicateCode ? { ...row, duplicateCode, error: `Serial Number already belongs to ${duplicateCode}. Use transfer or claim instead.` } : row;
-    });
-    setRows(parsed);
-    const validRows = parsed.filter((row) => !row.error && row.result !== "Created");
-    if (!validRows.length) {
-      setMessage("Fix the highlighted rows before creating Profiles.");
-      return;
-    }
-
-    setSaving(true);
-    setMessage("");
-    let created = 0;
-    const results = new Map<number, string>();
-
+    if (running.current || leaseState !== "owned" || !draftLoaded || !ownerId || storageError || parseError || !rows.length) return;
+    running.current = true; setSaving(true); setMessage("");
     try {
-      for (const row of validRows) {
-        const uploadId = createClientKey();
-        const idempotencyKey = createClientKey();
-        let storagePath = "";
-        try {
+      const checked = await checkDuplicates(rows);
+      persistRows(checked);
+      if (!checked.some((row) => !row.error && row.result !== "Created")) { setMessage("Fix the highlighted rows before creating Profiles."); return; }
+      const result = await runBulkImport(checked, {
+        ownerName, makeKey: createClientKey,
+        persist: (nextRows) => {
+          try { persistRows(nextRows); }
+          catch (error) { setStorageError(error instanceof Error ? error.message : "Import progress could not be saved."); throw error; }
+        },
+        upload: async (row, uploadId) => {
           const dataUrl = await remoteImageToDataUrl(row.photo);
-          const uploadResponse = await fetch("/api/instruments/uploads", {
-            method: "POST",
-            headers: {
-              "content-type": "application/json",
-              authorization: "Bearer " + token
-            },
+          const token = await tokenForOwner();
+          const response = await fetch("/api/instruments/uploads", {
+            method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
             body: JSON.stringify({ uploadId, kind: "image", dataUrl, index: 0 })
           });
-          const uploadPayload = await uploadResponse.json().catch(() => null) as { ok?: boolean; storagePath?: string; message?: string } | null;
-          if (!uploadResponse.ok || !uploadPayload?.ok || !uploadPayload.storagePath) {
-            results.set(row.rowNumber, uploadPayload?.message || "The photo could not be staged for import.");
-            continue;
-          }
-          storagePath = uploadPayload.storagePath;
-        } catch (error) {
-          results.set(row.rowNumber, error instanceof Error ? error.message : "The photo could not be prepared for import.");
-          continue;
+          const payload = await response.json().catch(() => null) as { ok?: boolean; storagePath?: string; message?: string } | null;
+          if (!response.ok || !payload?.ok || !payload.storagePath) throw new Error(payload?.message || "The photo could not be staged. Retry this row.");
+          return payload.storagePath;
+        },
+        create: async (body) => {
+          const token = await tokenForOwner();
+          const response = await fetch("/api/instruments", {
+            method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify(body)
+          });
+          return readBulkCreateResponse(response);
         }
-
-        const response = await fetch("/api/instruments", {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            authorization: "Bearer " + token
-          },
-          body: JSON.stringify({
-            name: [row.brand, row.model].filter(Boolean).join(" "),
-            brand: row.brand,
-            model: row.model,
-            serial: row.serial,
-            serialNotUsed: row.serialNotUsed,
-            year: row.year,
-            instrumentType: row.instrumentType,
-            condition: row.condition,
-            saleStatus: row.saleStatus,
-            originalityStatus: row.originalityStatus,
-            ownerName,
-            location: row.location,
-            visibility: "private",
-            summary: row.summary,
-            heroImageDataUrl: storagePath,
-            photos: [storagePath],
-            uploadId,
-            idempotencyKey,
-            showSerialPublic: Boolean(row.serial) && row.showSerialPublic,
-            documents: [],
-            customFields: [
-              row.seller ? { label: "Seller / source", value: row.seller } : null,
-              row.acquisitionDate ? { label: "Acquired", value: row.acquisitionDate } : null
-            ].filter(Boolean)
-          })
-        });
-        const payload = await response.json().catch(() => null) as { ok?: boolean; message?: string } | null;
-        if (response.ok && payload?.ok) {
-          created += 1;
-          results.set(row.rowNumber, "Created");
-        } else {
-          results.set(row.rowNumber, payload?.message || "Could not create this Profile.");
-        }
-      }
-
-      setRows((current) => current.map((row) => ({ ...row, result: results.get(row.rowNumber) || row.result })));
-      setMessage(String(created) + " Profile" + (created === 1 ? "" : "s") + " created. Rows with errors were left untouched.");
-      if (created) onComplete();
-    } catch {
-      setMessage("The import stopped because the connection failed. No unprocessed rows were submitted. Preview the rows and try again.");
-    } finally {
-      setSaving(false);
-    }
+      });
+      setMessage(result.stoppedReason || `${result.created} Profile${result.created === 1 ? "" : "s"} created. Completed rows are saved; retry any remaining rows.`);
+      if (result.created) onComplete();
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Import stopped. Saved rows can be resumed safely."); }
+    finally { running.current = false; setSaving(false); }
   }
 
   function updateRow(rowNumber: number, field: "brand" | "model" | "serial" | "instrumentType" | "photo", value: string) {
+    if (saving || previewing || leaseState !== "owned") return;
     setRows((current) => current.map((row) => {
-      if (row.rowNumber !== rowNumber) return row;
+      if (row.rowNumber !== rowNumber || row.attempt) return row;
       const next = { ...row, [field]: value, serialNotUsed: field === "serial" ? /^(none|n\/a|na|no serial|not used)$/i.test(value.trim()) : row.serialNotUsed, duplicateCode: "", result: "" };
-      if (field === "serial" && next.serialNotUsed) next.serial = "";
+      if (field === "serial" && next.serialNotUsed) { next.serial = ""; next.showSerialPublic = false; }
       return { ...next, error: validateBulkRow(next).join(" ") };
     }));
   }
 
   function updateColumnMapping(sourceHeader: string, targetHeader: string) {
+    if (controlsLocked) return;
     const next = { ...columnMapping, [sourceHeader]: targetHeader };
-    setColumnMapping(next);
-    setRows(parseRows(text, next));
+    setColumnMapping(next); setRows(parseSource(text, next) || []);
     setMessage("Column mapping updated. Review the rows before creating Profiles.");
+  }
+
+  function startNewImport() {
+    if (saving || previewing || hasUncertain || storageError || leaseState !== "owned") return;
+    setText(""); setRows([]); setColumnMapping({}); setMessage(""); setParseError(""); setFilter("all");
+  }
+
+  function loadExample() {
+    if (controlsLocked) return;
+    const mapping = autoColumnMapping(template);
+    setText(template); setColumnMapping(mapping); setRows(parseSource(template, mapping) || []); setMessage("");
   }
 
   return (
@@ -262,20 +266,21 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
         <div className="bulk-import-intro">
           <h2>1. Add inventory</h2>
           <p>Upload CSV/TSV or paste spreadsheet rows. Required: Brand, Model, Type, a Serial Number or explicit no-serial value, and a real photo URL.</p>
-          <label className="import-file-drop"><Upload size={20} /><span><b>Choose CSV or TSV</b><small>Comma and tab delimiters are detected automatically.</small></span><input type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" onChange={(event) => void loadFile(event.target.files?.[0])} /></label>
+          <label className="import-file-drop"><Upload size={20} /><span><b>Choose CSV or TSV</b><small>Comma and tab delimiters are detected automatically.</small></span><input disabled={controlsLocked} type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" onChange={(event) => void loadFile(event.target.files?.[0])} /></label>
         </div>
         <label className="field custom-wide" htmlFor="dashboardBulkImport">
           <span>Or paste spreadsheet rows</span>
-          <textarea id="dashboardBulkImport" rows={8} value={text} onChange={(event) => { setText(event.target.value); setRows([]); }} spellCheck={false} placeholder={template} />
+          <textarea disabled={controlsLocked} id="dashboardBulkImport" rows={8} value={text} onChange={(event) => { setText(event.target.value); setRows([]); setParseError(""); setMessage(""); }} spellCheck={false} placeholder={template} />
         </label>
         <div className="bulk-import-actions">
-          <button className="button secondary" type="button" onClick={() => { const mapping = autoColumnMapping(template); setText(template); setColumnMapping(mapping); setRows(parseRows(template, mapping)); }}>Load example</button>
-          <button className="button secondary" type="button" onClick={() => void previewRows()}>Map & preview rows</button>
-          <button className="button" type="button" onClick={() => void createProfiles()} disabled={saving || (rows.length > 0 && readyCount === 0)}>
+          <button className="button secondary" type="button" disabled={controlsLocked} onClick={loadExample}>Load example</button>
+          <button className="button secondary" type="button" disabled={controlsLocked} onClick={() => void previewRows()}>Map & preview rows</button>
+          <button className="button" type="button" onClick={() => void createProfiles()} disabled={leaseState !== "owned" || saving || previewing || !draftLoaded || Boolean(storageError) || Boolean(parseError) || !rows.length || readyCount === 0}>
             <Upload size={16} /> {saving ? "Creating..." : "Create Private Profiles"}
           </button>
+          <button className="button secondary" type="button" disabled={leaseState !== "owned" || !draftLoaded || saving || previewing || hasUncertain || Boolean(storageError)} onClick={startNewImport}>Start new import</button>
         </div>
-        {rows.length ? (
+        {sourceHeaders.length ? (
           <div className="bulk-preview-workspace">
             <div className="import-mapping">
               <div><span className="eyebrow">Column mapping</span><h2>Review detected headings</h2><p>Correct any heading before creating Profiles.</p></div>
@@ -283,7 +288,7 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
                 {sourceHeaders.map((sourceHeader) => (
                   <label key={sourceHeader}>
                     <span>{sourceHeader}</span>
-                    <select aria-label={`Map ${sourceHeader} column`} value={columnMapping[sourceHeader] ?? normalizeHeader(sourceHeader)} onChange={(event) => updateColumnMapping(sourceHeader, event.target.value)}>
+                    <select disabled={controlsLocked} aria-label={`Map ${sourceHeader} column`} value={columnMapping[sourceHeader] ?? normalizeHeader(sourceHeader)} onChange={(event) => updateColumnMapping(sourceHeader, event.target.value)}>
                       {importTargets.map((target) => <option key={target || "ignore"} value={target}>{target ? target.replaceAll("_", " ") : "Ignore column"}</option>)}
                     </select>
                   </label>
@@ -296,16 +301,21 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
               <div className={row.error || (row.result && row.result !== "Created") ? "bulk-preview-row has-error" : "bulk-preview-row"} key={row.rowNumber}>
                 <strong>Row {row.rowNumber}: {row.brand || "Missing brand"} {row.model || "Missing model"}</strong>
                 <span>{[row.year, row.serial || "No Serial Number", row.serial ? qrCodeFromSerial(row.serial) : "QRguitar ID assigned at creation", "Private on creation", row.photo ? "Photo ready" : "Photo missing"].filter(Boolean).join(" / ")}</span>
-                {row.result !== "Created" ? <div className="bulk-row-editor"><input aria-label={`Row ${row.rowNumber} brand`} value={row.brand} onChange={(event) => updateRow(row.rowNumber, "brand", event.target.value)} placeholder="Brand" /><input aria-label={`Row ${row.rowNumber} model`} value={row.model} onChange={(event) => updateRow(row.rowNumber, "model", event.target.value)} placeholder="Model" /><input aria-label={`Row ${row.rowNumber} Serial Number`} value={row.serialNotUsed ? "No Serial" : row.serial} onChange={(event) => updateRow(row.rowNumber, "serial", event.target.value)} placeholder="Serial Number or No Serial" /><input aria-label={`Row ${row.rowNumber} type`} value={row.instrumentType} onChange={(event) => updateRow(row.rowNumber, "instrumentType", event.target.value)} placeholder="Type" /><input aria-label={`Row ${row.rowNumber} photo URL`} value={row.photo} onChange={(event) => updateRow(row.rowNumber, "photo", event.target.value)} placeholder="https:// photo URL" /></div> : null}
+                {row.result !== "Created" ? <fieldset disabled={leaseState !== "owned" || saving || previewing || Boolean(row.attempt)} className="bulk-row-editor" style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }} aria-label={`Edit row ${row.rowNumber}`}><input aria-label={`Row ${row.rowNumber} brand`} value={row.brand} onChange={(event) => updateRow(row.rowNumber, "brand", event.target.value)} placeholder="Brand" /><input aria-label={`Row ${row.rowNumber} model`} value={row.model} onChange={(event) => updateRow(row.rowNumber, "model", event.target.value)} placeholder="Model" /><input aria-label={`Row ${row.rowNumber} Serial Number`} value={row.serialNotUsed ? "No Serial" : row.serial} onChange={(event) => updateRow(row.rowNumber, "serial", event.target.value)} placeholder="Serial Number or No Serial" /><input aria-label={`Row ${row.rowNumber} type`} value={row.instrumentType} onChange={(event) => updateRow(row.rowNumber, "instrumentType", event.target.value)} placeholder="Type" /><input aria-label={`Row ${row.rowNumber} photo URL`} value={row.photo} onChange={(event) => updateRow(row.rowNumber, "photo", event.target.value)} placeholder="https:// photo URL" /></fieldset> : null}
                 <small>{bulkRowStatus(row)}{row.error || row.result ? `: ${row.error || row.result}` : ""}</small>
+                {row.attempt?.phase === "complete" && row.attempt.qrCode ? <a href={`/edit/${encodeURIComponent(row.attempt.qrCode)}`}>Open created Profile</a> : null}
                 {row.duplicateCode ? <a href={`/i/${row.duplicateCode}`} target="_blank" rel="noreferrer">Open existing Profile</a> : null}
               </div>
             ))}
           </div>
           </div>
         ) : null}
-        {message ? <p className="form-message">{message}</p> : null}
-        <p className="fine-print">Imported Profiles start Private. Review each Profile before publishing it.</p>
+        {leaseState === "waiting" && ownerId ? <p className="form-message" role="status" aria-live="polite">Waiting to open this account’s import. Close its other import tab; saved progress will load here automatically.</p> : null}
+        {message ? <p className="form-message" role="status" aria-live="polite">{message}</p> : null}
+        {parseError ? <p className="form-message" role="alert">{parseError}</p> : null}
+        {storageError ? <p className="form-message" role="alert">{storageError} Reload after resolving the storage issue; the saved draft has been kept.</p> : null}
+        {hasUncertain ? <p className="fine-print">Retry confirms the original request. Keep this draft until its result is known.</p> : null}
+        <p className="fine-print">Import up to 50 rows per batch. Imported Profiles start Private, and Serial Numbers stay hidden unless show_serial explicitly says yes. Review each Profile before publishing it.</p>
       </div>
     </section>
   );
@@ -331,127 +341,4 @@ async function remoteImageToDataUrl(url: string) {
     reader.onerror = () => reject(new Error("The photo could not be read."));
     reader.readAsDataURL(blob);
   });
-}
-
-function parseRows(source: string, columnMapping: ColumnMapping = {}) {
-  const lines = source.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  if (lines.length < 2) return [];
-
-  const delimiter = lines[0].includes("\t") ? "\t" : ",";
-  const sourceHeaders = splitLine(lines[0], delimiter).map((value) => value.trim());
-  const parsedHeaders = sourceHeaders.map((value) => columnMapping[value] ?? normalizeHeader(value));
-
-  return lines.slice(1, 51).map((line, index) => {
-    const cells = splitLine(line, delimiter);
-    const value = (key: string) => String(cells[parsedHeaders.indexOf(key)] || "").trim();
-    const enteredBrand = value("brand");
-    const brand = canonicalInstrumentBrand(enteredBrand) || enteredBrand;
-    const model = value("model");
-    const serialValue = value("serial");
-    const serialNotUsed = /^(none|n\/a|na|no serial|not used)$/i.test(serialValue);
-    const serial = serialNotUsed ? "" : serialValue;
-    const photo = value("photo");
-    const conditionValue = value("condition").toLowerCase();
-    const saleValue = value("sale_status").toLowerCase().replace(/[\s-]+/g, "_");
-    const originalityValue = value("originality").toLowerCase().replace(/[\s-]+/g, "_");
-    const showSerialValue = value("show_serial").toLowerCase();
-    const row: BulkRow = {
-      rowNumber: index + 2,
-      brand,
-      model,
-      serial,
-      serialNotUsed,
-      year: value("year"),
-      instrumentType: value("type") || "Other Guitar",
-      condition: conditionValue === "new" ? "new" as const : "used" as const,
-      saleStatus: saleValue === "for_sale" ? "for_sale" as const : "not_for_sale" as const,
-      originalityStatus: originalityValue === "all_original" ? "all_original" as const : originalityValue === "modified" ? "modified" as const : "unknown" as const,
-      location: value("location"),
-      visibility: "private" as const,
-      photo,
-      summary: value("summary"),
-      seller: value("seller"),
-      acquisitionDate: value("acquisition_date"),
-      showSerialPublic: Boolean(serial) && !["no", "false", "hidden", "private"].includes(showSerialValue),
-      error: "",
-      result: "",
-      duplicateCode: ""
-    };
-    row.error = validateBulkRow(row).join(" ");
-    return row;
-  });
-}
-
-function getSourceHeaders(source: string) {
-  const headerLine = source.split(/\r?\n/).find((line) => line.trim());
-  if (!headerLine) return [];
-  const delimiter = headerLine.includes("\t") ? "\t" : ",";
-  return splitLine(headerLine, delimiter).map((value) => value.trim()).filter(Boolean);
-}
-
-function autoColumnMapping(source: string) {
-  return mergeAutoColumnMapping(getSourceHeaders(source), {});
-}
-
-function mergeAutoColumnMapping(sourceHeaders: string[], current: ColumnMapping) {
-  return Object.fromEntries(sourceHeaders.map((sourceHeader) => [sourceHeader, current[sourceHeader] ?? (headers.includes(normalizeHeader(sourceHeader)) ? normalizeHeader(sourceHeader) : "")]));
-}
-
-function validateBulkRow(row: Pick<BulkRow, "brand" | "model" | "serial" | "serialNotUsed" | "instrumentType" | "photo">) {
-  return [
-    !row.brand.trim() ? "Brand is required." : "",
-    !row.model.trim() ? "Model is required." : "",
-    !row.instrumentType.trim() ? "Type is required." : "",
-    !row.serial.trim() && !row.serialNotUsed ? "Enter a Serial Number or No Serial." : "",
-    !row.photo.trim() ? "A real photo URL is required." : "",
-    row.photo && !/^https?:\/\//i.test(row.photo) ? "Photo must use an http or https URL." : ""
-  ].filter(Boolean);
-}
-
-function bulkRowStatus(row: Pick<BulkRow, "duplicateCode" | "error" | "result">) {
-  if (row.result === "Created") return "Created";
-  if (row.duplicateCode) return "Duplicate";
-  if (row.result) return "Needs Attention";
-  if (!row.error) return "Ready";
-  return /required|enter a Serial Number/i.test(row.error) ? "Draft" : "Invalid";
-}
-
-function normalizeHeader(value: string) {
-  const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
-  if (normalized === "make" || normalized === "brand_name") return "brand";
-  if (normalized === "serial_number" || normalized === "serial_build_id") return "serial";
-  if (normalized === "instrument_type") return "type";
-  if (normalized === "availability") return "sale_status";
-  if (normalized === "photo_url" || normalized === "image" || normalized === "image_url") return "photo";
-  if (normalized === "description") return "summary";
-  if (normalized === "seller_store" || normalized === "seller_source" || normalized === "store") return "seller";
-  if (normalized === "acquired" || normalized === "acquired_date") return "acquisition_date";
-  if (normalized === "show_serial_publicly") return "show_serial";
-  return normalized;
-}
-
-function splitLine(line: string, delimiter: string) {
-  if (delimiter === "\t") return line.split("\t");
-  const values: string[] = [];
-  let current = "";
-  let quoted = false;
-
-  for (let index = 0; index < line.length; index += 1) {
-    const character = line[index];
-    if (character === "\"") {
-      if (quoted && line[index + 1] === "\"") {
-        current += "\"";
-        index += 1;
-      } else {
-        quoted = !quoted;
-      }
-    } else if (character === "," && !quoted) {
-      values.push(current);
-      current = "";
-    } else {
-      current += character;
-    }
-  }
-  values.push(current);
-  return values;
 }

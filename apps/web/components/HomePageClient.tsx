@@ -14,6 +14,8 @@ import type { DemoInstrument } from "../lib/local-demo";
 import { getProfilePhotoUrls } from "../lib/instrument-profile-contract";
 import { buildEditableHomeCopy, fetchPublishedSiteSettings, type EditableSiteSettings } from "../lib/site-settings";
 
+import styles from "./HomePageClient.module.css";
+
 export function HomePageClient({
   initialRecords,
   initialSettings
@@ -166,6 +168,7 @@ export function HomePageClient({
               <Link className="button" href="/create">{copy.hero.primaryCta}</Link>
               <Link className="button secondary" href="/catalog">{copy.hero.secondaryCta}</Link>
             </div>
+            <a className={styles.betaNote} href="#pricing">Free during public beta · View plans</a>
           </div>
           <LatestPublicRecord initialRecord={initialLatestRecord} content={settings?.content} />
         </div>
@@ -290,7 +293,7 @@ export function HomePageClient({
       </section>
     ),
     pricing: (
-      <section className="section pricing-section">
+      <section className="section pricing-section" id="pricing">
         <div className="shell">
           <div className="section-header"><div className="eyebrow">{copy.pricing.eyebrow}</div><h2>{copy.pricing.headline}</h2>{copy.pricing.body ? <p>{copy.pricing.body}</p> : null}</div>
           <div className="pricing-grid">
@@ -312,7 +315,7 @@ export function HomePageClient({
   return (
     <>
       <Nav />
-      <main>
+      <main className={styles.home}>
         {homeSections.filter((section) => section.visible).map((section) => <Fragment key={section.id}>{renderedSections[section.id] || null}</Fragment>)}
       </main>
       <Footer />

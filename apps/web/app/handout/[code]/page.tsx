@@ -1,7 +1,11 @@
 "use client";
 
+import { ownerProfileHref } from "../../../lib/owner-profile";
+
+import { loadHandoutInstrument } from "../../../lib/handout-load";
+
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, useParams } from "next/navigation";
 import { ArrowLeft, CheckCircle2, ExternalLink, FileText, Printer, QrCode, RotateCcw, ShieldCheck, Siren, SlidersHorizontal, Wrench, X, ZoomIn, ZoomOut } from "lucide-react";
 import QRCode from "qrcode";
 import type { CSSProperties, ReactNode } from "react";
@@ -107,7 +111,8 @@ function Badge({ children, tone = "neutral", icon }: { children: ReactNode; tone
   );
 }
 
-export default function HandoutPage({ params }: { params: { code: string } }) {
+export default function HandoutPage() {
+  const params = useParams<{ code: string }>();
   const content = useSiteContent();
   const code = String(params.code || "").trim().toUpperCase();
   const router = useRouter();
@@ -122,6 +127,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
   const [instrument, setInstrument] = useState<DemoInstrument | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [mode, setMode] = useState<PrintMode>(requestedMode);
   const [ownerAuthorized, setOwnerAuthorized] = useState(false);
@@ -146,62 +152,37 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
+    setLoading(true);
+    setMessage("");
+    setInstrument(null);
+    setOwnerAuthorized(false);
+    setPrintScope("public");
+    setSelectedServiceId("");
 
     async function loadHandoutProfile() {
-      setLoading(true);
-      setMessage("");
-
-      const token = await Promise.race([
-        getSupabaseAccessToken().catch(() => ""),
-        new Promise<string>((resolve) => window.setTimeout(() => resolve(""), 2500))
-      ]);
-      if (token) {
-        const ownerResponse = await fetch(`/api/instruments?scope=mine&code=${encodeURIComponent(code)}`, {
-          cache: "no-store",
-          headers: {
-            "Cache-Control": "no-cache",
-            authorization: `Bearer ${token}`
-          }
-        });
-        const ownerPayload = (await ownerResponse.json().catch(() => null)) as HandoutPayload | null;
-        if (!cancelled && ownerResponse.ok && ownerPayload?.ok && ownerPayload.instrument) {
-          setOwnerAuthorized(true);
-          setInstrument(ownerPayload.instrument);
-          if (ownerPayload.instrument.qrCode && ownerPayload.instrument.qrCode !== code) {
-            router.replace(`/handout/${encodeURIComponent(ownerPayload.instrument.qrCode)}`);
-          }
-          setLoading(false);
-          return;
+      try {
+        const result = await loadHandoutInstrument({ code, readToken: getSupabaseAccessToken, signal: controller.signal });
+        if (cancelled) return;
+        setInstrument(result.instrument);
+        setOwnerAuthorized(result.ownerAuthorized);
+        if (result.instrument.qrCode && result.instrument.qrCode !== code) {
+          const query = searchParams.toString();
+          router.replace(`/handout/${encodeURIComponent(result.instrument.qrCode)}${query ? `?${query}` : ""}`);
         }
-      }
-
-      const publicResponse = await fetch(`/api/instruments?code=${encodeURIComponent(code)}`, {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-cache" }
-      });
-      const publicPayload = (await publicResponse.json().catch(() => null)) as HandoutPayload | null;
-      if (!cancelled && publicResponse.ok && publicPayload?.ok && publicPayload.instrument) {
-        setOwnerAuthorized(false);
-        setInstrument(publicPayload.instrument);
-        if (publicPayload.instrument.qrCode && publicPayload.instrument.qrCode !== code) {
-          router.replace(`/handout/${encodeURIComponent(publicPayload.instrument.qrCode)}`);
-        }
-        setLoading(false);
-        return;
-      }
-
-      if (!cancelled) {
-        setInstrument(null);
-        setMessage(publicPayload?.message || "This QRguitar Profile is unavailable or requires the owner account to print.");
-        setLoading(false);
+      } catch (error) {
+        if (!cancelled) setMessage(error instanceof Error ? error.message : "This Profile could not be loaded. Please try again.");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     }
 
     void loadHandoutProfile();
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, [code, router]);
+  }, [code, router, searchParams, loadAttempt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -373,7 +354,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
               <p>{getContentValue(content, "printWorkspace.body")}</p>
             </div>
             <div className="print-kit-toolbar-actions">
-              <Link className="button secondary" href={`/i/${encodeURIComponent(canonicalCode)}`} target="_blank">
+              <Link className="button secondary" href={instrument ? ownerProfileHref(instrument) : "/dashboard"} target="_blank">
                 <ExternalLink size={16} />
                 Open Profile
               </Link>
@@ -486,7 +467,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
 
           {isPrivate ? (
             <div className="print-kit-warning no-print">
-              This Profile is private. Its QR code will open only for an authorized account until visibility changes.
+              This Profile is private. Visitors can open its QR link after you make it public or unlisted. You can preview it from your dashboard.
             </div>
           ) : null}
 
@@ -500,6 +481,7 @@ export default function HandoutPage({ params }: { params: { code: string } }) {
               <FileText />
               <h2>Print Suite unavailable.</h2>
               <p>{message || "This QRguitar Profile could not be loaded."}</p>
+              <button type="button" className="button button-primary no-print" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button>
             </section>
           ) : mode === "label" ? (
             <article className="print-kit print-kit--label" id="qrguitar-print-root" data-print-document aria-label={`Printable QR label for ${title}`}>

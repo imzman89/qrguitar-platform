@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,17 +24,14 @@ const [bulk, bulkRoute, accountApi, collectionPage, collections, publicInstrumen
   "app/globals.css"
 ].map(read));
 
-ok(bulk.includes('headerLine.includes("\\t")') && bulk.includes('delimiter === "\\t"'), "Bulk delimiter detection missing");
+execFileSync(process.execPath, ["--test", path.join(root, "scripts/test-bulk-import.mjs")], { stdio: "inherit" });
+ok(bulkRoute.includes("BulkImportWorkspace"), "Bulk import Dashboard route missing");
 ok(bulk.includes("Column mapping") && bulk.includes("updateColumnMapping") && bulk.includes("Map & preview rows"), "Editable bulk column mapping missing");
-ok(bulk.includes('visibility: "private" as const') && !bulk.includes('visibility: row.visibility'), "Bulk Profiles do not default to Private");
-ok(bulk.includes("validateBulkRow") && bulk.includes("A real photo URL is required") && bulk.includes("Enter a Serial Number or No Serial"), "Bulk minimum requirements missing");
-ok(bulk.includes("qrguitar.bulkImportDraft.v1") && bulk.includes("localStorage.setItem") && bulk.includes("rows, columnMapping"), "Import draft persistence missing");
 ok(bulk.includes("Serial Number already belongs to") && bulk.includes("Open existing Profile"), "Duplicate Serial Number workflow missing");
 ok(bulk.includes('filter === "duplicate"') && bulk.includes('filter === "invalid"'), "Bulk review filters missing");
-ok(bulk.includes("lines.slice(1, 51)") && bulkRoute.includes("BulkImportWorkspace"), "Bulk import limit or Dashboard route missing");
 
 ok(accountApi.includes("getAuthenticatedUser") && accountApi.includes("assertAccountCanWrite"), "Collection settings are not owner protected");
-ok(accountApi.includes("already in use") && accountApi.includes("status: 409"), "Unique collection handles are not enforced");
+execFileSync(process.execPath, [path.join(root, "scripts/security/account-transaction.test.mjs")], { stdio: "inherit" });
 ok(collections.includes("enabled: false") && collectionPage.includes("notFound()"), "Public Collections are not opt-in");
 ok(collectionPage.includes("getPublicInstruments(ownerId)") && publicInstruments.includes("visibility=eq.public") && publicInstruments.includes("ownerId"), "Collection public-only contract missing");
 ok(!collectionPage.includes("ownerUserEmail") && !collectionPage.includes("ownerEmail"), "Collection page references private email");

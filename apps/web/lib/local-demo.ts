@@ -111,6 +111,8 @@ export type CustomProfileLink = {
 };
 
 export type CustomDocumentFile = {
+  id?: string;
+  mimeType?: string;
   name: string;
   url: string;
   visibility?: "public" | "hidden";
@@ -1145,10 +1147,6 @@ export function getAccountVerificationStatus(
     return "verified";
   }
 
-  if (user?.plan && user.plan !== "free") {
-    return "verified";
-  }
-
   return "unverified";
 }
 
@@ -1167,7 +1165,7 @@ export function isFreeInstrumentLimitReached(user: DemoUser | null, instruments:
     return false;
   }
 
-  if (getAccountPlan(user) !== "free") {
+  if (getAccountPlan(user) === "brand" || getAccountPlan(user) === "commercial") {
     return false;
   }
 

@@ -1,8 +1,10 @@
 "use client";
 
+import { ownerProfileHref } from "../../lib/owner-profile";
+
 import { BookOpenText, Copy, Ellipsis, EyeOff, FileSpreadsheet, FileText, ImagePlus, Mail, Printer, Repeat2, ShieldCheck, UsersRound, Wrench } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActionDrawer } from "../../components/ActionDrawer";
 import { CompactQr } from "../../components/CompactQr";
 import { Footer } from "../../components/Footer";
@@ -16,7 +18,6 @@ import { defaultSiteSettings, fetchPublishedSiteSettings } from "../../lib/site-
 import {
   getInstrumentCondition,
   getInstrumentVerificationStatus,
-  instrumentToProfileUrl,
   transferStatusLabel,
   type DemoInstrument,
   type DemoTransfer,
@@ -96,7 +97,16 @@ export default function DashboardPage() {
   const [transfers, setTransfers] = useState<DemoTransfer[]>([]);
   const [serviceRequests, setServiceRequests] = useState<ServiceRequestSummary[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(true);
-  const [authChecked, setAuthChecked] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
+  const sessionEmail = useRef("");
+  const accountRevision = useRef(0);
+  const renderedAccountRevision = accountRevision.current;
+  const visibilityRequests = useRef(new Map<string, { revision: number }>());
+  const removalRequests = useRef(new Map<string, { revision: number }>());
+  const [visibilityPendingCodes, setVisibilityPendingCodes] = useState<string[]>([]);
+  const [recordsLoaded, setRecordsLoaded] = useState(false);
+  const [recordsError, setRecordsError] = useState("");
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [dashboardMessage, setDashboardMessage] = useState("");
   const [dashboardCopy, setDashboardCopy] = useState(defaultSiteSettings.dashboard);
   const [activeFilter, setActiveFilter] = useState<DashboardFilter>("all");
@@ -115,83 +125,94 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    const supabase = createBrowserSupabaseClient();
     let cancelled = false;
     let authResolved = false;
+    let supabase: ReturnType<typeof createBrowserSupabaseClient>;
+    try { supabase = createBrowserSupabaseClient(); } catch {
+      setAuthChecked(true);
+      setDashboardMessage("Account access is temporarily unavailable. Please reload.");
+      return;
+    }
     const timeout = window.setTimeout(() => {
       if (!cancelled && !authResolved) {
-        setUser(null);
-        setAuthChecked(true);
+        setUser(null); setAuthChecked(true);
+        setDashboardMessage("Could not check your session. Please reload.");
       }
-    }, 5000);
-
-    supabase.auth.getSession().then(({ data }) => {
-      if (!cancelled) {
-        authResolved = true;
-        window.clearTimeout(timeout);
-        setUser(data.session?.user ? mapSupabaseUser(data.session.user) : null);
-        setAuthChecked(true);
-      }
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    }, 10000);
+    function applySession(session: { user: { email?: string; user_metadata?: Record<string, unknown> } } | null) {
+      if (cancelled) return;
       authResolved = true;
       window.clearTimeout(timeout);
+      const email = session?.user.email || "";
+      if (sessionEmail.current !== email) {
+        sessionEmail.current = email;
+        accountRevision.current++;
+        visibilityRequests.current.clear(); removalRequests.current.clear(); setVisibilityPendingCodes([]);
+        setInstruments([]); setTransfers([]); setServiceRequests([]);
+        setQuickEditRecord(null); setActionRecord(null);
+        setCollectionHandle(""); setCollectionAccountType("");
+        setRecordsLoaded(false); setRecordsError("");
+      }
       setUser(session?.user ? mapSupabaseUser(session.user) : null);
       setAuthChecked(true);
+    }
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!authResolved) applySession(data.session);
+    }).catch(() => {
+      if (!cancelled && !authResolved) { setAuthChecked(true); setDashboardMessage("Could not check your session. Please reload."); }
     });
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeout);
-      listener.subscription.unsubscribe();
-    };
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => applySession(session));
+    return () => { cancelled = true; accountRevision.current++; window.clearTimeout(timeout); listener.subscription.unsubscribe(); };
   }, []);
 
   useEffect(() => {
-    if (!user?.email) {
-      setInstruments([]);
-      setLoadingRecords(false);
-      return;
-    }
-
+    if (!user?.email) { setLoadingRecords(false); return; }
     let cancelled = false;
-    setLoadingRecords(true);
-
-    getSupabaseAccessToken().then(async (token) => {
-      const [records, transferRecords, requests] = await Promise.all([
-        loadDashboardInstruments(token, false),
-        loadDashboardTransfers(token),
-        loadOwnerServiceRequests(token)
-      ]);
-
-      if (!cancelled) {
-        setInstruments(mergeDashboardRecords(records));
-        setTransfers(transferRecords);
-        setServiceRequests(requests);
+    const revision = accountRevision.current;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      controller.abort();
+      if (!cancelled && revision === accountRevision.current) {
+        setRecordsError("Loading your collection took too long. Please try again.");
+        setLoadingRecords(false);
       }
-    })
-      .finally(() => {
-        if (!cancelled) {
-          setLoadingRecords(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.email]);
+    }, 20000);
+    setLoadingRecords(true);
+    setRecordsError("");
+    void getSupabaseAccessToken().then(async token => {
+      const [records, transferRecords, requests] = await Promise.all([
+        loadDashboardInstruments(token, false, controller.signal),
+        loadDashboardTransfers(token, controller.signal),
+        loadOwnerServiceRequests(token, controller.signal)
+      ]);
+      if (!cancelled && revision === accountRevision.current && !controller.signal.aborted) {
+        setInstruments(mergeDashboardRecords(records)); setTransfers(transferRecords); setServiceRequests(requests);
+        setRecordsLoaded(true);
+      }
+    }).catch(error => {
+      if (!cancelled && revision === accountRevision.current) setRecordsError(error instanceof Error ? error.message : "Could not load your collection. Please try again.");
+    }).finally(() => {
+      window.clearTimeout(timeout);
+      if (!cancelled && revision === accountRevision.current) setLoadingRecords(false);
+    });
+    return () => { cancelled = true; controller.abort(); window.clearTimeout(timeout); };
+  }, [user?.email, loadAttempt]);
 
   useEffect(() => {
     if (!user?.email) return;
-    getSupabaseAccessToken().then(async (token) => {
-      const response = await fetch("/api/account", { headers: { authorization: `Bearer ${token}` }, cache: "no-store" });
-      const payload = await response.json().catch(() => null) as { account?: { publicCollection?: { enabled?: boolean; handle?: string; accountType?: string } } } | null;
-      const collection = payload?.account?.publicCollection;
+    let cancelled = false;
+    const revision = accountRevision.current;
+    void getSupabaseAccessToken().then(async token => {
+      const response = await fetch("/api/account", { headers: { authorization: "Bearer " + token }, cache: "no-store" });
+      const payload = await response.json().catch(() => null) as { ok?: boolean; account?: { publicCollection?: { enabled?: boolean; handle?: string; accountType?: string } } } | null;
+      if (cancelled || revision !== accountRevision.current) return;
+      if (!response.ok || !payload?.ok) { setCollectionHandle(""); setCollectionAccountType(""); return; }
+      const collection = payload.account?.publicCollection;
       setCollectionHandle(collection?.enabled ? String(collection.handle || "") : "");
       setCollectionAccountType(String(collection?.accountType || ""));
-    }).catch(() => { setCollectionHandle(""); setCollectionAccountType(""); });
-  }, [user?.email]);
+    }).catch(() => { if (!cancelled && revision === accountRevision.current) { setCollectionHandle(""); setCollectionAccountType(""); } });
+    return () => { cancelled = true; };
+  }, [user?.email, loadAttempt]);
 
   const instrumentCodes = useMemo(() => new Set(instruments.map((instrument) => instrument.qrCode.toUpperCase())), [instruments]);
   const pendingTransfers = transfers.filter(
@@ -218,30 +239,11 @@ export default function DashboardPage() {
     [activeFilter, chronologicalInstruments]
   );
 
-  function refreshInstruments() {
-    if (!user?.email) {
-      setInstruments([]);
-      return;
-    }
-
-    getSupabaseAccessToken()
-      .then(async (token) => {
-        const [records, transferRecords, requests] = await Promise.all([
-          loadDashboardInstruments(token, false),
-          loadDashboardTransfers(token),
-          loadOwnerServiceRequests(token)
-        ]);
-        return { records, transferRecords, requests };
-      })
-      .then(({ records, transferRecords, requests }) => {
-        setInstruments(mergeDashboardRecords(records));
-        setTransfers(transferRecords);
-        setServiceRequests(requests);
-      });
-  }
+  function refreshInstruments() { setLoadAttempt(value => value + 1); }
 
   function focusServiceRequests() {
     setDashboardMessage("");
+    if (!recordsLoaded || recordsError) { setDashboardMessage("Service requests could not be checked. Reload your collection first."); return; }
     if (!pendingServiceRequests) {
       setDashboardMessage("No service requests need review.");
       return;
@@ -251,111 +253,79 @@ export default function DashboardPage() {
 
   const stats = useMemo(
     () => [
-      { label: "Profiles", value: String(instruments.length), filter: "all" as const, helper: "Active instruments" },
-      { label: "Public", value: String(publicRecords), filter: "public" as const, helper: "Listed in the Catalog" },
-      { label: "Private / Unlisted", value: String(privateRecords + unlistedRecords), filter: "private" as const, helper: "Limited visibility" }
+      { label: "Profiles", value: recordsLoaded ? String(instruments.length) : "—", filter: "all" as const, helper: "Active instruments" },
+      { label: "Public", value: recordsLoaded ? String(publicRecords) : "—", filter: "public" as const, helper: "Listed in the Catalog" },
+      { label: "Private / Unlisted", value: recordsLoaded ? String(privateRecords + unlistedRecords) : "—", filter: "private" as const, helper: "Limited visibility" }
     ],
-    [instruments.length, privateRecords, publicRecords, unlistedRecords]
+    [instruments.length, privateRecords, publicRecords, unlistedRecords, recordsLoaded]
   );
 
   async function updateSerialVisibility(instrument: DemoInstrument, showSerialPublic: boolean) {
-    if (!instrument.serial) {
-      setDashboardMessage("This Profile does not have a Serial Number to display.");
-      return;
+    const revision = accountRevision.current;
+    if (sessionEmail.current !== user?.email) return;
+    if (!instrument.serial) { setDashboardMessage("This Profile does not have a Serial Number to display."); return; }
+    const code = instrument.qrCode;
+    if (visibilityRequests.current.has(code)) return;
+    const operation = { revision };
+    visibilityRequests.current.set(code, operation);
+    setVisibilityPendingCodes(Array.from(visibilityRequests.current.keys()));
+    try {
+      const token = await getSupabaseAccessToken();
+      if (revision !== accountRevision.current) return;
+      if (!token) throw new Error("Sign in again before changing visibility.");
+      const response = await fetch("/api/instruments", {
+        method: "PATCH", headers: { "Content-Type": "application/json", authorization: "Bearer " + token },
+        body: JSON.stringify({ qrCode: code, verificationOnly: true, showSerialPublic })
+      });
+      const payload = await response.json().catch(() => null) as { ok?: boolean; qrCode?: string; showSerialPublic?: boolean; message?: string } | null;
+      if (revision !== accountRevision.current) return;
+      if (!response.ok || payload?.ok !== true || payload.qrCode !== code || typeof payload.showSerialPublic !== "boolean") {
+        setDashboardMessage(payload?.message || "Could not confirm visibility. Reload the Profile before trying again."); return;
+      }
+      const confirmedVisibility = payload.showSerialPublic;
+      setInstruments((current) => current.map((item) => item.qrCode === code ? { ...item, showSerialPublic: confirmedVisibility } : item));
+      setActionRecord((current) => current?.qrCode === code ? { ...current, showSerialPublic: confirmedVisibility } : current);
+      setDashboardMessage(confirmedVisibility ? "Serial Number is now shown on the public Profile." : "Serial Number is now hidden from the public Profile.");
+    } catch (error) {
+      if (revision === accountRevision.current) setDashboardMessage(error instanceof Error && error.message === "Sign in again before changing visibility." ? error.message : "Could not confirm visibility. Reload the Profile before trying again.");
+    } finally {
+      if (visibilityRequests.current.get(code) === operation) visibilityRequests.current.delete(code);
+      if (revision === accountRevision.current) setVisibilityPendingCodes(Array.from(visibilityRequests.current.keys()));
     }
-
-    const token = await getSupabaseAccessToken();
-    const response = await fetch("/api/instruments", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        authorization: "Bearer " + token
-      },
-      body: JSON.stringify({
-        qrCode: instrument.qrCode,
-        verificationOnly: true,
-        verificationStatus: getInstrumentVerificationStatus(instrument),
-        authenticityStatus: instrument.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed",
-        showSerialPublic
-      })
-    });
-    const payload = await response.json().catch(() => null) as { ok?: boolean; message?: string } | null;
-    if (!response.ok || !payload?.ok) {
-      setDashboardMessage(payload?.message || "Could not update Serial Number visibility.");
-      return;
-    }
-
-    setInstruments((current) => current.map((item) => item.qrCode === instrument.qrCode ? { ...item, showSerialPublic } : item));
-    setActionRecord((current) => current?.qrCode === instrument.qrCode ? { ...current, showSerialPublic } : current);
-    setDashboardMessage(showSerialPublic ? "Serial Number is now shown on the public Profile." : "Serial Number is now hidden from the public Profile.");
   }
 
   async function removeFromCollection(instrument: DemoInstrument) {
+    const revision = accountRevision.current;
+    if (sessionEmail.current !== user?.email || removalRequests.current.has(instrument.qrCode)) return;
     const allowed = getInstrumentVerificationStatus(instrument) !== "verified" && instrument.authenticityStatus !== "confirmed";
-    if (!allowed) {
-      setDashboardMessage("Verified and authenticity-confirmed Profiles are preserved for provenance. Transfer ownership or contact QRguitar support for permanent removal.");
-      return;
-    }
-
-    const confirmed = window.confirm("Permanently delete this QRguitar Profile? This cannot be undone. The QRguitar ID stays reserved, but the Profile will be removed from your active account and hidden from public view.");
-    if (!confirmed) {
-      return;
-    }
-
-    const token = await getSupabaseAccessToken();
-    const response = await fetch("/api/instruments", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        qrCode: instrument.qrCode,
-        action: "remove_from_collection",
-        reason: "Owner permanently deleted Profile from dashboard."
-      })
-    });
-    const payload = await response.json().catch(() => ({}));
-    setDashboardMessage(payload.message || (response.ok ? "Profile permanently deleted from your dashboard." : "Could not delete this Profile."));
-    if (response.ok) {
+    if (!allowed) { setDashboardMessage("Verified and authenticity-confirmed Profiles are preserved for provenance. Transfer ownership or contact QRguitar support for permanent removal."); return; }
+    if (!window.confirm("Permanently delete this QRguitar Profile? This cannot be undone. The QRguitar ID stays reserved, but the Profile will be removed from your active account and hidden from public view.")) return;
+    const operation = { revision }; const code = instrument.qrCode;
+    removalRequests.current.set(code, operation);
+    try {
+      const token = await getSupabaseAccessToken();
+      if (revision !== accountRevision.current) return;
+      if (!token) throw new Error("Sign in required.");
+      const response = await fetch("/api/instruments", { method: "PATCH",
+        headers: { "Content-Type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ qrCode: code, action: "remove_from_collection", reason: "Owner permanently deleted Profile from dashboard." })
+      });
+      const payload = await response.json().catch(() => null) as { ok?: boolean; qrCode?: string; message?: string } | null;
+      if (revision !== accountRevision.current) return;
+      if (!response.ok || payload?.ok !== true || payload.qrCode !== code) {
+        setDashboardMessage(payload?.message || "Could not confirm removal. Reload your collection before trying again."); return;
+      }
+      setDashboardMessage(payload.message || "Profile permanently deleted from your dashboard.");
+      setActionRecord((current) => current?.qrCode === code ? null : current);
       refreshInstruments();
+    } catch {
+      if (revision === accountRevision.current) setDashboardMessage("Could not confirm removal. Reload your collection before trying again.");
+    } finally {
+      if (removalRequests.current.get(code) === operation) removalRequests.current.delete(code);
     }
   }
 
-  if (!authChecked) {
-    return (
-      <>
-        <Nav />
-        <main className="section auth-page">
-          <div className="shell">
-            <section className="card auth-card sign-in-required-card dashboard-signin-card">
-              <div className="dashboard-signin-icon"><ShieldCheck size={24} /></div>
-              <div className="eyebrow">Dashboard</div>
-              <h2>Sign in to manage your QRguitar Profiles.</h2>
-              <p>{dashboardCopy.subtitle}</p>
-              <div className="dashboard-signin-points">
-                <span>Private inventory</span>
-                <span>QR downloads</span>
-                <span>Photos and documents</span>
-              </div>
-              <div className="form-actions">
-                <Link className="button" href={`/login?next=${encodeURIComponent("/dashboard")}`}>
-                  Sign in
-                </Link>
-                <Link className="button secondary" href={`/login?next=${encodeURIComponent("/dashboard")}`}>
-                  Create account
-                </Link>
-                <Link className="button secondary" href="/catalog">
-                  Browse catalog
-                </Link>
-              </div>
-            </section>
-          </div>
-        </main>
-        <Footer />
-      </>
-    );
-  }
+  if (!authChecked) return <><Nav /><main className="section auth-page"><div className="shell"><section className="card auth-card"><div className="eyebrow">Your collection</div><h1>Opening your dashboard…</h1><p role="status">Checking your account.</p></section></div></main><Footer /></>;
 
   if (!user) {
     return (
@@ -377,7 +347,7 @@ export default function DashboardPage() {
                 <Link className="button" href={`/login?next=${encodeURIComponent("/dashboard")}`}>
                   Sign in
                 </Link>
-                <Link className="button secondary" href={`/login?next=${encodeURIComponent("/dashboard")}`}>
+                <Link className="button secondary" href={`/login?mode=register&next=${encodeURIComponent("/dashboard")}`}>
                   Create account
                 </Link>
                 <Link className="button secondary" href="/catalog">
@@ -409,11 +379,12 @@ export default function DashboardPage() {
             </div>
           </div>
           <nav className="dashboard-workspace-links" aria-label="Owner tools">
-            <button type="button" onClick={focusServiceRequests}><Wrench size={15} /> Service review <span>{pendingServiceRequests}</span></button>
-            <Link href="/ownership-claim">Claims &amp; transfers <span>{pendingTransfers}</span></Link>
+            <button type="button" onClick={focusServiceRequests}><Wrench size={15} /> Service review <span>{recordsLoaded ? pendingServiceRequests : "—"}</span></button>
+            <Link href="/ownership-claim">Claims &amp; transfers <span>{recordsLoaded ? pendingTransfers : "—"}</span></Link>
             <Link href="/account?section=collection" title="Publish your public Profiles together and control member inquiries"><UsersRound size={15} /> Collection &amp; inquiries <span>{collectionHandle ? "Live" : "Set up"}</span></Link>
           </nav>
-          {dashboardMessage ? <div className="admin-message">{dashboardMessage}</div> : null}
+          {dashboardMessage ? <div className="admin-message" role="status">{dashboardMessage}</div> : null}
+          {recordsError ? <div className="profile-refresh-notice" role="alert"><p>{recordsError} {recordsLoaded ? "Previously loaded Profiles are shown below." : "Your collection is not yet loaded."}</p><button type="button" className="button secondary" onClick={refreshInstruments}>Try again</button></div> : null}
 
           <div className="stats-grid dashboard-metric-grid" aria-label="Collection overview">
             {stats.map((stat) => (
@@ -431,8 +402,8 @@ export default function DashboardPage() {
             ))}
           </div>
           <div className="dashboard-trust-summary" aria-label="Trust summary">
-            <span><b>{verifiedRecords}</b> Verified</span>
-            <span><b>{authenticityConfirmedRecords}</b> Authenticity Confirmed</span>
+            <span><b>{recordsLoaded ? verifiedRecords : "—"}</b> Verified</span>
+            <span><b>{recordsLoaded ? authenticityConfirmedRecords : "—"}</b> Authenticity Confirmed</span>
             {activeFilter !== "all" ? <button type="button" onClick={() => setActiveFilter("all")}>Clear filter</button> : null}
           </div>
 
@@ -479,6 +450,8 @@ export default function DashboardPage() {
                   <h3>Loading your Profiles...</h3>
                   <p>Pulling your saved Profiles now.</p>
                 </div>
+              ) : !recordsLoaded && recordsError ? (
+                <div className="card auth-card"><h3>Collection unavailable</h3><p>Use Try again above to reload your Profiles.</p></div>
               ) : displayedInstruments.length ? (
                 displayedInstruments.map((instrument) => {
                   const totalDocs = instrument.documentFiles?.length || 0;
@@ -496,7 +469,7 @@ export default function DashboardPage() {
                       <span className={styles.profileNumber} aria-label={`Collection profile ${profileNumber}`}>
                         {String(profileNumber).padStart(2, "0")}
                       </span>
-                      <Link className={styles.instrumentBodyLink} href={instrumentToProfileUrl(instrument)} aria-label={`Open ${title} profile`}>
+                      <Link className={styles.instrumentBodyLink} href={ownerProfileHref(instrument)} aria-label={`Open ${title} profile`}>
                         <DashboardInstrumentThumb sources={imageSources} title={title} />
                         <div className={styles.instrumentDetails}>
                           <div className={styles.instrumentInfo}>
@@ -519,7 +492,7 @@ export default function DashboardPage() {
                       <aside className={styles.qrActionColumn}>
                         <div className={styles.compactQr}><CompactQr code={instrument.qrCode} label={title} /><span>{instrument.qrCode}</span></div>
                         <div className={styles.primaryActions}>
-                          <Link className="button" href={instrumentToProfileUrl(instrument)}>{getContentValue(content, "dashboard.card.open")}</Link>
+                          <Link className="button" href={ownerProfileHref(instrument)}>{getContentValue(content, "dashboard.card.open")}</Link>
                           <Link className="button secondary" href={`/edit/${instrument.qrCode}`}>{getContentValue(content, "dashboard.card.edit")}</Link>
                           <button className="button secondary" type="button" onClick={() => setQuickEditRecord(instrument)}>Quick Edit</button>
                         </div>
@@ -552,7 +525,7 @@ export default function DashboardPage() {
 
         </div>
       </main>
-      {quickEditRecord ? <ProfileQuickEdit record={quickEditRecord} onClose={() => setQuickEditRecord(null)} onSaved={(saved) => { setInstruments((current) => current.map((item) => item.qrCode === saved.qrCode ? saved : item)); setQuickEditRecord(null); setDashboardMessage("Quick Edit saved."); }} /> : null}
+      {quickEditRecord ? <ProfileQuickEdit key={`${renderedAccountRevision}:${quickEditRecord.qrCode}`} record={quickEditRecord} isSessionCurrent={() => accountRevision.current === renderedAccountRevision} onClose={() => { if (accountRevision.current === renderedAccountRevision) setQuickEditRecord(null); }} onSaved={(saved) => { if (accountRevision.current !== renderedAccountRevision) return; setInstruments((current) => current.map((item) => item.qrCode === saved.qrCode ? saved : item)); setQuickEditRecord(null); setDashboardMessage("Quick Edit saved."); }} /> : null}
       {actionRecord ? (
         <ActionDrawer eyebrow="Profile actions" title={dashboardRecordTitle(actionRecord)} returnFocusTo={actionTrigger} onClose={() => setActionRecord(null)}>
           <div className={styles.drawerIdentity}>
@@ -575,10 +548,10 @@ export default function DashboardPage() {
             </section>
             <section>
               <b>Privacy &amp; safety</b>
-              {actionRecord.serial ? <button type="button" onClick={() => void updateSerialVisibility(actionRecord, !actionRecord.showSerialPublic)}><EyeOff size={15} /> {actionRecord.showSerialPublic ? "Hide Serial Number" : "Show Serial Number"}</button> : null}
+              {actionRecord.serial ? <button type="button" disabled={visibilityPendingCodes.includes(actionRecord.qrCode)} aria-busy={visibilityPendingCodes.includes(actionRecord.qrCode)} onClick={() => void updateSerialVisibility(actionRecord, !actionRecord.showSerialPublic)}><EyeOff size={15} /> {actionRecord.showSerialPublic ? "Hide Serial Number" : "Show Serial Number"}</button> : null}
               <Link href={`/edit/${actionRecord.qrCode}#privacy-safety`}><ShieldCheck size={15} /> Visibility &amp; safety</Link>
             </section>
-            <TransferPanel className={styles.transferPanel} bodyClassName={styles.transferPanelBody} instrument={actionRecord} user={user} allowBuyerCode={collectionAccountType === "shop" || collectionAccountType === "builder"} latestTransfer={latestTransferForInstrument(transfers, actionRecord.qrCode)} onTransferCreated={(transfer) => setTransfers((current) => [transfer, ...current.filter((item) => item.id !== transfer.id)])} onTransferChanged={refreshInstruments} />
+            <TransferPanel className={styles.transferPanel} bodyClassName={styles.transferPanelBody} instrument={actionRecord} user={user} allowBuyerCode={collectionAccountType === "shop" || collectionAccountType === "builder"} latestTransfer={latestTransferForInstrument(transfers, actionRecord.qrCode)} onTransferCreated={(transfer) => { if (sessionEmail.current === user?.email) setTransfers((current) => [transfer, ...current.filter((item) => item.id !== transfer.id)]); }} onTransferChanged={refreshInstruments} />
             <section className={styles.drawerDanger}><b>Danger zone</b><button className={styles.dangerAction} type="button" onClick={() => void removeFromCollection(actionRecord)}>{getContentValue(content, "dashboard.card.remove")}</button></section>
           </div>
         </ActionDrawer>
@@ -628,14 +601,20 @@ function TransferPanel({
       return;
     }
 
-    await window.navigator.clipboard?.writeText(visibleClaimUrl);
-    setMessage("Claim link copied.");
+    try {
+      if (!window.navigator.clipboard) throw new Error("Clipboard unavailable");
+      await window.navigator.clipboard.writeText(visibleClaimUrl);
+      setMessage("Claim link copied.");
+    } catch { setMessage("Could not copy the claim link. Select and copy the displayed link."); }
   }
 
   async function copyBuyerCode() {
     if (!buyerCode) return;
-    await window.navigator.clipboard?.writeText(buyerCode);
-    setMessage("Private buyer code copied.");
+    try {
+      if (!window.navigator.clipboard) throw new Error("Clipboard unavailable");
+      await window.navigator.clipboard.writeText(buyerCode);
+      setMessage("Private buyer code copied.");
+    } catch { setMessage("Could not copy the code. Select and copy the displayed buyer code."); }
   }
 
   async function createTransfer() {
@@ -673,7 +652,10 @@ function TransferPanel({
       setLastCreatedClaimUrl(nextClaimUrl);
       setBuyerCode(String(result.buyerCode || ""));
       onTransferCreated(result.transfer);
-      setMessage(result.message || "Transfer email sent. You can also copy the claim link.");
+      setMessage(result.message || "Transfer prepared. Check its invitation status before sharing.");
+    } catch {
+      setMessage("We could not confirm that action. Reload your collection to check its status before trying again.");
+      onTransferChanged();
     } finally {
       setSaving(false);
     }
@@ -713,6 +695,9 @@ function TransferPanel({
       }
       setMessage(result.message || "Transfer cancelled.");
       onTransferChanged();
+    } catch {
+      setMessage("We could not confirm that action. Reload your collection to check its status before trying again.");
+      onTransferChanged();
     } finally {
       setSaving(false);
     }
@@ -730,7 +715,10 @@ function TransferPanel({
         body: JSON.stringify({ id: latestTransfer.id, action: "resend" })
       });
       const result = await response.json().catch(() => null) as { ok?: boolean; message?: string } | null;
-      setMessage(result?.message || (response.ok ? "Invitation resent." : "Could not resend invitation."));
+      setMessage(result?.message || (response.ok && result?.ok ? "Invitation resent." : "Could not confirm the invitation. Check its status before trying again."));
+    } catch {
+      setMessage("We could not confirm that action. Reload your collection to check its status before trying again.");
+      onTransferChanged();
     } finally {
       setSaving(false);
     }
@@ -874,48 +862,28 @@ function dashboardRecordTitle(instrument: DemoInstrument) {
   return brand || model || instrument.serial || instrument.qrCode || "Untitled instrument";
 }
 
-async function loadDashboardInstruments(token: string, includeRemoved = false) {
-  if (!token) {
-    return [];
-  }
-
-  const response = await fetch(`/api/instruments?scope=mine${includeRemoved ? "&includeRemoved=1" : ""}`, { headers: { authorization: `Bearer ${token}` } });
-  const payload = (await response.json().catch(() => null)) as
-    | { ok?: boolean; instruments?: DemoInstrument[]; count?: number; message?: string }
-    | null;
-
-  if (!response.ok || !payload?.ok) {
-    return [];
-  }
-
-  return payload.instruments || [];
+async function loadDashboardInstruments(token: string, includeRemoved = false, signal?: AbortSignal): Promise<DemoInstrument[]> {
+  if (!token) throw new Error("Your session expired. Sign in again to load your collection.");
+  const response = await fetch("/api/instruments?scope=mine" + (includeRemoved ? "&includeRemoved=1" : ""), { headers: { authorization: "Bearer " + token }, cache: "no-store", signal });
+  const payload = await response.json().catch(() => null) as { ok?: boolean; instruments?: DemoInstrument[] } | null;
+  if (!response.ok || !payload?.ok || !Array.isArray(payload.instruments)) throw new Error("We could not load your Profiles. Please try again.");
+  return payload.instruments;
 }
 
-async function loadDashboardTransfers(token: string) {
-  if (!token) {
-    return [];
-  }
-
-  const response = await fetch("/api/transfers?scope=mine", { headers: { authorization: `Bearer ${token}` } });
-  const payload = (await response.json().catch(() => null)) as
-    | { ok?: boolean; transfers?: DemoTransfer[]; message?: string }
-    | null;
-
-  if (!response.ok || !payload?.ok) {
-    return [];
-  }
-
-  return payload.transfers || [];
+async function loadDashboardTransfers(token: string, signal?: AbortSignal): Promise<DemoTransfer[]> {
+  if (!token) throw new Error("Your session expired. Sign in again to load your transfers.");
+  const response = await fetch("/api/transfers?scope=mine", { headers: { authorization: "Bearer " + token }, cache: "no-store", signal });
+  const payload = await response.json().catch(() => null) as { ok?: boolean; transfers?: DemoTransfer[] } | null;
+  if (!response.ok || !payload?.ok || !Array.isArray(payload.transfers)) throw new Error("We could not load ownership transfers. Please try again.");
+  return payload.transfers;
 }
 
-async function loadOwnerServiceRequests(token: string): Promise<ServiceRequestSummary[]> {
-  if (!token) return [];
-  const response = await fetch("/api/service-submissions?scope=owner", {
-    headers: { authorization: `Bearer ${token}` },
-    cache: "no-store"
-  });
-  const payload = (await response.json().catch(() => null)) as { ok?: boolean; submissions?: ServiceRequestSummary[] } | null;
-  return response.ok && payload?.ok ? payload.submissions || [] : [];
+async function loadOwnerServiceRequests(token: string, signal?: AbortSignal): Promise<ServiceRequestSummary[]> {
+  if (!token) throw new Error("Your session expired. Sign in again to load service requests.");
+  const response = await fetch("/api/service-submissions?scope=owner", { headers: { authorization: "Bearer " + token }, cache: "no-store", signal });
+  const payload = await response.json().catch(() => null) as { ok?: boolean; submissions?: ServiceRequestSummary[] } | null;
+  if (!response.ok || !payload?.ok || !Array.isArray(payload.submissions)) throw new Error("We could not load service requests. Please try again.");
+  return payload.submissions;
 }
 
 function serviceRequestStatusLabel(status: ServiceRequestSummary["status"]) {

@@ -48,9 +48,6 @@ export async function PATCH(request: Request) {
   const requestedCategories = Array.isArray(body?.serviceCategories) ? body?.serviceCategories : [];
   const serviceCategories = requestedCategories.map((value) => cleanServiceText(value, 80)).filter((value) => (SERVICE_CATEGORIES as readonly string[]).includes(value));
 
-  const current = await supabase.from("service_provider_profiles").select("verification_status,verified_at,verified_by,internal_review_note").eq("user_id", auth.user.id).maybeSingle();
-  if (current.error && serviceMigrationMissing(current.error.message)) return json({ ok: false, message: serviceMigrationMessage() }, 503);
-
   const result = await supabase.from("service_provider_profiles").upsert({
     user_id: auth.user.id,
     business_name: businessName,
@@ -58,10 +55,6 @@ export async function PATCH(request: Request) {
     website: cleanServiceUrl(body?.website) || null,
     location: cleanServiceText(body?.location, 240) || null,
     service_categories: serviceCategories,
-    verification_status: current.data?.verification_status || "unverified",
-    verified_at: current.data?.verified_at || null,
-    verified_by: current.data?.verified_by || null,
-    internal_review_note: current.data?.internal_review_note || null,
     updated_at: new Date().toISOString()
   }, { onConflict: "user_id" }).select("*").single();
 

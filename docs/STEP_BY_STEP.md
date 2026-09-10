@@ -4,7 +4,7 @@
 
 Install:
 
-- Node.js 20 LTS
+- Node.js 24 LTS
 - GitHub Desktop or Git
 - VS Code
 - Expo Go app on your phone

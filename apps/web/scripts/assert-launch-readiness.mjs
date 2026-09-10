@@ -91,7 +91,8 @@ ok(siteEditor.includes("if (!authorized)") && siteEditor.includes('status === "l
 ok(migration.includes("migration:QRG-05068283:setup-2026-06-20") && migration.includes("date '2026-06-20'") && migration.includes("Properly setup on 6/20/2026"), "Canonical setup migration lost source/date/text");
 ok(migration.indexOf("insert into public.guitar_timeline_events") < migration.indexOf("delete from public.guitar_specs") && migration.includes("and exists ("), "Legacy setup deletion is not gated on canonical insert");
 
-// Create contract: staged uploads, bounded concurrency, preserved form state, and atomic publish.
+// Structural UI smoke checks. Atomic rollback, idempotency and authorization are
+// exercised against actual route code and SQL by test:atomic-profiles in CI.
 ok(uploadApi.includes('export async function POST') && uploadApi.includes('export async function DELETE'), "Staged upload create/cleanup routes missing");
 ok(uploadApi.includes("assertAccountCanWrite") && uploadApi.includes("MAX_STAGED_FILE_BYTES") && uploadApi.includes("profile-uploads"), "Staged upload authorization or limits missing");
 ok(createPage.includes("uploadWithConcurrency") && createPage.includes("concurrency = 3") && createPage.includes("stageSelectedFiles") && createPage.includes("cleanupUploads"), "Create upload orchestration missing");
@@ -99,9 +100,6 @@ ok(createPage.includes("PhotoOrganizer") && createPage.includes("Add at least on
 ok(!createPage.includes("QR customization"), "Create still includes premature QR customization");
 ok(photoOrganizer.includes("onDragStart") && photoOrganizer.includes("onPointerMove") && photoOrganizer.includes("Move earlier") && photoOrganizer.includes("Set photo"), "Photo organizer reorder/main controls missing");
 ok(styles.includes(".photo-drag-handle") && styles.includes("touch-action: none"), "Photo organizer mobile drag safety missing");
-ok(instrumentsApi.includes("idempotencyKey") && instrumentsApi.includes("createSubmissionContentKey") && instrumentsApi.includes("request_in_progress"), "Create idempotency contract missing");
-ok(instrumentsApi.includes('visibility: "private" as const') && instrumentsApi.includes("publishResult") && instrumentsApi.indexOf('visibility: "private" as const') < instrumentsApi.indexOf("publishResult"), "Create does not publish private-first");
-ok(instrumentsApi.includes("cleanupAndFail") && instrumentsApi.includes("removeStagedUploads") && instrumentsApi.includes("insertedGuitarId"), "Create rollback contract missing");
 ok(instrumentsApi.includes("fieldErrors") && instrumentsApi.includes("retryable") && instrumentsApi.includes("cleanupUploads"), "Create error contract missing");
 ok(!instrumentsApi.includes("serial/build ID"), "Create/update API has stale Serial Number terminology");
 

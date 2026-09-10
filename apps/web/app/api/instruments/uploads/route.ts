@@ -1,3 +1,4 @@
+import { isOwnedStagedPath, removeUnreferencedStagedUploads } from "../../../../lib/staged-upload-cleanup";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { assertAccountCanWrite } from "../../../../lib/admin-auth";
@@ -87,6 +88,17 @@ export async function POST(request: Request) {
     return json({ ok: false, code: "storage_upload_failed", message: "That file could not be uploaded. Retry the failed file.", retryable: true }, 502);
   }
 
+  try {
+    const registration = await supabase.rpc("register_staged_instrument_upload", {
+      p_owner_id: auth.user.id, p_upload_id: uploadId, p_bucket_id: bucket, p_storage_path: objectPath
+    });
+    if (registration.error || registration.data?.ok !== true) {
+      return json({ ok: false, code: "upload_registration_failed", message: "That upload could not be prepared safely. Retry the file.", retryable: true }, 503);
+    }
+  } catch {
+    return json({ ok: false, code: "upload_registration_failed", message: "That upload could not be confirmed. Retry the file.", retryable: true }, 503);
+  }
+
   return json({ ok: true, storagePath: objectPath, kind });
 }
 
@@ -100,24 +112,15 @@ export async function DELETE(request: Request) {
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   const uploadId = cleanUploadId(body?.uploadId);
   const paths = Array.isArray(body?.paths) ? body.paths.map(String).slice(0, 30) : [];
-  const mediaPaths = paths.filter((path) => path.startsWith(`${auth.user.id}/profile-uploads/${uploadId}/image-`));
-  const documentPaths = paths.filter((path) => path.startsWith(`${auth.user.id}/profile-uploads/${uploadId}/document-`));
+  const mediaPaths = paths.filter((path) => isOwnedStagedPath(path, auth.user.id, uploadId, "image"));
+  const documentPaths = paths.filter((path) => isOwnedStagedPath(path, auth.user.id, uploadId, "document"));
 
   if (!uploadId || mediaPaths.length + documentPaths.length !== paths.length) {
     return json({ ok: false, code: "invalid_cleanup", message: "Upload cleanup was rejected.", retryable: false }, 400);
   }
 
-  const errors: string[] = [];
-  if (mediaPaths.length) {
-    const result = await supabase.storage.from(MEDIA_BUCKET).remove(mediaPaths);
-    if (result.error) errors.push(result.error.message);
-  }
-  if (documentPaths.length) {
-    const result = await supabase.storage.from(DOCUMENT_BUCKET).remove(documentPaths);
-    if (result.error) errors.push(result.error.message);
-  }
-
-  return errors.length
-    ? json({ ok: false, code: "cleanup_failed", message: "Some staged files could not be removed.", retryable: true }, 502)
-    : json({ ok: true });
+  const cleaned = await removeUnreferencedStagedUploads(supabase, auth.user.id, uploadId, mediaPaths, documentPaths);
+  return cleaned
+    ? json({ ok: true })
+    : json({ ok: false, code: "cleanup_failed", message: "Some staged files could not be removed. Your saved Profiles are unchanged.", retryable: true }, 502);
 }

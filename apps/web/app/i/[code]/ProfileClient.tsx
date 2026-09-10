@@ -37,18 +37,22 @@ import {
 } from "../../../lib/local-demo";
 import { formatRecordLocation } from "../../../lib/record-location";
 import { fetchPublishedSiteSettings, normalizeBrandLogoKey } from "../../../lib/site-settings";
-import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../../lib/supabase-browser";
+import { createBrowserSupabaseClient } from "../../../lib/supabase-browser";
+import { fetchOwnerProfile, OwnerProfileError } from "../../../lib/owner-profile";
 import { resolveInstrumentPresentation } from "../../../lib/instrument-profile-contract";
 import { getContentValue } from "../../../lib/content-registry";
 
 type ProfileTab = "overview" | "specs" | "timeline" | "service" | "ownership" | "media" | "repairs" | "documents";
 const PROFILE_FETCH_TIMEOUT_MS = 28000;
 
-export function ProfileClient({ code: codeParam, initialInstrument }: { code: string; initialInstrument: DemoInstrument | null }) {
+export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview = false }: { code: string; initialInstrument: DemoInstrument | null; ownerPreview?: boolean }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [stored, setStored] = useState<DemoInstrument | null>(initialInstrument);
+  const [ownerRecord, setOwnerRecord] = useState<DemoInstrument | null>(null);
   const [resolved, setResolved] = useState(true);
+  const [profileLoadError, setProfileLoadError] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [transfers, setTransfers] = useState<DemoTransfer[]>([]);
   const [shareUrl, setShareUrl] = useState("");
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
@@ -85,6 +89,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     let cancelled = false;
     setResolved(Boolean(initialInstrument));
     setStored(initialInstrument);
+    setProfileLoadError(false);
 
     async function loadInstrument() {
       const pathCode =
@@ -103,7 +108,11 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
       };
 
       const fallbackNow = () => {
-        markResolved(null);
+        if (cancelled) return;
+        // A failed refresh must not erase a Profile already loaded by the server.
+        settled = true;
+        setProfileLoadError(true);
+        setResolved(true);
       };
 
       const timeout = setTimeout(() => {
@@ -150,9 +159,13 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
 
         if (!cancelled) {
           if (foundInstrument) {
+            setProfileLoadError(false);
             markResolved(foundInstrument, true);
-          } else if (!settled || lastStatus === 404) {
-            markResolved(null);
+          } else if (lastStatus === 404) {
+            setProfileLoadError(false);
+            markResolved(null, true);
+          } else {
+            fallbackNow();
           }
         }
       } catch {
@@ -163,127 +176,141 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
       }
     }
 
-    void loadInstrument();
+    if (!ownerPreview) void loadInstrument();
 
     return () => {
       cancelled = true;
     };
-  }, [code, initialInstrument]);
+  }, [code, initialInstrument, loadAttempt, ownerPreview]);
 
   useEffect(() => {
-    const supabase = createBrowserSupabaseClient();
     let cancelled = false;
-
-    async function loadOwnerContext() {
-      const { data } = await supabase.auth.getSession();
-      const session = data.session;
-      if (cancelled) return;
-
-      setCurrentUserEmail(session?.user.email?.toLowerCase() || "");
-      if (!session) {
-        setTransfers([]);
-        return;
-      }
-
-      const token = session.access_token || await getSupabaseAccessToken();
-      if (!token || cancelled) return;
-
-      const [recordResponse, transferResponse] = await Promise.all([
-        fetch(`/api/instruments?scope=mine&code=${encodeURIComponent(code)}`, {
-          cache: "no-store",
-          headers: { authorization: `Bearer ${token}` }
-        }),
-        fetch("/api/transfers?scope=mine", {
-          cache: "no-store",
-          headers: { authorization: `Bearer ${token}` }
-        })
-      ]);
-
-      const recordPayload = (await recordResponse.json().catch(() => null)) as { ok?: boolean; instruments?: DemoInstrument[] } | null;
-      const transferPayload = (await transferResponse.json().catch(() => null)) as { ok?: boolean; transfers?: DemoTransfer[] } | null;
-
-      if (cancelled) return;
-      const ownerInstrument = recordPayload?.instruments?.[0];
-      if (recordResponse.ok && recordPayload?.ok && ownerInstrument) {
-        setStored(ownerInstrument);
-      }
-      setTransfers((transferResponse.ok && transferPayload?.ok ? transferPayload.transfers || [] : [])
-        .filter((transfer) => transfer.guitarQrCode.toUpperCase() === code.toUpperCase()));
+    let generation = 0;
+    let controller: AbortController | undefined;
+    let supabase: ReturnType<typeof createBrowserSupabaseClient>;
+    setOwnerRecord(null);
+    setTransfers([]);
+    setCurrentUserEmail("");
+    try { supabase = createBrowserSupabaseClient(); }
+    catch {
+      if (ownerPreview) { setStored(null); setProfileLoadError(true); setResolved(true); }
+      return;
     }
 
-    void loadOwnerContext();
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    async function loadOwnerContext(session: { access_token: string; user: { email?: string } } | null, authChanged = false) {
+      const request = ++generation;
+      controller?.abort();
+      setOwnerRecord(null);
+      setTransfers([]);
+      setActiveMedia(null);
+      if (ownerPreview && authChanged) setStored(null);
       setCurrentUserEmail(session?.user.email?.toLowerCase() || "");
-      if (!session) {
-        setTransfers([]);
+      if (!session?.access_token) {
+        if (ownerPreview) setStored(null);
         return;
       }
-      void loadOwnerContext();
+      const requestController = new AbortController();
+      controller = requestController;
+      const timer = setTimeout(() => requestController.abort(), PROFILE_FETCH_TIMEOUT_MS);
+      try {
+        const [recordResult, transferResult] = await Promise.allSettled([
+          fetchOwnerProfile(code, session.access_token, requestController.signal),
+          fetch("/api/transfers?scope=mine", {
+            cache: "no-store", headers: { authorization: `Bearer ${session.access_token}` }, signal: requestController.signal
+          }).then(async (response) => {
+            const payload = await response.json().catch(() => null) as { ok?: boolean; transfers?: DemoTransfer[] } | null;
+            return response.ok && payload?.ok && Array.isArray(payload.transfers) ? payload.transfers : [];
+          })
+        ]);
+        if (cancelled || request !== generation) return;
+        if (recordResult.status === "fulfilled") {
+          setOwnerRecord(recordResult.value);
+          setProfileLoadError(false);
+          setResolved(true);
+        } else if (ownerPreview) {
+          setStored(null);
+          setProfileLoadError(!(recordResult.reason instanceof OwnerProfileError && [401, 404].includes(recordResult.reason.status)));
+          setResolved(true);
+        }
+        setTransfers((transferResult.status === "fulfilled" ? transferResult.value : [])
+          .filter((transfer) => typeof transfer?.guitarQrCode === "string" && transfer.guitarQrCode.toUpperCase() === code.toUpperCase()));
+      } catch {
+        if (!cancelled && request === generation) {
+          setTransfers([]);
+          if (ownerPreview) { setOwnerRecord(null); setStored(null); setProfileLoadError(true); setResolved(true); }
+        }
+      } finally { clearTimeout(timer); }
+    }
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!cancelled && generation === 0) void loadOwnerContext(data.session);
+    }).catch(() => {
+      if (!cancelled && generation === 0 && ownerPreview) { setStored(null); setProfileLoadError(true); setResolved(true); }
     });
-
-    return () => {
-      cancelled = true;
-      listener.subscription.unsubscribe();
-    };
-  }, [code]);
-
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!cancelled) void loadOwnerContext(session, true);
+    });
+    return () => { cancelled = true; generation++; controller?.abort(); listener.subscription.unsubscribe(); };
+  }, [code, initialInstrument, ownerPreview, loadAttempt]);
   const instrument = useMemo<DemoInstrument | null>(() => {
-    if (stored) {
+    const candidate = ownerRecord || stored;
+    const displayRecord = candidate?.qrCode?.toUpperCase() === code.toUpperCase() ? candidate : null;
+    if (displayRecord) {
       return {
-        ...stored,
-        qrCode: (stored.qrCode || code).toUpperCase(),
-        permanentPath: stored.permanentPath || `/i/${(stored.qrCode || code).toUpperCase()}`,
-        name: stored.name || "",
-        brand: stored.brand || "",
-        model: stored.model || "",
-        serial: stored.serial || "",
-        year: stored.year || "",
-        instrumentType: stored.instrumentType || "",
-        builder: stored.builder || "",
-        owner: stored.owner || "Unclaimed",
-        location: stored.location || "",
-        summary: stored.summary || "",
-        finish: stored.finish || "",
-        bodyWood: stored.bodyWood || "",
-        neckWood: stored.neckWood || "",
-        pickups: stored.pickups || "",
-        instrumentCondition: stored.instrumentCondition === "new" ? "new" : "used",
-        creatorAccountType: stored.creatorAccountType || "customer",
-        verificationStatus: stored.verificationStatus || "unverified",
-        authenticityStatus: stored.authenticityStatus || "unconfirmed",
-        showVerificationBadge: stored.showVerificationBadge !== false,
-        showAuthenticityBadge: stored.showAuthenticityBadge !== false,
-        publicVerificationNote: stored.publicVerificationNote || "",
-        publicAuthenticityNote: stored.publicAuthenticityNote || "",
-        safetyStatus: stored.safetyStatus === "lost" || stored.safetyStatus === "stolen" || stored.safetyStatus === "recovered" ? stored.safetyStatus : "clear",
-        publicSafetyNote: stored.publicSafetyNote || "",
-        safetyStatusUpdatedAt: stored.safetyStatusUpdatedAt || "",
-        heroImageDataUrl: stored.heroImageDataUrl || "",
-        galleryImageDataUrls: stored.galleryImageDataUrls && stored.galleryImageDataUrls.length
-          ? stored.galleryImageDataUrls
+        ...displayRecord,
+        qrCode: (displayRecord.qrCode || code).toUpperCase(),
+        permanentPath: displayRecord.permanentPath || `/i/${(displayRecord.qrCode || code).toUpperCase()}`,
+        name: displayRecord.name || "",
+        brand: displayRecord.brand || "",
+        model: displayRecord.model || "",
+        serial: displayRecord.serial || "",
+        year: displayRecord.year || "",
+        instrumentType: displayRecord.instrumentType || "",
+        builder: displayRecord.builder || "",
+        owner: displayRecord.owner || "Unclaimed",
+        location: displayRecord.location || "",
+        summary: displayRecord.summary || "",
+        finish: displayRecord.finish || "",
+        bodyWood: displayRecord.bodyWood || "",
+        neckWood: displayRecord.neckWood || "",
+        pickups: displayRecord.pickups || "",
+        instrumentCondition: displayRecord.instrumentCondition === "new" ? "new" : "used",
+        creatorAccountType: displayRecord.creatorAccountType || "customer",
+        verificationStatus: displayRecord.verificationStatus || "unverified",
+        authenticityStatus: displayRecord.authenticityStatus || "unconfirmed",
+        showVerificationBadge: displayRecord.showVerificationBadge !== false,
+        showAuthenticityBadge: displayRecord.showAuthenticityBadge !== false,
+        publicVerificationNote: displayRecord.publicVerificationNote || "",
+        publicAuthenticityNote: displayRecord.publicAuthenticityNote || "",
+        safetyStatus: displayRecord.safetyStatus === "lost" || displayRecord.safetyStatus === "stolen" || displayRecord.safetyStatus === "recovered" ? displayRecord.safetyStatus : "clear",
+        publicSafetyNote: displayRecord.publicSafetyNote || "",
+        safetyStatusUpdatedAt: displayRecord.safetyStatusUpdatedAt || "",
+        heroImageDataUrl: displayRecord.heroImageDataUrl || "",
+        galleryImageDataUrls: displayRecord.galleryImageDataUrls && displayRecord.galleryImageDataUrls.length
+          ? displayRecord.galleryImageDataUrls
           : [],
-        documentFiles: stored.documentFiles && stored.documentFiles.length
-          ? stored.documentFiles
+        documentFiles: displayRecord.documentFiles && displayRecord.documentFiles.length
+          ? displayRecord.documentFiles
           : [],
-        timelineEvents: stored.timelineEvents && stored.timelineEvents.length
-          ? stored.timelineEvents
-          : stored.serviceEvents || [],
-        serviceEvents: stored.serviceEvents && stored.serviceEvents.length
-          ? stored.serviceEvents
+        timelineEvents: displayRecord.timelineEvents && displayRecord.timelineEvents.length
+          ? displayRecord.timelineEvents
+          : displayRecord.serviceEvents || [],
+        serviceEvents: displayRecord.serviceEvents && displayRecord.serviceEvents.length
+          ? displayRecord.serviceEvents
           : [],
-        externalMedia: stored.externalMedia && stored.externalMedia.length ? stored.externalMedia : []
+        externalMedia: displayRecord.externalMedia && displayRecord.externalMedia.length ? displayRecord.externalMedia : []
       };
     }
 
     return null;
-  }, [code, stored]);
+  }, [code, stored, ownerRecord]);
 
   const canEdit = Boolean(currentUserEmail && instrument?.ownerUserEmail && currentUserEmail === instrument.ownerUserEmail.toLowerCase());
   const canSubmitService = Boolean(currentUserEmail && instrument && !canEdit && instrument.visibility !== "private");
 
   const presentation = useMemo(
-    () => instrument ? resolveInstrumentPresentation(instrument, "public") : null,
-    [instrument]
+    () => instrument ? resolveInstrumentPresentation(instrument, ownerPreview || ownerRecord ? "owner" : "public") : null,
+    [instrument, ownerPreview, ownerRecord]
   );
   const galleryImages = useMemo(() => presentation?.photos || [], [presentation?.photos]);
   const documentFiles = presentation?.documents || [];
@@ -503,9 +530,10 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     return (
       <main className="scan-profile">
         <section className="scan-shell">
-          <section className="scan-tab-panel" aria-label="Profile not found">
-            <h2>Instrument profile not found</h2>
-            <p>This QRguitar Profile has not been published.</p>
+          <section className="scan-tab-panel" aria-label={profileLoadError ? "Profile unavailable" : "Profile not found"}>
+            <h2>{profileLoadError ? "Profile temporarily unavailable" : "Instrument profile not found"}</h2>
+            <p>{profileLoadError ? "We could not load this Profile. Please try again." : "This QRguitar Profile has not been published."}</p>
+            {profileLoadError ? <button type="button" className="button" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button> : null}
             <div className="scan-actions">
               <Action icon={<Home />} label="Go to homepage" onClick={() => router.push("/")} />
               <Action icon={<Download />} label="Browse catalog" onClick={() => router.push("/catalog")} />
@@ -551,7 +579,6 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
       : null
   ].filter((item): item is { label: string; note: string } => Boolean(item));
 
-  const stalePublicValues = new Set(["custom offset", "alder", "maple neck, rosewood board"]);
   const identityValues = {
     qrGuitarId: instrument.qrCode,
     brand: instrument.brand,
@@ -577,7 +604,7 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
     ...(instrument.customFields || [])
   ].filter((spec) => {
     const value = String(spec.value || "").trim();
-    return value && !stalePublicValues.has(value.toLowerCase());
+    return Boolean(value);
   });
 
   const profileLinks = [
@@ -594,6 +621,13 @@ export function ProfileClient({ code: codeParam, initialInstrument }: { code: st
   return (
     <main className="scan-profile">
       <section className="scan-shell">
+        {ownerPreview && instrument ? <div className="profile-refresh-notice" role="status"><p><strong>Owner preview.</strong> {instrument.visibility === "private" ? "This Profile is private. Its QR link will work for visitors when you make it public." : "You are viewing this Profile from your account."}</p><Link className="button secondary" href={"/edit/" + encodeURIComponent(instrument.qrCode)}>Edit Profile</Link><Link href="/dashboard">Back to collection</Link></div> : null}
+        {profileLoadError ? (
+          <div className="profile-refresh-notice" role="status">
+            <p>This is the last loaded Profile. We could not check for updates.</p>
+            <button type="button" className="button secondary" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button>
+          </div>
+        ) : null}
         <div className="scan-topbar">
           <button type="button" aria-label="Back to homepage" onClick={() => router.push("/")}>
             <ArrowLeft size={24} />

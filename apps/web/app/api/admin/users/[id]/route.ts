@@ -81,14 +81,14 @@ async function loadDeleteEligibility(supabase: ServerSupabaseClient, targetUserI
   return { ok: blockers.length === 0, blockers };
 }
 
-export async function PATCH(request: Request, context: { params: { id: string } }) {
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const access = await requireAdmin(request);
   if (!access.ok) {
     return access.response;
   }
 
   const { supabase, admin } = access;
-  const targetUserId = cleanText(context.params.id, 100);
+  const targetUserId = cleanText((await context.params).id, 100);
   if (!targetUserId) {
     return adminJson({ ok: false, message: "User ID is required." }, { status: 400 });
   }

@@ -19,8 +19,9 @@ type QuickEditForm = {
   publicSafetyNote: string;
 };
 
-export function ProfileQuickEdit({ record, onClose, onSaved }: {
+export function ProfileQuickEdit({ record, onClose, onSaved, isSessionCurrent }: {
   record: DemoInstrument;
+  isSessionCurrent: () => boolean;
   onClose: () => void;
   onSaved: (record: DemoInstrument) => void;
 }) {
@@ -29,6 +30,9 @@ export function ProfileQuickEdit({ record, onClose, onSaved }: {
   const [savedForm, setSavedForm] = useState<QuickEditForm>(() => toForm(record, photos));
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const active = useRef(true);
+  const savePending = useRef(false);
+  function isCurrent() { return active.current && isSessionCurrent(); }
   const dialogRef = useRef<HTMLElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const closeRef = useRef<() => void>(() => undefined);
@@ -36,10 +40,12 @@ export function ProfileQuickEdit({ record, onClose, onSaved }: {
 
   closeRef.current = () => {
     if (dirty && !window.confirm("Discard unsaved Quick Edit changes?")) return;
+    active.current = false;
     onClose();
   };
 
   useEffect(() => {
+    active.current = true;
     returnFocusRef.current = document.activeElement as HTMLElement | null;
     const previousOverflow = document.body.style.overflow;
     const previousPaddingRight = document.body.style.paddingRight;
@@ -75,6 +81,7 @@ export function ProfileQuickEdit({ record, onClose, onSaved }: {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => {
+      active.current = false;
       document.body.style.overflow = previousOverflow;
       document.body.style.paddingRight = previousPaddingRight;
       document.removeEventListener("keydown", handleKeyDown);
@@ -97,10 +104,14 @@ export function ProfileQuickEdit({ record, onClose, onSaved }: {
   }
 
   async function save() {
+    if (!isCurrent() || savePending.current) return;
+    savePending.current = true;
     setSaving(true);
     setMessage("");
     try {
       const token = await getSupabaseAccessToken();
+      if (!isCurrent()) return;
+      if (!token) throw new Error("Sign in again before saving.");
       const response = await fetch("/api/instruments", {
         method: "PATCH",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
@@ -132,19 +143,23 @@ export function ProfileQuickEdit({ record, onClose, onSaved }: {
           customLinks: record.customLinks || []
         })
       });
-      const payload = await response.json().catch(() => null) as { ok?: boolean; message?: string } | null;
-      if (!response.ok || !payload?.ok) throw new Error(payload?.message || "Could not save Quick Edit changes.");
+      const payload = await response.json().catch(() => null) as { ok?: boolean; qrCode?: string; message?: string } | null;
+      if (!isCurrent()) return;
+      if (!response.ok || payload?.ok !== true || payload.qrCode !== record.qrCode) throw new Error(payload?.message || "Could not save Quick Edit changes.");
 
       if (form.safetyStatus !== (record.safetyStatus || "clear") || form.publicSafetyNote !== (record.publicSafetyNote || "")) {
+        if (!isCurrent()) return;
         const safetyResponse = await fetch("/api/safety-status", {
           method: "PATCH",
           headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
           body: JSON.stringify({ qrCode: record.qrCode, safetyStatus: form.safetyStatus, publicSafetyNote: form.publicSafetyNote })
         });
-        const safetyPayload = await safetyResponse.json().catch(() => null) as { ok?: boolean; message?: string } | null;
-        if (!safetyResponse.ok || !safetyPayload?.ok) throw new Error(safetyPayload?.message || "Profile saved, but the safety alert could not be updated.");
+        const safetyPayload = await safetyResponse.json().catch(() => null) as { ok?: boolean; qrCode?: string; message?: string } | null;
+        if (!isCurrent()) return;
+        if (!safetyResponse.ok || safetyPayload?.ok !== true || safetyPayload.qrCode !== record.qrCode) throw new Error(safetyPayload?.message || "Profile saved, but the safety alert could not be updated.");
       }
 
+      if (!isCurrent()) return;
       setSavedForm(form);
       onSaved({
         ...record,
@@ -161,9 +176,11 @@ export function ProfileQuickEdit({ record, onClose, onSaved }: {
       });
       setMessage("Profile updated.");
     } catch (error) {
+      if (!isCurrent()) return;
       setMessage(error instanceof Error ? error.message : "Could not save Quick Edit changes.");
     } finally {
-      setSaving(false);
+      savePending.current = false;
+      if (isCurrent()) setSaving(false);
     }
   }
 

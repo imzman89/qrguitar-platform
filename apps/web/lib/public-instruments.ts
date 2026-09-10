@@ -2,6 +2,7 @@ import { defaultQrStyle, type DemoInstrument } from "./local-demo";
 import { mergeRecordTrustSettings, recordTrustContentKey, type RecordTrustSettings } from "./record-trust";
 import { unstable_noStore as noStore } from "next/cache";
 import { supabaseHttpsJson } from "./supabase-http";
+import { supabasePagedRows, supabaseRowsByValues } from "./supabase-pagination";
 import { isEligiblePublicProfile, isRetiredPublicProfileCode, normalizePublicProfileCode } from "./public-profile-eligibility";
 import { cleanPublicCollection, publicCollectionOwnerKey, type PublicCollectionSettings } from "./public-collections";
 import { publicFileUrl } from "./public-file-url";
@@ -127,14 +128,9 @@ type PublicCollectionSiteRow = {
   content_value: Partial<PublicCollectionSettings> | null;
 };
 
-const stalePublicSpecValues = new Set([
-  "alder",
-  "maple neck, rosewood board"
-]);
-
 function cleanPublicSpecValue(value?: string | null) {
   const trimmed = String(value || "").trim();
-  return stalePublicSpecValues.has(trimmed.toLowerCase()) ? "" : trimmed;
+  return trimmed;
 }
 
 function isRenderablePublicMediaSource(source: string) {
@@ -347,16 +343,11 @@ async function loadTrustSettingsMap(qrCodes: string[]) {
     return trustByCode;
   }
 
-  const keyFilter = qrCodes.map((code) => `"${recordTrustContentKey(code)}"`).join(",");
-  let rows: SiteContentRow[];
-  try {
-    rows = await supabaseHttpsJson<SiteContentRow[]>(
-      `/rest/v1/site_content?select=content_key,content_value&content_key=in.(${keyFilter})`,
-      { serviceRole: true, timeoutMs: 4000 }
-    );
-  } catch {
-    return trustByCode;
-  }
+  const rows = await supabaseRowsByValues<SiteContentRow>(
+    "/rest/v1/site_content?select=content_key,content_value&order=content_key.asc",
+    "content_key", qrCodes.map(recordTrustContentKey),
+    { serviceRole: true, timeoutMs: 4000 }
+  );
 
   for (const row of rows) {
     const code = row.content_key.replace(/^record_trust:/, "").toUpperCase();
@@ -366,7 +357,7 @@ async function loadTrustSettingsMap(qrCodes: string[]) {
   return trustByCode;
 }
 
-async function loadRelated(guitars: GuitarRow[], serviceRole = false) {
+async function loadRelated(guitars: GuitarRow[], serviceRole = true) {
   if (!guitars.length) {
     return {
       media: new Map<string, string[]>(),
@@ -380,30 +371,23 @@ async function loadRelated(guitars: GuitarRow[], serviceRole = false) {
   }
 
   const ids = guitars.map((guitar) => guitar.id);
-  const ownerIds = guitars.map((guitar) => guitar.owner_id).filter(Boolean) as string[];
-  const idFilter = ids.map(encodeURIComponent).join(",");
-  const ownerIdFilter = ownerIds.map(encodeURIComponent).join(",");
-  const collectionKeyFilter = ownerIds.map((ownerId) => `"${publicCollectionOwnerKey(ownerId)}"`).join(",");
+  const ownerIds = [...new Set(guitars.map((guitar) => guitar.owner_id).filter(Boolean) as string[])];
   const [mediaRows, specRows, documentRows, profileRows, serviceEventRows, externalMediaRows, collectionRows] = await Promise.all([
-    supabaseHttpsJson<MediaRow[]>(`/rest/v1/guitar_media?select=guitar_id,storage_path&guitar_id=in.(${idFilter})`, { serviceRole }),
-    supabaseHttpsJson<SpecRow[]>(`/rest/v1/guitar_specs?select=guitar_id,label,value&guitar_id=in.(${idFilter})`, { serviceRole }),
-    supabaseHttpsJson<DocumentRow[]>(`/rest/v1/guitar_documents?select=guitar_id,name,storage_path,is_public,document_type,public_description,issuer_source,document_date,description,file_size_bytes,related_timeline_event_id,related_service_event_id,created_at&guitar_id=in.(${idFilter})`, { serviceRole }),
-    ownerIds.length
-      ? supabaseHttpsJson<ProfileRow[]>(`/rest/v1/profiles?select=id,display_name,account_status,hide_public_content&id=in.(${ownerIdFilter})`, { serviceRole })
-      : Promise.resolve([]),
-    supabaseHttpsJson<TimelineRow[]>(`/rest/v1/guitar_timeline_events?select=id,guitar_id,event_date,event_type,title,description,shop_name,location,is_public,created_at,updated_at,date_precision,category,is_system,related_document_id,related_media_id,source_kind,provider_user_id,provider_display_name,provider_verified_at_snapshot,evidence_reviewed_at,service_submission_id,work_order_reference,parts_installed,setup_measurements,who_performed&guitar_id=in.(${idFilter})&is_public=eq.true&order=event_date.desc.nullslast,created_at.desc`, { serviceRole })
+    supabaseRowsByValues<MediaRow>("/rest/v1/guitar_media?select=guitar_id,storage_path,sort_order&order=sort_order.asc,id.asc", "guitar_id", ids, { serviceRole }),
+    supabaseRowsByValues<SpecRow>("/rest/v1/guitar_specs?select=guitar_id,label,value&order=sort_order.asc,id.asc", "guitar_id", ids, { serviceRole }),
+    supabaseRowsByValues<DocumentRow>("/rest/v1/guitar_documents?select=guitar_id,name,storage_path,is_public,document_type,public_description,issuer_source,document_date,description,file_size_bytes,related_timeline_event_id,related_service_event_id,created_at&is_public=eq.true&order=created_at.asc,id.asc", "guitar_id", ids, { serviceRole }),
+    supabaseRowsByValues<ProfileRow>("/rest/v1/profiles?select=id,display_name,account_status,hide_public_content&order=id.asc", "id", ownerIds, { serviceRole }),
+    supabaseRowsByValues<TimelineRow>("/rest/v1/guitar_timeline_events?select=id,guitar_id,event_date,event_type,title,description,shop_name,location,is_public,created_at,updated_at,date_precision,category,is_system,related_document_id,related_media_id,source_kind,provider_user_id,provider_display_name,provider_verified_at_snapshot,evidence_reviewed_at,service_submission_id,work_order_reference,parts_installed,setup_measurements,who_performed&is_public=eq.true&order=event_date.desc.nullslast,created_at.desc,id.asc", "guitar_id", ids, { serviceRole })
       .catch(async (error: Error) => {
         if (!/column .* does not exist/i.test(error.message)) throw error;
-        return supabaseHttpsJson<TimelineRow[]>(`/rest/v1/guitar_timeline_events?select=id,guitar_id,event_date,event_type,title,description,shop_name,location,is_public,created_at,updated_at&guitar_id=in.(${idFilter})&is_public=eq.true&order=event_date.desc.nullslast,created_at.desc`, { serviceRole });
+        return supabaseRowsByValues<TimelineRow>("/rest/v1/guitar_timeline_events?select=id,guitar_id,event_date,event_type,title,description,shop_name,location,is_public,created_at,updated_at&is_public=eq.true&order=event_date.desc.nullslast,created_at.desc,id.asc", "guitar_id", ids, { serviceRole });
       }),
-    supabaseHttpsJson<ExternalMediaRow[]>(`/rest/v1/guitar_external_media?select=id,guitar_id,provider,canonical_url,provider_id,title,caption,thumbnail_url,is_public,sort_order,created_at&guitar_id=in.(${idFilter})&is_public=eq.true&order=sort_order.asc,created_at.asc`, { serviceRole })
+    supabaseRowsByValues<ExternalMediaRow>("/rest/v1/guitar_external_media?select=id,guitar_id,provider,canonical_url,provider_id,title,caption,thumbnail_url,is_public,sort_order,created_at&is_public=eq.true&order=sort_order.asc,created_at.asc,id.asc", "guitar_id", ids, { serviceRole })
       .catch((error: Error) => {
-        if (/does not exist/i.test(error.message)) return [];
+        if (/relation .*guitar_external_media.* does not exist/i.test(error.message)) return [];
         throw error;
       }),
-    ownerIds.length
-      ? supabaseHttpsJson<PublicCollectionSiteRow[]>(`/rest/v1/site_content?select=content_key,content_value&content_key=in.(${collectionKeyFilter})`, { serviceRole: true }).catch(() => [])
-      : Promise.resolve([])
+    supabaseRowsByValues<PublicCollectionSiteRow>("/rest/v1/site_content?select=content_key,content_value&order=content_key.asc", "content_key", ownerIds.map(publicCollectionOwnerKey), { serviceRole: true })
   ]);
 
   const media = new Map<string, string[]>();
@@ -454,7 +438,9 @@ async function loadRelated(guitars: GuitarRow[], serviceRole = false) {
 
 export async function getPublicInstruments(ownerId?: string) {
   noStore();
-  const guitars = await supabaseHttpsJson<GuitarRow[]>("/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,no_serial_used,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&visibility=eq.public&admin_archived_at=is.null&owner_removed_at=is.null&order=created_at.desc");
+  const query = new URL("/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,no_serial_used,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&visibility=eq.public&admin_archived_at=is.null&owner_removed_at=is.null&order=created_at.desc,id.asc", "https://supabase.invalid");
+  if (ownerId) query.searchParams.set("owner_id", "eq." + ownerId);
+  const guitars = await supabasePagedRows<GuitarRow>(query.pathname + query.search, { serviceRole: true });
   const [related, trustByCode] = await Promise.all([
     loadRelated(guitars),
     loadTrustSettingsMap(guitars.map((guitar) => guitar.qr_code))

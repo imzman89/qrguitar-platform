@@ -12,8 +12,8 @@ function normalizeCode(codeParam: string) {
   return normalizePublicProfileCode(codeParam);
 }
 
-export async function generateMetadata({ params }: { params: { code: string } }): Promise<Metadata> {
-  const code = normalizeCode(params.code);
+export async function generateMetadata({ params }: { params: Promise<{ code: string }> }): Promise<Metadata> {
+  const code = normalizeCode((await params).code);
   if (!code || isRetiredPublicProfileCode(code)) {
     return {
       title: "QRguitar Profile Not Found",
@@ -32,8 +32,8 @@ export async function generateMetadata({ params }: { params: { code: string } })
   };
 }
 
-export default async function PublicProfilePage({ params }: { params: { code: string } }) {
-  const code = normalizeCode(params.code);
+export default async function PublicProfilePage({ params }: { params: Promise<{ code: string }> }) {
+  const code = normalizeCode((await params).code);
   if (!code || isRetiredPublicProfileCode(code)) {
     notFound();
   }

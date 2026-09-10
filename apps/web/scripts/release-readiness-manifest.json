@@ -1,0 +1,756 @@
+{
+  "releaseVersion": "2026-09-10.1",
+  "checks": [
+    "catalog_readable",
+    "required_functions",
+    "function_security",
+    "blocked_function_grants",
+    "private_tables",
+    "private_table_grants",
+    "server_only_policies",
+    "private_storage_buckets",
+    "private_storage_policy",
+    "receipt_constraints",
+    "editor_versioning",
+    "schema_columns",
+    "public_schema_create",
+    "self_security"
+  ],
+  "serviceFunctions": [
+    "public.save_instrument_profile(uuid,uuid,timestamp with time zone,jsonb)",
+    "public.create_instrument_profile(uuid,text,text,jsonb,boolean,text)",
+    "public.register_staged_instrument_upload(uuid,text,text,text)",
+    "public.cleanup_staged_instrument_uploads(uuid,text,text[],text[])",
+    "public.save_account_settings(uuid,text,jsonb)",
+    "public.prepare_ownership_transfer(uuid,text,text,text,text,text,integer,boolean,text)",
+    "public.complete_ownership_transfer(uuid,uuid,text,text,boolean,text)",
+    "public.manage_ownership_transfer(uuid,uuid,text,text,boolean,text)",
+    "public.approve_ownership_claim(uuid,uuid,text)",
+    "public.approve_service_submission(uuid,uuid,text)",
+    "public.commit_service_evidence(uuid,uuid,boolean,text,jsonb)",
+    "public.mutate_external_media(uuid,uuid,boolean,text,uuid,jsonb)",
+    "public.update_instrument_controls(uuid,text,text,jsonb,boolean)",
+    "public.legacy_create_matches_profile(uuid,uuid,jsonb)",
+    "public.read_site_editor_state()",
+    "public.mutate_site_editor(uuid,text,boolean,jsonb,jsonb,jsonb,jsonb)"
+  ],
+  "blockedFunctions": [
+    "public.create_instrument_profile_unregistered(uuid,text,text,jsonb,boolean,text)",
+    "public.ownership_transfer_actor(uuid,text,boolean)",
+    "public.ownership_transfer_snapshot(public.ownership_transfers,public.guitars,boolean)",
+    "public.complete_ownership_transfer(uuid,uuid)",
+    "public.assign_site_editor_version()",
+    "public.site_editor_changed_fields(jsonb,jsonb)"
+  ],
+  "fingerprints": [
+    {
+      "signature": "public.save_instrument_profile(uuid,uuid,timestamp with time zone,jsonb)",
+      "source_hash": "a2f4dbadd9c941bac84328884d6869cc4a72c94047d758641d8986a50bad7efb",
+      "arguments": "p_guitar_id uuid, p_owner_id uuid, p_expected_updated_at timestamp with time zone, p_payload jsonb",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.create_instrument_profile(uuid,text,text,jsonb,boolean,text)",
+      "source_hash": "680f6f11d9beaae41c154fcdc6dd5365db648a5294cec9796c943e7b929d751f",
+      "arguments": "p_owner_id uuid, p_idempotency_key text, p_upload_id text, p_payload jsonb, p_launch_testing_access boolean DEFAULT false, p_owner_display_name text DEFAULT NULL::text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.register_staged_instrument_upload(uuid,text,text,text)",
+      "source_hash": "177836ba3ab2a43c89553da383c181b8452b7244dc559c3a953745cd9c218372",
+      "arguments": "p_owner_id uuid, p_upload_id text, p_bucket_id text, p_storage_path text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.cleanup_staged_instrument_uploads(uuid,text,text[],text[])",
+      "source_hash": "792471a16e89da03c47c82e5b3f5bbcffad1bb646353ee13dea89475ad76b41f",
+      "arguments": "p_owner_id uuid, p_upload_id text, p_media_paths text[], p_document_paths text[]",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.save_account_settings(uuid,text,jsonb)",
+      "source_hash": "9048a3a0689223149dcdff8e00072e33bc54bb1b9351779d2533673a9c234d4c",
+      "arguments": "p_user_id uuid, p_display_name text, p_collection jsonb DEFAULT NULL::jsonb",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=public"
+      ]
+    },
+    {
+      "signature": "public.prepare_ownership_transfer(uuid,text,text,text,text,text,integer,boolean,text)",
+      "source_hash": "2ebbb209c53ff2588ee3dd2fc45533f2edaeebf33ead6e29cd2196b0b84803d3",
+      "arguments": "p_actor_id uuid, p_qr_code text, p_to_email text, p_to_name text, p_buyer_code_hash text, p_order_reference_hash text, p_expires_in_days integer, p_env_admin boolean, p_display_name text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=public, pg_temp"
+      ]
+    },
+    {
+      "signature": "public.complete_ownership_transfer(uuid,uuid,text,text,boolean,text)",
+      "source_hash": "95288614642a410c6e380ea5379d10157a54103680ce783298a33ba67a31e559",
+      "arguments": "p_transfer_id uuid, p_new_owner_id uuid, p_buyer_code_hash text, p_order_reference_hash text, p_env_admin boolean, p_display_name text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=public, pg_temp"
+      ]
+    },
+    {
+      "signature": "public.manage_ownership_transfer(uuid,uuid,text,text,boolean,text)",
+      "source_hash": "5d2c60dc8832108223dad6f0503329c65344c104773fcbc1076665bc56725503",
+      "arguments": "p_transfer_id uuid, p_actor_id uuid, p_action text, p_reason text, p_env_admin boolean, p_display_name text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=public, pg_temp"
+      ]
+    },
+    {
+      "signature": "public.approve_ownership_claim(uuid,uuid,text)",
+      "source_hash": "e864ff724979daac8a9334cf351d5f0db8e5cf7d3ce395cea84cd3cd8878ef25",
+      "arguments": "p_claim_id uuid, p_decided_by uuid, p_decision_note text DEFAULT NULL::text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=public"
+      ]
+    },
+    {
+      "signature": "public.approve_service_submission(uuid,uuid,text)",
+      "source_hash": "4f1d48b14d4643b1a7299ec317426107b28ccd1376430c5740d66b680e157c79",
+      "arguments": "p_submission_id uuid, p_owner_user_id uuid, p_token_hash text DEFAULT NULL::text",
+      "result": "TABLE(service_event_id uuid, timeline_event_id uuid, already_approved boolean)",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=public"
+      ]
+    },
+    {
+      "signature": "public.commit_service_evidence(uuid,uuid,boolean,text,jsonb)",
+      "source_hash": "93b3a91156a4f2c4d37156cd666255fc46c313084e07dfa73d4339a72ab93973",
+      "arguments": "p_submission_id uuid, p_actor_id uuid, p_is_admin boolean, p_action text, p_evidence jsonb",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=public"
+      ]
+    },
+    {
+      "signature": "public.mutate_external_media(uuid,uuid,boolean,text,uuid,jsonb)",
+      "source_hash": "f961e97c00e1b4661bb2abee080b82f2d3412e5b28a087fd45c2abb7e57716d1",
+      "arguments": "p_guitar_id uuid, p_actor_id uuid, p_is_admin boolean, p_action text, p_media_id uuid DEFAULT NULL::uuid, p_values jsonb DEFAULT '{}'::jsonb",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=public"
+      ]
+    },
+    {
+      "signature": "public.update_instrument_controls(uuid,text,text,jsonb,boolean)",
+      "source_hash": "943292d159a6f242234b55b0e2517f608008375e942f81c92940d5d6d89ee173",
+      "arguments": "p_actor_id uuid, p_qr_code text, p_action text, p_payload jsonb, p_env_admin boolean",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=public, pg_temp"
+      ]
+    },
+    {
+      "signature": "public.legacy_create_matches_profile(uuid,uuid,jsonb)",
+      "source_hash": "fa7cb33513af89a2ef2d8b9eac94d23a28d79c027ce8c135e55930669282094f",
+      "arguments": "p_guitar_id uuid, p_owner_id uuid, p_payload jsonb",
+      "result": "boolean",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.read_site_editor_state()",
+      "source_hash": "7cbc630a7a2486b6e6d1fa7186a8832e4ba6ed65ac540f67da5306f7dfe71271",
+      "arguments": "",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=public"
+      ]
+    },
+    {
+      "signature": "public.mutate_site_editor(uuid,text,boolean,jsonb,jsonb,jsonb,jsonb)",
+      "source_hash": "94c71ae7dba298416640d2e1d24d48b18093112a4262cc179a0bbd1dd4658a2c",
+      "arguments": "p_actor_id uuid, p_actor_email text, p_env_authorized boolean, p_request jsonb, p_settings jsonb, p_defaults jsonb, p_revision_value jsonb DEFAULT NULL::jsonb",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=public"
+      ]
+    },
+    {
+      "signature": "public.create_instrument_profile_unregistered(uuid,text,text,jsonb,boolean,text)",
+      "source_hash": "c5cfecebf87e01a60d9b28011d702cf21f0311aa3d23ee87b011dcf54bd4a303",
+      "arguments": "p_owner_id uuid, p_idempotency_key text, p_upload_id text, p_payload jsonb, p_launch_testing_access boolean DEFAULT false, p_owner_display_name text DEFAULT NULL::text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.ownership_transfer_actor(uuid,text,boolean)",
+      "source_hash": "dd353c5889e52d708e95820c2d01b43470e2c6ba2573f70603ef3cdd5301d6aa",
+      "arguments": "p_actor_id uuid, p_display_name text, p_env_admin boolean",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=public, pg_temp"
+      ]
+    },
+    {
+      "signature": "public.ownership_transfer_snapshot(public.ownership_transfers,public.guitars,boolean)",
+      "source_hash": "9e4a8c4de1db34be347cf8356be854217a19872e6c8dd38615323dab0452f4e8",
+      "arguments": "p_transfer ownership_transfers, p_guitar guitars, p_replayed boolean DEFAULT false",
+      "result": "jsonb",
+      "definer": false,
+      "volatility": "s",
+      "settings": [
+        "search_path=public, pg_temp"
+      ]
+    },
+    {
+      "signature": "public.complete_ownership_transfer(uuid,uuid)",
+      "source_hash": "327623422f63c2a981cd5b450b66f8ce239d2a6aa68ee1d8ef33da50b3bef10a",
+      "arguments": "p_transfer_id uuid, p_new_owner_id uuid",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=public"
+      ]
+    },
+    {
+      "signature": "public.assign_site_editor_version()",
+      "source_hash": "8f90a61aca53ea9f9649c357f4d393193f83c14cea1e548f4057bb09f5127322",
+      "arguments": "",
+      "result": "trigger",
+      "definer": false,
+      "volatility": "v",
+      "settings": [
+        "search_path=public"
+      ]
+    },
+    {
+      "signature": "public.site_editor_changed_fields(jsonb,jsonb)",
+      "source_hash": "3399a47b1ca75906d40c1888262079bf0074f264f19f2f7d7e60b385f7e21bea",
+      "arguments": "p_before jsonb, p_after jsonb",
+      "result": "jsonb",
+      "definer": false,
+      "volatility": "i",
+      "settings": [
+        "search_path=public"
+      ]
+    },
+    {
+      "signature": "public.normalize_instrument_serial(text)",
+      "source_hash": "91722cea83f2ff8c05c8aeef5537ba970525872dab7ed3da5f0b57b6ec74957c",
+      "arguments": "value text",
+      "result": "text",
+      "definer": false,
+      "volatility": "i",
+      "settings": null
+    },
+    {
+      "signature": "public.protect_service_provider_provenance()",
+      "source_hash": "ac9b72526864b01d3f69bf3e810cbdf1ea6e456e59f6d36c03346cd10dd66d12",
+      "arguments": "",
+      "result": "trigger",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=public"
+      ]
+    },
+    {
+      "signature": "public.protect_system_timeline_event()",
+      "source_hash": "c0e08affd1ce06e835e0f2ce29b1727a8ceeb25becb7aef2db8c20bd88b494c6",
+      "arguments": "",
+      "result": "trigger",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=public"
+      ]
+    },
+    {
+      "signature": "public.create_profile_timeline_event()",
+      "source_hash": "f07bc30b54adc82629ffcc795e4dd5170827191a5f668f0d62793d8ae319ffc2",
+      "arguments": "",
+      "result": "trigger",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=public"
+      ]
+    },
+    {
+      "signature": "public.set_guitar_no_serial_flag()",
+      "source_hash": "6de7f23e2a2570fa4e7bffdac7bfc7aa389b9aa5d40378589bee55e85965700c",
+      "arguments": "",
+      "result": "trigger",
+      "definer": false,
+      "volatility": "v",
+      "settings": null
+    },
+    {
+      "signature": "public.sync_guitar_serial_alias()",
+      "source_hash": "b567b3fe11152851b9f17c6af0efc47979011149a3eecc2a268d14c12a6edc65",
+      "arguments": "",
+      "result": "trigger",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=public"
+      ]
+    }
+  ],
+  "baseTables": [
+    "profiles",
+    "guitars",
+    "qr_redirects",
+    "guitar_specs",
+    "guitar_timeline_events",
+    "guitar_media",
+    "guitar_documents",
+    "ownership_transfers",
+    "site_content",
+    "guitar_serial_aliases",
+    "guitar_external_media",
+    "ownership_claims",
+    "ownership_claim_evidence",
+    "ownership_claim_events",
+    "admin_audit_events",
+    "service_provider_profiles",
+    "service_provider_profile_access",
+    "service_submissions",
+    "service_submission_evidence",
+    "service_submission_tokens",
+    "service_submission_activity",
+    "service_submission_notifications"
+  ],
+  "tables": [
+    "profiles",
+    "guitars",
+    "qr_redirects",
+    "guitar_specs",
+    "guitar_timeline_events",
+    "guitar_media",
+    "guitar_documents",
+    "ownership_transfers",
+    "site_content",
+    "guitar_serial_aliases",
+    "guitar_external_media",
+    "ownership_claims",
+    "ownership_claim_evidence",
+    "ownership_claim_events",
+    "admin_audit_events",
+    "service_provider_profiles",
+    "service_provider_profile_access",
+    "service_submissions",
+    "service_submission_evidence",
+    "service_submission_tokens",
+    "service_submission_activity",
+    "service_submission_notifications",
+    "instrument_create_receipts",
+    "instrument_staged_uploads",
+    "site_editor_receipts"
+  ],
+  "buckets": [
+    "instrument-media",
+    "instrument-documents",
+    "service-evidence"
+  ],
+  "storagePolicy": {
+    "using_expression": "(bucket_id <> ALL (ARRAY['instrument-media'::text, 'instrument-documents'::text, 'service-evidence'::text]))",
+    "check_expression": "(bucket_id <> ALL (ARRAY['instrument-media'::text, 'instrument-documents'::text, 'service-evidence'::text]))"
+  },
+  "constraints": [
+    [
+      "instrument_create_receipts",
+      "p",
+      [
+        "owner_id",
+        "idempotency_key"
+      ]
+    ],
+    [
+      "instrument_create_receipts",
+      "u",
+      [
+        "owner_id",
+        "upload_id"
+      ]
+    ],
+    [
+      "instrument_staged_uploads",
+      "p",
+      [
+        "bucket_id",
+        "storage_path"
+      ]
+    ],
+    [
+      "site_editor_receipts",
+      "p",
+      [
+        "actor_user_id",
+        "request_id"
+      ]
+    ]
+  ],
+  "columns": [
+    {
+      "table": "profiles",
+      "name": "id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "profiles",
+      "name": "role",
+      "type": "member_role",
+      "not_null": true
+    },
+    {
+      "table": "profiles",
+      "name": "plan",
+      "type": "plan_tier",
+      "not_null": true
+    },
+    {
+      "table": "profiles",
+      "name": "account_status",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "guitars",
+      "name": "id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "guitars",
+      "name": "owner_id",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "guitars",
+      "name": "qr_code",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "guitars",
+      "name": "permanent_path",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "guitars",
+      "name": "serial_number",
+      "type": "text",
+      "not_null": false
+    },
+    {
+      "table": "guitars",
+      "name": "no_serial_used",
+      "type": "boolean",
+      "not_null": true
+    },
+    {
+      "table": "guitars",
+      "name": "status",
+      "type": "guitar_status",
+      "not_null": true
+    },
+    {
+      "table": "guitars",
+      "name": "owner_removed_at",
+      "type": "timestamp with time zone",
+      "not_null": false
+    },
+    {
+      "table": "guitars",
+      "name": "owner_removed_by",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "guitars",
+      "name": "owner_removed_reason",
+      "type": "text",
+      "not_null": false
+    },
+    {
+      "table": "guitars",
+      "name": "admin_archived_at",
+      "type": "timestamp with time zone",
+      "not_null": false
+    },
+    {
+      "table": "guitars",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "ownership_transfers",
+      "name": "guitar_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "ownership_transfers",
+      "name": "from_owner_id",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "ownership_transfers",
+      "name": "to_email",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "ownership_transfers",
+      "name": "status",
+      "type": "transfer_status",
+      "not_null": true
+    },
+    {
+      "table": "ownership_transfers",
+      "name": "accepted_by",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "ownership_transfers",
+      "name": "accepted_at",
+      "type": "timestamp with time zone",
+      "not_null": false
+    },
+    {
+      "table": "ownership_transfers",
+      "name": "expires_at",
+      "type": "timestamp with time zone",
+      "not_null": false
+    },
+    {
+      "table": "ownership_transfers",
+      "name": "claim_token_hash",
+      "type": "text",
+      "not_null": false
+    },
+    {
+      "table": "ownership_transfers",
+      "name": "purchaser_code_hash",
+      "type": "text",
+      "not_null": false
+    },
+    {
+      "table": "ownership_transfers",
+      "name": "claim_prepared_at",
+      "type": "timestamp with time zone",
+      "not_null": false
+    },
+    {
+      "table": "site_content",
+      "name": "content_key",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "site_content",
+      "name": "content_value",
+      "type": "jsonb",
+      "not_null": true
+    },
+    {
+      "table": "site_content",
+      "name": "editor_version",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "site_content",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "instrument_create_receipts",
+      "name": "owner_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "instrument_create_receipts",
+      "name": "idempotency_key",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "instrument_create_receipts",
+      "name": "upload_id",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "instrument_create_receipts",
+      "name": "request_hash",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "instrument_create_receipts",
+      "name": "guitar_id",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "instrument_create_receipts",
+      "name": "qr_code",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "instrument_create_receipts",
+      "name": "permanent_path",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "instrument_staged_uploads",
+      "name": "bucket_id",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "instrument_staged_uploads",
+      "name": "storage_path",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "instrument_staged_uploads",
+      "name": "owner_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "instrument_staged_uploads",
+      "name": "upload_id",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "instrument_staged_uploads",
+      "name": "state",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "instrument_staged_uploads",
+      "name": "guitar_id",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "site_editor_receipts",
+      "name": "actor_user_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "site_editor_receipts",
+      "name": "request_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "site_editor_receipts",
+      "name": "request_body",
+      "type": "jsonb",
+      "not_null": true
+    },
+    {
+      "table": "site_editor_receipts",
+      "name": "result",
+      "type": "jsonb",
+      "not_null": true
+    }
+  ],
+  "provenanceTriggers": [
+    [
+      "guitar_timeline_events",
+      "protect_service_provider_provenance_trigger",
+      "CREATE TRIGGER protect_service_provider_provenance_trigger BEFORE INSERT OR DELETE OR UPDATE ON public.guitar_timeline_events FOR EACH ROW EXECUTE FUNCTION protect_service_provider_provenance()"
+    ],
+    [
+      "guitar_timeline_events",
+      "protect_system_timeline_event_trigger",
+      "CREATE TRIGGER protect_system_timeline_event_trigger BEFORE DELETE OR UPDATE ON public.guitar_timeline_events FOR EACH ROW EXECUTE FUNCTION protect_system_timeline_event()"
+    ],
+    [
+      "guitars",
+      "create_profile_timeline_event_trigger",
+      "CREATE TRIGGER create_profile_timeline_event_trigger AFTER INSERT ON public.guitars FOR EACH ROW EXECUTE FUNCTION create_profile_timeline_event()"
+    ],
+    [
+      "guitars",
+      "set_guitar_no_serial_flag_trigger",
+      "CREATE TRIGGER set_guitar_no_serial_flag_trigger BEFORE INSERT OR UPDATE OF serial_number ON public.guitars FOR EACH ROW EXECUTE FUNCTION set_guitar_no_serial_flag()"
+    ],
+    [
+      "guitars",
+      "sync_guitar_serial_alias_trigger",
+      "CREATE TRIGGER sync_guitar_serial_alias_trigger AFTER INSERT OR UPDATE OF serial_number ON public.guitars FOR EACH ROW EXECUTE FUNCTION sync_guitar_serial_alias()"
+    ]
+  ]
+}

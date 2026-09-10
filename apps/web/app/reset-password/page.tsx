@@ -9,6 +9,8 @@ import { createBrowserSupabaseClient } from "../../lib/supabase-browser";
 import { getContentValue } from "../../lib/content-registry";
 import { useSiteContent } from "../../lib/use-site-content";
 
+import { safeAuthRedirect } from "../../lib/auth-redirect";
+
 export default function ResetPasswordPage() {
   const content = useSiteContent();
   const router = useRouter();
@@ -25,7 +27,7 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    setSafeNext(sanitizeNext(params.get("next")));
+    setSafeNext(safeAuthRedirect(params.get("next")));
     setHasRecoveryLink(
       params.has("code")
       || params.has("token_hash")
@@ -170,14 +172,6 @@ export default function ResetPasswordPage() {
       <Footer />
     </>
   );
-}
-
-function sanitizeNext(path: string | null) {
-  if (!path || path === "/login" || path === "/reset-password") {
-    return "/dashboard";
-  }
-
-  return path.startsWith("/") ? path : "/dashboard";
 }
 
 function cleanAuthError(message: string) {

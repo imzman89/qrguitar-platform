@@ -2,7 +2,8 @@ import { unstable_noStore as noStore } from "next/cache";
 import { cookies } from "next/headers";
 import { createServerSupabaseClient } from "./supabase-server";
 import { defaultSiteSettings, mergeSiteSettings, publishedSiteSettingsKey, type EditableSiteSettings } from "./site-settings";
-import { sitePreviewCookie, sitePreviewDraftKey, verifySitePreviewToken } from "./site-preview";
+import { isSitePreviewAuthorized } from "./site-preview-server";
+import { sitePreviewCookie, sitePreviewDraftKey } from "./site-preview";
 
 type SiteContentRow = {
   content_value: Partial<EditableSiteSettings> | null;
@@ -15,7 +16,7 @@ export async function loadPublishedSiteSettings() {
     return defaultSiteSettings;
   }
 
-  const preview = verifySitePreviewToken(cookies().get(sitePreviewCookie)?.value);
+  const preview = await isSitePreviewAuthorized((await cookies()).get(sitePreviewCookie)?.value, supabase);
   const { data, error } = await supabase
     .from("site_content")
     .select("content_value")

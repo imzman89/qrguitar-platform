@@ -1,0 +1,134 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import ts from "typescript";
+import os from "node:os";
+import {repoRoot as root,readRepo} from "./atomic-test-support.mjs";
+const runtime = fs.mkdtempSync(path.join(os.tmpdir(),"qrguitar-edit-tests-"));
+fs.mkdirSync(runtime, {recursive:true});
+const helperSource = fs.readFileSync(path.join(root, "apps/web/lib/profile-save-assets.ts"), "utf8");
+const helperJs = ts.transpileModule(helperSource, { compilerOptions: {target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+fs.writeFileSync(path.join(runtime, "helper.mjs"), helperJs);
+const {prepareProfileAssets, existingAssetPath, ProfileSaveError} = await import(pathToFileURL(path.join(runtime, "helper.mjs")).href);
+const owner = "10000000-0000-4000-8000-000000000001";
+const guitar = "20000000-0000-4000-8000-000000000001";
+const mediaPath = `${owner}/${guitar}/original.jpg`;
+const documentPath = `${owner}/${guitar}/receipt.pdf`;
+const baseUrl = "https://qrguitar-test.supabase.co";
+const media = {id:"30000000-0000-4000-8000-000000000001",storage_path:mediaPath,alt:"Existing",sort_order:0};
+const doc = {id:"40000000-0000-4000-8000-000000000001",name:"Receipt",storage_path:documentPath,is_public:false,
+  updated_at:"2026-01-02T00:00:00Z",document_type:"Receipt",public_description:"Invoice",private_notes:"Private original",
+  issuer_source:"Dealer",document_date:"2026-01-01",description:"Original receipt",
+  related_timeline_event_id:"50000000-0000-4000-8000-000000000001",related_service_event_id:null,mime_type:"application/pdf",file_size_bytes:1234};
+const jpg = "data:image/jpeg;base64," + Buffer.from([0xff,0xd8,0xff,0xe0,0x01]).toString("base64");
+const pdf = "data:application/pdf;base64," + Buffer.from("%PDF-1.4\nfixture").toString("base64");
+const options = (body, upload = async()=>{}) => ({body, ownerId:owner,guitarId:guitar,currentHeroPath:mediaPath,
+  supabaseUrl:baseUrl,existingMedia:[media],existingDocuments:[doc],upload});
+let passed = 0;
+async function test(name, fn) {await fn();console.log("PASS "+name);passed++;}
+await test("exact own Storage URLs map to paths; cross-origin and substring tricks do not", async()=>{
+  assert.equal(existingAssetPath(baseUrl+"/storage/v1/object/sign/instrument-documents/"+documentPath+"?token=old", [documentPath], "instrument-documents", baseUrl),documentPath);
+  for(const source of ["https://evil.test/?path="+documentPath,baseUrl+"/unrelated/"+documentPath,baseUrl+"/storage/v1/object/sign/instrument-documents/"+documentPath+".bak",baseUrl+"/storage/v1/object/sign/instrument-documents/%ZZ"]){
+    assert.equal(existingAssetPath(source,[documentPath],"instrument-documents",baseUrl),"");
+  }
+});
+await test("Quick Edit url documents retain identity and omitted private metadata",async()=>{
+  const saved = await prepareProfileAssets(options({photos:[mediaPath],documents:[{name:"Renamed",url:baseUrl+"/storage/v1/object/public/instrument-documents/"+documentPath,visibility:"hidden"}]}));
+  assert.equal(saved.documents[0].id,doc.id);
+  assert.equal(saved.documents[0].private_notes,doc.private_notes);
+  assert.equal(saved.documents[0].related_timeline_event_id,doc.related_timeline_event_id);
+  assert.equal(saved.documents[0].file_size_bytes,1234);
+});
+await test("omitted documents preserve all existing documents",async()=>{
+  const saved = await prepareProfileAssets(options({photos:[mediaPath]}));
+  assert.equal(saved.documents[0].id,doc.id);
+  assert.equal(saved.documents[0].private_notes,doc.private_notes);
+});
+await test("duplicate hero/gallery data URL uploads once and shares one path",async()=>{
+  const uploads=[];
+  const saved = await prepareProfileAssets(options({photos:[jpg],heroImageDataUrl:jpg,documents:[]},async(...args)=>uploads.push(args)));
+  assert.equal(uploads.length,1);assert.equal(saved.media.length,1);assert.equal(saved.heroImagePath,saved.media[0].storage_path);
+});
+await test("invalid later document rejects before uploading an earlier valid new photo",async()=>{
+  let uploads=0;
+  await assert.rejects(prepareProfileAssets(options({photos:[jpg],documents:[{name:"Bad",dataUrl:"data:application/pdf;base64,!!"}]},async()=>uploads++)),ProfileSaveError);
+  assert.equal(uploads,0);
+});
+await test("invalid calendar date rejects before any upload",async()=>{
+  let uploads=0;
+  await assert.rejects(prepareProfileAssets(options({photos:[jpg],documents:[{name:"Receipt",dataUrl:pdf,documentDate:"2026-02-30"}]},async()=>uploads++)),ProfileSaveError);
+  await assert.rejects(prepareProfileAssets(options({photos:[jpg],documents:[{name:"Receipt",dataUrl:pdf,documentDate:"2026-99-99"}]},async()=>uploads++)),ProfileSaveError);
+  assert.equal(uploads,0);
+});
+await test("duplicate existing documents reject before upload",async()=>{
+  let uploads=0;
+  await assert.rejects(prepareProfileAssets(options({photos:[jpg],documents:[{name:"Receipt",storagePath:documentPath},{name:"Receipt",storagePath:documentPath}]},async()=>uploads++)),ProfileSaveError);
+  assert.equal(uploads,0);
+});
+await test("upload rejection propagates without completing prepared payload",async()=>{
+  let uploads=0;
+  await assert.rejects(prepareProfileAssets(options({photos:[jpg],documents:[{name:"Receipt",dataUrl:pdf}]},async()=>{
+    uploads++; if(uploads===2)throw new Error("injected upload failure");
+  })),/injected upload failure/);
+  assert.equal(uploads,2);
+});
+const prelude = `
+import { prepareProfileAssets, ProfileSaveError, profileSaveFailure } from "./helper.mjs";
+const noStoreJson=(body, options={})=>({body,status:options.status||200});
+const normalizeSerialBuildId=(value)=>value.toUpperCase().replace(/[^A-Z0-9]/g,"");
+const qrCodeFromSerial=(value)=>"QRG-"+normalizeSerialBuildId(value).slice(0,64);
+const resolveCanonicalBrand=async(_db,value)=>({brand:value,suggestion:""});
+const findGuitarByExactSerial=async()=>null;
+const profileLinkSpecLabel=(value)=>"Profile link: "+value;
+const canApproveSerialCorrection=async()=>false;
+const getSupabaseEnvStatus=()=>({supabaseUrl:"${baseUrl}"});
+const revalidatePublicRecordSurfaces=()=>{};
+export async function run(body,supabase){
+  const auth={user:{id:"${owner}",email:"owner@example.test"}};
+`;
+const actualRoute=readRepo("apps/web/app/api/instruments/route.ts").replaceAll("\r\n","\n");
+const patchStart=actualRoute.indexOf("export async function PATCH(request: Request)");
+const tailStart=actualRoute.indexOf("  try {\n    const input = {",patchStart);
+assert.ok(patchStart>=0 && tailStart>patchStart,"Atomic edit handler must exist in actual route");
+const tail=actualRoute.slice(tailStart);
+fs.writeFileSync(path.join(runtime,"route-tail.mjs"),ts.transpileModule(prelude+tail,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText);
+const {run}=await import(pathToFileURL(path.join(runtime,"route-tail.mjs")).href);
+function mockDb({readError=false,uploadFailure=false,rpcError=null,rpcData={ok:true,qrCode:"QRG-ORIGINAL123",permanentPath:"/i/QRG-ORIGINAL123"}}={}){
+  const calls={rpc:0,uploads:0};
+  return {calls,
+    from(table){const result=table==="guitars"?{data:{id:guitar,owner_id:owner,serial_number:"ORIGINAL123",hero_image_path:mediaPath,updated_at:"2026-01-02T00:00:00Z"},error:null}:
+      table==="guitar_media"?{data:[media],error:null}:{data:[doc],error:readError?{message:"injected read failure"}:null};
+      const builder={select(){return builder},eq(){return builder},maybeSingle(){return Promise.resolve(result)},then(resolve,reject){return Promise.resolve(result).then(resolve,reject)}};
+      return builder;},
+    storage:{from(){return {async upload(){calls.uploads++;return {error:uploadFailure?{message:"failed upload"}:null}}}}},
+    async rpc(){calls.rpc++;return {data:rpcData,error:rpcError};}
+  };
+}
+const edit=(extra={})=>({qrCode:"QRG-ORIGINAL123",brand:"Fender",model:"Strat",serial:"ORIGINAL123",photos:[mediaPath],...extra});
+await test("existing document read failure returns failure before uploading or mutating",async()=>{
+  const db=mockDb({readError:true});const result=await run(edit({photos:[jpg]}),db);
+  assert.equal(result.body.ok,false);assert.equal(db.calls.rpc,0);assert.equal(db.calls.uploads,0);
+});
+await test("upload failure stops before the atomic RPC and reports failure",async()=>{
+  const db=mockDb({uploadFailure:true});const result=await run(edit({photos:[jpg]}),db);
+  assert.equal(result.body.ok,false);assert.equal(result.status,502);assert.equal(db.calls.rpc,0);
+});
+await test("missing migration fails closed with 503 and never says saved",async()=>{
+  const db=mockDb({rpcError:{code:"PGRST202"}});const result=await run(edit(),db);
+  assert.equal(result.body.ok,false);assert.equal(result.status,503);assert.equal(result.body.code,"profile_save_unavailable");assert.equal(db.calls.rpc,1);
+});
+await test("atomic RPC conflict returns 409 and never says saved",async()=>{
+  const db=mockDb({rpcError:{code:"40001"}});const result=await run(edit(),db);
+  assert.equal(result.body.ok,false);assert.equal(result.status,409);
+});
+await test("an ambiguous response never returns success",async()=>{
+  const db=mockDb({rpcData:null});const result=await run(edit(),db);
+  assert.equal(result.body.ok,false);assert.equal(result.status,502);
+});
+await test("confirmed RPC returns success only once, using committed code and path",async()=>{
+  const db=mockDb();const result=await run(edit(),db);
+  assert.equal(result.body.ok,true);assert.equal(result.body.permanentPath,"/i/QRG-ORIGINAL123");assert.equal(db.calls.rpc,1);
+});
+console.log(`Completed ${passed} asset and route failure-path tests.`);
+

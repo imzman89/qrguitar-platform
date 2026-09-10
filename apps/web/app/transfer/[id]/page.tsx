@@ -3,7 +3,7 @@
 import { BadgeCheck, Copy, LogIn, Repeat2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Footer } from "../../../components/Footer";
 import { Nav } from "../../../components/Nav";
 import { transferStatusLabel, type DemoTransfer } from "../../../lib/local-demo";
@@ -24,43 +24,83 @@ export default function TransferClaimPage() {
   const [permanentPath, setPermanentPath] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [requiresAccess, setRequiresAccess] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const authRevision = useRef(0);
   const [signedIn, setSignedIn] = useState(false);
   const [accepting, setAccepting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-
-    async function loadTransfer() {
-      setLoading(true);
-      const supabase = createBrowserSupabaseClient();
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token || "";
-      const response = await fetch(`/api/transfers?id=${encodeURIComponent(transferId)}`, {
-        headers: token ? { authorization: `Bearer ${token}` } : undefined
-      });
-      const payload = (await response.json().catch(() => null)) as TransferPayload | null;
-
-      if (cancelled) {
-        return;
-      }
-
-      setSignedIn(Boolean(data.session?.user));
-      if (!response.ok || !payload?.ok || !payload.transfer) {
-        setTransfer(null);
-        setMessage(payload?.message || "This claim link was not found.");
-      } else {
-        setTransfer(payload.transfer);
-        setMessage("");
-      }
-      setLoading(false);
+    let generation = 0;
+    let authResolved = false;
+    let controller: AbortController | undefined;
+    let unsubscribe = () => {};
+    setLoading(true); setLoadError(false); setRequiresAccess(false);
+    setTransfer(null); setPermanentPath(""); setSignedIn(false);
+    const authTimer = setTimeout(() => failSession("Could not check your session in time. Try again."), 10000);
+    function failSession(reason: string) {
+      if (cancelled || authResolved) return;
+      authResolved = true; generation++; authRevision.current++;
+      clearTimeout(authTimer); controller?.abort();
+      setAccepting(false); setLoadError(true); setMessage(reason); setLoading(false);
     }
-
-    void loadTransfer();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [transferId]);
+    function cleanup() {
+      cancelled = true; generation++; authRevision.current++;
+      clearTimeout(authTimer); controller?.abort(); unsubscribe();
+    }
+    let supabase: ReturnType<typeof createBrowserSupabaseClient>;
+    try { supabase = createBrowserSupabaseClient(); }
+    catch { failSession("Account access is temporarily unavailable. Try again."); return cleanup; }
+    async function loadTransfer(token: string, hasSession: boolean) {
+      if (cancelled) return;
+      authResolved = true; clearTimeout(authTimer);
+      const request = ++generation;
+      authRevision.current++;
+      setAccepting(false);
+      controller?.abort();
+      const requestController = new AbortController();
+      controller = requestController;
+      const timer = setTimeout(() => {
+        requestController.abort();
+        if (!cancelled && request === generation) {
+          setLoadError(true); setMessage("Loading this transfer took too long. Try again."); setLoading(false);
+        }
+      }, 20000);
+      setLoading(true); setLoadError(false); setRequiresAccess(false);
+      setTransfer(null); setPermanentPath(""); setSignedIn(hasSession);
+      try {
+        const response = await fetch("/api/transfers?id=" + encodeURIComponent(transferId), {
+          cache: "no-store", headers: token ? { authorization: "Bearer " + token } : undefined, signal: requestController.signal
+        });
+        const payload = await response.json().catch(() => null) as TransferPayload | null;
+        if (cancelled || request !== generation || requestController.signal.aborted) return;
+        if (response.ok && payload?.requiresSignIn) {
+          setRequiresAccess(true); setMessage("Use the recipient account or the current owner account to view this handoff.");
+        } else if (!response.ok || !payload?.ok || !payload.transfer) {
+          setMessage(payload?.message || "We could not load this transfer."); setLoadError(response.status >= 500 || response.ok);
+        } else { setTransfer(payload.transfer); setMessage(""); }
+      } catch {
+        if (!cancelled && request === generation && !requestController.signal.aborted) {
+          setLoadError(true); setMessage("We could not load this transfer. Check your connection and try again.");
+        }
+      } finally {
+        clearTimeout(timer);
+        if (!cancelled && request === generation) setLoading(false);
+      }
+    }
+    try {
+      void supabase.auth.getSession().then(({ data }) => {
+        if (!cancelled && !authResolved) void loadTransfer(data.session?.access_token || "", Boolean(data.session?.user));
+      }).catch(() => failSession("Could not check your session. Try again."));
+      const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (!cancelled) void loadTransfer(session?.access_token || "", Boolean(session?.user));
+      });
+      unsubscribe = () => listener.subscription.unsubscribe();
+    } catch { failSession("Account access is temporarily unavailable. Try again."); }
+    return cleanup;
+  }, [transferId, loadAttempt]);
 
   const profileHref = useMemo(() => {
     if (permanentPath) {
@@ -75,10 +115,12 @@ export default function TransferClaimPage() {
       return;
     }
 
+    const revision = authRevision.current;
     setAccepting(true);
     setMessage("");
     try {
       const token = await getSupabaseAccessToken();
+      if (authRevision.current !== revision) return;
       const response = await fetch("/api/transfers", {
         method: "PATCH",
         headers: {
@@ -88,6 +130,7 @@ export default function TransferClaimPage() {
         body: JSON.stringify({ id: transfer.id, action: "accept" })
       });
       const payload = (await response.json().catch(() => null)) as TransferPayload | null;
+      if (authRevision.current !== revision) return;
 
       if (!response.ok || !payload?.ok || !payload.transfer) {
         setMessage(payload?.message || "Could not accept this transfer.");
@@ -97,8 +140,12 @@ export default function TransferClaimPage() {
       setTransfer(payload.transfer);
       setPermanentPath(payload.permanentPath || "");
       setMessage(payload.message || "Ownership accepted. The permanent QRguitar URL stayed the same.");
+    } catch {
+      if (authRevision.current !== revision) return;
+      setLoadError(true);
+      setMessage("We could not confirm the transfer. Reload its status before trying again.");
     } finally {
-      setAccepting(false);
+      if (authRevision.current === revision) setAccepting(false);
     }
   }
 
@@ -107,8 +154,13 @@ export default function TransferClaimPage() {
       return;
     }
 
-    await window.navigator.clipboard?.writeText(`${window.location.origin}${profileHref}`);
-    setMessage("Profile link copied.");
+    try {
+      if (!window.navigator.clipboard) throw new Error("Clipboard unavailable");
+      await window.navigator.clipboard.writeText(`${window.location.origin}${profileHref}`);
+      setMessage("Profile link copied.");
+    } catch {
+      setMessage("Could not copy the link. Open the Profile and copy its address from your browser.");
+    }
   }
 
   if (loading) {
@@ -137,8 +189,10 @@ export default function TransferClaimPage() {
           <div className="shell auth-layout">
             <section className="card auth-card">
               <div className="eyebrow">Ownership transfer</div>
-              <h1>This claim link was not found.</h1>
-              <p>Ask the seller, builder, or shop to create a fresh QRguitar ownership transfer link.</p>
+              <h1>{loadError ? "Unable to load this transfer" : requiresAccess ? "Sign in with the recipient account" : "This transfer is unavailable"}</h1>
+              <p>{loadError ? "Your instrument and transfer have not been changed by this check." : "Check the link and the account you are signed in to, or ask the current owner for help."}</p>
+              {loadError ? <button type="button" className="button" onClick={() => setLoadAttempt(value => value + 1)}>Try again</button> : null}
+              {!signedIn ? <Link className="button" href={"/login?next=" + encodeURIComponent("/transfer/" + transferId)}>Sign in</Link> : null}
               <Link className="button" href="/dashboard">
                 Go to Dashboard
               </Link>
@@ -195,7 +249,7 @@ export default function TransferClaimPage() {
                 <div className="icon"><BadgeCheck /></div>
                 <h3>Ownership accepted.</h3>
                 <p>This Profile now belongs to the accepting account and keeps the same permanent QRguitar link.</p>
-                <Link className="button" href={profileHref}>
+                <Link className="button" href={"/dashboard/profile/" + encodeURIComponent(transfer.guitarQrCode)}>
                   View Profile
                 </Link>
                 <button className="button secondary" type="button" onClick={() => void copyProfileLink()}>
@@ -223,7 +277,7 @@ export default function TransferClaimPage() {
                 <Link className="button" href={`/login?next=${encodeURIComponent(`/transfer/${transfer.id}`)}`}>
                   Sign in
                 </Link>
-                <Link className="button secondary" href={`/login?next=${encodeURIComponent(`/transfer/${transfer.id}`)}`}>
+                <Link className="button secondary" href={`/login?mode=register&next=${encodeURIComponent(`/transfer/${transfer.id}`)}`}>
                   Create account
                 </Link>
               </>
@@ -240,7 +294,8 @@ export default function TransferClaimPage() {
                 </Link>
               </>
             )}
-            {message ? <p className="form-message">{message}</p> : null}
+            {message ? <p className="form-message" role="status">{message}</p> : null}
+            {loadError ? <button type="button" className="button secondary" onClick={() => setLoadAttempt(value => value + 1)}>Reload transfer status</button> : null}
           </section>
         </div>
       </main>

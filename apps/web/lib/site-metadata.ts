@@ -18,7 +18,7 @@ export async function buildManagedSiteMetadata(): Promise<Metadata> {
     alternates: { canonical },
     icons: {
       icon: settings.seo.favicon || "/qrguitar-logo-white-orange.svg",
-      apple: settings.seo.favicon || "/qrguitar-logo-white-orange.svg"
+      apple: [{ url: "/app-icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }]
     },
     robots: { index: true, follow: true },
     openGraph: {

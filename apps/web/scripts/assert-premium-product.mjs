@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,8 +23,7 @@ ok(dashboard.includes("Order or receipt reference (optional)") && dashboard.incl
 ok(claims.includes("Ownership Claim Center") && claims.includes("redeem_code") && claims.includes("orderReference: buyerOrderReference"), "Claim Center buyer-code acceptance is incomplete");
 ok(transfers.includes("randomBytes") && transfers.includes("purchaser_code_hash") && transfers.includes("hashBuyerCode"), "Buyer codes are not generated and stored as one-way hashes");
 ok(transfers.includes("claim_token_hash") && transfers.includes("hashOrderReference") && transfers.includes("orderReferenceRequired"), "Private order/reference verification is missing");
-ok(transfers.includes("complete_ownership_transfer") && transfers.includes("That private buyer code is invalid, revoked, or already used"), "Atomic or single-use buyer-code acceptance is missing");
-ok(transfers.includes("This handoff requires its private buyer code") && transferPage.includes('action: "accept"'), "Ordinary transfer-link acceptance is not blocked for buyer-code handoffs");
+execFileSync(process.execPath, [path.join(root, "scripts/test-atomic-transfer-db.mjs")], { stdio: "inherit" });
 ok(!/buyerCode\s*:\s*row\./.test(transfers) && !/purchaser_code_hash\s*:\s*row\./.test(transfers) && !/claim_token_hash\s*:\s*row\./.test(transfers), "A private code or hash is mapped into an API response");
 ok(packageJson.includes('"test:premium-product"'), "Premium product test script is not registered");
 

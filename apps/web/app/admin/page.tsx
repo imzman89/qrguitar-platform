@@ -1,4 +1,5 @@
 "use client";
+import { createEditorMutationController, type EditorMutationPayload } from "../../lib/site-editor-client";
 
 import {
   Activity,
@@ -389,6 +390,10 @@ export default function AdminPage() {
   const [adminAuthorized, setAdminAuthorized] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAdminAction | null>(null);
   const [siteSettings, setSiteSettings] = useState<EditableSiteSettings>(defaultSiteSettings);
+  const logoEditor = useRef<ReturnType<typeof createEditorMutationController> | null>(null);
+  const logoVersions = useRef({ publishedVersion: "", draftVersion: "" });
+  const logoSaving = useRef(false);
+  const logoNeedsReload = useRef(false);
   const [brandLogoBrand, setBrandLogoBrand] = useState("");
   const [brandLogoUrl, setBrandLogoUrl] = useState("");
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
@@ -549,41 +554,48 @@ export default function AdminPage() {
   }, [loadAdmin]);
 
   async function loadSiteSettings() {
-    const response = await fetch("/api/site-settings", { cache: "no-store" });
-    const payload = await response.json().catch(() => ({}));
-    if (payload.settings) {
-      setSiteSettings(mergeSiteSettings(payload.settings));
-    }
+    try {
+      const token = await tokenPromise;
+      if (!token) return;
+      const response = await fetch("/api/site-editor", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.ok !== true || !payload.editorActorId || typeof payload.publishedVersion !== "string" || typeof payload.draftVersion !== "string") throw new Error(payload.message || "Could not load brand logo settings.");
+      setSiteSettings(mergeSiteSettings(payload.published));
+      logoVersions.current = { publishedVersion: payload.publishedVersion, draftVersion: payload.draftVersion };
+      logoEditor.current = createEditorMutationController({ actorId: payload.editorActorId, storageScope: "brand-logos", storage: window.sessionStorage, uuid: () => crypto.randomUUID(), send: async (body) => {
+        const accessToken = await tokenPromise;
+        if (!accessToken) return { status: 401, payload: { ok: false, uncertain: false, message: "Sign in required." } };
+        const abort = new AbortController(); const timer = window.setTimeout(() => abort.abort(), 20000);
+        try {
+          const result = await fetch("/api/site-editor", { method: "PUT", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body, cache: "no-store", signal: abort.signal });
+          return { status: result.status, payload: await result.json().catch(() => ({})) as EditorMutationPayload };
+        } finally { window.clearTimeout(timer); }
+      } });
+      if (logoEditor.current.pending) setMessage("A previous brand logo save needs confirmation. Use Save again to retry that exact change before making another.");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not load brand logo settings."); }
   }
 
-  useEffect(() => {
-    void loadSiteSettings();
-  }, []);
+  useEffect(() => { void loadSiteSettings(); }, []);
 
   async function saveBrandLogoMapping(nextLogos: Record<string, string>) {
-    const token = await tokenPromise;
-    if (!token) {
-      setMessage("Sign in required.");
-      return;
-    }
-
-    setBusy("brand-logo");
-    const nextSettings = mergeSiteSettings({ ...siteSettings, brandLogos: nextLogos });
-    const response = await fetch("/api/site-settings", {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ settings: nextSettings })
-    });
-    const payload = await response.json().catch(() => ({}));
-    setBusy("");
-    setMessage(payload.message || (response.ok ? "Brand logo settings saved." : "Brand logo settings failed."));
-    if (response.ok && payload.settings) {
-      setSiteSettings(mergeSiteSettings(payload.settings));
-    }
+    if (logoSaving.current) return;
+    const controller = logoEditor.current;
+    if (!controller || logoNeedsReload.current) { setMessage("Reload the admin page before changing brand logos."); return; }
+    if (!controller.pending && logoVersions.current.draftVersion) { setMessage("A shared draft exists. Manage brand logos in the Site Editor to preserve it."); return; }
+    logoSaving.current = true; setBusy("brand-logo");
+    try {
+      const nextSettings = mergeSiteSettings({ ...siteSettings, brandLogos: nextLogos });
+      const payload = await (controller.pending ? controller.retry() : controller.mutate({ action: "publish", source: "brand_logo_admin", settings: nextSettings, note: "Brand logo mapping updated", area: "Brand assets" }, logoVersions.current, JSON.stringify(nextSettings)));
+      if (payload.published) setSiteSettings(mergeSiteSettings(payload.published as Partial<EditableSiteSettings>));
+      logoVersions.current = { publishedVersion: payload.publishedVersion!, draftVersion: payload.draftVersion! };
+      logoNeedsReload.current = payload.superseded === true;
+      setMessage(payload.superseded ? "The previous save succeeded; later edits exist. Reload before making another change." : payload.message || "Brand logos published.");
+    } catch (error) {
+      if (!controller.pending) logoNeedsReload.current = true;
+      setMessage((error instanceof Error ? error.message : "The save could not be confirmed.") + (controller.pending ? " Use Save again to retry that exact change." : " Reload before making another change."));
+    } finally { logoSaving.current = false; setBusy(""); }
   }
+
 
   function saveCurrentBrandLogo() {
     const key = normalizeBrandLogoKey(brandLogoBrand);

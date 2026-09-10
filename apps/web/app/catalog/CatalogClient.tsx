@@ -1,5 +1,7 @@
 "use client";
 
+import { matchesCatalogQuery } from "../../lib/catalog-search";
+
 import { Search, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -108,8 +110,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
       if (exactMatchCode) {
         return true;
       }
-      const haystack = [record.qrCode, record.name, record.brand, record.model, record.location, record.instrumentType, record.saleStatus, record.originalityStatus].join(" ").toLowerCase();
-      return haystack.includes(query.toLowerCase());
+      return matchesCatalogQuery(record, query);
     });
 
   const visibleRecords = [...filtered].sort((a, b) => {
