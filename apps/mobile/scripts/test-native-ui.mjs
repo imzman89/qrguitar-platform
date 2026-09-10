@@ -244,4 +244,3 @@ test('mutation queue keeps later work locked through a rejected predecessor',asy
  const one=queue.run(async()=>{events.push('first');await first.promise;});const rejected=assert.rejects(one,/synthetic failure/);const two=queue.run(async()=>{events.push('second');await second.promise;});assert.equal(queue.getBusy(),true);await tick();assert.deepEqual(events,['first']);
  first.reject(Error('synthetic failure'));await rejected;await tick();assert.deepEqual(events,['first','second']);assert.equal(queue.getBusy(),true);second.resolve();await two;assert.equal(queue.getBusy(),false);assert.equal(changes,4);unsub();
 });
-
