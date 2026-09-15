@@ -71,9 +71,9 @@ The guarded release command:
 
 1. requires a clean committed checkout linked to the production project
 2. runs build, type, launch, behavior, audit and database readiness checks
-3. stages without assigning domains, verifies the exact deployment, promotes, and verifies public production
+3. stages with custom-domain promotion skipped, verifies the exact deployment, promotes, and verifies public production
 
-For the first incompatible database cutover, use the split commands in the release runbook instead. `npm run push:live -- --stage-only` completes local checks and staging before migration. `npm run push:live -- --promote-staged` requires the same clean commit and checks database readiness and the exact staged deployment before promotion.
+For the first incompatible database cutover, use the split commands in the release runbook instead. `npm run push:live -- --stage-only` completes local checks and staging before migration. Capture alias targets before staging: generated Vercel aliases can move despite `--skip-domain` and must be inspected/restored until cutover. `npm run push:live -- --promote-staged` requires the same clean commit and checks database readiness and the exact staged deployment before promotion.
 
 ## 6. After push
 
