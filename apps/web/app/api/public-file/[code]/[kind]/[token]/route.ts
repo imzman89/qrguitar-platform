@@ -97,7 +97,7 @@ export async function GET(
   const allowedTypes = kind === "media" ? ALLOWED_MEDIA_TYPES : ALLOWED_DOCUMENT_TYPES;
   if (!allowedTypes.has(contentType)) return notFound();
 
-  return new NextResponse(await download.data.arrayBuffer(), {
+  return new NextResponse(download.data.stream(), {
     status: 200,
     headers: {
       "Cache-Control": "private, no-store",
