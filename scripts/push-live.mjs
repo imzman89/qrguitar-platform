@@ -1,9 +1,9 @@
-import { createReleaseSnapshot, removeReleaseSnapshot } from "./release-snapshot.mjs";
+import { createReleaseSnapshot, cleanupReleaseSnapshot } from "./release-snapshot.mjs";
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runReleaseChecks, runLocalReleaseChecks, verifyProduction, verifyDeploymentIdentity, assertSameCommit, deploymentUrl, parseCurlProbe, stageAndPromote, releaseMode, stageReleaseForLater, promoteStagedRelease } from "./release-policy.mjs";
+import { runReleaseChecks, runLocalReleaseChecks, verifyProduction, verifyDeploymentIdentity, assertSameCommit, parseDeploymentJson, parseCurlProbe, stageAndPromote, releaseMode, stageReleaseForLater, promoteStagedRelease } from "./release-policy.mjs";
 import { PRODUCTION_PROJECT_ID, STAGE_RECORD_NAME, createStageRecord, validateStageRecord } from "./release-stage-record.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -63,7 +63,9 @@ try {
   const stage = () => {
     // Upload exactly the reviewed commit, without local secrets or concurrent checkout edits.
     snapshot = createReleaseSnapshot(root, gitSha, projectLink);
-    return deploymentUrl(cli(["deploy", "--prod", "--skip-domain", "--yes", ...vercelArgs], true));
+    const deployment = parseDeploymentJson(cli(["deploy", "--project", projectId, "--prod", "--skip-domain", "--json", "--yes", ...vercelArgs], true));
+    console.log("Staged production deployment " + deployment.id + " at " + deployment.url + ".");
+    return deployment.url;
   };
   const verify = async (url, identityOnly = false) => {
     console.log("Checking staged production deployment " + url + ".");
@@ -100,7 +102,8 @@ try {
         fs.renameSync(temporary, stageRecordPath);
       }
     });
-    console.log("Production candidate staged with domains skipped. Database readiness and full staged probes are deferred until --promote-staged.");
+    console.log("Production candidate staged with custom-domain promotion skipped. Generated Vercel aliases may move; inspect and restore baseline aliases until cutover.");
+    console.log("Database readiness and full staged probes are deferred until --promote-staged.");
     console.log("Review the staged release record: " + stageRecordPath);
   } else if (mode === "promote-staged") {
     await promoteStagedRelease({ unchanged, loadRecord, checkBackend, verify, promote, verifyLive });
@@ -116,5 +119,5 @@ try {
   console.error(error instanceof Error ? error.message : "Release stopped.");
   process.exitCode = 1;
 } finally {
-  if (snapshot) removeReleaseSnapshot(snapshot);
+  if (snapshot) cleanupReleaseSnapshot(snapshot);
 }

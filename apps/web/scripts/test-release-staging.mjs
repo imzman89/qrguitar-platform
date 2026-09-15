@@ -4,8 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import {execFileSync}from"node:child_process";
 import {test}from"node:test";
-import {assertSameCommit,deploymentUrl,parseCurlProbe,stageAndPromote,verifyProduction,verifyDeploymentIdentity,RELEASE_VERSION,RELEASE_CHECKS,releaseMode,runLocalReleaseChecks,stageReleaseForLater,promoteStagedRelease}from"../../../scripts/release-policy.mjs";
-import {createReleaseSnapshot,removeReleaseSnapshot}from"../../../scripts/release-snapshot.mjs";
+import {assertSameCommit,deploymentUrl,parseDeploymentJson,parseCurlProbe,stageAndPromote,verifyProduction,verifyDeploymentIdentity,RELEASE_VERSION,RELEASE_CHECKS,releaseMode,runLocalReleaseChecks,stageReleaseForLater,promoteStagedRelease}from"../../../scripts/release-policy.mjs";
+import {createReleaseSnapshot,removeReleaseSnapshot,cleanupReleaseSnapshot}from"../../../scripts/release-snapshot.mjs";
 import {PRODUCTION_PROJECT_ID,createStageRecord,validateStageRecord}from"../../../scripts/release-stage-record.mjs";
 test("changed commit cannot pass a clean-tree-only release guard",()=>assert.throws(()=>assertSameCommit("new","old")));
 test("staging is verified before domain promotion",async()=>{const events=[];await stageAndPromote({unchanged:()=>events.push("check"),stage:()=>{events.push("stage");return"https://fixture.vercel.app";},verify:url=>events.push("verify:"+url),promote:url=>events.push("promote:"+url)});assert.deepEqual(events,["check","stage","check","verify:https://fixture.vercel.app","check","promote:https://fixture.vercel.app"]);});
@@ -60,7 +60,7 @@ test("stage-only runs every local gate, verifies identity, and records a deploym
   verifyIdentity:url=>events.push("identity:"+url),saveRecord:url=>{events.push("record");saved=validRecord();assert.equal(saved.deploymentUrl,url);},
   checkBackend:()=>assert.fail("stage-only must defer the database"),promote:()=>assert.fail("stage-only must not assign domains")});
  assert.deepEqual(events,["unchanged",...RELEASE_CHECKS,"unchanged","stage","unchanged","identity:"+fixtureUrl,"unchanged","record"]);
- assert.equal(saved.databaseReadiness,"required-before-promotion");assert.equal(saved.domainAssignment,"skipped");
+ assert.equal(saved.databaseReadiness,"required-before-promotion");assert.equal(saved.domainAssignment,"custom-domains-skipped");
 });
 
 for(const failure of ["checks","stage","identity","changedAfterChecks","changedAfterStage","changedAfterIdentity"])test("stage-only "+failure+" never writes a promotable record",async()=>{
@@ -116,4 +116,44 @@ for(const failure of ["database","verify","changedAfterDatabase","changedAfterVe
 test("public verification failure is reported after promotion rather than claiming domains were unchanged",async()=>{
  let promoted=false;await assert.rejects(promoteStagedRelease({unchanged:()=>{},loadRecord:()=>validRecord(),checkBackend:()=>{},verify:()=>{},promote:()=>{promoted=true;},verifyLive:()=>{throw Error("public verification failed");}}));
  assert.equal(promoted,true);
+});
+
+const deploymentJson=()=>({id:"dpl_Fixture123",url:fixtureUrl,inspectorUrl:"https://vercel.com/team/project/Fixture123",readyState:"READY",target:"production",deploymentApiUrl:"https://api.vercel.com/v13/deployments/dpl_Fixture123"});
+test("CLI59.15.1 deployment JSON is accepted directly and in its agent envelope",()=>{
+ const expected={id:"dpl_Fixture123",url:fixtureUrl};
+ assert.deepEqual(parseDeploymentJson(JSON.stringify(deploymentJson())),expected);
+ assert.deepEqual(parseDeploymentJson(JSON.stringify({status:"ok",deployment:deploymentJson(),message:"Deployment ready.",next:[]})),expected);
+});
+for(const [name,change]of[
+ ["building",d=>({...d,readyState:"BUILDING"})],["canceled",d=>({...d,readyState:"CANCELED"})],
+ ["preview",d=>({...d,target:"preview"})],["missing ID",d=>({...d,id:undefined})],
+ ["bad API identity",d=>({...d,deploymentApiUrl:"https://api.vercel.com/v13/deployments/dpl_Other"})],
+ ["foreign API",d=>({...d,deploymentApiUrl:"https://other.invalid/v13/deployments/"+d.id})],
+ ["custom domain",d=>({...d,url:"https://qrguitar.com"})],["foreign URL",d=>({...d,url:"https://other.invalid"})],
+ ["multiple URL lines",d=>({...d,url:fixtureUrl+"\nhttps://other.vercel.app"})],
+ ["failed checks",d=>({...d,error:{name:"CHECKS_FAILED",message:"fixture failure"}})],
+ ["failed agent envelope",d=>({status:"error",deployment:d})]
+])test("structured "+name+" deployment never creates a staged release record",async()=>{
+ let saved=false;await assert.rejects(stageReleaseForLater({unchanged:()=>{},runChecks:()=>{},stage:()=>parseDeploymentJson(JSON.stringify(change(deploymentJson()))).url,
+  verifyIdentity:()=>assert.fail("Invalid deployment cannot reach identity checks."),saveRecord:()=>{saved=true;}}));assert.equal(saved,false);
+});
+test("human output or mixed JSON output cannot be mistaken for a deployment",()=>{
+ for(const input of ["▲ Production "+fixtureUrl,fixtureUrl,"null","[]",JSON.stringify(deploymentJson())+"\n▲ Aliased https://stable.vercel.app",JSON.stringify(deploymentJson())+JSON.stringify(deploymentJson())])assert.throws(()=>parseDeploymentJson(input));
+});
+test("snapshot cleanup permission failure keeps the primary release error and identifies only the verified retained directory",()=>{
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),"qrguitar-release-"));
+ try{
+  const primary=Error("Primary deployment parsing failed");const warnings=[];
+  assert.throws(()=>{try{throw primary;}finally{
+   assert.equal(cleanupReleaseSnapshot(directory,{remove:()=>{throw Object.assign(Error("fixture permission failure"),{code:"EPERM"});},warn:message=>warnings.push(message)}),false);
+  }},error=>error===primary);
+  assert.equal(warnings.length,1);assert.ok(warnings[0].includes(path.resolve(directory)));assert.equal(fs.existsSync(directory),true);
+ }finally{removeReleaseSnapshot(directory);}
+});
+test("cleanup never calls removal for an unverified path and tolerates an already removed owned snapshot",()=>{
+ let removed=false;const warnings=[];
+ assert.equal(cleanupReleaseSnapshot(path.join(os.tmpdir(),"unrelated-release"),{remove:()=>{removed=true;},warn:message=>warnings.push(message)}),false);
+ assert.equal(removed,false);assert.equal(warnings.length,1);
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),"qrguitar-release-"));
+ assert.equal(cleanupReleaseSnapshot(directory),true);assert.equal(fs.existsSync(directory),false);assert.equal(cleanupReleaseSnapshot(directory),true);
 });

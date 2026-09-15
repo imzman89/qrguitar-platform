@@ -12,7 +12,7 @@ export function validateStageRecord(record, { projectId, gitSha }) {
   if (projectId !== PRODUCTION_PROJECT_ID || !/^[a-f0-9]{40}$/.test(gitSha || "") ||
       !sameKeys(record, ["schemaVersion", "projectId", "gitSha", "deploymentUrl", "releaseEnvironment", "checks", "stagedAt", "domainAssignment", "databaseReadiness"]) ||
       record.schemaVersion !== 1 || record.projectId !== projectId || record.gitSha !== gitSha ||
-      record.domainAssignment !== "skipped" || record.databaseReadiness !== "required-before-promotion") fail();
+      record.domainAssignment !== "custom-domains-skipped" || record.databaseReadiness !== "required-before-promotion") fail();
   try { if (deploymentUrl(record.deploymentUrl) !== record.deploymentUrl) fail(); } catch { fail(); }
   const env = record.releaseEnvironment;
   if (!sameKeys(env, ["QRGUITAR_BUILD_ENV", "QRGUITAR_GIT_SHA", "QRGUITAR_BUILD_TIMESTAMP", "QRGUITAR_BUILD_DIRTY", "NEXT_PUBLIC_SITE_URL"]) ||
@@ -31,6 +31,6 @@ export function createStageRecord({ projectId, gitSha, url, releaseEnvironment, 
   return validateStageRecord({
     schemaVersion: 1, projectId, gitSha, deploymentUrl: url, releaseEnvironment,
     checks: { status: "passed", commands: RELEASE_CHECKS, startedAt, completedAt },
-    stagedAt, domainAssignment: "skipped", databaseReadiness: "required-before-promotion"
+    stagedAt, domainAssignment: "custom-domains-skipped", databaseReadiness: "required-before-promotion"
   }, { projectId, gitSha });
 }

@@ -83,6 +83,24 @@ export function deploymentUrl(stdout) {
   }
   return url.origin;
 }
+export function parseDeploymentJson(stdout) {
+  const fail = () => { throw new Error("Vercel did not return a ready production deployment in the expected JSON format."); };
+  let payload;
+  try { payload = JSON.parse(stdout); } catch { fail(); }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) fail();
+  // CLI 59.15.1 emits the deployment directly for --json, or this envelope
+  // in agent/noninteractive mode. Neither format contains a project ID;
+  // the deploy command separately pins --project to the verified local link.
+  const deployment = Object.hasOwn(payload, "deployment")
+    ? payload.status === "ok" && !payload.error ? payload.deployment : null
+    : payload;
+  if (!deployment || typeof deployment !== "object" || Array.isArray(deployment) ||
+      !/^dpl_[A-Za-z0-9]+$/.test(deployment.id || "") || deployment.readyState !== "READY" ||
+      deployment.target !== "production" || deployment.error ||
+      deployment.deploymentApiUrl !== "https://api.vercel.com/v13/deployments/" + deployment.id) fail();
+  const url = deploymentUrl(deployment.url);
+  return { id: deployment.id, url };
+}
 export function parseCurlProbe(output) {
   const matched = output.match(/\n__QRG_STATUS__:(\d{3})\r?\n__QRG_TYPE__:([^\r\n]*)\r?\n?$/);
   if (!matched) throw new Error("Staged deployment probe returned an invalid response.");
@@ -107,8 +125,8 @@ export function releaseMode(args) {
   throw new Error("Use npm run push:live, or append -- --stage-only or -- --promote-staged.");
 }
 
-// This mode deliberately has no database or domain-assignment callback. The
-// deployment stays unaliased until promoteStagedRelease passes both live gates.
+// This mode deliberately has no database or promotion callback. --skip-domain
+// defers custom-domain promotion; Vercel can still move its generated aliases.
 export async function stageReleaseForLater({ unchanged, runChecks, stage, verifyIdentity, saveRecord }) {
   await unchanged();
   await runChecks();
