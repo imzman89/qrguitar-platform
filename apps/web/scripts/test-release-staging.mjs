@@ -7,6 +7,7 @@ import {test}from"node:test";
 import {assertSameCommit,deploymentUrl,parseDeploymentJson,parseCurlProbe,stageAndPromote,verifyProduction,verifyDeploymentIdentity,RELEASE_VERSION,RELEASE_CHECKS,releaseMode,runLocalReleaseChecks,stageReleaseForLater,promoteStagedRelease}from"../../../scripts/release-policy.mjs";
 import {createReleaseSnapshot,removeReleaseSnapshot,cleanupReleaseSnapshot}from"../../../scripts/release-snapshot.mjs";
 import {PRODUCTION_PROJECT_ID,createStageRecord,validateStageRecord}from"../../../scripts/release-stage-record.mjs";
+import {VERCEL_VERSION,findVercelEntrypoint,validateVercelEntrypoint,resolveVercelCli}from"../../../scripts/vercel-cli.mjs";
 test("changed commit cannot pass a clean-tree-only release guard",()=>assert.throws(()=>assertSameCommit("new","old")));
 test("staging is verified before domain promotion",async()=>{const events=[];await stageAndPromote({unchanged:()=>events.push("check"),stage:()=>{events.push("stage");return"https://fixture.vercel.app";},verify:url=>events.push("verify:"+url),promote:url=>events.push("promote:"+url)});assert.deepEqual(events,["check","stage","check","verify:https://fixture.vercel.app","check","promote:https://fixture.vercel.app"]);});
 for(const failed of ["stage","verify","changedAfterStage","changedAfterVerify"])test(failed+" never promotes",async()=>{
@@ -157,3 +158,41 @@ test("cleanup never calls removal for an unverified path and tolerates an alread
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),"qrguitar-release-"));
  assert.equal(cleanupReleaseSnapshot(directory),true);assert.equal(fs.existsSync(directory),false);assert.equal(cleanupReleaseSnapshot(directory),true);
 });
+
+function withCliFixture(fn) {
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),"qrguitar-cli-test-"));
+ try {
+  const bins=path.join(directory,"node_modules",".bin"),packageRoot=path.join(directory,"node_modules","vercel"),entrypoint=path.join(packageRoot,"dist","vc.js");
+  fs.mkdirSync(bins,{recursive:true});fs.mkdirSync(path.dirname(entrypoint),{recursive:true});
+  fs.writeFileSync(path.join(packageRoot,"package.json"),JSON.stringify({name:"vercel",version:VERCEL_VERSION,bin:{vercel:"./dist/vc.js"}}));
+  fs.writeFileSync(entrypoint,"process.stdout.write(JSON.stringify(process.argv.slice(2)));\n");
+  return fn({directory,bins,packageRoot,entrypoint:fs.realpathSync(entrypoint)});
+ } finally {
+  const target=path.resolve(directory);if(path.dirname(target)!==path.resolve(os.tmpdir())||!path.basename(target).startsWith("qrguitar-cli-test-"))throw Error("Unsafe fixture cleanup");
+  fs.rmSync(target,{recursive:true,force:true,maxRetries:3,retryDelay:200});
+ }
+}
+
+test("pinned CLI discovery and direct execution preserve curl separators, newlines, percent templates, and spaced arguments",()=>withCliFixture(({bins,entrypoint})=>{
+ const resolved=resolveVercelCli("fixture-npx",args=>{
+  assert.deepEqual(args.slice(0,6),["fixture-npx","--yes","--package","vercel@"+VERCEL_VERSION,"--","node"]);
+  assert.ok(path.isAbsolute(args[6]));assert.equal(args.length,7);
+  return execFileSync(process.execPath,[args[6]],{env:{...process.env,PATH:bins},encoding:"utf8"});
+ });
+ assert.equal(resolved,entrypoint);
+ const args=["curl","/api/build-info?release=fixture","--deployment","https://fixture.vercel.app","--","--header","Cache-Control: no-cache","--write-out","\n__QRG_STATUS__:%{http_code}\n__QRG_TYPE__:%{content_type}\n"];
+ assert.deepEqual(JSON.parse(execFileSync(process.execPath,[resolved,...args],{encoding:"utf8"})),args);
+}));
+
+test("CLI discovery rejects missing or unpinned packages and unsafe entrypoints",()=>withCliFixture(({bins,packageRoot,entrypoint})=>{
+ assert.equal(findVercelEntrypoint(bins),entrypoint);
+ assert.throws(()=>findVercelEntrypoint(""));assert.throws(()=>validateVercelEntrypoint("relative/vc.js"));
+ for(const metadata of [{name:"other",version:VERCEL_VERSION,bin:{vercel:"./dist/vc.js"}},{name:"vercel",version:"0.0.0",bin:{vercel:"./dist/vc.js"}},{name:"vercel",version:VERCEL_VERSION,bin:{vercel:"../../unrelated.js"}}]) {
+  fs.writeFileSync(path.join(packageRoot,"package.json"),JSON.stringify(metadata));assert.throws(()=>findVercelEntrypoint(bins));assert.throws(()=>validateVercelEntrypoint(entrypoint));
+ }
+}));
+
+test("CLI resolver rejects ambiguous output or unpinned metadata before commands can run",()=>withCliFixture(({entrypoint})=>{
+ for(const output of ["not json",JSON.stringify({version:"0.0.0",entrypoint}),JSON.stringify({version:VERCEL_VERSION,entrypoint,other:true}),JSON.stringify({version:VERCEL_VERSION,entrypoint:"relative.js"})])assert.throws(()=>resolveVercelCli("fixture-npx",()=>output));
+ assert.throws(()=>resolveVercelCli("fixture-npx",()=>{throw Error("npm resolution failed");}),/npm resolution failed/);
+}));

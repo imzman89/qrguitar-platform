@@ -5,9 +5,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runReleaseChecks, runLocalReleaseChecks, verifyProduction, verifyDeploymentIdentity, assertSameCommit, parseDeploymentJson, parseCurlProbe, stageAndPromote, releaseMode, stageReleaseForLater, promoteStagedRelease } from "./release-policy.mjs";
 import { PRODUCTION_PROJECT_ID, STAGE_RECORD_NAME, createStageRecord, validateStageRecord } from "./release-stage-record.mjs";
+import { resolveVercelCli } from "./vercel-cli.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const VERCEL_CLI = "vercel@59.15.1";
 function git(...args) { return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim(); }
 function run(executable, args, env, options = {}) {
   const result = spawnSync(executable, args, {
@@ -56,8 +56,9 @@ try {
   const runCheck = args => run(process.execPath, [npmCli, ...args], env);
   const checkBackend = () => run(process.execPath, ["scripts/check-release-readiness.mjs"], env);
   const npxCli = path.join(path.dirname(npmCli), "npx-cli.js");
+  const vercelEntrypoint = resolveVercelCli(npxCli, args => run(process.execPath, args, env, { capture: true, label: "Resolve pinned Vercel CLI" }));
   const vercelArgs = Object.entries(releaseEnvironment).flatMap(([key, value]) => ["--build-env", key + "=" + value, "--env", key + "=" + value]);
-  const cli = (args, capture = false) => run(process.execPath, [npxCli, "--yes", VERCEL_CLI, ...args], env, {
+  const cli = (args, capture = false) => run(process.execPath, [vercelEntrypoint, ...args], env, {
     cwd: snapshot || root, capture, label: "Vercel " + args[0]
   });
   const stage = () => {
