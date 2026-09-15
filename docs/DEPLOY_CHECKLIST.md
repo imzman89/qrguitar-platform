@@ -1,6 +1,6 @@
 # QRguitar Deploy Checklist
 
-Use this in order.
+For the September 2026 candidate, follow [the current release runbook](RELEASE_2026_09.md), including its guarded `--stage-only` / `--promote-staged` cutover, database readiness, WAF freeze/drain, and authenticated acceptance. The legacy setup notes below do not replace those release gates. Never replay the baseline schema over an existing production database.
 
 ## 1. Supabase
 
@@ -67,11 +67,13 @@ Double-click:
 PUSH QRGUITAR LIVE
 ```
 
-That button:
+The guarded release command:
 
-1. builds the site
-2. stops if the build fails
-3. pushes production if the build passes
+1. requires a clean committed checkout linked to the production project
+2. runs build, type, launch, behavior, audit and database readiness checks
+3. stages without assigning domains, verifies the exact deployment, promotes, and verifies public production
+
+For the first incompatible database cutover, use the split commands in the release runbook instead. `npm run push:live -- --stage-only` completes local checks and staging before migration. `npm run push:live -- --promote-staged` requires the same clean commit and checks database readiness and the exact staged deployment before promotion.
 
 ## 6. After push
 

@@ -8,8 +8,12 @@ export const RELEASE_CHECKS = [
   ["audit", "--workspace", "@qrguitar/web", "--audit-level=low", "--include=dev", "--include=optional", "--include=peer"]
 ];
 
-export async function runReleaseChecks(run, checkBackend) {
+export async function runLocalReleaseChecks(run) {
   for (const args of RELEASE_CHECKS) await run(args);
+}
+
+export async function runReleaseChecks(run, checkBackend) {
+  await runLocalReleaseChecks(run);
   return await checkBackend();
 }
 
@@ -41,16 +45,21 @@ export async function checkBackendReadiness({ url, serviceKey, fetchImpl = fetch
   return validateReadiness(value);
 }
 
-export async function verifyProduction({ sha, origin = "https://qrguitar.com", staged = false, fetchImpl = fetch }) {
+export async function verifyDeploymentIdentity({ sha, buildTimestamp, origin = "https://qrguitar.com", staged = false, fetchImpl = fetch }) {
   const response = await fetchImpl(new URL("/api/build-info?release=" + encodeURIComponent(sha), origin), {
     cache: "no-store", signal: AbortSignal.timeout(20000)
   });
   if (!response.ok) throw new Error("Production identity endpoint returned HTTP " + response.status + ".");
   const identity = await response.json();
-  if (identity.gitCommitSha !== sha || identity.environment !== "production" || identity.dirtyWorkingTree === true ||
+  if (identity.gitCommitSha !== sha || (buildTimestamp !== undefined && identity.buildTimestamp !== buildTimestamp) || identity.environment !== "production" || identity.dirtyWorkingTree === true ||
       !(staged ? [new URL(origin).origin] : ["https://qrguitar.com", "https://www.qrguitar.com"]).includes(identity.origin)) {
     throw new Error("Production has not confirmed the expected committed release. Inspect the Vercel deployment before announcing completion.");
   }
+  return identity;
+}
+
+export async function verifyProduction({ sha, buildTimestamp, origin = "https://qrguitar.com", staged = false, fetchImpl = fetch }) {
+  const identity = await verifyDeploymentIdentity({ sha, buildTimestamp, origin, staged, fetchImpl });
   const health = await fetchImpl(new URL("/api/health", identity.origin), { cache: "no-store", signal: AbortSignal.timeout(15000) });
   const healthState = health.ok ? await health.json() : null;
   if (healthState?.status !== "ready" || healthState?.releaseVersion !== RELEASE_VERSION) throw new Error("Production database readiness failed. Inspect the deployed environment and migrations.");
@@ -89,4 +98,38 @@ export async function stageAndPromote({ unchanged, stage, verify, promote }) {
   await unchanged();
   await promote(url);
   return url;
+}
+
+export function releaseMode(args) {
+  if (args.length === 0) return "normal";
+  if (args.length === 1 && args[0] === "--stage-only") return "stage-only";
+  if (args.length === 1 && args[0] === "--promote-staged") return "promote-staged";
+  throw new Error("Use npm run push:live, or append -- --stage-only or -- --promote-staged.");
+}
+
+// This mode deliberately has no database or domain-assignment callback. The
+// deployment stays unaliased until promoteStagedRelease passes both live gates.
+export async function stageReleaseForLater({ unchanged, runChecks, stage, verifyIdentity, saveRecord }) {
+  await unchanged();
+  await runChecks();
+  await unchanged();
+  const url = deploymentUrl(await stage());
+  await unchanged();
+  await verifyIdentity(url);
+  await unchanged();
+  await saveRecord(url);
+  return url;
+}
+
+export async function promoteStagedRelease({ unchanged, loadRecord, checkBackend, verify, promote, verifyLive }) {
+  await unchanged();
+  // loadRecord must validate the saved project, full SHA, and completed checks.
+  const record = await loadRecord();
+  await checkBackend();
+  await unchanged();
+  await verify(record.deploymentUrl);
+  await unchanged();
+  await promote(record.deploymentUrl);
+  await verifyLive();
+  return record.deploymentUrl;
 }
