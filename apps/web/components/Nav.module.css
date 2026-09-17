@@ -24,6 +24,7 @@
 .dropdown a, .dropdown button { width: 100%; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 10px; background: transparent; color: var(--text); border: 0; font: inherit; font-size: .875rem; cursor: pointer; text-align: left; border-radius: 4px; }
 .dropdown a:hover, .dropdown button:hover { background: rgba(255,255,255,.06); }
 .dropdown p { padding: 8px; font-size: .875rem; color: #ffb4a9; }
+.sessionNotice { margin: 0; padding: 0 0 16px; color: #ffb4a9; font-size: .875rem; line-height: 1.6; overflow-wrap: anywhere; }
 .header :is(a,button):focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; }
 @media (max-width: 900px) {
   .inner { min-height: 72px; }

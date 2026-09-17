@@ -12,9 +12,11 @@ type RecordShareButtonProps = {
   showLabel?: boolean;
 };
 
+// Browser share and clipboard operations cannot be cancelled by unmounting a button.
+let pendingShareOperation: symbol | null = null;
+
 export function RecordShareButton({ code, title, className = "", showLabel = false }: RecordShareButtonProps) {
   const [status, setStatus] = useState<"idle" | "shared" | "copied" | "ready">("idle");
-  const pending = useRef(false);
   const revision = useRef(0);
   const active = useRef(true);
   const timer = useRef<number | undefined>(undefined);
@@ -23,7 +25,6 @@ export function RecordShareButton({ code, title, className = "", showLabel = fal
 
   useEffect(() => {
     active.current = true;
-    pending.current = false;
     setStatus("idle");
     return () => {
       active.current = false;
@@ -35,8 +36,9 @@ export function RecordShareButton({ code, title, className = "", showLabel = fal
   async function shareRecord(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
     event.stopPropagation();
-    if (pending.current || !active.current) return;
-    pending.current = true;
+    if (pendingShareOperation || !active.current) return;
+    const operation = Symbol("record-share");
+    pendingShareOperation = operation;
     const attempt = ++revision.current;
     const isCurrent = () => active.current && revision.current === attempt;
     if (timer.current !== undefined) window.clearTimeout(timer.current);
@@ -66,7 +68,7 @@ export function RecordShareButton({ code, title, className = "", showLabel = fal
     } catch {
       feedback("ready");
     } finally {
-      if (isCurrent()) pending.current = false;
+      if (pendingShareOperation === operation) pendingShareOperation = null;
     }
   }
 

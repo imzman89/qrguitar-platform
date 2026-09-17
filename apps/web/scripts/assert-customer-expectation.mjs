@@ -43,13 +43,13 @@ for (const legacy of ["Print handout &amp; labels", "Print or Download QR", ">Pr
 includes(layout, "loadPublishedSiteSettings", "The published theme must be rendered on the server.");
 includes(layout, '"--bg": publishedSettings.colors.background', "First paint must use the published background.");
 excludes(themeRuntime, "applyThemeSettings(defaultSiteSettings)", "Theme hydration must not flash bundled defaults.");
-assert(/useEffect\(\(\) => \{\s+const supabase = createBrowserSupabaseClient\(\);\s+void fetchPublishedSiteSettings\(\)/.test(nav), "Navigation must load published settings on mount.");
+assert(/useEffect\(\(\) => \{\s+let active = true;\s+void fetchPublishedSiteSettings\(\)/.test(nav) && nav.includes("if (active && settings) setContent(settings.content)"), "Navigation must load published settings on mount and ignore completion after unmount.");
 
 includes(middleware, 'request.headers.get("host")', "Local canonicalization must inspect the Host header.");
 excludes(middleware, 'request.nextUrl.hostname === "localhost"', "Local canonicalization must not self-redirect 127.0.0.1.");
 includes(dashboard, "imageSourceKey", "Dashboard image fallback must use a stable source key.");
 includes(profile, "presentation?.counts.service", "Profile tabs must react to the current service count.");
-includes(qrDownload, "[code, displayLabel, isTransparent, profileUrl, style]", "QR previews must react to code and style changes.");
+includes(qrDownload, "[code, displayLabel, profileUrl, style, renderKey, colorError, styleCurrent]", "QR previews must react to code and style changes and reject stale renders.");
 includes(admin, "const fallbackFocus = navButtonRef.current", "Admin overlays must capture a stable focus-return target.");
 includes(admin, "const records = useMemo", "Admin record-derived controls must use a stable records array.");
 includes(login, "sessionExpiredCopy", "Expired-session copy must follow published content.");

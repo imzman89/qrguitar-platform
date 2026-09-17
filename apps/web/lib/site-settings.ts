@@ -410,7 +410,16 @@ export function normalizeEditorialComposition(value?: Partial<EditorialCompositi
     }
     const fallbackById = new Map(defaults.sections.map((section) => [section.id, section]));
     const candidateById = new Map(candidate.sections.map((section) => [String(section?.id || ""), section]));
-    const orderedSections = defaults.sections.map((fallback) => candidateById.get(fallback.id) || fallback);
+    const movableIds = Array.from(candidateById.keys()).filter((id) => fallbackById.has(id) && !fallbackById.get(id)?.locked);
+    for (const fallback of defaults.sections) {
+      if (!fallback.locked && !movableIds.includes(fallback.id)) movableIds.push(fallback.id);
+    }
+    let movableIndex = 0;
+    // Preserve supported editorial order while keeping required sections in their fixed slots.
+    const orderedSections = defaults.sections.map((fallback) => {
+      const id = fallback.locked ? fallback.id : movableIds[movableIndex++];
+      return candidateById.get(id) || fallbackById.get(id)!;
+    });
     const sections = orderedSections.map((section) => {
       const fallback = fallbackById.get(String(section?.id || ""));
       const fallbackBlocks = new Map((fallback?.blocks || []).map((block) => [block.id, block]));

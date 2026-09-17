@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { DemoInstrument } from "../lib/local-demo";
 import { qrCodeFromSerial } from "../lib/qrguitar-id";
 import { createBrowserSupabaseClient } from "../lib/supabase-browser";
+import { observeSessionIdentity } from "../lib/session-identity";
 import { getContentValue } from "../lib/content-registry";
 import { useSiteContent } from "../lib/use-site-content";
 import { acquireBulkImportLease, type BulkImportLease } from "../lib/bulk-import-lock";
@@ -30,6 +31,7 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({});
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [ownerId, setOwnerId] = useState("");
+  const [accountGeneration, setAccountGeneration] = useState(0);
   const [storageError, setStorageError] = useState("");
   const [parseError, setParseError] = useState("");
   const activeAccount = useRef("");
@@ -49,19 +51,27 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
 
   useEffect(() => {
     let alive = true;
-    const supabase = createBrowserSupabaseClient();
     const changeAccount = (nextOwner: string) => {
       if (!alive || (activeAccount.current === nextOwner && nextOwner)) return;
+      const changed = activeAccount.current !== nextOwner;
       activeAccount.current = nextOwner;
+      // Batched A → signed-out/B → A events still invalidate the released lease,
+      // even when React sees the same final owner ID as the previous render.
+      if (changed) setAccountGeneration((current) => current + 1);
       draftLease.current?.release(); draftLease.current = null;
       setOwnerId(nextOwner); setDraftLoaded(false); setStorageError(""); setParseError("");
       setText(""); setRows([]); setColumnMapping({}); setMessage("");
       setLeaseState(nextOwner ? "waiting" : "signed-out");
       if (!nextOwner) setMessage("Sign in to restore your import.");
     };
-    void supabase.auth.getSession().then(({ data }) => changeAccount(data.session?.user.id || ""));
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => changeAccount(session?.user.id || ""));
-    return () => { alive = false; data.subscription.unsubscribe(); draftLease.current?.release(); };
+    let stop: () => void = () => undefined;
+    try {
+      const supabase = createBrowserSupabaseClient();
+      stop = observeSessionIdentity(supabase.auth, changeAccount);
+    } catch {
+      changeAccount("");
+    }
+    return () => { alive = false; stop(); draftLease.current?.release(); };
   }, []);
 
   useEffect(() => {
@@ -102,7 +112,7 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
       lease.release();
       if (draftLease.current === lease) draftLease.current = null;
     };
-  }, [ownerId]);
+  }, [ownerId, accountGeneration]);
 
   function assertDraftOwnership() {
     if (!ownerId || activeAccount.current !== ownerId || draftLease.current?.ownerId !== ownerId) throw new Error("Your account changed. Sign in with the original account to resume its import.");

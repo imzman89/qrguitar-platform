@@ -14725,6 +14725,11 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.cms-section-open > *,
+.cms-block-row > * {
+  /* Keep a single drop target while crossing the row's decorative labels. */
+  pointer-events: none;
+}
 .cms-block-row small {
   font-size: 8px;
   text-transform: uppercase;

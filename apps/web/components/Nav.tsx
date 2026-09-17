@@ -5,45 +5,34 @@ import { usePathname } from "next/navigation";
 import { LogOut, Menu, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { BrandLogo } from "./BrandLogo";
-import { clearQrGuitarSessionState, createBrowserSupabaseClient } from "../lib/supabase-browser";
+import { useAuthNavigation } from "../lib/use-auth-navigation";
 import { defaultSiteSettings, fetchPublishedSiteSettings } from "../lib/site-settings";
 import { getContentValue } from "../lib/content-registry";
 import styles from "./Nav.module.css";
 
 export function Nav() {
   const pathname = usePathname();
-  const [isSignedIn, setIsSignedIn] = useState(false);
+  const { signedIn: isSignedIn, signingOut, logoutError, logout: signOut, clearLogoutError } = useAuthNavigation();
   const [isOpen, setIsOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
-  const [logoutError, setLogoutError] = useState("");
   const [content, setContent] = useState(defaultSiteSettings.content);
   const headerRef = useRef<HTMLElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const accountRef = useRef<HTMLButtonElement>(null);
 
   async function logout() {
-    try {
-      const { error } = await createBrowserSupabaseClient().auth.signOut();
-      if (error) throw error;
-      clearQrGuitarSessionState();
-      setIsSignedIn(false);
+    if (await signOut()) {
       setIsOpen(false);
       setAccountMenuOpen(false);
-    } catch {
-      setLogoutError("Could not sign out. Please try again.");
     }
   }
 
   useEffect(() => {
-    const supabase = createBrowserSupabaseClient();
+    let active = true;
     void fetchPublishedSiteSettings().then((settings) => {
-      if (settings) setContent(settings.content);
+      if (active && settings) setContent(settings.content);
     });
-    void supabase.auth.getSession().then(({ data }) => setIsSignedIn(Boolean(data.session?.user)));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsSignedIn(Boolean(session?.user));
-    });
-    return () => listener.subscription.unsubscribe();
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -104,18 +93,19 @@ export function Nav() {
             <div className={styles.account}>
               <button ref={accountRef} className={styles.accountButton} type="button" aria-label="Account menu"
                 aria-expanded={accountMenuOpen} aria-controls="account-navigation"
-                onClick={() => { setAccountMenuOpen((open) => !open); setLogoutError(""); }}>
+                onClick={() => { setAccountMenuOpen((open) => !open); clearLogoutError(); }}>
                 <UserRound size={18} aria-hidden="true" /><span>Account</span>
               </button>
               {accountMenuOpen ? <div className={styles.dropdown} id="account-navigation">
                 <Link href="/account" onClick={() => { setIsOpen(false); setAccountMenuOpen(false); }}>Account settings</Link>
-                <button type="button" onClick={() => void logout()}><LogOut size={16} aria-hidden="true" /> Sign out</button>
+                <button type="button" disabled={signingOut} onClick={() => void logout()}><LogOut size={16} aria-hidden="true" /> {signingOut ? "Signing out..." : "Sign out"}</button>
                 {logoutError ? <p role="alert">{logoutError}</p> : null}
               </div> : null}
             </div>
           ) : <Link href="/login" onClick={() => setIsOpen(false)}>Sign in</Link>}
         </nav>
       </div>
+      {!isSignedIn && logoutError ? <div className="shell"><p className={styles.sessionNotice} role="alert">{logoutError}</p></div> : null}
     </header>
   );
 }

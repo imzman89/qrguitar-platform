@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type DragEvent } from "react";
 import { ArrowDown, ArrowUp, ChevronDown, Copy, Eye, EyeOff, GripVertical, Plus, RotateCcw, Trash2 } from "lucide-react";
 import {
   defaultEditorialComposition,
@@ -17,8 +17,10 @@ type Props = {
   onChange: (sections: EditorialSection[]) => void;
 };
 
+const dragMimeTypes = { section: "text/cms-section", block: "text/cms-block" };
+
 function moveItem<T>(items: T[], from: number, to: number) {
-  if (to < 0 || to >= items.length || from === to) return items;
+  if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || from >= items.length || to < 0 || to >= items.length || from === to) return items;
   const next = [...items];
   const [item] = next.splice(from, 1);
   next.splice(to, 0, item);
@@ -35,16 +37,29 @@ function newBlockId(pageKey: EditorialPageKey, sectionId: string) {
 export function SiteCompositionEditor({ pageKey, sections, onChange }: Props) {
   const defaults = defaultEditorialComposition[pageKey].sections;
   const [openSectionId, setOpenSectionId] = useState(sections[0]?.id || "");
-  const [focusedBlockId, setFocusedBlockId] = useState("");
+  const [focusedBlockId, setFocusedBlockId] = useState(sections[0]?.blocks[0]?.id || "");
+  const previousPageKey = useRef(pageKey);
+  const dragSequence = useRef(0);
+  const drag = useRef<{
+    kind: "section" | "block";
+    pageKey: EditorialPageKey;
+    sectionId: string;
+    blockId?: string;
+    sections: EditorialSection[];
+    payload: string;
+  } | null>(null);
 
   useEffect(() => {
+    if (previousPageKey.current === pageKey) return;
+    previousPageKey.current = pageKey;
+    drag.current = null;
     const firstSection = sections[0];
     setOpenSectionId(firstSection?.id || "");
     setFocusedBlockId(firstSection?.blocks[0]?.id || "");
-  }, [pageKey]);
+  }, [pageKey, sections]);
 
   useEffect(() => {
-    if (!sections.some((section) => section.id === openSectionId)) {
+    if (openSectionId && !sections.some((section) => section.id === openSectionId)) {
       setOpenSectionId(sections[0]?.id || "");
     }
   }, [openSectionId, sections]);
@@ -54,8 +69,9 @@ export function SiteCompositionEditor({ pageKey, sections, onChange }: Props) {
   }
 
   function reorderSection(from: number, to: number) {
-    if (sections[from]?.locked || sections[to]?.locked) return;
-    onChange(moveItem(sections, from, to));
+    const next = moveItem(sections, from, to);
+    if (next === sections || sections.slice(Math.min(from, to), Math.max(from, to) + 1).some((section) => section.locked)) return;
+    onChange(next);
   }
 
   function updateBlock(sectionIndex: number, blockIndex: number, patch: Partial<EditorialBlock>) {
@@ -66,7 +82,52 @@ export function SiteCompositionEditor({ pageKey, sections, onChange }: Props) {
   }
 
   function reorderBlock(sectionIndex: number, from: number, to: number) {
-    updateSection(sectionIndex, { blocks: moveItem(sections[sectionIndex].blocks, from, to) });
+    const section = sections[sectionIndex];
+    if (!section) return;
+    const blocks = moveItem(section.blocks, from, to);
+    if (blocks !== section.blocks) updateSection(sectionIndex, { blocks });
+  }
+
+  function beginDrag(event: DragEvent<HTMLElement>, sectionId: string, blockId?: string) {
+    event.stopPropagation();
+    drag.current = null;
+    const section = sections.find((item) => item.id === sectionId);
+    const kind = blockId === undefined ? "section" : "block";
+    if (!section || (kind === "section" && (section.locked || event.target !== event.currentTarget))) return;
+    const payload = JSON.stringify({ pageKey, sectionId, blockId, sequence: ++dragSequence.current });
+    drag.current = { kind, pageKey, sectionId, blockId, sections, payload };
+    event.dataTransfer.setData(dragMimeTypes[kind], payload);
+    event.dataTransfer.effectAllowed = "move";
+  }
+
+  function currentDrag(kind: "section" | "block") {
+    const source = drag.current;
+    return source?.kind === kind && source.pageKey === pageKey && source.sections === sections ? source : null;
+  }
+
+  function dragOver(event: DragEvent<HTMLElement>, kind: "section" | "block", section: EditorialSection) {
+    event.stopPropagation();
+    const source = currentDrag(kind);
+    if (source && (kind === "block" ? source.sectionId === section.id : !section.locked)) event.preventDefault();
+  }
+
+  function drop(event: DragEvent<HTMLElement>, kind: "section" | "block", sectionIndex: number, blockIndex?: number) {
+    event.preventDefault();
+    event.stopPropagation();
+    const source = currentDrag(kind);
+    drag.current = null;
+    if (!source) return;
+    try {
+      // Only this component's current drag may change its current page snapshot.
+      if (event.dataTransfer.getData(dragMimeTypes[kind]) !== source.payload) return;
+    } catch { return; }
+    const fromSection = sections.findIndex((section) => section.id === source.sectionId);
+    if (kind === "section") {
+      reorderSection(fromSection, sectionIndex);
+    } else if (fromSection === sectionIndex && blockIndex !== undefined) {
+      const fromBlock = sections[fromSection]?.blocks.findIndex((block) => block.id === source.blockId) ?? -1;
+      reorderBlock(sectionIndex, fromBlock, blockIndex);
+    }
   }
 
   function addBlock(sectionIndex: number) {
@@ -109,6 +170,7 @@ export function SiteCompositionEditor({ pageKey, sections, onChange }: Props) {
     const fallback = defaults.find((item) => item.id === section.id);
     if (!fallback || !window.confirm(`Reset "${section.name}" to its approved default blocks and visibility?`)) return;
     updateSection(sectionIndex, structuredClone(fallback));
+    if (section.id === openSectionId) setFocusedBlockId(fallback.blocks[0]?.id || "");
   }
 
   return (
@@ -128,12 +190,10 @@ export function SiteCompositionEditor({ pageKey, sections, onChange }: Props) {
             className={`${section.visible ? "cms-section-editor" : "cms-section-editor is-hidden"}${isOpen ? " is-open" : ""}`}
             key={section.id}
             draggable={!section.locked}
-            onDragStart={(event) => event.dataTransfer.setData("text/cms-section", String(sectionIndex))}
-            onDragOver={(event) => { if (!section.locked) event.preventDefault(); }}
-            onDrop={(event) => {
-              event.preventDefault();
-              reorderSection(Number(event.dataTransfer.getData("text/cms-section")), sectionIndex);
-            }}
+            onDragStart={(event) => beginDrag(event, section.id)}
+            onDragEnd={() => { drag.current = null; }}
+            onDragOver={(event) => dragOver(event, "section", section)}
+            onDrop={(event) => drop(event, "section", sectionIndex)}
           >
             <div className="cms-section-editor-head">
               <button
@@ -167,17 +227,10 @@ export function SiteCompositionEditor({ pageKey, sections, onChange }: Props) {
                     className={`${block.visible ? "cms-block-row" : "cms-block-row is-hidden"}${focusedBlock?.id === block.id ? " is-active" : ""}`}
                     key={block.id}
                     draggable
-                    onDragStart={(event) => event.dataTransfer.setData("text/cms-block", JSON.stringify({ sectionIndex, blockIndex }))}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      try {
-                        const source = JSON.parse(event.dataTransfer.getData("text/cms-block")) as { sectionIndex: number; blockIndex: number };
-                        if (source.sectionIndex === sectionIndex) reorderBlock(sectionIndex, source.blockIndex, blockIndex);
-                      } catch {
-                        // Ignore drops that did not originate from a composition block.
-                      }
-                    }}
+                    onDragStart={(event) => beginDrag(event, section.id, block.id)}
+                    onDragEnd={() => { drag.current = null; }}
+                    onDragOver={(event) => dragOver(event, "block", section)}
+                    onDrop={(event) => drop(event, "block", sectionIndex, blockIndex)}
                     onClick={() => setFocusedBlockId(block.id)}
                   >
                     <GripVertical size={15} aria-hidden="true" />
@@ -212,7 +265,7 @@ export function SiteCompositionEditor({ pageKey, sections, onChange }: Props) {
                   </section>
                 ) : null}
               </div>
-            ) : isOpen ? <p className="cms-section-empty">This section uses the page&apos;s approved layout and copy fields. You can still hide or reorder it.</p> : null}
+            ) : isOpen ? <p className="cms-section-empty">This section uses the page&apos;s approved layout and copy fields. {section.locked ? "This required section stays visible in its fixed position." : "You can still hide or reorder it."}</p> : null}
           </article>
         )})}
       </div>

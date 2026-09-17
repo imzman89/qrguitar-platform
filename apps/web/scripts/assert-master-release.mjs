@@ -36,7 +36,7 @@ excludes(siteEditor, "Checking owner access", "Site Editor must not show duplica
 includes(registry, '"printWorkspace.title"', "Print Suite copy must remain in Content Studio.");
 includes(middleware, 'request.headers.get("host")', "Local origin normalization must inspect the actual Host header.");
 excludes(middleware, 'request.nextUrl.hostname === "localhost"', "Local origin normalization must not self-redirect 127.0.0.1.");
-assert(/useEffect\(\(\) => \{\s+const supabase = createBrowserSupabaseClient\(\);\s+void fetchPublishedSiteSettings\(\)/.test(nav), "Navigation must load published Site Editor settings on mount.");
+assert(/useEffect\(\(\) => \{\s+let active = true;\s+void fetchPublishedSiteSettings\(\)/.test(nav) && nav.includes("if (active && settings) setContent(settings.content)"), "Navigation must load published Site Editor settings on mount and ignore completion after unmount.");
 includes(layout, "loadPublishedSiteSettings", "The published theme must be rendered on the server.");
 includes(layout, '"--bg": publishedSettings.colors.background', "The first paint must use the published background.");
 excludes(themeRuntime, "applyThemeSettings(defaultSiteSettings)", "Theme hydration must not flash bundled defaults over the published theme.");

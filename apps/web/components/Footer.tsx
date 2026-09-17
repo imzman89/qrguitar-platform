@@ -4,36 +4,22 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BrandLogo } from "./BrandLogo";
 import { defaultSiteSettings, fetchPublishedSiteSettings, type EditableSiteSettings } from "../lib/site-settings";
-import { clearQrGuitarSessionState, createBrowserSupabaseClient } from "../lib/supabase-browser";
+import { useAuthNavigation } from "../lib/use-auth-navigation";
 import { getContentValue } from "../lib/content-registry";
 
 export function Footer() {
   const [settings, setSettings] = useState<EditableSiteSettings>(defaultSiteSettings);
-  const [isSignedIn, setIsSignedIn] = useState(false);
+  const { signedIn: isSignedIn, signingOut, logoutError, logout } = useAuthNavigation();
 
   useEffect(() => {
-    const supabase = createBrowserSupabaseClient();
+    let active = true;
     void fetchPublishedSiteSettings().then((published) => {
-      if (published) {
+      if (active && published) {
         setSettings(published);
       }
     });
-    supabase.auth.getSession().then(({ data }) => setIsSignedIn(Boolean(data.session?.user)));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsSignedIn(Boolean(session?.user));
-    });
-
-    return () => {
-      listener.subscription.unsubscribe();
-    };
+    return () => { active = false; };
   }, []);
-
-  async function logout() {
-    const supabase = createBrowserSupabaseClient();
-    await supabase.auth.signOut();
-    clearQrGuitarSessionState();
-    setIsSignedIn(false);
-  }
 
   const footerLinks = settings.composition.footer.sections
     .find((section) => section.id === "links")
@@ -49,10 +35,11 @@ export function Footer() {
         <nav className="footer-links" aria-label="Footer navigation">
           {footerLinks.map((item) => <Link href={item.ctaUrl || "/"} key={item.id}>{item.ctaLabel || item.title}</Link>)}
           {isSignedIn ? (
-            <button type="button" onClick={() => void logout()}>Logout</button>
+            <button type="button" disabled={signingOut} onClick={() => void logout()}>{signingOut ? "Signing out..." : "Logout"}</button>
           ) : (
             <Link href="/login">Login</Link>
           )}
+          {logoutError ? <p role="alert">{logoutError}</p> : null}
           <a href="mailto:support@qrguitar.com">{getContentValue(settings.content, "global.footer.supportLabel")}: support@qrguitar.com</a>
         </nav>
       </div>
