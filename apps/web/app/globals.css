@@ -17156,11 +17156,6 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
     align-items: start;
   }
 
-  .account-hero-copy {
-    position: sticky;
-    top: 98px;
-  }
-
   .auth-page .account-hero-copy .mini-chip-row span,
   .auth-page .account-quick-links a,
   .auth-page .account-summary-grid,
@@ -17925,7 +17920,7 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   .account-section-nav {
     position: sticky;
     z-index: 10;
-    top: 72px;
+    top: 0;
     justify-content: flex-start;
     border-radius: 7px;
     background: rgba(8, 13, 16, .96);
