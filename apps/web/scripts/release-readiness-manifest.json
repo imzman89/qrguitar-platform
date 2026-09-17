@@ -1,5 +1,5 @@
 {
-  "releaseVersion": "2026-09-17.2",
+  "releaseVersion": "2026-09-17.3",
   "checks": [
     "catalog_readable",
     "required_functions",
@@ -32,7 +32,21 @@
     "public.update_instrument_controls(uuid,text,text,jsonb,boolean)",
     "public.legacy_create_matches_profile(uuid,uuid,jsonb)",
     "public.read_site_editor_state()",
-    "public.mutate_site_editor(uuid,text,boolean,jsonb,jsonb,jsonb,jsonb)"
+    "public.mutate_site_editor(uuid,text,boolean,jsonb,jsonb,jsonb,jsonb)",
+    "public.billing_account_status(uuid,text)",
+    "public.billing_catalog(text)",
+    "public.billing_fulfill_order(uuid,text,uuid,jsonb)",
+    "public.billing_get_customer(uuid,text)",
+    "public.billing_get_order(uuid,text,uuid)",
+    "public.billing_link_checkout(uuid,text,uuid,text,text)",
+    "public.billing_link_customer(uuid,text,text)",
+    "public.billing_mark_order_error(uuid,text,uuid,text,text)",
+    "public.billing_record_checkout_expired(uuid,text,uuid,jsonb)",
+    "public.billing_record_review(uuid,text,uuid,jsonb)",
+    "public.billing_register_offer(text,jsonb)",
+    "public.billing_reserve_order(uuid,text,uuid,jsonb)",
+    "public.billing_resolve_review(uuid,text,text,uuid,uuid,text,text)",
+    "public.create_instrument_profile(uuid,text,text,jsonb,boolean,text,text)"
   ],
   "blockedFunctions": [
     "public.create_instrument_profile_unregistered(uuid,text,text,jsonb,boolean,text)",
@@ -42,7 +56,20 @@
     "public.assign_site_editor_version()",
     "public.site_editor_changed_fields(jsonb,jsonb)",
     "public.approve_ownership_claim(uuid,uuid,text)",
-    "public.save_account_settings(uuid,text,jsonb)"
+    "public.save_account_settings(uuid,text,jsonb)",
+    "public._billing_consume_profile_credit(uuid,text,uuid,text)",
+    "public._billing_create_environment(text)",
+    "public._billing_environment(text)",
+    "public._billing_held(uuid,text)",
+    "public._billing_immutable()",
+    "public._billing_instance_boundary()",
+    "public._billing_lock_actor(uuid,text,boolean)",
+    "public._billing_offer(jsonb)",
+    "public._billing_order_identity()",
+    "public._billing_order_json(billing_orders)",
+    "public._billing_payment_identity(billing_orders,jsonb)",
+    "public._billing_receipt(billing_orders,text,jsonb)",
+    "public.create_instrument_profile_credited(uuid,text,text,jsonb,boolean,text,text)"
   ],
   "fingerprints": [
     {
@@ -58,7 +85,7 @@
     },
     {
       "signature": "public.create_instrument_profile(uuid,text,text,jsonb,boolean,text)",
-      "source_hash": "680f6f11d9beaae41c154fcdc6dd5365db648a5294cec9796c943e7b929d751f",
+      "source_hash": "607024b72c2e44b9469b7151a768ee4b60a87ca23fc1d3cac710d7c067f6f010",
       "arguments": "p_owner_id uuid, p_idempotency_key text, p_upload_id text, p_payload jsonb, p_launch_testing_access boolean DEFAULT false, p_owner_display_name text DEFAULT NULL::text",
       "result": "jsonb",
       "definer": true,
@@ -364,6 +391,303 @@
       "signature": "public.save_account_settings(uuid,text,jsonb,bigint)",
       "source_hash": "1beee0b381bf308147d8e0afee278040196d18cf42fd8aea15e1607800b86c42",
       "arguments": "p_user_id uuid, p_display_name text, p_collection jsonb, p_expected_version bigint",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._billing_consume_profile_credit(uuid,text,uuid,text)",
+      "source_hash": "f8d7be56d2b87173eef2b74c9f724f769b005b6ae8da4287a0a39e8706e03fe5",
+      "arguments": "p_owner_id uuid, p_environment text, p_guitar_id uuid, p_create_key text",
+      "result": "void",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._billing_create_environment(text)",
+      "source_hash": "4c534df403278e7a927e66e1b10e168a88cc0f40e64f2fe43c594211d53ecf1c",
+      "arguments": "p_environment text",
+      "result": "void",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._billing_environment(text)",
+      "source_hash": "332b159de69bc1bd74959f6e3e9c8c5e961a6a3c0b047e902fa6dc2a587b3251",
+      "arguments": "p_environment text",
+      "result": "void",
+      "definer": false,
+      "volatility": "i",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._billing_held(uuid,text)",
+      "source_hash": "7038f2dbcd756962fc26133ce2a2d2f6d275f4f5f40e66b272551c7b519923a2",
+      "arguments": "p_owner_id uuid, p_environment text",
+      "result": "boolean",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._billing_immutable()",
+      "source_hash": "2def10c331b753cd566d4039d48acf3ea071fb0ce5561c908499d63f631aaa91",
+      "arguments": "",
+      "result": "trigger",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._billing_instance_boundary()",
+      "source_hash": "b4476170a15d04858124f9b7658768934d972c3ab5f601061ffe3bc2bd89739f",
+      "arguments": "",
+      "result": "trigger",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._billing_lock_actor(uuid,text,boolean)",
+      "source_hash": "55e8464be4a8f7911caafc05067c8e83fe46db96a159ad16486d7add10769466",
+      "arguments": "p_owner_id uuid, p_environment text, p_active boolean",
+      "result": "void",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._billing_offer(jsonb)",
+      "source_hash": "fe2b13c9f49736f6327c9d03bfea2331121f5d0252a616f3e80c0fb4cea53464",
+      "arguments": "p_offer jsonb",
+      "result": "void",
+      "definer": false,
+      "volatility": "i",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._billing_order_identity()",
+      "source_hash": "11bbdf808b03da634da3f49552964db7cfb528bc59aff97989e6eb379a1fba87",
+      "arguments": "",
+      "result": "trigger",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._billing_order_json(billing_orders)",
+      "source_hash": "6528563bf5c002d84ed7b70608ae0d83f2dfa3a8a9cce864221bfe5a158089e8",
+      "arguments": "p_order billing_orders",
+      "result": "jsonb",
+      "definer": false,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._billing_payment_identity(billing_orders,jsonb)",
+      "source_hash": "5256b1915877148882dd5b5329c1cd60322d58496e0df0396ab16e66f990df9e",
+      "arguments": "p_order billing_orders, p_receipt jsonb",
+      "result": "void",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._billing_receipt(billing_orders,text,jsonb)",
+      "source_hash": "bd6ec3ed50d1402f356e04f28e2b0dd27d8127e458a747fd68f092847de2ea1f",
+      "arguments": "p_order billing_orders, p_kind text, p_receipt jsonb",
+      "result": "boolean",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_account_status(uuid,text)",
+      "source_hash": "1e5d79d6ca804285a7a1c3d2b7920608948c3c75ecbea4277fd815e480f87c36",
+      "arguments": "p_owner_id uuid, p_environment text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_catalog(text)",
+      "source_hash": "4647d87b75ef3fce1687ee7d79ec92bbc9dc1f1dec8b70957bc992f85ffcd2a6",
+      "arguments": "p_environment text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_fulfill_order(uuid,text,uuid,jsonb)",
+      "source_hash": "afca305e99c79a195248550a45c151e9fc8314fba7fd388f72c6ae2bac9efd31",
+      "arguments": "p_owner_id uuid, p_environment text, p_order_id uuid, p_receipt jsonb",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_get_customer(uuid,text)",
+      "source_hash": "93b90cde97ea41a01b14c55781e0929dc3b830314a80ef8708b3e7b5c755fa77",
+      "arguments": "p_owner_id uuid, p_environment text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_get_order(uuid,text,uuid)",
+      "source_hash": "790fbd5f221eaf7e533b0b78071d67302497770f4e265b059488336bb6a34b25",
+      "arguments": "p_owner_id uuid, p_environment text, p_order_id uuid",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_link_checkout(uuid,text,uuid,text,text)",
+      "source_hash": "8ddce9d8a17b9d181f01680cd1cb4d71d451467f2ebb77e5a8505e66fa4fb17e",
+      "arguments": "p_owner_id uuid, p_environment text, p_order_id uuid, p_session_id text, p_customer_id text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_link_customer(uuid,text,text)",
+      "source_hash": "17fd4af2c6ef0a5941442741b32fada380ee21642eaa5c475fa785cc7f3b1ed6",
+      "arguments": "p_owner_id uuid, p_environment text, p_customer_id text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_mark_order_error(uuid,text,uuid,text,text)",
+      "source_hash": "287293691f145d79cadd63885ec2ff06e4b7c87b3b22e875a5ce59fa192c1807",
+      "arguments": "p_owner_id uuid, p_environment text, p_order_id uuid, p_code text, p_receipt_id text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_record_checkout_expired(uuid,text,uuid,jsonb)",
+      "source_hash": "53a934a6dbf5b50bffe9ca69c504cdc7d3b71a54b9993ae22ba3b275ee8014eb",
+      "arguments": "p_owner_id uuid, p_environment text, p_order_id uuid, p_receipt jsonb",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_record_review(uuid,text,uuid,jsonb)",
+      "source_hash": "03fca6104e6096f83315de10aaefe172b6e6b542f2b6baf7aad82791961fced7",
+      "arguments": "p_owner_id uuid, p_environment text, p_order_id uuid, p_receipt jsonb",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_register_offer(text,jsonb)",
+      "source_hash": "2f85df8a69fa2846dc601076b759768f3c3caa30eda7ed9efdb06b7fcc69a054",
+      "arguments": "p_environment text, p_offer jsonb",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_reserve_order(uuid,text,uuid,jsonb)",
+      "source_hash": "b590f4489bd11f03c1009216fff9fe6f2c3000f20ce4ed03f865f6db0102fbf8",
+      "arguments": "p_owner_id uuid, p_environment text, p_request_key uuid, p_offer jsonb",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_resolve_review(uuid,text,text,uuid,uuid,text,text)",
+      "source_hash": "de7011330bffbd2344e5bfac5e472956d8977f9f8f4343e1a2dfe5ec0f86ff4f",
+      "arguments": "p_owner_id uuid, p_environment text, p_event_id text, p_operator_id uuid, p_decision_id uuid, p_action text, p_reason text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.create_instrument_profile(uuid,text,text,jsonb,boolean,text,text)",
+      "source_hash": "4c1a08dea4f32d5912abd3dc276cfcfe3a1be2367c6b80f946bb2c5f8a238c4a",
+      "arguments": "p_owner_id uuid, p_idempotency_key text, p_upload_id text, p_payload jsonb, p_launch_testing_access boolean, p_owner_display_name text, p_billing_environment text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.create_instrument_profile_credited(uuid,text,text,jsonb,boolean,text,text)",
+      "source_hash": "26cf85566613051178cb58d5676cb5b254d21acd81ff6ace549bef40bb86c211",
+      "arguments": "p_owner_id uuid, p_idempotency_key text, p_upload_id text, p_payload jsonb, p_launch_testing_access boolean, p_owner_display_name text, p_billing_environment text",
       "result": "jsonb",
       "definer": true,
       "volatility": "v",
@@ -754,6 +1078,366 @@
       "name": "account_settings_version",
       "type": "bigint",
       "not_null": true
+    },
+    {
+      "table": "billing_credit_consumptions",
+      "name": "guitar_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_credit_consumptions",
+      "name": "order_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_credit_consumptions",
+      "name": "owner_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_credit_consumptions",
+      "name": "environment",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_credit_consumptions",
+      "name": "create_key",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_credit_consumptions",
+      "name": "credits",
+      "type": "integer",
+      "not_null": true
+    },
+    {
+      "table": "billing_credit_consumptions",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "billing_credit_grants",
+      "name": "order_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_credit_grants",
+      "name": "owner_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_credit_grants",
+      "name": "environment",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_credit_grants",
+      "name": "session_id",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_credit_grants",
+      "name": "payment_id",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_credit_grants",
+      "name": "credits",
+      "type": "integer",
+      "not_null": true
+    },
+    {
+      "table": "billing_credit_grants",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "billing_credit_holds",
+      "name": "environment",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_credit_holds",
+      "name": "event_id",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_credit_holds",
+      "name": "owner_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_credit_holds",
+      "name": "reason",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_credit_holds",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "billing_customers",
+      "name": "owner_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_customers",
+      "name": "environment",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_customers",
+      "name": "customer_id",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_customers",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "billing_instance_config",
+      "name": "singleton",
+      "type": "boolean",
+      "not_null": true
+    },
+    {
+      "table": "billing_instance_config",
+      "name": "create_environment",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_offers",
+      "name": "environment",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_offers",
+      "name": "offer_key",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_offers",
+      "name": "version",
+      "type": "integer",
+      "not_null": true
+    },
+    {
+      "table": "billing_offers",
+      "name": "price_id",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_offers",
+      "name": "amount",
+      "type": "integer",
+      "not_null": true
+    },
+    {
+      "table": "billing_offers",
+      "name": "credits",
+      "type": "integer",
+      "not_null": true
+    },
+    {
+      "table": "billing_offers",
+      "name": "currency",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_offers",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "billing_orders",
+      "name": "id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_orders",
+      "name": "owner_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_orders",
+      "name": "environment",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_orders",
+      "name": "request_key",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_orders",
+      "name": "offer",
+      "type": "jsonb",
+      "not_null": true
+    },
+    {
+      "table": "billing_orders",
+      "name": "status",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_orders",
+      "name": "customer_id",
+      "type": "text",
+      "not_null": false
+    },
+    {
+      "table": "billing_orders",
+      "name": "session_id",
+      "type": "text",
+      "not_null": false
+    },
+    {
+      "table": "billing_orders",
+      "name": "payment_id",
+      "type": "text",
+      "not_null": false
+    },
+    {
+      "table": "billing_orders",
+      "name": "last_error",
+      "type": "text",
+      "not_null": false
+    },
+    {
+      "table": "billing_orders",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "billing_orders",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "billing_receipts",
+      "name": "environment",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_receipts",
+      "name": "event_id",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_receipts",
+      "name": "owner_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_receipts",
+      "name": "order_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_receipts",
+      "name": "kind",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_receipts",
+      "name": "receipt",
+      "type": "jsonb",
+      "not_null": true
+    },
+    {
+      "table": "billing_receipts",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "billing_review_decisions",
+      "name": "id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_review_decisions",
+      "name": "environment",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_review_decisions",
+      "name": "event_id",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_review_decisions",
+      "name": "owner_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_review_decisions",
+      "name": "operator_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_review_decisions",
+      "name": "action",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_review_decisions",
+      "name": "reason",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_review_decisions",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true
     }
   ],
   "provenanceTriggers": [
@@ -781,6 +1465,592 @@
       "guitars",
       "sync_guitar_serial_alias_trigger",
       "CREATE TRIGGER sync_guitar_serial_alias_trigger AFTER INSERT OR UPDATE OF serial_number ON public.guitars FOR EACH ROW EXECUTE FUNCTION sync_guitar_serial_alias()"
+    ],
+    [
+      "billing_credit_consumptions",
+      "billing_history_immutable",
+      "CREATE TRIGGER billing_history_immutable BEFORE DELETE OR UPDATE ON public.billing_credit_consumptions FOR EACH ROW EXECUTE FUNCTION _billing_immutable()"
+    ],
+    [
+      "billing_credit_grants",
+      "billing_history_immutable",
+      "CREATE TRIGGER billing_history_immutable BEFORE DELETE OR UPDATE ON public.billing_credit_grants FOR EACH ROW EXECUTE FUNCTION _billing_immutable()"
+    ],
+    [
+      "billing_credit_holds",
+      "billing_history_immutable",
+      "CREATE TRIGGER billing_history_immutable BEFORE DELETE OR UPDATE ON public.billing_credit_holds FOR EACH ROW EXECUTE FUNCTION _billing_immutable()"
+    ],
+    [
+      "billing_customers",
+      "billing_history_immutable",
+      "CREATE TRIGGER billing_history_immutable BEFORE DELETE OR UPDATE ON public.billing_customers FOR EACH ROW EXECUTE FUNCTION _billing_immutable()"
+    ],
+    [
+      "billing_instance_config",
+      "billing_instance_boundary",
+      "CREATE TRIGGER billing_instance_boundary BEFORE DELETE OR UPDATE ON public.billing_instance_config FOR EACH ROW EXECUTE FUNCTION _billing_instance_boundary()"
+    ],
+    [
+      "billing_offers",
+      "billing_history_immutable",
+      "CREATE TRIGGER billing_history_immutable BEFORE DELETE OR UPDATE ON public.billing_offers FOR EACH ROW EXECUTE FUNCTION _billing_immutable()"
+    ],
+    [
+      "billing_orders",
+      "billing_order_identity",
+      "CREATE TRIGGER billing_order_identity BEFORE DELETE OR UPDATE ON public.billing_orders FOR EACH ROW EXECUTE FUNCTION _billing_order_identity()"
+    ],
+    [
+      "billing_receipts",
+      "billing_history_immutable",
+      "CREATE TRIGGER billing_history_immutable BEFORE DELETE OR UPDATE ON public.billing_receipts FOR EACH ROW EXECUTE FUNCTION _billing_immutable()"
+    ],
+    [
+      "billing_review_decisions",
+      "billing_history_immutable",
+      "CREATE TRIGGER billing_history_immutable BEFORE DELETE OR UPDATE ON public.billing_review_decisions FOR EACH ROW EXECUTE FUNCTION _billing_immutable()"
     ]
-  ]
+  ],
+  "rpcOnlyTables": [
+    "billing_instance_config",
+    "billing_offers",
+    "billing_customers",
+    "billing_orders",
+    "billing_receipts",
+    "billing_credit_grants",
+    "billing_credit_consumptions",
+    "billing_credit_holds",
+    "billing_review_decisions"
+  ],
+  "billingDefaults": [
+    {
+      "table": "billing_credit_consumptions",
+      "name": "guitar_id",
+      "expression": null
+    },
+    {
+      "table": "billing_credit_consumptions",
+      "name": "order_id",
+      "expression": null
+    },
+    {
+      "table": "billing_credit_consumptions",
+      "name": "owner_id",
+      "expression": null
+    },
+    {
+      "table": "billing_credit_consumptions",
+      "name": "environment",
+      "expression": null
+    },
+    {
+      "table": "billing_credit_consumptions",
+      "name": "create_key",
+      "expression": null
+    },
+    {
+      "table": "billing_credit_consumptions",
+      "name": "credits",
+      "expression": "1"
+    },
+    {
+      "table": "billing_credit_consumptions",
+      "name": "created_at",
+      "expression": "clock_timestamp()"
+    },
+    {
+      "table": "billing_credit_grants",
+      "name": "order_id",
+      "expression": null
+    },
+    {
+      "table": "billing_credit_grants",
+      "name": "owner_id",
+      "expression": null
+    },
+    {
+      "table": "billing_credit_grants",
+      "name": "environment",
+      "expression": null
+    },
+    {
+      "table": "billing_credit_grants",
+      "name": "session_id",
+      "expression": null
+    },
+    {
+      "table": "billing_credit_grants",
+      "name": "payment_id",
+      "expression": null
+    },
+    {
+      "table": "billing_credit_grants",
+      "name": "credits",
+      "expression": null
+    },
+    {
+      "table": "billing_credit_grants",
+      "name": "created_at",
+      "expression": "clock_timestamp()"
+    },
+    {
+      "table": "billing_credit_holds",
+      "name": "environment",
+      "expression": null
+    },
+    {
+      "table": "billing_credit_holds",
+      "name": "event_id",
+      "expression": null
+    },
+    {
+      "table": "billing_credit_holds",
+      "name": "owner_id",
+      "expression": null
+    },
+    {
+      "table": "billing_credit_holds",
+      "name": "reason",
+      "expression": null
+    },
+    {
+      "table": "billing_credit_holds",
+      "name": "created_at",
+      "expression": "clock_timestamp()"
+    },
+    {
+      "table": "billing_customers",
+      "name": "owner_id",
+      "expression": null
+    },
+    {
+      "table": "billing_customers",
+      "name": "environment",
+      "expression": null
+    },
+    {
+      "table": "billing_customers",
+      "name": "customer_id",
+      "expression": null
+    },
+    {
+      "table": "billing_customers",
+      "name": "created_at",
+      "expression": "clock_timestamp()"
+    },
+    {
+      "table": "billing_instance_config",
+      "name": "singleton",
+      "expression": "true"
+    },
+    {
+      "table": "billing_instance_config",
+      "name": "create_environment",
+      "expression": null
+    },
+    {
+      "table": "billing_offers",
+      "name": "environment",
+      "expression": null
+    },
+    {
+      "table": "billing_offers",
+      "name": "offer_key",
+      "expression": null
+    },
+    {
+      "table": "billing_offers",
+      "name": "version",
+      "expression": null
+    },
+    {
+      "table": "billing_offers",
+      "name": "price_id",
+      "expression": null
+    },
+    {
+      "table": "billing_offers",
+      "name": "amount",
+      "expression": null
+    },
+    {
+      "table": "billing_offers",
+      "name": "credits",
+      "expression": null
+    },
+    {
+      "table": "billing_offers",
+      "name": "currency",
+      "expression": null
+    },
+    {
+      "table": "billing_offers",
+      "name": "created_at",
+      "expression": "clock_timestamp()"
+    },
+    {
+      "table": "billing_orders",
+      "name": "id",
+      "expression": "gen_random_uuid()"
+    },
+    {
+      "table": "billing_orders",
+      "name": "owner_id",
+      "expression": null
+    },
+    {
+      "table": "billing_orders",
+      "name": "environment",
+      "expression": null
+    },
+    {
+      "table": "billing_orders",
+      "name": "request_key",
+      "expression": null
+    },
+    {
+      "table": "billing_orders",
+      "name": "offer",
+      "expression": null
+    },
+    {
+      "table": "billing_orders",
+      "name": "status",
+      "expression": "'reserved'::text"
+    },
+    {
+      "table": "billing_orders",
+      "name": "customer_id",
+      "expression": null
+    },
+    {
+      "table": "billing_orders",
+      "name": "session_id",
+      "expression": null
+    },
+    {
+      "table": "billing_orders",
+      "name": "payment_id",
+      "expression": null
+    },
+    {
+      "table": "billing_orders",
+      "name": "last_error",
+      "expression": null
+    },
+    {
+      "table": "billing_orders",
+      "name": "created_at",
+      "expression": "clock_timestamp()"
+    },
+    {
+      "table": "billing_orders",
+      "name": "updated_at",
+      "expression": "clock_timestamp()"
+    },
+    {
+      "table": "billing_receipts",
+      "name": "environment",
+      "expression": null
+    },
+    {
+      "table": "billing_receipts",
+      "name": "event_id",
+      "expression": null
+    },
+    {
+      "table": "billing_receipts",
+      "name": "owner_id",
+      "expression": null
+    },
+    {
+      "table": "billing_receipts",
+      "name": "order_id",
+      "expression": null
+    },
+    {
+      "table": "billing_receipts",
+      "name": "kind",
+      "expression": null
+    },
+    {
+      "table": "billing_receipts",
+      "name": "receipt",
+      "expression": null
+    },
+    {
+      "table": "billing_receipts",
+      "name": "created_at",
+      "expression": "clock_timestamp()"
+    },
+    {
+      "table": "billing_review_decisions",
+      "name": "id",
+      "expression": null
+    },
+    {
+      "table": "billing_review_decisions",
+      "name": "environment",
+      "expression": null
+    },
+    {
+      "table": "billing_review_decisions",
+      "name": "event_id",
+      "expression": null
+    },
+    {
+      "table": "billing_review_decisions",
+      "name": "owner_id",
+      "expression": null
+    },
+    {
+      "table": "billing_review_decisions",
+      "name": "operator_id",
+      "expression": null
+    },
+    {
+      "table": "billing_review_decisions",
+      "name": "action",
+      "expression": null
+    },
+    {
+      "table": "billing_review_decisions",
+      "name": "reason",
+      "expression": null
+    },
+    {
+      "table": "billing_review_decisions",
+      "name": "created_at",
+      "expression": "clock_timestamp()"
+    }
+  ],
+  "billingConstraints": [
+    {
+      "table": "billing_credit_consumptions",
+      "name": "billing_credit_consumptions_credits_check",
+      "definition": "CHECK ((credits = 1))",
+      "type": "c"
+    },
+    {
+      "table": "billing_credit_consumptions",
+      "name": "billing_credit_consumptions_order_id_owner_id_environment_fkey",
+      "definition": "FOREIGN KEY (order_id, owner_id, environment) REFERENCES billing_credit_grants(order_id, owner_id, environment)",
+      "type": "f"
+    },
+    {
+      "table": "billing_credit_consumptions",
+      "name": "billing_credit_consumptions_owner_id_create_key_key",
+      "definition": "UNIQUE (owner_id, create_key)",
+      "type": "u"
+    },
+    {
+      "table": "billing_credit_consumptions",
+      "name": "billing_credit_consumptions_pkey",
+      "definition": "PRIMARY KEY (guitar_id)",
+      "type": "p"
+    },
+    {
+      "table": "billing_credit_grants",
+      "name": "billing_credit_grants_credits_check",
+      "definition": "CHECK ((credits > 0))",
+      "type": "c"
+    },
+    {
+      "table": "billing_credit_grants",
+      "name": "billing_credit_grants_environment_payment_id_key",
+      "definition": "UNIQUE (environment, payment_id)",
+      "type": "u"
+    },
+    {
+      "table": "billing_credit_grants",
+      "name": "billing_credit_grants_environment_session_id_key",
+      "definition": "UNIQUE (environment, session_id)",
+      "type": "u"
+    },
+    {
+      "table": "billing_credit_grants",
+      "name": "billing_credit_grants_order_id_owner_id_environment_fkey",
+      "definition": "FOREIGN KEY (order_id, owner_id, environment) REFERENCES billing_orders(id, owner_id, environment)",
+      "type": "f"
+    },
+    {
+      "table": "billing_credit_grants",
+      "name": "billing_credit_grants_order_id_owner_id_environment_key",
+      "definition": "UNIQUE (order_id, owner_id, environment)",
+      "type": "u"
+    },
+    {
+      "table": "billing_credit_grants",
+      "name": "billing_credit_grants_pkey",
+      "definition": "PRIMARY KEY (order_id)",
+      "type": "p"
+    },
+    {
+      "table": "billing_credit_holds",
+      "name": "billing_credit_holds_environment_event_id_fkey",
+      "definition": "FOREIGN KEY (environment, event_id) REFERENCES billing_receipts(environment, event_id)",
+      "type": "f"
+    },
+    {
+      "table": "billing_credit_holds",
+      "name": "billing_credit_holds_pkey",
+      "definition": "PRIMARY KEY (environment, event_id)",
+      "type": "p"
+    },
+    {
+      "table": "billing_customers",
+      "name": "billing_customers_environment_check",
+      "definition": "CHECK ((environment = ANY (ARRAY['test'::text, 'live'::text])))",
+      "type": "c"
+    },
+    {
+      "table": "billing_customers",
+      "name": "billing_customers_environment_customer_id_key",
+      "definition": "UNIQUE (environment, customer_id)",
+      "type": "u"
+    },
+    {
+      "table": "billing_customers",
+      "name": "billing_customers_pkey",
+      "definition": "PRIMARY KEY (owner_id, environment)",
+      "type": "p"
+    },
+    {
+      "table": "billing_instance_config",
+      "name": "billing_instance_config_create_environment_check",
+      "definition": "CHECK ((create_environment = ANY (ARRAY['test'::text, 'live'::text])))",
+      "type": "c"
+    },
+    {
+      "table": "billing_instance_config",
+      "name": "billing_instance_config_pkey",
+      "definition": "PRIMARY KEY (singleton)",
+      "type": "p"
+    },
+    {
+      "table": "billing_instance_config",
+      "name": "billing_instance_config_singleton_check",
+      "definition": "CHECK (singleton)",
+      "type": "c"
+    },
+    {
+      "table": "billing_offers",
+      "name": "billing_offers_check",
+      "definition": "CHECK (((version = 1) AND (((offer_key = 'profile_1'::text) AND (amount = 1200) AND (credits = 1)) OR ((offer_key = 'profile_10'::text) AND (amount = 5000) AND (credits = 10)) OR ((offer_key = 'profile_25'::text) AND (amount = 9900) AND (credits = 25)))))",
+      "type": "c"
+    },
+    {
+      "table": "billing_offers",
+      "name": "billing_offers_currency_check",
+      "definition": "CHECK ((currency = 'usd'::text))",
+      "type": "c"
+    },
+    {
+      "table": "billing_offers",
+      "name": "billing_offers_environment_check",
+      "definition": "CHECK ((environment = ANY (ARRAY['test'::text, 'live'::text])))",
+      "type": "c"
+    },
+    {
+      "table": "billing_offers",
+      "name": "billing_offers_environment_price_id_key",
+      "definition": "UNIQUE (environment, price_id)",
+      "type": "u"
+    },
+    {
+      "table": "billing_offers",
+      "name": "billing_offers_pkey",
+      "definition": "PRIMARY KEY (environment, offer_key, version)",
+      "type": "p"
+    },
+    {
+      "table": "billing_orders",
+      "name": "billing_orders_environment_check",
+      "definition": "CHECK ((environment = ANY (ARRAY['test'::text, 'live'::text])))",
+      "type": "c"
+    },
+    {
+      "table": "billing_orders",
+      "name": "billing_orders_environment_payment_id_key",
+      "definition": "UNIQUE (environment, payment_id)",
+      "type": "u"
+    },
+    {
+      "table": "billing_orders",
+      "name": "billing_orders_environment_session_id_key",
+      "definition": "UNIQUE (environment, session_id)",
+      "type": "u"
+    },
+    {
+      "table": "billing_orders",
+      "name": "billing_orders_id_owner_id_environment_key",
+      "definition": "UNIQUE (id, owner_id, environment)",
+      "type": "u"
+    },
+    {
+      "table": "billing_orders",
+      "name": "billing_orders_owner_id_environment_request_key_key",
+      "definition": "UNIQUE (owner_id, environment, request_key)",
+      "type": "u"
+    },
+    {
+      "table": "billing_orders",
+      "name": "billing_orders_pkey",
+      "definition": "PRIMARY KEY (id)",
+      "type": "p"
+    },
+    {
+      "table": "billing_orders",
+      "name": "billing_orders_status_check",
+      "definition": "CHECK ((status = ANY (ARRAY['reserved'::text, 'open'::text, 'fulfilled'::text, 'expired'::text])))",
+      "type": "c"
+    },
+    {
+      "table": "billing_receipts",
+      "name": "billing_receipts_kind_check",
+      "definition": "CHECK ((kind = ANY (ARRAY['payment'::text, 'refund'::text, 'dispute'::text, 'expired'::text, 'error'::text])))",
+      "type": "c"
+    },
+    {
+      "table": "billing_receipts",
+      "name": "billing_receipts_order_id_owner_id_environment_fkey",
+      "definition": "FOREIGN KEY (order_id, owner_id, environment) REFERENCES billing_orders(id, owner_id, environment)",
+      "type": "f"
+    },
+    {
+      "table": "billing_receipts",
+      "name": "billing_receipts_pkey",
+      "definition": "PRIMARY KEY (environment, event_id)",
+      "type": "p"
+    },
+    {
+      "table": "billing_review_decisions",
+      "name": "billing_review_decisions_action_check",
+      "definition": "CHECK ((action = ANY (ARRAY['release'::text, 'retain_hold'::text])))",
+      "type": "c"
+    },
+    {
+      "table": "billing_review_decisions",
+      "name": "billing_review_decisions_environment_event_id_fkey",
+      "definition": "FOREIGN KEY (environment, event_id) REFERENCES billing_credit_holds(environment, event_id)",
+      "type": "f"
+    },
+    {
+      "table": "billing_review_decisions",
+      "name": "billing_review_decisions_pkey",
+      "definition": "PRIMARY KEY (id)",
+      "type": "p"
+    }
+  ],
+  "billingIndexes": [
+    {
+      "table": "billing_orders",
+      "name": "billing_one_unresolved_checkout",
+      "definition": "CREATE UNIQUE INDEX billing_one_unresolved_checkout ON public.billing_orders USING btree (owner_id, environment) WHERE (status = ANY (ARRAY['reserved'::text, 'open'::text]))"
+    }
+  ],
+  "billingInstance": {
+    "environment": "live"
+  }
 }

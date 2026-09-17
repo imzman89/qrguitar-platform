@@ -34,7 +34,7 @@
     "test:bulk-concurrency": "node scripts/test-bulk-import-concurrency.mjs",
     "test:workflow-security": "node scripts/security/workflow-races.test.mjs && node scripts/security/public-file.test.mjs",
     "test:atomic-profiles": "node scripts/test-atomic-create-db.mjs && node scripts/test-atomic-create-api.mjs && node scripts/test-atomic-edit-db.mjs && node scripts/test-atomic-edit-assets.mjs && node scripts/test-instrument-api-boundaries.mjs",
-    "test:behavior": "npm run test:core-behavior && npm run test:public-data-reliability && npm run test:bulk-import && npm run test:bulk-concurrency && npm run test:security && npm run test:workflow-security && npm run test:atomic-profiles && npm run test:account && npm run test:owner-reads && npm run test:upload-registry && npm run test:transfer-client && npm run test:owner-preview && npm run test:pwa && npm run test:dashboard-client && npm run test:atomic-transfers && npm run test:auxiliary-security && npm run test:instrument-controls && npm run test:release-gate && npm run test:beta-entitlements && npm run test:site-editor-transactions && npm run test:release-readiness && npm run test:dashboard-transfer-regressions && npm run test:preview-sessions && npm run test:signed-uploads && npm run test:workspace-tools && npm run test:provider-workbench && npm run test:print-layout && npm run test:ownership-claims && npm run test:qr-output && npm run test:record-share && npm run test:session-lifecycle",
+    "test:behavior": "npm run test:core-behavior && npm run test:public-data-reliability && npm run test:bulk-import && npm run test:bulk-concurrency && npm run test:security && npm run test:workflow-security && npm run test:atomic-profiles && npm run test:account && npm run test:owner-reads && npm run test:upload-registry && npm run test:transfer-client && npm run test:owner-preview && npm run test:pwa && npm run test:dashboard-client && npm run test:atomic-transfers && npm run test:auxiliary-security && npm run test:instrument-controls && npm run test:release-gate && npm run test:beta-entitlements && npm run test:site-editor-transactions && npm run test:release-readiness && npm run test:dashboard-transfer-regressions && npm run test:preview-sessions && npm run test:signed-uploads && npm run test:workspace-tools && npm run test:provider-workbench && npm run test:print-layout && npm run test:ownership-claims && npm run test:qr-output && npm run test:record-share && npm run test:session-lifecycle && npm run test:billing",
     "test:account": "node scripts/security/account-route.test.mjs && node scripts/security/account-client.test.mjs && node scripts/security/account-transaction.test.mjs",
     "test:owner-reads": "node --test scripts/test-owner-reads.mjs scripts/test-handout-load.mjs",
     "test:upload-registry": "node scripts/test-staged-upload-registry.mjs && node scripts/test-staged-upload-registry-api.mjs",
@@ -58,7 +58,10 @@
     "test:ownership-claims": "node scripts/test-ownership-claim-db.mjs && node scripts/security/claim-boundaries.test.mjs && node scripts/test-ownership-claim-client.mjs",
     "test:qr-output": "node --test scripts/test-qr-output.mjs scripts/test-qr-component.mjs",
     "test:record-share": "node --test scripts/test-record-share.mjs",
-    "test:session-lifecycle": "node --test scripts/test-session-lifecycle.mjs"
+    "test:session-lifecycle": "node --test scripts/test-session-lifecycle.mjs",
+    "test:billing": "node scripts/test-billing-service.mjs && node scripts/test-stripe-sdk-gateway.mjs && node scripts/test-billing-http.mjs && node scripts/test-billing-environment.mjs && node scripts/test-billing-runtime.mjs && node scripts/test-billing-client.mjs && node scripts/test-billing-ledger.mjs && node scripts/test-billing-integration.mjs && node scripts/generate-billing-readiness.mjs && node --test scripts/test-billing-concurrency-config.mjs",
+    "test:billing-concurrency": "node scripts/test-billing-concurrency.mjs",
+    "test:billing-concurrency-config": "node --test scripts/test-billing-concurrency-config.mjs"
   },
   "dependencies": {
     "@qrguitar/shared": "*",
@@ -67,7 +70,8 @@
     "next": "^15.5.25",
     "qrcode": "^1.5.4",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "stripe": "22.6.2"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
@@ -77,6 +81,7 @@
     "@types/react-dom": "^19.3.0",
     "eslint": "^8.57.1",
     "eslint-config-next": "^15.5.25",
+    "pg": "8.23.0",
     "typescript": "^5.5.4",
     "zxing-wasm": "3.1.3"
   },

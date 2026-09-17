@@ -1,9 +1,16 @@
-import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import{fileURLToPath}from'node:url';import{PGlite}from'@electric-sql/pglite';import{installRepositorySchema}from'./security/postgres-fixture.mjs';
-const scripts=path.dirname(fileURLToPath(import.meta.url)),repo=path.resolve(scripts,'../../..'),manifest=JSON.parse(fs.readFileSync(path.join(scripts,'release-readiness-manifest.json'),'utf8'));
-const db=new PGlite();await installRepositorySchema(db,repo);await db.exec("insert into storage.buckets(id,name,public)values('instrument-media','instrument-media',false),('instrument-documents','instrument-documents',false),('service-evidence','service-evidence',false) on conflict(id)do update set public=false;");
+import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import{fileURLToPath,pathToFileURL}from'node:url';import{createRequire}from'node:module';
+const scripts=path.dirname(fileURLToPath(import.meta.url));
+const option=name=>{const i=process.argv.indexOf(name);return i<0?null:process.argv[i+1];};
+const repo=path.resolve(option('--repo')||path.resolve(scripts,'../../..')),overlay=option('--migration-root');
+const source=overlay?path.resolve(overlay):repo;
+const manifest=JSON.parse(fs.readFileSync(path.join(source,'apps/web/scripts/release-readiness-manifest.json'),'utf8'));
+const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite');
+const {installRepositorySchema}=await import(pathToFileURL(path.join(repo,'apps/web/scripts/security/postgres-fixture.mjs')));
+const db=new PGlite();await installRepositorySchema(db,repo,overlay?'20260917190000':undefined);
+if(overlay)for(const file of ['20260917190000_billing_credits.sql','20260917191000_release_readiness.sql'])await db.exec(fs.readFileSync(path.join(source,'supabase/migrations',file),'utf8'));await db.exec("insert into storage.buckets(id,name,public)values('instrument-media','instrument-media',false),('instrument-documents','instrument-documents',false),('service-evidence','service-evidence',false) on conflict(id)do update set public=false;");
 const ready=async()=> (await db.query('select public.qrguitar_release_readiness() result')).rows[0].result;
 let passed=0;async function test(name,fn){await db.exec('begin');try{await fn();console.log('PASS '+name);passed++;}finally{await db.exec('rollback');}}
-function assertShape(result){assert.deepEqual(Object.keys(result).sort(),['checks','ready','releaseVersion']);assert.equal(result.releaseVersion,'2026-09-17.2');assert.equal(typeof result.ready,'boolean');assert.deepEqual(result.checks.map(c=>c.name),manifest.checks);assert.equal(new Set(result.checks.map(c=>c.name)).size,manifest.checks.length);for(const check of result.checks){assert.deepEqual(Object.keys(check).sort(),['name','ok']);assert.equal(typeof check.ok,'boolean');}}
+function assertShape(result){assert.deepEqual(Object.keys(result).sort(),['checks','ready','releaseVersion']);assert.equal(result.releaseVersion,'2026-09-17.3');assert.equal(typeof result.ready,'boolean');assert.deepEqual(result.checks.map(c=>c.name),manifest.checks);assert.equal(new Set(result.checks.map(c=>c.name)).size,manifest.checks.length);for(const check of result.checks){assert.deepEqual(Object.keys(check).sort(),['name','ok']);assert.equal(typeof check.ok,'boolean');}}
 async function expectFalse(name){const result=await ready();assertShape(result);assert.equal(result.ready,false);assert.equal(result.checks.find(c=>c.name===name)?.ok,false);}
 await test('complete schema returns exact version and all14 checks true',async()=>{const result=await ready();assertShape(result);assert.equal(result.ready,true,JSON.stringify(result));assert.equal(result.checks.length,14);assert.ok(result.checks.every(c=>c.ok));});
 await test('anonymous and authenticated callers cannot execute the readiness routine',async()=>{for(const role of['anon','authenticated']){await db.exec('savepoint deny');try{await db.exec('set role '+role);await assert.rejects(ready,e=>e.code==='42501');}finally{await db.exec('rollback to savepoint deny');}}});
@@ -35,4 +42,44 @@ await test('missing guarded claim approval blocks deployment',async()=>{await db
 await test('legacy account save grant cannot bypass version checks',async()=>{await db.exec('grant execute on function public.save_account_settings(uuid,text,jsonb) to service_role;');await expectFalse('blocked_function_grants');});
 await test('missing account version column blocks deployment',async()=>{await db.exec('alter table public.profiles drop column account_settings_version;');await expectFalse('schema_columns');});
 for(const signature of ['public.save_account_settings(uuid,text,jsonb,bigint)','public.save_instrument_profile(uuid,uuid,timestamp with time zone,jsonb)','public.commit_service_evidence(uuid,uuid,boolean,text,jsonb)'])await test('restored serialization_failure conflict blocks deployment: '+signature,async()=>{const source=(await db.query('select pg_get_functiondef($1::regprocedure) definition',[signature])).rows[0].definition;assert.ok(source.includes("errcode = 'PT409'"));assert.ok(!source.includes("errcode = '40001'"));await db.exec(source.replace("errcode = 'PT409'","errcode = '40001'"));await expectFalse('function_security');});
+
+for(const table of manifest.rpcOnlyTables){
+ await test(table+' cannot acquire direct service SELECT access',async()=>{await db.exec('grant select on public.'+table+' to service_role');await expectFalse('private_table_grants');});
+ await test(table+' cannot acquire column-only service access',async()=>{const column=manifest.columns.find(c=>c.table===table).name;await db.exec('grant select('+column+') on public.'+table+' to service_role');await expectFalse('private_table_grants');});
+ await test(table+' must retain RLS',async()=>{await db.exec('alter table public.'+table+' disable row level security');await expectFalse('private_tables');});
+ await test(table+' must retain its restrictive policy',async()=>{await db.exec('drop policy qrguitar_billing_server_only on public.'+table);await expectFalse('server_only_policies');});
+}
+for(const role of ['public','anon','authenticated'])await test(role+' cannot acquire billing ledger table privilege',async()=>{await db.exec('grant select on billing_credit_grants to '+role);await expectFalse('private_table_grants');});
+const billingFunctions=manifest.fingerprints.filter(f=>/^public\.(?:_?billing_|create_instrument_profile(?:_credited)?\()/.test(f.signature));
+for(const item of billingFunctions)await test('billing function ACL drift fails closed: '+item.signature,async()=>{await db.exec('grant execute on function '+item.signature+' to '+(manifest.blockedFunctions.includes(item.signature)?'service_role':'authenticated'));await expectFalse(manifest.blockedFunctions.includes(item.signature)?'blocked_function_grants':'function_security');});
+await test('missing billing catalog cannot claim launch readiness',async()=>{await db.exec('drop function billing_catalog(text)');await expectFalse('required_functions');});
+await test('private billing helper implementation drift fails its fingerprint',async()=>{const value=(await db.query("select pg_get_functiondef('public._billing_consume_profile_credit(uuid,text,uuid,text)'::regprocedure) definition")).rows[0].definition;assert.ok(value.includes("errcode='QG008'"));await db.exec(value.replace("errcode='QG008'","errcode='PT409'"));await expectFalse('function_security');});
+for(const [table,name]of manifest.provenanceTriggers.filter(([table])=>table.startsWith('billing_')))await test('disabled '+table+' append-only/identity trigger fails readiness',async()=>{await db.exec('alter table '+table+' disable trigger '+name);await expectFalse('schema_columns');});
+await test('weakened positive-only debit constraint fails exact credits=1 contract',async()=>{await db.exec('alter table billing_credit_consumptions drop constraint billing_credit_consumptions_credits_check;alter table billing_credit_consumptions add constraint billing_credit_consumptions_credits_check check(credits>0)');await expectFalse('receipt_constraints');});
+await test('ledger ownership foreign key cannot degrade to order-only linkage',async()=>{const item=manifest.billingConstraints.find(c=>c.table==='billing_credit_grants'&&c.type==='f');assert.ok(item);await db.exec('alter table billing_credit_grants drop constraint '+item.name+';alter table billing_credit_grants add constraint '+item.name+' foreign key(order_id) references billing_orders(id)');await expectFalse('receipt_constraints');});
+await test('missing unique provider event receipt prevents readiness',async()=>{await db.exec('alter table billing_receipts drop constraint billing_receipts_pkey cascade');await expectFalse('receipt_constraints');});
+await test('nonunique pending-order index cannot masquerade under required name',async()=>{await db.exec("drop index billing_one_unresolved_checkout;create index billing_one_unresolved_checkout on billing_orders(owner_id,environment) where status in ('reserved','open')");await expectFalse('receipt_constraints');});
+await test('partial uniqueness must cover both reserved and open checkout states',async()=>{await db.exec("drop index billing_one_unresolved_checkout;create unique index billing_one_unresolved_checkout on billing_orders(owner_id,environment) where status='open'");await expectFalse('receipt_constraints');});
+await test('unvalidated ledger check constraint cannot pass by identical expression',async()=>{const item=manifest.billingConstraints.find(c=>c.table==='billing_credit_consumptions'&&c.name==='billing_credit_consumptions_credits_check');await db.exec('alter table billing_credit_consumptions drop constraint '+item.name+';alter table billing_credit_consumptions add constraint '+item.name+' '+item.definition+' not valid');await expectFalse('receipt_constraints');});
+await test('wrong debit default fails required schema contract',async()=>{await db.exec('alter table billing_credit_consumptions alter column credits set default 2');await expectFalse('schema_columns');});
+await test('TEST-configured empty sandbox intentionally cannot pass production readiness',async()=>{await db.exec("update billing_instance_config set create_environment='test' where singleton");await expectFalse('receipt_constraints');});
+await test('missing singleton database environment cannot pass production readiness',async()=>{await db.exec('alter table billing_instance_config disable trigger billing_instance_boundary;delete from billing_instance_config;alter table billing_instance_config enable trigger billing_instance_boundary');await expectFalse('receipt_constraints');});
+await test('billing snapshots never appear in readiness response',async()=>{await db.exec("insert into billing_orders(owner_id,environment,request_key,offer,last_error)values('10000000-0000-4000-8000-000000000009','live','10000000-0000-4000-8000-000000000008','{\"privateSentinel\":\"BILLING_SENTINEL\"}','PRIVATE_ERROR_SENTINEL')");const result=await ready();assertShape(result);assert.equal(result.ready,true);assert.equal(JSON.stringify(result).includes('SENTINEL'),false);});
+
+await test('PG17 relation nullability uses attnotnull without requiring PG18-only constraint rows',async()=>{
+ assert.equal(manifest.billingConstraints.some(c=>c.type==='n'),false);
+ const actual=(await db.query("select t.relname as table,a.attname as name,a.attnotnull as not_null from pg_attribute a join pg_class t on t.oid=a.attrelid where t.relnamespace='public'::regnamespace and t.relname=any($1) and a.attnum>0 and not a.attisdropped order by t.relname,a.attname",[manifest.rpcOnlyTables])).rows;
+ const expected=manifest.columns.filter(c=>manifest.rpcOnlyTables.includes(c.table)).map(({table,name,not_null})=>({table,name,not_null})).sort((a,b)=>(a.table+'.'+a.name).localeCompare(b.table+'.'+b.name));
+ assert.deepEqual(actual,expected,'Every billing column retains exact pg_attribute nullability coverage');
+ assert.equal((await ready()).ready,true);
+ const fields=[['billing_instance_config','create_environment'],['billing_offers','amount'],['billing_customers','created_at'],['billing_orders','offer'],['billing_receipts','receipt'],['billing_credit_grants','credits'],['billing_credit_consumptions','credits'],['billing_credit_holds','owner_id'],['billing_review_decisions','reason']];
+ for(const [table,column]of fields){
+  assert.equal(expected.find(c=>c.table===table&&c.name===column)?.not_null,true);
+  await db.exec('savepoint nullability');
+  try{await db.exec('alter table '+table+' alter column '+column+' drop not null');await expectFalse('schema_columns');}
+  finally{await db.exec('rollback to savepoint nullability;release savepoint nullability');}
+  assert.equal((await ready()).ready,true,table+' readiness is restored only after NOT NULL is restored');
+ }
+});
+
 console.log('Completed '+passed+' actual PostgreSQL readiness tests.');await db.close();

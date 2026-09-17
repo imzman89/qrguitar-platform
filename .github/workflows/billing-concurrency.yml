@@ -1,0 +1,71 @@
+name: Billing concurrency
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'supabase/**'
+      - 'apps/web/scripts/security/postgres-fixture.mjs'
+      - 'apps/web/scripts/test-billing-concurrency*.mjs'
+      - 'apps/web/package.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/billing-concurrency.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'supabase/**'
+      - 'apps/web/scripts/security/postgres-fixture.mjs'
+      - 'apps/web/scripts/test-billing-concurrency*.mjs'
+      - 'apps/web/package.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/billing-concurrency.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  postgres17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_DB: qrguitar_billing_qa
+          POSTGRES_USER: qrguitar_billing_fixture
+          # Disposable synthetic service-container credential, never an application secret.
+          POSTGRES_PASSWORD: ci_fixture_only_password
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U qrguitar_billing_fixture -d qrguitar_billing_qa"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Verify fixture connection guards without connecting
+        run: node --test apps/web/scripts/test-billing-concurrency-config.mjs
+      - name: Prove ten PostgreSQL scheduling barriers
+        timeout-minutes: 5
+        run: node apps/web/scripts/test-billing-concurrency.mjs --repo . --report-dir test-results/billing-concurrency
+        env:
+          QRGUITAR_CONCURRENCY_FIXTURE: isolated-postgresql-17
+          QRGUITAR_CONCURRENCY_DATABASE_URL: postgresql://qrguitar_billing_fixture:ci_fixture_only_password@127.0.0.1:${{ job.services.postgres.ports[5432] }}/qrguitar_billing_qa
+      - name: Retain source hashes, lock barriers, and outcomes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: billing-postgres17-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/billing-concurrency/
+          if-no-files-found: warn
+          retention-days: 7

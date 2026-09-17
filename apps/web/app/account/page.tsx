@@ -126,6 +126,7 @@ function AccountSettingsPage() {
               <Link href="/dashboard">Dashboard</Link>
               <Link href="/create">Create Profile</Link>
               <Link href="/catalog">Explore the Catalog</Link>
+              <Link href="/billing">Profile credits</Link>
               <Link href="/contact">Support</Link>
             </div>
             <div className="account-summary-grid">

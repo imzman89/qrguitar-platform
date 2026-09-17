@@ -1,5 +1,6 @@
 import { OwnerReadError, readAllOwnerPages, readOwnerBatches, groupOwnerRows, signOwnerSources } from "../../../lib/owner-record-read";
 import { buildCreateProfilePayload, createProfileFailure, CreateProfileError } from "../../../lib/profile-create";
+import { profileBillingEnvironment } from "../../../lib/billing-environment";
 import { prepareProfileAssets, ProfileSaveError, profileSaveFailure, type SavedMedia, type SavedDocument } from "../../../lib/profile-save-assets";
 import { isOwnedStagedPath, removeUnreferencedStagedUploads } from "../../../lib/staged-upload-cleanup";
 import { NextResponse } from "next/server";
@@ -1608,10 +1609,13 @@ export async function POST(request: Request) {
     );
     // Single service-role transaction owns allocation, limits, files, relational rows
     // and receipt. No pre-commit pending record or compensating delete is persisted.
+    const billingEnvironment = profileBillingEnvironment(process.env, getSupabaseEnvStatus().supabaseUrl);
+    if (!billingEnvironment) return preserveAndFail(503,"create_configuration_unavailable","Profile creation is temporarily unavailable. Your form and uploads are preserved.",{retryable:false});
     const result = await supabase.rpc("create_instrument_profile",{
       p_owner_id:ownerUser.id,p_idempotency_key:idempotencyKey,p_upload_id:uploadId,p_payload:payload,
       p_launch_testing_access:hasLaunchTestingAccess(ownerUser.email||""),
-      p_owner_display_name:ownerUser.user_metadata?.display_name || ownerUser.email || ""
+      p_owner_display_name:ownerUser.user_metadata?.display_name || ownerUser.email || "",
+      ...(billingEnvironment === "test" ? { p_billing_environment: billingEnvironment } : {})
     });
     if(result.error || result.data?.ok!==true){
       const failure=createProfileFailure(result.error);

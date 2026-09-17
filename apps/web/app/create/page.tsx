@@ -122,6 +122,7 @@ export default function CreatePage() {
   const [lastErrorRetryable, setLastErrorRetryable] = useState(false);
   const [existingProfileHref, setExistingProfileHref] = useState("");
   const [claimHref, setClaimHref] = useState("");
+  const [billingHelp, setBillingHelp] = useState(false);
   const [uploadId] = useState(makeClientKey);
   const [idempotencyKey] = useState(makeClientKey);
   const [qrCode, setQrCode] = useState(makePreviewQrCode);
@@ -406,6 +407,7 @@ export default function CreatePage() {
 
       setSavingProfile(true);
       setMessage("");
+      setBillingHelp(false);
       setFieldErrors({});
       setLastErrorRetryable(false);
       setExistingProfileHref("");
@@ -488,8 +490,9 @@ export default function CreatePage() {
         setLastErrorRetryable(Boolean(result?.retryable));
         setExistingProfileHref(result?.existingProfileHref || "");
         setClaimHref(result?.claimHref || "");
+        setBillingHelp(result?.code === "profile_limit_reached" || result?.code === "billing_review_required");
         if (response.status === 402) {
-          setMessage(result?.message || "Free public beta accounts can create up to 25 Profiles. Contact QRguitar for commercial setup.");
+          setMessage(result?.message || "Your free Profile allowance is full. Check Profile credits in your account, or contact QRguitar for help.");
           return;
         }
         if (response.status === 401) {
@@ -705,7 +708,7 @@ export default function CreatePage() {
                   <p className="create-permanent-note">This QRguitar ID and Profile URL remain permanent. Customize the downloadable QR later from your Dashboard.</p>
                 </section>
 
-              {message ? <div className="form-message" role={fieldErrors && Object.keys(fieldErrors).length ? "alert" : "status"}><strong>{message}</strong>{existingProfileHref || claimHref ? <div className="form-actions">{existingProfileHref ? <Link className="button secondary" href={existingProfileHref}>View existing Profile</Link> : null}{claimHref ? <Link className="button secondary" href={claimHref}>Request ownership</Link> : null}</div> : null}{lastErrorRetryable ? <button className="button secondary" type="button" onClick={() => void createRecordAndRedirect(false)} disabled={savingProfile}>Retry safely</button> : null}</div> : null}
+              {message ? <div className="form-message" role={fieldErrors && Object.keys(fieldErrors).length ? "alert" : "status"}><strong>{message}</strong>{existingProfileHref || claimHref ? <div className="form-actions">{existingProfileHref ? <Link className="button secondary" href={existingProfileHref}>View existing Profile</Link> : null}{claimHref ? <Link className="button secondary" href={claimHref}>Request ownership</Link> : null}</div> : null}{billingHelp ? <div className="form-actions"><Link className="button secondary" href="/billing" target="_blank" rel="noopener noreferrer">Check Profile credits in a new tab</Link><span>Keep this form open, then return to create your Profile.</span></div> : null}{lastErrorRetryable ? <button className="button secondary" type="button" onClick={() => void createRecordAndRedirect(false)} disabled={savingProfile}>Retry safely</button> : null}</div> : null}
               <div className="create-wizard-actions">
                 <Link className="button secondary" href="/dashboard">Cancel</Link>
                 <button className="button" type="button" onClick={saveDraft} disabled={savingProfile}>{savingProfile ? "Creating Profile..." : getContentValue(content, "create.actions.submit")}</button>
