@@ -35,6 +35,8 @@ try {
   await db.exec(migration);
   const versions = fs.readFileSync(path.join(proposal, "supabase/migrations/20260917172000_account_settings_versions.sql"), "utf8");
   await db.exec(versions); await db.exec(versions);
+  const conflictResponse = fs.readFileSync(path.join(proposal, "supabase/migrations/20260917174500_business_conflict_responses.sql"), "utf8");
+  await db.exec(conflictResponse); await db.exec(conflictResponse);
   await db.query("insert into auth.users(id) values($1),($2),($3)", [first, second, fresh]);
   await db.query("insert into profiles(id,display_name,role,plan,remaining_code_count,admin_notes) values($1,'First','shop','business',73,'private operator note'),($2,'Second','builder','pack_25',12,'second private note')", [first, second]);
   await db.query("insert into site_content(content_key,content_value) values('unrelated', '{\"keep\":true}')");
@@ -143,25 +145,34 @@ try {
     assert.equal(await version(first), loadedVersion);
     const savedB = await save(first, "Confirmed B", collection("confirmed-b"), loadedVersion);
     assert.equal(savedB.settingsVersion, loadedVersion + 1); const afterB = await snapshot();
-    release(); assert.equal((await outcomeA).error?.code, "40001"); assert.deepEqual(await snapshot(), afterB);
-    await assert.rejects(save(first, "Stale retry", collection("late-a"), loadedVersion), (error) => error.code === "40001");
+    release(); assert.equal((await outcomeA).error?.code, "PT409"); assert.deepEqual(await snapshot(), afterB);
+    await assert.rejects(save(first, "Stale retry", collection("late-a"), loadedVersion), (error) => error.code === "PT409");
     assert.deepEqual(await snapshot(), afterB);
   });
   await test("overlapping same-version account saves commit exactly once", async () => {
     const expected = await version(first);
     const outcomes = await Promise.allSettled([save(first, "Concurrent A", collection("concurrent-a"), expected), save(first, "Concurrent B", collection("concurrent-b"), expected)]);
     assert.equal(outcomes.filter((result) => result.status === "fulfilled").length, 1);
-    assert.equal(outcomes.find((result) => result.status === "rejected").reason.code, "40001");
+    assert.equal(outcomes.find((result) => result.status === "rejected").reason.code, "PT409");
     const winner = outcomes.find((result) => result.status === "fulfilled").value;
     assert.equal(await version(first), expected + 1); assert.equal((await content(ownerKey(first))).handle, winner.publicCollection.handle);
     assert.equal(await content(handleKey(winner.publicCollection.handle === "concurrent-a" ? "concurrent-b" : "concurrent-a")), undefined);
   });
   await test("reload after a lost committed response permits the next version only", async () => {
     const old = await version(first); const committed = await save(first, "Lost response", collection("lost-response"), old);
-    const before = await snapshot(); await assert.rejects(save(first, "Blind retry", null, old), (error) => error.code === "40001");
+    const before = await snapshot(); await assert.rejects(save(first, "Blind retry", null, old), (error) => error.code === "PT409");
     assert.deepEqual(await snapshot(), before);
     const recovered = await version(first); assert.equal(recovered, committed.settingsVersion);
     assert.equal((await save(first, "Recovered save", null, recovered)).settingsVersion, recovered + 1);
+  });
+  await test("expected stale-save conflict is PT409, never retryable serialization_failure", async () => {
+    const before = await snapshot(), old = (await version(first)) - 1;
+    await assert.rejects(save(first, "Must not retry", null, old), (error) => {
+      assert.equal(error.code, "PT409"); assert.notEqual(error.code.slice(0, 2), "40"); return true;
+    });
+    assert.deepEqual(await snapshot(), before);
+    const source = (await db.query("select prosrc from pg_proc where oid='public.save_account_settings(uuid,text,jsonb,bigint)'::regprocedure")).rows[0].prosrc;
+    assert.match(source, /errcode = 'PT409'/); assert.doesNotMatch(source, /40001|serialization_failure/);
   });
   await test("invalid expected versions roll back all account state", async () => {
     const before = await snapshot();

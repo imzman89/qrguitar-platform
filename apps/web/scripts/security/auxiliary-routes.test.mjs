@@ -96,8 +96,8 @@ await test("confirmed evidence delete precedes physical cleanup and reports clea
   const response=await f.route("apps/web/app/api/service-evidence/route.ts").DELETE(request("service-evidence","DELETE",{evidenceId:evidence}));const payload=await response.json();
   assert.equal(response.status,200);assert.equal(payload.committed,true);assert.equal(payload.cleanupPending,true);assert.match(payload.message,/cleanup is pending/);
 });
-await test("stale evidence upload rejects submitted status and cleans only the newly staged object",async()=>{
-  const f=fixture({actor:provider});f.db.rpc=async()=>({data:null,error:{code:"40001"}});
+for(const code of ["PT409","40001"]) await test("stale evidence upload "+code+" rejects submitted status and cleans only the newly staged object",async()=>{
+  const f=fixture({actor:provider});f.db.rpc=async()=>({data:null,error:{code}});
   const response=await f.route("apps/web/app/api/service-evidence/route.ts").POST(uploadRequest());assert.equal(response.status,409);
   const uploaded=f.storageCalls.find(x=>x.action==="upload"),removed=f.storageCalls.find(x=>x.action==="remove");assert.equal(removed.paths[0],uploaded.path);assert.notEqual(removed.paths[0],f.tables.service_submission_evidence[0].storage_path);
 });

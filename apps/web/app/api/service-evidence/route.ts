@@ -20,7 +20,7 @@ function evidenceResponse(row: EvidenceRow) {
 function unconfirmed() { return json({ ok: false, commitStatus: "unknown", message: "Could not confirm the evidence change. Reload the submission before trying again." }, 503); }
 function rpcFailure(error: { code?: string; message?: string }) {
   if (!error.code) return unconfirmed();
-  const status = error.code === "40001" ? 409 : error.code === "42501" ? 403 : error.code === "P0002" ? 404 : error.code === "22023" ? 400 : 503;
+  const status = error.code === "PT409" || error.code === "40001" ? 409 : error.code === "42501" ? 403 : error.code === "P0002" ? 404 : error.code === "22023" ? 400 : 503;
   return json({ ok: false, message: status === 409 ? "The submission changed. Reload before editing evidence." : status === 403 ? "You cannot change this evidence." : status === 404 ? "Evidence or submission was not found." : "Could not save the evidence change. Please try again." }, status);
 }
 async function authorize(request: Request, submission: ServiceSubmissionRow, action: "read" | "write") {

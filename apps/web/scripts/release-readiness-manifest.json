@@ -1,5 +1,5 @@
 {
-  "releaseVersion": "2026-09-17.1",
+  "releaseVersion": "2026-09-17.2",
   "checks": [
     "catalog_readable",
     "required_functions",
@@ -47,7 +47,7 @@
   "fingerprints": [
     {
       "signature": "public.save_instrument_profile(uuid,uuid,timestamp with time zone,jsonb)",
-      "source_hash": "a2f4dbadd9c941bac84328884d6869cc4a72c94047d758641d8986a50bad7efb",
+      "source_hash": "24bb651ac92f5a535463871eeee53c98b819952b239e4fc533de7a6f718f1186",
       "arguments": "p_guitar_id uuid, p_owner_id uuid, p_expected_updated_at timestamp with time zone, p_payload jsonb",
       "result": "jsonb",
       "definer": true,
@@ -157,7 +157,7 @@
     },
     {
       "signature": "public.commit_service_evidence(uuid,uuid,boolean,text,jsonb)",
-      "source_hash": "93b3a91156a4f2c4d37156cd666255fc46c313084e07dfa73d4339a72ab93973",
+      "source_hash": "c4e7f658861a3c4ec7a0457affb125b1e50ac8e0eb1e3ad4a8a651418dab78e8",
       "arguments": "p_submission_id uuid, p_actor_id uuid, p_is_admin boolean, p_action text, p_evidence jsonb",
       "result": "jsonb",
       "definer": true,
@@ -362,7 +362,7 @@
     },
     {
       "signature": "public.save_account_settings(uuid,text,jsonb,bigint)",
-      "source_hash": "d8d741388a16d16970b50e3132a7374b89f3beb44c0a769de1771e0874b18cfb",
+      "source_hash": "1beee0b381bf308147d8e0afee278040196d18cf42fd8aea15e1607800b86c42",
       "arguments": "p_user_id uuid, p_display_name text, p_collection jsonb, p_expected_version bigint",
       "result": "jsonb",
       "definer": true,

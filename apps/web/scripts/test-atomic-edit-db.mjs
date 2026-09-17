@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
-import {createTestDb} from "./atomic-test-support.mjs";
+import {createTestDb,readRepo} from "./atomic-test-support.mjs";
 const db=await createTestDb(["20260910220000_atomic_instrument_profile_save.sql"]);
+const conflictMigration=readRepo("supabase/migrations/20260917174500_business_conflict_responses.sql");
+const correctedProfile=conflictMigration.match(/create or replace function public\.save_instrument_profile\([\s\S]*?\$\$;/i)?.[0];
+assert(correctedProfile,"Reviewed profile conflict function missing");
+await db.exec(correctedProfile);
 const owner = "10000000-0000-4000-8000-000000000001";
 const other = "10000000-0000-4000-8000-000000000002";
 const guitar = "20000000-0000-4000-8000-000000000001";
@@ -125,14 +129,14 @@ await test("second save with the same guitar snapshot rejects instead of overwri
   await save(p, before.guitars[0].updated_at);
   const committed = await snapshot();
   p.guitar.name = "Would overwrite the first writer";
-  await assert.rejects(save(p, before.guitars[0].updated_at), (e) => e.code === "40001");
+  await assert.rejects(save(p, before.guitars[0].updated_at), (e) => e.code === "PT409");
   assert.deepEqual(await snapshot(), committed);
 });
 await test("a concurrently edited document rejects a stale file snapshot", async () => {
   const before = await snapshot(); const p = await payload();
   await db.exec(`update public.guitar_documents set updated_at=clock_timestamp(), private_notes='Concurrent private note' where id='${doc}'`);
   const concurrent = await snapshot();
-  await assert.rejects(save(p, before.guitars[0].updated_at), (e) => e.code === "40001");
+  await assert.rejects(save(p, before.guitars[0].updated_at), (e) => e.code === "PT409");
   assert.deepEqual(await snapshot(), concurrent);
 });
 await test("approved serial correction commits redirect, aliases, trust migration and audit together", async () => {
@@ -153,5 +157,3 @@ await test("approved serial correction commits redirect, aliases, trust migratio
 });
 console.log(`Completed ${passed} PostgreSQL transactional tests against actual repository schema and the proposed RPC.`);
 await db.close();
-
-

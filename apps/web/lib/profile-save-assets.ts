@@ -186,7 +186,7 @@ export function profileSaveFailure(error: { code?: string; message?: string } | 
   if (error?.code === "PGRST202" || error?.code === "42883") {
     return { status: 503, code: "profile_save_unavailable", message: "Profile saving is temporarily unavailable. Your existing Profile has not been replaced." };
   }
-  if (error?.code === "40001") return { status: 409, code: "profile_changed", message: "This Profile changed while you were saving. Reload it before trying again." };
+  if (error?.code === "PT409" || error?.code === "40001") return { status: 409, code: "profile_changed", message: "This Profile changed while you were saving. Reload it before trying again." };
   if (error?.code === "42501") return { status: 403, code: "profile_save_forbidden", message: "This Profile can no longer be edited by this account." };
   if (error?.code === "P0002") return { status: 404, code: "profile_not_found", message: "QRguitar Profile was not found." };
   if (error?.code === "23505") return { status: 409, code: "profile_identity_conflict", message: "The Serial Number, QR link, or trust settings conflict with an existing Profile. Admin review is required." };

@@ -22,6 +22,8 @@ async function test(name, run) { await run(); passes++; console.log("PASS " + na
 try {
   await installRepositorySchema(db, repo, "20260911002000");
   for (let i = 0; i < 2; i++) for (const name of ["20260911002000_atomic_service_evidence.sql", "20260911002100_atomic_external_media.sql"]) await db.exec(fs.readFileSync(path.join(proposal,"supabase/migrations",name),"utf8"));
+  const correctedEvidence=fs.readFileSync(path.join(proposal,"supabase/migrations/20260917174500_business_conflict_responses.sql"),"utf8").match(/create or replace function public\.commit_service_evidence\([\s\S]*?\$\$;/i)?.[0];
+  assert(correctedEvidence,"Reviewed evidence conflict function missing");await db.exec(correctedEvidence);
   await db.query("insert into auth.users(id,email) values($1,'owner@example.test'),($2,'provider@example.test'),($3,'recipient@example.test')", [owner,provider,stranger]);
   await db.query("insert into profiles(id,display_name) values($1,'Owner'),($2,'Provider'),($3,'Stranger')", [owner,provider,stranger]);
   await db.query("insert into guitars(id,owner_id,qr_code,permanent_path,name,brand) values($1,$2,'QRG-AUDIT','/i/QRG-AUDIT','Synthetic','Synthetic')", [guitar,owner]);
@@ -53,15 +55,15 @@ try {
   await test("a submitted request rejects evidence mutation after a stale draft authorization", async () => {
     await db.query("update service_submissions set status='submitted' where id=$1",[submission]);
     const before = await snapshot();
-    await assert.rejects(evidence("delete",{id:originalEvidence.id}),error=>error.code==="40001");
-    await assert.rejects(evidence("upload",uploadValues("after-submit")),error=>error.code==="40001");
+    await assert.rejects(evidence("delete",{id:originalEvidence.id}),error=>error.code==="PT409");
+    await assert.rejects(evidence("upload",uploadValues("after-submit")),error=>error.code==="PT409");
     assert.deepEqual(await snapshot(),before);
   });
   await test("actual approval preserves evidence against delayed provider upload/delete", async () => {
     await db.query("select public.approve_service_submission($1,$2,null)",[submission,owner]);
     const before=await snapshot();
-    await assert.rejects(evidence("delete",{id:originalEvidence.id}),error=>error.code==="40001");
-    await assert.rejects(evidence("upload",uploadValues("after-approval")),error=>error.code==="40001");
+    await assert.rejects(evidence("delete",{id:originalEvidence.id}),error=>error.code==="PT409");
+    await assert.rejects(evidence("upload",uploadValues("after-approval")),error=>error.code==="PT409");
     assert.deepEqual(await snapshot(),before);
   });
   await test("explicit server admin evidence removal records the committed row/path", async () => {
@@ -107,4 +109,3 @@ try {
   });
   console.log(passes+" real PostgreSQL auxiliary API tests passed.");
 } finally { await db.close(); }
-

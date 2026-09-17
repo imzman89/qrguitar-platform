@@ -114,7 +114,7 @@ export async function PATCH(request: Request) {
   }
   if (saved.error) {
     const code = saved.error.code;
-    if (code === "40001") return json({ ok: false, reloadRequired: true, message: "Your account settings changed since they were loaded. Reload your account before saving again." }, { status: 409 });
+    if (code === "PT409" || code === "40001") return json({ ok: false, reloadRequired: true, message: "Your account settings changed since they were loaded. Reload your account before saving again." }, { status: 409 });
     if (!code) return json({ ok: false, commitStatus: "unknown", message: "Could not confirm the save. Reload your account before trying again." }, { status: 503 });
     const status = code === "23505" ? 409 : code === "42501" ? 403 : code === "22023" ? 400 : 503;
     const message = status === 409 ? "That public collection handle is already in use."

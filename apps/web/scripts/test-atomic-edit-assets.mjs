@@ -118,8 +118,8 @@ await test("missing migration fails closed with 503 and never says saved",async(
   const db=mockDb({rpcError:{code:"PGRST202"}});const result=await run(edit(),db);
   assert.equal(result.body.ok,false);assert.equal(result.status,503);assert.equal(result.body.code,"profile_save_unavailable");assert.equal(db.calls.rpc,1);
 });
-await test("atomic RPC conflict returns 409 and never says saved",async()=>{
-  const db=mockDb({rpcError:{code:"40001"}});const result=await run(edit(),db);
+for(const code of ["PT409","40001"]) await test("atomic RPC conflict "+code+" returns 409 and never says saved",async()=>{
+  const db=mockDb({rpcError:{code}});const result=await run(edit(),db);
   assert.equal(result.body.ok,false);assert.equal(result.status,409);
 });
 await test("an ambiguous response never returns success",async()=>{

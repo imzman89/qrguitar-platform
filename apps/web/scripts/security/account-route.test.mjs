@@ -80,7 +80,7 @@ await test("name-only save returns the unchanged committed collection", async ()
   assert.equal(f.rpcCalls[0].args.p_collection, null);
   assert.equal(result.account.publicCollection.handle, collection.handle);
 });
-for (const [code, status] of [["23505", 409], ["40001", 409], ["42501", 403], ["22023", 400], ["57014", 503], ["PGRST202", 503]]) await test("RPC error " + code + " maps to " + status + " and prevents Auth writes", async () => {
+for (const [code, status] of [["23505", 409], ["PT409", 409], ["40001", 409], ["42501", 403], ["22023", 400], ["57014", 503], ["PGRST202", 503]]) await test("RPC error " + code + " maps to " + status + " and prevents Auth writes", async () => {
   const f = fixture(); f.db.rpc = async () => ({ data: null, error: { code, message: "synthetic database rejection" } });
   const response = await f.routes.PATCH(req({ displayName: "Valid name", publicCollection: collection }));
   assert.equal(response.status, status); assert.equal((await response.json()).ok, false); assert.equal(f.metadataCalls.length, 0);
@@ -166,10 +166,11 @@ for (const expectedVersion of [undefined, null, -1, 1.5, "0", Number.MAX_SAFE_IN
   assert.equal(response.status, 400); assert.equal((await response.json()).reloadRequired, true);
   assert.equal(f.rpcCalls.length, 0); assert.equal(f.metadataCalls.length, 0);
 });
-await test("stale save is a reload-required conflict without any auth mutation", async () => {
-  const f = fixture(); f.db.rpc = async () => ({ error: { code: "40001" } });
+for (const code of ["PT409", "40001"]) await test("stale save " + code + " is a reload-required conflict without retry or auth mutation", async () => {
+  const f = fixture(); let attempts = 0; f.db.rpc = async () => { attempts++; return { error: { code } }; };
   const response = await f.routes.PATCH(req({ displayName: "New name" })), result = await response.json();
   assert.equal(response.status, 409); assert.equal(result.reloadRequired, true); assert.match(result.message, /Reload/); assert.equal(f.metadataCalls.length, 0);
+  assert.equal(attempts, 1); assert.equal(result.commitStatus, undefined);
 });
 for (const settingsVersion of [undefined, 0, 2, "1"]) await test("invalid committed version " + settingsVersion + " is unconfirmed", async () => {
   const f = fixture(); f.db.rpc = async () => ({ data: { displayName: "New name", publicCollection: collection, settingsVersion }, error: null });
