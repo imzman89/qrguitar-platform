@@ -9,6 +9,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.qrguitar.app",
+      "associatedDomains": [
+        "applinks:qrguitar.com",
+        "applinks:www.qrguitar.com"
+      ],
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false,
@@ -18,6 +22,32 @@
     },
     "android": {
       "package": "com.qrguitar.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "qrguitar.com",
+              "pathPrefix": "/i/"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        },
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "www.qrguitar.com",
+              "pathPrefix": "/i/"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
       ]

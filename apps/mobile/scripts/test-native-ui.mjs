@@ -58,7 +58,7 @@ function fixture(options={}){
  const requestPermission=async()=>{calls.requestPermission++;permission=options.requestPermission?await options.requestPermission():{granted:false,canAskAgain:false};permissionListeners.forEach(fn=>fn(permission));return permission;};
  const getPermission=async()=>permission;
  const api={listPublic:async()=>[],listMine:async()=>[],readPublic:async()=>options.record,readMine:async()=>options.record,...options.api};
- const bridge={AppState:appState,Platform:{OS:options.platform||'android'},Alert:{alert:(...args)=>alerts.push(args)},Linking:{openURL:async url=>calls.links.push(url),openSettings:async()=>calls.links.push('settings'),getInitialURL:async()=>options.initialUrl||null,addEventListener:()=>({remove(){}})},BackHandler:{addEventListener:()=>{calls.backHandlers=(calls.backHandlers||0)+1;return{remove(){}};}},Share:{share:async()=>{}},StyleSheet:{create:x=>x,absoluteFill:{position:'absolute'}}};
+ const bridge={AppState:appState,Platform:{OS:options.platform||'android'},Alert:{alert:(...args)=>alerts.push(args)},Linking:{openURL:async url=>{calls.links.push(url);return options.openURL?.(url);},openSettings:async()=>calls.links.push('settings'),getInitialURL:async()=>options.initialUrl||null,addEventListener:()=>({remove(){}})},BackHandler:{addEventListener:()=>{calls.backHandlers=(calls.backHandlers||0)+1;return{remove(){}};}},Share:{share:async()=>{}},StyleSheet:{create:x=>x,absoluteFill:{position:'absolute'}}};
  for(const name of ['ActivityIndicator','KeyboardAvoidingView','Modal','Pressable','RefreshControl','ScrollView','Switch','Text','View'])bridge[name]=name;
  const mocks={'react':React,'react-native':bridge,'react-native-safe-area-context':{SafeAreaProvider:'SafeAreaProvider',SafeAreaView:'SafeAreaView'},'expo-status-bar':{StatusBar:'StatusBar'},'expo-image':{Image:'Image'},
   'expo-image-picker':{launchImageLibraryAsync:async()=>{calls.picker++;return options.picker?options.picker():{canceled:true};},getPendingResultAsync:async()=>{calls.pendingPicker++;return options.pendingPicker?options.pendingPicker():null;}},
@@ -70,7 +70,7 @@ function fixture(options={}){
  const cache=new Map();
  function load(file){
   if(cache.has(file))return cache.get(file);let source=fs.readFileSync(path.join(base,file),'utf8');
-  if(file==='App.tsx')source+='\nexport {Login,Create,Profile,Photo,useResource,OwnedRecords};';
+  if(file==='App.tsx')source+='\nexport {Login,Create,Profile,Photo,useResource,OwnedRecords,Library,openWeb};';
   const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.React,esModuleInterop:true}}).outputText;
   const module={exports:{}};cache.set(file,module.exports);
   const scopedRequire=id=>{if(mocks[id])return mocks[id];const key=id.split('/').at(-1);if(mocks[key])return mocks[key];if(id.startsWith('.')){const candidate=path.posix.normalize(path.posix.join(path.posix.dirname(file),id));return load(fs.existsSync(path.join(base,candidate+'.tsx'))?candidate+'.tsx':candidate+'.ts');}return require(id);};
@@ -83,6 +83,64 @@ function fixture(options={}){
   createProps:{actorId:'owner-111111111111',displayName:'Owner',onCreated:code=>calls.profiles.push(code),leaveGuardRef:{current:null}}};
 }
 test('renderer uses precisely the mobile React runtime',()=>{assert.equal(React.version,'19.2.3');assert.equal(Renderer.version,React.version);});
+
+const librarySnapshot=(id='owner-111111111111')=>({status:'signed-in',session:{user:{id,email:id+'@example.invalid'},access_token:'PRIVATE_ACCESS',refresh_token:'PRIVATE_REFRESH'},revision:1,message:''});
+const libraryProps=snapshot=>({snapshot,onSignIn(){},onCreate(){},onOpen(){},onSignOut(){}});
+
+test('signed-in Library exposes deletion review before the instrument collection with accurate browser guidance',async()=>{
+ const f=fixture(),view=await render(f.App.Library,libraryProps(librarySnapshot()));
+ assert.ok(action(view,'Request account deletion'));
+ const copy=text(view),requestIndex=copy.indexOf('Request account deletion');
+ assert.ok(requestIndex<copy.indexOf('Your collection')||requestIndex<copy.indexOf('0 Profiles'));
+ assert.match(copy,/permanent instrument history/);assert.match(copy,/website may ask you to sign in/);assert.match(copy,/use the account you want reviewed/);
+ assert.match(copy,/does not delete your account or personal information/);assert.deepEqual(f.calls.links,[]);
+});
+
+test('deletion-review entry opens only the privacy URL without credentials or native mutations',async()=>{
+ const f=fixture(),view=await render(f.App.Library,libraryProps(librarySnapshot()));
+ await invoke(action(view,'Request account deletion').props.onPress);
+ assert.deepEqual(f.calls.links,['https://qrguitar.com/account?section=privacy']);assert.doesNotMatch(f.calls.links[0],/PRIVATE|token|email|owner-/);
+ assert.deepEqual(f.calls.signIn,[]);assert.deepEqual(f.calls.signUp,[]);assert.deepEqual(f.calls.create,[]);assert.deepEqual(f.calls.save,[]);assert.equal(f.calls.discard,0);assert.equal(f.alerts.length,0);
+});
+
+test('signed-out loading auth-error and unconfigured Library states do not expose an account request action',async()=>{
+ for(const status of ['signed-out','loading','error','unconfigured']){
+  const f=fixture(),view=await render(f.App.Library,libraryProps({status,session:null,revision:1,message:'Session check unavailable'}));
+  assert.equal(action(view,'Request account deletion'),undefined);assert.deepEqual(f.calls.links,[]);
+ }
+});
+
+test('sign-out removes the visible request entry and another actor gets the same credential-free destination',async()=>{
+ const f=fixture(),view=await render(f.App.Library,libraryProps(librarySnapshot()));
+ await update(view,f.App.Library,libraryProps({status:'signed-out',session:null,revision:2,message:''}));assert.equal(action(view,'Request account deletion'),undefined);
+ await update(view,f.App.Library,libraryProps(librarySnapshot('different-owner')));await invoke(action(view,'Request account deletion').props.onPress);
+ assert.deepEqual(f.calls.links,['https://qrguitar.com/account?section=privacy']);
+});
+
+test('browser launch rejection is caught without claiming request receipt or erasure',async()=>{
+ const f=fixture({openURL:async()=>{throw Error('Browser could not open');}}),view=await render(f.App.Library,libraryProps(librarySnapshot()));
+ await invoke(action(view,'Request account deletion').props.onPress);
+ assert.deepEqual(f.calls.links,['https://qrguitar.com/account?section=privacy']);assert.equal(f.alerts.length,1);assert.equal(f.alerts[0][0],'Link unavailable');assert.equal(f.alerts[0][1],'Browser could not open');
+ assert.doesNotMatch(text(view),/Request received|Request submitted|Account deleted|Deletion completed/);assert.deepEqual(f.calls.create,[]);
+});
+
+test('Account Create and sign-out controls remain usable beside deletion review',async()=>{
+ let signedOut=0,created=0;const f=fixture(),view=await render(f.App.Library,{...libraryProps(librarySnapshot()),onSignOut(){signedOut++;},onCreate(){created++;}});
+ await invoke(action(view,'Account').props.onPress);await invoke(action(view,'Create Profile').props.onPress);await invoke(action(view,'Sign out').props.onPress);
+ assert.deepEqual(f.calls.links,['https://qrguitar.com/account']);assert.equal(signedOut,1);assert.equal(created,1);
+});
+
+test('web links retain previous allowed routes and accept the exact privacy-section route',async()=>{
+ const f=fixture(),paths=['/login','/login?mode=register','/login?mode=reset','/account','/dashboard','/create','/catalog','/privacy','/terms','/edit/QRG-ABC123','/handout/QRG-ABC123','/account?section=privacy'];
+ for(const value of paths)await f.App.openWeb(value);
+ assert.deepEqual(f.calls.links,paths.map(value=>'https://qrguitar.com'+value));
+});
+
+test('web links reject other sections credentials redirects fragments and encoded lookalikes before Linking',async()=>{
+ const f=fixture();
+ for(const value of ['/account?section=billing','/account?section=Privacy','/account?section=privacy&access_token=SECRET','/account?access_token=SECRET&section=privacy','/account?section=privacy#token','/account?section=privacy/','/account?section=privacy&next=https://evil.invalid','/account?section=privacy&section=privacy','/account?section=%70rivacy','/account/?section=privacy','/account%3Fsection%3Dprivacy','//evil.invalid/account?section=privacy','https://evil.invalid/account?section=privacy','https://qrguitar.com/account?section=privacy','/privacy?section=privacy','/dashboard?section=privacy','/login?mode=register&token=SECRET'])await assert.rejects(f.App.openWeb(value),/link is unavailable/);
+ assert.deepEqual(f.calls.links,[]);
+});
 test('scanner does not request camera on mount and manual URL opens only the permanent identity',async()=>{
  const f=fixture(),v=await render(f.Scanner,{onProfile:code=>f.calls.profiles.push(code)});assert.equal(f.calls.requestPermission,0);
  await invoke(field(v,'QRguitar ID or Profile link').props.onChangeText,'https://qrguitar.com/i/QRG-ABC123?ignored=yes#photo');

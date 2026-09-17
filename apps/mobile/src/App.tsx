@@ -63,7 +63,7 @@ const messageOf = (error: unknown) =>
     : "This action could not be completed. Please try again.";
 async function openWeb(path: string) {
   if (
-    !/^\/(?:login(?:\?mode=(?:register|reset))?|account|dashboard|create|catalog|privacy|terms|edit\/QRG-[A-Z0-9]+|handout\/QRG-[A-Z0-9]+)$/.test(
+    !/^\/(?:login(?:\?mode=(?:register|reset))?|account(?:\?section=privacy)?|dashboard|create|catalog|privacy|terms|edit\/QRG-[A-Z0-9]+|handout\/QRG-[A-Z0-9]+)$/.test(
       path,
     )
   )
@@ -372,6 +372,25 @@ function Library({
               secondary
               compact
               onPress={() => void openWeb("/account").catch(reportLink)}
+            />
+          </View>
+          <View style={styles.card}>
+            <Text style={styles.h2}>Privacy &amp; account</Text>
+            <Text style={styles.copy}>
+              Request review of removing personal information while keeping
+              permanent instrument history. The website may ask you to sign in;
+              use the account you want reviewed.
+            </Text>
+            <Text style={styles.small}>
+              Submitting a request does not delete your account or personal
+              information.
+            </Text>
+            <Action
+              title="Request account deletion"
+              secondary
+              onPress={() =>
+                void openWeb("/account?section=privacy").catch(reportLink)
+              }
             />
           </View>
           <OwnedRecords

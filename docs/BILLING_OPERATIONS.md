@@ -15,12 +15,21 @@ exception. The authoritative owned count includes retained owner-linked records.
 
 ## Deployment and configuration
 
-Apply the new migrations in order: `20260917190000_billing_credits.sql`, then
-`20260917191000_release_readiness.sql`. Readiness version `2026-09-17.3` checks
-the private ledger, exact function implementations, grants, constraints, and LIVE
-database boundary. Do not edit old migrations or bypass fingerprint checks.
-Coordinate schema and application promotion: a `.2` application does not certify
-a `.3` database. An empty offer catalog is expected before merchant provisioning.
+The billing migrations are `20260917190000_billing_credits.sql` and
+`20260917191000_release_readiness.sql`. The current release also requires
+`20260917200000_account_deletion_intake.sql` and
+`20260917201000_release_readiness.sql`, in that order. The active readiness
+version is **2026-09-17.4**; the historical `.3` migration is an intermediate
+contract. The active contract checks the private ledger and intake schema,
+exact function implementations, grants, constraints, and LIVE database boundary.
+Do not edit old migrations or bypass fingerprint checks. Coordinate schema and
+application promotion against the active contract, not an older readiness
+version. An empty offer catalog is expected before merchant provisioning.
+
+The four migrations were applied to the production project on September 17,
+2026, with all 14 readiness checks passing. Applying them did not activate
+checkout. Do not reapply them to an existing database; inspect its migration
+history and current readiness before preparing a release.
 
 The values in `.env.example` are server-only configuration. Store credentials in
 the hosting provider's secret settings, never in source, browser variables, task
