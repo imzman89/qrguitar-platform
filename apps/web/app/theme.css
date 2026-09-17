@@ -163,6 +163,9 @@
   body[data-product-theme] :is(.scan-overview p,.scan-copy-notice,.identity-cell span,.identity-card-header,.profile-data-grid > span,.ownership-grid > span,.public-spec-list span,.profile-claim-entry span,.scan-qr span,.scan-tabs button,.scan-bottom-nav button) { color: var(--muted); }
   body[data-product-theme] :is(.scan-hero-media,.scan-hero-thumbnails,.public-gallery-grid img,.collection-directory-placeholder,.collection-avatar) { background: var(--surface-subtle); }
   body[data-product-theme] :is(.identity-cell,.identity-card-header,.public-gallery,.scan-hero-thumbnails,.scan-qr,.scan-tabs,.scan-actions) { border-color: var(--line); }
+  body[data-product-theme] .profile-trust-summary summary { color: #2f633c; }
+  body[data-product-theme] .profile-trust-summary p { color: var(--muted); }
+  body[data-product-theme] .profile-trust-summary > details + details { border-color: var(--line); }
   body[data-product-theme] :is(.scan-actions a,.scan-actions button,.document-item button,.scan-tags span,.transfer-mode button,.qr-preset,.qr-toggle,.qr-download,.qr-customizer) { color: var(--text); background: var(--surface-subtle); border-color: var(--line); }
   body[data-product-theme] :is(.qr-preset.selected,.transfer-mode button[aria-pressed="true"]) { background: #e4eadc; border-color: var(--action); }
   body[data-product-theme] .scan-safety-alert { background: #fae8df; border-color: #c79079; color: #8a2e20; }
