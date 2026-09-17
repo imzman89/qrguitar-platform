@@ -20,7 +20,7 @@ const savedFetch = globalThis.fetch;
 globalThis.fetch = async () => { throw new Error("External network is forbidden by this offline fixture"); };
 const db = new PGlite();
 await installRepositorySchema(db, repo, "20260917190000");
-await db.exec("alter table storage.objects add column metadata jsonb not null default '{}'::jsonb");
+await db.exec("alter table storage.objects add column if not exists metadata jsonb; alter table storage.objects alter column metadata set default '{}'::jsonb, alter column metadata set not null");
 await db.exec(fs.readFileSync(sqlPath, "utf8"));
 // A separate, empty in-memory TEST database is configured before any actor/history.
 await db.exec("update billing_instance_config set create_environment='test' where singleton");

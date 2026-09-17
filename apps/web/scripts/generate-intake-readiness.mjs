@@ -137,8 +137,7 @@ try {
   assert.equal(result.releaseVersion, '2026-09-17.4'); assert.equal(result.ready, true, JSON.stringify(result));
   assert.deepEqual(result.checks.map(check => check.name), originalChecks); assert.ok(result.checks.every(check => check.ok));
   const outputs = new Map([
-    ['supabase/migrations/20260917201000_release_readiness.sql', sql],
-    ['apps/web/scripts/release-readiness-manifest.json', JSON.stringify(manifest, null, 2) + '\n']
+    ['supabase/migrations/20260917201000_release_readiness.sql', sql]
   ]);
   for (const [relative, content] of outputs) {
     const destination = path.join(output, relative);

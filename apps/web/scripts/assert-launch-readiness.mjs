@@ -70,7 +70,7 @@ for (const [name, source] of [["Contact", contact], ["Privacy", privacy], ["Term
 }
 ok(!catalog.includes("service history, proof, or Availability"), "Catalog promises missing filter");
 ok(profileContract.includes("if (event.isSystem) return false"), "System events counted as service history");
-ok(resetPassword.includes("hasRecoveryLink") && resetPassword.includes("isComplete") && resetPassword.includes("authChecked && !isComplete && hasSession"), "Reset states are not mutually exclusive");
+ok(resetPassword.includes("hasRecoveryLink") && resetPassword.includes("isComplete") && resetPassword.includes("authChecked && !authError && !isComplete && hasSession"), "Reset states are not mutually exclusive");
 ok(!installers.includes("Owners can find a nearby shop") && installers.includes("connects approved shops and owners manually"), "Installer page overpromises a finder");
 ok(
   collectibleCard.includes("presentation.serialNumber")

@@ -1,3 +1,5 @@
+import { serviceEvidenceStoragePath, validServiceEvidenceSignedUploadUrl } from "./service-evidence-upload";
+
 /** Browser orchestration only; the service APIs remain the permission authority. */
 export type ProviderForm = { businessName: string; publicDisplayName: string; website: string; location: string; serviceCategories: string[] };
 export type ServiceForm = { serviceDate: string; serviceType: string; workOrderReference: string; title: string; workPerformed: string; partsInstalled: string; setupMeasurements: string; recommendedPublicDescription: string; privateProviderNote: string; requestedVisibility: string };
@@ -51,10 +53,15 @@ function formFromSubmission(row: WorkSubmission): ServiceForm {
 }
 class StaleOperation extends Error {}
 class WorkbenchFailure extends Error {
-  constructor(message: string, readonly uncertain = false, readonly duplicateId = "", readonly conflict = false) { super(message); }
+  constructor(message: string, readonly uncertain = false, readonly duplicateId = "", readonly conflict = false, readonly rejected = false,
+    readonly responseStatus?: number, readonly responsePayload?: Record<string, unknown>) { super(message); }
 }
 type Lease = { actorId: string; revision: number };
-type Dependencies = { auth: () => WorkbenchAuth; fetch?: typeof fetch; timeoutMs?: number };
+type EvidenceAttempt = {
+  metadata: { expectedActorId: string; submissionId: string; uploadId: string; evidenceType: string; fileName: string; mimeType: string; size: number };
+  storagePath: string; file: File | null; completionDispatched: boolean;
+};
+type Dependencies = { auth: () => WorkbenchAuth; fetch?: typeof fetch; timeoutMs?: number; uploadTimeoutMs?: number; supabaseUrl?: string };
 export function createServiceWorkbench(qrCode: string, submissionId: string, deps: Dependencies) {
   let state = initialWorkbenchState();
   let auth: WorkbenchAuth | undefined;
@@ -65,6 +72,11 @@ export function createServiceWorkbench(qrCode: string, submissionId: string, dep
   let lock: symbol | undefined;
   let loadRevision = 0;
   let evidenceRevision = 0;
+  // Controller-lifetime recovery only. Never replace an unresolved identity, and
+  // drop file bytes on every actor transition while retaining private metadata.
+  const evidenceAttempts = new Map<string, EvidenceAttempt>();
+  const pendingEvidence = () => evidenceAttempts.get(state.actorId);
+  const recoveryMessage = "This evidence upload is unconfirmed. Reload the saved version to reconcile the original upload before choosing another file.";
   const listeners = new Set<(value: WorkbenchState) => void>();
   const pending = new Set<AbortController>();
   const transport = deps.fetch || fetch;
@@ -73,7 +85,7 @@ export function createServiceWorkbench(qrCode: string, submissionId: string, dep
   const live = (lease: Lease) => !disposed && lease.revision === revision && lease.actorId === state.actorId;
   const check = (lease: Lease) => { if (!live(lease)) throw new StaleOperation(); };
   function abortPending() { pending.forEach(controller => controller.abort()); pending.clear(); }
-  async function bounded<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  async function bounded<T>(run: (signal: AbortSignal) => Promise<T>, limitMs = timeoutMs): Promise<T> {
     const controller = new AbortController();
     pending.add(controller);
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -82,7 +94,7 @@ export function createServiceWorkbench(qrCode: string, submissionId: string, dep
       return await Promise.race([Promise.resolve().then(() => run(controller.signal)), new Promise<never>((_, reject) => {
         onAbort = () => reject(new Error("The request was interrupted. Please retry."));
         controller.signal.addEventListener("abort", onAbort, { once: true });
-        timer = setTimeout(() => { reject(new Error("The request timed out. Please retry.")); controller.abort(); }, timeoutMs);
+        timer = setTimeout(() => { reject(new Error("The request timed out. Please retry.")); controller.abort(); }, limitMs);
       })]);
     } finally { if (timer) clearTimeout(timer); controller.signal.removeEventListener("abort", onAbort); pending.delete(controller); }
   }
@@ -91,6 +103,7 @@ export function createServiceWorkbench(qrCode: string, submissionId: string, dep
     const actorId = session?.access_token ? session.user.id : "";
     if (actorKnown && actorId === state.actorId) return;
     actorKnown = true;
+    evidenceAttempts.forEach(attempt => { attempt.file = null; });
     revision++;
     loadRevision++;
     abortPending();
@@ -125,7 +138,7 @@ export function createServiceWorkbench(qrCode: string, submissionId: string, dep
       check(lease);
       throw new WorkbenchFailure(error instanceof Error ? error.message : "The request could not be completed.", mutation);
     }
-    if (!response.ok || payload.ok !== true) throw new WorkbenchFailure(typeof payload.message === "string" ? payload.message : "The server did not confirm this request. Please retry.", mutation && (response.status >= 500 || response.ok || payload.commitStatus === "unknown"), response.status === 409 && identifier(payload.existingSubmissionId) ? payload.existingSubmissionId : "", response.status === 409 && !payload.existingSubmissionId);
+    if (!response.ok || payload.ok !== true) throw new WorkbenchFailure(typeof payload.message === "string" ? payload.message : "The server did not confirm this request. Please retry.", mutation && (response.status >= 500 || response.ok || payload.commitStatus === "unknown"), response.status === 409 && identifier(payload.existingSubmissionId) ? payload.existingSubmissionId : "", response.status === 409 && !payload.existingSubmissionId, !response.ok && response.status >= 400 && response.status < 500 && payload.ok === false, response.status, payload);
     return payload;
   }
   async function load() {
@@ -133,7 +146,7 @@ export function createServiceWorkbench(qrCode: string, submissionId: string, dep
     const lease = { actorId: state.actorId, revision };
     const loading = ++loadRevision;
     evidenceRevision++;
-    const id = state.submission?.id || submissionId;
+    const id = state.submission?.id || submissionId || pendingEvidence()?.metadata.submissionId;
     publish({ phase: "loading", message: "", evidence: null, evidenceLoading: false, evidenceError: "" });
     try {
       const providerPayload = await request(lease, "/api/service-providers");
@@ -147,7 +160,7 @@ export function createServiceWorkbench(qrCode: string, submissionId: string, dep
       }
       check(lease);
       if (loading !== loadRevision) return;
-      publish({ phase: "ready", provider, submission, form: submission ? formFromSubmission(submission) : state.form, uncertain: id ? "" : state.uncertain, message: !id && state.uncertain === "create" ? "Draft creation is unconfirmed. Check recent service work before creating another draft." : "" });
+      publish({ phase: "ready", provider, submission, form: submission ? formFromSubmission(submission) : state.form, uncertain: pendingEvidence() ? "change" : id ? "" : state.uncertain, message: pendingEvidence() ? recoveryMessage : !id && state.uncertain === "create" ? "Draft creation is unconfirmed. Check recent service work before creating another draft." : "" });
     } catch (error) {
       if (live(lease) && loading === loadRevision) publish({ phase: "error", message: error instanceof Error ? error.message : "Could not load service work. Please retry." });
     }
@@ -172,8 +185,8 @@ export function createServiceWorkbench(qrCode: string, submissionId: string, dep
       if (!disposed && revision === startingRevision) publish({ phase: "error", message: error instanceof Error ? error.message : "Sign-in is unavailable. Please retry." });
     }
   }
-  async function loadEvidence() {
-    if (disposed || lock || state.phase !== "ready" || !state.submission || state.evidenceLoading) return;
+  async function loadEvidence(confirmedUploadLease?: Lease) {
+    if (disposed || (lock && (!confirmedUploadLease || !live(confirmedUploadLease))) || state.phase !== "ready" || !state.submission || state.evidenceLoading) return;
     const lease = { actorId: state.actorId, revision };
     const id = state.submission.id;
     const loading = ++evidenceRevision;
@@ -188,9 +201,9 @@ export function createServiceWorkbench(qrCode: string, submissionId: string, dep
       if (live(lease) && loading === evidenceRevision) publish({ evidenceLoading: false });
     }
   }
-  async function mutate(label: string, work: (lease: Lease) => Promise<void>) {
-    if (disposed || lock || state.phase !== "ready" || state.uncertain) return;
-    if (state.submission && !["draft", "changes_requested"].includes(state.submission.status)) return;
+  async function mutate(label: string, work: (lease: Lease) => Promise<void>, uploadRecovery = false) {
+    if (disposed || lock || state.phase !== "ready" || ((state.uncertain || pendingEvidence()) && !uploadRecovery)) return;
+    if (!uploadRecovery && state.submission && !["draft", "changes_requested"].includes(state.submission.status)) return;
     const operation = Symbol(label);
     lock = operation;
     evidenceRevision++;
@@ -200,7 +213,7 @@ export function createServiceWorkbench(qrCode: string, submissionId: string, dep
     catch (error) {
       if (live(lease)) {
         const failure = error instanceof WorkbenchFailure ? error : new WorkbenchFailure(error instanceof Error ? error.message : "Could not complete the request.");
-        const uncertain = failure.uncertain || failure.conflict ? (state.submission ? "change" : "create") : "";
+        const uncertain = pendingEvidence() || failure.uncertain || failure.conflict ? (state.submission ? "change" : "create") : "";
         publish({ message: uncertain ? `${failure.message} ${state.submission ? "Reload the saved version before making another change; the last change may already be saved." : "Draft creation is unconfirmed. Check recent service work before creating another draft."}` : failure.message, duplicateId: failure.duplicateId, uncertain });
       }
     } finally {
@@ -241,12 +254,85 @@ export function createServiceWorkbench(qrCode: string, submissionId: string, dep
       if (!submission) throw new Error("Save the private draft before uploading evidence.");
       if (!["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(file.type)) throw new Error("Choose a JPG, PNG, WebP, or PDF evidence file.");
       if (!file.size || file.size > 15 * 1024 * 1024) throw new Error("Evidence files must be between 1 byte and 15 MB.");
-      const body = new FormData();
-      body.append("submissionId", submission.id); body.append("evidenceType", evidenceType); body.append("file", file);
-      const payload = await request(lease, "/api/service-evidence", { method: "POST", body }, true);
-      if (payload.committed !== true || !identifier(record(payload.evidence).id)) throw new WorkbenchFailure("The evidence upload was not confirmed.", true);
-      publish({ submission: { ...submission, evidenceCount: submission.evidenceCount + 1 }, evidence: null, evidenceError: "", message: "Private evidence uploaded." });
+      const uploadId = crypto.randomUUID();
+      const storagePath = serviceEvidenceStoragePath(submission.id, lease.actorId, uploadId, file.type);
+      if (!storagePath) throw new Error("The evidence upload identity could not be verified. Reload this submission.");
+      const metadata = { expectedActorId: lease.actorId, submissionId: submission.id, uploadId, evidenceType,
+        fileName: typeof file.name === "string" && file.name ? file.name : "evidence", mimeType: file.type, size: file.size };
+      const attempt: EvidenceAttempt = { metadata: Object.freeze(metadata), storagePath, file, completionDispatched: false };
+      evidenceAttempts.set(lease.actorId, attempt);
+      await continueEvidence(lease, attempt);
     });
+  }
+  async function continueEvidence(lease: Lease, attempt: EvidenceAttempt) {
+      const { metadata, storagePath } = attempt;
+      const { uploadId } = metadata;
+      if (metadata.expectedActorId !== lease.actorId || state.submission?.id !== metadata.submissionId || pendingEvidence() !== attempt) throw new StaleOperation();
+      const control = (action: "prepare" | "complete") => ({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...metadata, action }) });
+      const verifyBinding = (payload: Record<string, unknown>) => {
+        if (payload.uploadId !== uploadId || payload.submissionId !== metadata.submissionId || payload.actorId !== lease.actorId
+          || payload.bucket !== "service-evidence" || payload.storagePath !== storagePath) {
+          throw new WorkbenchFailure("The evidence upload destination was not confirmed. Reload before trying again.", true);
+        }
+      };
+      let payload: Record<string, unknown>;
+      try { payload = await request(lease, "/api/service-evidence", control("prepare")); }
+      catch (error) {
+        const denial = error instanceof WorkbenchFailure ? error.responsePayload : undefined;
+        if (live(lease) && pendingEvidence() === attempt && error instanceof WorkbenchFailure && error.responseStatus === 409
+          && denial?.ok === false && denial.code === "upload_deleted" && denial.uncertain === false && denial.retryable === false
+          && denial.uploadId === metadata.uploadId && denial.submissionId === metadata.submissionId && denial.actorId === metadata.expectedActorId) {
+          attempt.file = null; evidenceAttempts.delete(lease.actorId);
+          publish({ uncertain: "", evidence: null, evidenceError: "", message: "This evidence was removed. The original upload will not be recreated." });
+          await loadEvidence(lease);
+          return;
+        }
+        // Prepare cannot create evidence. A definitive rejection before any
+        // completion dispatch can release this attempt without duplicate risk.
+        if (live(lease) && pendingEvidence() === attempt && !attempt.completionDispatched && error instanceof WorkbenchFailure && error.rejected) {
+          attempt.file = null; evidenceAttempts.delete(lease.actorId);
+        }
+        throw error;
+      }
+      verifyBinding(payload);
+      if (!["upload", "uploaded", "committed"].includes(String(payload.phase))) throw new WorkbenchFailure("The upload preparation was not confirmed.", true);
+      if (payload.phase === "upload") {
+        const supabaseUrl = deps.supabaseUrl || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+        if (!validServiceEvidenceSignedUploadUrl(payload.signedUrl, supabaseUrl, storagePath)) throw new Error("The secure upload destination could not be verified. Please retry.");
+        if (!attempt.file) throw new WorkbenchFailure("The original file has not been confirmed in Storage. Its bytes were cleared when the account changed. This upload stays blocked; retry reconciliation later or contact support. A new file cannot replace it.", true);
+        await freshSession(lease);
+        check(lease);
+        try {
+          // The signed capability applies to this private object only. App session
+          // credentials are sent exclusively to the same-origin control endpoint.
+          await bounded(async signal => {
+            check(lease);
+            if (!attempt.file) throw new Error("The original evidence bytes are no longer available.");
+            await transport(payload.signedUrl as string, { method: "PUT", body: attempt.file, signal, redirect: "error", credentials: "omit",
+              cache: "no-store", headers: { "content-type": metadata.mimeType, "x-upsert": "false" } });
+          }, deps.uploadTimeoutMs ?? 120_000);
+        } catch { check(lease); /* The Storage response may be lost after a successful upload; verify via complete. */ }
+        check(lease);
+      }
+      if (payload.phase !== "committed") {
+        attempt.completionDispatched = true;
+        payload = await request(lease, "/api/service-evidence", control("complete"), true);
+        verifyBinding(payload);
+      }
+      if (payload.phase !== "committed" || payload.committed !== true || !identifier(record(payload.evidence).id)) throw new WorkbenchFailure("The evidence upload was not confirmed.", true);
+      check(lease);
+      attempt.file = null; evidenceAttempts.delete(lease.actorId);
+      publish({ evidence: null, evidenceError: "", uncertain: "", message: "Private evidence uploaded." });
+      // Read the actual count after either a new commit or a receipt replay.
+      await loadEvidence(lease);
+  }
+  async function reload() {
+    if (!state.actorId) return start();
+    const lease = { actorId: state.actorId, revision };
+    await load();
+    if (!live(lease)) return;
+    const attempt = pendingEvidence();
+    if (attempt) await mutate("evidence", current => continueEvidence(current, attempt), true);
   }
   async function removeEvidence(evidenceId: string) {
     return mutate("remove-evidence", async lease => {
@@ -261,9 +347,9 @@ export function createServiceWorkbench(qrCode: string, submissionId: string, dep
   return {
     getState: () => state,
     subscribe(listener: (value: WorkbenchState) => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
-    start, reload: () => state.actorId ? load() : start(), save, upload, loadEvidence, removeEvidence,
+    start, reload, save, upload, loadEvidence: () => loadEvidence(), removeEvidence,
     setProvider(provider: ProviderForm) { if (!lock && state.phase === "ready" && !state.uncertain) publish({ provider }); },
     setForm(form: ServiceForm) { if (!lock && state.phase === "ready" && !state.uncertain) publish({ form }); },
-    dispose() { disposed = true; revision++; abortPending(); unsubscribe?.(); listeners.clear(); state = initialWorkbenchState(); },
+    dispose() { disposed = true; revision++; evidenceAttempts.forEach(attempt => { attempt.file = null; }); evidenceAttempts.clear(); abortPending(); unsubscribe?.(); listeners.clear(); state = initialWorkbenchState(); },
   };
 }

@@ -1,0 +1,75 @@
+name: Service evidence upload concurrency
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'supabase/**'
+      - 'apps/web/scripts/security/postgres-fixture.mjs'
+      - 'apps/web/scripts/test-evidence-postgres-*.mjs'
+      - 'apps/web/package.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/evidence-postgres-concurrency.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'supabase/**'
+      - 'apps/web/scripts/security/postgres-fixture.mjs'
+      - 'apps/web/scripts/test-evidence-postgres-*.mjs'
+      - 'apps/web/package.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/evidence-postgres-concurrency.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  postgres17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_DB: qrguitar_evidence_qa
+          POSTGRES_USER: qrguitar_evidence_fixture
+          # Disposable service-container credential, never an application secret.
+          POSTGRES_PASSWORD: ci_fixture_only_password
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U qrguitar_evidence_fixture -d qrguitar_evidence_qa"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Check fixture guards without connecting
+        run: node --test apps/web/scripts/test-evidence-postgres-config.mjs
+      - name: Prove eight PostgreSQL scheduling barriers
+        timeout-minutes: 5
+        run: >-
+          node apps/web/scripts/test-evidence-postgres-concurrency.mjs
+          --repo .
+          --evidence-sql supabase/migrations/20260917210000_service_evidence_uploads.sql
+          --report-dir test-results/evidence-concurrency
+        env:
+          QRGUITAR_EVIDENCE_FIXTURE: isolated-evidence-postgresql-17
+          QRGUITAR_EVIDENCE_DATABASE_URL: postgresql://qrguitar_evidence_fixture:ci_fixture_only_password@127.0.0.1:${{ job.services.postgres.ports[5432] }}/qrguitar_evidence_qa
+      - name: Retain schema hashes, actual lock barriers, and outcomes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-postgres17-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/evidence-concurrency/
+          if-no-files-found: warn
+          retention-days: 7

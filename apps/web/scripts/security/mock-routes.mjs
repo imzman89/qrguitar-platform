@@ -86,7 +86,7 @@ export function loadRoutes(repo, database, { user = null, overlay = null, afterA
       return load(target + ".ts");
     };
     const fn = vm.runInNewContext("(function(require,module,exports){\n" + code + "\n})", {
-      URL, Request, Response, Buffer, File, FormData, console,
+      URL, Request, Response, Buffer, File, FormData, TextDecoder, setTimeout, clearTimeout, console,
       process: { env: {} }
     }, { filename: source });
     fn(require, module, module.exports);

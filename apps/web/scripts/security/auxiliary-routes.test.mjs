@@ -24,7 +24,7 @@ function fixture({actor=owner,hooks={},modules={},realAdmin=false}={}) {
   const route=loadRoutes(repo,db,{user,overlay,realAdmin,modules:{"apps/web/lib/security.ts":{checkServerRateLimit:()=>true},"apps/web/lib/transactional-email.ts":{sendCollectionInquiryEmail:async(value)=>{emails.push(value);return {ok:true,message:"Sent"};}},...modules}});
   return {tables,db,storageCalls,rpcCalls,emails,route};
 }
-function uploadRequest() {const body=new FormData();body.set("submissionId",submission);body.set("evidenceType","receipt");body.set("file",new File(["hello"],"new.pdf",{type:"application/pdf"}));return new Request("https://test.invalid/api/service-evidence",{method:"POST",body});}
+function uploadRequest() {return request("service-evidence","POST",{action:"complete",expectedActorId:provider,submissionId:submission,uploadId:"77777777-7777-4777-8777-777777777777",evidenceType:"receipt",fileName:"new.pdf",mimeType:"application/pdf",size:5});}
 let passes=0;
 async function test(name,run){if(args.includes("--match")&&!name.includes(option("--match")))return;await run();passes++;console.log("PASS "+name);}
 for(const method of ["GET","POST","DELETE"]) await test("evidence signed-out "+method+" rejects before parsing or lookup",async()=>{
@@ -96,10 +96,10 @@ await test("confirmed evidence delete precedes physical cleanup and reports clea
   const response=await f.route("apps/web/app/api/service-evidence/route.ts").DELETE(request("service-evidence","DELETE",{evidenceId:evidence}));const payload=await response.json();
   assert.equal(response.status,200);assert.equal(payload.committed,true);assert.equal(payload.cleanupPending,true);assert.match(payload.message,/cleanup is pending/);
 });
-for(const code of ["PT409","40001"]) await test("stale evidence upload "+code+" rejects submitted status and cleans only the newly staged object",async()=>{
+for(const code of ["PT409","40001"]) await test("stale evidence upload "+code+" rejects submitted status without uploading or deleting private bytes",async()=>{
   const f=fixture({actor:provider});f.db.rpc=async()=>({data:null,error:{code}});
   const response=await f.route("apps/web/app/api/service-evidence/route.ts").POST(uploadRequest());assert.equal(response.status,409);
-  const uploaded=f.storageCalls.find(x=>x.action==="upload"),removed=f.storageCalls.find(x=>x.action==="remove");assert.equal(removed.paths[0],uploaded.path);assert.notEqual(removed.paths[0],f.tables.service_submission_evidence[0].storage_path);
+  assert.equal(f.storageCalls.some(x=>x.action==="upload"||x.action==="remove"),false);assert.equal(f.tables.service_submission_evidence.length,1);
 });
 await test("unconfirmed evidence upload never deletes a potentially committed file",async()=>{
   const f=fixture({actor:provider});f.db.rpc=async()=>{throw new Error("RPC response lost");};

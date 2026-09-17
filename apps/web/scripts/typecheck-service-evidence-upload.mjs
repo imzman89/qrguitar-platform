@@ -1,0 +1,23 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+const overlay = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+const repo = path.resolve(process.env.QRGUITAR_SOURCE_ROOT || overlay);
+const require = createRequire(path.join(repo, 'package.json')), ts = require('typescript');
+const configFile = path.join(repo, 'apps/web/tsconfig.json');
+const config = ts.readConfigFile(configFile, ts.sys.readFile);
+const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, path.dirname(configFile));
+const options = { ...parsed.options, noEmit: true, incremental: false };
+const host = ts.createCompilerHost(options);
+host.resolveModuleNames = (names, containingFile) => names.map(name => {
+  const original = ts.resolveModuleName(name, containingFile, options, host).resolvedModule;
+  if (original) return original;
+  const relative = path.relative(overlay, containingFile);
+  return ts.resolveModuleName(name, relative.startsWith('..') ? containingFile : path.join(repo, relative), options, host).resolvedModule;
+});
+const files = ['apps/web/lib/service-evidence-upload.ts', 'apps/web/app/api/service-evidence/route.ts'].map(p => path.join(overlay, p));
+if (files.some(file => !fs.existsSync(file))) throw Error('Proposal files missing');
+const program = ts.createProgram(files, options, host), diagnostics = ts.getPreEmitDiagnostics(program);
+for (const d of diagnostics) console.error(ts.formatDiagnostic(d, { getCanonicalFileName: p => p, getCurrentDirectory: () => repo, getNewLine: () => '\n' }));
+if (diagnostics.length) process.exitCode = 1; else console.log('Focused direct-upload route/protocol TypeScript integration: 0 errors.');

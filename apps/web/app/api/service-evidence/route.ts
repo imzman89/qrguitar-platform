@@ -1,12 +1,15 @@
-import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { assertAccountCanWrite, getAdminContext } from "../../../lib/admin-auth";
-import { createServerSupabaseClient, getAuthenticatedUser } from "../../../lib/supabase-server";
+import { createServerSupabaseClient, getAuthenticatedUser, getSupabaseEnvStatus } from "../../../lib/supabase-server";
 import {
-  SERVICE_EVIDENCE_MAX_BYTES, SERVICE_EVIDENCE_MIME_TYPES, SERVICE_EVIDENCE_TYPES,
-  cleanServiceText, sanitizeEvidenceFilename, serviceMigrationMessage, serviceMigrationMissing,
+  cleanServiceText, serviceMigrationMessage, serviceMigrationMissing,
   type ServiceSubmissionRow
 } from "../../../lib/service-workflow";
+import {
+  SERVICE_EVIDENCE_UPLOAD_CONTROL_BYTES, SERVICE_EVIDENCE_UPLOAD_MAX_BYTES, SERVICE_EVIDENCE_UPLOAD_BUCKET,
+  cleanServiceEvidenceUploadId, normalizeServiceEvidenceUpload, serviceEvidenceStoragePath, validServiceEvidenceSignedUploadUrl,
+  type ServiceEvidenceUpload
+} from "../../../lib/service-evidence-upload";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -66,40 +69,125 @@ export async function GET(request: Request) {
   } catch { return json({ ok: false, message: "Evidence previews are temporarily unavailable. Please try again." }, 503); }
 }
 
-export async function POST(request: Request) {
-  const auth = await getAuthenticatedUser(request);
-  if (!auth.user) return json({ ok: false, message: auth.error || "Sign in required." }, 401);
-  const supabase = createServerSupabaseClient();
-  if (!supabase) return json({ ok: false, message: "Evidence is temporarily unavailable." }, 503);
-  const form = await request.formData().catch(() => null);
-  const submissionId = cleanServiceText(form?.get("submissionId"), 80);
-  const enteredType = cleanServiceText(form?.get("evidenceType"), 40);
-  const evidenceType = (SERVICE_EVIDENCE_TYPES as readonly string[]).includes(enteredType) ? enteredType : "other";
-  const file = form?.get("file");
-  if (!(file instanceof File)) return json({ ok: false, message: "Choose a supported evidence file." }, 400);
-  if (!SERVICE_EVIDENCE_MIME_TYPES.has(file.type)) return json({ ok: false, message: "Use a JPG, PNG, WebP, or PDF file." }, 415);
-  if (!file.size || file.size > SERVICE_EVIDENCE_MAX_BYTES) return json({ ok: false, message: "Evidence files must be between 1 byte and 15 MB." }, 413);
-  const submission = await supabase.from("service_submissions").select("*").eq("id", submissionId).maybeSingle<ServiceSubmissionRow>();
-  if (submission.error) return json({ ok: false, message: "Evidence is temporarily unavailable." }, 503);
-  if (!submission.data) return json({ ok: false, message: "Service submission was not found." }, 404);
-  const access = await authorize(request, submission.data, "write");
-  if (!access.allowed || !access.user) return json({ ok: false, message: access.message }, access.status);
-  const safeName = sanitizeEvidenceFilename(file.name);
-  const storagePath = `${submissionId}/${access.user.id}/${randomUUID()}-${safeName}`;
-  const upload = await supabase.storage.from("service-evidence").upload(storagePath, file, { contentType: file.type, upsert: false });
-  if (upload.error) return json({ ok: false, message: "Evidence upload failed. Please try again." }, 503);
-  let committed;
+async function bounded<T>(work: PromiseLike<T>, milliseconds = 10_000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try { return await Promise.race([Promise.resolve(work), new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("Evidence operation timed out")), milliseconds); })]); }
+  finally { if (timer) clearTimeout(timer); }
+}
+async function uploadBody(request: Request): Promise<{ body?: unknown; status?: number }> {
+  const length = request.headers.get("content-length");
+  if (length !== null && (!/^\d+$/.test(length) || Number(length) > SERVICE_EVIDENCE_UPLOAD_CONTROL_BYTES)) return { status: 413 };
+  const reader = request.body?.getReader();
+  if (!reader) return { status: 400 };
+  let bytes = 0, text = "";
+  const decoder = new TextDecoder("utf-8", { fatal: true });
   try {
-    committed = await supabase.rpc("commit_service_evidence", { p_submission_id: submissionId, p_actor_id: access.user.id, p_is_admin: access.admin,
-      p_action: "upload", p_evidence: { evidence_type: evidenceType, file_name: safeName, mime_type: file.type, file_size_bytes: file.size, storage_path: storagePath } });
-  } catch { return unconfirmed(); }
-  if (committed.error) {
-    // A transport error may hide a committed insert. Only clean up after a confirmed database rejection.
-    if (committed.error.code && !committed.error.code.startsWith("PGRST")) await supabase.storage.from("service-evidence").remove([storagePath]).catch(() => undefined);
-    return rpcFailure(committed.error);
-  }
-  if (!committed.data?.id) return unconfirmed();
-  return json({ ok: true, committed: true, evidence: evidenceResponse(committed.data as EvidenceRow), message: "Private evidence uploaded." });
+    return await bounded((async () => {
+      for (;;) {
+        const next = await reader.read(); if (next.done) break;
+        bytes += next.value.byteLength;
+        if (bytes > SERVICE_EVIDENCE_UPLOAD_CONTROL_BYTES) { void reader.cancel().catch(() => undefined); return { status: 413 }; }
+        text += decoder.decode(next.value, { stream: true });
+      }
+      return { body: JSON.parse(text + decoder.decode()) as unknown };
+    })(), 5_000);
+  } catch { void reader.cancel().catch(() => undefined); return { status: 400 }; }
+  finally { reader.releaseLock(); }
+}
+function uploadFailure(code: string, message: string, status: number, input?: ServiceEvidenceUpload, retryable = false, uncertain = false) {
+  return json({ ok: false, code, message, retryable, uncertain,
+    ...(uncertain && input?.action === "complete" ? { commitStatus: "unknown" } : {}),
+    ...(input ? { uploadId: input.uploadId, submissionId: input.submissionId, actorId: input.expectedActorId } : {}) }, status);
+}
+function uploadRpcFailure(error: { code?: string }, input: ServiceEvidenceUpload) {
+  const code = error.code;
+  if (code === "SE409") return uploadFailure("upload_deleted", "This evidence upload was removed. Choose the file again to start a new upload.", 409, input);
+  if (code === "SE404") return uploadFailure("upload_not_ready", "The file has not arrived yet. Retry this same upload.", 409, input, true);
+  if (code === "SE422") return uploadFailure("upload_metadata_mismatch", "The stored file does not match this upload. Keep this attempt for review and select a new file.", 409, input);
+  if (code === "PT409" || code === "40001") return uploadFailure("upload_conflict", "The upload or submission changed. Reload before continuing.", 409, input);
+  if (code === "42501") return uploadFailure("evidence_write_forbidden", "You cannot change this private evidence.", 403, input);
+  if (code === "P0002") return uploadFailure("submission_not_found", "The service submission was not found.", 404, input);
+  if (code === "22023") return uploadFailure("invalid_upload", "This evidence upload is invalid. Select the file again.", 400, input);
+  return uploadFailure("upload_unconfirmed", "This upload could not be confirmed. Reload the submission before retrying this same file.", 503, input, true, true);
+}
+type UploadReceipt = {
+  ok: true; uploadId: string; submissionId: string; actorId: string; state: "prepared" | "committed";
+  bucket: string; storagePath: string; metadata: { evidence_type: string; file_name: string; mime_type: string; file_size_bytes: number };
+  evidence: (EvidenceRow & { submission_id: string; uploaded_by_user_id: string }) | null; deletedAt: null;
+};
+function uploadReceipt(value: unknown, input: ServiceEvidenceUpload): UploadReceipt | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as UploadReceipt, metadata = row.metadata;
+  if (row.ok !== true || row.uploadId !== input.uploadId || row.submissionId !== input.submissionId || row.actorId !== input.expectedActorId
+    || row.bucket !== SERVICE_EVIDENCE_UPLOAD_BUCKET || row.storagePath !== serviceEvidenceStoragePath(input.submissionId, input.expectedActorId, input.uploadId, input.mimeType)
+    || !metadata || metadata.evidence_type !== input.evidenceType || metadata.file_name !== input.fileName || metadata.mime_type !== input.mimeType || metadata.file_size_bytes !== input.size
+    || row.deletedAt !== null || (row.state !== "prepared" && row.state !== "committed")) return null;
+  if (row.state === "committed") {
+    const evidence = row.evidence;
+    if (!evidence || !cleanServiceEvidenceUploadId(evidence.id) || evidence.submission_id !== input.submissionId || evidence.uploaded_by_user_id !== input.expectedActorId
+      || evidence.evidence_type !== metadata.evidence_type || evidence.file_name !== metadata.file_name
+      || evidence.mime_type !== metadata.mime_type || evidence.file_size_bytes !== metadata.file_size_bytes || evidence.storage_path !== row.storagePath
+      || typeof evidence.created_at !== "string" || !Number.isFinite(Date.parse(evidence.created_at))) return null;
+  } else if (row.evidence !== null) return null;
+  return row;
+}
+function uploadBinding(receipt: UploadReceipt) {
+  return { uploadId: receipt.uploadId, submissionId: receipt.submissionId, actorId: receipt.actorId, bucket: receipt.bucket, storagePath: receipt.storagePath };
+}
+function uploadCommitted(receipt: UploadReceipt, replayed: boolean) {
+  return json({ ok: true, phase: "committed", committed: true, replayed, ...uploadBinding(receipt), evidence: evidenceResponse(receipt.evidence!), message: "Private evidence uploaded." });
+}
+export async function POST(request: Request) {
+  let input: ServiceEvidenceUpload | undefined;
+  try {
+    const auth = await bounded(getAuthenticatedUser(request));
+    if (!auth.user) return uploadFailure("auth_required", "Sign in again before uploading evidence.", 401);
+    const supabase = createServerSupabaseClient();
+    if (!supabase) return uploadFailure("evidence_unavailable", "Evidence is temporarily unavailable.", 503, undefined, true);
+    if (request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/json") return uploadFailure("direct_upload_required", "Reload the service editor to upload files directly. This endpoint accepts only small JSON upload instructions.", 415);
+    const origin = request.headers.get("origin");
+    if (origin && origin !== new URL(request.url).origin) return uploadFailure("origin_forbidden", "This upload request came from another site.", 403);
+    const parsed = await uploadBody(request);
+    if (parsed.status) return uploadFailure(parsed.status === 413 ? "upload_control_too_large" : "invalid_upload", "Upload instructions must be valid JSON no larger than 16 KiB. File bytes must be uploaded directly.", parsed.status);
+    input = normalizeServiceEvidenceUpload(parsed.body) || undefined;
+    if (!input) {
+      const body = parsed.body as { size?: unknown; mimeType?: unknown } | null;
+      if (body && typeof body.size === "number" && body.size > SERVICE_EVIDENCE_UPLOAD_MAX_BYTES) return uploadFailure("file_too_large", "Use an evidence file no larger than 15 MiB.", 413);
+      return uploadFailure("invalid_upload", "Choose a nonempty JPG, PNG, WebP, or PDF file and a valid evidence type.", 400);
+    }
+    if (cleanServiceEvidenceUploadId(auth.user.id) !== input.expectedActorId) return uploadFailure("upload_actor_changed", "The signed-in account changed. Return to the original account before retrying this upload.", 409, input);
+    const access = await bounded(assertAccountCanWrite(supabase, auth.user));
+    if (!access.ok) return uploadFailure("account_write_blocked", access.message, access.status, input);
+    const admin = await bounded(getAdminContext(request));
+    const isAdmin = admin.ok && admin.user?.id === auth.user.id;
+    const args = { p_submission_id: input.submissionId, p_actor_id: auth.user.id, p_is_admin: isAdmin, p_upload_id: input.uploadId };
+    // The locked RPC authorizes the provider/submission and immutable metadata. It can
+    // return a committed receipt after submission closes, without creating another row.
+    const prepared = await bounded(supabase.rpc("prepare_service_evidence_upload", { ...args,
+      p_evidence: { evidence_type: input.evidenceType, file_name: input.fileName, mime_type: input.mimeType, file_size_bytes: input.size } }));
+    if (prepared.error) return uploadRpcFailure(prepared.error, input);
+    const receipt = uploadReceipt(prepared.data, input);
+    if (!receipt) return uploadFailure("upload_unconfirmed", "The saved upload identity could not be confirmed. Retry this same upload.", 503, input, true, true);
+    if (receipt.state === "committed") return uploadCommitted(receipt, true);
+    const storage = supabase.storage.from(receipt.bucket), info = await bounded(storage.info(receipt.storagePath));
+    if (!info.error && info.data) {
+      const actual = info.data, expected = receipt.metadata;
+      if (actual.name !== receipt.storagePath || actual.bucketId !== receipt.bucket || actual.size !== expected.file_size_bytes || actual.contentType !== expected.mime_type || actual.isDeleteMarker) return uploadFailure("upload_metadata_mismatch", "The stored file does not match this upload. Keep this attempt for review and select a new file.", 409, input);
+      if (input.action === "prepare") return json({ ok: true, phase: "uploaded", ...uploadBinding(receipt) });
+      const committed = await bounded(supabase.rpc("commit_service_evidence_upload", args));
+      if (committed.error) return uploadRpcFailure(committed.error, input);
+      const final = uploadReceipt(committed.data, input);
+      if (!final || final.state !== "committed") return uploadFailure("upload_unconfirmed", "The evidence save could not be confirmed. Reload the submission before retrying this same file.", 503, input, true, true);
+      return uploadCommitted(final, false);
+    }
+    const error = info.error as { status?: number; statusCode?: string; code?: string } | null;
+    const missing = error?.status === 404 || error?.statusCode === "404" || error?.code === "NoSuchKey" || error?.code === "not_found";
+    if (!missing) return uploadFailure("upload_verification_unavailable", "The stored file could not be checked. Retry this same upload.", 503, input, true, true);
+    if (input.action === "complete") return uploadFailure("upload_not_ready", "The file has not arrived yet. Retry this same upload.", 409, input, true);
+    const signed = await bounded(storage.createSignedUploadUrl(receipt.storagePath, { upsert: false }));
+    if (signed.error || !signed.data || signed.data.path !== receipt.storagePath || !validServiceEvidenceSignedUploadUrl(signed.data.signedUrl, getSupabaseEnvStatus().supabaseUrl, receipt.storagePath)) return uploadFailure("signed_upload_unavailable", "A secure upload could not be prepared. Retry this same file.", 503, input, true, true);
+    return json({ ok: true, phase: "upload", ...uploadBinding(receipt), signedUrl: signed.data.signedUrl });
+  } catch { return uploadFailure("upload_unconfirmed", "This upload could not be confirmed. Reload the submission before retrying this same file.", 503, input, true, Boolean(input)); }
 }
 
 export async function DELETE(request: Request) {

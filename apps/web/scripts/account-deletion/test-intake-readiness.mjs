@@ -17,9 +17,10 @@ const repo = path.resolve(opts.get('--repo') || path.join(here,'../../../..'));
 const source = path.resolve(opts.get('--source-root') || repo);
 const intakePath = path.resolve(opts.get('--intake-sql') || path.join(source,'supabase/migrations/20260917200000_account_deletion_intake.sql'));
 const readinessPath = path.join(source,'supabase/migrations/20260917201000_release_readiness.sql');
-const manifestPath = path.join(source,'apps/web/scripts/release-readiness-manifest.json');
 const intakeSql = fs.readFileSync(intakePath,'utf8'), readinessSql = fs.readFileSync(readinessPath,'utf8');
-const manifest = JSON.parse(fs.readFileSync(manifestPath,'utf8'));
+const manifestText = readinessSql.match(/\$manifest\$([\s\S]*?)\$manifest\$/)?.[1];
+assert.ok(manifestText, 'Historical intake readiness manifest is required');
+const manifest = JSON.parse(manifestText);
 const sha = value => createHash('sha256').update(value).digest('hex');
 const normalize = value => value.replaceAll('\r\n','\n');
 assert.equal(manifest.releaseVersion,'2026-09-17.4'); assert.equal(manifest.checks.length,14);
@@ -35,7 +36,7 @@ const db = new PGlite(), results = [], previousFetch = globalThis.fetch;
 globalThis.fetch = async () => { throw new Error('Network is forbidden in this isolated readiness suite'); };
 const report = { scope:'Isolated actual PGlite catalog faults; no live database or PostgreSQL17 scheduling proof.', tests:results,
   canonicalSchemaHashes:canonicalHashes(),
-  sourceHashes:{ intake:sha(intakeSql),readiness:sha(readinessSql),manifest:sha(fs.readFileSync(manifestPath)),runner:sha(fs.readFileSync(fileURLToPath(import.meta.url))) } };
+  sourceHashes:{ intake:sha(intakeSql),readiness:sha(readinessSql),manifest:sha(manifestText),runner:sha(fs.readFileSync(fileURLToPath(import.meta.url))) } };
 const ident = value => { assert.match(value,/^[a-z_][a-z_0-9]*$/); return '"'+value+'"'; };
 const ready = async () => (await db.query('select public.qrguitar_release_readiness() result')).rows[0].result;
 function shape(value) {
@@ -206,7 +207,7 @@ try {
   });
   assert.equal(sha(fs.readFileSync(intakePath,'utf8')),report.sourceHashes.intake,'Intake changed during test');
   assert.equal(sha(fs.readFileSync(readinessPath,'utf8')),report.sourceHashes.readiness,'Readiness changed during test');
-  assert.equal(sha(fs.readFileSync(manifestPath)),report.sourceHashes.manifest,'Manifest changed during test');
+  assert.equal(sha(fs.readFileSync(readinessPath,'utf8').match(/\$manifest\$([\s\S]*?)\$manifest\$/)[1]),report.sourceHashes.manifest,'Historical manifest changed during test');
   assert.deepEqual(canonicalHashes(),report.canonicalSchemaHashes,'Canonical fixture sources changed during test');
   assert.equal(sha(fs.readFileSync(fileURLToPath(import.meta.url))),report.sourceHashes.runner,'Fault test source changed during test');
 } catch(error) { report.fatal={message:String(error.message),code:error.code};console.error('FATAL '+error.message); }

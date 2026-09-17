@@ -4,7 +4,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const read = (filePath) => readFile(path.join(root, filePath), "utf8");
+const sourceRoot = process.env.QRGUITAR_SOURCE_ROOT ? path.join(process.env.QRGUITAR_SOURCE_ROOT, "apps/web") : root;
+const read = (filePath) => readFile(path.join(root, filePath), "utf8").catch(error => {
+  if (error.code !== "ENOENT" || sourceRoot === root) throw error;
+  return readFile(path.join(sourceRoot, filePath), "utf8");
+});
 const ok = (value, message) => {
   if (!value) throw new Error(message);
 };
@@ -61,9 +65,11 @@ ok(submissions.includes("hashReviewToken(reviewToken)"), "Review token is not ha
 ok(submissions.includes("20"), "Submission rate limit missing");
 ok(submissions.includes("priorVersion") && submissions.includes("revisedToVersion"), "Revision audit history does not preserve the prior version");
 ok(evidence.includes('from("service-evidence")') && evidence.includes("createSignedUrl"), "Evidence is not served through short-lived signed URLs");
-ok(evidence.includes("SERVICE_EVIDENCE_MAX_BYTES") && workflow.includes("15 * 1024 * 1024"), "Evidence size limit missing");
+const evidenceProtocol = await read("lib/service-evidence-upload.ts");
+ok(evidence.includes("SERVICE_EVIDENCE_UPLOAD_MAX_BYTES") && evidenceProtocol.includes("15 * 1024 * 1024") && evidenceProtocol.includes("v.size > SERVICE_EVIDENCE_UPLOAD_MAX_BYTES"), "Direct evidence size limit missing");
+ok(evidenceProtocol.includes("16 * 1024") && evidence.includes("bytes > SERVICE_EVIDENCE_UPLOAD_CONTROL_BYTES") && !evidence.includes("request.formData()"), "Evidence upload control transport is not bounded");
 ok(evidence.includes("writeAllowed") && evidence.includes('submission.status === "changes_requested"'), "Evidence write-state guard missing");
-execFileSync(process.execPath, [path.join(root, "scripts/security/auxiliary-routes.test.mjs"), "--match", "evidence signed-out"], { stdio: "inherit" });
+execFileSync(process.execPath, [path.join(root, "scripts/security/auxiliary-routes.test.mjs"), "--repo", path.resolve(sourceRoot, "../.."), "--overlay", path.resolve(root, "../.."), "--match", "evidence signed-out"], { stdio: "inherit" });
 
 ok(serviceEvents.includes('source_kind: "owner_reported"'), "Owner service provenance missing");
 ok(serviceEvents.includes('source_kind === "provider_submitted_owner_approved"'), "Approved provider history protection missing");

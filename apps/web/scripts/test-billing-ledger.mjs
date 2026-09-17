@@ -16,7 +16,7 @@ process.on('uncaughtException',error=>{console.error({message:error.message,code
 const {installRepositorySchema}=await import(pathToFileURL(path.join(repo,'apps/web/scripts/security/postgres-fixture.mjs')));
 const db=new PGlite();await installRepositorySchema(db,repo,overlay?'20260917190000':undefined);
 // The common fixture scaffolds Storage minimally; real Storage also has this metadata column.
-await db.exec("alter table storage.objects add column metadata jsonb not null default '{}'::jsonb");
+await db.exec("alter table storage.objects add column if not exists metadata jsonb; alter table storage.objects alter column metadata set default '{}'::jsonb, alter column metadata set not null");
 if(overlay)await db.exec(billingSql);
 const actor='10000000-0000-4000-8000-000000000001',other='20000000-0000-4000-8000-000000000002',admin='30000000-0000-4000-8000-000000000003';
 await db.query('insert into auth.users(id) values($1),($2),($3)',[actor,other,admin]);

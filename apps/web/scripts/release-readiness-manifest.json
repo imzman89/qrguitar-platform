@@ -1,5 +1,5 @@
 {
-  "releaseVersion": "2026-09-17.4",
+  "releaseVersion": "2026-09-17.5",
   "checks": [
     "catalog_readable",
     "required_functions",
@@ -50,7 +50,9 @@
     "public.cancel_account_deletion_request(uuid,uuid,uuid,bigint)",
     "public.read_account_deletion_queue(uuid,boolean,timestamp with time zone,uuid,integer)",
     "public.read_account_deletion_requests(uuid,uuid)",
-    "public.submit_account_deletion_request(uuid,uuid,bigint)"
+    "public.submit_account_deletion_request(uuid,uuid,bigint)",
+    "public.commit_service_evidence_upload(uuid,uuid,boolean,uuid)",
+    "public.prepare_service_evidence_upload(uuid,uuid,boolean,uuid,jsonb)"
   ],
   "blockedFunctions": [
     "public.create_instrument_profile_unregistered(uuid,text,text,jsonb,boolean,text)",
@@ -77,7 +79,12 @@
     "public._account_deletion_intake_guard()",
     "public._account_deletion_lock_actor(uuid)",
     "public._account_deletion_receipt_json(account_deletion_request_receipts)",
-    "public._account_deletion_request_json(account_deletion_requests)"
+    "public._account_deletion_request_json(account_deletion_requests)",
+    "public._service_evidence_upload_authority(service_submissions,uuid,boolean)",
+    "public._service_evidence_upload_bucket()",
+    "public._service_evidence_upload_deleted()",
+    "public._service_evidence_upload_guard()",
+    "public._service_evidence_upload_json(service_evidence_uploads)"
   ],
   "fingerprints": [
     {
@@ -784,6 +791,83 @@
       "signature": "public.submit_account_deletion_request(uuid,uuid,bigint)",
       "source_hash": "bb89bbeccdcb6a100d6b471d1ac56141c9cc904aa36dad403f7e8d381c16af3b",
       "arguments": "p_actor_id uuid, p_operation_id uuid, p_expected_revision bigint",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._service_evidence_upload_authority(service_submissions,uuid,boolean)",
+      "source_hash": "05feb9cff502672a2f8ab19b5160add8c9bf596f9c86916e9fc038b7680eda8d",
+      "arguments": "p_submission service_submissions, p_actor_id uuid, p_is_admin boolean",
+      "result": "void",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._service_evidence_upload_bucket()",
+      "source_hash": "7c978bcf4b724811cbf551bcdc4c24f8b47689d0d52c084028749dbd773927b6",
+      "arguments": "",
+      "result": "void",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._service_evidence_upload_deleted()",
+      "source_hash": "ecc38252ae8293ba4460ed5a272fe5e580272b7b64df07e1bca6854a6b8af37b",
+      "arguments": "",
+      "result": "trigger",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._service_evidence_upload_guard()",
+      "source_hash": "dfb760ef2b7c34e9adf355fe4ed16f0ac05f953b3c9a1e6d58ed86fa955585aa",
+      "arguments": "",
+      "result": "trigger",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._service_evidence_upload_json(service_evidence_uploads)",
+      "source_hash": "7e7c806b789cbeca256177a5ca8eaa2b8de0ef85c6f49c9aee14833b576f2a72",
+      "arguments": "p_upload service_evidence_uploads",
+      "result": "jsonb",
+      "definer": false,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.commit_service_evidence_upload(uuid,uuid,boolean,uuid)",
+      "source_hash": "cddf9aed8634e943119f93190de1443779206f8c78bf1fcd9d5948e842a37979",
+      "arguments": "p_submission_id uuid, p_actor_id uuid, p_is_admin boolean, p_upload_id uuid",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.prepare_service_evidence_upload(uuid,uuid,boolean,uuid,jsonb)",
+      "source_hash": "ac879ad5f5865c4a94d2f07ecbd3c58a3c0cb4563fe352c5c6ce856dce05a7af",
+      "arguments": "p_submission_id uuid, p_actor_id uuid, p_is_admin boolean, p_upload_id uuid, p_evidence jsonb",
       "result": "jsonb",
       "definer": true,
       "volatility": "v",
@@ -1612,6 +1696,90 @@
       "name": "cancelled_at",
       "type": "timestamp with time zone",
       "not_null": false
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "upload_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "submission_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "actor_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "evidence_type",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "file_name",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "mime_type",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "file_size_bytes",
+      "type": "bigint",
+      "not_null": true
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "storage_path",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "state",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "evidence_id",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "evidence_result",
+      "type": "jsonb",
+      "not_null": false
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "prepared_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "committed_at",
+      "type": "timestamp with time zone",
+      "not_null": false
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "deleted_at",
+      "type": "timestamp with time zone",
+      "not_null": false
     }
   ],
   "provenanceTriggers": [
@@ -1694,6 +1862,16 @@
       "account_deletion_requests",
       "account_deletion_requests_intake_only",
       "CREATE TRIGGER account_deletion_requests_intake_only BEFORE DELETE OR UPDATE ON public.account_deletion_requests FOR EACH ROW EXECUTE FUNCTION _account_deletion_intake_guard()"
+    ],
+    [
+      "service_evidence_uploads",
+      "service_evidence_upload_identity",
+      "CREATE TRIGGER service_evidence_upload_identity BEFORE UPDATE ON public.service_evidence_uploads FOR EACH ROW EXECUTE FUNCTION _service_evidence_upload_guard()"
+    ],
+    [
+      "service_submission_evidence",
+      "service_evidence_upload_tombstone",
+      "CREATE TRIGGER service_evidence_upload_tombstone AFTER DELETE ON public.service_submission_evidence FOR EACH ROW EXECUTE FUNCTION _service_evidence_upload_deleted()"
     ]
   ],
   "rpcOnlyTables": [
@@ -2456,6 +2634,208 @@
     {
       "table": "account_deletion_requests",
       "name": "account_deletion_requests_no_direct_access"
+    }
+  ],
+  "serviceEvidenceTables": [
+    "service_evidence_uploads"
+  ],
+  "serviceEvidenceFunctionSignatures": [
+    "public._service_evidence_upload_authority(service_submissions,uuid,boolean)",
+    "public._service_evidence_upload_bucket()",
+    "public._service_evidence_upload_deleted()",
+    "public._service_evidence_upload_guard()",
+    "public._service_evidence_upload_json(service_evidence_uploads)",
+    "public.commit_service_evidence_upload(uuid,uuid,boolean,uuid)",
+    "public.prepare_service_evidence_upload(uuid,uuid,boolean,uuid,jsonb)"
+  ],
+  "serviceEvidenceSourceSha256": "a24e44c5d96f50caf678eb3f7ff16f6e45ef9b27ae4551e7db3c0351549fe943",
+  "serviceEvidenceBucket": {
+    "id": "service-evidence",
+    "public": false,
+    "fileSizeLimit": 15728640,
+    "allowedMimeTypes": [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/webp"
+    ]
+  },
+  "serviceEvidenceDefaults": [
+    {
+      "table": "service_evidence_uploads",
+      "name": "upload_id",
+      "expression": null
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "submission_id",
+      "expression": null
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "actor_id",
+      "expression": null
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "evidence_type",
+      "expression": null
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "file_name",
+      "expression": null
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "mime_type",
+      "expression": null
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "file_size_bytes",
+      "expression": null
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "storage_path",
+      "expression": null
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "state",
+      "expression": "'prepared'::text"
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "evidence_id",
+      "expression": null
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "evidence_result",
+      "expression": null
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "prepared_at",
+      "expression": "clock_timestamp()"
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "committed_at",
+      "expression": null
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "deleted_at",
+      "expression": null
+    }
+  ],
+  "serviceEvidenceConstraints": [
+    {
+      "table": "service_evidence_uploads",
+      "name": "service_evidence_uploads_actor_id_fkey",
+      "definition": "FOREIGN KEY (actor_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "type": "f"
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "service_evidence_uploads_check",
+      "definition": "CHECK ((storage_path = ((((((submission_id)::text || '/'::text) || (actor_id)::text) || '/direct/'::text) || (upload_id)::text) ||\nCASE mime_type\n    WHEN 'image/jpeg'::text THEN '.jpg'::text\n    WHEN 'image/png'::text THEN '.png'::text\n    WHEN 'image/webp'::text THEN '.webp'::text\n    ELSE '.pdf'::text\nEND)))",
+      "type": "c"
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "service_evidence_uploads_check1",
+      "definition": "CHECK ((((state = 'prepared'::text) AND (evidence_id IS NULL) AND (evidence_result IS NULL) AND (committed_at IS NULL) AND (deleted_at IS NULL)) OR ((state = ANY (ARRAY['committed'::text, 'deleted'::text])) AND (evidence_id IS NOT NULL) AND (jsonb_typeof(evidence_result) = 'object'::text) AND ((evidence_result ->> 'id'::text) IS NOT NULL) AND ((evidence_result ->> 'id'::text) = (evidence_id)::text) AND (committed_at IS NOT NULL) AND (committed_at >= prepared_at) AND (((state = 'committed'::text) AND (deleted_at IS NULL)) OR ((state = 'deleted'::text) AND (deleted_at IS NOT NULL) AND (deleted_at >= committed_at))))))",
+      "type": "c"
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "service_evidence_uploads_evidence_id_key",
+      "definition": "UNIQUE (evidence_id)",
+      "type": "u"
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "service_evidence_uploads_evidence_type_check",
+      "definition": "CHECK ((evidence_type = ANY (ARRAY['invoice'::text, 'work_order'::text, 'service_slip'::text, 'before_photo'::text, 'after_photo'::text, 'measurement_sheet'::text, 'receipt'::text, 'other'::text])))",
+      "type": "c"
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "service_evidence_uploads_file_name_check",
+      "definition": "CHECK ((((char_length(file_name) >= 1) AND (char_length(file_name) <= 120)) AND (file_name ~ '^[A-Za-z0-9_][A-Za-z0-9._-]*$'::text)))",
+      "type": "c"
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "service_evidence_uploads_file_size_bytes_check",
+      "definition": "CHECK (((file_size_bytes >= 1) AND (file_size_bytes <= 15728640)))",
+      "type": "c"
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "service_evidence_uploads_mime_type_check",
+      "definition": "CHECK ((mime_type = ANY (ARRAY['image/jpeg'::text, 'image/png'::text, 'image/webp'::text, 'application/pdf'::text])))",
+      "type": "c"
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "service_evidence_uploads_pkey",
+      "definition": "PRIMARY KEY (upload_id)",
+      "type": "p"
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "service_evidence_uploads_state_check",
+      "definition": "CHECK ((state = ANY (ARRAY['prepared'::text, 'committed'::text, 'deleted'::text])))",
+      "type": "c"
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "service_evidence_uploads_storage_path_key",
+      "definition": "UNIQUE (storage_path)",
+      "type": "u"
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "service_evidence_uploads_submission_id_fkey",
+      "definition": "FOREIGN KEY (submission_id) REFERENCES service_submissions(id) ON DELETE CASCADE",
+      "type": "f"
+    }
+  ],
+  "serviceEvidenceIndexes": [
+    {
+      "table": "service_evidence_uploads",
+      "name": "service_evidence_uploads_evidence_id_key",
+      "definition": "CREATE UNIQUE INDEX service_evidence_uploads_evidence_id_key ON public.service_evidence_uploads USING btree (evidence_id)",
+      "unique": true
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "service_evidence_uploads_pkey",
+      "definition": "CREATE UNIQUE INDEX service_evidence_uploads_pkey ON public.service_evidence_uploads USING btree (upload_id)",
+      "unique": true
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "service_evidence_uploads_storage_path_key",
+      "definition": "CREATE UNIQUE INDEX service_evidence_uploads_storage_path_key ON public.service_evidence_uploads USING btree (storage_path)",
+      "unique": true
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "service_evidence_uploads_submission_actor",
+      "definition": "CREATE INDEX service_evidence_uploads_submission_actor ON public.service_evidence_uploads USING btree (submission_id, actor_id, prepared_at)",
+      "unique": false
+    }
+  ],
+  "serviceEvidencePolicies": [
+    {
+      "table": "service_evidence_uploads",
+      "name": "service_evidence_uploads_no_direct_access"
     }
   ]
 }

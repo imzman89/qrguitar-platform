@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import { clearQrGuitarSessionState, createBrowserSupabaseClient, readSessionStorage, removeSessionStorage, sessionExpiredMessageKey } from "../../lib/supabase-browser";
@@ -12,12 +12,25 @@ import { useSiteContent } from "../../lib/use-site-content";
 import { safeAuthRedirect } from "../../lib/auth-redirect";
 
 type LoginMode = "login" | "register" | "reset";
+type AuthOperation = { epoch: number; actor: string; revision: number };
+
+async function readAuthSession(client: ReturnType<typeof createBrowserSupabaseClient>) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([client.auth.getSession(), new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("Sign-in check timed out. Please try again.")), 10000);
+    })]);
+  } finally { if (timer) clearTimeout(timer); }
+}
 
 export default function LoginPage() {
   const content = useSiteContent();
   const sessionExpiredCopy = getContentValue(content, "login.sessionExpired");
   const router = useRouter();
-  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const client = useRef<ReturnType<typeof createBrowserSupabaseClient> | null>(null);
+  const lifetime = useRef({ active: false, epoch: 0, actor: "", revision: 0, known: false, operationRevision: 0 });
+  const pending = useRef<AuthOperation | null>(null);
+  const initialized = useRef(false);
   const [mode, setMode] = useState<LoginMode>("login");
   const [safeNext, setSafeNext] = useState("/dashboard");
   const [name, setName] = useState("");
@@ -27,7 +40,44 @@ export default function LoginPage() {
   const [isWorking, setIsWorking] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
 
+  const applyIdentity = useCallback((actor: string) => {
+    const life = lifetime.current;
+    if (!life.active) return;
+    if (actor !== life.actor) {
+      life.revision++;
+      setName(""); setEmail(""); setPassword(""); setStatus("");
+    }
+    life.known = true; life.actor = actor;
+    setIsSignedIn(Boolean(actor));
+  }, []);
+  function current(operation: AuthOperation) {
+    const life = lifetime.current;
+    return life.active && life.epoch === operation.epoch && pending.current === operation;
+  }
+  function sameActor(operation: AuthOperation) {
+    const life = lifetime.current;
+    return current(operation) && life.actor === operation.actor && life.revision === operation.revision;
+  }
+  function signedInBy(operation: AuthOperation, actor: string) {
+    const life = lifetime.current;
+    return current(operation) && Boolean(actor) && (sameActor(operation)
+      || (!operation.actor && life.actor === actor && life.revision === operation.revision + 1));
+  }
+  function signedOutBy(operation: AuthOperation) {
+    const life = lifetime.current;
+    return sameActor(operation) || (current(operation) && !life.actor && life.revision === operation.revision + 1);
+  }
+  async function mutation<T>(operation: AuthOperation, run: () => Promise<T>) {
+    // Auth mutations cannot be cancelled. Keep the operation lock until settlement.
+    const timer = window.setTimeout(() => {
+      if (sameActor(operation) || (operation.actor && signedOutBy(operation))) setStatus("This request is still pending. Its outcome is not confirmed; please wait before trying again.");
+    }, 20000);
+    try { return await run(); } finally { window.clearTimeout(timer); }
+  }
+
   useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
     const params = new URLSearchParams(window.location.search);
     const nextPath = safeAuthRedirect(params.get("next"));
     setSafeNext(nextPath);
@@ -38,23 +88,41 @@ export default function LoginPage() {
       removeSessionStorage(sessionExpiredMessageKey);
     }
 
-    supabase.auth.getSession().then(({ data }) => {
-      const signedIn = Boolean(data.session?.user);
-      setIsSignedIn(signedIn);
-      if (signedIn && nextPath !== "/login") {
-        router.replace(nextPath);
-      }
-    });
+  }, [sessionExpiredCopy]);
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsSignedIn(Boolean(session?.user));
-      window.dispatchEvent(new CustomEvent("qrguitar:auth"));
-    });
-
-    return () => listener.subscription.unsubscribe();
-  }, [router, sessionExpiredCopy, supabase]);
+  useEffect(() => {
+    const life = lifetime.current;
+    life.active = true; const epoch = ++life.epoch;
+    const operationRevision = life.operationRevision;
+    let eventRevision = 0, unsubscribe: (() => void) | undefined;
+    const active = () => life.active && life.epoch === epoch;
+    try {
+      const supabase = createBrowserSupabaseClient(); client.current = supabase;
+      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (!active()) return;
+        eventRevision++;
+        const initial = !life.known;
+        applyIdentity(session?.user.id || "");
+        window.dispatchEvent(new CustomEvent("qrguitar:auth"));
+        if (initial && session?.user.id && !pending.current) router.replace(safeAuthRedirect(new URLSearchParams(window.location.search).get("next")));
+      });
+      unsubscribe = () => data.subscription.unsubscribe();
+      const initialRevision = eventRevision;
+      // A synchronous subscription event also outranks the initial read.
+      const hadEvent = eventRevision !== 0;
+      void readAuthSession(supabase).then(({ data: initial, error }) => {
+        if (!active() || hadEvent || eventRevision !== initialRevision || life.operationRevision !== operationRevision) return;
+        if (error) { setStatus("Your sign-in could not be checked. You can try signing in again."); return; }
+        const actor = initial.session?.user.id || "";
+        applyIdentity(actor);
+        if (actor) router.replace(safeAuthRedirect(new URLSearchParams(window.location.search).get("next")));
+      }).catch(() => { if (active() && !hadEvent && eventRevision === initialRevision && life.operationRevision === operationRevision) setStatus("Your sign-in could not be checked. You can try signing in again."); });
+    } catch { client.current = null; setStatus("Sign-in is temporarily unavailable. Please reload and try again."); }
+    return () => { life.active = false; life.epoch++; client.current = null; unsubscribe?.(); };
+  }, [router, applyIdentity]);
 
   function switchMode(nextMode: LoginMode) {
+    if (pending.current) return;
     setMode(nextMode);
     setStatus("");
     setPassword("");
@@ -64,114 +132,93 @@ export default function LoginPage() {
   }
 
   async function submitAccountAction() {
-    if (isWorking) return;
-    try {
-      if (mode === "register") await register();
-      else if (mode === "reset") await sendPasswordReset();
-      else await login();
-    } catch {
-      setStatus("We couldn't connect. Check your connection and try again.");
-    } finally {
-      setIsWorking(false);
-    }
-  }
-
-  async function register() {
-    if (!name.trim() || !email.trim() || !password.trim()) {
+    const supabase = client.current, life = lifetime.current;
+    if (!life.active || pending.current) return;
+    if (!supabase) { setStatus("Sign-in is temporarily unavailable. Please reload and try again."); return; }
+    if (mode === "register" && (!name.trim() || !email.trim() || !password.trim())) {
       setStatus("Name, email, and password are required.");
       return;
     }
-
-    if (password.length < 8) {
+    if (mode === "register" && password.length < 8) {
       setStatus("Use at least 8 characters for your password.");
       return;
     }
-
-    setIsWorking(true);
-    setStatus("");
-
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        data: {
-          display_name: name.trim()
-        },
-        emailRedirectTo: `${window.location.origin}${safeNext}`
-      }
-    });
-
-    setIsWorking(false);
-
-    if (error) {
-      setStatus(cleanAuthError(error.message));
-      return;
-    }
-
-    if (data.session) {
-      removeSessionStorage(sessionExpiredMessageKey);
-      router.replace(safeNext);
-      return;
-    }
-
-    setStatus("Account created. Check your email to confirm it, then sign in.");
-  }
-
-  async function login() {
-    if (!email.trim() || !password.trim()) {
+    if (mode === "login" && (!email.trim() || !password.trim())) {
       setStatus("Email and password are required.");
       return;
     }
-
-    setIsWorking(true);
-    setStatus("");
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password
-    });
-
-    setIsWorking(false);
-
-    if (error) {
-      setStatus(cleanAuthError(error.message));
-      return;
-    }
-
-    removeSessionStorage(sessionExpiredMessageKey);
-    router.replace(safeNext);
-  }
-
-  async function sendPasswordReset() {
     if (!email.trim()) {
       setStatus("Enter your email first.");
       return;
     }
-
-    setIsWorking(true);
-    setStatus("");
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/reset-password?next=${encodeURIComponent(safeNext)}`
-    });
-
-    setIsWorking(false);
-
-    if (error) {
-      setStatus(cleanAuthError(error.message));
-      return;
+    const operation = { epoch: life.epoch, actor: life.actor, revision: life.revision };
+    life.operationRevision++;
+    pending.current = operation; setIsWorking(true); setStatus("");
+    let signedInActor = "";
+    try {
+      const before = await readAuthSession(supabase);
+      if (!sameActor(operation)) return;
+      if (before.error) throw before.error;
+      const beforeActor = before.data.session?.user.id || "";
+      if (beforeActor !== operation.actor) { applyIdentity(beforeActor); return; }
+      if (mode === "reset") {
+        const { error } = await mutation(operation, () => supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: `${window.location.origin}/reset-password?next=${encodeURIComponent(safeNext)}`
+        }));
+        if (sameActor(operation)) setStatus(error ? cleanAuthError(error.message) : "Password reset email sent. Check your inbox, then follow the secure reset link.");
+        return;
+      }
+      const { data, error } = await mutation(operation, () => mode === "register"
+        ? supabase.auth.signUp({ email: email.trim(), password, options: { data: { display_name: name.trim() }, emailRedirectTo: `${window.location.origin}${safeNext}` } })
+        : supabase.auth.signInWithPassword({ email: email.trim(), password }));
+      if (error) { if (sameActor(operation)) setStatus(cleanAuthError(error.message)); return; }
+      if (mode === "register" && !data.session) {
+        if (sameActor(operation)) setStatus("Account created. Check your email to confirm it, then sign in.");
+        return;
+      }
+      const actor = data.session?.user.id || "";
+      if (!signedInBy(operation, actor)) {
+        if (sameActor(operation)) setStatus("Sign-in could not be confirmed. Please check your account and try again.");
+        return;
+      }
+      signedInActor = actor;
+      const after = await readAuthSession(supabase);
+      if (!signedInBy(operation, actor)) return;
+      if (after.error) throw after.error;
+      if (after.data.session?.user.id !== actor) { applyIdentity(after.data.session?.user.id || ""); return; }
+      applyIdentity(actor);
+      removeSessionStorage(sessionExpiredMessageKey); router.replace(safeNext);
+    } catch {
+      if (sameActor(operation) || (signedInActor && signedInBy(operation, signedInActor))) setStatus("The request could not be confirmed. Check your connection and account status before trying again.");
+    } finally {
+      if (pending.current === operation) { pending.current = null; if (life.active) setIsWorking(false); }
     }
-
-    setStatus("Password reset email sent. Check your inbox, then follow the secure reset link.");
   }
 
   async function logout() {
-    setIsWorking(true);
-    await supabase.auth.signOut();
-    clearQrGuitarSessionState();
-    setIsWorking(false);
-    setIsSignedIn(false);
-    setStatus("Signed out.");
+    const supabase = client.current, life = lifetime.current;
+    if (!life.active || !life.actor || !supabase || pending.current) return;
+    const operation = { epoch: life.epoch, actor: life.actor, revision: life.revision };
+    life.operationRevision++;
+    pending.current = operation; setIsWorking(true); setStatus("");
+    try {
+      const before = await readAuthSession(supabase);
+      if (!sameActor(operation)) return;
+      if (before.error) throw before.error;
+      if (before.data.session?.user.id !== operation.actor) { applyIdentity(before.data.session?.user.id || ""); return; }
+      const { error } = await mutation(operation, () => supabase.auth.signOut());
+      if (error) throw error;
+      if (!signedOutBy(operation)) return;
+      clearQrGuitarSessionState(); applyIdentity(""); setStatus("Signed out.");
+    } catch {
+      if (sameActor(operation)) setStatus("Could not sign out. Please try again.");
+      else if (signedOutBy(operation) && !life.actor) {
+        clearQrGuitarSessionState();
+        setStatus("You are signed out on this device. Sign-out on other devices could not be confirmed.");
+      }
+    } finally {
+      if (pending.current === operation) { pending.current = null; if (life.active) setIsWorking(false); }
+    }
   }
 
   return (
@@ -211,10 +258,10 @@ export default function LoginPage() {
               <>
                 {mode !== "reset" ? (
                   <div className="auth-mode-switch" role="tablist" aria-label="Account access">
-                    <button className={mode === "login" ? "active" : ""} type="button" role="tab" aria-selected={mode === "login"} onClick={() => switchMode("login")}>
+                    <button className={mode === "login" ? "active" : ""} type="button" role="tab" aria-selected={mode === "login"} disabled={isWorking} onClick={() => switchMode("login")}>
                       Sign in
                     </button>
-                    <button className={mode === "register" ? "active" : ""} type="button" role="tab" aria-selected={mode === "register"} onClick={() => switchMode("register")}>
+                    <button className={mode === "register" ? "active" : ""} type="button" role="tab" aria-selected={mode === "register"} disabled={isWorking} onClick={() => switchMode("register")}>
                       Create account
                     </button>
                   </div>
@@ -266,12 +313,12 @@ export default function LoginPage() {
                 </form>
                 <div className="auth-card-link-row">
                   {mode === "login" ? (
-                    <button className="link-button" type="button" onClick={() => switchMode("reset")}>
+                    <button className="link-button" type="button" disabled={isWorking} onClick={() => switchMode("reset")}>
                       {getContentValue(content, "login.actions.forgot")}
                     </button>
                   ) : null}
                   {mode === "reset" ? (
-                    <button className="link-button" type="button" onClick={() => switchMode("login")}>Back to sign in</button>
+                    <button className="link-button" type="button" disabled={isWorking} onClick={() => switchMode("login")}>Back to sign in</button>
                   ) : null}
                 </div>
               </>

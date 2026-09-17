@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import { createBrowserSupabaseClient } from "../../lib/supabase-browser";
@@ -11,10 +11,22 @@ import { useSiteContent } from "../../lib/use-site-content";
 
 import { safeAuthRedirect } from "../../lib/auth-redirect";
 
+async function readAuthSession(client: ReturnType<typeof createBrowserSupabaseClient>) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([client.auth.getSession(), new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("Sign-in check timed out. Please try again.")), 10000);
+    })]);
+  } finally { if (timer) clearTimeout(timer); }
+}
+
 export default function ResetPasswordPage() {
   const content = useSiteContent();
   const router = useRouter();
-  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const client = useRef<ReturnType<typeof createBrowserSupabaseClient> | null>(null);
+  const lifetime = useRef({ active: false, epoch: 0, actor: "", revision: 0, known: false, readFailed: false });
+  const pending = useRef<symbol | null>(null);
+  const redirectTimer = useRef<number | undefined>(undefined);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [status, setStatus] = useState("");
@@ -24,8 +36,28 @@ export default function ResetPasswordPage() {
   const [hasRecoveryLink, setHasRecoveryLink] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [safeNext, setSafeNext] = useState("/dashboard");
+  const [authError, setAuthError] = useState(false);
+  const [authAttempt, setAuthAttempt] = useState(0);
+
+  const applyIdentity = useCallback((actor: string) => {
+    const life = lifetime.current;
+    if (!life.active) return;
+    if (actor !== life.actor) {
+      life.revision++;
+      setPassword(""); setConfirmPassword(""); setStatus(""); setIsComplete(false);
+      window.clearTimeout(redirectTimer.current); redirectTimer.current = undefined;
+    }
+    life.known = true; life.actor = actor;
+    if (life.readFailed) { life.readFailed = false; setStatus(""); }
+    setHasSession(Boolean(actor)); setAuthChecked(true); setAuthError(false);
+  }, []);
 
   useEffect(() => {
+    const life = lifetime.current;
+    life.active = true; const epoch = ++life.epoch;
+    let eventRevision = 0, unsubscribe: (() => void) | undefined;
+    const active = () => life.active && life.epoch === epoch;
+    setAuthChecked(false); setAuthError(false);
     const params = new URLSearchParams(window.location.search);
     setSafeNext(safeAuthRedirect(params.get("next")));
     setHasRecoveryLink(
@@ -35,26 +67,36 @@ export default function ResetPasswordPage() {
       || window.location.hash.includes("access_token")
     );
 
-    supabase.auth.getSession().then(({ data, error }) => {
-      const ready = Boolean(data.session?.user);
-      setHasSession(ready);
-      setAuthChecked(true);
-      setStatus(error ? cleanAuthError(error.message) : "");
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      const ready = Boolean(session?.user);
-      setHasSession(ready);
-      if (ready) {
-        setStatus("");
-      }
-    });
-
-    return () => listener.subscription.unsubscribe();
-  }, [supabase]);
+    function failRead() {
+      if (!active()) return;
+      life.readFailed = true;
+      setAuthChecked(true); setAuthError(true); setHasSession(false);
+      setStatus("Your sign-in could not be checked. Please try again.");
+    }
+    try {
+      const supabase = createBrowserSupabaseClient(); client.current = supabase;
+      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (!active()) return;
+        eventRevision++;
+        applyIdentity(session?.user.id || "");
+      });
+      unsubscribe = () => data.subscription.unsubscribe();
+      const initialRevision = eventRevision, hadEvent = eventRevision !== 0;
+      void readAuthSession(supabase).then(({ data: initial, error }) => {
+        if (!active() || hadEvent || eventRevision !== initialRevision) return;
+        if (error) failRead(); else applyIdentity(initial.session?.user.id || "");
+      }).catch(() => { if (!hadEvent && eventRevision === initialRevision) failRead(); });
+    } catch { client.current = null; failRead(); }
+    return () => {
+      life.active = false; life.epoch++; client.current = null; unsubscribe?.();
+      window.clearTimeout(redirectTimer.current); redirectTimer.current = undefined;
+    };
+  }, [authAttempt, applyIdentity]);
 
   async function savePassword() {
-    if (!hasSession) {
+    const supabase = client.current, life = lifetime.current;
+    if (!life.active || pending.current) return;
+    if (!hasSession || !life.actor || !supabase || authError) {
       setStatus("Open the password reset link from your email to continue.");
       return;
     }
@@ -69,18 +111,39 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    setIsWorking(true);
-    setStatus("");
-    const { error } = await supabase.auth.updateUser({ password });
-    setIsWorking(false);
-
-    if (error) {
-      setStatus(cleanAuthError(error.message));
-      return;
+    const operation = Symbol("password-update"), actor = life.actor, revision = life.revision, epoch = life.epoch;
+    const current = () => life.active && life.epoch === epoch && life.actor === actor && life.revision === revision;
+    pending.current = operation; setIsWorking(true); setStatus("");
+    let timer: number | undefined, dispatched = false;
+    try {
+      const before = await readAuthSession(supabase);
+      if (!current()) return;
+      if (before.error) throw before.error;
+      if (before.data.session?.user.id !== actor) { applyIdentity(before.data.session?.user.id || ""); return; }
+      // The SDK cannot cancel this mutation. Do not permit overlapping retries.
+      timer = window.setTimeout(() => {
+        if (current()) setStatus("The password update is still pending. It may already have been saved; please wait before trying again.");
+      }, 20000);
+      dispatched = true;
+      const { data, error } = await supabase.auth.updateUser({ password });
+      window.clearTimeout(timer); timer = undefined;
+      if (!current()) return;
+      if (error) { setStatus(cleanAuthError(error.message)); return; }
+      if (data.user?.id !== actor) throw new Error("Unconfirmed password update");
+      const after = await readAuthSession(supabase);
+      if (!current()) return;
+      if (after.error) throw after.error;
+      if (after.data.session?.user.id !== actor) { applyIdentity(after.data.session?.user.id || ""); return; }
+      setPassword(""); setConfirmPassword(""); setIsComplete(true);
+      redirectTimer.current = window.setTimeout(() => { if (current()) router.replace(safeNext); }, 900);
+    } catch {
+      if (current()) setStatus(dispatched
+        ? "The password update could not be confirmed. It may already have been saved. Check your connection, then retry or request a fresh reset link."
+        : "Your sign-in could not be checked. Check your connection and try again.");
+    } finally {
+      window.clearTimeout(timer);
+      if (pending.current === operation) { pending.current = null; if (life.active) setIsWorking(false); }
     }
-
-    setIsComplete(true);
-    window.setTimeout(() => router.replace(safeNext), 900);
   }
 
   return (
@@ -100,6 +163,8 @@ export default function ResetPasswordPage() {
               <strong>
                 {!authChecked
                   ? "Checking reset link."
+                  : authError
+                    ? "Sign-in check unavailable."
                   : isComplete
                     ? "Password updated."
                     : hasSession
@@ -112,25 +177,27 @@ export default function ResetPasswordPage() {
 
             {!authChecked ? <p className="form-message">Validating your secure link.</p> : null}
 
-            {authChecked && isComplete ? (
+            {authChecked && authError ? <div><p className="form-message error-message" role="alert">{status}</p><button className="button" type="button" disabled={isWorking} onClick={() => setAuthAttempt(value => value + 1)}>Try again</button></div> : null}
+
+            {authChecked && !authError && isComplete ? (
               <>
                 <p className="form-message">Your new password is saved. Taking you back to QRguitar.</p>
                 <Link className="button" href={safeNext}>Continue</Link>
               </>
             ) : null}
 
-            {authChecked && !isComplete && !hasSession ? (
+            {authChecked && !authError && !isComplete && !hasSession ? (
               <>
                 <p className="form-message">
                   {hasRecoveryLink
                     ? "This reset link is no longer valid. Request a fresh password reset email."
                     : "Open the password reset link from your email to continue."}
                 </p>
-                <Link className="button" href="/login">Back to sign in</Link>
+                <Link className="button" href={`/login?mode=reset&next=${encodeURIComponent(safeNext)}`}>Request a new reset link</Link>
               </>
             ) : null}
 
-            {authChecked && !isComplete && hasSession ? (
+            {authChecked && !authError && !isComplete && hasSession ? (
               <>
                 <div className="field">
                   <label htmlFor="password">New password</label>
@@ -160,12 +227,12 @@ export default function ResetPasswordPage() {
                   <button className="button" type="button" onClick={savePassword} disabled={isWorking}>
                     {isWorking ? "Saving..." : "Save new password"}
                   </button>
-                  <Link className="button secondary" href="/login">Back to sign in</Link>
+                  <Link className="button secondary" href={`/login?next=${encodeURIComponent(safeNext)}`}>Back to sign in</Link>
                 </div>
               </>
             ) : null}
 
-            {status && (!authChecked || hasSession) ? <p className="form-message error-message">{status}</p> : null}
+            {status && !authError && (!authChecked || hasSession) ? <p className="form-message error-message" role="status">{status}</p> : null}
           </section>
         </div>
       </main>
