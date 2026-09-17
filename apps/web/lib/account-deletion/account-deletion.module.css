@@ -1,0 +1,44 @@
+.section { padding: 28px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); color: var(--text); min-width: 0; }
+.header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.icon { display: grid; place-items: center; width: 46px; height: 46px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); color: var(--gold); flex-shrink: 0; }
+.eyebrow { color: var(--gold) !important; font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 6px; }
+.section h2 { margin: 0; font-size: clamp(1.35rem, 3vw, 1.7rem); letter-spacing: -.03em; line-height: 1.2; }
+.section h3 { margin: 0 0 12px; font-size: 1.02rem; letter-spacing: -.015em; }
+.section p { font-size: .9rem; line-height: 1.7; }
+.intro { margin: 0 0 12px; }
+.explanation, .muted { color: var(--muted); }
+.explanation { margin: 0 0 24px; }
+.notice, .request, .confirmation, .pending { border: 1px solid var(--line); border-radius: 12px; padding: 22px; background: var(--panel-2); margin: 20px 0; }
+.notice p, .request p, .confirmation p, .pending p { color: var(--muted); margin: 0 0 16px; }
+.notice p a { color: var(--gold); text-decoration: underline; text-underline-offset: 3px; }
+.pending, .confirmation { border-color: var(--gold); }
+.requestHeading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+.requestHeading h3 { margin: 0; }
+.requested, .cancelled { display: inline-flex; font-size: .7rem; font-weight: 750; border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; }
+.requested { color: var(--gold); border-color: var(--gold); }
+.cancelled { color: var(--muted); }
+.request dl { display: grid; gap: 14px; margin: 20px 0 0; border-top: 1px solid var(--line); padding-top: 16px; }
+.request dl > div { display: grid; grid-template-columns: 125px minmax(0, 1fr); align-items: baseline; gap: 14px; }
+.request dt { font-size: .75rem; color: var(--muted); }
+.request dd { margin: 0; font-size: .78rem; }
+.section code { font-size: .74rem; overflow-wrap: anywhere; }
+.reference { display: grid; gap: 5px; font-size: .75rem !important; }
+.referenceDetails { color: var(--muted); font-size: .75rem; margin-top: 18px; }
+.referenceDetails summary { cursor: pointer; padding: 8px 0; }
+.referenceDetails code { display: block; padding-top: 8px; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.primary, .secondary, .refresh { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; padding: 11px 16px; font: inherit; font-size: .83rem; font-weight: 750; text-decoration: none; cursor: pointer; }
+.primary { background: var(--gold); border-color: var(--gold); color: var(--on-action); }
+.primary:hover:not(:disabled) { background: var(--action-hover); }
+.secondary { background: var(--panel); color: var(--text); }
+.secondary:hover:not(:disabled) { border-color: var(--muted); }
+.section button:disabled { cursor: not-allowed; opacity: .5; }
+.section button:focus-visible, .section a:focus-visible, .section summary:focus-visible, .check input:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+.check { display: flex; align-items: flex-start; gap: 12px; font-size: .88rem; line-height: 1.6; cursor: pointer; margin: 22px 0; }
+.check input { margin: 3px 0 0; width: 19px; height: 19px; flex-shrink: 0; accent-color: var(--gold); }
+.error { color: var(--negative) !important; overflow-wrap: anywhere; }
+.feedback { color: var(--muted); overflow-wrap: anywhere; }
+.footer { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 24px; border-top: 1px solid var(--line); padding-top: 16px; }
+.refresh { background: transparent; color: var(--text); padding-left: 0; border-color: transparent; }
+.footer span { color: var(--muted); font-size: .75rem; }
+@media (max-width: 600px) { .section { padding: 21px; } .notice, .request, .confirmation, .pending { padding: 18px; } .request dl > div { grid-template-columns: 1fr; gap: 5px; } .actions { flex-direction: column; } .actions > button { width: 100%; } }

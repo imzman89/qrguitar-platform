@@ -21,6 +21,8 @@ function runtime(overrides = {}) {
     const module = { exports: {} }; cache.set(relative, module);
     const localRequire = (specifier) => {
       if (Object.hasOwn(overrides, specifier)) return overrides[specifier];
+      if (specifier.endsWith(".module.css")) return { __esModule: true, default: new Proxy({}, { get: (_, key) => String(key) }) };
+      if (specifier.startsWith("@/")) return load("apps/web/" + specifier.slice(2));
       return specifier.startsWith(".") ? load(path.posix.normalize(path.posix.join(path.posix.dirname(relative), specifier))) : require(specifier);
     };
     new Function("require", "exports", "module", code)(localRequire, module.exports, module); return module.exports;
@@ -192,14 +194,14 @@ test("login destinations retain sections and reject arbitrary redirects", () => 
   for (const section of ["overview", "https://attacker.example", "//attacker.example", "__proto__"]) assert.equal(accountReturnPath(section), "/account");
   assert.equal(savedCollectionHref({ ...accountFor("a"), publicCollection: { ...defaultPublicCollectionSettings, handle: "not-published" } }), "");
 });
-async function accountPageUI(f) {
+async function accountPageUI(f, section = "collection") {
   const values = [], effects = [], previous = []; let cursor = 0, effectCursor = 0;
   const hooks = { ...React,
     useState(initial) { const index = cursor++; if (!(index in values)) values[index] = typeof initial === "function" ? initial() : initial; return [values[index], (value) => { values[index] = typeof value === "function" ? value(values[index]) : value; }]; },
     useRef(initial) { const index = cursor++; return values[index] ||= { current: initial }; },
     useEffect(run, deps) { const index = effectCursor++; if (!previous[index] || deps.some((item, i) => item !== previous[index][i])) { previous[index] = deps; effects.push(run); } }
   };
-  const search = new URLSearchParams("section=collection");
+  const search = new URLSearchParams("section=" + section);
   const ui = runtime({ react: hooks, "next/navigation": { useSearchParams: () => search }, "next/link": ({ children, ...props }) => React.createElement("a", props, children),
     "apps/web/lib/account-settings": { ...load("apps/web/lib/account-settings"), createAccountSettings: () => f.client },
     "apps/web/lib/supabase-browser": {}, "apps/web/lib/use-site-content": { useSiteContent: () => ({}) },
@@ -230,4 +232,29 @@ test("uncertain account save disables editing but leaves Security actions usable
   const signout = nodes(tree, (node) => node.type === "button" && renderToStaticMarkup(node).includes("Sign out"))[0];
   assert.equal(signout.props.disabled, false); await signout.props.onClick(); await tick();
   assert.equal(f.client.getState().phase, "signed-out"); assert.match(renderToStaticMarkup(render()), /next=%2Faccount%3Fsection%3Dsecurity/); f.client.dispose();
+});
+
+test("privacy intake remains outside account settings while a save is in flight or uncertain", async () => {
+  const f = await fixture().mount(), render = await accountPageUI(f, "privacy");
+  const gate = deferred(); f.reply = async () => { await gate.promise; throw new Error("Settings reply lost"); };
+  const saving = f.client.save(); await tick();
+  const tree = render(), fieldset = nodes(tree, node => node.type === "fieldset")[0];
+  assert.equal(fieldset.props.disabled, true);
+  const intake = nodes(tree, node => node.type?.name === "AccountDeletionSection");
+  assert.equal(intake.length, 1); assert.equal(intake[0].props.actorId, "a"); assert.equal(typeof intake[0].props.auth, "function");
+  assert.equal(nodes(fieldset, node => node.type?.name === "AccountDeletionSection").length, 0);
+  gate.resolve(); await saving;
+  assert.equal(f.client.getState().uncertainSave, true);
+  assert.equal(nodes(render(), node => node.type?.name === "AccountDeletionSection").length, 1);
+  f.client.dispose();
+});
+
+test("authenticated metadata failure preserves self privacy intake but sign-out removes it", async () => {
+  const f = await fixture().mount(), render = await accountPageUI(f, "privacy");
+  f.reply = async () => { throw new Error("Metadata unavailable"); }; await f.client.reload();
+  assert.equal(f.client.getState().phase, "error");
+  const intake = nodes(render(), node => node.type?.name === "AccountDeletionSection");
+  assert.equal(intake.length, 1); assert.equal(intake[0].props.actorId, "a");
+  f.change(null); assert.equal(nodes(render(), node => node.type?.name === "AccountDeletionSection").length, 0);
+  f.client.dispose();
 });

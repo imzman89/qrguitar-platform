@@ -1,4 +1,4 @@
-export const RELEASE_VERSION = "2026-09-17.3";
+export const RELEASE_VERSION = "2026-09-17.4";
 export const REQUIRED_DATABASE_CHECKS: readonly string[] = [
   "catalog_readable",
   "required_functions",

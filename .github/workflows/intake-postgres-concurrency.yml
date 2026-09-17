@@ -1,0 +1,75 @@
+name: Account deletion intake concurrency
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'supabase/**'
+      - 'apps/web/scripts/security/postgres-fixture.mjs'
+      - 'apps/web/scripts/test-intake-postgres-*.mjs'
+      - 'apps/web/package.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/intake-postgres-concurrency.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'supabase/**'
+      - 'apps/web/scripts/security/postgres-fixture.mjs'
+      - 'apps/web/scripts/test-intake-postgres-*.mjs'
+      - 'apps/web/package.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/intake-postgres-concurrency.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  postgres17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_DB: qrguitar_intake_qa
+          POSTGRES_USER: qrguitar_intake_fixture
+          # Disposable service-container credential, never an application secret.
+          POSTGRES_PASSWORD: ci_fixture_only_password
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U qrguitar_intake_fixture -d qrguitar_intake_qa"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Check fixture guards without connecting
+        run: node --test apps/web/scripts/test-intake-postgres-config.mjs
+      - name: Prove eleven PostgreSQL scheduling barriers
+        timeout-minutes: 5
+        run: >-
+          node apps/web/scripts/test-intake-postgres-concurrency.mjs
+          --repo .
+          --intake-sql supabase/migrations/20260917200000_account_deletion_intake.sql
+          --report-dir test-results/intake-concurrency
+        env:
+          QRGUITAR_INTAKE_FIXTURE: isolated-intake-postgresql-17
+          QRGUITAR_INTAKE_DATABASE_URL: postgresql://qrguitar_intake_fixture:ci_fixture_only_password@127.0.0.1:${{ job.services.postgres.ports[5432] }}/qrguitar_intake_qa
+      - name: Retain schema hashes, actual lock barriers, and outcomes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: intake-postgres17-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/intake-concurrency/
+          if-no-files-found: warn
+          retention-days: 7

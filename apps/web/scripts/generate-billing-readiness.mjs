@@ -1,5 +1,7 @@
 // Generates only the new billing readiness contract from historical reviewed SQL and real PGlite catalogs.
-// Default mode verifies existing generated artifacts; --write emits only the two named new output files.
+// Default mode verifies the complete historical .3 SQL, including its embedded
+// manifest. --write emits that historical SQL only. The active release manifest
+// belongs to the newest readiness generator and must not be reverted to .3.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -110,8 +112,7 @@ try {
   sql=sql.replace(/^--[\s\S]*?(?=create or replace function)/,"-- Release 2026-09-17.3: private permanent-credit ledger and LIVE database boundary.\n-- Read-only service RPC: catalogs, protected bucket metadata and one billing-instance configuration row.\nbegin;\n");
   sql=sql.trimEnd()+'\ncommit;\n';
   const outputs=new Map([
-    ['supabase/migrations/20260917191000_release_readiness.sql',sql],
-    ['apps/web/scripts/release-readiness-manifest.json',JSON.stringify(manifest,null,2)+'\n']
+    ['supabase/migrations/20260917191000_release_readiness.sql',sql]
   ]);
   for(const [relative,content] of outputs){
     const destination=path.join(output,relative);

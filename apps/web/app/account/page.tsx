@@ -14,6 +14,8 @@ import { accountReturnPath, createAccountSettings, initialAccountSettings, saved
 import { getContentValue } from "../../lib/content-registry";
 import { useSiteContent } from "../../lib/use-site-content";
 import { getWorkspace, WORKSPACE_OPTIONS } from "../../lib/workspace-tools";
+import AccountDeletionSection from "../../lib/account-deletion/AccountDeletionSection";
+import { accountDeletionAuth } from "../../lib/account-deletion/account-deletion-auth";
 
 type AccountSection = "overview" | "profile" | "collection" | "security" | "notifications" | "provider" | "privacy";
 
@@ -83,7 +85,7 @@ function AccountSettingsPage() {
 
   if (state.phase === "loading") return <AccountLoading />;
 
-  if (state.phase === "error") return <><Nav /><main className="section auth-page"><div className="shell auth-layout"><section className="card auth-card sign-in-required-card" role="alert"><div className="eyebrow">Account</div><h1>Your account could not be loaded.</h1><p>{status}</p><button className="button" type="button" onClick={() => void controller.current?.reload()}>Try again</button></section></div></main><Footer /></>;
+  if (state.phase === "error") return <><Nav /><main className="section auth-page"><div className="shell auth-layout"><section className="card auth-card sign-in-required-card" role="alert"><div className="eyebrow">Account</div><h1>Your account could not be loaded.</h1><p>{status}</p><button className="button" type="button" onClick={() => void controller.current?.reload()}>Try again</button></section>{state.actorId && <AccountDeletionSection actorId={state.actorId} auth={accountDeletionAuth} />}</div></main><Footer /></>;
 
   if (state.phase === "signed-out") {
     return (
@@ -309,6 +311,7 @@ function AccountSettingsPage() {
             </section> : null}
 
             </fieldset>
+            {activeSection === "privacy" && <AccountDeletionSection actorId={state.actorId} auth={accountDeletionAuth} />}
             {status ? <p className="form-message account-form-message" role="status">{status}</p> : null}
             {state.uncertainSave && <div className="form-message account-form-message"><p>Reload the saved settings before editing again; reloading replaces the form with the server version.</p><button className="button secondary" type="button" onClick={() => void controller.current?.reload()}>Reload saved account</button></div>}
           </div>
