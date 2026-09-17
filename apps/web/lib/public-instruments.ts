@@ -418,7 +418,8 @@ async function loadRelated(guitars: GuitarRow[], serviceRole = true) {
       collections.set(ownerId, {
         handle: collection.handle,
         publicName: collection.publicName,
-        accountType: collection.accountType
+        accountType: collection.accountType,
+        websiteUrl: collection.websiteUrl
       });
     }
   }

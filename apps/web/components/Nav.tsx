@@ -79,12 +79,13 @@ export function Nav() {
   const navigation = [
     { href: "/dashboard", label: getContentValue(content, "global.navigation.dashboard") },
     { href: "/catalog", label: getContentValue(content, "global.navigation.catalog") },
+    { href: "/collections", label: "Collections" },
     { href: "/how-it-works", label: getContentValue(content, "global.navigation.howItWorks") },
     { href: "/create", label: getContentValue(content, "global.navigation.create"), primary: true }
   ];
 
   return (
-    <header className={styles.header} ref={headerRef}>
+    <header className={`brand-frame ${styles.header}`} ref={headerRef}>
       <div className={`shell ${styles.inner}`}>
         <Link className={styles.brand} href="/" aria-label="QRguitar homepage">
           <BrandLogo className={styles.logo} />

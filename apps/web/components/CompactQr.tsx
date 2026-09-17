@@ -2,13 +2,14 @@
 
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
+import { publicProfileUrl } from "../lib/profile-url";
 
 export function CompactQr({ code, label }: { code: string; label: string }) {
   const [source, setSource] = useState("");
 
   useEffect(() => {
     let active = true;
-    const url = `${window.location.origin}/i/${encodeURIComponent(code)}`;
+    const url = publicProfileUrl(code);
     void QRCode.toDataURL(url, {
       width: 180,
       margin: 1,

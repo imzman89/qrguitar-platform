@@ -27,6 +27,7 @@ import { BrandLogo } from "../../../components/BrandLogo";
 import { buildProfileIdentityFields, ProfileIdentity } from "../../../components/ProfileIdentity";
 import { ProfileStatusBadges } from "../../../components/ProfileStatusBadges";
 import { RecordShareButton } from "../../../components/RecordShareButton";
+import { SellerWebsiteLink } from "../../../components/SellerWebsiteLink";
 import {
   getInstrumentVerificationStatus,
   type DemoTransfer,
@@ -41,6 +42,7 @@ import { createBrowserSupabaseClient } from "../../../lib/supabase-browser";
 import { fetchOwnerProfile, OwnerProfileError } from "../../../lib/owner-profile";
 import { resolveInstrumentPresentation } from "../../../lib/instrument-profile-contract";
 import { getContentValue } from "../../../lib/content-registry";
+import { PUBLIC_SITE_ORIGIN, publicProfileUrl } from "../../../lib/profile-url";
 
 type ProfileTab = "overview" | "specs" | "timeline" | "service" | "ownership" | "media" | "repairs" | "documents";
 const PROFILE_FETCH_TIMEOUT_MS = 28000;
@@ -385,7 +387,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
       return;
     }
 
-    setShareUrl(`${window.location.origin}${instrumentPermanentPath}`);
+    setShareUrl(`${PUBLIC_SITE_ORIGIN}${instrumentPermanentPath}`);
   }, [instrumentPermanentPath]);
 
   useEffect(() => {
@@ -776,6 +778,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
               includeCondition={false}
               className="profile-hero-badges"
             />
+            {instrument.publicCollection ? <SellerWebsiteLink {...instrument.publicCollection} /> : null}
           </div>
         </section>
 
@@ -1356,13 +1359,11 @@ function EmptyPanel({ title, copy }: { title: string; copy: string }) {
 
 function ProfileQr({ code }: { code: string }) {
   const [dataUrl, setDataUrl] = useState("");
-  const profilePath = `/i/${code}`;
+  const profileUrl = publicProfileUrl(code);
 
   useEffect(() => {
     let cancelled = false;
-    const url = typeof window === "undefined" ? profilePath : `${window.location.origin}${profilePath}`;
-
-    QRCode.toDataURL(url, {
+    QRCode.toDataURL(profileUrl, {
       errorCorrectionLevel: "H",
       margin: 1,
       width: 180,
@@ -1379,7 +1380,7 @@ function ProfileQr({ code }: { code: string }) {
     return () => {
       cancelled = true;
     };
-  }, [code, profilePath]);
+  }, [profileUrl]);
 
   return (
     <div className="qr-placeholder" aria-label={`QR code for ${code}`}>

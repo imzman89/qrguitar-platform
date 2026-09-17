@@ -1,5 +1,5 @@
 {
-  "releaseVersion": "2026-09-10.1",
+  "releaseVersion": "2026-09-17.1",
   "checks": [
     "catalog_readable",
     "required_functions",
@@ -21,11 +21,11 @@
     "public.create_instrument_profile(uuid,text,text,jsonb,boolean,text)",
     "public.register_staged_instrument_upload(uuid,text,text,text)",
     "public.cleanup_staged_instrument_uploads(uuid,text,text[],text[])",
-    "public.save_account_settings(uuid,text,jsonb)",
+    "public.save_account_settings(uuid,text,jsonb,bigint)",
     "public.prepare_ownership_transfer(uuid,text,text,text,text,text,integer,boolean,text)",
     "public.complete_ownership_transfer(uuid,uuid,text,text,boolean,text)",
     "public.manage_ownership_transfer(uuid,uuid,text,text,boolean,text)",
-    "public.approve_ownership_claim(uuid,uuid,text)",
+    "public.approve_ownership_claim(uuid,uuid,text,boolean)",
     "public.approve_service_submission(uuid,uuid,text)",
     "public.commit_service_evidence(uuid,uuid,boolean,text,jsonb)",
     "public.mutate_external_media(uuid,uuid,boolean,text,uuid,jsonb)",
@@ -40,7 +40,9 @@
     "public.ownership_transfer_snapshot(public.ownership_transfers,public.guitars,boolean)",
     "public.complete_ownership_transfer(uuid,uuid)",
     "public.assign_site_editor_version()",
-    "public.site_editor_changed_fields(jsonb,jsonb)"
+    "public.site_editor_changed_fields(jsonb,jsonb)",
+    "public.approve_ownership_claim(uuid,uuid,text)",
+    "public.save_account_settings(uuid,text,jsonb)"
   ],
   "fingerprints": [
     {
@@ -345,6 +347,28 @@
       "volatility": "v",
       "settings": [
         "search_path=public"
+      ]
+    },
+    {
+      "signature": "public.approve_ownership_claim(uuid,uuid,text,boolean)",
+      "source_hash": "c571700d25f3df6ec004d88632cd6d7a75f23d23f4abfbba2679becd018d6830",
+      "arguments": "p_claim_id uuid, p_decided_by uuid, p_decision_note text, p_env_admin boolean",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=public, pg_temp"
+      ]
+    },
+    {
+      "signature": "public.save_account_settings(uuid,text,jsonb,bigint)",
+      "source_hash": "d8d741388a16d16970b50e3132a7374b89f3beb44c0a769de1771e0874b18cfb",
+      "arguments": "p_user_id uuid, p_display_name text, p_collection jsonb, p_expected_version bigint",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
       ]
     }
   ],
@@ -723,6 +747,12 @@
       "table": "site_editor_receipts",
       "name": "result",
       "type": "jsonb",
+      "not_null": true
+    },
+    {
+      "table": "profiles",
+      "name": "account_settings_version",
+      "type": "bigint",
       "not_null": true
     }
   ],

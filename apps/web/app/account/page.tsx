@@ -3,34 +3,17 @@
 import { PwaInstall } from "../../components/PwaInstall";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ExternalLink, LockKeyhole, LogOut, ShieldCheck, UserRound, UsersRound } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
-import { clearQrGuitarSessionState, createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
-import { defaultPublicCollectionSettings, type PublicCollectionSettings } from "../../lib/public-collections";
+import { clearQrGuitarSessionState, createBrowserSupabaseClient } from "../../lib/supabase-browser";
+import { type PublicCollectionSettings } from "../../lib/public-collections";
+import { accountReturnPath, createAccountSettings, initialAccountSettings, savedCollectionHref } from "../../lib/account-settings";
 import { getContentValue } from "../../lib/content-registry";
 import { useSiteContent } from "../../lib/use-site-content";
-
-type AccountPayload = {
-  ok?: boolean;
-  message?: string;
-  account?: {
-    email: string;
-    displayName: string;
-    role: string;
-    plan: string;
-    accountStatus: string;
-    publicCollection?: PublicCollectionSettings;
-    stats?: {
-      records: number;
-      publicRecords: number;
-      privateRecords: number;
-      unlistedRecords: number;
-      recordsWithPhotos: number;
-    };
-  };
-};
+import { getWorkspace, WORKSPACE_OPTIONS } from "../../lib/workspace-tools";
 
 type AccountSection = "overview" | "profile" | "collection" | "security" | "notifications" | "provider" | "privacy";
 
@@ -45,159 +28,64 @@ const accountSections: Array<{ id: AccountSection; label: string }> = [
 ];
 
 export default function AccountPage() {
+  return <Suspense fallback={<AccountLoading />}><AccountSettingsPage /></Suspense>;
+}
+
+function AccountSettingsPage() {
   const content = useSiteContent();
-  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
-  const [email, setEmail] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [role, setRole] = useState("");
-  const [plan, setPlan] = useState("");
-  const [accountStatus, setAccountStatus] = useState("");
-  const [stats, setStats] = useState({ records: 0, publicRecords: 0, privateRecords: 0, unlistedRecords: 0, recordsWithPhotos: 0 });
-  const [status, setStatus] = useState("");
-  const [signedIn, setSignedIn] = useState(false);
-  const [authReady, setAuthReady] = useState(false);
-  const [isWorking, setIsWorking] = useState(false);
-  const [publicCollection, setPublicCollection] = useState<PublicCollectionSettings>(defaultPublicCollectionSettings);
+  const search = useSearchParams();
+  const controller = useRef<ReturnType<typeof createAccountSettings> | null>(null);
+  const [state, setState] = useState(initialAccountSettings);
   const [activeSection, setActiveSection] = useState<AccountSection>("overview");
+  const { displayName, publicCollection } = state.draft;
+  const email = state.account?.email || "";
+  const role = state.account?.role || "";
+  const plan = state.account?.plan || "";
+  const accountStatus = state.account?.accountStatus || "";
+  const stats = state.account?.stats || { records: 0, publicRecords: 0, privateRecords: 0, unlistedRecords: 0, recordsWithPhotos: 0 };
+  const status = state.message;
+  const isWorking = Boolean(state.busy);
+  const publishedHref = savedCollectionHref(state.account);
+  const returnPath = accountReturnPath(activeSection);
+  const setDisplayName = (value: string) => controller.current?.setDraft({ displayName: value });
+  const setPublicCollection = (update: (current: PublicCollectionSettings) => PublicCollectionSettings) => {
+    if (controller.current) controller.current.setDraft({ publicCollection: update(controller.current.getState().draft.publicCollection) });
+  };
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadAccount() {
-      try {
-        const token = await getSupabaseAccessToken();
-        if (!token) {
-          if (!cancelled) {
-            setSignedIn(false);
-            setStatus("");
-          }
-          return;
-        }
-
-        const response = await fetch("/api/account", {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store"
-        });
-        const payload = (await response.json().catch(() => null)) as AccountPayload | null;
-
-        if (cancelled) {
-          return;
-        }
-
-        if (!response.ok || !payload?.ok || !payload.account) {
-          setSignedIn(false);
-          setStatus(payload?.message || "Could not load account.");
-          return;
-        }
-
-        setSignedIn(true);
-        setEmail(payload.account.email);
-        setDisplayName(payload.account.displayName);
-        setRole(payload.account.role);
-        setPlan(payload.account.plan);
-        setAccountStatus(payload.account.accountStatus);
-        setPublicCollection(payload.account.publicCollection || { ...defaultPublicCollectionSettings, publicName: payload.account.displayName });
-        setStats(payload.account.stats || { records: 0, publicRecords: 0, privateRecords: 0, unlistedRecords: 0, recordsWithPhotos: 0 });
-        setStatus("");
-      } catch {
-        if (!cancelled) {
-          setSignedIn(false);
-          setStatus("Could not load account. Check your connection and try again.");
-        }
-      } finally {
-        if (!cancelled) setAuthReady(true);
-      }
-    }
-
-    void loadAccount();
-
-    return () => {
-      cancelled = true;
-    };
+    const current = createAccountSettings({
+      auth: () => createBrowserSupabaseClient().auth,
+      onSaved: () => window.dispatchEvent(new CustomEvent("qrguitar:auth")),
+      onSignedOut: () => { clearQrGuitarSessionState(); window.dispatchEvent(new CustomEvent("qrguitar:auth")); }
+    });
+    controller.current = current;
+    const unsubscribe = current.subscribe(setState);
+    setState(current.getState());
+    void current.start();
+    return () => { unsubscribe(); current.dispose(); if (controller.current === current) controller.current = null; };
   }, []);
 
   useEffect(() => {
-    const requestedSection = new URLSearchParams(window.location.search).get("section");
-    if (accountSections.some((section) => section.id === requestedSection)) {
-      setActiveSection(requestedSection as AccountSection);
-    }
-  }, []);
+    const requestedSection = search.get("section");
+    setActiveSection(accountSections.some((section) => section.id === requestedSection) ? requestedSection as AccountSection : "overview");
+  }, [search]);
 
   async function saveAccount() {
-    setIsWorking(true);
-    setStatus("");
-    try {
-      const token = await getSupabaseAccessToken();
-      const response = await fetch("/api/account", {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ displayName, publicCollection })
-      });
-      const payload = (await response.json().catch(() => null)) as AccountPayload | null;
-      if (!response.ok || !payload?.ok) {
-        setStatus(payload?.message || "Could not confirm the save. Reload your account before trying again.");
-        return;
-      }
-      setStatus(payload.message || "Account updated.");
-      if (payload.account?.publicCollection) setPublicCollection(payload.account.publicCollection);
-      window.dispatchEvent(new CustomEvent("qrguitar:auth"));
-    } catch {
-      setStatus("Could not confirm the save. Check your connection and reload your account before trying again.");
-    } finally {
-      setIsWorking(false);
-    }
+    await controller.current?.save();
   }
   async function sendPasswordReset() {
-    if (!email) {
-      setStatus("Account email is missing.");
-      return;
-    }
-
-    setIsWorking(true);
-    setStatus("");
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password?next=/account`
-    });
-    setIsWorking(false);
-
-    if (error) {
-      setStatus(error.message || "Could not send password reset email.");
-      return;
-    }
-
-    setStatus("Password reset email sent.");
+    await controller.current?.resetPassword(`${window.location.origin}/reset-password?next=${encodeURIComponent(returnPath)}`);
   }
 
   async function signOut() {
-    setIsWorking(true);
-    await supabase.auth.signOut();
-    clearQrGuitarSessionState();
-    window.dispatchEvent(new CustomEvent("qrguitar:auth"));
-    window.location.href = "/";
+    await controller.current?.signOut();
   }
 
-  if (!authReady) {
-    return (
-      <>
-        <Nav />
-        <main className="section auth-page">
-          <div className="shell auth-layout">
-            <section className="card auth-card sign-in-required-card" aria-live="polite" aria-busy="true">
-              <div className="eyebrow">Account</div>
-              <h1>Loading your account...</h1>
-              <p>Checking your QRguitar session and owner workspace.</p>
-            </section>
-          </div>
-        </main>
-        <Footer />
-      </>
-    );
-  }
+  if (state.phase === "loading") return <AccountLoading />;
 
-  if (!signedIn) {
+  if (state.phase === "error") return <><Nav /><main className="section auth-page"><div className="shell auth-layout"><section className="card auth-card sign-in-required-card" role="alert"><div className="eyebrow">Account</div><h1>Your account could not be loaded.</h1><p>{status}</p><button className="button" type="button" onClick={() => void controller.current?.reload()}>Try again</button></section></div></main><Footer /></>;
+
+  if (state.phase === "signed-out") {
     return (
       <>
         <Nav />
@@ -208,8 +96,8 @@ export default function AccountPage() {
               <h1>Sign in to manage your account.</h1>
               <p>Update your display name, password access, and account details from one place.</p>
               <div className="form-actions">
-                <Link className="button" href="/login?next=/account">Sign in</Link>
-                <Link className="button secondary" href="/login?mode=register&next=/account">Create account</Link>
+                <Link className="button" href={`/login?next=${encodeURIComponent(returnPath)}`}>Sign in</Link>
+                <Link className="button secondary" href={`/login?mode=register&next=${encodeURIComponent(returnPath)}`}>Create account</Link>
               </div>
               {status ? <p className="form-message">{status}</p> : null}
             </section>
@@ -277,6 +165,7 @@ export default function AccountPage() {
 
             {activeSection === "overview" ? <PwaInstall /> : null}
 
+            <fieldset disabled={isWorking || (state.uncertainSave && (activeSection === "profile" || activeSection === "collection"))} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
             {activeSection === "overview" ? (
               <section className="card auth-card account-settings-card account-overview-card">
                 <div className="auth-card-head">
@@ -311,6 +200,12 @@ export default function AccountPage() {
                 <p className="field-note">Shown on private tools and used as your default owner/shop label.</p>
               </div>
 
+              <div className="field">
+                <label htmlFor="workspaceType">How you use QRguitar</label>
+                <select id="workspaceType" value={publicCollection.accountType} onChange={(event) => setPublicCollection((current) => ({ ...current, accountType: event.target.value as PublicCollectionSettings["accountType"] }))}>{WORKSPACE_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select>
+                <p className="field-note">Choose the daily tools shown on your dashboard. You can save this preference with your public collection turned off. Provider verification is reviewed separately.</p>
+              </div>
+
               <div className="form-actions">
                 <button className="button" type="button" onClick={saveAccount} disabled={isWorking}>
                   {isWorking ? "Saving..." : getContentValue(content, "account.actions.save")}
@@ -323,7 +218,7 @@ export default function AccountPage() {
                 <span>Public collection</span>
                 <strong><UsersRound size={18} aria-hidden="true" /> Your public collection</strong>
               </div>
-              <p className="account-card-copy">Create one shareable page for your public QRguitar Profiles. Private and unlisted Profiles never appear there.</p>
+              <p className="account-card-copy">Create one shareable page for your public QRguitar Profiles. Enable your collection and make at least one instrument Profile public to appear in Member Collections. Private and unlisted Profiles never appear there.</p>
               <label className="toggle-field">
                 <input type="checkbox" checked={publicCollection.enabled} onChange={(event) => setPublicCollection((current) => ({ ...current, enabled: event.target.checked }))} />
                 Show my public Profiles together on a public collection page
@@ -331,10 +226,10 @@ export default function AccountPage() {
               <div className="form-grid compact">
                 <label className="field"><span>Public name</span><input value={publicCollection.publicName} onChange={(event) => setPublicCollection((current) => ({ ...current, publicName: event.target.value }))} placeholder={displayName} /></label>
                 <label className="field"><span>Public link</span><input value={publicCollection.handle} onChange={(event) => setPublicCollection((current) => ({ ...current, handle: event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") }))} placeholder="my-collection" /></label>
-                <label className="field"><span>Collection type</span><select value={publicCollection.accountType} onChange={(event) => setPublicCollection((current) => ({ ...current, accountType: event.target.value as PublicCollectionSettings["accountType"] }))}><option value="player">Player</option><option value="collector">Collector</option><option value="shop">Shop / retailer</option><option value="builder">Builder / brand</option><option value="luthier">Luthier / technician</option><option value="other">Other</option></select></label>
+                <label className="field"><span>Workspace / collection type</span><select value={publicCollection.accountType} onChange={(event) => setPublicCollection((current) => ({ ...current, accountType: event.target.value as PublicCollectionSettings["accountType"] }))}>{WORKSPACE_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
                 <label className="field"><span>Location (optional)</span><input value={publicCollection.location} onChange={(event) => setPublicCollection((current) => ({ ...current, location: event.target.value }))} placeholder="City, region, country" /></label>
                 <label className="field custom-wide"><span>Short bio</span><textarea rows={3} value={publicCollection.bio} onChange={(event) => setPublicCollection((current) => ({ ...current, bio: event.target.value }))} placeholder="What you collect, build, repair, or sell." /></label>
-                <label className="field"><span>Website (optional)</span><input type="url" value={publicCollection.websiteUrl} onChange={(event) => setPublicCollection((current) => ({ ...current, websiteUrl: event.target.value }))} placeholder="https://" /></label>
+                <label className="field"><span>Your website (optional)</span><input type="url" aria-describedby="collection-website-help" value={publicCollection.websiteUrl} onChange={(event) => setPublicCollection((current) => ({ ...current, websiteUrl: event.target.value }))} placeholder="https://your-website.com" maxLength={500} /><small id="collection-website-help" className="field-note">Use the full HTTPS address. When your public collection is enabled, visitors can open this website from the collection and its instrument Profiles. Purchases and bookings take place on your website.</small></label>
                 <label className="field"><span>Avatar URL (optional)</span><input type="url" value={publicCollection.avatarUrl} onChange={(event) => setPublicCollection((current) => ({ ...current, avatarUrl: event.target.value }))} placeholder="https://" /></label>
               </div>
               <label className="toggle-field"><input type="checkbox" checked={publicCollection.allowIndexing} onChange={(event) => setPublicCollection((current) => ({ ...current, allowIndexing: event.target.checked }))} /> Allow search engines to index this collection</label>
@@ -345,8 +240,10 @@ export default function AccountPage() {
               <p className="field-note">Your email stays private. QRguitar relays the first message, and you decide whether to reply.</p>
               <div className="form-actions">
                 <button className="button" type="button" onClick={saveAccount} disabled={isWorking}>{isWorking ? "Saving..." : "Save public collection"}</button>
-                {publicCollection.enabled && publicCollection.handle ? <Link className="button secondary" href={`/collections/${publicCollection.handle}`} target="_blank">View public collection <ExternalLink size={15} /></Link> : null}
+                {publishedHref ? <Link className="button secondary" href={publishedHref} target="_blank" rel="noopener noreferrer">View saved public collection <ExternalLink size={15} /></Link> : null}
+                <Link className="button secondary" href="/collections">Browse member collections</Link>
               </div>
+              {(publicCollection.handle !== state.account?.publicCollection.handle || publicCollection.enabled !== state.account?.publicCollection.enabled) && <p className="field-note">Save your changes to update the public collection link. The preview opens your last saved collection.</p>}
             </section> : null}
 
             {activeSection === "security" ? <section className="card auth-card account-settings-card">
@@ -388,8 +285,9 @@ export default function AccountPage() {
                 <div><span>Plan</span><strong>{plan || "free"}</strong></div>
                 <div><span>Role</span><strong>{role || "user"}</strong></div>
               </div>
-              <p className="account-card-copy">Use business tools when you manage inventory at scale or document work for an instrument owner.</p>
+              <p className="account-card-copy">{getWorkspace(publicCollection.accountType).description}</p>
               <div className="form-actions">
+                <Link className="button" href="/dashboard/service">Open service workbench</Link>
                 <Link className="button secondary" href="/dashboard/import">Open Bulk Import</Link>
                 <Link className="button secondary" href="/installers">Service Provider Network</Link>
               </div>
@@ -409,11 +307,17 @@ export default function AccountPage() {
               </div>
             </section> : null}
 
-            {status ? <p className="form-message account-form-message">{status}</p> : null}
+            </fieldset>
+            {status ? <p className="form-message account-form-message" role="status">{status}</p> : null}
+            {state.uncertainSave && <div className="form-message account-form-message"><p>Reload the saved settings before editing again; reloading replaces the form with the server version.</p><button className="button secondary" type="button" onClick={() => void controller.current?.reload()}>Reload saved account</button></div>}
           </div>
         </div>
       </main>
       <Footer />
     </>
   );
+}
+
+function AccountLoading() {
+  return <><Nav /><main className="section auth-page"><div className="shell auth-layout"><section className="card auth-card sign-in-required-card" aria-live="polite" aria-busy="true"><div className="eyebrow">Account</div><h1>Loading your account...</h1><p>Checking your QRguitar session and owner workspace.</p></section></div></main><Footer /></>;
 }

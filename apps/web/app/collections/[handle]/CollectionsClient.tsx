@@ -1,6 +1,7 @@
 "use client";
 
 import { Search } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CollectibleRecordCard } from "../../../components/CollectibleRecordCard";
 import { getContentValue } from "../../../lib/content-registry";
@@ -13,11 +14,13 @@ export function CollectionsClient({ records, content }: { records: DemoInstrumen
   const [availability, setAvailability] = useState("All availability");
   const [type, setType] = useState("All types");
   const [sort, setSort] = useState("Newest");
+  const hasFilters = Boolean(query.trim()) || brand !== "All brands" || condition !== "All conditions" || availability !== "All availability" || type !== "All types";
+  function clearFilters() { setQuery(""); setBrand("All brands"); setCondition("All conditions"); setAvailability("All availability"); setType("All types"); }
   const brands = useMemo(() => ["All brands", ...Array.from(new Set(records.map((record) => record.brand).filter(Boolean))).sort()], [records]);
   const types = useMemo(() => ["All types", ...Array.from(new Set(records.map((record) => record.instrumentType).filter(Boolean) as string[])).sort()], [records]);
   const visible = records.filter((record) => {
     const haystack = [record.name, record.brand, record.model, record.year, record.location, record.qrCode].join(" ").toLowerCase();
-    if (query && !haystack.includes(query.toLowerCase())) return false;
+    if (query.trim() && !haystack.includes(query.trim().toLowerCase())) return false;
     if (brand !== "All brands" && record.brand !== brand) return false;
     if (condition !== "All conditions" && getInstrumentCondition(record) !== condition.toLowerCase()) return false;
     if (availability === "For sale" && record.saleStatus !== "for_sale") return false;
@@ -25,6 +28,8 @@ export function CollectionsClient({ records, content }: { records: DemoInstrumen
     if (type !== "All types" && record.instrumentType !== type) return false;
     return true;
   }).sort((first, second) => sort === "Oldest" ? Date.parse(first.createdAt) - Date.parse(second.createdAt) : sort === "Title" ? first.name.localeCompare(second.name) : Date.parse(second.createdAt) - Date.parse(first.createdAt));
+
+  if (!records.length) return <div className="empty-state"><h2>No public instrument Profiles yet.</h2><p>This member hasn’t added any instruments to their public collection yet.</p><Link className="button secondary" href="/collections">Explore other collections</Link></div>;
 
   return <>
     <div className="collection-filters" aria-label="Collection filters">
@@ -35,9 +40,10 @@ export function CollectionsClient({ records, content }: { records: DemoInstrumen
       <label><span>Type</span><select value={type} onChange={(event) => setType(event.target.value)}>{types.map((item) => <option key={item}>{item}</option>)}</select></label>
       <label><span>Sort</span><select value={sort} onChange={(event) => setSort(event.target.value)}><option>Newest</option><option>Oldest</option><option>Title</option></select></label>
     </div>
-    <p className="collection-result-count">
+    <p className="collection-result-count" role="status">
       {getContentValue(content, "collections.results.count").replace("{count}", String(visible.length))}
     </p>
+    {hasFilters && <div className="form-actions"><button className="button secondary" type="button" onClick={clearFilters}>Clear filters</button></div>}
     <div className="catalog-record-grid collection-record-grid">
       {visible.map((record) => <CollectibleRecordCard key={record.qrCode} record={record} content={content} />)}
     </div>
@@ -45,6 +51,7 @@ export function CollectionsClient({ records, content }: { records: DemoInstrumen
       <div className="empty-state">
         <h2>{getContentValue(content, "collections.empty.filteredTitle")}</h2>
         <p>{getContentValue(content, "collections.empty.filteredBody")}</p>
+        <button className="button secondary" type="button" onClick={clearFilters}>Show all public Profiles</button>
       </div>
     ) : null}
   </>;

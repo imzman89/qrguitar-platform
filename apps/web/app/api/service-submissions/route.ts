@@ -71,6 +71,9 @@ async function serializeSubmissions(supabase: Supabase, rows: ServiceSubmissionR
     submissionIds.length ? supabase.from("service_submission_evidence").select("id,submission_id").in("submission_id", submissionIds) : Promise.resolve({ data: [], error: null }),
     includeActivity && submissionIds.length ? supabase.from("service_submission_activity").select("id,submission_id,action,note,metadata,created_at").in("submission_id", submissionIds).order("created_at") : Promise.resolve({ data: [], error: null })
   ]);
+  for (const result of [guitars, providers, evidence, activities]) {
+    if (result.error) throw new Error(result.error.message);
+  }
   const guitarMap = new Map((guitars.data || []).map((row) => [row.id, row as ServiceGuitarRow]));
   const providerMap = new Map((providers.data || []).map((row) => [row.user_id, row as ServiceProviderProfileRow]));
   const evidenceCounts = new Map<string, number>();

@@ -18,7 +18,10 @@ const ownerKey = (id) => "public_collection_owner:" + id;
 const handleKey = (handle) => "public_collection_handle:" + handle;
 const collection = (handle, extra = {}) => ({ enabled: true, handle, publicName: "Synthetic collection", accountType: "collector", ...extra });
 async function asRole(role) { await db.exec("reset role; set role " + role); }
-async function save(id, name, settings = null) { return (await db.query("select public.save_account_settings($1,$2,$3::jsonb) as saved", [id, name, settings])).rows[0].saved; }
+async function version(id) { return Number((await db.query("select account_settings_version from profiles where id=$1", [id])).rows[0]?.account_settings_version || 0); }
+async function save(id, name, settings = null, expectedVersion) {
+  return (await db.query("select public.save_account_settings($1,$2,$3::jsonb,$4::bigint) as saved", [id, name, settings, expectedVersion === undefined ? await version(id) : expectedVersion])).rows[0].saved;
+}
 async function content(key) { return (await db.query("select content_value from site_content where content_key=$1", [key])).rows[0]?.content_value; }
 async function snapshot() {
   return (await db.query("select jsonb_build_object('profiles',(select jsonb_agg(to_jsonb(p) order by id) from profiles p),'content',(select jsonb_agg(to_jsonb(c) order by content_key) from site_content c)) as state")).rows[0].state;
@@ -30,6 +33,8 @@ try {
   const migration = fs.readFileSync(path.join(proposal, "supabase/migrations/20260911001000_atomic_account_settings.sql"), "utf8");
   await db.exec(migration);
   await db.exec(migration);
+  const versions = fs.readFileSync(path.join(proposal, "supabase/migrations/20260917172000_account_settings_versions.sql"), "utf8");
+  await db.exec(versions); await db.exec(versions);
   await db.query("insert into auth.users(id) values($1),($2),($3)", [first, second, fresh]);
   await db.query("insert into profiles(id,display_name,role,plan,remaining_code_count,admin_notes) values($1,'First','shop','business',73,'private operator note'),($2,'Second','builder','pack_25',12,'second private note')", [first, second]);
   await db.query("insert into site_content(content_key,content_value) values('unrelated', '{\"keep\":true}')");
@@ -37,9 +42,18 @@ try {
   await test("anon and authenticated cannot call the service-only RPC", async () => {
     for (const role of ["anon", "authenticated"]) {
       await asRole(role);
-      await assert.rejects(save(first, "Escalation", collection("stolen")), (error) => error.code === "42501");
+      await assert.rejects(save(first, "Escalation", collection("stolen"), 0), (error) => error.code === "42501");
     }
     await asRole("service_role");
+  });
+  await test("service role cannot bypass versions through the old three-argument helper", async () => {
+    const before = await snapshot();
+    await assert.rejects(db.query("select public.save_account_settings($1,$2,$3::jsonb)", [first, "Bypass", collection("bypass")]), (error) => error.code === "42501");
+    assert.deepEqual(await snapshot(), before);
+  });
+  await test("versioned RPC has the intended signature and fixed definer search path", async () => {
+    const row = (await db.query("select prosecdef, proconfig from pg_proc where oid='public.save_account_settings(uuid,text,jsonb,bigint)'::regprocedure")).rows[0];
+    assert.equal(row.prosecdef, true); assert.deepEqual(row.proconfig, ["search_path=pg_catalog, public"]);
   });
   await test("new profile inherits valid database defaults", async () => {
     await save(fresh, "New profile");
@@ -57,7 +71,7 @@ try {
     const after = await snapshot();
     for (const prior of before.profiles) {
       const current = after.profiles.find((item) => item.id === prior.id);
-      assert.deepEqual(current, prior.id === first ? { ...prior, display_name: "Updated name" } : prior);
+      assert.deepEqual(current, prior.id === first ? { ...prior, display_name: "Updated name", account_settings_version: prior.account_settings_version + 1 } : prior);
     }
     assert.deepEqual(await content("unrelated"), { keep: true });
     assert.equal((await content(ownerKey(first))).ownerId, first);
@@ -116,6 +130,42 @@ try {
     await asRole("service_role");
     const before = await snapshot();
     await assert.rejects(save(first, "Must not persist", collection("forced-failure")), /synthetic failure/);
+    assert.deepEqual(await snapshot(), before);
+  });
+  await test("deferred A cannot overwrite B after a pre-save reload", async () => {
+    const loadedVersion = await version(first);
+    let release; const gate = new Promise((resolve) => { release = resolve; });
+    // The transport-delayed request reaches real SQL only after B commits. This
+    // represents the reported timeout/reload order without claiming independent
+    // connections: PGlite's one connection serializes database transactions.
+    const delayedA = gate.then(() => save(first, "Late A", collection("late-a"), loadedVersion));
+    const outcomeA = delayedA.then((value) => ({ value }), (error) => ({ error }));
+    assert.equal(await version(first), loadedVersion);
+    const savedB = await save(first, "Confirmed B", collection("confirmed-b"), loadedVersion);
+    assert.equal(savedB.settingsVersion, loadedVersion + 1); const afterB = await snapshot();
+    release(); assert.equal((await outcomeA).error?.code, "40001"); assert.deepEqual(await snapshot(), afterB);
+    await assert.rejects(save(first, "Stale retry", collection("late-a"), loadedVersion), (error) => error.code === "40001");
+    assert.deepEqual(await snapshot(), afterB);
+  });
+  await test("overlapping same-version account saves commit exactly once", async () => {
+    const expected = await version(first);
+    const outcomes = await Promise.allSettled([save(first, "Concurrent A", collection("concurrent-a"), expected), save(first, "Concurrent B", collection("concurrent-b"), expected)]);
+    assert.equal(outcomes.filter((result) => result.status === "fulfilled").length, 1);
+    assert.equal(outcomes.find((result) => result.status === "rejected").reason.code, "40001");
+    const winner = outcomes.find((result) => result.status === "fulfilled").value;
+    assert.equal(await version(first), expected + 1); assert.equal((await content(ownerKey(first))).handle, winner.publicCollection.handle);
+    assert.equal(await content(handleKey(winner.publicCollection.handle === "concurrent-a" ? "concurrent-b" : "concurrent-a")), undefined);
+  });
+  await test("reload after a lost committed response permits the next version only", async () => {
+    const old = await version(first); const committed = await save(first, "Lost response", collection("lost-response"), old);
+    const before = await snapshot(); await assert.rejects(save(first, "Blind retry", null, old), (error) => error.code === "40001");
+    assert.deepEqual(await snapshot(), before);
+    const recovered = await version(first); assert.equal(recovered, committed.settingsVersion);
+    assert.equal((await save(first, "Recovered save", null, recovered)).settingsVersion, recovered + 1);
+  });
+  await test("invalid expected versions roll back all account state", async () => {
+    const before = await snapshot();
+    for (const expected of [null, -1, 9007199254740991]) await assert.rejects(save(first, "Invalid version", collection("invalid-version"), expected), (error) => error.code === "22023");
     assert.deepEqual(await snapshot(), before);
   });
   await test("mismatched owner settings fail without changing any row", async () => {

@@ -70,6 +70,7 @@ export type DemoInstrument = {
     handle: string;
     publicName: string;
     accountType: string;
+    websiteUrl?: string;
   };
   ownerUserEmail?: string;
   location: string;

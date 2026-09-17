@@ -7,8 +7,9 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 const includes = (source, snippet, message) => assert(source.includes(snippet), message);
 const excludes = (source, snippet, message) => assert(!source.includes(snippet), message);
 
-const printSuite = read("app/handout/[code]/page.tsx");
+const printSuite = ["app/handout/[code]/page.tsx", "app/handout/[code]/PrintDocument.tsx", "lib/print-layout.ts"].map(read).join("\n");
 const printCss = read("app/handout/[code]/print-suite.module.css");
+const printDocumentCss = read("app/handout/[code]/print-document.module.css");
 const globalCss = read("app/globals.css");
 const profile = read("app/i/[code]/ProfileClient.tsx");
 const contract = read("lib/instrument-profile-contract.ts");
@@ -32,8 +33,9 @@ excludes(printSuite, "document.write", "Print Suite must not generate popup docu
 excludes(printSuite, "about:blank", "Print Suite must not print from a blank popup.");
 includes(printCss, "@media print", "Print Suite must provide scoped print layout rules.");
 includes(printCss, "overflow: visible !important", "The active print root must not retain a scrolling preview viewport.");
-includes(globalCss, ".handout-shell[data-print-size=\"compact\"] .print-kit--label", "Compact labels must fit their physical page.");
-includes(globalCss, "break-inside: avoid", "Printable sections must avoid accidental page splitting.");
+includes(printDocumentCss, "width: 3.3in", "Compact labels must fit their physical page margins.");
+includes(printDocumentCss, "break-inside: avoid", "Printable sections must avoid accidental page splitting.");
+includes(printSuite, "printReadiness(images", "Print must check actual image readiness and overflow.");
 
 includes(contract, "service: serviceEntries.length > 0", "Service tab visibility must be data-driven.");
 includes(contract, "!isServiceHistoryEvent(event)", "Service events must not duplicate inside Timeline.");

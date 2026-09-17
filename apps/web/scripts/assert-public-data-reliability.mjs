@@ -204,6 +204,28 @@ test("public loader returns every eligible record and complete ordered relations
   assert.ok(app.calls.filter(({ url }) => url.pathname.endsWith("/guitar_documents")).every(({ url }) => url.searchParams.get("is_public") === "eq.true"));
 });
 
+test("seller website follows the current owner rather than the instrument's former owner", async () => {
+  const db = fixtures(2);
+  db.site_content.find((row) => row.content_key === "public_collection_owner:owner-000").content_value.websiteUrl = "https://old-shop.example";
+  db.site_content.find((row) => row.content_key === "public_collection_owner:owner-001").content_value.websiteUrl = " https://current-shop.example/guitars ";
+  db.guitars[0].owner_id = "owner-001";
+  const app = runtime(mockDatabase(db));
+  const record = await app.load("apps/web/lib/public-instruments.ts").getPublicInstrumentByCode("QRG-TEST0000");
+  assert.equal(record.publicCollection.websiteUrl, "https://current-shop.example/guitars");
+  assert.equal(record.publicCollection.handle, "owner-001");
+  assert.equal(JSON.stringify(record).includes("old-shop.example"), false);
+});
+
+for (const settings of [{ enabled: false, websiteUrl: "https://private-business.example" }, { enabled: true, websiteUrl: "https://" }, { enabled: true, websiteUrl: "javascript:alert(1)" }]) test("unpublished or invalid owner websites never become Profile links: " + JSON.stringify(settings), async () => {
+  const db = fixtures(1);
+  Object.assign(db.site_content.find((row) => row.content_key === "public_collection_owner:owner-000").content_value, settings);
+  const app = runtime(mockDatabase(db));
+  const record = await app.load("apps/web/lib/public-instruments.ts").getPublicInstrumentByCode("QRG-TEST0000");
+  assert.ok(!record.publicCollection?.websiteUrl);
+  const catalog = await app.load("apps/web/lib/public-instruments.ts").getPublicInstruments();
+  assert.ok(!catalog[0].publicCollection?.websiteUrl);
+});
+
 test("owner restriction reaches the database before any related data is requested", async () => {
   const app = runtime(mockDatabase(fixtures()));
   const records = await app.load("apps/web/lib/public-instruments.ts").getPublicInstruments("owner-078");

@@ -37,6 +37,20 @@ export function cleanCollectionHandle(value: unknown) {
   return String(value || "").trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
 }
 
+/** Public account links use explicit HTTPS URLs; invalid entries are never published. */
+export function cleanCollectionWebsite(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const text = value.trim();
+  if (!text || text.length > 500 || !/^https:\/\//i.test(text) || /[\s\\]/.test(text)) return "";
+  try {
+    const url = new URL(text);
+    if (url.protocol !== "https:" || !url.hostname || url.username || url.password || url.href.length > 500) return "";
+    return url.href;
+  } catch {
+    return "";
+  }
+}
+
 export function cleanPublicCollection(value: Partial<PublicCollectionSettings> | null | undefined): PublicCollectionSettings {
   const enteredAccountType = String(value?.accountType || "");
   const accountType = enteredAccountType === "brand"
@@ -51,7 +65,7 @@ export function cleanPublicCollection(value: Partial<PublicCollectionSettings> |
     accountType,
     bio: String(value?.bio || "").trim().slice(0, 600),
     location: String(value?.location || "").trim().slice(0, 160),
-    websiteUrl: /^https:\/\//i.test(String(value?.websiteUrl || "")) ? String(value?.websiteUrl || "").trim().slice(0, 500) : "",
+    websiteUrl: cleanCollectionWebsite(value?.websiteUrl),
     avatarUrl: /^https:\/\//i.test(String(value?.avatarUrl || "")) ? String(value?.avatarUrl || "").trim().slice(0, 1000) : "",
     allowIndexing: value?.allowIndexing !== false,
     allowMessages: value?.allowMessages === true,

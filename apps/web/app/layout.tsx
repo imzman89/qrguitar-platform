@@ -1,5 +1,6 @@
 import "./globals.css";
 import "./product.css";
+import "./theme.css";
 import type { Metadata, Viewport } from "next";
 import { PwaRuntime } from "../components/PwaRuntime";
 import type { CSSProperties, ReactNode } from "react";
@@ -38,7 +39,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
 
   return (
     <html lang="en" style={themeStyle}>
-      <body>
+      <body data-product-theme="paper">
         <ThemeRuntime />
         <SessionLifecycle />
         <script

@@ -640,7 +640,7 @@ export default function CreatePage() {
                     <input type="checkbox" disabled={!form.serial.trim()} checked={form.showSerialPublic && Boolean(form.serial.trim())} onChange={(event) => setForm((current) => ({ ...current, showSerialPublic: event.target.checked }))} />
                     Show Serial Number publicly
                   </label>
-                  <p className="fine-print">The signed-in owner and authorized admin retain the Serial Number even when its separate public field is hidden.</p>
+                  <p className="fine-print">This hides only the Serial Number field. The permanent QR ID and URL may still include the serial. Choose a private Profile to restrict access to the signed-in owner and authorized admin.</p>
                 </section>
 
 

@@ -786,3 +786,29 @@
 .primaryActions :global(.button):first-child:disabled {
   opacity: .55;
 }
+
+/* Owner cards use the same paper palette as the public collection. */
+.instrumentTable, .instrumentRow {
+  background: var(--panel);
+  border-color: var(--line);
+  box-shadow: none;
+}
+.instrumentRow:last-child { border-color: var(--line); }
+.instrumentThumb { background: var(--surface-soft); border-color: var(--line); }
+.instrumentThumb span { background: var(--panel); color: var(--text); border-color: var(--line); }
+.instrumentInfo strong { font-family: Georgia, "Times New Roman", serif; font-weight: 400; font-size: 1.5rem; }
+.dashboardIdentity { color: var(--muted); font-size: .8rem; }
+.instrumentMeta, .instrumentMeta span + span, .qrActionColumn, .compactQr { border-color: var(--line); }
+.qrActionColumn { background: var(--surface-soft); }
+.instrumentMeta span, .compactQr span { font-size: .75rem; font-weight: 500; }
+.moreButton, .moreMenu > summary, .moreMenuBody, .moreMenuBody a, .moreMenuBody button,
+.drawerIdentity, .drawerSections section, .drawerSections section a, .drawerSections section button {
+  color: var(--text);
+  background: var(--panel);
+  border-color: var(--line);
+  font-weight: 600;
+}
+.moreButton, .primaryActions :global(.button) { min-height: 44px; font-size: .8125rem; }
+.profileNumber { color: #f8f2e5; background: #172a20; border-color: #405343; }
+.dangerAction { color: #a12f29 !important; border-color: #d5a39a !important; }
+.drawerSections > section > p { grid-column: 1 / -1; margin: 0; font-size: .8rem; line-height: 1.5; }

@@ -10,7 +10,7 @@ export const fetchCache = "force-no-store";
 
 const EVIDENCE_BUCKET = "instrument-documents";
 const MAX_EVIDENCE_FILES = 3;
-const MAX_EVIDENCE_BYTES = 10 * 1024 * 1024;
+const MAX_EVIDENCE_BYTES = 3_000_000;
 const HEADERS = { "Cache-Control": "no-store, no-cache, must-revalidate" };
 class ClaimStateConflict extends Error {}
 const ALLOWED_EVIDENCE_TYPES = new Map([
@@ -33,6 +33,7 @@ type ClaimRow = {
   admin_review_note: string | null;
   expires_at: string | null;
   decided_at: string | null;
+  decided_by?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -44,6 +45,8 @@ type GuitarRow = {
   name: string | null;
   brand: string | null;
   model: string | null;
+  admin_archived_at?: string | null;
+  owner_removed_at?: string | null;
 };
 
 type EvidenceInput = { name?: string; dataUrl?: string; type?: string; note?: string };
@@ -71,8 +74,15 @@ function parseEvidence(input: EvidenceInput) {
   const extension = ALLOWED_EVIDENCE_TYPES.get(match[1]);
   if (!extension) throw new Error("Evidence must be a PDF, JPG, PNG, or WEBP file.");
   const bytes = Buffer.from(match[2], "base64");
-  if (!bytes.length || bytes.length > MAX_EVIDENCE_BYTES) throw new Error("Each evidence file must be 10 MB or smaller.");
+  if (!bytes.length || bytes.length > MAX_EVIDENCE_BYTES) throw new Error("Evidence must total 3 MB or less.");
   return { mimeType: match[1], extension, bytes };
+}
+
+function validateEvidence(evidence: EvidenceInput[]) {
+  try {
+    const bytes = evidence.reduce((total, file) => total + parseEvidence(file).bytes.length, 0);
+    return bytes > MAX_EVIDENCE_BYTES ? "Evidence must total 3 MB or less. Choose smaller files and try again." : "";
+  } catch (error) { return error instanceof Error ? error.message : "Could not read the evidence."; }
 }
 
 async function findGuitarBySerial(supabase: NonNullable<ReturnType<typeof createServerSupabaseClient>>, normalized: string) {
@@ -103,7 +113,7 @@ async function findGuitarByIdentifier(supabase: NonNullable<ReturnType<typeof cr
 async function loadGuitar(supabase: NonNullable<ReturnType<typeof createServerSupabaseClient>>, guitarId: string) {
   return supabase
     .from("guitars")
-    .select("id,owner_id,qr_code,name,brand,model")
+    .select("id,owner_id,qr_code,name,brand,model,admin_archived_at,owner_removed_at")
     .eq("id", guitarId)
     .maybeSingle<GuitarRow>();
 }
@@ -150,9 +160,10 @@ export async function GET(request: Request) {
   const guitarIds = [...new Set(claims.map((claim) => claim.guitar_id))];
   const claimIds = claims.map((claim) => claim.id);
   const [guitarsResult, evidenceResult] = await Promise.all([
-    guitarIds.length ? supabase.from("guitars").select("id,owner_id,qr_code,name,brand,model").in("id", guitarIds) : Promise.resolve({ data: [], error: null }),
+    guitarIds.length ? supabase.from("guitars").select("id,owner_id,qr_code,name,brand,model,admin_archived_at,owner_removed_at").in("id", guitarIds) : Promise.resolve({ data: [], error: null }),
     claimIds.length ? supabase.from("ownership_claim_evidence").select("id,claim_id,evidence_type,file_name,storage_path,private_note,created_at").in("claim_id", claimIds) : Promise.resolve({ data: [], error: null })
   ]);
+  if (guitarsResult.error || evidenceResult.error) return json({ ok: false, message: "Ownership request details are temporarily unavailable. Please retry." }, 503);
   const guitars = new Map(((guitarsResult.data || []) as GuitarRow[]).map((guitar) => [guitar.id, guitar]));
   const evidenceCounts = new Map<string, number>();
   const evidenceByClaim = new Map<string, ClaimEvidenceRow[]>();
@@ -162,11 +173,11 @@ export async function GET(request: Request) {
   }
 
   const safeEvidenceByClaim = new Map<string, Array<{ id: string; type: string; fileName: string; note: string; url: string; createdAt: string }>>();
-  await Promise.all(claims.map(async (claim) => {
+  try { await Promise.all(claims.map(async (claim) => {
     if (!admin.ok && claim.current_owner_id !== auth.user?.id) return;
     const safeEvidence = await Promise.all((evidenceByClaim.get(claim.id) || []).map(async (row) => {
       const signed = await supabase.storage.from(EVIDENCE_BUCKET).createSignedUrl(row.storage_path, 5 * 60);
-      if (signed.error || !signed.data?.signedUrl) return null;
+      if (signed.error || !signed.data?.signedUrl) throw new Error("Private evidence links are temporarily unavailable.");
       return {
         id: row.id,
         type: row.evidence_type,
@@ -177,7 +188,9 @@ export async function GET(request: Request) {
       };
     }));
     safeEvidenceByClaim.set(claim.id, safeEvidence.filter(Boolean) as Array<{ id: string; type: string; fileName: string; note: string; url: string; createdAt: string }>);
-  }));
+  })); } catch {
+    return json({ ok: false, message: "Private evidence links are temporarily unavailable. Please retry." }, 503);
+  }
 
   return json({
     ok: true,
@@ -227,7 +240,8 @@ export async function POST(request: Request) {
     if (!guitarId) return json({ ok: false, message: "No QRguitar Profile matches that ID or exact Serial Number." }, 404);
     const guitarResult = await loadGuitar(supabase, guitarId);
     const guitar = guitarResult.data;
-    if (guitarResult.error || !guitar) return json({ ok: false, message: "The matching Profile is unavailable." }, 404);
+    if (guitarResult.error) return json({ ok: false, message: "Profile lookup is temporarily unavailable." }, 503);
+    if (!guitar || guitar.admin_archived_at || guitar.owner_removed_at) return json({ ok: false, message: "The matching Profile is unavailable." }, 404);
     if (guitar.owner_id === auth.user.id) return json({ ok: false, message: "This QRguitar Profile is already in your account." }, 409);
 
     const existing = await supabase
@@ -237,8 +251,11 @@ export async function POST(request: Request) {
       .eq("claimant_user_id", auth.user.id)
       .in("status", ["awaiting_claimant", "awaiting_owner", "admin_review"])
       .maybeSingle<{ id: string; status: string }>();
+    if (existing.error) return json({ ok: false, message: "Could not check existing ownership requests. Please retry." }, 503);
     if (existing.data) return json({ ok: false, message: "You already have an active ownership request for this Profile." }, 409);
 
+    const evidenceError = validateEvidence(evidence);
+    if (evidenceError) return json({ ok: false, message: evidenceError }, 400);
     const claimInsert = await supabase.from("ownership_claims").insert({
       guitar_id: guitar.id,
       claim_type: claimType,
@@ -307,12 +324,14 @@ export async function PATCH(request: Request) {
   if (!id || !action || !["cancel", "approve", "deny", "request_information", "expire", "resubmit"].includes(action)) return json({ ok: false, message: "A valid ownership request action is required." }, 400);
   const claimResult = await supabase.from("ownership_claims").select("*").eq("id", id).maybeSingle<ClaimRow>();
   const claim = claimResult.data;
-  if (claimResult.error || !claim) return json({ ok: false, message: "Ownership request not found." }, 404);
-  if (!["awaiting_claimant", "awaiting_owner", "admin_review"].includes(claim.status)) return json({ ok: false, message: "This ownership request is already closed." }, 409);
+  if (claimResult.error) return json({ ok: false, message: "Ownership request lookup is temporarily unavailable. Please retry." }, 503);
+  if (!claim) return json({ ok: false, message: "Ownership request not found." }, 404);
+  if (!(action === "approve" && claim.status === "approved" && claim.decided_by === auth.user.id) && !["awaiting_claimant", "awaiting_owner", "admin_review"].includes(claim.status)) return json({ ok: false, message: "This ownership request is already closed." }, 409);
 
   const admin = await getAdminContext(request);
   const isAdmin = admin.ok;
   const note = cleanText(body.note, 1000);
+  if ((action === "approve" || action === "resubmit") && claim.status !== "approved" && claim.expires_at && Date.parse(claim.expires_at) <= Date.now()) return json({ ok: false, message: "This ownership request has expired." }, 409);
   const adminDecision = action === "approve" || action === "deny" || action === "request_information" || action === "expire";
   if (isAdmin && adminDecision && !note) {
     return json({ ok: false, message: "An operator reason is required for the audit trail." }, 400);
@@ -323,6 +342,8 @@ export async function PATCH(request: Request) {
     }
     const evidence = Array.isArray(body.evidence) ? body.evidence.slice(0, MAX_EVIDENCE_FILES) : [];
     if (!evidence.length) return json({ ok: false, message: "Add at least one requested evidence file." }, 400);
+    const evidenceError = validateEvidence(evidence);
+    if (evidenceError) return json({ ok: false, message: evidenceError }, 400);
     const uploadedPaths: string[] = [];
     try {
       for (const [index, file] of evidence.entries()) {
@@ -377,8 +398,17 @@ export async function PATCH(request: Request) {
     if (!result.data) return json({ ok: false, message: "This ownership request changed while you were reviewing it. Refresh and try again." }, 409);
   } else {
     if (claim.current_owner_id !== auth.user.id && !isAdmin) return json({ ok: false, message: "Current owner or admin review is required." }, 403);
-    const approved = await supabase.rpc("approve_ownership_claim", { p_claim_id: id, p_decided_by: auth.user.id, p_decision_note: note || null });
-    if (approved.error) return json({ ok: false, message: approved.error.message || "Could not approve the ownership request." }, 409);
+    let approved;
+    try {
+      approved = await supabase.rpc("approve_ownership_claim", { p_claim_id: id, p_decided_by: auth.user.id, p_decision_note: note || null, p_env_admin: isAdmin && admin.accessSource === "env" });
+    } catch {
+      return json({ ok: false, uncertain: true, message: "Could not confirm approval. Reload the request before trying again." }, 503);
+    }
+    if (approved.error) {
+      const conflict = ["QC001","QC002","QC003","42501","22023"].includes(approved.error.code || "");
+      return json({ ok: false, ...(!conflict ? { uncertain: true } : {}), message: conflict ? approved.error.message : "Could not confirm approval. Reload the request before trying again." }, conflict ? 409 : 503);
+    }
+    if (!approved.data || approved.data.ok !== true || approved.data.claim_id !== id) return json({ ok: false, uncertain: true, message: "Could not confirm approval. Reload the request before trying again." }, 503);
     return json({ ok: true, message: "Ownership transferred. The QRguitar ID and permanent Profile URL did not change." });
   }
 

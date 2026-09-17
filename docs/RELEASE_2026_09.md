@@ -29,6 +29,11 @@ Apply the reviewed candidate migrations in this order after their historical pre
 11. `20260911003500_atomic_site_editor.sql`
 12. `20260911004000_beta_plan_quota.sql`
 13. `20260911004500_release_readiness.sql`
+14. `20260917170000_ownership_claim_guards.sql`
+15. `20260917172000_account_settings_versions.sql`
+16. `20260917173000_release_readiness.sql`
+
+For an installation already on release `2026-09-10.1`, the September 17 update applies only migrations 14–16 after verifying that baseline. The claim migration adds a service-only four-argument approval function, rechecks expiry, current ownership, account eligibility, and archived/removed instruments under lock, and revokes execution of the unsafe three-argument overload. The account migration adds a version column and a locked, version-checked save function so a delayed request cannot overwrite a newer save. The old unversioned account entry point is revoked. Existing clients must reload. Existing instrument QR identifiers remain unchanged. The matching readiness migration requires both reviewed implementations and blocks their old grants.
 
 The staged-upload wrapper and its private backing function must be installed together. Quota04000 patches the private backing function without enabling direct invocation. Do not restore old API-role grants afterward.
 
@@ -40,7 +45,7 @@ Wait for the PostgREST schema cache to recognize the new functions, then run:
 npm run release:database
 ```
 
-The service-only `qrguitar_release_readiness()` RPC checks the exact reviewed function implementations and signatures, client grants, private tables/buckets, policies, receipt uniqueness, editor versioning, and provenance triggers. All 14 checks must pass for release version `2026-09-10.1`. A missing RPC, incomplete response, changed implementation, or privilege drift blocks release. Inspect and fix the cause; do not regenerate fingerprints from an unreviewed live database just to make the check green.
+The service-only `qrguitar_release_readiness()` RPC checks the exact reviewed function implementations and signatures, client grants, private tables/buckets, policies, receipt uniqueness, editor versioning, and provenance triggers. All 14 checks must pass for release version `2026-09-17.1`. A missing RPC, incomplete response, changed implementation, or privilege drift blocks release. Inspect and fix the cause; do not regenerate fingerprints from an unreviewed live database just to make the check green.
 
 ## Application release
 

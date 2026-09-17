@@ -8,10 +8,10 @@ const repo = path.resolve(args.includes("--repo") ? option("--repo") : path.join
 const overlay = args.includes("--overlay") ? path.resolve(option("--overlay")) : null;
 const user = { id: "11111111-1111-4111-8111-111111111111", email: "synthetic@example.test", user_metadata: { display_name: "Old", unchanged: "metadata" } };
 const collection = { enabled: true, handle: "valid-handle", publicName: "Collection", accountType: "collector" };
-const req = (body) => new Request("https://test.invalid/api/account", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+const req = (body) => new Request("https://test.invalid/api/account", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedVersion: 0, ...body }) });
 function fixture(hooks = {}) {
   const tables = {
-    profiles: [{ id: user.id, display_name: "Old", role: "shop", plan: "business", account_status: "active" }],
+    profiles: [{ id: user.id, display_name: "Old", role: "shop", plan: "business", account_status: "active", account_settings_version: 0 }],
     site_content: [{ content_key: "public_collection_owner:" + user.id, content_value: collection }],
     guitars: Array.from({ length: 3306 }, (_, i) => ({ id: String(i), owner_id: user.id,
       owner_removed_at: null, visibility: ["public", "private", "unlisted"][i % 3], hero_image_path: i % 2 === 0 ? "image.jpg" : null }))
@@ -19,7 +19,7 @@ function fixture(hooks = {}) {
   };
   const db = createMemoryDatabase(tables, hooks);
   const rpcCalls = [], metadataCalls = [];
-  db.rpc = async (name, args) => { rpcCalls.push({ name, args }); return { data: { displayName: args.p_display_name, publicCollection: args.p_collection || collection }, error: null }; };
+  db.rpc = async (name, args) => { rpcCalls.push({ name, args }); return { data: { displayName: args.p_display_name, publicCollection: args.p_collection || collection, settingsVersion: args.p_expected_version + 1 }, error: null }; };
   db.auth.admin.updateUserById = async (...args) => { metadataCalls.push(args); return { error: null }; };
   const routes = loadRoutes(repo, db, { user, overlay })("apps/web/app/api/account/route.ts");
   return { tables, db, rpcCalls, metadataCalls, routes };
@@ -69,7 +69,8 @@ await test("one RPC uses only the authenticated actor and normalized settings; A
   assert.equal(f.rpcCalls.length, 1); assert.equal(f.rpcCalls[0].name, "save_account_settings");
   assert.equal(f.rpcCalls[0].args.p_user_id, user.id); assert.equal(f.rpcCalls[0].args.p_collection.ownerId, user.id);
   assert.equal(f.rpcCalls[0].args.p_collection.handle, "valid-handle"); assert.equal(f.rpcCalls[0].args.p_display_name, "Valid name");
-  assert.deepEqual(Object.keys(f.rpcCalls[0].args).sort(), ["p_collection", "p_display_name", "p_user_id"]);
+  assert.deepEqual(Object.keys(f.rpcCalls[0].args).sort(), ["p_collection", "p_display_name", "p_expected_version", "p_user_id"]);
+  assert.equal(f.rpcCalls[0].args.p_expected_version, 0); assert.equal(result.account.settingsVersion, 1);
   assert.deepEqual(JSON.parse(JSON.stringify(f.metadataCalls)), [[user.id, { user_metadata: { display_name: "Valid name" } }]]);
   assert.equal(f.db.calls.filter((item) => item.operation !== "select").length, 0);
 });
@@ -79,7 +80,7 @@ await test("name-only save returns the unchanged committed collection", async ()
   assert.equal(f.rpcCalls[0].args.p_collection, null);
   assert.equal(result.account.publicCollection.handle, collection.handle);
 });
-for (const [code, status] of [["23505", 409], ["42501", 403], ["22023", 400], ["57014", 503], ["PGRST202", 503]]) await test("RPC error " + code + " maps to " + status + " and prevents Auth writes", async () => {
+for (const [code, status] of [["23505", 409], ["40001", 409], ["42501", 403], ["22023", 400], ["57014", 503], ["PGRST202", 503]]) await test("RPC error " + code + " maps to " + status + " and prevents Auth writes", async () => {
   const f = fixture(); f.db.rpc = async () => ({ data: null, error: { code, message: "synthetic database rejection" } });
   const response = await f.routes.PATCH(req({ displayName: "Valid name", publicCollection: collection }));
   assert.equal(response.status, status); assert.equal((await response.json()).ok, false); assert.equal(f.metadataCalls.length, 0);
@@ -104,6 +105,76 @@ await test("unauthenticated reads and writes do not reach account data", async (
   assert.equal((await route.GET(new Request("https://test.invalid/api/account"))).status, 401);
   assert.equal((await route.PATCH(req({ displayName: "Valid name" }))).status, 401);
   assert.equal(f.db.calls.length, 0); assert.equal(f.rpcCalls.length, 0); assert.equal(f.metadataCalls.length, 0);
+});
+for (const websiteUrl of ["example.com", "https://", "http://example.com", "javascript:alert(1)", "https://user:password@example.com", "https://example.com\\@elsewhere.test", "https://shop.example/" + "é".repeat(100), null, { url: "https://example.com" }]) await test("invalid website is rejected without losing saved account data: " + JSON.stringify(websiteUrl), async () => {
+  const f = fixture();
+  const response = await f.routes.PATCH(req({ displayName: "Valid name", publicCollection: { ...collection, websiteUrl } }));
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).message, /website address/i);
+  assert.equal(f.rpcCalls.length, 0);
+  assert.equal(f.metadataCalls.length, 0);
+});
+await test("pasted HTTPS website whitespace is normalized before the atomic save", async () => {
+  const f = fixture();
+  const response = await f.routes.PATCH(req({ displayName: "Valid name", publicCollection: { ...collection, websiteUrl: "  https://shop.example/store?category=guitars  " } }));
+  assert.equal(response.status, 200);
+  assert.equal(f.rpcCalls[0].args.p_collection.websiteUrl, "https://shop.example/store?category=guitars");
+  assert.equal((await response.json()).account.publicCollection.websiteUrl, "https://shop.example/store?category=guitars");
+});
+await test("workspace preference and website can be saved without publishing a collection", async () => {
+  const f = fixture();
+  const response = await f.routes.PATCH(req({ displayName: "Valid name", publicCollection: { enabled: false, accountType: "luthier", websiteUrl: "https://repairs.example" } }));
+  assert.equal(response.status, 200);
+  assert.equal(f.rpcCalls[0].args.p_collection.enabled, false);
+  assert.equal(f.rpcCalls[0].args.p_collection.accountType, "luthier");
+  assert.equal(f.rpcCalls[0].args.p_collection.websiteUrl, "https://repairs.example/");
+});
+await test("GET returns a coherent versioned account snapshot", async () => {
+  const f = fixture(); f.tables.profiles[0].account_settings_version = 7;
+  const result = await (await f.routes.GET(new Request("https://test.invalid/api/account"))).json();
+  assert.equal(result.account.settingsVersion, 7);
+  assert.deepEqual(f.db.calls.filter((call) => ["profiles", "site_content"].includes(call.table)).map((call) => call.table), ["profiles", "site_content", "profiles"]);
+});
+for (const point of ["after initial profile", "after collection"]) await test("GET rejects a save interleaved " + point, async () => {
+  let profiles = 0, changed = false;
+  const f = fixture({ after(query) {
+    if (query.table === "profiles") profiles++;
+    if (!changed && ((point === "after initial profile" && query.table === "profiles" && profiles === 1) || (point === "after collection" && query.table === "site_content"))) {
+      changed = true; f.tables.profiles[0].account_settings_version++; f.tables.profiles[0].display_name = "Newer name";
+      f.tables.site_content[0].content_value = { ...collection, handle: "newer-collection" };
+    }
+  } });
+  const response = await f.routes.GET(new Request("https://test.invalid/api/account"));
+  assert.equal(response.status, 503); assert.equal((await response.json()).account, undefined);
+});
+await test("failed final version read cannot publish a mixed snapshot", async () => {
+  let profiles = 0;
+  const f = fixture({ before(query) { if (query.table === "profiles" && ++profiles === 2) return { data: null, error: { message: "unavailable" } }; } });
+  assert.equal((await f.routes.GET(new Request("https://test.invalid/api/account"))).status, 503);
+});
+for (const version of [undefined, null, -1, 1.5, "0", Number.MAX_SAFE_INTEGER + 1]) await test("GET fails closed for invalid saved version " + version, async () => {
+  const f = fixture(); f.tables.profiles[0].account_settings_version = version;
+  assert.equal((await f.routes.GET(new Request("https://test.invalid/api/account"))).status, 503);
+});
+await test("new account with no profile can begin at version zero", async () => {
+  const f = fixture(); f.tables.profiles = []; f.tables.site_content = [];
+  const result = await (await f.routes.GET(new Request("https://test.invalid/api/account"))).json();
+  assert.equal(result.account.settingsVersion, 0);
+});
+for (const expectedVersion of [undefined, null, -1, 1.5, "0", Number.MAX_SAFE_INTEGER]) await test("PATCH rejects invalid expected version " + expectedVersion + " before writes", async () => {
+  const f = fixture(); const response = await f.routes.PATCH(req({ displayName: "New name", expectedVersion }));
+  assert.equal(response.status, 400); assert.equal((await response.json()).reloadRequired, true);
+  assert.equal(f.rpcCalls.length, 0); assert.equal(f.metadataCalls.length, 0);
+});
+await test("stale save is a reload-required conflict without any auth mutation", async () => {
+  const f = fixture(); f.db.rpc = async () => ({ error: { code: "40001" } });
+  const response = await f.routes.PATCH(req({ displayName: "New name" })), result = await response.json();
+  assert.equal(response.status, 409); assert.equal(result.reloadRequired, true); assert.match(result.message, /Reload/); assert.equal(f.metadataCalls.length, 0);
+});
+for (const settingsVersion of [undefined, 0, 2, "1"]) await test("invalid committed version " + settingsVersion + " is unconfirmed", async () => {
+  const f = fixture(); f.db.rpc = async () => ({ data: { displayName: "New name", publicCollection: collection, settingsVersion }, error: null });
+  const response = await f.routes.PATCH(req({ displayName: "New name" }));
+  assert.equal(response.status, 503); assert.equal((await response.json()).commitStatus, "unknown"); assert.equal(f.metadataCalls.length, 0);
 });
 console.log(passes + " mocked account route tests passed.");
 

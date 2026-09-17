@@ -118,6 +118,7 @@ export function HowItWorksClient({ settings }: { settings: EditableSiteSettings 
             <div className="shell product-guide-visibility-heading">
               <h2>{getContentValue(content, "howItWorks.privacy.heading")}</h2>
               <p>{getContentValue(content, "howItWorks.privacy.body")}</p>
+              <p className="fine-print">Hiding the Serial Number field does not change the permanent QR ID or URL, which may include that serial. Choose a Private Profile when access must be restricted.</p>
             </div>
             <div className="shell product-guide-visibility-grid" aria-label="Profile visibility options">
               {visibility.map((item) => <article key={item.title}><item.icon /><div><strong>{getContentValue(content, item.title)}</strong><span>{getContentValue(content, item.body)}</span></div></article>)}

@@ -3,6 +3,7 @@
 import { Share2 } from "lucide-react";
 import type { MouseEvent } from "react";
 import { useState } from "react";
+import { publicProfileUrl } from "../lib/profile-url";
 
 type RecordShareButtonProps = {
   code: string;
@@ -11,11 +12,9 @@ type RecordShareButtonProps = {
   showLabel?: boolean;
 };
 
-const publicSiteUrl = "https://www.qrguitar.com";
-
 export function RecordShareButton({ code, title, className = "", showLabel = false }: RecordShareButtonProps) {
   const [status, setStatus] = useState<"idle" | "copied" | "ready">("idle");
-  const url = `${publicSiteUrl}/i/${encodeURIComponent(code)}`;
+  const url = publicProfileUrl(code);
   const label = title || code;
 
   async function shareRecord(event: MouseEvent<HTMLButtonElement>) {

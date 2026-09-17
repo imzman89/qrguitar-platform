@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
-import { getProfilePhotoUrls } from "../../lib/instrument-profile-contract";
 import { getPublicInstruments } from "../../lib/public-instruments";
+import { buildCollectionDirectory } from "../../lib/collection-directory";
+import { CollectionsDirectoryClient } from "./CollectionsDirectoryClient";
+import styles from "./collections.module.css";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -16,24 +18,15 @@ export const metadata: Metadata = {
 
 export default async function CollectionsDirectoryPage() {
   const records = await getPublicInstruments();
-  const grouped = new Map<string, { handle: string; name: string; accountType: string; count: number; image: string }>();
-  for (const record of records) {
-    const collection = record.publicCollection;
-    if (!collection?.handle || !collection.publicName) continue;
-    const existing = grouped.get(collection.handle);
-    const image = getProfilePhotoUrls(record)[0] || "";
-    grouped.set(collection.handle, existing
-      ? { ...existing, count: existing.count + 1, image: existing.image || image }
-      : { handle: collection.handle, name: collection.publicName, accountType: collection.accountType, count: 1, image });
-  }
-  const collections = [...grouped.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  const collections = buildCollectionDirectory(records);
 
   return <>
     <Nav />
     <main className="section collection-directory-page">
       <div className="shell">
-        <header className="collection-directory-hero"><div><div className="eyebrow">Member collections</div><h1>See who is building, playing, repairing, and collecting.</h1><p>Open public collections from players, shops, builders, brands, and service professionals. Each instrument keeps its own permanent QRguitar Profile.</p></div>{collections.length ? <Link className="button" href="/account?section=collection">Publish your collection</Link> : null}</header>
-        {collections.length ? <div className="collection-directory-grid">{collections.map((collection) => <Link className="collection-directory-card" href={`/collections/${collection.handle}`} key={collection.handle}>{collection.image ? <img src={collection.image} alt="" /> : <div className="collection-directory-placeholder" aria-hidden="true">QR</div>}<div><span>{collection.accountType || "Member"}</span><h2>{collection.name}</h2><p>{collection.count} public {collection.count === 1 ? "Profile" : "Profiles"}</p></div></Link>)}</div> : <div className="empty-state collection-directory-empty"><div className="eyebrow">Your public showcase</div><h2>Share a collection when you are ready.</h2><p>Choose a public name and turn collection sharing on. Only public Profiles appear; private and unlisted Profiles stay hidden.</p><div className="form-actions"><Link className="button" href="/account?section=collection">Publish your collection</Link><Link className="button secondary" href="/catalog">Browse the Catalog</Link></div></div>}
+        <nav className={styles.navigation} aria-label="Explore QRguitar"><Link href="/catalog">Browse instrument Profiles</Link><Link href="/account?section=collection">Your collection settings</Link></nav>
+        <header className="collection-directory-hero"><div><div className="eyebrow">Member collections</div><h1>Meet the people behind the instruments.</h1><p>Explore public collections from players, collectors, stores, builders, brands, and repair shops. Open a collection to view that member’s public instrument Profiles.</p></div>{collections.length ? <Link className="button" href="/account?section=collection">Publish your collection</Link> : null}</header>
+        <CollectionsDirectoryClient collections={collections} />
       </div>
     </main>
     <Footer />

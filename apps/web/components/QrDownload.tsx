@@ -4,6 +4,7 @@ import { Download, X } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useMemo, useState } from "react";
 import { defaultQrStyle, type QrStyle } from "../lib/local-demo";
+import { publicProfileUrl } from "../lib/profile-url";
 
 type QrDownloadProps = {
   code: string;
@@ -31,7 +32,6 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHando
   const [labelInput, setLabelInput] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
-  const profilePath = `/i/${code}`;
   const isTransparent = style.background === "transparent";
 
   const incomingStyle = useMemo(
@@ -39,13 +39,7 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHando
     [qrStyle]
   );
 
-  const profileUrl = useMemo(() => {
-    if (typeof window === "undefined") {
-      return profilePath;
-    }
-
-    return `${window.location.origin}${profilePath}`;
-  }, [profilePath]);
+  const profileUrl = publicProfileUrl(code);
 
   const fallbackLabelText = useMemo(() => {
     const trimmed = label?.trim();

@@ -1223,7 +1223,7 @@ export default function EditInstrumentPage() {
                 </label>
               </div>
               <p className="fine-print">
-                Hidden serials stay private on public pages. No-serial records require QRguitar approval before verification or authenticity confirmation.
+                This hides only the Serial Number field. The permanent QR ID and URL may still include the serial. Choose a private Profile to restrict access. No-serial records require QRguitar approval before verification or authenticity confirmation.
               </p>
               <p className="fine-print">
                 Originality is an owner-stated modification status for search and disclosure. It is not QRguitar authentication or verification.
@@ -1980,4 +1980,3 @@ function CategoryField({
     </div>
   );
 }
-

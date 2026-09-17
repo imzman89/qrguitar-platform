@@ -65,9 +65,9 @@ includes(editor, "This Profile is verified by QRguitar.", "The owner editor must
 includes(transfer, "This Profile now belongs to the accepting account", "Transfer completion must describe the Profile consistently.");
 includes(siteCompositionEditor, 'section.visible ? "Shown" : "Hidden"', "Content Studio visibility states must use Shown/Hidden language.");
 includes(collectibleCard, "Photo unavailable", "Collectible cards need a concise photo fallback.");
-includes(account, "const [authReady, setAuthReady]", "Account must distinguish session loading from signed-out state.");
+includes(account, "createAccountSettings", "Account must use the authenticated account lifecycle controller.");
 includes(account, "Loading your account...", "Account must show a neutral loading state while authentication resolves.");
-assert(account.indexOf("if (!authReady)") < account.indexOf("if (!signedIn)"), "Account must settle authentication before rendering signed-out actions.");
+assert(account.includes('state.phase === "loading"') && account.indexOf('state.phase === "loading"') < account.indexOf('state.phase === "signed-out"'), "Account must settle authentication before rendering signed-out actions.");
 includes(quickEdit, 'document.body.style.overflow = "hidden"', "Quick Edit must lock background scrolling while open.");
 includes(quickEdit, 'event.key === "Escape"', "Quick Edit must close with Escape.");
 includes(quickEdit, 'returnFocusRef.current?.focus()', "Quick Edit must restore focus to its trigger.");

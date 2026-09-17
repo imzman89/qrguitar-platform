@@ -320,7 +320,7 @@ export function HomePageClient({
   return (
     <>
       <Nav />
-      <main className={styles.home}>
+      <main className={`home-page ${styles.home}`}>
         {homeSections.filter((section) => section.visible).map((section) => <Fragment key={section.id}>{renderedSections[section.id] || null}</Fragment>)}
       </main>
       <Footer />

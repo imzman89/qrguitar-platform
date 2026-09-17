@@ -13,6 +13,8 @@ import { ProfileStatusBadges } from "../../components/ProfileStatusBadges";
 import { ProfileQuickEdit } from "../../components/ProfileQuickEdit";
 import { QrDownload } from "../../components/QrDownload";
 import { RecordShareButton } from "../../components/RecordShareButton";
+import { WorkspaceActions } from "../../components/WorkspaceActions";
+import { getWorkspace } from "../../lib/workspace-tools";
 import styles from "./dashboard-records.module.css";
 import { defaultSiteSettings, fetchPublishedSiteSettings } from "../../lib/site-settings";
 import {
@@ -113,6 +115,7 @@ export default function DashboardPage() {
   const [quickEditRecord, setQuickEditRecord] = useState<DemoInstrument | null>(null);
   const [collectionHandle, setCollectionHandle] = useState("");
   const [collectionAccountType, setCollectionAccountType] = useState("");
+  const workspace = getWorkspace(collectionAccountType);
   const [actionRecord, setActionRecord] = useState<DemoInstrument | null>(null);
   const [actionTrigger, setActionTrigger] = useState<HTMLElement | null>(null);
 
@@ -369,22 +372,24 @@ export default function DashboardPage() {
         <div className="shell">
           <div className="dashboard-hero">
             <div>
-              <div className="eyebrow">Owner workspace</div>
-              <h1>{getContentValue(content, "dashboard.hero.headline")}</h1>
-              <p>{getContentValue(content, "dashboard.hero.body")}</p>
+              <div className="eyebrow">{workspace.label}</div>
+              <h1>{collectionAccountType ? workspace.title : getContentValue(content, "dashboard.hero.headline")}</h1>
+              <p>{collectionAccountType ? workspace.description : getContentValue(content, "dashboard.hero.body")}</p>
             </div>
             <div className="dashboard-buttons">
-              <Link className="button" href="/create">{getContentValue(content, "dashboard.actions.create")}</Link>
-              <Link className="button secondary" href="/dashboard/import"><FileSpreadsheet size={16} /> {getContentValue(content, "dashboard.actions.bulk")}</Link>
+              {collectionAccountType === "luthier" ? <Link className="button" href="/dashboard/service"><Wrench size={16} /> Open service workbench</Link> : <Link className="button" href="/create">{getContentValue(content, "dashboard.actions.create")}</Link>}
+              {collectionAccountType === "shop" || collectionAccountType === "builder" ? <Link className="button secondary" href="/dashboard/import"><FileSpreadsheet size={16} /> {getContentValue(content, "dashboard.actions.bulk")}</Link> : <Link className="button secondary" href={collectionAccountType === "luthier" ? "/create" : "/account?section=collection"}>{collectionAccountType === "luthier" ? "Add your own instrument" : "Set up public collection"}</Link>}
             </div>
           </div>
           <nav className="dashboard-workspace-links" aria-label="Owner tools">
             <button type="button" onClick={focusServiceRequests}><Wrench size={15} /> Service review <span>{recordsLoaded ? pendingServiceRequests : "—"}</span></button>
-            <Link href="/ownership-claim">Claims &amp; transfers <span>{recordsLoaded ? pendingTransfers : "—"}</span></Link>
+            <Link href="/ownership-claim">Ownership claims</Link>
+            <a href="#ownership-transfers">Ownership transfers <span>{recordsLoaded ? pendingTransfers : "—"}</span></a>
             <Link href="/account?section=collection" title="Publish your public Profiles together and control member inquiries"><UsersRound size={15} /> Collection &amp; inquiries <span>{collectionHandle ? "Live" : "Set up"}</span></Link>
           </nav>
           {dashboardMessage ? <div className="admin-message" role="status">{dashboardMessage}</div> : null}
           {recordsError ? <div className="profile-refresh-notice" role="alert"><p>{recordsError} {recordsLoaded ? "Previously loaded Profiles are shown below." : "Your collection is not yet loaded."}</p><button type="button" className="button secondary" onClick={refreshInstruments}>Try again</button></div> : null}
+          <WorkspaceActions accountType={collectionAccountType} />
 
           <div className="stats-grid dashboard-metric-grid" aria-label="Collection overview">
             {stats.map((stat) => (
@@ -436,6 +441,17 @@ export default function DashboardPage() {
             </section>
           ) : null}
 
+          <details className="card dashboard-transfer-overview" id="ownership-transfers">
+            <summary>Ownership transfers <span>{recordsLoaded ? pendingTransfers : "—"} pending</span></summary>
+            <p>To send an instrument to a new owner, open its More menu below and choose Transfer Ownership. The instrument keeps its QRguitar ID, QR link, and history.</p>
+            {transfers.filter((transfer) => transfer.status === "sent" && instrumentCodes.has(transfer.guitarQrCode.toUpperCase())).map((transfer) => {
+              const record = instruments.find((instrument) => instrument.qrCode.toUpperCase() === transfer.guitarQrCode.toUpperCase());
+              return record ? <div className="dashboard-transfer-row" key={transfer.id}>
+                <span><strong>{dashboardRecordTitle(record)}</strong><small>{transferStatusLabel(transfer)}</small></span>
+                <button className="button secondary" type="button" onClick={(event) => { setActionTrigger(event.currentTarget); setActionRecord(record); }}>Manage transfer</button>
+              </div> : null;
+            })}
+          </details>
           <section className={`card ${styles.instrumentTable}`} id="saved-profiles">
             <div className={styles.tableHeader}>
               <div>
@@ -548,6 +564,7 @@ export default function DashboardPage() {
             </section>
             <section>
               <b>Privacy &amp; safety</b>
+              {actionRecord.serial ? <p className="fine-print">Hiding the serial field does not change the permanent QR ID or URL, which may contain the serial. Use private visibility to restrict access.</p> : null}
               {actionRecord.serial ? <button type="button" disabled={visibilityPendingCodes.includes(actionRecord.qrCode)} aria-busy={visibilityPendingCodes.includes(actionRecord.qrCode)} onClick={() => void updateSerialVisibility(actionRecord, !actionRecord.showSerialPublic)}><EyeOff size={15} /> {actionRecord.showSerialPublic ? "Hide Serial Number" : "Show Serial Number"}</button> : null}
               <Link href={`/edit/${actionRecord.qrCode}#privacy-safety`}><ShieldCheck size={15} /> Visibility &amp; safety</Link>
             </section>
@@ -934,5 +951,3 @@ function mapSupabaseUser(user: { email?: string; user_metadata?: Record<string, 
     verificationStatus: "unverified"
   };
 }
-
-
