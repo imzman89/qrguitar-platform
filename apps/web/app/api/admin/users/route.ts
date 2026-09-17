@@ -1,6 +1,7 @@
 import { adminJson, requireAdmin } from "../_utils";
-import { isAdminRole, normalizeEmail, readAdminEmailList } from "../../../../lib/admin-auth";
+import { isAdminRole, normalizeEmail, readAdminEmailList, type ServerSupabaseClient } from "../../../../lib/admin-auth";
 import { mergeRecordTrustSettings, recordTrustContentKey } from "../../../../lib/record-trust";
+import { ACCOUNT_DELETION_UNAVAILABLE } from "../../../../lib/admin-account-deletion-status";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -33,20 +34,30 @@ export async function GET(request: Request) {
     return access.response;
   }
 
-  const { supabase } = access;
+  try {
+    return await loadUsers(request, access.supabase);
+  } catch {
+    return adminJson({ ok: false, message: "Account information is unavailable. No account controls were changed." }, { status: 503 });
+  }
+}
+
+async function loadUsers(request: Request, supabase: ServerSupabaseClient) {
   const url = new URL(request.url);
   const search = String(url.searchParams.get("search") || "").trim().toLowerCase();
   const status = String(url.searchParams.get("status") || "").trim();
 
   const authUsers = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  if (authUsers.error) {
-    return adminJson({ ok: false, message: authUsers.error.message || "Could not list auth users." }, { status: 500 });
+  if (authUsers.error || !Array.isArray(authUsers.data?.users)) {
+    return adminJson({ ok: false, message: "Account information is unavailable. No account controls were changed." }, { status: 503 });
   }
 
   const profileResult = await supabase
     .from("profiles")
     .select("id,display_name,role,account_status,hide_public_content,admin_notes,created_at");
-  const profileRows = profileResult.error ? [] : ((profileResult.data || []) as ProfileRow[]);
+  if (profileResult.error || !Array.isArray(profileResult.data)) {
+    return adminJson({ ok: false, message: "Account information is unavailable. No account controls were changed." }, { status: 503 });
+  }
+  const profileRows = profileResult.data as ProfileRow[];
   const profiles = new Map(profileRows.map((profile) => [profile.id, profile]));
   const envAdminEmails = readAdminEmailList();
 
@@ -56,6 +67,9 @@ export async function GET(request: Request) {
     supabase.from("guitar_timeline_events").select("id,guitars(owner_id)"),
     supabase.from("ownership_transfers").select("id,from_owner_id,accepted_by,status")
   ]);
+  if ([guitars, documents, serviceEvents, transfers].some((result) => result.error || !Array.isArray(result.data))) {
+    return adminJson({ ok: false, message: "Account history is unavailable. No account controls were changed." }, { status: 503 });
+  }
 
   const guitarRows = (guitars.data || []) as Array<{ id: string; owner_id: string | null; qr_code?: string | null; status?: string | null; visibility: string | null }>;
   const recordCounts = countByOwner(guitarRows, "owner_id");
@@ -78,6 +92,9 @@ export async function GET(request: Request) {
   const trustResult = trustKeys.length
     ? await supabase.from("site_content").select("content_key,content_value").in("content_key", trustKeys)
     : { data: [], error: null };
+  if (trustResult.error || !Array.isArray(trustResult.data)) {
+    return adminJson({ ok: false, message: "Account history is unavailable. No account controls were changed." }, { status: 503 });
+  }
   const ownerByTrustKey = new Map(guitarRows.map((guitar) => [recordTrustContentKey(guitar.qr_code || ""), guitar.owner_id || ""]));
   const authenticityConfirmedCounts = new Map<string, number>();
   for (const row of (trustResult.data || []) as Array<{ content_key?: string | null; content_value?: unknown }>) {
@@ -140,8 +157,8 @@ export async function GET(request: Request) {
       hidePublicContent: profile?.hide_public_content === true,
       adminNotes: profile?.admin_notes || "",
       isEmpty: deleteBlockers.length === 0,
-      deleteEligible: deleteBlockers.length === 0,
-      deleteDisabledReason: deleteBlockers.length ? `Cannot delete: ${deleteBlockers.join(", ")}.` : "",
+      deleteEligible: false,
+      deleteDisabledReason: ACCOUNT_DELETION_UNAVAILABLE,
       recordCount: emptyCounts.recordCount,
       publicRecordCount: publicRecordCounts.get(user.id) || 0,
       privateRecordCount: privateRecordCounts.get(user.id) || 0,
@@ -174,8 +191,6 @@ export async function GET(request: Request) {
   return adminJson({
     ok: true,
     users,
-    migrationNotice: profileResult.error && /column .* does not exist/i.test(profileResult.error.message)
-      ? "Run supabase/admin-panel-foundation.sql to enable lock, ban, notes, and hide-public-content controls."
-      : ""
+    migrationNotice: ""
   });
 }

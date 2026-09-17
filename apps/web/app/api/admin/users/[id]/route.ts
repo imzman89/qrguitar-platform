@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { adminJson, cleanText, requireAdmin } from "../../_utils";
 import { isAdminRole, logAdminAuditEvent, normalizeEmail, readAdminEmailList, type ServerSupabaseClient } from "../../../../../lib/admin-auth";
-import { mergeRecordTrustSettings, recordTrustContentKey } from "../../../../../lib/record-trust";
+import { ACCOUNT_DELETION_UNAVAILABLE, inspectAccountDeletion, isAccountDeletionTarget } from "../../../../../lib/admin-account-deletion";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -35,52 +35,6 @@ async function countOtherAdminAccess(supabase: ServerSupabaseClient, targetUserI
   return roleAdmins + envAdmins;
 }
 
-async function loadDeleteEligibility(supabase: ServerSupabaseClient, targetUserId: string, targetIsEnvManaged: boolean) {
-  const blockers: string[] = [];
-  const [profileResult, guitarsResult, documentsResult, serviceResult, transfersResult] = await Promise.all([
-    supabase.from("profiles").select("role").eq("id", targetUserId).maybeSingle<{ role?: string | null }>(),
-    supabase.from("guitars").select("id,qr_code,status").eq("owner_id", targetUserId),
-    supabase.from("guitar_documents").select("id,guitars(owner_id)"),
-    supabase.from("guitar_timeline_events").select("id,guitars(owner_id)"),
-    supabase.from("ownership_transfers").select("id,from_owner_id,accepted_by").or(`from_owner_id.eq.${targetUserId},accepted_by.eq.${targetUserId}`)
-  ]);
-
-  const guitarRows = (guitarsResult.data || []) as Array<{ id?: string | null; qr_code?: string | null; status?: string | null }>;
-  const ownedNestedCount = (rows: unknown[]) => {
-    let count = 0;
-    for (const row of rows as Array<{ guitars?: { owner_id?: string | null } | Array<{ owner_id?: string | null }> }>) {
-      const guitar = Array.isArray(row.guitars) ? row.guitars[0] : row.guitars;
-      if (guitar?.owner_id === targetUserId) {
-        count += 1;
-      }
-    }
-    return count;
-  };
-  const proofCount = ownedNestedCount(documentsResult.data || []);
-  const serviceCount = ownedNestedCount(serviceResult.data || []);
-  const transferCount = ((transfersResult.data || []) as Array<unknown>).length;
-  const verifiedCount = guitarRows.filter((guitar) => guitar.status === "verified").length;
-  let authenticityConfirmedCount = 0;
-
-  const trustKeys = guitarRows.map((guitar) => guitar.qr_code ? recordTrustContentKey(guitar.qr_code) : "").filter(Boolean);
-  if (trustKeys.length) {
-    const trustResult = await supabase.from("site_content").select("content_value").in("content_key", trustKeys);
-    authenticityConfirmedCount = ((trustResult.data || []) as Array<{ content_value?: unknown }>)
-      .filter((row) => mergeRecordTrustSettings(row.content_value as Parameters<typeof mergeRecordTrustSettings>[0]).authenticityStatus === "confirmed").length;
-  }
-
-  if (targetIsEnvManaged) blockers.push("environment-managed admin");
-  if (isAdminRole(profileResult.data?.role)) blockers.push("admin access");
-  if (guitarRows.length) blockers.push("records");
-  if (proofCount) blockers.push("proof documents");
-  if (serviceCount) blockers.push("service history");
-  if (transferCount) blockers.push("transfers");
-  if (verifiedCount) blockers.push("verified records");
-  if (authenticityConfirmedCount) blockers.push("authenticity-confirmed records");
-
-  return { ok: blockers.length === 0, blockers };
-}
-
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const access = await requireAdmin(request);
   if (!access.ok) {
@@ -96,8 +50,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const body = (await request.json().catch(() => null)) as Body | null;
   const action = cleanText(body?.action, 60);
   const reason = cleanText(body?.reason, 1000);
+  if (action === "delete_empty_user" && !isAccountDeletionTarget(targetUserId)) {
+    return adminJson({ ok: false, message: "A valid account ID is required." }, { status: 400 });
+  }
   const now = new Date().toISOString();
-  const targetUser = await supabase.auth.admin.getUserById(targetUserId);
+  const targetUser = await supabase.auth.admin.getUserById(targetUserId).catch(() => null);
+  if (!targetUser || (targetUser.error && targetUser.error.status !== 404 && targetUser.error.code !== "user_not_found")) {
+    return adminJson({ ok: false, message: "Account lookup is unavailable. No account controls were changed." }, { status: 503 });
+  }
   const targetEmail = normalizeEmail(targetUser.data?.user?.email);
   const targetIsEnvManaged = readAdminEmailList().includes(targetEmail);
   const selfDestructiveAction = ["lock", "ban", "remove", "delete_empty_user", "change_role"].includes(action);
@@ -111,7 +71,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 
   if (targetIsEnvManaged && ["lock", "ban", "remove", "delete_empty_user", "change_role"].includes(action)) {
-    return adminJson({ ok: false, message: "This admin is managed by server environment settings." }, { status: 400 });
+    return adminJson({ ok: false, message: "This environment-managed admin is protected by server settings." }, { status: 400 });
   }
 
   if (!reason) {
@@ -187,33 +147,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     });
     auditAction = "user_restored";
   } else if (action === "delete_empty_user") {
-    const eligibility = await loadDeleteEligibility(supabase, targetUserId, targetIsEnvManaged);
-    if (!eligibility.ok) {
-      return adminJson({ ok: false, message: `Cannot delete this user: ${eligibility.blockers.join(", ")}.` }, { status: 400 });
+    const eligibility = await inspectAccountDeletion(supabase, targetUserId, targetEmail, targetIsEnvManaged);
+    if (!eligibility.readable) {
+      return adminJson({ ok: false, code: "account_deletion_checks_unavailable", message: "Account deletion checks are unavailable. No account or data was deleted. Restore access to all required account-history tables before reviewing this account." }, { status: 503 });
     }
-
-    await logAdminAuditEvent(supabase, {
-      actorUserId: admin.user?.id,
-      actorEmail: admin.email,
-      action: "empty_user_deleted",
-      targetType: "profile",
-      targetId: targetUserId,
-      targetUserId,
-      reason: auditReason || null,
-      metadata: { email: targetEmail ? "redacted" : "" }
-    });
-
-    const authDelete = await supabase.auth.admin.deleteUser(targetUserId);
-    if (authDelete.error) {
-      return adminJson({ ok: false, message: authDelete.error.message || "Could not delete user." }, { status: 500 });
+    if (eligibility.blockers.length) {
+      return adminJson({ ok: false, code: "account_deletion_retained_records", message: `Cannot delete this account: retained ${eligibility.blockers.join(", ")}. No account or data was deleted.` }, { status: 409 });
     }
-
-    await supabase.from("profiles").delete().eq("id", targetUserId);
-    revalidatePath("/");
-    revalidatePath("/catalog");
-    revalidatePath("/api/instruments");
-
-    return adminJson({ ok: true, message: "Empty user deleted." });
+    // An empty snapshot cannot authorize a later, separate Auth transaction.
+    // Do not emit a success audit or invoke deleteUser while this gap remains.
+    return adminJson({ ok: false, code: "account_deletion_disabled", message: ACCOUNT_DELETION_UNAVAILABLE }, { status: 503 });
   } else if (action === "hide_public_content") {
     Object.assign(update, { hide_public_content: true });
     auditAction = "hide_public_content";

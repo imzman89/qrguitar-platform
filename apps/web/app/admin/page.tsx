@@ -27,6 +27,7 @@ import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import { defaultSiteSettings, mergeSiteSettings, normalizeBrandLogoKey, type EditableSiteSettings } from "../../lib/site-settings";
 import { getSupabaseAccessToken } from "../../lib/supabase-browser";
+import { ACCOUNT_DELETION_UNAVAILABLE } from "../../lib/admin-account-deletion-status";
 
 type OverviewPayload = {
   ok?: boolean;
@@ -636,6 +637,10 @@ export default function AdminPage() {
   }
 
   function beginUserAction(user: AdminUser, action: string, extra: Record<string, unknown> = {}, options: { includeNote?: boolean; confirm?: boolean; title?: string } = {}) {
+    if (action === "delete_empty_user") {
+      setMessage(ACCOUNT_DELETION_UNAVAILABLE);
+      return;
+    }
     if (!options.includeNote && !options.confirm) {
       void updateUser(user, action, extra);
       return;
@@ -656,6 +661,10 @@ export default function AdminPage() {
   }
 
   async function updateUser(user: AdminUser, action: string, extra: Record<string, unknown> = {}, reason = "") {
+    if (action === "delete_empty_user") {
+      setMessage(ACCOUNT_DELETION_UNAVAILABLE);
+      return;
+    }
     const token = await tokenPromise;
     if (!token) {
       setMessage("Sign in required.");
@@ -1653,7 +1662,7 @@ export default function AdminPage() {
           </div></section>
           <section><span>Public presence</span><div className="admin-drawer-actions"><button type="button" onClick={() => beginUserAction(selectedUser, selectedUser.hidePublicContent ? "restore_public_content" : "hide_public_content", {}, { confirm: true, title: selectedUser.hidePublicContent ? "Restore Public Content" : "Hide Public Content" })}>{selectedUser.hidePublicContent ? "Restore public content" : "Hide public content"}</button></div></section>
           <section><span>Administration</span><div className="admin-drawer-actions"><button type="button" disabled={selectedUser.envManaged} onClick={() => beginUserAction(selectedUser, "change_role", { role: selectedUser.role === "admin" ? "owner" : "admin" }, { confirm: true, title: selectedUser.role === "admin" ? "Remove Admin" : "Add Admin" })}>{selectedUser.role === "admin" ? "Remove admin" : "Add admin"}</button><button type="button" onClick={() => beginUserAction(selectedUser, "admin_note", {}, { includeNote: true, title: "Save Admin Note" })}>Internal note</button></div></section>
-          <section className="admin-danger-zone"><span>Permanent action</span><p>{selectedUser.deleteDisabledReason || "Only eligible accounts with no Profiles, claims, transfers, submissions, or evidence can be permanently deleted."}</p><button type="button" disabled={!selectedUser.deleteEligible} onClick={() => beginUserAction(selectedUser, "delete_empty_user", {}, { confirm: true, title: "Permanently Delete Eligible Account" })}>Permanently delete eligible account</button></section>
+          <section className="admin-danger-zone"><span>Permanent action</span><p id="admin-deletion-unavailable">{ACCOUNT_DELETION_UNAVAILABLE}</p><button type="button" disabled aria-describedby="admin-deletion-unavailable">Permanent account deletion unavailable</button></section>
         </div>
       </aside>
     </div>
@@ -1718,19 +1727,13 @@ export default function AdminPage() {
                 </div>
                 <div className="admin-impact-summary">
                   <strong>Impact</strong>
-                  <p>{pendingAction.kind === "user" && pendingAction.action === "delete_empty_user" ? "This permanently removes the eligible authentication account. It cannot be undone." : "This changes operational data immediately. The action is recorded in the audit trail and the affected view is refreshed."}</p>
-                  <span>{pendingAction.kind === "user" && pendingAction.action === "delete_empty_user" ? "Irreversible" : "Reversible where the corresponding restore action is available"}</span>
+                  <p>{pendingAction.kind === "user" && pendingAction.action === "delete_empty_user" ? ACCOUNT_DELETION_UNAVAILABLE : "This changes operational data immediately. The action is recorded in the audit trail and the affected view is refreshed."}</p>
+                  <span>{pendingAction.kind === "user" && pendingAction.action === "delete_empty_user" ? "Unavailable" : "Reversible where the corresponding restore action is available"}</span>
                 </div>
                 <label>
                   Operator reason
                   <textarea value={pendingAction.reason} onChange={(event) => setPendingAction({ ...pendingAction, reason: event.target.value })} rows={2} placeholder="Required for the audit trail" />
                 </label>
-                {pendingAction.kind === "user" && pendingAction.action === "delete_empty_user" ? (
-                  <label>
-                    Type the account email to confirm permanent deletion
-                    <input value={pendingAction.typedConfirmation || ""} onChange={(event) => setPendingAction({ ...pendingAction, typedConfirmation: event.target.value })} autoComplete="off" />
-                  </label>
-                ) : null}
                 {pendingAction.kind === "user" && pendingAction.includeNote ? (
                   <label>
                     Internal admin note
@@ -1774,7 +1777,7 @@ export default function AdminPage() {
                   </div>
                 ) : null}
                 <div className="form-actions">
-                  <button className="button" type="button" disabled={!pendingAction.reason.trim() || (pendingAction.kind === "user" && pendingAction.action === "delete_empty_user" && pendingAction.typedConfirmation?.trim().toLowerCase() !== pendingAction.user.email.trim().toLowerCase())} onClick={() => void confirmPendingAction()}>
+                  <button className="button" type="button" disabled={!pendingAction.reason.trim() || (pendingAction.kind === "user" && pendingAction.action === "delete_empty_user")} onClick={() => void confirmPendingAction()}>
                     Confirm
                   </button>
                   <button className="button secondary" type="button" onClick={() => setPendingAction(null)}>

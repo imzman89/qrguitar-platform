@@ -41,7 +41,7 @@ for (const endpoint of ["/api/admin/overview", "/api/admin/users", "/api/admin/r
   const response = await fetch(`${origin}${endpoint}`, { cache: "no-store" });
   if (![401, 403].includes(response.status)) throw new Error(`Unauthenticated ${endpoint} returned ${response.status}.`);
 }
-for (const marker of ["Permanently Delete Eligible Account", "Type the account email to confirm permanent deletion", "Irreversible"]) {
+for (const marker of ["Permanent account deletion unavailable", "ACCOUNT_DELETION_UNAVAILABLE", 'aria-describedby="admin-deletion-unavailable"']) {
   if (!page.includes(marker)) throw new Error(`Admin permanent deletion safeguards are missing ${marker}.`);
 }
 console.log("Admin assertions passed.");
