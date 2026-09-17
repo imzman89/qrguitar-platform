@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 import { useEffect, useMemo, useState } from "react";
 import { defaultQrStyle, type QrStyle } from "../lib/local-demo";
 import { publicProfileUrl } from "../lib/profile-url";
+import { beginQrRender, qrColorError, qrRenderOptions } from "../lib/qr-output";
 
 type QrDownloadProps = {
   code: string;
@@ -27,9 +28,10 @@ const qrPresets: Array<{ label: string; style: Pick<QrStyle, "foreground" | "bac
 ];
 
 export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHandout = true }: QrDownloadProps) {
-  const [dataUrl, setDataUrl] = useState("");
+  const [rendered, setRendered] = useState({ key: "", url: "", error: "" });
+  const [retry, setRetry] = useState(0);
   const [style, setStyle] = useState<QrStyle>(qrStyle ?? defaultQrStyle);
-  const [labelInput, setLabelInput] = useState("");
+  const [appliedStyleKey, setAppliedStyleKey] = useState(JSON.stringify(qrStyle ?? defaultQrStyle));
   const [isEditing, setIsEditing] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const isTransparent = style.background === "transparent";
@@ -38,6 +40,7 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHando
     () => qrStyle ?? defaultQrStyle,
     [qrStyle]
   );
+  const incomingStyleKey = JSON.stringify(incomingStyle);
 
   const profileUrl = publicProfileUrl(code);
 
@@ -46,40 +49,27 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHando
     return trimmed ? `${code}\n${trimmed}` : `${code}\nInstrument`;
   }, [code, label]);
 
-  useEffect(() => {
-    const nextValue = style.labelText?.trim() ? style.labelText : fallbackLabelText;
-    setLabelInput(nextValue);
-  }, [fallbackLabelText, style.labelText]);
-
+  const labelInput = style.labelText ?? "";
   const displayLabel = useMemo(() => labelInput.trim() || fallbackLabelText, [labelInput, fallbackLabelText]);
+  const renderKey = JSON.stringify([profileUrl, code, displayLabel, style, retry]);
+  const colorError = qrColorError(style);
+  // Never offer the last instrument/style's download while the next render is pending.
+  const styleCurrent = appliedStyleKey === incomingStyleKey;
+  const dataUrl = styleCurrent && rendered.key === renderKey && !colorError ? rendered.url : "";
+  const renderError = styleCurrent ? colorError || (rendered.key === renderKey ? rendered.error : "") : "";
 
   useEffect(() => {
     setStyle((current) => (areQrStylesEqual(current, incomingStyle) ? current : incomingStyle));
-  }, [incomingStyle]);
+    setAppliedStyleKey(incomingStyleKey);
+  }, [incomingStyle, incomingStyleKey]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    QRCode.toDataURL(profileUrl, {
-      errorCorrectionLevel: "H",
-      margin: 2,
-      width: 720,
-      color: {
-        dark: style.foreground,
-        light: isTransparent ? "#ffffff00" : style.background
-      }
-    })
-      .then((url) => renderDownloadImage(url, code, displayLabel, style))
-      .then((url) => {
-        if (!cancelled) {
-          setDataUrl(url);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [code, displayLabel, isTransparent, profileUrl, style]);
+    if (colorError || !styleCurrent) return;
+    return beginQrRender(
+      async () => renderDownloadImage(await QRCode.toDataURL(profileUrl, qrRenderOptions(style)), code, displayLabel, style),
+      result => setRendered({ key: renderKey, ...result })
+    );
+  }, [code, displayLabel, profileUrl, style, renderKey, colorError, styleCurrent]);
 
   useEffect(() => {
     if (!isLightboxOpen) {
@@ -109,7 +99,6 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHando
   }
 
   function handleLabelChange(nextLabel: string) {
-    setLabelInput(nextLabel);
     updateStyle({ labelText: nextLabel });
   }
 
@@ -144,7 +133,7 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHando
           </a>
         ) : (
           <button className="button secondary qr-download-button" type="button" disabled>
-            Preparing
+            {renderError ? "Download unavailable" : "Preparing"}
           </button>
         )}
         <button className="button secondary qr-edit-button" type="button" onClick={() => setIsEditing((current) => !current)}>
@@ -156,6 +145,8 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHando
           </a>
         ) : null}
       </div>
+
+      {renderError ? <p className="form-message" role="alert">{renderError} {!colorError ? <button className="link-button" type="button" onClick={() => setRetry(value => value + 1)}>Try again</button> : null}</p> : null}
 
       {isEditing ? (
         <div className="qr-editor-panel">
@@ -221,7 +212,7 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHando
               </label>
             </>
           ) : (
-            <p className="qr-note">Transparent export downloads the QR only: no background, border, label, or QRguitar branding.</p>
+            <p className="qr-note">Transparent export contains only the QR. Place it on a plain, contrasting background and keep the clear margin around every edge.</p>
           )}
         </div>
       ) : null}
@@ -274,60 +265,64 @@ function renderDownloadImage(qrUrl: string, code: string, label: string, style: 
     const isTransparent = style.background === "transparent";
 
     image.onload = () => {
-      const qrSize = isTransparent ? 1024 : 900;
-      const padding = isTransparent ? 0 : 90;
-      const canvasWidth = isTransparent ? qrSize : qrSize + padding * 2;
-      const maxTextWidth = isTransparent ? qrSize : canvasWidth - padding * 2 - 20;
-      const labelBlockHeight = style.includeLabel ? getLabelBlockHeight(label, code, maxTextWidth) : 0;
-      const canvas = document.createElement("canvas");
-      canvas.width = canvasWidth;
-      canvas.height = isTransparent ? qrSize : qrSize + padding * 2 + labelBlockHeight;
-      const context = canvas.getContext("2d");
+      try {
+        const qrSize = isTransparent ? 1024 : 900;
+        const padding = isTransparent ? 0 : 90;
+        const canvasWidth = isTransparent ? qrSize : qrSize + padding * 2;
+        const maxTextWidth = isTransparent ? qrSize : canvasWidth - padding * 2 - 20;
+        const labelBlockHeight = style.includeLabel ? getLabelBlockHeight(label, code, maxTextWidth) : 0;
+        const canvas = document.createElement("canvas");
+        canvas.width = canvasWidth;
+        canvas.height = isTransparent ? qrSize : qrSize + padding * 2 + labelBlockHeight;
+        const context = canvas.getContext("2d");
 
-      if (!context) {
-        reject(new Error("Could not render QR image."));
-        return;
-      }
-
-      if (!isTransparent) {
-        context.fillStyle = style.background;
-        context.fillRect(0, 0, canvas.width, canvas.height);
-      } else {
-        context.clearRect(0, 0, canvas.width, canvas.height);
-      }
-
-      context.drawImage(image, padding, padding, qrSize, qrSize);
-
-      if (!isTransparent && style.includeLabel) {
-        const labelLines = wrapText(context, label, code, maxTextWidth);
-        const codeFont = "900 42px Arial, sans-serif";
-        const labelFont = "700 28px Arial, sans-serif";
-        const codeLineHeight = 48;
-        const labelLineHeight = 33;
-        const gap = Math.max(16, 0.02 * canvas.width);
-        const labelY = padding + qrSize + 44;
-        let cursorY = labelY;
-
-        context.textAlign = "center";
-        context.textBaseline = "alphabetic";
-        context.fillStyle = style.foreground;
-        context.font = codeFont;
-
-        for (const line of labelLines.firstLine) {
-          context.fillText(line, canvas.width / 2, cursorY);
-          cursorY += codeLineHeight;
+        if (!context) {
+          reject(new Error("Could not render QR image."));
+          return;
         }
 
-        context.font = labelFont;
-        cursorY += gap;
-
-        for (const line of labelLines.remainingLines) {
-          context.fillText(line, canvas.width / 2, cursorY);
-          cursorY += labelLineHeight;
+        if (!isTransparent) {
+          context.fillStyle = style.background;
+          context.fillRect(0, 0, canvas.width, canvas.height);
+        } else {
+          context.clearRect(0, 0, canvas.width, canvas.height);
         }
-      }
 
-      resolve(canvas.toDataURL("image/png"));
+        context.drawImage(image, padding, padding, qrSize, qrSize);
+
+        if (!isTransparent && style.includeLabel) {
+          const labelLines = wrapText(context, label, code, maxTextWidth);
+          const codeFont = "900 42px Arial, sans-serif";
+          const labelFont = "700 28px Arial, sans-serif";
+          const codeLineHeight = 48;
+          const labelLineHeight = 33;
+          const gap = Math.max(16, 0.02 * canvas.width);
+          const labelY = padding + qrSize + 44;
+          let cursorY = labelY;
+
+          context.textAlign = "center";
+          context.textBaseline = "alphabetic";
+          context.fillStyle = style.foreground;
+          context.font = codeFont;
+
+          for (const line of labelLines.firstLine) {
+            context.fillText(line, canvas.width / 2, cursorY);
+            cursorY += codeLineHeight;
+          }
+
+          context.font = labelFont;
+          cursorY += gap;
+
+          for (const line of labelLines.remainingLines) {
+            context.fillText(line, canvas.width / 2, cursorY);
+            cursorY += labelLineHeight;
+          }
+        }
+
+        resolve(canvas.toDataURL("image/png"));
+      } catch (error) {
+        reject(error);
+      }
     };
 
     image.onerror = () => reject(new Error("Could not load generated QR image."));

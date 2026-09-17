@@ -10,7 +10,6 @@ import {
   Home,
   Image as ImageIcon,
   MessageCircle,
-  QrCode,
   Repeat2,
   Share2,
   ShieldCheck,
@@ -20,10 +19,10 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import QRCode from "qrcode";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BrandLogo } from "../../../components/BrandLogo";
+import { CompactQr } from "../../../components/CompactQr";
 import { buildProfileIdentityFields, ProfileIdentity } from "../../../components/ProfileIdentity";
 import { ProfileStatusBadges } from "../../../components/ProfileStatusBadges";
 import { RecordShareButton } from "../../../components/RecordShareButton";
@@ -42,7 +41,7 @@ import { createBrowserSupabaseClient } from "../../../lib/supabase-browser";
 import { fetchOwnerProfile, OwnerProfileError } from "../../../lib/owner-profile";
 import { resolveInstrumentPresentation } from "../../../lib/instrument-profile-contract";
 import { getContentValue } from "../../../lib/content-registry";
-import { PUBLIC_SITE_ORIGIN, publicProfileUrl } from "../../../lib/profile-url";
+import { publicProfileUrl } from "../../../lib/profile-url";
 
 type ProfileTab = "overview" | "specs" | "timeline" | "service" | "ownership" | "media" | "repairs" | "documents";
 const PROFILE_FETCH_TIMEOUT_MS = 28000;
@@ -56,7 +55,6 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
   const [profileLoadError, setProfileLoadError] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [transfers, setTransfers] = useState<DemoTransfer[]>([]);
-  const [shareUrl, setShareUrl] = useState("");
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
   const [shareNotice, setShareNotice] = useState<"idle" | "copied" | "failed">("idle");
   const [actionNotice, setActionNotice] = useState<"transfer" | "documents" | "owner" | null>(null);
@@ -372,7 +370,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
   const latestTransfer = latestTransfers[0];
 
   const instrumentQrCode = instrument?.qrCode;
-  const instrumentPermanentPath = instrument?.permanentPath;
+  const shareUrl = instrumentQrCode ? publicProfileUrl(instrumentQrCode) : "";
 
   useEffect(() => {
     if (!instrumentQrCode) {
@@ -381,14 +379,6 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
 
     setMediaIndex(0);
   }, [instrumentQrCode, galleryImages.length]);
-
-  useEffect(() => {
-    if (!instrumentPermanentPath || typeof window === "undefined") {
-      return;
-    }
-
-    setShareUrl(`${PUBLIC_SITE_ORIGIN}${instrumentPermanentPath}`);
-  }, [instrumentPermanentPath]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1358,33 +1348,9 @@ function EmptyPanel({ title, copy }: { title: string; copy: string }) {
 }
 
 function ProfileQr({ code }: { code: string }) {
-  const [dataUrl, setDataUrl] = useState("");
-  const profileUrl = publicProfileUrl(code);
-
-  useEffect(() => {
-    let cancelled = false;
-    QRCode.toDataURL(profileUrl, {
-      errorCorrectionLevel: "H",
-      margin: 1,
-      width: 180,
-      color: {
-        dark: "#f8f6f2",
-        light: "#071014"
-      }
-    }).then((generated) => {
-      if (!cancelled) {
-        setDataUrl(generated);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [profileUrl]);
-
   return (
     <div className="qr-placeholder" aria-label={`QR code for ${code}`}>
-      {dataUrl ? <img src={dataUrl} alt={`QR code for ${code}`} /> : <QrCode size={52} />}
+      <CompactQr code={code} label={code} />
     </div>
   );
 }

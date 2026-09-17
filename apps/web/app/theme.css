@@ -1,31 +1,37 @@
 /* Shared screen palette. Printed documents own their physical colors and geometry. */
 @media screen {
   body[data-product-theme="paper"] {
-    --canvas: #f3efe5;
-    --surface: #fffdf7;
-    --surface-subtle: #ebe9dd;
+    --canvas: #101615;
+    --surface: #18201e;
+    --surface-subtle: #222c27;
+    --field-surface: #f7f8f4;
+    --field-text: #233026;
+    --field-muted: #5b665b;
     --evergreen: #172a20;
-    --action: #274f38;
-    --action-hover: #1b3c29;
-    --on-action: #fffdf7;
+    --action: #e6af57;
+    --action-hover: #f0c67f;
+    --on-action: #172a20;
     --bg: var(--canvas);
     --bg-2: var(--surface-subtle);
     --panel: var(--surface);
     --panel-2: var(--surface-subtle);
-    --text: #233026;
-    --muted: #5b665b;
-    --muted-strong: #465548;
-    --line: #d3d5c7;
-    --gold: #805820;
-    --gold-2: #805820;
+    --text: #f2f4ed;
+    --muted: #adb7b0;
+    --muted-strong: #ced5ce;
+    --line: #36413b;
+    --gold: #e6af57;
+    --gold-2: #e6af57;
+    --positive: #94d5a7;
+    --negative: #f0aaa4;
+    --selected-surface: #293c30;
     --cream: #f5f0df;
     --ink: #172a20;
     --surface-raised: var(--surface);
     --surface-soft: var(--surface-subtle);
     --border: var(--line);
-    --border-soft: #dfe0d5;
-    --border-strong: #b7bfab;
-    --shadow-card: 0 8px 24px #23302608;
+    --border-soft: #2c3630;
+    --border-strong: #68786b;
+    --shadow-card: 0 8px 24px #00000012;
     --warm-canvas: var(--canvas);
     --light-surface: var(--surface);
     --dark-text: var(--text);
@@ -33,7 +39,7 @@
     --line-light: var(--line);
     background: var(--canvas);
     color: var(--text);
-    color-scheme: light;
+    color-scheme: dark;
     line-height: 1.55;
   }
 
@@ -61,13 +67,14 @@
     font-weight: 400;
     font-size: 3rem;
     line-height: 1.1;
-    letter-spacing: -.035em;
+    letter-spacing: 0;
     text-wrap: balance;
   }
-  body[data-product-theme] main:not(.home-page) :is(h2,h3) { color: var(--text); line-height: 1.25; letter-spacing: -.015em; }
+  body[data-product-theme] main:not(.home-page) :is(h2,h3) { color: var(--text); line-height: 1.25; letter-spacing: 0; }
+  body[data-product-theme] main:is(.dashboard-page,.auth-page,.create-page,.create-wizard-page,.admin-page,.cms-page) h1 { max-width: none; font-family: inherit; font-size: 2rem; font-weight: 650; line-height: 1.2; }
   body[data-product-theme] main.handout-page h1 { font-size: 1.875rem; }
   body[data-product-theme] main:not(.home-page) :is(p,.lede,.field-note,.fine-print,.muted,.account-card-copy) { color: var(--muted); }
-  body[data-product-theme] :is(.eyebrow,.mini-eyebrow) { color: var(--gold); font-size: .7rem; font-weight: 650; letter-spacing: .12em; }
+  body[data-product-theme] :is(.eyebrow,.mini-eyebrow) { color: var(--gold); font-size: .7rem; font-weight: 650; letter-spacing: 0; }
 
   body[data-product-theme] :is(.card,.auth-card,.account-settings-card,.auth-state-card,.sign-in-required-card,.catalog-filters,.catalog-more-filters,.catalog-empty,.collection-filters,.collection-inquiry,.collection-directory-card,.collection-directory-empty,.collection-header,.dashboard-metric,.create-wizard-form,.installer-feature-card,.installer-apply-panel,.legal-card,.contact-card,.bulk-import-workspace,.bulk-import-panel,.bulk-preview-row,.bulk-import-locked,.claim-scenario-card,.claim-workspace,.claim-status-list article,.service-work-card,.admin-panel-card,.admin-stat-card,.cms-section-editor,.cms-field-group,.cms-block-row,.cms-focused-block) {
     color: var(--text);
@@ -108,13 +115,14 @@
   body[data-product-theme] .catalog-search > span { color: var(--muted); background: var(--surface); border-color: var(--border-strong); }
   body[data-product-theme] .catalog-search > span input { border: 0; box-shadow: none; }
   body[data-product-theme] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]),select,textarea) {
-    color: var(--text);
-    background: var(--surface);
-    border-color: var(--border-strong);
+    color: var(--field-text);
+    background: var(--field-surface);
+    border-color: #a5afa4;
     color-scheme: light;
   }
-  body[data-product-theme] :is(input,textarea)::placeholder { color: #697365; opacity: 1; }
-  body[data-product-theme] input:-webkit-autofill { -webkit-text-fill-color: var(--text); box-shadow: 0 0 0 1000px var(--surface) inset; }
+  body[data-product-theme] :is(input,textarea)::placeholder { color: var(--field-muted); opacity: 1; }
+  body[data-product-theme] input:-webkit-autofill { -webkit-text-fill-color: var(--field-text); box-shadow: 0 0 0 1000px var(--field-surface) inset; }
+  body[data-product-theme] .catalog-search > span { background: var(--field-surface); color: var(--field-muted); }
   body[data-product-theme] input:is([type="checkbox"],[type="radio"]) { accent-color: var(--action); }
   body[data-product-theme] input[type="file"]::file-selector-button { color: var(--on-action); background: var(--action); border: 0; border-radius: 4px; padding: 9px 12px; margin-right: 12px; cursor: pointer; }
 
@@ -122,16 +130,15 @@
   body[data-product-theme] :is(.auth-mode-switch,.auth-tabs,.account-section-nav,.editor-tabs,.scan-tabs,.scan-bottom-nav) button { color: var(--muted); background: transparent; font-weight: 650; }
   body[data-product-theme] :is(.auth-mode-switch,.auth-tabs,.account-section-nav,.editor-tabs,.scan-tabs,.scan-bottom-nav) button:is(.active,.is-active,[aria-selected="true"]),
   body[data-product-theme] .editor-section-nav a[aria-current="location"] { color: var(--on-action); background: var(--action); border-color: var(--action); }
-  body[data-product-theme] :is(.dashboard-metric.is-active,.claim-scenario-card.is-active,.claim-scenario-card:hover,.create-step.is-active) { color: var(--text); background: #e4eadc; border-color: #718d6c; }
+  body[data-product-theme] :is(.dashboard-metric.is-active,.claim-scenario-card.is-active,.claim-scenario-card:hover,.create-step.is-active) { color: var(--text); background: var(--selected-surface); border-color: #718d6c; }
   body[data-product-theme] :is(.dashboard-metric span,.dashboard-metric small,.auth-card-head > span) { color: var(--muted); }
   body[data-product-theme] :is(.account-section-nav,.editor-section-nav) { box-shadow: none; }
-  body[data-product-theme] .form-message { border-color: #c9bd92; background: #f7f0d7; color: #59451e; }
-  body[data-product-theme] .profile-refresh-notice { border-color: #c9bd92; background: #f7f0d7; color: #59451e; }
+  body[data-product-theme] :is(.form-message,.profile-refresh-notice) { border-color: #6e603d; background: #2d2a20; color: #f0cf91; }
   body[data-product-theme] .claim-load-status { margin-bottom: 20px; }
   body[data-product-theme] .claim-evidence-guide li::before { background: var(--action); border-color: var(--action); color: var(--on-action); }
-  body[data-product-theme] .claim-evidence-list li > svg { color: #2f633c; }
-  body[data-product-theme] .claim-evidence-list li button { color: #a12f29; }
-  body[data-product-theme] .dashboard-transfer-overview { margin-bottom: 24px; padding: 20px 24px; }
+  body[data-product-theme] .claim-evidence-list li > svg { color: var(--positive); }
+  body[data-product-theme] .claim-evidence-list li button { color: var(--negative); }
+  body[data-product-theme] .dashboard-transfer-overview { min-height: 0; margin-bottom: 24px; padding: 16px 20px; }
   body[data-product-theme] .dashboard-transfer-overview summary { cursor: pointer; min-height: 32px; font-weight: 650; }
   body[data-product-theme] .dashboard-transfer-overview summary span { float: right; font-size: .8rem; font-weight: 500; color: var(--muted); }
   body[data-product-theme] .dashboard-transfer-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--line); }
@@ -148,28 +155,53 @@
   body[data-product-theme] :is(.collectible-card-gallery-controls button,.collectible-card-share .record-share-button):hover { color: #f2bd68; border-color: #f2bd68; }
   body[data-product-theme] .collectible-card-code { color: #f2bd68; border-color: #bea06a; background: #172a20e8; }
   body[data-product-theme] :is(.collectible-card-action,.collectible-card-empty-media,.collectible-card-loading-media) { color: var(--text); background: var(--surface-subtle); border-color: var(--line); }
-  body[data-product-theme] .record-badge { --badge-text: #53634f; color: var(--badge-text); background: transparent; border-color: var(--line); text-shadow: none; font-weight: 600; text-transform: none; }
-  body[data-product-theme] :is(.record-badge--verified,.record-badge--auth-confirmed,.record-badge--recovered) { --badge-text: #2f633c; }
-  body[data-product-theme] :is(.record-badge--unverified,.record-badge--auth-unconfirmed,.record-badge--sale) { --badge-text: #805820; }
-  body[data-product-theme] .record-badge--safety { --badge-text: #a12f29; }
+  body[data-product-theme] .record-badge { --badge-text: var(--muted-strong); color: var(--badge-text); background: transparent; border-color: var(--line); text-shadow: none; font-weight: 600; text-transform: none; }
+  body[data-product-theme] :is(.record-badge--verified,.record-badge--auth-confirmed,.record-badge--recovered) { --badge-text: var(--positive); }
+  body[data-product-theme] :is(.record-badge--unverified,.record-badge--auth-unconfirmed,.record-badge--sale) { --badge-text: #dec491; }
+  body[data-product-theme] .record-badge--safety { --badge-text: var(--negative); }
 
   body[data-product-theme] .instrument-preview { background: var(--surface); border-color: var(--line); box-shadow: var(--shadow-card); }
   body[data-product-theme] .instrument-preview-hero { --text: #fffdf7; --muted: #e3e8dd; --muted-strong: #e3e8dd; --gold-2: #f2bd68; color: var(--text); }
   body[data-product-theme] :is(.preview-identity-grid,.preview-identity-grid > div) { border-color: var(--line); }
   body[data-product-theme] :is(.preview-chip-list,.preview-link-list) span { background: var(--surface-subtle); border-color: var(--line); color: var(--text); }
 
-  /* Public QR Profiles use the same paper surface; photographs keep their own overlays. */
+  /* Profiles share the dark canvas; content groups use spacing rather than nested boxes. */
   body[data-product-theme] :is(.scan-shell,.scan-hero,.scan-hero-info,.scan-tab-panel,.scan-action-panel,.identity-card,.profile-claim-entry,.scan-qr,.scan-actions,.timeline-item,.document-item,.message-item,.collaboration-thread,.maker-signature,.profile-data-grid > span,.ownership-grid > span,.media-placeholder-grid > span,.public-spec-list span,.public-link-list a,.profile-market-card) { color: var(--text); background: var(--surface); border-color: var(--line); box-shadow: none; }
   body[data-product-theme] :is(.scan-overview p,.scan-copy-notice,.identity-cell span,.identity-card-header,.profile-data-grid > span,.ownership-grid > span,.public-spec-list span,.profile-claim-entry span,.scan-qr span,.scan-tabs button,.scan-bottom-nav button) { color: var(--muted); }
   body[data-product-theme] :is(.scan-hero-media,.scan-hero-thumbnails,.public-gallery-grid img,.collection-directory-placeholder,.collection-avatar) { background: var(--surface-subtle); }
   body[data-product-theme] :is(.identity-cell,.identity-card-header,.public-gallery,.scan-hero-thumbnails,.scan-qr,.scan-tabs,.scan-actions) { border-color: var(--line); }
-  body[data-product-theme] .profile-trust-summary summary { color: #2f633c; }
+  body[data-product-theme] .profile-trust-summary summary { color: var(--positive); }
   body[data-product-theme] .profile-trust-summary p { color: var(--muted); }
   body[data-product-theme] .profile-trust-summary > details + details { border-color: var(--line); }
   body[data-product-theme] :is(.scan-actions a,.scan-actions button,.document-item button,.scan-tags span,.transfer-mode button,.qr-preset,.qr-toggle,.qr-download,.qr-customizer) { color: var(--text); background: var(--surface-subtle); border-color: var(--line); }
-  body[data-product-theme] :is(.qr-preset.selected,.transfer-mode button[aria-pressed="true"]) { background: #e4eadc; border-color: var(--action); }
-  body[data-product-theme] .scan-safety-alert { background: #fae8df; border-color: #c79079; color: #8a2e20; }
-  body[data-product-theme] .scan-safety-alert p { color: #8a2e20; }
+  body[data-product-theme] :is(.qr-preset.selected,.transfer-mode button[aria-pressed="true"]) { background: var(--selected-surface); border-color: var(--action); }
+  body[data-product-theme] .qr-lightbox-frame.transparent {
+    background-color: #fff;
+    background-image: linear-gradient(45deg, #e4e8e5 25%, transparent 25%), linear-gradient(-45deg, #e4e8e5 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e4e8e5 75%), linear-gradient(-45deg, transparent 75%, #e4e8e5 75%);
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+    background-size: 20px 20px;
+  }
+  body[data-product-theme] .scan-safety-alert { background: #352322; border-color: #885750; color: var(--negative); }
+  body[data-product-theme] .scan-safety-alert p { color: var(--negative); }
+  body[data-product-theme] .scan-shell { border: 0; background: transparent; box-shadow: none; }
+  body[data-product-theme] .scan-hero-info { background: transparent; }
+  body[data-product-theme] .identity-card { border: 0; border-radius: 0; background: transparent; }
+  body[data-product-theme] .identity-card-header { padding-inline: 0; }
+  body[data-product-theme] .scan-qr { margin-inline: 0; padding: 20px 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; }
+  body[data-product-theme] .scan-tabs { gap: 12px; padding: 0 28px; background: transparent; border-block: 1px solid var(--line); }
+  body[data-product-theme] .scan-tabs button { min-height: 52px; padding: 14px 8px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; text-transform: none; }
+  body[data-product-theme] .scan-tabs button.active { background: transparent; color: var(--text); border-bottom-color: var(--gold); box-shadow: none; }
+  body[data-product-theme] .scan-tab-panel { padding-block: 32px; background: transparent; }
+  body[data-product-theme] .maker-signature { padding: 20px 0 20px 24px; border: 0; border-left: 1px solid var(--line); border-radius: 0; background: transparent; }
+  body[data-product-theme] .scan-tags span { padding: 0 16px 0 0; border: 0; border-radius: 0; background: transparent; }
+  body[data-product-theme] .scan-tags { gap: 16px; }
+  body[data-product-theme] .scan-overview .public-spec-list { gap: 20px; }
+  body[data-product-theme] .scan-overview .public-spec-list span { padding: 0; border: 0; border-radius: 0; background: transparent; }
+  body[data-product-theme] .scan-hero-gallery-controls svg { transform: none; }
+  body[data-product-theme] .dashboard-workspace-links svg { flex-shrink: 0; }
+  body[data-product-theme] :is(.account-summary-grid,.account-status-grid) { gap: 12px; border: 0; background: transparent; }
+  body[data-product-theme] :is(.account-summary-grid,.account-status-grid) > div { border: 1px solid var(--line); border-radius: 6px; }
+  body[data-product-theme] .account-quick-links a { border-radius: 6px; }
 
   /* Dialogs are mounted outside main; they share the workspace palette too. */
   body[data-product-theme] :is(.action-drawer,.admin-entity-drawer,.admin-modal,.cms-modal,.quick-edit-dialog,.quick-edit-modal,.profile-quick-edit,.qr-lightbox,.media-gallery-lightbox) { color: var(--text); background: var(--surface); border-color: var(--line); }
@@ -178,24 +210,24 @@
   body[data-product-theme] .quick-edit-dialog > header .icon-button { background: var(--surface-subtle); color: var(--text); border-color: var(--line); }
   body[data-product-theme] :is(.service-form-section,.service-approval-panel,.service-review-facts > div,.admin-service-meta > span,.admin-service-card) { background: var(--surface); color: var(--text); border-color: var(--line); }
   body[data-product-theme] :is(.service-status span,.service-privacy-note span) { color: var(--muted); }
-  body[data-product-theme] :is(.service-status--submitted,.service-status-submitted,.service-status--approved,.service-status-approved) { color: #2f633c; }
-  body[data-product-theme] :is(.service-status--declined,.service-status-declined,.service-status--cancelled,.service-status-cancelled,.service-status--expired,.service-status-expired) { color: #a12f29; }
+  body[data-product-theme] :is(.service-status--submitted,.service-status-submitted,.service-status--approved,.service-status-approved) { color: var(--positive); }
+  body[data-product-theme] :is(.service-status--declined,.service-status-declined,.service-status--cancelled,.service-status-cancelled,.service-status--expired,.service-status-expired) { color: var(--negative); }
   body[data-product-theme] .cms-preview-panel { background: var(--surface); border-color: var(--line); color: var(--text); }
   body[data-product-theme] :is(.action-drawer .icon-button,.admin-entity-drawer > header button,.qr-lightbox-close,.media-overlay-close) { color: var(--text); background: var(--surface-subtle); border-color: var(--line); }
   body[data-product-theme] :is(.admin-command-bar,.admin-sidebar,.admin-row,.admin-attention-row,.admin-filter-row,.admin-drawer-body dl,.admin-drawer-actions button,.admin-drawer-actions a,.cms-commandbar,.cms-sidebar,.cms-tree,.cms-tree details,.cms-tree summary,.cms-inspector,.cms-editor,.cms-editor-heading,.cms-block-row,.cms-section-editor,.cms-field-group,.cms-focused-block,.cms-preview-toolbar) { color: var(--text); background: var(--surface); border-color: var(--line); }
   body[data-product-theme] :is(.admin-row,.admin-attention-row,.cms-block-row,.cms-field-group) :is(p,small,span) { color: var(--muted); }
   body[data-product-theme] :is(.admin-sidebar nav button,.admin-mini-list button) { color: var(--muted); }
-  body[data-product-theme] .admin-sidebar nav button.active { color: var(--action); background: #e4eadc; box-shadow: inset 2px 0 var(--action); }
+  body[data-product-theme] .admin-sidebar nav button.active { color: var(--action); background: var(--selected-surface); box-shadow: inset 2px 0 var(--action); }
   body[data-product-theme] :is(.admin-global-search,.admin-impact-summary,.cms-tree-search,.cms-composition-editor,.cms-block-editor,.cms-preview-drawer,.cms-preview-meta,.cms-preview-loading,.cms-preview-error,.cms-json-state,.cms-coverage-summary > div,.cms-coverage-list article,.cms-social-preview > div) { background: var(--surface); color: var(--text); border-color: var(--line); }
+  body[data-product-theme] :is(.cms-tree-search,.admin-global-search) { --muted: var(--field-muted); background: var(--field-surface); color: var(--field-text); border-color: #a5afa4; }
   body[data-product-theme] :is(.cms-section-controls button,.cms-block-actions button,.cms-add-block,.cms-icon-text-control,.cms-mode-switch) { background: var(--surface-subtle); color: var(--text); border-color: var(--line); }
   body[data-product-theme] .cms-tree :is(button,summary) { color: var(--muted); }
-  body[data-product-theme] .cms-tree button.active { color: var(--action); background: #e4eadc; box-shadow: inset 2px 0 var(--action); }
+  body[data-product-theme] .cms-tree button.active { color: var(--action); background: var(--selected-surface); box-shadow: inset 2px 0 var(--action); }
   body[data-product-theme] .cms-search-preview :is(span,p) { color: var(--muted); }
-  body[data-product-theme] .cms-search-preview h3 { color: #245492; }
-  body[data-product-theme] :is(.cms-seo-guidance .is-pass,.cms-coverage-summary .is-pass strong) { color: #2f633c; }
-  body[data-product-theme] .cms-save-state.is-saved { color: #2f633c; }
-  body[data-product-theme] :is(.cms-seo-guidance .is-warning,.cms-coverage-summary .is-warning strong) { color: #805820; }
-  body[data-product-theme] :is(.cms-asset-list button,.cms-block-actions .is-danger) { color: #a12f29; }
+  body[data-product-theme] .cms-search-preview h3 { color: #a2c8f4; }
+  body[data-product-theme] :is(.cms-seo-guidance .is-pass,.cms-coverage-summary .is-pass strong,.cms-save-state.is-saved) { color: var(--positive); }
+  body[data-product-theme] :is(.cms-seo-guidance .is-warning,.cms-coverage-summary .is-warning strong) { color: var(--gold); }
+  body[data-product-theme] :is(.cms-asset-list button,.cms-block-actions .is-danger) { color: var(--negative); }
   body[data-product-theme] .catalog-guidance strong { color: var(--text); }
 
   /* Evergreen brand frame is identical on every route. */
@@ -220,17 +252,18 @@
   body[data-product-theme] .footer { margin-top: 0; }
   body[data-product-theme] .footer :is(p,a,button) { color: #d3ddcc; }
   body[data-product-theme] .scan-topbar :is(a,button) { color: #f8f2e5; }
-  body[data-product-theme] .home-page :is(.home-archive-section,.home-roles-section) {
-    --text: #233026; --muted: #5b665b; --muted-strong: #465548; --line: #d3d5c7; --gold: #805820; --gold-2: #805820;
-    --action: #274f38; --action-hover: #1b3c29; --on-action: #fffdf7;
-  }
   body[data-product-theme] .home-page :is(.hero,.home-lifecycle-section,.record-holds-section,.continuity-section,.home-final-cta) .card { background: transparent; border-color: var(--line); }
   body[data-product-theme] .home-page .button.secondary { background: transparent; color: var(--text); border-color: #9cae93; }
   body[data-product-theme] .home-page .price-card { background: #14241a; color: #f8f2e5; border-color: #59704f; }
 }
 @media screen and (max-width: 760px) {
   body[data-product-theme] main:not(.home-page) h1 { font-size: 2.25rem; line-height: 1.12; }
+  body[data-product-theme] main:is(.dashboard-page,.auth-page,.create-page,.create-wizard-page,.admin-page,.cms-page) h1 { font-size: 1.75rem; line-height: 1.2; }
   body[data-product-theme] main.handout-page h1 { font-size: 1.875rem; }
   body[data-product-theme] .dashboard-workspace-links { grid-template-columns: repeat(2,minmax(0,1fr)); }
   body[data-product-theme] .dashboard-workspace-links > :last-child { grid-column: auto; }
+  body[data-product-theme] .account-summary-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+  body[data-product-theme] .scan-tabs { padding-inline: 12px; gap: 8px; }
+  body[data-product-theme] .scan-tab-panel { padding-block: 24px; }
+  body[data-product-theme] .maker-signature { padding: 20px 0 0; border-left: 0; border-top: 1px solid var(--line); }
 }

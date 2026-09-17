@@ -2,7 +2,7 @@
 
 import { Share2 } from "lucide-react";
 import type { MouseEvent } from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { publicProfileUrl } from "../lib/profile-url";
 
 type RecordShareButtonProps = {
@@ -13,34 +13,60 @@ type RecordShareButtonProps = {
 };
 
 export function RecordShareButton({ code, title, className = "", showLabel = false }: RecordShareButtonProps) {
-  const [status, setStatus] = useState<"idle" | "copied" | "ready">("idle");
+  const [status, setStatus] = useState<"idle" | "shared" | "copied" | "ready">("idle");
+  const pending = useRef(false);
+  const revision = useRef(0);
+  const active = useRef(true);
+  const timer = useRef<number | undefined>(undefined);
   const url = publicProfileUrl(code);
   const label = title || code;
+
+  useEffect(() => {
+    active.current = true;
+    pending.current = false;
+    setStatus("idle");
+    return () => {
+      active.current = false;
+      revision.current++;
+      if (timer.current !== undefined) window.clearTimeout(timer.current);
+    };
+  }, [url]);
 
   async function shareRecord(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
     event.stopPropagation();
+    if (pending.current || !active.current) return;
+    pending.current = true;
+    const attempt = ++revision.current;
+    const isCurrent = () => active.current && revision.current === attempt;
+    if (timer.current !== undefined) window.clearTimeout(timer.current);
+    setStatus("idle");
+    function feedback(next: "shared" | "copied" | "ready") {
+      if (!isCurrent()) return;
+      setStatus(next);
+      timer.current = window.setTimeout(() => { if (isCurrent()) setStatus("idle"); }, next === "ready" ? 3200 : 1400);
+    }
 
     try {
       const shouldUseNativeShare = typeof navigator.share === "function" && window.matchMedia?.("(pointer: coarse)").matches;
 
       if (shouldUseNativeShare) {
-        await navigator.share({
-          title: label,
-          text: `QRguitar Profile for ${label}`,
-          url
-        });
-        setStatus("copied");
-        window.setTimeout(() => setStatus("idle"), 1400);
+        try {
+          await navigator.share({ title: label, text: `QRguitar Profile for ${label}`, url });
+        } catch (error) {
+          if (error && typeof error === "object" && "name" in error && error.name === "AbortError") return;
+          throw error;
+        }
+        feedback("shared");
         return;
       }
 
-      await copyUrl(url);
-      setStatus("copied");
-      window.setTimeout(() => setStatus("idle"), 1400);
+      await copyUrl(url, isCurrent);
+      feedback("copied");
     } catch {
-      setStatus("ready");
-      window.setTimeout(() => setStatus("idle"), 3200);
+      feedback("ready");
+    } finally {
+      if (isCurrent()) pending.current = false;
     }
   }
 
@@ -51,19 +77,21 @@ export function RecordShareButton({ code, title, className = "", showLabel = fal
         {showLabel ? <span>Share Profile</span> : null}
       </button>
       {status !== "idle" ? (
-        <span className="record-share-feedback">
-          {status === "copied" ? "Link copied" : <a href={url}>Open link</a>}
+        <span className="record-share-feedback" role="status">
+          {status === "copied" ? "Link copied" : status === "shared" ? "Share opened" : <a href={url}>Open link</a>}
         </span>
       ) : null}
     </span>
   );
 }
 
-async function copyUrl(url: string) {
+async function copyUrl(url: string, isCurrent: () => boolean) {
   try {
     await navigator.clipboard.writeText(url);
     return;
   } catch {
+    if (!isCurrent()) return;
+    const focused = document.activeElement as HTMLElement | null;
     const textarea = document.createElement("textarea");
     textarea.value = url;
     textarea.setAttribute("readonly", "true");
@@ -71,17 +99,18 @@ async function copyUrl(url: string) {
     textarea.style.left = "-9999px";
     textarea.style.top = "0";
     document.body.appendChild(textarea);
-    textarea.focus();
-    textarea.select();
-    textarea.setSelectionRange(0, textarea.value.length);
 
     try {
+      textarea.focus();
+      textarea.select();
+      textarea.setSelectionRange(0, textarea.value.length);
       const copied = document.execCommand("copy");
       if (!copied) {
         throw new Error("Copy command failed");
       }
     } finally {
       document.body.removeChild(textarea);
+      if (focused?.isConnected) focused.focus({ preventScroll: true });
     }
   }
 }

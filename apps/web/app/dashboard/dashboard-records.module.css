@@ -764,21 +764,21 @@
 }
 
 .primaryActions :global(.button):first-child {
-  border-color: rgba(248, 246, 242, .78);
-  color: #081014;
-  background: var(--cream);
+  border-color: var(--action);
+  color: var(--on-action);
+  background: var(--action);
 }
 
 .primaryActions :global(.button):first-child:hover,
 .primaryActions :global(.button):first-child:focus-visible {
-  border-color: #fff;
-  color: #05090b;
-  background: #fffdf7;
+  border-color: var(--action-hover);
+  color: var(--on-action);
+  background: var(--action-hover);
 }
 
 .primaryActions :global(.button):first-child:active {
-  color: #081014;
-  background: #e4dfd2;
+  color: var(--on-action);
+  background: var(--action-hover);
   transform: translateY(1px);
 }
 
@@ -787,7 +787,7 @@
   opacity: .55;
 }
 
-/* Owner cards use the same paper palette as the public collection. */
+/* Owner cards share the public collection palette and action hierarchy. */
 .instrumentTable, .instrumentRow {
   background: var(--panel);
   border-color: var(--line);
@@ -810,5 +810,5 @@
 }
 .moreButton, .primaryActions :global(.button) { min-height: 44px; font-size: .8125rem; }
 .profileNumber { color: #f8f2e5; background: #172a20; border-color: #405343; }
-.dangerAction { color: #a12f29 !important; border-color: #d5a39a !important; }
+.dangerAction { color: var(--negative) !important; border-color: #885750 !important; }
 .drawerSections > section > p { grid-column: 1 / -1; margin: 0; font-size: .8rem; line-height: 1.5; }

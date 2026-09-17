@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
-import { clearQrGuitarSessionState, createBrowserSupabaseClient, sessionExpiredMessageKey } from "../../lib/supabase-browser";
+import { clearQrGuitarSessionState, createBrowserSupabaseClient, readSessionStorage, removeSessionStorage, sessionExpiredMessageKey } from "../../lib/supabase-browser";
 import { getContentValue } from "../../lib/content-registry";
 import { useSiteContent } from "../../lib/use-site-content";
 
@@ -32,10 +32,10 @@ export default function LoginPage() {
     const nextPath = safeAuthRedirect(params.get("next"));
     setSafeNext(nextPath);
     if (params.get("mode") === "register" || params.get("mode") === "reset") setMode(params.get("mode") as LoginMode);
-    const expiredMessage = window.localStorage.getItem(sessionExpiredMessageKey);
+    const expiredMessage = readSessionStorage(sessionExpiredMessageKey);
     if (params.get("reason") === "session-expired" || expiredMessage) {
       setStatus(expiredMessage || sessionExpiredCopy);
-      window.localStorage.removeItem(sessionExpiredMessageKey);
+      removeSessionStorage(sessionExpiredMessageKey);
     }
 
     supabase.auth.getSession().then(({ data }) => {
@@ -109,7 +109,7 @@ export default function LoginPage() {
     }
 
     if (data.session) {
-      window.localStorage.removeItem(sessionExpiredMessageKey);
+      removeSessionStorage(sessionExpiredMessageKey);
       router.replace(safeNext);
       return;
     }
@@ -138,7 +138,7 @@ export default function LoginPage() {
       return;
     }
 
-    window.localStorage.removeItem(sessionExpiredMessageKey);
+    removeSessionStorage(sessionExpiredMessageKey);
     router.replace(safeNext);
   }
 

@@ -3,6 +3,9 @@
   --ink: #172022;
   --muted: #536064;
   --rule: #d9dfe0;
+  --text: var(--ink);
+  --positive: #2f633c;
+  --negative: #a12f29;
   box-sizing: border-box;
   width: var(--print-content-width);
   height: calc(var(--print-content-height) - 0.02in);
@@ -15,7 +18,7 @@
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
-.document[data-theme="dark"] { --paper: #142023; --ink: #f5f7f7; --muted: #c4cecf; --rule: #425154; }
+.document[data-theme="dark"] { --paper: #142023; --ink: #f5f7f7; --muted: #c4cecf; --rule: #425154; --positive: #94d5a7; --negative: #f0aaa4; }
 .document *, .document *::before, .document *::after { box-sizing: border-box; letter-spacing: 0; }
 .document h2, .document h3, .document p, .document dl, .document dd { margin: 0; color: inherit; }
 .document h2 { font: 700 27px/1.15 Arial, sans-serif; overflow-wrap: anywhere; }

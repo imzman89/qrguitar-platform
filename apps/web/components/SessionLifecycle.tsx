@@ -6,8 +6,11 @@ import {
   clearQrGuitarSessionState,
   createBrowserSupabaseClient,
   lastActivityAtKey,
+  readSessionStorage,
   sessionExpiredMessageKey,
-  sessionStartedAtKey
+  sessionIdentityKey,
+  sessionStartedAtKey,
+  writeSessionStorage
 } from "../lib/supabase-browser";
 
 const normalIdleMs = 8 * 60 * 60 * 1000;
@@ -16,7 +19,7 @@ const absoluteMaxMs = 14 * 24 * 60 * 60 * 1000;
 const activityWriteThrottleMs = 30 * 1000;
 
 function numericStorageValue(key: string) {
-  const value = window.localStorage.getItem(key);
+  const value = readSessionStorage(key);
   const parsed = value ? Number(value) : 0;
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
@@ -41,6 +44,29 @@ function sessionTimestamp(session: { user?: { last_sign_in_at?: string | null } 
   return Number.isFinite(signInAt) && signInAt > 0 ? signInAt : Date.now();
 }
 
+function sessionClock(session: { access_token?: string; user: { id: string; last_sign_in_at?: string | null } }) {
+  let sessionId = "";
+  try {
+    const parts = session.access_token?.split(".");
+    if (parts?.length === 3) {
+      const encoded = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+      const payload = JSON.parse(atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, "=")));
+      if (typeof payload?.session_id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.session_id)) sessionId = payload.session_id;
+    }
+  } catch { /* Older or unavailable token metadata falls back to the sign-in timestamp. */ }
+  // This decoded claim identifies local clock metadata only; it never grants access.
+  const identity = JSON.stringify([session.user.id, sessionId ? `session:${sessionId}` : session.user.last_sign_in_at || ""]);
+  const previousIdentity = readSessionStorage(sessionIdentityKey);
+  const changed = previousIdentity !== null && previousIdentity !== identity;
+  const fallbackStartedAt = sessionTimestamp(session);
+  const startedAt = (!changed && numericStorageValue(sessionStartedAtKey)) || fallbackStartedAt;
+  const lastActivityAt = (!changed && numericStorageValue(lastActivityAtKey)) || fallbackStartedAt;
+  writeSessionStorage(sessionIdentityKey, identity);
+  writeSessionStorage(sessionStartedAtKey, String(startedAt));
+  writeSessionStorage(lastActivityAtKey, String(lastActivityAt));
+  return { startedAt, lastActivityAt };
+}
+
 export function SessionLifecycle() {
   const router = useRouter();
   const pathname = usePathname();
@@ -54,6 +80,7 @@ export function SessionLifecycle() {
 
   useEffect(() => {
     let cancelled = false;
+    let authRevision = 0;
     const supabase = createBrowserSupabaseClient();
 
     async function expireSession() {
@@ -63,7 +90,7 @@ export function SessionLifecycle() {
 
       sessionActiveRef.current = false;
       clearQrGuitarSessionState();
-      window.localStorage.setItem(sessionExpiredMessageKey, "Your session expired. Please sign in again.");
+      writeSessionStorage(sessionExpiredMessageKey, "Your session expired. Please sign in again.");
       await supabase.auth.signOut();
       window.dispatchEvent(new CustomEvent("qrguitar:auth"));
 
@@ -74,28 +101,27 @@ export function SessionLifecycle() {
     }
 
     async function checkSession() {
-      const { data } = await supabase.auth.getSession();
+      const revision = authRevision;
+      const { data, error } = await supabase.auth.getSession();
+      if (cancelled || revision !== authRevision || error) return false;
       const session = data.session;
 
       if (!session?.user) {
         sessionActiveRef.current = false;
         clearQrGuitarSessionState();
-        return;
+        return false;
       }
 
       sessionActiveRef.current = true;
       const now = Date.now();
-      const fallbackStartedAt = sessionTimestamp(session);
-      const startedAt = numericStorageValue(sessionStartedAtKey) || fallbackStartedAt;
-      const lastActivityAt = numericStorageValue(lastActivityAtKey) || fallbackStartedAt;
-
-      window.localStorage.setItem(sessionStartedAtKey, String(startedAt));
-      window.localStorage.setItem(lastActivityAtKey, String(lastActivityAt));
+      const { startedAt, lastActivityAt } = sessionClock(session);
 
       const idleLimit = routeUsesAdminTimeout(pathnameRef.current || "/") ? adminIdleMs : normalIdleMs;
       if (now - lastActivityAt > idleLimit || now - startedAt > absoluteMaxMs) {
         await expireSession();
+        return false;
       }
+      return true;
     }
 
     function recordActivity(force = false) {
@@ -109,12 +135,12 @@ export function SessionLifecycle() {
       }
 
       lastWriteRef.current = now;
-      window.localStorage.setItem(lastActivityAtKey, String(now));
+      writeSessionStorage(lastActivityAtKey, String(now));
     }
 
     function handleVisibility() {
       if (document.visibilityState === "visible") {
-        void checkSession().then(() => recordActivity(true));
+        void checkSession().then((active) => { if (active) recordActivity(true); }).catch(() => undefined);
       }
     }
 
@@ -124,12 +150,13 @@ export function SessionLifecycle() {
     window.addEventListener("focus", handleVisibility);
     document.addEventListener("visibilitychange", handleVisibility);
 
-    void checkSession();
+    void checkSession().catch(() => undefined);
     const interval = window.setInterval(() => {
-      void checkSession();
+      void checkSession().catch(() => undefined);
     }, 60 * 1000);
 
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      authRevision++;
       if (!session?.user) {
         sessionActiveRef.current = false;
         clearQrGuitarSessionState();
@@ -137,11 +164,8 @@ export function SessionLifecycle() {
       }
 
       sessionActiveRef.current = true;
-      if (event === "SIGNED_IN" || !numericStorageValue(sessionStartedAtKey)) {
-        const now = Date.now();
-        window.localStorage.setItem(sessionStartedAtKey, String(now));
-        window.localStorage.setItem(lastActivityAtKey, String(now));
-      }
+      // SIGNED_IN also fires when an existing tab resumes; it is not a new login.
+      sessionClock(session);
     });
 
     return () => {
