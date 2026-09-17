@@ -92,7 +92,9 @@ export async function main(args = process.argv.slice(2), environment = process.e
       let barrier; const deadline = Date.now() + 6000;
       while (Date.now() < deadline) {
         const row = (await observer.query('select pg_blocking_pids(pid) blockers, wait_event_type, wait_event from pg_stat_activity where pid=$1', [bPid])).rows[0];
-        if (row?.blockers?.includes(aPid)) { barrier = { name, aPid, bPid, observerPid: report.observerPid, ...row }; break; }
+        // Activity wait fields and lock-manager blockers can reflect different instants.
+        // Retain A's transaction until one sample proves both, with B still pending.
+        if (!settled && row?.blockers?.includes(aPid) && row.wait_event_type === 'Lock') { barrier = { name, aPid, bPid, observerPid: report.observerPid, ...row }; break; }
         if (settled) throw new Error('B did not wait on A: ' + JSON.stringify(await pending));
         await pause(10);
       }
