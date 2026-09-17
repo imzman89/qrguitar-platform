@@ -43,6 +43,7 @@ import {
   type NativeProfileInput,
 } from "./lib/profile-draft";
 import { createUiMutationQueue, waitForDraftIdle } from "./lib/ui-actions";
+import { getNativePhotoPicker } from "./lib/photo-picker";
 import { parseQrInput, profileWebUrl, publicSearchText } from "./lib/qr-input";
 import { Scanner } from "./components/Scanner";
 import {
@@ -966,6 +967,7 @@ function Create({
     ),
     lifetime = useRef(new AbortController());
   const mutations = useMemo(() => createUiMutationQueue(), []);
+  const photoPicker = useMemo(() => Platform.OS === "android" ? getNativePhotoPicker() : null, []);
   const submitting = useSyncExternalStore(
     mutations.subscribe,
     mutations.getBusy,
@@ -976,20 +978,27 @@ function Create({
   useEffect(() => {
     latest.current = { input, photos, ready };
   }, [input, photos, ready]);
+  const restoreDraft = useCallback(async () => {
+    let draft = await controller.loadDraft();
+    if (photoPicker) draft = await photoPicker.recover(actorId, controller, lifetime.current.signal) || draft;
+    if (!mounted.current) return;
+    if (draft) { setInput(draft.input); setPhotos(draft.photos); }
+    setReady(true);
+  }, [actorId, controller, photoPicker]);
+  const flushEditableDraft = useCallback(async () => {
+    clearTimeout(autosaveTimer.current);
+    await waitForDraftIdle(controller, lifetime.current.signal);
+    const current = controller.getState().draft;
+    if (latest.current.ready && !current?.frozenBody && !current?.uncertain && !current?.result && (
+      !current || JSON.stringify(current.input) !== JSON.stringify(latest.current.input) ||
+      current.photos.length !== latest.current.photos.length || current.photos.some((photo, index) => photo !== latest.current.photos[index])
+    )) await controller.saveDraft(latest.current.input, latest.current.photos);
+  }, [controller]);
   useEffect(() => {
     const lifetimeController = lifetime.current;
     mounted.current = true;
     const unsub = controller.subscribe(setState);
-    void controller
-      .loadDraft()
-      .then((draft) => {
-        if (!mounted.current) return;
-        if (draft) {
-          setInput(draft.input);
-          setPhotos(draft.photos);
-        }
-        setReady(true);
-      })
+    void restoreDraft()
       .catch((error) => {
         if (mounted.current) setLocalError(messageOf(error));
       });
@@ -999,7 +1008,21 @@ function Create({
       unsub();
       controller.dispose();
     };
-  }, [controller]);
+  }, [controller, restoreDraft]);
+  useEffect(() => {
+    if (!photoPicker || !ready) return;
+    const subscription = AppState.addEventListener("change", next => {
+      if (next !== "active" || pickerBusy.current || mutations.getBusy()) return;
+      pickerBusy.current = true; setSelecting(true);
+      void mutations.run(async () => {
+        await flushEditableDraft();
+        const draft = await photoPicker.recover(actorId, controller, lifetime.current.signal);
+        if (mounted.current && draft) { setInput(draft.input); setPhotos(draft.photos); }
+      }).catch(error => { if (mounted.current) setLocalError(messageOf(error)); })
+        .finally(() => { pickerBusy.current = false; if (mounted.current) setSelecting(false); });
+    });
+    return () => subscription.remove();
+  }, [actorId, controller, flushEditableDraft, mutations, photoPicker, ready]);
   useEffect(() => {
     if (!ready || locked) return;
     const pending = new AbortController();
@@ -1065,6 +1088,14 @@ function Create({
     setSelecting(true);
     setLocalError("");
     try {
+      if (photoPicker) {
+        const draft = await mutations.run(async () => {
+          await flushEditableDraft();
+          return photoPicker.pick(actorId, controller, latest.current.input, latest.current.photos, lifetime.current.signal);
+        });
+        if (mounted.current && draft) { setInput(draft.input); setPhotos(draft.photos); }
+        return;
+      }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsMultipleSelection: true,
@@ -1132,6 +1163,20 @@ function Create({
       if (mounted.current) setLocalError(messageOf(error));
     }
   }
+  function discardPendingSelection() {
+    if (!photoPicker) return;
+    Alert.alert("Discard pending photo selection?", "Only the pending photo selection will be removed. Your saved draft and any Profile save attempt will be kept.", [
+      { text: "Keep selection", style: "cancel" },
+      { text: "Discard selection", style: "destructive", onPress: () => {
+        void mutations.run(async () => {
+          await flushEditableDraft();
+          await photoPicker.discard(actorId, lifetime.current.signal);
+          await restoreDraft();
+          if (mounted.current) setLocalError("");
+        }).catch(error => { if (mounted.current) setLocalError(messageOf(error)); });
+      } }
+    ]);
+  }
 
   if (!ready)
     return (
@@ -1142,16 +1187,7 @@ function Create({
             title="Try restoring again"
             onPress={() => {
               setLocalError("");
-              void controller
-                .loadDraft()
-                .then((d) => {
-                  if (!mounted.current) return;
-                  if (d) {
-                    setInput(d.input);
-                    setPhotos(d.photos);
-                  }
-                  setReady(true);
-                })
+              void restoreDraft()
                 .catch((e) => {
                   if (mounted.current) setLocalError(messageOf(e));
                 });
@@ -1160,6 +1196,7 @@ function Create({
         ) : (
           <ActivityIndicator color={colors.gold} />
         )}
+        {localError && photoPicker ? <Action title="Discard pending photo selection" secondary onPress={discardPendingSelection} disabled={submitting} /> : null}
       </View>
     );
   if (state.draft?.result)
@@ -1196,6 +1233,7 @@ function Create({
       {localError || state.error ? (
         <Notice error message={localError || state.error} />
       ) : null}
+      {localError && photoPicker ? <Action title="Discard pending photo selection" secondary onPress={discardPendingSelection} disabled={submitting || selecting} /> : null}
       {state.draft?.uncertain ? (
         <Notice message="The previous save is not confirmed. Retry that same save before changing or discarding this draft." />
       ) : null}

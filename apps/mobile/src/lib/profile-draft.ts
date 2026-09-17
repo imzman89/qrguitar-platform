@@ -46,7 +46,9 @@ export type NativeProfileDraft = {
   frozenBody: string | null;
   uncertain: boolean;
   result: NativeCreateResult | null;
+  lastPhotoSelectionId?: string;
 };
+export type NativePhotoSelectionTarget = Pick<NativeProfileDraft, "actorId" | "uploadId" | "idempotencyKey"> & { photoIds: string[] };
 export type NativeProfileDraftState = {
   draft: NativeProfileDraft | null;
   busy: boolean;
@@ -60,6 +62,7 @@ export interface NativeProfileDraftController {
     input: NativeProfileInput,
     photos: NativePhoto[],
   ): Promise<NativeProfileDraft>;
+  applyPhotoSelection(selectionId: string, target: NativePhotoSelectionTarget, photos: NativePhoto[]): Promise<NativeProfileDraft>;
   createOrRetry(
     input?: NativeProfileInput,
     photos?: NativePhoto[],
@@ -247,7 +250,8 @@ function parseDraft(raw: string, actorId: string): NativeProfileDraft {
     !KEY.test(draft.idempotencyKey) ||
     !Array.isArray(draft.stagedPaths) ||
     typeof draft.uncertain !== "boolean" ||
-    !(draft.frozenBody === null || typeof draft.frozenBody === "string")
+    !(draft.frozenBody === null || typeof draft.frozenBody === "string") ||
+    (draft.lastPhotoSelectionId !== undefined && !KEY.test(draft.lastPhotoSelectionId))
   )
     throw new Error(
       "This saved draft is unreadable. Keep it for support; it has not been deleted.",
@@ -371,6 +375,7 @@ export function makeProfileDraftController(
     input: NativeProfileInput,
     photos: NativePhoto[],
     lease: AuthLease,
+    selectionId?: string,
   ) => {
     const previous = await load(lease);
     if (previous?.frozenBody || previous?.uncertain)
@@ -414,6 +419,7 @@ export function makeProfileDraftController(
         frozenBody: null,
         uncertain: false,
         result: null,
+        ...(selectionId || previous?.lastPhotoSelectionId ? { lastPhotoSelectionId: selectionId || previous?.lastPhotoSelectionId } : {}),
       },
       lease,
     );
@@ -436,6 +442,17 @@ export function makeProfileDraftController(
     getState: () => state,
     loadDraft: () => run((lease) => load(lease)),
     saveDraft: (input, photos) => run((lease) => save(input, photos, lease)),
+    applyPhotoSelection: (selectionId, target, photos) => run(async (lease) => {
+      const previous = await load(lease);
+      if (!KEY.test(selectionId) || !previous || target.actorId !== actorId || previous.uploadId !== target.uploadId || previous.idempotencyKey !== target.idempotencyKey)
+        throw new Error("These photos belong to an earlier draft. The selection has been kept for recovery.");
+      // The receipt and photos commit in the same encrypted draft write. A lost
+      // cleanup response or process restart must never append this selection twice.
+      if (previous.lastPhotoSelectionId === selectionId) return previous;
+      if (previous.photos.length !== target.photoIds.length || previous.photos.some((photo, index) => photo.id !== target.photoIds[index]))
+        throw new Error("This draft's photos changed while the picker was open. The selection has been kept for recovery.");
+      return save(previous.input, [...previous.photos, ...photos], lease, selectionId);
+    }),
     createOrRetry: (input, photos) =>
       run(async (lease) => {
         let draft = await load(lease);

@@ -34,7 +34,10 @@ const text=view=>{
 };
 function fixture(options={}){
  const events=new Set(),authListeners=new Set(),permissionListeners=new Set();
- const calls={signIn:[],signUp:[],create:[],save:[],discard:0,dispose:0,requestPermission:0,picker:0,links:[],profiles:[]};
+ const calls={signIn:[],signUp:[],create:[],save:[],discard:0,dispose:0,requestPermission:0,picker:0,pendingPicker:0,links:[],profiles:[]};
+ const stored=new Map(options.selectionIntent?[['qrguitar.android-photo-selection.v1',JSON.stringify(options.selectionIntent)]]:[]);
+ const storage={getItem:async key=>stored.get(key)??null,setItem:async(key,value)=>{stored.set(key,value);},removeItem:async key=>{await options.removeSelection?.(key);stored.delete(key);}};
+ class SessionChanged extends Error{constructor(){super('Your account session changed.');}}
  let snapshot=options.snapshot||{status:'signed-in',session:{user:{id:'owner-111111111111',email:'owner@example.invalid',user_metadata:{display_name:'Owner'}}},revision:1,message:''};
  let permission=options.permission||{granted:false,canAskAgain:true};
  const appState={currentState:'active',addEventListener(_event,fn){events.add(fn);return {remove(){events.delete(fn);}};}};
@@ -43,11 +46,13 @@ function fixture(options={}){
   signIn:async(...args)=>{calls.signIn.push(args);return options.signIn?.(...args);},
   signUp:async(...args)=>{calls.signUp.push(args);return options.signUp?options.signUp(...args):{requiresEmailConfirmation:true};},
   signOut:async()=>{snapshot={...snapshot,status:'signed-out',session:null,revision:snapshot.revision+1};authListeners.forEach(fn=>fn(snapshot));},
-  retry:async()=>{}};
+  retry:async()=>{},acquireSession:async expected=>{if(snapshot.status!=='signed-in'||snapshot.session?.user.id!==expected)throw new SessionChanged();return {actorId:expected,revision:snapshot.revision,accessToken:'test-token'};},
+  isCurrent:lease=>snapshot.status==='signed-in'&&snapshot.session?.user.id===lease.actorId&&snapshot.revision===lease.revision};
  let state={draft:options.draft||null,busy:false,error:''};const listeners=new Set();
  const emit=patch=>{state={...state,...patch};listeners.forEach(fn=>fn(state));};
  const draft={getState:()=>state,subscribe(fn){listeners.add(fn);return()=>listeners.delete(fn);},loadDraft:async()=>state.draft,
-  saveDraft:async(input,photos)=>{calls.save.push([input,photos]);emit({busy:true});try{await options.saveDraft?.(input,photos);const next={actorId:snapshot.session?.user.id,input,photos,frozenBody:null,uncertain:false,result:null};emit({draft:next});return next;}finally{emit({busy:false});}},
+  saveDraft:async(input,photos)=>{calls.save.push([input,photos]);emit({busy:true});try{await options.saveDraft?.(input,photos);const next={actorId:snapshot.session?.user.id,input,photos,uploadId:state.draft?.uploadId||'upload-111111111111',idempotencyKey:state.draft?.idempotencyKey||'create-111111111111',lastPhotoSelectionId:state.draft?.lastPhotoSelectionId,frozenBody:null,uncertain:false,result:null};emit({draft:next});return next;}finally{emit({busy:false});}},
+  applyPhotoSelection:async(selectionId,target,photos)=>{if(state.draft?.lastPhotoSelectionId===selectionId)return state.draft;if(!state.draft||state.draft.actorId!==target.actorId||state.draft.uploadId!==target.uploadId||state.draft.idempotencyKey!==target.idempotencyKey||state.draft.frozenBody)throw Error('Stale selection');const saved=await draft.saveDraft(state.draft.input,[...state.draft.photos,...photos]);const next={...saved,lastPhotoSelectionId:selectionId};emit({draft:next});return next;},
   createOrRetry:async(...args)=>{calls.create.push(args);emit({busy:true});try{return options.create?await options.create(...args):{qrCode:'QRG-NEW123',permanentPath:'/i/QRG-NEW123',message:'Saved'};}finally{emit({busy:false});}},
   discardDraft:async()=>{calls.discard++;emit({draft:null});},dispose:()=>{calls.dispose++;listeners.clear();}};
  const requestPermission=async()=>{calls.requestPermission++;permission=options.requestPermission?await options.requestPermission():{granted:false,canAskAgain:false};permissionListeners.forEach(fn=>fn(permission));return permission;};
@@ -56,9 +61,10 @@ function fixture(options={}){
  const bridge={AppState:appState,Platform:{OS:options.platform||'android'},Alert:{alert:(...args)=>alerts.push(args)},Linking:{openURL:async url=>calls.links.push(url),openSettings:async()=>calls.links.push('settings'),getInitialURL:async()=>options.initialUrl||null,addEventListener:()=>({remove(){}})},BackHandler:{addEventListener:()=>{calls.backHandlers=(calls.backHandlers||0)+1;return{remove(){}};}},Share:{share:async()=>{}},StyleSheet:{create:x=>x,absoluteFill:{position:'absolute'}}};
  for(const name of ['ActivityIndicator','KeyboardAvoidingView','Modal','Pressable','RefreshControl','ScrollView','Switch','Text','View'])bridge[name]=name;
  const mocks={'react':React,'react-native':bridge,'react-native-safe-area-context':{SafeAreaProvider:'SafeAreaProvider',SafeAreaView:'SafeAreaView'},'expo-status-bar':{StatusBar:'StatusBar'},'expo-image':{Image:'Image'},
-  'expo-image-picker':{launchImageLibraryAsync:async()=>{calls.picker++;return options.picker?options.picker():{canceled:true};}},
+  'expo-image-picker':{launchImageLibraryAsync:async()=>{calls.picker++;return options.picker?options.picker():{canceled:true};},getPendingResultAsync:async()=>{calls.pendingPicker++;return options.pendingPicker?options.pendingPicker():null;}},
+  'expo-crypto':{randomUUID:require('node:crypto').randomUUID},
   'expo-camera':{CameraView:'CameraView',useCameraPermissions(){const [p,set]=React.useState(permission);React.useEffect(()=>{permissionListeners.add(set);return()=>permissionListeners.delete(set);},[]);return [p,requestPermission,getPermission];}},
-  'auth':{getNativeAuth:()=>auth},'api':{getNativeApi:()=>api,safeNativeImageUrl:value=>typeof value==='string'&&value.startsWith('https://')?value:null},
+  'auth':{getNativeAuth:()=>auth,getNativeStorage:()=>storage,NativeSessionChangedError:SessionChanged},'api':{getNativeApi:()=>api,safeNativeImageUrl:value=>typeof value==='string'&&value.startsWith('https://')?value:null},
   'profile-draft':{createProfileDraftController:()=>draft,photoFromPickerAsset:asset=>({id:asset.id||'photo-111111111111',dataUrl:'data:image/jpeg;base64,'+asset.base64}),MAX_NATIVE_PHOTOS:8,MAX_NATIVE_IMAGE_BYTES:12*1024*1024},
   'ui':{Action:'Action',Field:'Field',Heading:'Heading',Notice:'Notice',colors:{gold:'gold',background:'black'},styles:{}}};
  const cache=new Map();
@@ -70,7 +76,7 @@ function fixture(options={}){
   const scopedRequire=id=>{if(mocks[id])return mocks[id];const key=id.split('/').at(-1);if(mocks[key])return mocks[key];if(id.startsWith('.')){const candidate=path.posix.normalize(path.posix.join(path.posix.dirname(file),id));return load(fs.existsSync(path.join(base,candidate+'.tsx'))?candidate+'.tsx':candidate+'.ts');}return require(id);};
   new Function('require','module','exports',output)(scopedRequire,module,module.exports);cache.set(file,module.exports);return module.exports;
  }
- return {App:load('App.tsx'),Scanner:load('components/Scanner.tsx').Scanner,helpers:load('lib/ui-actions.ts'),calls,alerts,draft,emit,auth,
+ return {App:load('App.tsx'),Scanner:load('components/Scanner.tsx').Scanner,helpers:load('lib/ui-actions.ts'),calls,alerts,draft,emit,auth,stored,
   async background(value){appState.currentState=value;await invoke(()=>events.forEach(fn=>fn(value)));},
   async changeAccount(next){snapshot=next;await invoke(()=>authListeners.forEach(fn=>fn(snapshot)));},
   async setPermission(next){permission=next;await invoke(()=>permissionListeners.forEach(fn=>fn(next)));},
@@ -115,7 +121,7 @@ test('registration requires consent and reports confirmation without pretending 
 
 const draftInput=(extra={})=>({brand:'Fender',model:'Stratocaster',serial:'',serialNotUsed:true,instrumentType:'Guitar',year:'',condition:'used',visibility:'private',showSerialPublic:false,location:'',summary:'',ownerName:'Owner',...extra});
 const selectedPhoto={id:'photo-111111111111',dataUrl:'data:image/jpeg;base64,cGhvdG8='};
-const savedDraft=(extra={})=>({actorId:'owner-111111111111',input:draftInput(),photos:[selectedPhoto],frozenBody:null,uncertain:false,result:null,...extra});
+const savedDraft=(extra={})=>({actorId:'owner-111111111111',input:draftInput(),photos:[selectedPhoto],uploadId:'upload-111111111111',idempotencyKey:'create-111111111111',frozenBody:null,uncertain:false,result:null,...extra});
 const record=(extra={})=>({qrCode:'QRG-ABC123',name:'Private instrument',brand:'Fender',model:'Stratocaster',serial:'PRIVATE-SERIAL-42',visibility:'private',heroImageDataUrl:'https://synthetic.supabase.co/private-image.jpg',galleryImageDataUrls:[],...extra});
 const submitAction=(view,title)=>view.root.findAllByType('Action').filter(node=>node.props.title===title).at(-1);
 async function elapse(ms){await act(async()=>{await new Promise(resolve=>setTimeout(resolve,ms));await tick();});}
@@ -179,7 +185,65 @@ test('photo picker cancellation keeps existing photos and double taps launch onl
 test('photo picker results arriving after unmount cannot save or create a draft',async()=>{
  const pending=deferred(),f=fixture({picker:()=>pending.promise}),v=await render(f.App.Create,f.createProps);
  await invoke(action(v,'Choose photos').props.onPress);await unmount(v);assert.equal(f.calls.dispose,1);assert.equal(f.createProps.leaveGuardRef.current,null);
- pending.resolve({canceled:false,assets:[{id:'photo-late-123',base64:'bGF0ZQ=='}]});await flush();assert.equal(f.calls.save.length,0);assert.equal(f.calls.create.length,0);assert.equal(f.calls.picker,1);
+ const before=f.calls.save.length;pending.resolve({canceled:false,assets:[{id:'photo-late-123',base64:'bGF0ZQ=='}]});await flush();assert.ok(before>=1);assert.equal(f.calls.save.length,before);assert.equal(f.calls.create.length,0);assert.equal(f.calls.picker,1);
+});
+
+const pendingSelection=(draft=savedDraft(),extra={})=>({version:1,selectionId:'selection-111111111111',actorId:draft.actorId,uploadId:draft.uploadId,idempotencyKey:draft.idempotencyKey,photoIds:draft.photos.map(photo=>photo.id),...extra});
+const recoveredPhoto=()=>({canceled:false,assets:[{id:'recovered-111111111111',base64:'cGhvdG8='}]});
+test('restored Android Create attaches the pending original selection once without launching or submitting',async()=>{
+ const f=fixture({draft:savedDraft(),selectionIntent:pendingSelection(),pendingPicker:async()=>recoveredPhoto()}),v=await render(f.App.Create,f.createProps);
+ assert.equal(v.root.findAllByType('Image').length,2);assert.equal(f.calls.pendingPicker,1);assert.equal(f.calls.picker,0);assert.equal(f.calls.create.length,0);assert.equal(f.stored.size,0);
+ await f.background('active');assert.equal(v.root.findAllByType('Image').length,2);assert.equal(f.calls.pendingPicker,1);
+});
+test('pending picker error preserves saved draft and restore retry works without opening another picker',async()=>{
+ const f=fixture({draft:savedDraft(),selectionIntent:pendingSelection(),pendingPicker:async()=>({code:'ERR_PICKER',message:'private platform detail'})}),v=await render(f.App.Create,f.createProps);
+ assert.match(text(v),/choose the photos again/);assert.doesNotMatch(text(v),/private platform/);assert.equal(f.calls.create.length,0);
+ await invoke(action(v,'Try restoring again').props.onPress);assert.equal(field(v,'Brand').props.value,'Fender');assert.equal(v.root.findAllByType('Image').length,1);assert.equal(f.calls.picker,0);
+});
+test('explicit pending-selection discard resolves stale draft quarantine without deleting draft or creating Profile',async()=>{
+ const f=fixture({draft:savedDraft(),selectionIntent:pendingSelection(undefined,{uploadId:'earlier-upload-111111111'}),pendingPicker:async()=>({canceled:true,assets:null})}),v=await render(f.App.Create,f.createProps);
+ assert.match(text(v),/earlier or saved draft/);await invoke(action(v,'Discard pending photo selection').props.onPress);assert.equal(f.stored.size,1);
+ await invoke(f.alerts.at(-1)[2].find(button=>button.text==='Discard selection').onPress);
+ assert.equal(f.stored.size,0);assert.equal(field(v,'Brand').props.value,'Fender');assert.equal(v.root.findAllByType('Image').length,1);assert.equal(f.calls.discard,0);assert.equal(f.calls.create.length,0);
+});
+test('foreground recovery keeps local edits made before the autosave timer',async()=>{
+ const f=fixture({draft:savedDraft(),pendingPicker:async()=>recoveredPhoto()}),v=await render(f.App.Create,f.createProps);
+ await invoke(field(v,'Brand').props.onChangeText,'Edited before background');f.stored.set('qrguitar.android-photo-selection.v1',JSON.stringify(pendingSelection()));
+ await f.background('active');assert.equal(field(v,'Brand').props.value,'Edited before background');assert.equal(v.root.findAllByType('Image').length,2);assert.equal(f.draft.getState().draft.input.brand,'Edited before background');assert.equal(f.calls.create.length,0);
+});
+
+test('foreground before first autosave persists a fresh partial form',async()=>{
+ const f=fixture(),v=await render(f.App.Create,f.createProps);
+ await invoke(field(v,'Brand').props.onChangeText,'Fresh partial form');assert.equal(f.draft.getState().draft,null);
+ await f.background('active');assert.equal(f.calls.save.length,1);assert.equal(f.draft.getState().draft.input.brand,'Fresh partial form');assert.equal(field(v,'Brand').props.value,'Fresh partial form');assert.equal(f.calls.create.length,0);
+});
+
+test('discarding pending photos preserves edits made before autosave and never discards the draft',async()=>{
+ const f=fixture({draft:savedDraft(),pendingPicker:async()=>({canceled:true,assets:null})}),v=await render(f.App.Create,f.createProps);
+ f.stored.set('qrguitar.android-photo-selection.v1',JSON.stringify(pendingSelection(undefined,{uploadId:'earlier-upload-111111111'})));
+ await invoke(action(v,'Choose photos').props.onPress);assert.match(notices(v),/earlier or saved draft/);
+ await invoke(action(v,'Discard pending photo selection').props.onPress);
+ await invoke(field(v,'Brand').props.onChangeText,'Edit before discard confirmation');
+ await invoke(f.alerts.at(-1)[2].find(button=>button.text==='Discard selection').onPress);
+ assert.equal(field(v,'Brand').props.value,'Edit before discard confirmation');assert.equal(f.draft.getState().draft.input.brand,'Edit before discard confirmation');assert.equal(v.root.findAllByType('Image').length,1);assert.equal(f.calls.discard,0);assert.equal(f.calls.create.length,0);
+});
+
+test('picker cleanup retry preserves a fresh edit and cannot duplicate already-applied photos',async()=>{
+ let fail=true;const f=fixture({draft:savedDraft(),picker:async()=>recoveredPhoto(),removeSelection:async()=>{if(fail){fail=false;throw Error('storage temporarily unavailable');}}}),v=await render(f.App.Create,f.createProps);
+ await invoke(action(v,'Choose photos').props.onPress);assert.equal(v.root.findAllByType('Image').length,2);assert.equal(f.stored.size,1);
+ await invoke(field(v,'Brand').props.onChangeText,'Edited after receipt');await invoke(action(v,'Choose photos').props.onPress);
+ assert.equal(field(v,'Brand').props.value,'Edited after receipt');assert.equal(f.draft.getState().draft.input.brand,'Edited after receipt');assert.equal(v.root.findAllByType('Image').length,2);assert.equal(f.calls.picker,1);assert.equal(f.stored.size,0);assert.equal(f.calls.create.length,0);
+});
+
+test('previous-account unresolved selection explains the restriction without offering its private photos',async()=>{
+ const intent=pendingSelection(undefined,{actorId:'previous-111111111111'}),f=fixture({draft:savedDraft(),selectionIntent:intent}),v=await render(f.App.Create,f.createProps);
+ await invoke(action(v,'Choose photos').props.onPress);assert.match(notices(v),/previous account.*Sign back into that account/);assert.equal(f.calls.pendingPicker,0);assert.equal(f.calls.picker,0);assert.equal(v.root.findAllByType('Image').length,1);
+ await invoke(action(v,'Discard pending photo selection').props.onPress);await invoke(f.alerts.at(-1)[2].find(button=>button.text==='Discard selection').onPress);
+ assert.equal(JSON.parse(f.stored.get('qrguitar.android-photo-selection.v1')).actorId,intent.actorId);assert.equal(f.calls.pendingPicker,0);
+});
+test('web keeps the picker launch in the original user gesture and does not inspect Android pending results',async()=>{
+ const f=fixture({platform:'web'}),v=await render(f.App.Create,f.createProps);let immediate;
+ await invoke(()=>{action(v,'Choose photos').props.onPress();immediate=f.calls.picker;});assert.equal(immediate,1);assert.equal(f.calls.pendingPicker,0);assert.equal(f.calls.save.length,0);
 });
 test('backgrounding the root hides private Create content without losing its photos or inputs',async()=>{
  const f=fixture({picker:async()=>({canceled:false,assets:[{id:'selected-111111111',base64:'cGhvdG8='}]})}),v=await render(f.App.default);
