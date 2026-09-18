@@ -7,6 +7,8 @@ export type OptionalTrackingPurpose = (typeof optionalTrackingPurposes)[number];
 // Canonical, provider-neutral names for a future consent-gated integration.
 // Defining names here does not emit events or load tracking code.
 export const optionalTrackingProductEvents = {
+  publicProfileViewed: "public_profile_viewed",
+  qrLandingViewed: "qr_landing_viewed",
   registrationCompleted: "account_registration_completed",
   profileCreated: "profile_creation_completed",
   checkoutStarted: "credit_checkout_started",

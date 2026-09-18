@@ -31,6 +31,8 @@ conversion events:
 
 | Export | Event name | Emit only when |
 | --- | --- | --- |
+| `publicProfileViewed` | `public_profile_viewed` | A public Profile has rendered successfully; use only anonymous aggregate properties. |
+| `qrLandingViewed` | `qr_landing_viewed` | A public Profile rendered with a verified QR-origin marker defined by the future integration. Do not infer a scan from every Profile visit. |
 | `registrationCompleted` | `account_registration_completed` | The server-confirmed new account is available. |
 | `profileCreated` | `profile_creation_completed` | The Profile creation transaction has committed. |
 | `checkoutStarted` | `credit_checkout_started` | A checkout order or session was created successfully. |

@@ -40,6 +40,8 @@ test("optional tracking is disabled for empty or partly invalid configuration", 
 
 test("registration and conversion names are stable, explicit, and provider-neutral", () => {
   assert.deepEqual(consent.optionalTrackingProductEvents, {
+    publicProfileViewed: "public_profile_viewed",
+    qrLandingViewed: "qr_landing_viewed",
     registrationCompleted: "account_registration_completed",
     profileCreated: "profile_creation_completed",
     checkoutStarted: "credit_checkout_started",
