@@ -15,7 +15,8 @@ const OP = "30000000-0000-4000-8000-000000000003", OP2 = "40000000-0000-4000-800
 const REQUEST = "50000000-0000-4000-8000-000000000005", NEWER = "60000000-0000-4000-8000-000000000006";
 const time = "2026-09-17T12:00:00.123789+00:00", cancelledTime = "2026-09-17T13:00:00.987654+00:00";
 const dto = (requestId = REQUEST, status = "requested") => ({ requestId, status, requestedAt: time, cancelledAt: status === "cancelled" ? cancelledTime : null });
-const snapshot = (request, revision = "0") => ({ revision, activeRequest: request?.status === "requested" ? request : null, latestRequest: request || null });
+const snapshot = (request, revision = "0", fulfillment = null) => ({ revision, activeRequest: request?.status === "requested" ? request : null, latestRequest: request || null, fulfillment });
+const quiescing = { state: "quiescing_storage", blockers: ["storage_quiescence_required"], revision: "1", reviewedAt: time, storageQuiesceUntil: cancelledTime };
 const session = id => id ? { access_token: "token-" + id, user: { id } } : null;
 const json = value => Response.json({ ok: true, ...value });
 const denial = (status, message = "Retry rejected") => ({ ok: false, code: ({ 400: "invalid_request", 401: "identity_required", 403: "origin_not_allowed", 404: "request_not_found", 409: "operation_conflict" })[status], uncertain: false, retryable: false, message, ...(status === 409 ? { operationId: OP } : {}) });
@@ -357,6 +358,13 @@ test("actual in-flight action is not described as a failed or unconfirmed previo
 test("actual requested and cancelled states describe intake only", () => {
   const pending = renderSection(ready({ snapshot: snapshot(dto()) })); assert.match(pending, /Request received/); assert.match(pending, /Requested/); assert.match(pending, /Cancel deletion request/);
   const cancelled = renderSection(ready({ snapshot: snapshot(dto(REQUEST, "cancelled")) })); assert.match(cancelled, /Request cancelled/); assert.match(cancelled, /Request another review/); assert.doesNotMatch(cancelled, /data restored|erasure complete/);
+});
+test("quiescing status disables cancellation in the controller and explains the fixed freeze", async t => {
+  const f = fixture(t, { status: snapshot(dto(), "1", quiescing) }); await f.ready();
+  f.client.prepareCancel(); assert.equal(f.client.getState().confirmation, null); assert.equal(f.writes().length, 0);
+  const html = renderSection(ready({ snapshot: snapshot(dto(), "1", quiescing) }));
+  assert.match(html, /Account writes are frozen and public content is hidden/); assert.match(html, /can no longer be cancelled/);
+  assert.doesNotMatch(html, /Cancel deletion request|leaves your current account access unchanged/);
 });
 test("actual status error does not invent an empty request or enable a new submission", () => {
   const html = renderSection(ready({ phase: "error", snapshot: null, error: "Status is unavailable" })); assert.match(html, /Status is unavailable/); assert.match(html, /Refresh status/); assert.doesNotMatch(html, /You have no recorded|>Request deletion review<|Request received/);

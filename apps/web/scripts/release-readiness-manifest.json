@@ -1,5 +1,5 @@
 {
-  "releaseVersion": "2026-09-17.10",
+  "releaseVersion": "2026-09-17.11",
   "checks": [
     "catalog_readable",
     "required_functions",
@@ -46,10 +46,6 @@
     "public.billing_reserve_order(uuid,text,uuid,jsonb)",
     "public.billing_resolve_review(uuid,text,text,uuid,uuid,text,text)",
     "public.create_instrument_profile(uuid,text,text,jsonb,boolean,text,text)",
-    "public.cancel_account_deletion_request(uuid,uuid,uuid,bigint)",
-    "public.read_account_deletion_queue(uuid,boolean,timestamp with time zone,uuid,integer)",
-    "public.read_account_deletion_requests(uuid,uuid)",
-    "public.submit_account_deletion_request(uuid,uuid,bigint)",
     "public.commit_service_evidence_upload(uuid,uuid,boolean,uuid)",
     "public.commit_service_evidence_upload(uuid,uuid,boolean,uuid,bigint)",
     "public.discard_service_evidence_upload(uuid,uuid,boolean,uuid,bigint)",
@@ -97,7 +93,14 @@
     "public.billing_paypal_webhook_save_plan(text,uuid,uuid,jsonb)",
     "public.billing_paypal_webhook_scheduler_ready(text)",
     "public.cleanup_staged_instrument_edit_uploads(uuid,text,uuid,text[],text[])",
-    "public.register_staged_instrument_edit_upload(uuid,text,uuid,text,text)"
+    "public.register_staged_instrument_edit_upload(uuid,text,uuid,text,text)",
+    "public.cancel_account_deletion_request(uuid,uuid,uuid,bigint)",
+    "public.complete_account_deletion_fulfillment(uuid,boolean,uuid,uuid)",
+    "public.prepare_account_deletion_fulfillment(uuid,boolean,uuid,uuid,text[])",
+    "public.read_account_deletion_fulfillment(uuid,boolean,uuid)",
+    "public.read_account_deletion_queue(uuid,boolean,timestamp with time zone,uuid,integer)",
+    "public.read_account_deletion_requests(uuid,uuid)",
+    "public.submit_account_deletion_request(uuid,uuid,bigint)"
   ],
   "blockedFunctions": [
     "public.create_instrument_profile_unregistered(uuid,text,text,jsonb,boolean,text)",
@@ -120,10 +123,6 @@
     "public._billing_order_json(billing_orders)",
     "public._billing_payment_identity(billing_orders,jsonb)",
     "public._billing_receipt(billing_orders,text,jsonb)",
-    "public._account_deletion_intake_guard()",
-    "public._account_deletion_lock_actor(uuid)",
-    "public._account_deletion_receipt_json(account_deletion_request_receipts)",
-    "public._account_deletion_request_json(account_deletion_requests)",
     "public._service_evidence_upload_advance(uuid,uuid)",
     "public._service_evidence_upload_authority(service_submissions,uuid,boolean)",
     "public._service_evidence_upload_bucket()",
@@ -148,7 +147,21 @@
     "public._billing_paypal_webhook_headers(jsonb)",
     "public._billing_paypal_webhook_json(billing_paypal_webhook_deliveries,boolean,boolean)",
     "public._billing_paypal_webhook_receipt_id(text,integer)",
-    "public.consume_staged_instrument_edit_upload()"
+    "public.consume_staged_instrument_edit_upload()",
+    "public._account_deletion_admin(uuid,boolean)",
+    "public._account_deletion_billing_personal_content(uuid,text)",
+    "public._account_deletion_blockers(uuid,text,text[])",
+    "public._account_deletion_custody_fence()",
+    "public._account_deletion_fulfillment_guard()",
+    "public._account_deletion_fulfillment_json(account_deletion_fulfillments)",
+    "public._account_deletion_intake_guard()",
+    "public._account_deletion_lock_actor(uuid)",
+    "public._account_deletion_receipt_json(account_deletion_request_receipts)",
+    "public._account_deletion_request_json(account_deletion_requests)",
+    "public._account_deletion_retained_pii(uuid,uuid,text)",
+    "public._account_deletion_text_has_identity(text,uuid,text)",
+    "public._account_deletion_unscoped_personal_content(uuid,text)",
+    "public._account_deletion_write_fence()"
   ],
   "fingerprints": [
     {
@@ -745,94 +758,6 @@
       "signature": "public.create_instrument_profile(uuid,text,text,jsonb,boolean,text,text)",
       "source_hash": "4c1a08dea4f32d5912abd3dc276cfcfe3a1be2367c6b80f946bb2c5f8a238c4a",
       "arguments": "p_owner_id uuid, p_idempotency_key text, p_upload_id text, p_payload jsonb, p_launch_testing_access boolean, p_owner_display_name text, p_billing_environment text",
-      "result": "jsonb",
-      "definer": true,
-      "volatility": "v",
-      "settings": [
-        "search_path=pg_catalog, public"
-      ]
-    },
-    {
-      "signature": "public._account_deletion_intake_guard()",
-      "source_hash": "4e99b66af0ba20c34b565596c738e8d4f161df78a4afbd641afaf37d697b7cae",
-      "arguments": "",
-      "result": "trigger",
-      "definer": true,
-      "volatility": "v",
-      "settings": [
-        "search_path=pg_catalog, public"
-      ]
-    },
-    {
-      "signature": "public._account_deletion_lock_actor(uuid)",
-      "source_hash": "fe20d51521fc492350ef7f25e1a22a34a13cff23e4b0e99692b8386da6712fd1",
-      "arguments": "p_actor_id uuid",
-      "result": "void",
-      "definer": true,
-      "volatility": "v",
-      "settings": [
-        "search_path=pg_catalog, public"
-      ]
-    },
-    {
-      "signature": "public._account_deletion_receipt_json(account_deletion_request_receipts)",
-      "source_hash": "ad2b66186ea2064dadff2ca05a8e1136a8eebf2c97c79178cc915b69a72331b1",
-      "arguments": "p_receipt account_deletion_request_receipts",
-      "result": "jsonb",
-      "definer": false,
-      "volatility": "s",
-      "settings": [
-        "search_path=pg_catalog, public"
-      ]
-    },
-    {
-      "signature": "public._account_deletion_request_json(account_deletion_requests)",
-      "source_hash": "9268a97506f5e594f672dde463d29c0c004fe37110da9f668f866ba561355f27",
-      "arguments": "p_request account_deletion_requests",
-      "result": "jsonb",
-      "definer": false,
-      "volatility": "s",
-      "settings": [
-        "search_path=pg_catalog, public"
-      ]
-    },
-    {
-      "signature": "public.cancel_account_deletion_request(uuid,uuid,uuid,bigint)",
-      "source_hash": "8802c84938f3209b0e094e314241ec5613d466cd59d425e3c7e521d46bb2b042",
-      "arguments": "p_actor_id uuid, p_request_id uuid, p_operation_id uuid, p_expected_revision bigint",
-      "result": "jsonb",
-      "definer": true,
-      "volatility": "v",
-      "settings": [
-        "search_path=pg_catalog, public"
-      ]
-    },
-    {
-      "signature": "public.read_account_deletion_queue(uuid,boolean,timestamp with time zone,uuid,integer)",
-      "source_hash": "548e24be9ba4a94a289a9ad510379fa266c4909063d03e7488ace62209dda65c",
-      "arguments": "p_actor_id uuid, p_environment_admin boolean DEFAULT false, p_before_requested_at timestamp with time zone DEFAULT NULL::timestamp with time zone, p_before_id uuid DEFAULT NULL::uuid, p_limit integer DEFAULT 50",
-      "result": "jsonb",
-      "definer": true,
-      "volatility": "s",
-      "settings": [
-        "search_path=pg_catalog, public"
-      ]
-    },
-    {
-      "signature": "public.read_account_deletion_requests(uuid,uuid)",
-      "source_hash": "6c3cd6dcddc44103bd470d977da8e0a47d82667f95ef0d1cbd3c47a290bf5e73",
-      "arguments": "p_actor_id uuid, p_request_id uuid DEFAULT NULL::uuid",
-      "result": "jsonb",
-      "definer": true,
-      "volatility": "s",
-      "settings": [
-        "search_path=pg_catalog, public"
-      ]
-    },
-    {
-      "signature": "public.submit_account_deletion_request(uuid,uuid,bigint)",
-      "source_hash": "bb89bbeccdcb6a100d6b471d1ac56141c9cc904aa36dad403f7e8d381c16af3b",
-      "arguments": "p_actor_id uuid, p_operation_id uuid, p_expected_revision bigint",
       "result": "jsonb",
       "definer": true,
       "volatility": "v",
@@ -1642,6 +1567,237 @@
       "settings": [
         "search_path=pg_catalog, public"
       ]
+    },
+    {
+      "signature": "public._account_deletion_admin(uuid,boolean)",
+      "source_hash": "dbe25e2955813705a03f95bf6abc281a4b2f857f6507d1c3600544c4952d0597",
+      "arguments": "p_actor_id uuid, p_environment_admin boolean",
+      "result": "void",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._account_deletion_billing_personal_content(uuid,text)",
+      "source_hash": "5b41a9bd93bfd44a015d20f089e9a707b134fb4cc6498a4cfd678195e9a7de2e",
+      "arguments": "p_actor_id uuid, p_email text",
+      "result": "boolean",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._account_deletion_blockers(uuid,text,text[])",
+      "source_hash": "99c0cbb15458f8df77dc703afabff7d2019f323c6b9b50f41a0b9ca684686122",
+      "arguments": "p_actor_id uuid, p_email text, p_protected_admin_emails text[]",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._account_deletion_custody_fence()",
+      "source_hash": "79e2b839fbda07f8330b2747b8e7b429fad679d986717675932b39d5f880b42b",
+      "arguments": "",
+      "result": "trigger",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._account_deletion_fulfillment_guard()",
+      "source_hash": "130cfc056974ac18118a5a5febb66afe09be3cb65610ed6ac5e0267bc03d58d2",
+      "arguments": "",
+      "result": "trigger",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._account_deletion_fulfillment_json(account_deletion_fulfillments)",
+      "source_hash": "8882c32070c3c56cafc2475baecb9f4d91abf4f232c63ce8972b1876d931c613",
+      "arguments": "p_job account_deletion_fulfillments",
+      "result": "jsonb",
+      "definer": false,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._account_deletion_intake_guard()",
+      "source_hash": "97a80eea51e9c795fda8c335c26a14d9f6f55ce954f716d597911f5c7f71f12a",
+      "arguments": "",
+      "result": "trigger",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._account_deletion_lock_actor(uuid)",
+      "source_hash": "3ba068b8128ca2116785b213746eedb73c5e96585e59db754c7993addd425806",
+      "arguments": "p_actor_id uuid",
+      "result": "void",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._account_deletion_receipt_json(account_deletion_request_receipts)",
+      "source_hash": "ad2b66186ea2064dadff2ca05a8e1136a8eebf2c97c79178cc915b69a72331b1",
+      "arguments": "p_receipt account_deletion_request_receipts",
+      "result": "jsonb",
+      "definer": false,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._account_deletion_request_json(account_deletion_requests)",
+      "source_hash": "9268a97506f5e594f672dde463d29c0c004fe37110da9f668f866ba561355f27",
+      "arguments": "p_request account_deletion_requests",
+      "result": "jsonb",
+      "definer": false,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._account_deletion_retained_pii(uuid,uuid,text)",
+      "source_hash": "237a4fb1e8091753294cebedaa4c5f66e00dcfb71d9216764dcd7cc94a9ae2dc",
+      "arguments": "p_request_id uuid, p_actor_id uuid, p_email text",
+      "result": "boolean",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._account_deletion_text_has_identity(text,uuid,text)",
+      "source_hash": "00da7908765672f3ad0c3030a87b1e6e480fe5b72a5edf972b301748ba0f63c7",
+      "arguments": "p_text text, p_actor_id uuid, p_email text",
+      "result": "boolean",
+      "definer": false,
+      "volatility": "i",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._account_deletion_unscoped_personal_content(uuid,text)",
+      "source_hash": "9ee9ba6657a6bfbb697df4e7699144a33d53a7d846934be0782a2b8a212eddcc",
+      "arguments": "p_actor_id uuid, p_email text",
+      "result": "boolean",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._account_deletion_write_fence()",
+      "source_hash": "2a2455d91623c29b1fdb682777d5da43f0369d155c1e74de7f7f11241ee50e36",
+      "arguments": "",
+      "result": "trigger",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.cancel_account_deletion_request(uuid,uuid,uuid,bigint)",
+      "source_hash": "8802c84938f3209b0e094e314241ec5613d466cd59d425e3c7e521d46bb2b042",
+      "arguments": "p_actor_id uuid, p_request_id uuid, p_operation_id uuid, p_expected_revision bigint",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.complete_account_deletion_fulfillment(uuid,boolean,uuid,uuid)",
+      "source_hash": "6b0208d89458401c99caee3f8bfbb58abb8ad9d61580c28c8a88bab94f4dc9ed",
+      "arguments": "p_admin_id uuid, p_environment_admin boolean, p_request_id uuid, p_operation_id uuid",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.prepare_account_deletion_fulfillment(uuid,boolean,uuid,uuid,text[])",
+      "source_hash": "1edb4f8a424a6fa26886e06ec09f245ad59bba5d419f6c49ee34f8f9eccbd454",
+      "arguments": "p_admin_id uuid, p_environment_admin boolean, p_request_id uuid, p_operation_id uuid, p_protected_admin_emails text[] DEFAULT '{}'::text[]",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.read_account_deletion_fulfillment(uuid,boolean,uuid)",
+      "source_hash": "c22c08f9753b0d4b429f43088743f96011d043e66b9868b47465667f81ff6781",
+      "arguments": "p_admin_id uuid, p_environment_admin boolean, p_request_id uuid",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.read_account_deletion_queue(uuid,boolean,timestamp with time zone,uuid,integer)",
+      "source_hash": "c0e8358fd523dd966e43e12642da9204d440513fe70fb9754f00e8aaf34ded22",
+      "arguments": "p_actor_id uuid, p_environment_admin boolean DEFAULT false, p_before_requested_at timestamp with time zone DEFAULT NULL::timestamp with time zone, p_before_id uuid DEFAULT NULL::uuid, p_limit integer DEFAULT 50",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.read_account_deletion_requests(uuid,uuid)",
+      "source_hash": "63e5f16444e106d420f8bd80cd789df545c856eb4aa53834298c4e6fc3abbef9",
+      "arguments": "p_actor_id uuid, p_request_id uuid DEFAULT NULL::uuid",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.submit_account_deletion_request(uuid,uuid,bigint)",
+      "source_hash": "bb89bbeccdcb6a100d6b471d1ac56141c9cc904aa36dad403f7e8d381c16af3b",
+      "arguments": "p_actor_id uuid, p_operation_id uuid, p_expected_revision bigint",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
     }
   ],
   "baseTables": [
@@ -2388,84 +2544,6 @@
       "not_null": true
     },
     {
-      "table": "account_deletion_actor_revisions",
-      "name": "actor_id",
-      "type": "uuid",
-      "not_null": true
-    },
-    {
-      "table": "account_deletion_actor_revisions",
-      "name": "revision",
-      "type": "bigint",
-      "not_null": true
-    },
-    {
-      "table": "account_deletion_request_receipts",
-      "name": "actor_id",
-      "type": "uuid",
-      "not_null": true
-    },
-    {
-      "table": "account_deletion_request_receipts",
-      "name": "operation_id",
-      "type": "uuid",
-      "not_null": true
-    },
-    {
-      "table": "account_deletion_request_receipts",
-      "name": "action",
-      "type": "text",
-      "not_null": true
-    },
-    {
-      "table": "account_deletion_request_receipts",
-      "name": "request_id",
-      "type": "uuid",
-      "not_null": true
-    },
-    {
-      "table": "account_deletion_request_receipts",
-      "name": "expected_revision",
-      "type": "bigint",
-      "not_null": true
-    },
-    {
-      "table": "account_deletion_request_receipts",
-      "name": "recorded_at",
-      "type": "timestamp with time zone",
-      "not_null": true
-    },
-    {
-      "table": "account_deletion_requests",
-      "name": "id",
-      "type": "uuid",
-      "not_null": true
-    },
-    {
-      "table": "account_deletion_requests",
-      "name": "actor_id",
-      "type": "uuid",
-      "not_null": true
-    },
-    {
-      "table": "account_deletion_requests",
-      "name": "status",
-      "type": "text",
-      "not_null": true
-    },
-    {
-      "table": "account_deletion_requests",
-      "name": "requested_at",
-      "type": "timestamp with time zone",
-      "not_null": true
-    },
-    {
-      "table": "account_deletion_requests",
-      "name": "cancelled_at",
-      "type": "timestamp with time zone",
-      "not_null": false
-    },
-    {
       "table": "service_evidence_upload_discard_receipts",
       "name": "upload_id",
       "type": "uuid",
@@ -3136,6 +3214,240 @@
       "name": "received_at",
       "type": "timestamp with time zone",
       "not_null": true
+    },
+    {
+      "table": "account_deletion_actor_revisions",
+      "name": "actor_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_actor_revisions",
+      "name": "revision",
+      "type": "bigint",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_fulfillment_receipts",
+      "name": "operation_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_fulfillment_receipts",
+      "name": "request_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_fulfillment_receipts",
+      "name": "action",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_fulfillment_receipts",
+      "name": "result",
+      "type": "jsonb",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_fulfillment_receipts",
+      "name": "recorded_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "request_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "actor_id",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "subject_token",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "actor_fingerprint",
+      "type": "bytea",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "target_email",
+      "type": "text",
+      "not_null": false
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "state",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "blockers",
+      "type": "jsonb",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "revision",
+      "type": "bigint",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "started_by",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "last_reviewed_by",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "started_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "reviewed_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "storage_quiesce_until",
+      "type": "timestamp with time zone",
+      "not_null": false
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "database_anonymized_at",
+      "type": "timestamp with time zone",
+      "not_null": false
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "auth_deleted_at",
+      "type": "timestamp with time zone",
+      "not_null": false
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "completed_at",
+      "type": "timestamp with time zone",
+      "not_null": false
+    },
+    {
+      "table": "account_deletion_profile_custody",
+      "name": "guitar_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_profile_custody",
+      "name": "request_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_profile_custody",
+      "name": "prior_visibility",
+      "type": "guitar_visibility",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_profile_custody",
+      "name": "state",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_profile_custody",
+      "name": "held_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_request_receipts",
+      "name": "actor_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_request_receipts",
+      "name": "operation_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_request_receipts",
+      "name": "action",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_request_receipts",
+      "name": "request_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_request_receipts",
+      "name": "expected_revision",
+      "type": "bigint",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_request_receipts",
+      "name": "recorded_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_requests",
+      "name": "id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_requests",
+      "name": "actor_id",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "account_deletion_requests",
+      "name": "status",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_requests",
+      "name": "requested_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "account_deletion_requests",
+      "name": "cancelled_at",
+      "type": "timestamp with time zone",
+      "not_null": false
     }
   ],
   "provenanceTriggers": [
@@ -3208,16 +3520,6 @@
       "billing_review_decisions",
       "billing_history_immutable",
       "CREATE TRIGGER billing_history_immutable BEFORE DELETE OR UPDATE ON public.billing_review_decisions FOR EACH ROW EXECUTE FUNCTION _billing_immutable()"
-    ],
-    [
-      "account_deletion_request_receipts",
-      "account_deletion_receipts_immutable",
-      "CREATE TRIGGER account_deletion_receipts_immutable BEFORE DELETE OR UPDATE ON public.account_deletion_request_receipts FOR EACH ROW EXECUTE FUNCTION _account_deletion_intake_guard()"
-    ],
-    [
-      "account_deletion_requests",
-      "account_deletion_requests_intake_only",
-      "CREATE TRIGGER account_deletion_requests_intake_only BEFORE DELETE OR UPDATE ON public.account_deletion_requests FOR EACH ROW EXECUTE FUNCTION _account_deletion_intake_guard()"
     ],
     [
       "service_evidence_upload_discard_receipts",
@@ -3293,6 +3595,226 @@
       "guitar_media",
       "consume_staged_instrument_edit_media",
       "CREATE TRIGGER consume_staged_instrument_edit_media BEFORE INSERT ON public.guitar_media FOR EACH ROW EXECUTE FUNCTION consume_staged_instrument_edit_upload()"
+    ],
+    [
+      "account_deletion_fulfillment_receipts",
+      "account_deletion_fulfillment_receipts_immutable",
+      "CREATE TRIGGER account_deletion_fulfillment_receipts_immutable BEFORE DELETE OR UPDATE ON public.account_deletion_fulfillment_receipts FOR EACH ROW EXECUTE FUNCTION _account_deletion_fulfillment_guard()"
+    ],
+    [
+      "account_deletion_fulfillments",
+      "account_deletion_fulfillments_guard",
+      "CREATE TRIGGER account_deletion_fulfillments_guard BEFORE DELETE OR UPDATE ON public.account_deletion_fulfillments FOR EACH ROW EXECUTE FUNCTION _account_deletion_fulfillment_guard()"
+    ],
+    [
+      "account_deletion_profile_custody",
+      "account_deletion_profile_custody_immutable",
+      "CREATE TRIGGER account_deletion_profile_custody_immutable BEFORE DELETE OR UPDATE ON public.account_deletion_profile_custody FOR EACH ROW EXECUTE FUNCTION _account_deletion_fulfillment_guard()"
+    ],
+    [
+      "account_deletion_request_receipts",
+      "account_deletion_receipts_immutable",
+      "CREATE TRIGGER account_deletion_receipts_immutable BEFORE DELETE OR UPDATE ON public.account_deletion_request_receipts FOR EACH ROW EXECUTE FUNCTION _account_deletion_intake_guard()"
+    ],
+    [
+      "account_deletion_requests",
+      "account_deletion_requests_intake_only",
+      "CREATE TRIGGER account_deletion_requests_intake_only BEFORE DELETE OR UPDATE ON public.account_deletion_requests FOR EACH ROW EXECUTE FUNCTION _account_deletion_intake_guard()"
+    ],
+    [
+      "admin_audit_events",
+      "account_deletion_fence_admin_audit_events",
+      "CREATE TRIGGER account_deletion_fence_admin_audit_events BEFORE INSERT OR UPDATE ON public.admin_audit_events FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('actor_user_id', 'target_user_id')"
+    ],
+    [
+      "auth.users",
+      "account_deletion_fence_auth_users",
+      "CREATE TRIGGER account_deletion_fence_auth_users BEFORE UPDATE OF email ON auth.users FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('id', 'email__email')"
+    ],
+    [
+      "billing_credit_consumptions",
+      "account_deletion_fence_billing_credit_consumptions",
+      "CREATE TRIGGER account_deletion_fence_billing_credit_consumptions BEFORE INSERT OR UPDATE ON public.billing_credit_consumptions FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('owner_id')"
+    ],
+    [
+      "billing_credit_grants",
+      "account_deletion_fence_billing_credit_grants",
+      "CREATE TRIGGER account_deletion_fence_billing_credit_grants BEFORE INSERT OR UPDATE ON public.billing_credit_grants FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('owner_id')"
+    ],
+    [
+      "billing_credit_holds",
+      "account_deletion_fence_billing_credit_holds",
+      "CREATE TRIGGER account_deletion_fence_billing_credit_holds BEFORE INSERT OR UPDATE ON public.billing_credit_holds FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('owner_id')"
+    ],
+    [
+      "billing_customers",
+      "account_deletion_fence_billing_customers",
+      "CREATE TRIGGER account_deletion_fence_billing_customers BEFORE INSERT OR UPDATE ON public.billing_customers FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('owner_id')"
+    ],
+    [
+      "billing_direct_orders",
+      "account_deletion_fence_billing_direct_orders",
+      "CREATE TRIGGER account_deletion_fence_billing_direct_orders BEFORE INSERT OR UPDATE ON public.billing_direct_orders FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('owner_id')"
+    ],
+    [
+      "billing_direct_payments",
+      "account_deletion_fence_billing_direct_payments",
+      "CREATE TRIGGER account_deletion_fence_billing_direct_payments BEFORE INSERT OR UPDATE ON public.billing_direct_payments FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('operator_id')"
+    ],
+    [
+      "billing_orders",
+      "account_deletion_fence_billing_orders",
+      "CREATE TRIGGER account_deletion_fence_billing_orders BEFORE INSERT OR UPDATE ON public.billing_orders FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('owner_id')"
+    ],
+    [
+      "billing_paypal_orders",
+      "account_deletion_fence_billing_paypal_orders",
+      "CREATE TRIGGER account_deletion_fence_billing_paypal_orders BEFORE INSERT OR UPDATE ON public.billing_paypal_orders FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('owner_id')"
+    ],
+    [
+      "billing_paypal_webhook_admin_actions",
+      "account_deletion_fence_billing_paypal_webhook_admin_actions",
+      "CREATE TRIGGER account_deletion_fence_billing_paypal_webhook_admin_actions BEFORE INSERT OR UPDATE ON public.billing_paypal_webhook_admin_actions FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('operator_id')"
+    ],
+    [
+      "billing_receipts",
+      "account_deletion_fence_billing_receipts",
+      "CREATE TRIGGER account_deletion_fence_billing_receipts BEFORE INSERT OR UPDATE ON public.billing_receipts FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('owner_id')"
+    ],
+    [
+      "billing_review_decisions",
+      "account_deletion_fence_billing_review_decisions",
+      "CREATE TRIGGER account_deletion_fence_billing_review_decisions BEFORE INSERT OR UPDATE ON public.billing_review_decisions FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('owner_id', 'operator_id')"
+    ],
+    [
+      "guitar_documents",
+      "account_deletion_fence_guitar_documents",
+      "CREATE TRIGGER account_deletion_fence_guitar_documents BEFORE INSERT OR UPDATE ON public.guitar_documents FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('uploaded_by_user_id')"
+    ],
+    [
+      "guitar_external_media",
+      "account_deletion_fence_guitar_external_media",
+      "CREATE TRIGGER account_deletion_fence_guitar_external_media BEFORE INSERT OR UPDATE ON public.guitar_external_media FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('created_by')"
+    ],
+    [
+      "guitar_serial_aliases",
+      "account_deletion_fence_guitar_serial_aliases",
+      "CREATE TRIGGER account_deletion_fence_guitar_serial_aliases BEFORE INSERT OR UPDATE ON public.guitar_serial_aliases FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('created_by')"
+    ],
+    [
+      "guitar_timeline_events",
+      "account_deletion_fence_guitar_timeline_events",
+      "CREATE TRIGGER account_deletion_fence_guitar_timeline_events BEFORE INSERT OR UPDATE ON public.guitar_timeline_events FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('created_by_user_id', 'provider_user_id', 'evidence_reviewed_by')"
+    ],
+    [
+      "guitars",
+      "account_deletion_custody_guitar",
+      "CREATE TRIGGER account_deletion_custody_guitar BEFORE DELETE OR UPDATE ON public.guitars FOR EACH ROW EXECUTE FUNCTION _account_deletion_custody_fence()"
+    ],
+    [
+      "guitars",
+      "account_deletion_fence_guitars",
+      "CREATE TRIGGER account_deletion_fence_guitars BEFORE INSERT OR UPDATE ON public.guitars FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('owner_id', 'safety_status_updated_by', 'owner_removed_by')"
+    ],
+    [
+      "instrument_create_receipts",
+      "account_deletion_fence_instrument_create_receipts",
+      "CREATE TRIGGER account_deletion_fence_instrument_create_receipts BEFORE INSERT OR UPDATE ON public.instrument_create_receipts FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('owner_id')"
+    ],
+    [
+      "instrument_staged_uploads",
+      "account_deletion_fence_instrument_staged_uploads",
+      "CREATE TRIGGER account_deletion_fence_instrument_staged_uploads BEFORE INSERT OR UPDATE ON public.instrument_staged_uploads FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('owner_id')"
+    ],
+    [
+      "ownership_claim_events",
+      "account_deletion_fence_ownership_claim_events",
+      "CREATE TRIGGER account_deletion_fence_ownership_claim_events BEFORE INSERT OR UPDATE ON public.ownership_claim_events FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('actor_user_id')"
+    ],
+    [
+      "ownership_claim_evidence",
+      "account_deletion_fence_ownership_claim_evidence",
+      "CREATE TRIGGER account_deletion_fence_ownership_claim_evidence BEFORE INSERT OR UPDATE ON public.ownership_claim_evidence FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('uploaded_by')"
+    ],
+    [
+      "ownership_claims",
+      "account_deletion_custody_claim",
+      "CREATE TRIGGER account_deletion_custody_claim BEFORE INSERT OR DELETE OR UPDATE ON public.ownership_claims FOR EACH ROW EXECUTE FUNCTION _account_deletion_custody_fence()"
+    ],
+    [
+      "ownership_claims",
+      "account_deletion_fence_ownership_claims",
+      "CREATE TRIGGER account_deletion_fence_ownership_claims BEFORE INSERT OR UPDATE ON public.ownership_claims FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('current_owner_id', 'claimant_user_id', 'decided_by', 'email__recipient_email_normalized')"
+    ],
+    [
+      "ownership_transfers",
+      "account_deletion_custody_transfer",
+      "CREATE TRIGGER account_deletion_custody_transfer BEFORE INSERT OR DELETE OR UPDATE ON public.ownership_transfers FOR EACH ROW EXECUTE FUNCTION _account_deletion_custody_fence()"
+    ],
+    [
+      "ownership_transfers",
+      "account_deletion_fence_ownership_transfers",
+      "CREATE TRIGGER account_deletion_fence_ownership_transfers BEFORE INSERT OR UPDATE ON public.ownership_transfers FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('from_owner_id', 'accepted_by', 'email__to_email')"
+    ],
+    [
+      "profiles",
+      "account_deletion_fence_profiles",
+      "CREATE TRIGGER account_deletion_fence_profiles BEFORE INSERT OR UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('id')"
+    ],
+    [
+      "service_evidence_upload_discard_receipts",
+      "account_deletion_fence_service_evidence_upload_discard_receipts",
+      "CREATE TRIGGER account_deletion_fence_service_evidence_upload_discard_receipts BEFORE INSERT OR UPDATE ON public.service_evidence_upload_discard_receipts FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('actor_id')"
+    ],
+    [
+      "service_evidence_upload_scopes",
+      "account_deletion_fence_service_evidence_upload_scopes",
+      "CREATE TRIGGER account_deletion_fence_service_evidence_upload_scopes BEFORE INSERT OR UPDATE ON public.service_evidence_upload_scopes FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('actor_id')"
+    ],
+    [
+      "service_evidence_uploads",
+      "account_deletion_fence_service_evidence_uploads",
+      "CREATE TRIGGER account_deletion_fence_service_evidence_uploads BEFORE INSERT OR UPDATE ON public.service_evidence_uploads FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('actor_id')"
+    ],
+    [
+      "service_provider_profile_access",
+      "account_deletion_fence_service_provider_profile_access",
+      "CREATE TRIGGER account_deletion_fence_service_provider_profile_access BEFORE INSERT OR UPDATE ON public.service_provider_profile_access FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('provider_user_id', 'granted_by_user_id')"
+    ],
+    [
+      "service_provider_profiles",
+      "account_deletion_fence_service_provider_profiles",
+      "CREATE TRIGGER account_deletion_fence_service_provider_profiles BEFORE INSERT OR UPDATE ON public.service_provider_profiles FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('user_id', 'verified_by')"
+    ],
+    [
+      "service_submission_activity",
+      "account_deletion_fence_service_submission_activity",
+      "CREATE TRIGGER account_deletion_fence_service_submission_activity BEFORE INSERT OR UPDATE ON public.service_submission_activity FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('actor_user_id')"
+    ],
+    [
+      "service_submission_evidence",
+      "account_deletion_fence_service_submission_evidence",
+      "CREATE TRIGGER account_deletion_fence_service_submission_evidence BEFORE INSERT OR UPDATE ON public.service_submission_evidence FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('uploaded_by_user_id')"
+    ],
+    [
+      "service_submission_notifications",
+      "account_deletion_fence_service_submission_notifications",
+      "CREATE TRIGGER account_deletion_fence_service_submission_notifications BEFORE INSERT OR UPDATE ON public.service_submission_notifications FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('recipient_user_id')"
+    ],
+    [
+      "service_submissions",
+      "account_deletion_fence_service_submissions",
+      "CREATE TRIGGER account_deletion_fence_service_submissions BEFORE INSERT OR UPDATE ON public.service_submissions FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('provider_user_id', 'owner_user_id')"
+    ],
+    [
+      "site_content",
+      "account_deletion_fence_site_content",
+      "CREATE TRIGGER account_deletion_fence_site_content BEFORE INSERT OR UPDATE ON public.site_content FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('updated_by')"
+    ],
+    [
+      "site_editor_receipts",
+      "account_deletion_fence_site_editor_receipts",
+      "CREATE TRIGGER account_deletion_fence_site_editor_receipts BEFORE INSERT OR UPDATE ON public.site_editor_receipts FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('actor_user_id')"
     ]
   ],
   "rpcOnlyTables": [
@@ -4891,14 +5413,30 @@
   "intakeTables": [
     "account_deletion_requests",
     "account_deletion_request_receipts",
-    "account_deletion_actor_revisions"
+    "account_deletion_actor_revisions",
+    "account_deletion_fulfillments",
+    "account_deletion_fulfillment_receipts",
+    "account_deletion_profile_custody"
   ],
   "intakeFunctionSignatures": [
+    "public._account_deletion_admin(uuid,boolean)",
+    "public._account_deletion_billing_personal_content(uuid,text)",
+    "public._account_deletion_blockers(uuid,text,text[])",
+    "public._account_deletion_custody_fence()",
+    "public._account_deletion_fulfillment_guard()",
+    "public._account_deletion_fulfillment_json(account_deletion_fulfillments)",
     "public._account_deletion_intake_guard()",
     "public._account_deletion_lock_actor(uuid)",
     "public._account_deletion_receipt_json(account_deletion_request_receipts)",
     "public._account_deletion_request_json(account_deletion_requests)",
+    "public._account_deletion_retained_pii(uuid,uuid,text)",
+    "public._account_deletion_text_has_identity(text,uuid,text)",
+    "public._account_deletion_unscoped_personal_content(uuid,text)",
+    "public._account_deletion_write_fence()",
     "public.cancel_account_deletion_request(uuid,uuid,uuid,bigint)",
+    "public.complete_account_deletion_fulfillment(uuid,boolean,uuid,uuid)",
+    "public.prepare_account_deletion_fulfillment(uuid,boolean,uuid,uuid,text[])",
+    "public.read_account_deletion_fulfillment(uuid,boolean,uuid)",
     "public.read_account_deletion_queue(uuid,boolean,timestamp with time zone,uuid,integer)",
     "public.read_account_deletion_requests(uuid,uuid)",
     "public.submit_account_deletion_request(uuid,uuid,bigint)"
@@ -4914,6 +5452,136 @@
       "table": "account_deletion_actor_revisions",
       "name": "revision",
       "expression": "0"
+    },
+    {
+      "table": "account_deletion_fulfillment_receipts",
+      "name": "operation_id",
+      "expression": null
+    },
+    {
+      "table": "account_deletion_fulfillment_receipts",
+      "name": "request_id",
+      "expression": null
+    },
+    {
+      "table": "account_deletion_fulfillment_receipts",
+      "name": "action",
+      "expression": null
+    },
+    {
+      "table": "account_deletion_fulfillment_receipts",
+      "name": "result",
+      "expression": null
+    },
+    {
+      "table": "account_deletion_fulfillment_receipts",
+      "name": "recorded_at",
+      "expression": "clock_timestamp()"
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "request_id",
+      "expression": null
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "actor_id",
+      "expression": null
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "subject_token",
+      "expression": "gen_random_uuid()"
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "actor_fingerprint",
+      "expression": null
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "target_email",
+      "expression": null
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "state",
+      "expression": "'blocked'::text"
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "blockers",
+      "expression": "'[]'::jsonb"
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "revision",
+      "expression": "0"
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "started_by",
+      "expression": null
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "last_reviewed_by",
+      "expression": null
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "started_at",
+      "expression": "clock_timestamp()"
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "reviewed_at",
+      "expression": "clock_timestamp()"
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "storage_quiesce_until",
+      "expression": null
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "database_anonymized_at",
+      "expression": null
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "auth_deleted_at",
+      "expression": null
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "completed_at",
+      "expression": null
+    },
+    {
+      "table": "account_deletion_profile_custody",
+      "name": "guitar_id",
+      "expression": null
+    },
+    {
+      "table": "account_deletion_profile_custody",
+      "name": "request_id",
+      "expression": null
+    },
+    {
+      "table": "account_deletion_profile_custody",
+      "name": "prior_visibility",
+      "expression": null
+    },
+    {
+      "table": "account_deletion_profile_custody",
+      "name": "state",
+      "expression": "'privacy_review_required'::text"
+    },
+    {
+      "table": "account_deletion_profile_custody",
+      "name": "held_at",
+      "expression": "clock_timestamp()"
     },
     {
       "table": "account_deletion_request_receipts",
@@ -4991,6 +5659,120 @@
       "type": "c"
     },
     {
+      "table": "account_deletion_fulfillment_receipts",
+      "name": "account_deletion_fulfillment_receipts_action_check",
+      "definition": "CHECK ((action = ANY (ARRAY['prepare'::text, 'complete'::text])))",
+      "type": "c"
+    },
+    {
+      "table": "account_deletion_fulfillment_receipts",
+      "name": "account_deletion_fulfillment_receipts_pkey",
+      "definition": "PRIMARY KEY (operation_id)",
+      "type": "p"
+    },
+    {
+      "table": "account_deletion_fulfillment_receipts",
+      "name": "account_deletion_fulfillment_receipts_request_id_fkey",
+      "definition": "FOREIGN KEY (request_id) REFERENCES account_deletion_fulfillments(request_id) ON DELETE RESTRICT",
+      "type": "f"
+    },
+    {
+      "table": "account_deletion_fulfillment_receipts",
+      "name": "account_deletion_fulfillment_receipts_result_check",
+      "definition": "CHECK ((jsonb_typeof(result) = 'object'::text))",
+      "type": "c"
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "account_deletion_fulfillments_actor_fingerprint_check",
+      "definition": "CHECK ((octet_length(actor_fingerprint) = 32))",
+      "type": "c"
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "account_deletion_fulfillments_actor_fingerprint_key",
+      "definition": "UNIQUE (actor_fingerprint)",
+      "type": "u"
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "account_deletion_fulfillments_actor_id_fkey",
+      "definition": "FOREIGN KEY (actor_id) REFERENCES auth.users(id) ON DELETE SET NULL",
+      "type": "f"
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "account_deletion_fulfillments_blockers_check",
+      "definition": "CHECK (((jsonb_typeof(blockers) = 'array'::text) AND (jsonb_array_length(blockers) <= 20)))",
+      "type": "c"
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "account_deletion_fulfillments_check",
+      "definition": "CHECK ((((state = 'blocked'::text) AND (actor_id IS NOT NULL) AND (target_email IS NOT NULL) AND (storage_quiesce_until IS NULL) AND (database_anonymized_at IS NULL) AND (auth_deleted_at IS NULL) AND (completed_at IS NULL) AND (jsonb_array_length(blockers) > 0)) OR ((state = 'quiescing_storage'::text) AND (actor_id IS NOT NULL) AND (target_email IS NOT NULL) AND (storage_quiesce_until IS NOT NULL) AND (database_anonymized_at IS NULL) AND (auth_deleted_at IS NULL) AND (completed_at IS NULL) AND (jsonb_array_length(blockers) > 0)) OR ((state = 'ready_for_auth_deletion'::text) AND (target_email IS NULL) AND (storage_quiesce_until IS NOT NULL) AND (database_anonymized_at >= storage_quiesce_until) AND (auth_deleted_at IS NULL) AND (completed_at IS NULL) AND (blockers = '[]'::jsonb)) OR ((state = 'completed'::text) AND (actor_id IS NULL) AND (target_email IS NULL) AND (storage_quiesce_until IS NOT NULL) AND (database_anonymized_at >= storage_quiesce_until) AND (auth_deleted_at IS NOT NULL) AND (completed_at IS NOT NULL) AND (blockers = '[]'::jsonb))))",
+      "type": "c"
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "account_deletion_fulfillments_pkey",
+      "definition": "PRIMARY KEY (request_id)",
+      "type": "p"
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "account_deletion_fulfillments_request_id_fkey",
+      "definition": "FOREIGN KEY (request_id) REFERENCES account_deletion_requests(id) ON DELETE RESTRICT",
+      "type": "f"
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "account_deletion_fulfillments_revision_check",
+      "definition": "CHECK ((revision >= 0))",
+      "type": "c"
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "account_deletion_fulfillments_state_check",
+      "definition": "CHECK ((state = ANY (ARRAY['blocked'::text, 'quiescing_storage'::text, 'ready_for_auth_deletion'::text, 'completed'::text])))",
+      "type": "c"
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "account_deletion_fulfillments_subject_token_key",
+      "definition": "UNIQUE (subject_token)",
+      "type": "u"
+    },
+    {
+      "table": "account_deletion_profile_custody",
+      "name": "account_deletion_profile_custody_guitar_id_fkey",
+      "definition": "FOREIGN KEY (guitar_id) REFERENCES guitars(id) ON DELETE RESTRICT",
+      "type": "f"
+    },
+    {
+      "table": "account_deletion_profile_custody",
+      "name": "account_deletion_profile_custody_pkey",
+      "definition": "PRIMARY KEY (guitar_id)",
+      "type": "p"
+    },
+    {
+      "table": "account_deletion_profile_custody",
+      "name": "account_deletion_profile_custody_request_id_fkey",
+      "definition": "FOREIGN KEY (request_id) REFERENCES account_deletion_fulfillments(request_id) ON DELETE RESTRICT",
+      "type": "f"
+    },
+    {
+      "table": "account_deletion_profile_custody",
+      "name": "account_deletion_profile_custody_request_id_guitar_id_key",
+      "definition": "UNIQUE (request_id, guitar_id)",
+      "type": "u"
+    },
+    {
+      "table": "account_deletion_profile_custody",
+      "name": "account_deletion_profile_custody_state_check",
+      "definition": "CHECK ((state = 'privacy_review_required'::text))",
+      "type": "c"
+    },
+    {
       "table": "account_deletion_request_receipts",
       "name": "account_deletion_request_receipts_action_check",
       "definition": "CHECK ((action = ANY (ARRAY['submit'::text, 'cancel'::text])))",
@@ -5017,7 +5799,7 @@
     {
       "table": "account_deletion_requests",
       "name": "account_deletion_requests_actor_id_fkey",
-      "definition": "FOREIGN KEY (actor_id) REFERENCES auth.users(id) ON DELETE RESTRICT",
+      "definition": "FOREIGN KEY (actor_id) REFERENCES auth.users(id) ON DELETE SET NULL",
       "type": "f"
     },
     {
@@ -5050,6 +5832,60 @@
       "table": "account_deletion_actor_revisions",
       "name": "account_deletion_actor_revisions_pkey",
       "definition": "CREATE UNIQUE INDEX account_deletion_actor_revisions_pkey ON public.account_deletion_actor_revisions USING btree (actor_id)",
+      "unique": true
+    },
+    {
+      "table": "account_deletion_fulfillment_receipts",
+      "name": "account_deletion_fulfillment_receipt_request",
+      "definition": "CREATE INDEX account_deletion_fulfillment_receipt_request ON public.account_deletion_fulfillment_receipts USING btree (request_id, recorded_at, operation_id)",
+      "unique": false
+    },
+    {
+      "table": "account_deletion_fulfillment_receipts",
+      "name": "account_deletion_fulfillment_receipts_pkey",
+      "definition": "CREATE UNIQUE INDEX account_deletion_fulfillment_receipts_pkey ON public.account_deletion_fulfillment_receipts USING btree (operation_id)",
+      "unique": true
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "account_deletion_fulfillment_queue",
+      "definition": "CREATE INDEX account_deletion_fulfillment_queue ON public.account_deletion_fulfillments USING btree (state, reviewed_at, request_id)",
+      "unique": false
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "account_deletion_fulfillments_actor_fingerprint_key",
+      "definition": "CREATE UNIQUE INDEX account_deletion_fulfillments_actor_fingerprint_key ON public.account_deletion_fulfillments USING btree (actor_fingerprint)",
+      "unique": true
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "account_deletion_fulfillments_pkey",
+      "definition": "CREATE UNIQUE INDEX account_deletion_fulfillments_pkey ON public.account_deletion_fulfillments USING btree (request_id)",
+      "unique": true
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "account_deletion_fulfillments_subject_token_key",
+      "definition": "CREATE UNIQUE INDEX account_deletion_fulfillments_subject_token_key ON public.account_deletion_fulfillments USING btree (subject_token)",
+      "unique": true
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "account_deletion_one_fulfillment_actor",
+      "definition": "CREATE UNIQUE INDEX account_deletion_one_fulfillment_actor ON public.account_deletion_fulfillments USING btree (actor_id) WHERE ((actor_id IS NOT NULL) AND (state <> 'completed'::text))",
+      "unique": true
+    },
+    {
+      "table": "account_deletion_profile_custody",
+      "name": "account_deletion_profile_custody_pkey",
+      "definition": "CREATE UNIQUE INDEX account_deletion_profile_custody_pkey ON public.account_deletion_profile_custody USING btree (guitar_id)",
+      "unique": true
+    },
+    {
+      "table": "account_deletion_profile_custody",
+      "name": "account_deletion_profile_custody_request_id_guitar_id_key",
+      "definition": "CREATE UNIQUE INDEX account_deletion_profile_custody_request_id_guitar_id_key ON public.account_deletion_profile_custody USING btree (request_id, guitar_id)",
       "unique": true
     },
     {
@@ -5099,6 +5935,18 @@
     {
       "table": "account_deletion_actor_revisions",
       "name": "account_deletion_revisions_no_direct_access"
+    },
+    {
+      "table": "account_deletion_fulfillment_receipts",
+      "name": "account_deletion_fulfillment_receipts_no_direct_access"
+    },
+    {
+      "table": "account_deletion_fulfillments",
+      "name": "account_deletion_fulfillments_no_direct_access"
+    },
+    {
+      "table": "account_deletion_profile_custody",
+      "name": "account_deletion_profile_custody_no_direct_access"
     },
     {
       "table": "account_deletion_request_receipts",
@@ -5524,5 +6372,6 @@
     "public.consume_staged_instrument_edit_upload()",
     "public.register_staged_instrument_edit_upload(uuid,text,uuid,text,text)"
   ],
-  "profileEditUploadSourceSha256": "f1d0ba57a3d19ceaef9f6ec216d31158267792cec19b85f48beee965b44dcee1"
+  "profileEditUploadSourceSha256": "f1d0ba57a3d19ceaef9f6ec216d31158267792cec19b85f48beee965b44dcee1",
+  "accountDeletionFulfillmentSourceSha256": "5cd700b7d03aec84f111b597b141a8236757d8c216376ea10ddcdf679e9c2f05"
 }

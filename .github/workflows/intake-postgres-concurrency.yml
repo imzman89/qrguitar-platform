@@ -1,4 +1,4 @@
-name: Account deletion intake concurrency
+name: Account deletion concurrency
 
 on:
   workflow_dispatch:
@@ -55,12 +55,13 @@ jobs:
       - run: npm ci
       - name: Check fixture guards without connecting
         run: node --test apps/web/scripts/test-intake-postgres-config.mjs
-      - name: Prove eleven PostgreSQL scheduling barriers
+      - name: Prove fourteen PostgreSQL scheduling barriers and the late-upload rescan
         timeout-minutes: 5
         run: >-
           node apps/web/scripts/test-intake-postgres-concurrency.mjs
           --repo .
           --intake-sql supabase/migrations/20260917200000_account_deletion_intake.sql
+          --fulfillment-sql supabase/migrations/20260918170000_account_deletion_fulfillment.sql
           --report-dir test-results/intake-concurrency
         env:
           QRGUITAR_INTAKE_FIXTURE: isolated-intake-postgresql-17

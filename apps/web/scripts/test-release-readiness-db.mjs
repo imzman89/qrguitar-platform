@@ -8,6 +8,7 @@ const migrationSha=relative=>createHash('sha256').update(fs.readFileSync(path.jo
 assert.equal(manifest.paypalWebhookSourceSha256,migrationSha('supabase/migrations/20260918132000_paypal_webhook_inbox.sql'));
 assert.equal(manifest.paypalAdminReviewSourceSha256,migrationSha('supabase/migrations/20260918133000_paypal_admin_reviews.sql'));
 assert.equal(manifest.profileEditUploadSourceSha256,migrationSha('supabase/migrations/20260918150000_profile_edit_staged_uploads.sql'));
+assert.equal(manifest.accountDeletionFulfillmentSourceSha256,migrationSha('supabase/migrations/20260918170000_account_deletion_fulfillment.sql'));
 assert.deepEqual(manifest.profileEditUploadFunctionSignatures,[
   'public.cleanup_staged_instrument_edit_uploads(uuid,text,uuid,text[],text[])',
   'public.consume_staged_instrument_edit_upload()',
@@ -19,7 +20,7 @@ const db=new PGlite();await installRepositorySchema(db,repo,overlay?'20260917190
 if(overlay)for(const file of fs.readdirSync(path.join(source,'supabase/migrations')).filter(file=>file.endsWith('.sql')&&file>='20260917190000').sort())await db.exec(fs.readFileSync(path.join(source,'supabase/migrations',file),'utf8').replaceAll('\r\n','\n'));await db.exec("insert into storage.buckets(id,name,public)values('instrument-media','instrument-media',false),('instrument-documents','instrument-documents',false),('service-evidence','service-evidence',false) on conflict(id)do update set public=false;");
 const ready=async()=> (await db.query('select public.qrguitar_release_readiness() result')).rows[0].result;
 let passed=0;async function test(name,fn){await db.exec('begin');try{await fn();console.log('PASS '+name);passed++;}finally{await db.exec('rollback');}}
-function assertShape(result){assert.deepEqual(Object.keys(result).sort(),['checks','ready','releaseVersion']);assert.equal(result.releaseVersion,'2026-09-17.10');assert.equal(typeof result.ready,'boolean');assert.deepEqual(result.checks.map(c=>c.name),manifest.checks);assert.equal(new Set(result.checks.map(c=>c.name)).size,manifest.checks.length);for(const check of result.checks){assert.deepEqual(Object.keys(check).sort(),['name','ok']);assert.equal(typeof check.ok,'boolean');}}
+function assertShape(result){assert.deepEqual(Object.keys(result).sort(),['checks','ready','releaseVersion']);assert.equal(result.releaseVersion,'2026-09-17.11');assert.equal(typeof result.ready,'boolean');assert.deepEqual(result.checks.map(c=>c.name),manifest.checks);assert.equal(new Set(result.checks.map(c=>c.name)).size,manifest.checks.length);for(const check of result.checks){assert.deepEqual(Object.keys(check).sort(),['name','ok']);assert.equal(typeof check.ok,'boolean');}}
 async function expectFalse(name){const result=await ready();assertShape(result);assert.equal(result.ready,false);assert.equal(result.checks.find(c=>c.name===name)?.ok,false);}
 await test('complete schema returns exact version and all14 checks true',async()=>{const result=await ready();assertShape(result);assert.equal(result.ready,true,JSON.stringify(result));assert.equal(result.checks.length,14);assert.ok(result.checks.every(c=>c.ok));});
 await test('anonymous and authenticated callers cannot execute the readiness routine',async()=>{for(const role of['anon','authenticated']){await db.exec('savepoint deny');try{await db.exec('set role '+role);await assert.rejects(ready,e=>e.code==='42501');}finally{await db.exec('rollback to savepoint deny');}}});
@@ -189,5 +190,32 @@ for(const [table,name]of manifest.provenanceTriggers.filter(([,name])=>name.star
 });
 for(const [table,name]of manifest.provenanceTriggers.filter(([,name])=>name.startsWith('consume_staged_instrument_edit_')))await test('wrong '+table+' Profile edit consumption trigger fails readiness',async()=>{
   await db.exec('drop trigger '+name+' on '+table+';create trigger '+name+' before insert on '+table+' for each row execute function public.create_profile_timeline_event()');await expectFalse('schema_columns');
+});
+assert.deepEqual([...manifest.intakeTables].sort(),[
+  'account_deletion_actor_revisions','account_deletion_fulfillment_receipts','account_deletion_fulfillments',
+  'account_deletion_profile_custody','account_deletion_request_receipts','account_deletion_requests'
+]);
+assert.equal(manifest.intakeFunctionSignatures.length,21);
+await test('missing deletion fulfillment RPC blocks release',async()=>{
+  await db.exec('drop function public.prepare_account_deletion_fulfillment(uuid,boolean,uuid,uuid,text[])');await expectFalse('required_functions');
+});
+await test('private deletion helper cannot acquire service execution',async()=>{
+  await db.exec('grant execute on function public._account_deletion_write_fence() to service_role');await expectFalse('blocked_function_grants');
+});
+await test('fulfillment tombstones cannot acquire direct service reads',async()=>{
+  await db.exec('grant select on public.account_deletion_fulfillments to service_role');await expectFalse('private_table_grants');
+});
+await test('request actor nullability required by Auth erasure is pinned',async()=>{
+  await db.exec('alter table public.account_deletion_requests alter column actor_id set not null');await expectFalse('schema_columns');
+});
+await test('disabled post-deletion UUID write fence blocks release',async()=>{
+  await db.exec('alter table public.billing_orders disable trigger account_deletion_fence_billing_orders');await expectFalse('schema_columns');
+});
+await test('missing irreversible actor fingerprint uniqueness blocks release',async()=>{
+  const item=manifest.intakeConstraints.find(c=>c.table==='account_deletion_fulfillments'&&c.definition==='UNIQUE (actor_fingerprint)');assert.ok(item);
+  await db.exec('alter table public.account_deletion_fulfillments drop constraint '+item.name);await expectFalse('receipt_constraints');
+});
+await test('unreviewed deletion fulfillment overload cannot bypass reviewed protocol',async()=>{
+  await db.exec("create function public.prepare_account_deletion_fulfillment(uuid) returns jsonb language sql as $$select '{}'::jsonb$$");await expectFalse('function_security');
 });
 console.log('Completed '+passed+' actual PostgreSQL readiness tests.');await db.close();

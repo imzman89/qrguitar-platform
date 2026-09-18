@@ -3,13 +3,15 @@ export type QueueAuth = {
   getSession(): Promise<{ data: { session: QueueSession }; error?: unknown }>;
   onAuthStateChange(callback: (event: string, session: QueueSession) => void): { data: { subscription: { unsubscribe(): void } } };
 };
-export type QueueRequest = { requestId: string; actorId: string; status: "requested"; requestedAt: string; cancelledAt: null };
+export type QueueFulfillment = { state: "blocked" | "quiescing_storage" | "ready_for_auth_deletion" | "completed"; blockers: string[]; revision: string; reviewedAt: string; storageQuiesceUntil: string | null };
+export type QueueRequest = { requestId: string; actorId: string | null; status: "requested"; requestedAt: string; cancelledAt: null; fulfillment?: QueueFulfillment };
 export type QueueCursor = { requestedAt: string; requestId: string };
 export type QueueState = {
   phase: "loading" | "ready" | "error" | "signed-out" | "forbidden";
-  actorId: string; requests: QueueRequest[]; busy: boolean; hasMore: boolean; cursor: QueueCursor | null; error: string;
+  actorId: string; requests: QueueRequest[]; busy: boolean; actionRequestId: string; actionMessage: string; actionError: string;
+  hasMore: boolean; cursor: QueueCursor | null; error: string;
 };
-export const initialQueueState = (): QueueState => ({ phase: "loading", actorId: "", requests: [], busy: false, hasMore: false, cursor: null, error: "" });
+export const initialQueueState = (): QueueState => ({ phase: "loading", actorId: "", requests: [], busy: false, actionRequestId: "", actionMessage: "", actionError: "", hasMore: false, cursor: null, error: "" });
 const uuid = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const object = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 function readSession(value: unknown): QueueSession {
@@ -27,12 +29,26 @@ function older(row: QueueCursor, before: QueueCursor) {
   const left = micros(row.requestedAt), right = micros(before.requestedAt);
   return left < right || (left === right && row.requestId < before.requestId);
 }
+const blockerCodes = new Set(["administrator_account", "unused_paid_credits", "unresolved_payment_order", "payment_hold_or_dispute", "billing_retention_migration_required", "unused_profile_credits", "storage_cleanup_required", "storage_quiescence_required", "active_ownership_transfer", "active_ownership_claim", "active_service_workflow", "service_record_migration_required", "retained_personal_content_review_required"]);
+function fulfillment(value: unknown): QueueFulfillment | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!object(value) || !["blocked","quiescing_storage","ready_for_auth_deletion","completed"].includes(String(value.state)) || !Array.isArray(value.blockers)
+    || value.blockers.some(code => typeof code !== "string" || !blockerCodes.has(code)) || new Set(value.blockers).size !== value.blockers.length
+    || typeof value.revision !== "string" || !/^(?:0|[1-9][0-9]{0,18})$/.test(value.revision) || !validTime(value.reviewedAt)
+    || (value.storageQuiesceUntil !== null && !validTime(value.storageQuiesceUntil))
+    || (((value.state === "blocked" || value.state === "quiescing_storage") !== (value.blockers.length > 0))
+      || (value.state === "blocked" && value.storageQuiesceUntil !== null)
+      || (value.state !== "blocked" && value.storageQuiesceUntil === null))) throw new Error("Invalid fulfillment status");
+  return { state:value.state as QueueFulfillment["state"], blockers:[...value.blockers], revision:value.revision, reviewedAt:value.reviewedAt,
+    storageQuiesceUntil:value.storageQuiesceUntil as string|null };
+}
 function page(value: unknown, limit: number, cursor: QueueCursor | null, existing: QueueRequest[]) {
   if (!object(value) || value.ok !== true || !Array.isArray(value.requests) || value.requests.length > limit) throw new Error("Invalid queue response");
   const seen = new Set(existing.map(row => row.requestId)); let before = cursor;
   return value.requests.map(value => {
-    if (!object(value) || !uuid(value.requestId) || !uuid(value.actorId) || value.status !== "requested" || value.cancelledAt !== null || !validTime(value.requestedAt)) throw new Error("Invalid queue item");
-    const row: QueueRequest = { requestId: value.requestId.toLowerCase(), actorId: value.actorId.toLowerCase(), status: "requested", requestedAt: value.requestedAt, cancelledAt: null };
+    if (!object(value) || !uuid(value.requestId) || (value.actorId !== null && !uuid(value.actorId)) || value.status !== "requested" || value.cancelledAt !== null || !validTime(value.requestedAt)) throw new Error("Invalid queue item");
+    const status=fulfillment(value.fulfillment);
+    const row: QueueRequest = { requestId: value.requestId.toLowerCase(), actorId: typeof value.actorId === "string" ? value.actorId.toLowerCase() : null, status: "requested", requestedAt: value.requestedAt, cancelledAt: null, ...(status ? {fulfillment:status} : {}) };
     if (seen.has(row.requestId) || (before && !older(row, before))) throw new Error("Invalid queue cursor order");
     seen.add(row.requestId); before = row; return row;
   });
@@ -40,7 +56,7 @@ function page(value: unknown, limit: number, cursor: QueueCursor | null, existin
 class Stale extends Error {}
 class Denied extends Error { constructor(readonly status: 401 | 403) { super("Queue access denied"); } }
 
-/** Read-only controller. The server verifies the bearer and administrator authority. */
+/** Admin queue controller. The server verifies the bearer and administrator authority for every read and mutation. */
 export function createAdminIntakeClient(deps: { auth: () => QueueAuth; fetch?: typeof fetch; timeoutMs?: number; pageSize?: number }) {
   const transport = deps.fetch || fetch, limit = deps.pageSize ?? 50;
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error("Invalid queue page size");
@@ -114,6 +130,31 @@ export function createAdminIntakeClient(deps: { auth: () => QueueAuth; fetch?: t
       }
     }
   }
+  async function execute(requestId: string) {
+    if (disposed || !auth || state.busy || state.actionRequestId || !uuid(requestId) || !actor) return;
+    const authLease=authRevision, workLease=++workRevision; abort();
+    publish({actionRequestId:requestId,actionMessage:"",actionError:""});
+    try {
+      const result=await bounded(()=>auth!.getSession()); check(authLease,workLease);
+      if(!result||result.error||!result.data) throw new Error("Session check unavailable");
+      const session=readSession(result.data.session); if(!session||session.user.id!==actor) throw new Denied(401);
+      const response=await bounded(signal=>transport(`/api/admin/account-deletion-requests/${encodeURIComponent(requestId)}/fulfill`,{method:"POST",cache:"no-store",credentials:"omit",redirect:"error",headers:{authorization:`Bearer ${session.access_token}`,"content-type":"application/json"},body:JSON.stringify({operationId:crypto.randomUUID(),action:"prepare"}),signal}));
+      check(authLease,workLease); const payload=await bounded(()=>response.json()); check(authLease,workLease);
+      if(!response.ok){if(response.status===401||response.status===403)throw new Denied(response.status);throw new Error("Fulfillment unavailable");}
+      if(!object(payload)||payload.ok!==true||!object(payload.fulfillment))throw new Error("Invalid fulfillment response");
+      const next=fulfillment(payload.fulfillment); if(!next)throw new Error("Invalid fulfillment response");
+      const finalAuth=await bounded(()=>auth!.getSession());check(authLease,workLease);const finalSession=readSession(finalAuth.data.session);
+      if(!finalSession||finalSession.user.id!==actor)throw new Denied(401);
+      const message=next.state==="completed"?"Account identity removed. Instrument Profiles remain in private custody for review.":next.state==="quiescing_storage"?"Account writes are frozen and public content is hidden. Auth remains until the fixed storage safety window is rescanned.":"Fulfillment paused on recorded blockers. No Auth identity was deleted.";
+      publish({actionRequestId:"",actionMessage:message,actionError:""});
+      await load(false);
+      if(live(authRevision,workRevision))publish({actionMessage:message});
+    } catch(error) {
+      if(!live(authLease,workLease)||error instanceof Stale)return;
+      if(error instanceof Denied) publish({...initialQueueState(),actorId:actor,phase:error.status===403?"forbidden":"signed-out"});
+      else publish({actionRequestId:"",actionMessage:"",actionError:"Fulfillment could not be confirmed. Retry safely; completion is never assumed."});
+    }
+  }
   async function start() {
     if (disposed || started) return; started = true;
     try {
@@ -132,6 +173,7 @@ export function createAdminIntakeClient(deps: { auth: () => QueueAuth; fetch?: t
     start,
     refresh: () => auth ? load(false) : start(),
     loadMore: () => load(true),
+    execute,
     dispose() { if (disposed) return; disposed = true; authRevision++; workRevision++; abort(); unsubscribe?.(); listeners.clear(); }
   };
 }

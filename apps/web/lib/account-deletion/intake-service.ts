@@ -15,6 +15,7 @@ export type IntakeDependencies = {
 };
 export type RequestDto = { requestId: string; status: "requested" | "cancelled"; requestedAt: string; cancelledAt: string | null };
 export type ReceiptDto = { operationId: string; expectedRevision: string; action: "submit" | "cancel"; requestId: string; recordedAt: string };
+export type QueueFulfillmentDto = { state: "blocked" | "quiescing_storage" | "ready_for_auth_deletion" | "completed"; blockers: string[]; revision: string; reviewedAt: string; storageQuiesceUntil: string | null };
 export class IntakeError extends Error {
   constructor(readonly status: number, readonly code: string, message: string, readonly uncertain = false, readonly operationId?: string, readonly retryable = false, readonly expectedRevision?: string) { super(message); }
 }
@@ -37,6 +38,22 @@ export function validTimestamp(value: unknown): value is string {
 function timestampMicros(value: string) {
   const fraction = /\.(\d+)/.exec(value)?.[1] || "";
   return BigInt(Date.parse(value.replace(/\.\d+/, ""))) * 1000n + BigInt(fraction.padEnd(6, "0"));
+}
+const queueBlockers = new Set(["administrator_account", "unused_paid_credits", "unresolved_payment_order", "payment_hold_or_dispute",
+  "billing_retention_migration_required", "unused_profile_credits", "storage_cleanup_required", "active_ownership_transfer",
+  "storage_quiescence_required", "active_ownership_claim", "active_service_workflow", "service_record_migration_required",
+  "retained_personal_content_review_required"]);
+function queueFulfillment(value: unknown): QueueFulfillmentDto | null {
+  if (value === null) return null;
+  if (!object(value) || !["blocked", "quiescing_storage", "ready_for_auth_deletion", "completed"].includes(String(value.state)) || !Array.isArray(value.blockers)
+    || value.blockers.some(item => typeof item !== "string" || !queueBlockers.has(item)) || new Set(value.blockers).size !== value.blockers.length
+    || !validRevision(value.revision) || !validTimestamp(value.reviewedAt)
+    || (value.storageQuiesceUntil !== null && !validTimestamp(value.storageQuiesceUntil))) throw unavailable();
+  if (((value.state === "blocked" || value.state === "quiescing_storage") !== (value.blockers.length > 0))
+    || (value.state === "blocked" && value.storageQuiesceUntil !== null)
+    || (value.state !== "blocked" && value.storageQuiesceUntil === null)) throw unavailable();
+  return { state: value.state as QueueFulfillmentDto["state"], blockers: [...value.blockers], revision: value.revision,
+    reviewedAt: value.reviewedAt, storageQuiesceUntil: value.storageQuiesceUntil as string | null };
 }
 function unavailable(operationId?: string) {
   return new IntakeError(503, operationId ? "intake_unconfirmed" : "intake_unavailable",
@@ -134,8 +151,10 @@ export function createIntakeService(deps: IntakeDependencies) {
       const verified = await actor(request), target = requestId?.toLowerCase();
       const data = await rpc(verified.client, request, "read_account_deletion_requests", { p_actor_id: verified.id, p_request_id: target || null });
       const selected = data.request === null ? null : requestDto(data.request), active = data.activeRequest === null ? null : requestDto(data.activeRequest), latest = data.latestRequest === null ? null : requestDto(data.latestRequest);
-      if (!validRevision(data.revision) || (target ? selected?.requestId !== target : selected !== null) || (active && active.status !== "requested")) throw unavailable();
-      return { ok: true as const, revision: data.revision, request: selected, activeRequest: active, latestRequest: latest };
+      const fulfillment = queueFulfillment(data.fulfillment);
+      if (!validRevision(data.revision) || (target ? selected?.requestId !== target : selected !== null) || (active && active.status !== "requested")
+        || (fulfillment !== null && (!active || fulfillment.state === "completed"))) throw unavailable();
+      return { ok: true as const, revision: data.revision, request: selected, activeRequest: active, latestRequest: latest, fulfillment };
     },
     async queue(request: Request, cursor: { beforeRequestedAt?: string; beforeId?: string; limit?: number }) {
       const limit = cursor.limit ?? 50;
@@ -160,9 +179,9 @@ export function createIntakeService(deps: IntakeDependencies) {
       const ids = new Set<string>();
       const requests = data.requests.map(value => {
         const item = requestDto(value);
-        if (!object(value) || !uuid(value.actorId) || item.status !== "requested" || ids.has(item.requestId)) throw unavailable();
+        if (!object(value) || (value.actorId !== null && !uuid(value.actorId)) || item.status !== "requested" || ids.has(item.requestId)) throw unavailable();
         ids.add(item.requestId);
-        return { ...item, actorId: value.actorId };
+        return { ...item, actorId: value.actorId === null ? null : value.actorId.toLowerCase(), fulfillment: queueFulfillment(value.fulfillment) };
       });
       return { ok: true as const, requests };
     }

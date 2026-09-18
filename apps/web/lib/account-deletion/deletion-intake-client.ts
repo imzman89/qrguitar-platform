@@ -4,7 +4,8 @@ export type IntakeAuth = {
   onAuthStateChange(callback: (event: string, session: IntakeSession) => void): { data: { subscription: { unsubscribe(): void } } };
 };
 export type DeletionRequest = { requestId: string; status: "requested" | "cancelled"; requestedAt: string; cancelledAt: string | null };
-export type IntakeSnapshot = { revision: string; activeRequest: DeletionRequest | null; latestRequest: DeletionRequest | null };
+export type IntakeFulfillment = { state: "blocked" | "quiescing_storage" | "ready_for_auth_deletion"; blockers: string[]; revision: string; reviewedAt: string; storageQuiesceUntil: string | null };
+export type IntakeSnapshot = { revision: string; activeRequest: DeletionRequest | null; latestRequest: DeletionRequest | null; fulfillment: IntakeFulfillment | null };
 export type IntakeIntent = { operationId: string; expectedRevision: string; action: "submit" | "cancel"; requestId: string };
 export type IntakeConfirmation = { expectedRevision: string; action: "submit" | "cancel"; requestId: string };
 export type IntakeState = {
@@ -25,15 +26,31 @@ function readRequest(value: unknown): DeletionRequest {
     || (row.status === "requested" ? row.cancelledAt !== null : !timestamp(row.cancelledAt) || Date.parse(row.cancelledAt) < Date.parse(row.requestedAt))) throw new Error("The request status could not be verified. Refresh to try again.");
   return { requestId: id, status: row.status as DeletionRequest["status"], requestedAt: row.requestedAt, cancelledAt: row.cancelledAt as string | null };
 }
+const fulfillmentBlockers = new Set(["administrator_account", "unused_paid_credits", "unresolved_payment_order", "payment_hold_or_dispute", "billing_retention_migration_required", "unused_profile_credits", "storage_cleanup_required", "storage_quiescence_required", "active_ownership_transfer", "active_ownership_claim", "active_service_workflow", "service_record_migration_required", "retained_personal_content_review_required"]);
+function readFulfillment(value: unknown): IntakeFulfillment | null {
+  if (value === null) return null;
+  const row = record(value), state = row.state;
+  if (!["blocked", "quiescing_storage", "ready_for_auth_deletion"].includes(String(state)) || !Array.isArray(row.blockers)
+    || row.blockers.some(code => typeof code !== "string" || !fulfillmentBlockers.has(code)) || new Set(row.blockers).size !== row.blockers.length
+    || !intakeRevision(row.revision) || !timestamp(row.reviewedAt) || (row.storageQuiesceUntil !== null && !timestamp(row.storageQuiesceUntil))
+    || (((state === "blocked" || state === "quiescing_storage") !== (row.blockers.length > 0))
+      || (state === "blocked" && row.storageQuiesceUntil !== null) || (state !== "blocked" && row.storageQuiesceUntil === null))) {
+    throw new Error("The request status could not be verified. Refresh to try again.");
+  }
+  return { state: state as IntakeFulfillment["state"], blockers: [...row.blockers], revision: row.revision,
+    reviewedAt: row.reviewedAt, storageQuiesceUntil: row.storageQuiesceUntil as string | null };
+}
 function readSnapshot(value: unknown): IntakeSnapshot {
   const row = record(value);
   if (row.ok !== true || row.request !== null || !intakeRevision(row.revision)) throw new Error("The request status could not be verified. Refresh to try again.");
   const activeRequest = row.activeRequest === null ? null : readRequest(row.activeRequest);
   const latestRequest = row.latestRequest === null ? null : readRequest(row.latestRequest);
+  const fulfillment = readFulfillment(row.fulfillment);
   if ((activeRequest && (activeRequest.status !== "requested" || latestRequest?.requestId !== activeRequest.requestId
     || latestRequest.status !== "requested" || latestRequest.requestedAt !== activeRequest.requestedAt))
-    || (latestRequest?.status === "requested" && activeRequest?.requestId !== latestRequest.requestId)) throw new Error("The request status could not be verified. Refresh to try again.");
-  return { revision: row.revision, activeRequest, latestRequest };
+    || (latestRequest?.status === "requested" && activeRequest?.requestId !== latestRequest.requestId)
+    || (fulfillment !== null && !activeRequest)) throw new Error("The request status could not be verified. Refresh to try again.");
+  return { revision: row.revision, activeRequest, latestRequest, fulfillment };
 }
 function readIntent(value: unknown): IntakeIntent | null {
   const row = record(value), operationId = uuid(row.operationId), requestId = uuid(row.requestId);
@@ -197,7 +214,7 @@ export function createDeletionIntakeClient(deps: {
   function prepare(action: "submit" | "cancel") {
     if (disposed || lock || state.phase !== "ready" || state.refreshing || state.recoveryBlocked || state.intent || !state.snapshot || state.actorId !== expectedActor) return;
     const active = state.snapshot.activeRequest;
-    if (action === "submit" ? Boolean(active) : !active) return;
+    if (action === "submit" ? Boolean(active) : !active || (state.snapshot.fulfillment !== null && state.snapshot.fulfillment.state !== "blocked")) return;
     publish({ confirmation: { expectedRevision: state.snapshot.revision, action, requestId: action === "cancel" ? active!.requestId : "" }, feedback: "", error: "" });
   }
   async function mutate(retry: boolean) {

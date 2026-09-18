@@ -52,14 +52,16 @@ Apply the reviewed candidate migrations in this order after their historical pre
 34. `20260918134000_release_readiness.sql`
 35. `20260918150000_profile_edit_staged_uploads.sql`
 36. `20260918160000_release_readiness.sql`
+37. `20260918170000_account_deletion_fulfillment.sql`
+38. `20260918171000_release_readiness.sql`
 
 For an installation already on an intermediate readiness version, begin with the
 first unapplied migration above only after verifying the installed migration
 history and that version's readiness response. Do not skip an intermediate
 schema migration merely because a later readiness migration replaces the
 readiness function. The final migration must be
-`20260918160000_release_readiness.sql`; it binds the complete reviewed chain to
-release `2026-09-17.10`.
+`20260918171000_release_readiness.sql`; it binds the complete reviewed chain to
+release `2026-09-17.11`.
 
 The claim migration adds a service-only four-argument approval function,
 rechecks expiry, current ownership, account eligibility, and archived/removed
@@ -83,7 +85,7 @@ Wait for the PostgREST schema cache to recognize the new functions, then run:
 npm run release:database
 ```
 
-The service-only `qrguitar_release_readiness()` RPC checks the exact reviewed function implementations and signatures, client grants, private tables/buckets, policies, receipt uniqueness, editor versioning, payment ledgers and webhook queue, staged Profile-edit uploads, and provenance triggers. All 14 checks must pass for release version `2026-09-17.10`. A missing RPC, incomplete response, changed implementation, or privilege drift blocks release. Inspect and fix the cause; do not regenerate fingerprints from an unreviewed live database just to make the check green. Passing the repository generator tests proves that the committed readiness contract is internally consistent; it does not prove that production has applied these migrations.
+The service-only `qrguitar_release_readiness()` RPC checks the exact reviewed function implementations and signatures, client grants, private tables/buckets, policies, receipt uniqueness, editor versioning, payment ledgers and webhook queue, staged Profile-edit uploads, account-deletion state/custody/write fences, and provenance triggers. All 14 checks must pass for release version `2026-09-17.11`. A missing RPC, incomplete response, changed implementation, or privilege drift blocks release. Inspect and fix the cause; do not regenerate fingerprints from an unreviewed live database just to make the check green. Passing the repository generator tests proves that the committed readiness contract is internally consistent; it does not prove that production has applied these migrations.
 
 ## Payment activation gate
 
@@ -123,7 +125,7 @@ status paths while new checkout stays disabled.
   capability, the exact production hostname is registered, the deployed
   association bytes are verified, and a supported real device passes the
   Sandbox acceptance flow.
-- After the final `.10` readiness check passes against production, verify the
+- After the final `.11` readiness check passes against production, verify the
   webhook, sweep heartbeat, sanitized `/admin/payments` queue, and signed-in
   billing page on the immutable staged deployment. A real-money Live acceptance
   purchase requires the owner's separate authorization.
@@ -182,7 +184,8 @@ Use dedicated synthetic accounts and private test Profiles. Never use customer r
 7. Use two authorized Site Editor tabs. Test conflict, typing during autosave, publish after autosave, interrupted-response retry, discard, restore and legacy logo publishing with an existing shared draft.
 8. Test label/hang-tag/profile-sheet output and scannable permanent URLs. Private QR links become publicly readable only after choosing public or unlisted visibility.
 9. Test supported iOS/Android installation and standalone launch. Offline navigation must show only the connection page; reconnect and sign out must not expose cached account pages.
-10. Remove only the synthetic fixtures and their staged objects after final verification.
+10. Submit a synthetic account-deletion request. Prove a paid-credit or private-file fixture remains blocked and cancellable without data loss. Then use a separate clear fixture: prove its first review atomically records custody, forces affected instruments private, hides and freezes the account Profile, and preserves the fixed three-hour Storage deadline across retries. Confirm direct anonymous table reads remain denied and public catalog/file routes reject the held Profile. Upload an object with a previously issued capability and prove the post-deadline rescan finds it. After verified object cleanup, confirm the same job resumes through database anonymization, Auth-provider deletion, idempotent retry/finalization, post-cascade UUID and recipient-email rejection, and the absence of deleted identity in admin/browser JSON. Follow [Account deletion fulfillment](ACCOUNT_DELETION_FULFILLMENT.md).
+11. Remove only the remaining synthetic fixtures and staged objects after final verification. The completed-deletion fixture's tombstone and retained custody Profile are intentional protocol evidence; do not bypass their guards to clean them up.
 
 The PGlite tests execute real PostgreSQL routines, constraints and rollback behavior. Their single connection does not prove scheduling under multiple independent production database connections. Route/effect tests and local Chromium browser checks do not replace the migrated HTTP/Storage, real device, email delivery or production acceptance checks.
 

@@ -39,4 +39,5 @@ test('main requires exact explicit source options before reading files', async (
   await assert.rejects(main(['--repo'],env()),/requires a value/);
   await assert.rejects(main(['--unknown','x'],env()),/Unknown/);
   await assert.rejects(main(['--repo','x','--repo','y'],env()),/duplicate/);
+  await assert.rejects(main(['--repo','x','--intake-sql','y'],env()),/fulfillment-sql/);
 });

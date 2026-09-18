@@ -35,6 +35,7 @@ for (const visibility of ["public", "unlisted"]) for (const kind of ["media", "d
 }
 for (const [label, guitar, owner] of [
   ["private profile", { visibility: "private" }, {}],
+  ["ownerless private deletion-custody Profile", { visibility: "private", owner_id: null }, {}],
   ["archived profile", { admin_archived_at: "2026-09-01" }, {}],
   ["removed profile", { owner_removed_at: "2026-09-01" }, {}],
   ["retired QR", { qr_code: "QRG-0001" }, {}],

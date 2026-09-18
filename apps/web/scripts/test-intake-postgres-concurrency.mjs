@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 
 export const FIXTURE_MARKER = 'isolated-intake-postgresql-17';
-const DATABASE = 'qrguitar_intake_qa', USER = 'qrguitar_intake_fixture', EXPECTED_CASES = 11;
+  const DATABASE = 'qrguitar_intake_qa', USER = 'qrguitar_intake_fixture', EXPECTED_CASES = 15, EXPECTED_BARRIERS = 14;
 export function validateFixtureConnection(environment) {
   assert.equal(environment.QRGUITAR_INTAKE_FIXTURE, FIXTURE_MARKER, 'Explicit isolated intake fixture marker is required');
   const raw = environment.QRGUITAR_INTAKE_DATABASE_URL;
@@ -31,11 +31,12 @@ export async function main(args = process.argv.slice(2), environment = process.e
   assert.equal(args.length % 2, 0, 'Every option requires a value');
   const options = new Map();
   for (let i = 0; i < args.length; i += 2) {
-    assert.ok(['--repo', '--intake-sql', '--report-dir'].includes(args[i]) && !options.has(args[i]), 'Unknown or duplicate option');
+    assert.ok(['--repo', '--intake-sql', '--fulfillment-sql', '--report-dir'].includes(args[i]) && !options.has(args[i]), 'Unknown or duplicate option');
     assert.ok(args[i + 1] && !args[i + 1].startsWith('--'), 'Missing option value'); options.set(args[i], args[i + 1]);
   }
-  assert.ok(options.has('--repo') && options.has('--intake-sql'), '--repo and --intake-sql must explicitly select the reviewed sources');
-  const repo = fs.realpathSync(options.get('--repo')), intakePath = fs.realpathSync(options.get('--intake-sql'));
+  assert.ok(options.has('--repo') && options.has('--intake-sql') && options.has('--fulfillment-sql'), '--repo, --intake-sql, and --fulfillment-sql must explicitly select the reviewed sources');
+  const repo = fs.realpathSync(options.get('--repo')), intakePath = fs.realpathSync(options.get('--intake-sql')),
+    fulfillmentPath = fs.realpathSync(options.get('--fulfillment-sql'));
   const here = path.dirname(fileURLToPath(import.meta.url));
   const { Client } = createRequire(path.join(repo, 'apps/web/package.json'))('pg');
   const runId = 'intake-' + new Date().toISOString().replace(/[:.]/g, '-') + '-' + randomBytes(4).toString('hex');
@@ -48,7 +49,8 @@ export async function main(args = process.argv.slice(2), environment = process.e
   const fingerprints = () => Object.fromEntries(sourceFiles().map(file => [file, hash(fs.readFileSync(path.join(repo, file)))]));
   const report = { runId, startedAt: new Date().toISOString(), database: DATABASE, host: config.host, port: config.port,
     fixtureMarker: FIXTURE_MARKER, sourceHashes: fingerprints(), intakeSource: path.relative(repo, intakePath).replaceAll('\\', '/'),
-    intakeHash: hash(fs.readFileSync(intakePath)), runnerHash: hash(fs.readFileSync(fileURLToPath(import.meta.url))),
+    fulfillmentSource: path.relative(repo, fulfillmentPath).replaceAll('\\', '/'), intakeHash: hash(fs.readFileSync(intakePath)),
+    fulfillmentHash: hash(fs.readFileSync(fulfillmentPath)), runnerHash: hash(fs.readFileSync(fileURLToPath(import.meta.url))),
     tests: [], barriers: [], clientErrors: [], cleanupErrors: [], closedConnections: 0 };
   const message = error => String(error?.message || error).replaceAll(config.password, '[redacted]').replaceAll(environment.QRGUITAR_INTAKE_DATABASE_URL, '[fixture URL]');
   const log = value => { console.log(value); fs.appendFileSync(path.join(runDir, 'test-output.log'), value + '\n'); };
@@ -69,6 +71,15 @@ export async function main(args = process.argv.slice(2), environment = process.e
   async function service(work) { await begin(observer); try { const value = await work(observer); await observer.query('commit'); return value; } catch (error) { await observer.query('rollback'); throw error; } }
   const submit = (client, actor, operation, revision) => result(client, 'select public.submit_account_deletion_request($1,$2,$3::bigint) result', [actor, operation, revision]);
   const cancel = (client, actor, request, operation, revision) => result(client, 'select public.cancel_account_deletion_request($1,$2,$3,$4::bigint) result', [actor, request, operation, revision]);
+  const prepare = (client, admin, request, operation) => result(client, 'select public.prepare_account_deletion_fulfillment($1,true,$2,$3) result', [admin, request, operation]);
+  async function expireQuiescence(requestId) {
+    await observer.query('begin');
+    try {
+      await observer.query("select set_config('qrguitar.account_deletion_request',$1,true)", [requestId]);
+      await observer.query("update account_deletion_fulfillments set storage_quiesce_until=clock_timestamp()-interval '1 second' where request_id=$1 and state='quiescing_storage'", [requestId]);
+      await observer.query('commit');
+    } catch (error) { await observer.query('rollback'); throw error; }
+  }
   const snapshot = actor => service(client => result(client, 'select public.read_account_deletion_requests($1,null) result', [actor]));
   async function actor() {
     const id = randomUUID(); await observer.query('insert into auth.users(id,email) values($1,$2)', [id, 'synthetic-' + id + '@example.invalid']); return id;
@@ -81,13 +92,13 @@ export async function main(args = process.argv.slice(2), environment = process.e
 
   // A retains its transaction locks after its RPC; B runs on another backend.
   // A third backend proves B is blocked by A before A is released. No timing-only acceptance.
-  async function race(name, aWork, bWork, commit = true) {
+  async function race(name, aWork, bWork, commit = true, beginA = begin, beginB = begin) {
     let a, b, pending, settled = false;
     try {
       a = await connect(name + ':A'); b = await connect(name + ':B');
       const aPid = (await a.query('select pg_backend_pid() pid')).rows[0].pid, bPid = (await b.query('select pg_backend_pid() pid')).rows[0].pid;
       assert.equal(new Set([aPid, bPid, report.observerPid]).size, 3);
-      await begin(a); const first = await aWork(a); await begin(b);
+      await beginA(a); const first = await aWork(a); await beginB(b);
       pending = bWork(b, first).then(value => ({ ok: true, value }), error => ({ ok: false, code: error.code, message: message(error) })).then(value => { settled = true; return value; });
       let barrier; const deadline = Date.now() + 6000;
       while (Date.now() < deadline) {
@@ -181,7 +192,62 @@ export async function main(args = process.argv.slice(2), environment = process.e
       const got = await race('cancel-rollback', c => cancel(c,id,initial.request.requestId,a,'1'), c => cancel(c,id,initial.request.requestId,b,'1'), false);
       assert.equal(got.second.ok,true); assert.equal(got.second.value.request.status,'cancelled'); await assertCounts(id,1,0,2,'2'); await assertNoReceipt(id,a);
     });
-    assert.equal(report.tests.length,EXPECTED_CASES); assert.equal(report.barriers.length,EXPECTED_CASES);
+    await test('earlier actor write commits before fulfillment inventory and is anonymized', async () => {
+      const id=await actor(), admin=await actor();
+      await observer.query("insert into profiles(id,display_name,role) values($1,'Deletion target','owner'),($2,'Fixture admin','admin')",[id,admin]);
+      const requested=await service(c=>submit(c,id,randomUUID(),'0')), guitarId=randomUUID();
+      const got=await race('write-before-fulfillment',async c=>{
+        await c.query("select pg_advisory_xact_lock(hashtextextended('qrguitar:create:'||$1::text,0))",[id]);
+        await c.query("insert into guitars(id,owner_id,qr_code,permanent_path,name,brand,model,visibility) values($1,$2,$3,$4,'Private owner text','Fixture','Race','public')",[guitarId,id,'QRG-'+guitarId.slice(0,8),'/i/QRG-'+guitarId.slice(0,8)]);
+        return guitarId;
+      },c=>prepare(c,admin,requested.request.requestId,randomUUID()),true,c=>c.query('begin'),begin);
+      assert.equal(got.second.ok,true);assert.equal(got.second.value.fulfillment.state,'quiescing_storage');
+      await expireQuiescence(requested.request.requestId);
+      assert.equal((await service(c=>prepare(c,admin,requested.request.requestId,randomUUID()))).fulfillment.state,'ready_for_auth_deletion');
+      assert.deepEqual((await observer.query('select owner_id,visibility,name from guitars where id=$1',[guitarId])).rows[0],{owner_id:null,visibility:'private',name:'Retained instrument Profile'});
+      assert.equal((await observer.query('select count(*)::integer n from account_deletion_profile_custody where guitar_id=$1',[guitarId])).rows[0].n,1);
+    });
+    await test('later actor write waits, is rejected, and tombstone survives Auth cascade', async () => {
+      const id=await actor(), admin=await actor();
+      await observer.query("insert into profiles(id,display_name,role) values($1,'Deletion target','owner'),($2,'Fixture admin','admin')",[id,admin]);
+      const requested=await service(c=>submit(c,id,randomUUID(),'0'));
+      const insertOrder=(c,key)=>c.query("insert into billing_orders(owner_id,environment,request_key,offer,status) values($1,'live',$2,'{}'::jsonb,'expired')",[id,key]);
+      const got=await race('write-after-fulfillment',c=>prepare(c,admin,requested.request.requestId,randomUUID()),async c=>{
+        await c.query("select pg_advisory_xact_lock(hashtextextended('qrguitar:create:'||$1::text,0))",[id]);
+        return insertOrder(c,randomUUID());
+      },true,begin,c=>c.query('begin'));
+      assert.equal(got.first.fulfillment.state,'quiescing_storage');assert.equal(got.second.ok,false);assert.equal(got.second.code,'PD423');
+      await expireQuiescence(requested.request.requestId);
+      assert.equal((await service(c=>prepare(c,admin,requested.request.requestId,randomUUID()))).fulfillment.state,'ready_for_auth_deletion');
+      await observer.query('delete from auth.users where id=$1',[id]);
+      await assert.rejects(insertOrder(observer,randomUUID()),error=>error.code==='PD423');
+      assert.equal((await observer.query('select count(*)::integer n from billing_orders where owner_id=$1',[id])).rows[0].n,0);
+    });
+    await test('recipient invite commits before email inventory or is rejected before readiness', async () => {
+      const id=await actor(), admin=await actor(), sender=await actor(), guitarId=randomUUID(), email='synthetic-'+id+'@example.invalid';
+      await observer.query("insert into profiles(id,display_name,role) values($1,'Deletion target','owner'),($2,'Fixture admin','admin'),($3,'Sender','owner')",[id,admin,sender]);
+      await observer.query("insert into guitars(id,owner_id,qr_code,permanent_path,name,brand,model,visibility) values($1,$2,$3,$4,'Sender Profile','Fixture','Invite','private')",[guitarId,sender,'QRG-'+guitarId.slice(0,8),'/i/QRG-'+guitarId.slice(0,8)]);
+      const requested=await service(c=>submit(c,id,randomUUID(),'0'));
+      const got=await race('invite-before-email-inventory',c=>c.query("insert into ownership_transfers(guitar_id,from_owner_id,to_email,to_name,status) values($1,$2,$3,'Deletion target','sent') returning id",[guitarId,sender,email]),c=>prepare(c,admin,requested.request.requestId,randomUUID()),true,c=>c.query('begin'),begin);
+      assert.equal(got.second.ok,true);assert.equal(got.second.value.fulfillment.state,'blocked');assert.deepEqual(got.second.value.fulfillment.blockers,['active_ownership_transfer']);
+      assert.equal((await observer.query('select count(*)::integer n from ownership_transfers where lower(btrim(to_email))=$1',[email])).rows[0].n,1);
+      assert.notEqual(got.second.value.fulfillment.state,'ready_for_auth_deletion');
+    });
+    await test('upload arriving after freeze is found by the post-deadline storage rescan', async () => {
+      const id=await actor(), admin=await actor();
+      await observer.query("insert into profiles(id,display_name,role) values($1,'Deletion target','owner'),($2,'Fixture admin','admin')",[id,admin]);
+      const requested=await service(c=>submit(c,id,randomUUID(),'0'));
+      const frozen=await service(c=>prepare(c,admin,requested.request.requestId,randomUUID()));
+      assert.equal(frozen.fulfillment.state,'quiescing_storage');
+      await observer.query("insert into storage.objects(bucket_id,name) values('instrument-media',$1)",[id+'/profile-uploads/issued-before-freeze/late.jpg']);
+      await expireQuiescence(requested.request.requestId);
+      const blocked=await service(c=>prepare(c,admin,requested.request.requestId,randomUUID()));
+      assert.equal(blocked.fulfillment.state,'quiescing_storage');assert.deepEqual(blocked.fulfillment.blockers,['storage_cleanup_required']);
+      assert.equal((await observer.query("select count(*)::integer n from storage.objects where strpos('/'||name||'/','/'||$1::text||'/')>0",[id])).rows[0].n,1);
+      await observer.query("delete from storage.objects where strpos('/'||name||'/','/'||$1::text||'/')>0",[id]);
+      assert.equal((await service(c=>prepare(c,admin,requested.request.requestId,randomUUID()))).fulfillment.state,'ready_for_auth_deletion');
+    });
+    assert.equal(report.tests.length,EXPECTED_CASES); assert.equal(report.barriers.length,EXPECTED_BARRIERS);
   }
   try {
     observer = await connect('observer');
@@ -199,24 +265,28 @@ export async function main(args = process.argv.slice(2), environment = process.e
     await observer.query("insert into storage.buckets(id,name,public) values('instrument-media','instrument-media',false),('instrument-documents','instrument-documents',false),('service-evidence','service-evidence',false) on conflict(id) do update set public=false");
     report.baselineReadiness = await result(observer,'select qrguitar_release_readiness() result');
     assert.equal(report.baselineReadiness.ready,true,'Canonical baseline readiness failed');
-    // If --intake-sql is already an installed canonical migration, do not replay it.
-    const included = sourceFiles().some(file => fs.realpathSync(path.join(repo,file)) === intakePath);
-    report.intakeInstalledByRepositoryFixture = included;
-    if (!included) await observer.query(fs.readFileSync(intakePath,'utf8'));
+    // If either reviewed source is already a canonical migration, do not replay it.
+    const intakeIncluded = sourceFiles().some(file => fs.realpathSync(path.join(repo,file)) === intakePath);
+    const fulfillmentIncluded = sourceFiles().some(file => fs.realpathSync(path.join(repo,file)) === fulfillmentPath);
+    report.intakeInstalledByRepositoryFixture = intakeIncluded;
+    report.fulfillmentInstalledByRepositoryFixture = fulfillmentIncluded;
+    if (!intakeIncluded) await observer.query(fs.readFileSync(intakePath,'utf8'));
+    if (!fulfillmentIncluded) await observer.query(fs.readFileSync(fulfillmentPath,'utf8'));
     report.installedSignatures = (await observer.query("select p.oid::regprocedure::text signature, encode(sha256(convert_to(replace(p.prosrc,chr(13)||chr(10),chr(10)),'UTF8')),'hex') source_hash from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like '%account_deletion%' order by signature")).rows;
-    for (const signature of ['submit_account_deletion_request(uuid,uuid,bigint)','cancel_account_deletion_request(uuid,uuid,uuid,bigint)','read_account_deletion_requests(uuid,uuid)']) {
-      assert.ok(report.installedSignatures.some(row => row.signature === signature),'Missing revision-fenced RPC: '+signature);
+    for (const signature of ['submit_account_deletion_request(uuid,uuid,bigint)','cancel_account_deletion_request(uuid,uuid,uuid,bigint)','read_account_deletion_requests(uuid,uuid)','prepare_account_deletion_fulfillment(uuid,boolean,uuid,uuid,text[])','complete_account_deletion_fulfillment(uuid,boolean,uuid,uuid)']) {
+      assert.ok(report.installedSignatures.some(row => row.signature === signature),'Missing deletion protocol RPC: '+signature);
     }
     await tests();
     assert.deepEqual(fingerprints(),report.sourceHashes,'Repository schema sources changed during validation');
     assert.equal(hash(fs.readFileSync(intakePath)),report.intakeHash,'Intake SQL changed during validation');
+    assert.equal(hash(fs.readFileSync(fulfillmentPath)),report.fulfillmentHash,'Fulfillment SQL changed during validation');
     assert.equal(hash(fs.readFileSync(fileURLToPath(import.meta.url))),report.runnerHash,'Harness source changed during validation');
   } catch (error) { report.fatal = {code:error.code,message:message(error)}; log('FATAL '+message(error)); }
   finally {
     for (const client of [...clients]) await close(client);
     report.passed = report.tests.filter(test => test.ok).length; report.failed = report.tests.filter(test => !test.ok).length;
     report.allConnectionsClosed = clients.size === 0 && report.cleanupErrors.length === 0; report.finishedAt = new Date().toISOString();
-    report.accepted = !report.fatal && !report.failed && !report.clientErrors.length && report.allConnectionsClosed && report.passed === EXPECTED_CASES && report.barriers.length === EXPECTED_CASES;
+    report.accepted = !report.fatal && !report.failed && !report.clientErrors.length && report.allConnectionsClosed && report.passed === EXPECTED_CASES && report.barriers.length === EXPECTED_BARRIERS;
     const reportFile = path.join(runDir,'report.json'); fs.writeFileSync(reportFile,JSON.stringify(report,null,2));
     log(JSON.stringify({accepted:report.accepted,passed:report.passed,failed:report.failed,barriers:report.barriers.length,allConnectionsClosed:report.allConnectionsClosed,reportFile}));
   }

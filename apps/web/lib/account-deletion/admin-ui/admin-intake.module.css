@@ -32,5 +32,10 @@
 .notice p, .empty p, .error p { margin: 0 0 12px; color: #b9c9bf; }
 .error { background: #271e19; border-color: #74563e; }
 .error p { color: #e4cbbb; }
+.success { margin: 18px 0; padding: 14px 16px; border: 1px solid #426a57; border-radius: 10px; background: #15271e; color: #cce8d7; }
+.warning, .blockers { margin: 18px 0; padding: 14px 16px; border: 1px solid #735f38; border-radius: 10px; background: #2a2418; color: #ead8ae; font-size: .84rem; line-height: 1.55; }
+.blockers strong { color: #f4dfad; }
+.blockers ul { margin: 9px 0 0; padding-left: 20px; }
+.blockers li + li { margin-top: 6px; }
 .pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; padding-top: 22px; line-height: 1.5; }
 @media (max-width: 650px) { .heading { flex-direction: column; gap: 16px; } .toolbar { align-items: flex-start; flex-direction: column; } .card { padding: 18px; } .card dl { grid-template-columns: 1fr; } .pagination { align-items: stretch; flex-direction: column; } .pagination .button { width: 100%; } }

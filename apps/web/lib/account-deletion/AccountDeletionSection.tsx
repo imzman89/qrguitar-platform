@@ -16,6 +16,8 @@ export default function AccountDeletionSection({ actorId, auth }: { actorId: str
     : state.actorId && state.actorId !== expectedActor ? initialIntakeState() : state;
   const confirmationKey = view.confirmation ? `${expectedActor}:${view.confirmation.action}:${view.confirmation.requestId}:${view.confirmation.expectedRevision}` : "";
   const active = view.snapshot?.activeRequest, latest = active || view.snapshot?.latestRequest;
+  const fulfillment = view.snapshot?.fulfillment;
+  const cancellationLocked = fulfillment?.state === "quiescing_storage" || fulfillment?.state === "ready_for_auth_deletion";
   const blocked = view.busy || view.refreshing || view.recoveryBlocked || Boolean(view.intent);
 
   useEffect(() => {
@@ -55,13 +57,18 @@ export default function AccountDeletionSection({ actorId, auth }: { actorId: str
     {view.phase === "ready" && view.snapshot && <>
       {latest ? <div className={styles.request}>
         <div className={styles.requestHeading}><h3>{active ? "Request received" : "Request cancelled"}</h3><span className={active ? styles.requested : styles.cancelled}>{active ? "Requested" : "Cancelled"}</span></div>
-        <p>{active ? "Your personal-information deletion request is awaiting review. The request preserves the direction to keep instrument history." : "This deletion request is no longer active. No account or personal information was deleted by this request flow."}</p>
+        <p>{active ? fulfillment?.state === "quiescing_storage"
+          ? `Account writes are frozen and public content is hidden while the storage safety window drains${fulfillment.storageQuiesceUntil ? ` until ${new Date(fulfillment.storageQuiesceUntil).toLocaleString()}` : ""}. This request can no longer be cancelled.`
+          : fulfillment?.state === "ready_for_auth_deletion"
+            ? "Database personal-information removal is complete and sign-in deletion is being reconciled. This request can no longer be cancelled."
+            : "Your personal-information deletion request is awaiting review. The request preserves the direction to keep instrument history."
+          : "This deletion request is no longer active. No account or personal information was deleted by this request flow."}</p>
         <dl><div><dt>Request reference</dt><dd><code>{latest.requestId}</code></dd></div><div><dt>Requested</dt><dd><time dateTime={latest.requestedAt}>{new Date(latest.requestedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</time></dd></div>{latest.cancelledAt && <div><dt>Cancelled</dt><dd><time dateTime={latest.cancelledAt}>{new Date(latest.cancelledAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</time></dd></div>}</dl>
       </div> : !view.intent && <p className={styles.muted}>You have no recorded deletion request.</p>}
 
-      {!view.confirmation && !view.intent && <div className={styles.actions}>{active
+      {!view.confirmation && !view.intent && <div className={styles.actions}>{active && !cancellationLocked
         ? <button className={styles.secondary} type="button" disabled={blocked} onClick={() => prepare("cancel")}>Cancel deletion request</button>
-        : <button className={styles.primary} type="button" disabled={blocked} onClick={() => prepare("submit")}>{latest ? "Request another review" : "Request deletion review"}</button>}</div>}
+        : !active ? <button className={styles.primary} type="button" disabled={blocked} onClick={() => prepare("submit")}>{latest ? "Request another review" : "Request deletion review"}</button> : null}</div>}
 
       {view.confirmation && <div className={styles.confirmation}>
         <h3>{view.confirmation.action === "submit" ? "Confirm your review request" : "Cancel this request?"}</h3>
