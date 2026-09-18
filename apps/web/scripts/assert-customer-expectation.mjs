@@ -40,7 +40,8 @@ for (const legacy of ["Print handout &amp; labels", "Print or Download QR", ">Pr
   excludes(`${dashboard}\n${create}\n${qrDownload}`, legacy, `Legacy print action remains: ${legacy}`);
 }
 
-includes(layout, "loadPublishedSiteSettings", "The published theme must be rendered on the server.");
+includes(layout, "loadSiteSettingsRequest", "The published theme must be loaded on the server.");
+includes(layout, "const publishedSettings = loadedSettings.settings", "The request-scoped published or authorized draft theme must be rendered on the server.");
 includes(layout, '"--bg": publishedSettings.colors.background', "First paint must use the published background.");
 excludes(themeRuntime, "applyThemeSettings(defaultSiteSettings)", "Theme hydration must not flash bundled defaults.");
 assert(/useEffect\(\(\) => \{\s+let active = true;\s+void fetchPublishedSiteSettings\(\)/.test(nav) && nav.includes("if (active && settings) setContent(settings.content)"), "Navigation must load published settings on mount and ignore completion after unmount.");
