@@ -216,7 +216,21 @@ class Controller:
         return self.command(self.adb + ["shell", *args], **kwargs)
 
     def read(self, relative, optional=False):
-        return self.command(self.adb + ["exec-out", "run-as", APP, "cat", relative], optional=optional)
+        # Some adb exec-out versions report the transport command as successful
+        # even when the remote `cat` runs before the AtomicFile target exists.
+        # Fence the raw read with a shell-v2 existence check whose remote exit
+        # status is reliable; an empty/missing certificate must never be parsed
+        # or mistaken for durable evidence.
+        present = self.shell("run-as", APP, "test", "-f", relative, optional=True)
+        require(not present.stdout.strip() and not present.stderr.strip() and
+                present.returncode in (0, 1), "certificate-presence-unreadable")
+        if present.returncode == 1:
+            if optional:
+                return present
+            raise GuardError("certificate-missing")
+        result = self.command(self.adb + ["exec-out", "run-as", APP, "cat", relative])
+        require(not result.stderr.strip(), "certificate-read-error")
+        return result
 
     def uptime(self):
         raw = self.shell("cat", "/proc/uptime").stdout.decode().split()

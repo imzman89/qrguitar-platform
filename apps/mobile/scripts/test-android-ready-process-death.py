@@ -234,6 +234,47 @@ class ControlFlow(unittest.TestCase):
         control.close(); self.assertTrue(child.terminated); self.assertEqual(control.events, [])
 
 
+class CertificateReadBoundary(unittest.TestCase):
+    def controller(self, presence):
+        control = object.__new__(m.Controller)
+        control.adb = ["synthetic-adb", "-s", m.SERIAL]
+        calls = []
+        def shell(*args, **kwargs):
+            calls.append(("shell", args, kwargs))
+            return presence
+        def command(args, timeout=15, optional=False):
+            calls.append(("command", args, {"timeout": timeout, "optional": optional}))
+            return subprocess.CompletedProcess(args, 0, b'{"protocol":1}', b"")
+        control.shell = shell; control.command = command
+        return control, calls
+
+    def test_optional_missing_certificate_never_invokes_exec_out_or_parser(self):
+        missing = subprocess.CompletedProcess([], 1, b"", b"")
+        control, calls = self.controller(missing)
+        result = control.read("no_backup/qrguitar-ready-death/scenario/stage.json", optional=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual([kind for kind, _, _ in calls], ["shell"])
+
+    def test_required_missing_or_unreadable_certificate_fails_closed(self):
+        cases = ((subprocess.CompletedProcess([], 1, b"", b""), "certificate-missing"),
+                 (subprocess.CompletedProcess([], 0, b"unexpected", b""), "certificate-presence-unreadable"),
+                 (subprocess.CompletedProcess([], 2, b"", b"denied"), "certificate-presence-unreadable"))
+        for presence, code in cases:
+            control, calls = self.controller(presence)
+            with self.subTest(code=code), self.assertRaisesRegex(m.GuardError, code):
+                control.read("no_backup/qrguitar-ready-death/scenario/recovery.json")
+            self.assertEqual([kind for kind, _, _ in calls], ["shell"])
+
+    def test_present_certificate_is_read_as_exact_exec_out_bytes(self):
+        present = subprocess.CompletedProcess([], 0, b"", b"")
+        control, calls = self.controller(present)
+        result = control.read("no_backup/qrguitar-ready-death/scenario/stage.json", optional=True)
+        self.assertEqual(result.stdout, b'{"protocol":1}')
+        self.assertEqual([kind for kind, _, _ in calls], ["shell", "command"])
+        self.assertIn("exec-out", calls[1][1])
+        self.assertNotIn("--", calls[1][1])
+
+
 class Environment(unittest.TestCase):
     def test_nonhosted_or_nonlinux_refuses_before_directory_or_device_access(self):
         for env, platform in (({}, "linux"), ({"GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "self-hosted", "RUNNER_OS": "Linux"}, "linux"),
