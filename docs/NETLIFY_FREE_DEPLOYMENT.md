@@ -4,7 +4,7 @@ This repository contains a source-only Netlify adapter. Adding these files does 
 
 ## Build contract
 
-The root [`netlify.toml`](../netlify.toml) keeps the repository root as the build base, runs `npm run build --workspace @qrguitar/web`, publishes `apps/web/.next`, and selects Node 24. Keeping the root base allows npm to install both the web workspace and `packages/shared` from the committed root lockfile.
+The root [`netlify.toml`](../netlify.toml) keeps the repository root as the build base, runs `npm run build --workspace @qrguitar/web`, publishes `apps/web/.next`, and selects Node 24. Keeping the root base allows npm to install both the web workspace and `packages/shared` from the committed root lockfile. The source-only adapter also includes a five-minute Scheduled Function for PayPal recovery and code-based limits for the two payment ingress paths.
 
 Netlify automatically applies its current OpenNext adapter to supported Next.js applications. The adapter provisions the SSR/API function, middleware edge function, caching, and image handling. Do not add or pin `@netlify/plugin-nextjs`: Netlify says pinning opts out of automatic adapter updates. The release script gives the CLI the reviewed source and configuration and does not depend on undocumented `.netlify/*` output paths.
 
@@ -33,7 +33,7 @@ Netlify states that its regular Free plan can host commercial projects. The curr
 - [Current Free-plan hard limit](https://www.netlify.com/pricing/)
 - [Production-deploy credit accounting](https://docs.netlify.com/manage/accounts-and-billing/billing/billing-for-credit-based-plans/how-credits-work/#credit-usage-for-production-deploys)
 
-The generated synchronous Next.js function has a non-configurable 60-second execution limit and a 6 MB buffered request/response limit. Binary request bodies are base64 encoded by the platform, reducing the practical binary request limit to about 4.5 MB. User files must upload directly to object storage through bounded signed URLs; application functions should receive only small metadata bodies. See [Netlify Function defaults](https://docs.netlify.com/build/functions/configuration/#default-values).
+The generated synchronous Next.js function has a non-configurable 60-second execution limit and a 6 MB buffered request/response limit. Scheduled Functions have a separate 30-second limit. Binary request bodies are base64 encoded by the platform, reducing the practical binary request limit to about 4.5 MB. User files upload directly to object storage through bounded signed URLs; application functions receive only small metadata bodies. See [Netlify Function defaults](https://docs.netlify.com/build/functions/configuration/#default-values).
 
 Run the source preflight before any Netlify release:
 
@@ -41,7 +41,7 @@ Run the source preflight before any Netlify release:
 npm run check:netlify
 ```
 
-It fails closed when a route declares more than 60 seconds or the Profile editor still sends inline file data in PATCH JSON. At this baseline it intentionally reports both blockers: `apps/web/app/api/billing/webhook/route.ts` declares 120 seconds, and `apps/web/app/edit/[code]/page.tsx` sends image/document data URLs. Those payment and Profile-edit changes are outside this adapter's scope. Do not stage or publish until their reviewed fixes are integrated and the preflight passes. The 6 MB response ceiling still needs production acceptance because static analysis cannot prove every dynamic response size.
+It fails closed when a route declares more than 60 seconds, the Profile editor sends inline file data in PATCH JSON, or the PayPal recovery schedule is missing, slower than five-minute intervals, pointed away from the canonical production endpoint, or allowed to run for 30 seconds. The current candidate passes those source checks: the editor sends storage paths, application routes stay within 60 seconds, and the scheduled request aborts after 15 seconds. The 6 MB response ceiling still needs production acceptance because static analysis cannot prove every dynamic response size.
 
 ## Local release state and required configuration
 
@@ -53,10 +53,20 @@ Set these non-secret operator values only in the release shell:
 QRGUITAR_NETLIFY_FREE_PLAN_CONFIRMED=true
 QRGUITAR_NETLIFY_SITE_ID=<exact Netlify site UUID>
 QRGUITAR_NETLIFY_PRODUCTION_ORIGIN=https://<assigned main host>
-QRGUITAR_NETLIFY_CANONICAL_ORIGIN=https://qrguitar.com
+QRGUITAR_NETLIFY_CANONICAL_ORIGIN=https://www.qrguitar.com
 ```
 
-`QRGUITAR_NETLIFY_CANONICAL_ORIGIN` is optional and defaults to `https://qrguitar.com`. The production origin must be returned by the expected Netlify site's API. The wrapper also requires Node 24, a clean committed tree, the same full SHA throughout, a pinned Netlify CLI, an authenticated CLI session or `NETLIFY_AUTH_TOKEN` in the process environment, and Netlify auto publishing locked. It does not log in, create a site, configure variables, lock the site, or edit a domain.
+`QRGUITAR_NETLIFY_CANONICAL_ORIGIN` is optional and defaults to `https://www.qrguitar.com`. The production origin must be returned by the expected Netlify site's API. The wrapper also requires Node 24, a clean committed tree, the same full SHA throughout, a pinned Netlify CLI, an authenticated CLI session or `NETLIFY_AUTH_TOKEN` in the process environment, and Netlify auto publishing locked. It does not log in, create a site, configure variables, lock the site, or edit a domain.
+
+## PayPal recovery schedule and traffic limits
+
+[`netlify/functions/paypal-webhook-sweep.mjs`](../netlify/functions/paypal-webhook-sweep.mjs) runs `*/5 * * * *` on published deploys. It sends one authenticated POST to the fixed canonical endpoint `https://www.qrguitar.com/api/internal/paypal-webhook-sweep`, refuses redirects, aborts after 15 seconds, validates the bounded response, and logs only fixed operational messages or an HTTP status. It never logs the bearer secret, response body, provider record, or customer data. A failure throws so it is visible in Netlify function logs. It does not replace the database's 15-minute checkout heartbeat gate.
+
+Before publication, add the same random 32–256 character `CRON_SECRET` used by the application to the Netlify project's environment variables. Enter it in the Netlify UI; do not place it in `netlify.toml`, source, or a release command. Scheduled Functions are available on all plans, execute automatically only on published deploys, cannot be invoked by a production URL, and have a 30-second limit. The Functions page can run the function manually on a draft for testing. See [Scheduled Functions](https://docs.netlify.com/build/functions/scheduled-functions/) and [function environment variables](https://docs.netlify.com/build/functions/environment-variables/).
+
+The two self-rewrite rules in `netlify.toml` apply code-based per-IP-and-domain limits to the public PayPal webhook and the authenticated sweep endpoint. This is supported on Free and protects function usage in addition to the application's signature/authentication, database quota, and leases. Netlify says code-based rule validation does not fail a deploy, so every staged and production deploy must show both accepted rules in the deploy log's post-processing section before checkout is enabled. See [Netlify rate limiting](https://docs.netlify.com/manage/security/secure-access-to-sites/rate-limiting/).
+
+After the custom domain resolves to the published Netlify deploy, open **Cloud compute → Functions → paypal-webhook-sweep**, confirm the `Scheduled` badge and next execution time, choose **Run now**, and inspect the function log for the fixed success message. Then confirm the private `billing_paypal_webhook_heartbeats.last_success_at` value for the live environment is fresh. Keep `QRGUITAR_PAYPAL_ENABLED=false` if the request fails, the canonical host redirects, either rate-limit rule is absent from post-processing, or no fresh heartbeat is recorded.
 
 Netlify CLI state and QRguitar stage receipts stay under ignored `.netlify/`. They contain site/deploy IDs and public build identity only, never credentials.
 
@@ -68,7 +78,7 @@ Stage from the reviewed commit:
 npm run release:netlify -- stage
 ```
 
-The wrapper runs the existing build, typecheck, launch, behavior, and audit gates. It exports exactly the committed Git tree to a temporary directory, excluding ignored secrets and untracked edits, then installs that snapshot's locked dependencies with `npm ci --no-audit --no-fund`. Pinned Netlify CLI 27.8.0 selects the `@qrguitar/web` monorepo application, builds that snapshot with the `production` context, and creates a draft because the command contains neither `--prod` nor `--prod-if-unlocked`. The wrapper validates the CLI JSON against the exact site UUID, deploy ID, and immutable `<DEPLOY_ID>--<site>.netlify.app` URL; verifies `/api/build-info` against the full SHA, timestamp, and deploy ID; rechecks the locked production baseline; then writes `.netlify/qrguitar-netlify-staged-release.json`. A failed check never creates a publishable record.
+The wrapper runs the existing build, typecheck, launch, behavior, audit, and Netlify runtime gates. It exports exactly the committed Git tree to a temporary directory, excluding ignored secrets and untracked edits, then installs that snapshot's locked dependencies with `npm ci --no-audit --no-fund`. Pinned Netlify CLI 27.8.0 selects the `@qrguitar/web` monorepo application, builds that snapshot with the `production` context, and creates a draft because the command contains neither `--prod` nor `--prod-if-unlocked`. The wrapper validates the CLI JSON against the exact site UUID, deploy ID, and immutable `<DEPLOY_ID>--<site>.netlify.app` URL; verifies `/api/build-info` against the full SHA, timestamp, and deploy ID; rechecks the locked production baseline; then writes `.netlify/qrguitar-netlify-staged-release.json`. A failed check never creates a publishable record.
 
 The immutable draft must be reachable by the release process for identity verification. Netlify may enable private-by-default deploys for a new credit-based project; in that state the stage command fails safely at the HTTP probe. Configure access through Netlify before using this adapter, or keep the deployment unpublished. Do not bypass the identity probe.
 

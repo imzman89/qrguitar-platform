@@ -59,6 +59,16 @@ continues when the heartbeat is stale. Do not enable checkout until both the
 secret and schedule are active. A Sandbox Hobby deployment can exercise the same
 endpoint manually or on its daily cron while new sales remain disabled.
 
+The Netlify adapter includes its own five-minute Scheduled Function on every
+published deploy. It calls the fixed `https://www.qrguitar.com` sweep endpoint,
+blocks redirects, and aborts after 15 seconds. Configure `CRON_SECRET` privately
+in the Netlify project before publishing; the scheduled bridge and application
+must receive the same value. Scheduled failures throw a fixed error into the
+function log without including the secret, response body, provider data, or
+customer data. Confirm the function's `Scheduled` badge, use **Run now**, and
+verify a fresh private database heartbeat before enabling checkout. Full Netlify
+steps are in [`NETLIFY_FREE_DEPLOYMENT.md`](NETLIFY_FREE_DEPLOYMENT.md).
+
 Keep the PayPal credentials, webhook registration, `CRON_SECRET`, and recovery
 schedule active when pausing new sales. Existing approved or paid orders must
 still receive webhooks and reconcile while `QRGUITAR_PAYPAL_ENABLED=false`.
@@ -112,16 +122,20 @@ never changes that identity. After signature verification and an allowlisted
 work plan are saved, the raw body and signature material are deleted immediately;
 unfinished items resume from that frozen plan. Pre-plan failures retain raw data
 only for bounded recovery. Neither form is returned by the admin API or browser
-UI. Configure a host-level rate limit on the public webhook as defense in depth;
-the database quota and immediate purge of permanently invalid envelopes remain
-the durable storage boundary.
+UI. The Netlify adapter applies a code-based limit of 300 requests per minute per
+source IP and domain to the public webhook, plus 12 per minute to the private
+sweep route. Confirm both rules in each deploy log's post-processing section;
+Netlify documents that an invalid code-based rule does not fail the deploy. On
+another production host, configure an equivalent path limit before enabling
+checkout. The database quota and immediate purge of permanently invalid
+envelopes remain the durable storage boundary.
 
 Unverified/raw recovery has a seven-day hard window. A verified frozen plan has
 a 30-day hard window, enough for every 20-item dispute to advance even under a
 temporary daily Sandbox schedule. Consecutive failures back off from five
 seconds to six hours; a successful verification, plan save, or item commit resets
 that failure streak. Total claim counts remain audit metadata and do not shorten
-the age-based recovery window. The live Pro schedule should still run at least
+the age-based recovery window. The live production schedule should still run at least
 every five minutes so ordinary work settles promptly.
 
 An active database administrator uses `/admin/payments` for two separate jobs:

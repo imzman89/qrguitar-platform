@@ -6,3 +6,22 @@
 
 [build.environment]
   NODE_VERSION = "24"
+
+# Netlify validates these code-based limits during deploy post-processing.
+# They are per source IP and domain and supplement the application's own
+# authentication, signature verification, bounded ingress quota, and leases.
+[[redirects]]
+  from = "/api/billing/paypal/webhook"
+  to = "/api/billing/paypal/webhook"
+  [redirects.rate_limit]
+    window_limit = 300
+    window_size = 60
+    aggregate_by = ["ip", "domain"]
+
+[[redirects]]
+  from = "/api/internal/paypal-webhook-sweep"
+  to = "/api/internal/paypal-webhook-sweep"
+  [redirects.rate_limit]
+    window_limit = 12
+    window_size = 60
+    aggregate_by = ["ip", "domain"]

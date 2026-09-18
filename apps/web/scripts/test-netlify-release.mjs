@@ -40,7 +40,7 @@ const releaseEnvironment = {
   QRGUITAR_GIT_SHA: gitSha,
   QRGUITAR_BUILD_TIMESTAMP: buildTimestamp,
   QRGUITAR_BUILD_DIRTY: "false",
-  NEXT_PUBLIC_SITE_URL: "https://qrguitar.com"
+  NEXT_PUBLIC_SITE_URL: "https://www.qrguitar.com"
 };
 
 test("root Netlify config builds the web workspace with managed output on Node 24", () => {
@@ -49,6 +49,30 @@ test("root Netlify config builds the web workspace with managed output on Node 2
   assert.match(config, /publish\s*=\s*"apps\/web\/\.next"/);
   assert.match(config, /NODE_VERSION\s*=\s*"24"/);
   assert.doesNotMatch(config, /(?:TOKEN|SECRET|PASSWORD|PRIVATE_KEY)\s*=/i);
+  for (const [route, limit] of [
+    ["/api/billing/paypal/webhook", 300],
+    ["/api/internal/paypal-webhook-sweep", 12]
+  ]) {
+    const escapedRoute = route.replaceAll("/", "\\/");
+    const block = new RegExp(
+      `from\\s*=\\s*"${escapedRoute}"[\\s\\S]*?to\\s*=\\s*"${escapedRoute}"[\\s\\S]*?` +
+      `\\[redirects\\.rate_limit\\][\\s\\S]*?window_limit\\s*=\\s*${limit}[\\s\\S]*?` +
+      `window_size\\s*=\\s*60[\\s\\S]*?aggregate_by\\s*=\\s*\\["ip",\\s*"domain"\\]`
+    );
+    assert.match(config, block);
+  }
+});
+
+test("Netlify release metadata defaults to QRguitar's www canonical origin", () => {
+  const release = fs.readFileSync(new URL("../../../scripts/netlify-release.mjs", import.meta.url), "utf8");
+  assert.match(
+    release,
+    /QRGUITAR_NETLIFY_CANONICAL_ORIGIN\s*\|\|\s*"https:\/\/www\.qrguitar\.com"/
+  );
+  assert.doesNotMatch(
+    release,
+    /QRGUITAR_NETLIFY_CANONICAL_ORIGIN\s*\|\|\s*"https:\/\/qrguitar\.com"/
+  );
 });
 
 function stageRecord() {

@@ -35,6 +35,118 @@ function stringValue(expression) {
     : null;
 }
 
+function exportedConstants(sourceFile) {
+  const result = new Map();
+  for (const statement of sourceFile.statements) {
+    if (
+      !ts.isVariableStatement(statement) ||
+      !statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)
+    ) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      if (ts.isIdentifier(declaration.name) && declaration.initializer) {
+        result.set(declaration.name.text, declaration.initializer);
+      }
+    }
+  }
+  return result;
+}
+
+function resolvedString(expression, constants, seen = new Set()) {
+  const direct = expression ? stringValue(expression) : null;
+  if (direct !== null) return direct;
+  if (!expression || !ts.isIdentifier(expression) || seen.has(expression.text)) return null;
+  const initializer = constants.get(expression.text);
+  if (!initializer) return null;
+  seen.add(expression.text);
+  return resolvedString(initializer, constants, seen);
+}
+
+function resolvedNumber(expression, constants, seen = new Set()) {
+  if (expression && ts.isNumericLiteral(expression)) return Number(expression.text);
+  if (!expression || !ts.isIdentifier(expression) || seen.has(expression.text)) return null;
+  const initializer = constants.get(expression.text);
+  if (!initializer) return null;
+  seen.add(expression.text);
+  return resolvedNumber(initializer, constants, seen);
+}
+
+function inspectPayPalScheduler(root) {
+  const scheduler = path.join(root, "netlify", "functions", "paypal-webhook-sweep.mjs");
+  if (!fs.existsSync(scheduler)) {
+    return ["the Netlify PayPal recovery schedule is missing"];
+  }
+  const source = fs.readFileSync(scheduler, "utf8");
+  const sourceFile = ts.createSourceFile(scheduler, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+  if (sourceFile.parseDiagnostics.length) {
+    return ["the Netlify PayPal recovery schedule could not be parsed"];
+  }
+
+  const constants = exportedConstants(sourceFile);
+  const config = constants.get("config");
+  const schedule = config && ts.isObjectLiteralExpression(config)
+    ? resolvedString(propertyAssignment(config, "schedule")?.initializer, constants)
+    : null;
+  const timeout = resolvedNumber(constants.get("PAYPAL_SWEEP_TIMEOUT_MS"), constants);
+  const target = resolvedString(constants.get("PAYPAL_SWEEP_URL"), constants);
+  const hasDefaultHandler = sourceFile.statements.some(statement =>
+    ts.isFunctionDeclaration(statement) &&
+    statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.DefaultKeyword)
+  );
+  const issues = [];
+  if (schedule !== "*/5 * * * *") issues.push("the PayPal recovery schedule is not fixed at five-minute intervals");
+  if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout >= 30000) {
+    issues.push("the PayPal recovery request timeout is not bounded below Netlify's 30-second scheduled-function limit");
+  }
+  if (target !== "https://www.qrguitar.com/api/internal/paypal-webhook-sweep") {
+    issues.push("the PayPal recovery schedule does not target the canonical production sweep endpoint");
+  }
+  if (!hasDefaultHandler) issues.push("the PayPal recovery schedule has no default Netlify handler");
+  return issues;
+}
+
+function tomlString(section, key) {
+  const match = section.match(new RegExp(`^\\s*${key}\\s*=\\s*"([^"]*)"\\s*(?:#.*)?$`, "m"));
+  return match?.[1] ?? null;
+}
+
+function tomlInteger(section, key) {
+  const match = section.match(new RegExp(`^\\s*${key}\\s*=\\s*(\\d+)\\s*(?:#.*)?$`, "m"));
+  return match ? Number(match[1]) : null;
+}
+
+function inspectPaymentRateLimits(root) {
+  const configPath = path.join(root, "netlify.toml");
+  if (!fs.existsSync(configPath)) return ["netlify.toml is missing"];
+  const source = fs.readFileSync(configPath, "utf8");
+  const sections = source
+    .split(/(?=^\[\[redirects\]\]\s*$)/m)
+    .filter(section => /^\[\[redirects\]\]\s*$/m.test(section));
+  const requirements = [
+    { route: "/api/billing/paypal/webhook", limit: 300 },
+    { route: "/api/internal/paypal-webhook-sweep", limit: 12 }
+  ];
+  const issues = [];
+  for (const requirement of requirements) {
+    const matching = sections.filter(section => tomlString(section, "from") === requirement.route);
+    const section = matching.length === 1 ? matching[0] : null;
+    const aggregation = section?.match(/^\s*aggregate_by\s*=\s*\[([^\]]*)\]\s*(?:#.*)?$/m)?.[1] ?? "";
+    const aggregateBy = Array.from(aggregation.matchAll(/"([^"]+)"/g), match => match[1]).sort();
+    if (
+      !section ||
+      tomlString(section, "to") !== requirement.route ||
+      !/^\s*\[redirects\.rate_limit\]\s*$/m.test(section) ||
+      tomlInteger(section, "window_limit") !== requirement.limit ||
+      tomlInteger(section, "window_size") !== 60 ||
+      aggregateBy.join(",") !== "domain,ip"
+    ) {
+      issues.push(
+        `the Netlify rate limit for ${requirement.route} is missing or differs from the reviewed self-rewrite rule`
+      );
+    }
+  }
+  return issues;
+}
+
 function isJsonStringify(call) {
   return ts.isPropertyAccessExpression(call.expression) &&
     ts.isIdentifier(call.expression.expression) &&
@@ -145,7 +257,7 @@ function inspectProfilePatchBoundary(source, filename) {
 }
 
 export function netlifyRuntimeConstraintViolations(root = defaultRoot) {
-  const violations = [];
+  const violations = [...inspectPayPalScheduler(root), ...inspectPaymentRateLimits(root)];
   const routesRoot = path.join(root, "apps", "web", "app", "api");
   for (const route of filesBelow(routesRoot).filter(file => /route\.(?:ts|js)$/.test(file))) {
     const source = fs.readFileSync(route, "utf8");
@@ -184,7 +296,7 @@ export function assertNetlifyRuntimeConstraints(root = defaultRoot) {
 if (process.argv[1] && path.resolve(process.argv[1]) === scriptPath) {
   try {
     assertNetlifyRuntimeConstraints();
-    console.log("Netlify runtime compatibility checks passed (6 MB buffered payload, 60-second synchronous functions).");
+    console.log("Netlify runtime compatibility checks passed (6 MB buffered payload, 60-second synchronous functions, five-minute bounded PayPal recovery schedule, reviewed payment rate limits).");
   } catch (error) {
     console.error(error instanceof Error ? error.message : "Netlify runtime compatibility check failed.");
     process.exitCode = 1;

@@ -107,11 +107,14 @@ status paths while new checkout stays disabled.
 - Register `https://www.qrguitar.com/api/billing/paypal/webhook` on that exact
   Live REST app with the event set in `PAYPAL_CHECKOUT_SETUP.md`. Verify the app
   can read orders, captures, refunds, and disputes for the receiving merchant.
-- Run an authenticated external schedule at least every five minutes against
-  `/api/internal/paypal-webhook-sweep`. Require a successful private heartbeat
-  before enabling sales. The application refuses new checkout when the latest
-  heartbeat is more than 15 minutes old, while preserving recovery for payments
-  already in flight.
+- Run an authenticated schedule at least every five minutes against
+  `/api/internal/paypal-webhook-sweep`. Netlify production uses the committed
+  `paypal-webhook-sweep` Scheduled Function; confirm its Scheduled badge, manual
+  **Run now** result, fixed success log, and both payment rate-limit rules in
+  deploy post-processing. Other hosts need an equivalent scheduler. Require a
+  successful private heartbeat before enabling sales. The application refuses
+  new checkout when the latest heartbeat is more than 15 minutes old, while
+  preserving recovery for payments already in flight.
 - Use a host plan whose terms permit commercial payment processing. Vercel
   Hobby must keep Live checkout disabled. A lawful commercial host or eligible
   Vercel plan, working HTTPS, and sufficient function/runtime limits must be

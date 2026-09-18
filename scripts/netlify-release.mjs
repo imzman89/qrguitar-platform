@@ -121,7 +121,7 @@ try {
   if (!isNetlifySiteId(siteId)) throw new Error("QRGUITAR_NETLIFY_SITE_ID must be the exact Netlify site UUID.");
   const productionOrigin = netlifyProductionOrigin(process.env.QRGUITAR_NETLIFY_PRODUCTION_ORIGIN || "");
   const canonicalOrigin = netlifyProductionOrigin(
-    process.env.QRGUITAR_NETLIFY_CANONICAL_ORIGIN || "https://qrguitar.com"
+    process.env.QRGUITAR_NETLIFY_CANONICAL_ORIGIN || "https://www.qrguitar.com"
   );
   const gitSha = git("rev-parse", "HEAD").toLowerCase();
   if (!/^[a-f0-9]{40}$/.test(gitSha)) throw new Error("Git did not return a full release commit SHA.");
