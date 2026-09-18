@@ -34,8 +34,42 @@ Apply the reviewed candidate migrations in this order after their historical pre
 16. `20260917173000_release_readiness.sql`
 17. `20260917174500_business_conflict_responses.sql`
 18. `20260917175000_release_readiness.sql`
+19. `20260917190000_billing_credits.sql`
+20. `20260917191000_release_readiness.sql`
+21. `20260917200000_account_deletion_intake.sql`
+22. `20260917201000_release_readiness.sql`
+23. `20260917210000_service_evidence_uploads.sql`
+24. `20260917211000_release_readiness.sql`
+25. `20260917220000_service_evidence_recovery.sql`
+26. `20260917220500_site_editor_helper_permissions.sql`
+27. `20260917221000_release_readiness.sql`
+28. `20260918120000_direct_business_payments.sql`
+29. `20260918121000_release_readiness.sql`
+30. `20260918130000_paypal_automatic_payments.sql`
+31. `20260918131000_release_readiness.sql`
+32. `20260918132000_paypal_webhook_inbox.sql`
+33. `20260918133000_paypal_admin_reviews.sql`
+34. `20260918134000_release_readiness.sql`
+35. `20260918150000_profile_edit_staged_uploads.sql`
+36. `20260918160000_release_readiness.sql`
 
-For an installation already on release `2026-09-10.1`, the September 17 update applies only migrations 14–18 after verifying that baseline. An installation already on `2026-09-17.1` applies only migrations 17–18. The claim migration adds a service-only four-argument approval function, rechecks expiry, current ownership, account eligibility, and archived/removed instruments under lock, and revokes execution of the unsafe three-argument overload. The account migration adds a version column and a locked, version-checked save function so a delayed request cannot overwrite a newer save. The old unversioned account entry point is revoked. Existing clients must reload. Existing instrument QR identifiers remain unchanged. The matching readiness migration requires the reviewed implementations and blocks their old grants.
+For an installation already on an intermediate readiness version, begin with the
+first unapplied migration above only after verifying the installed migration
+history and that version's readiness response. Do not skip an intermediate
+schema migration merely because a later readiness migration replaces the
+readiness function. The final migration must be
+`20260918160000_release_readiness.sql`; it binds the complete reviewed chain to
+release `2026-09-17.10`.
+
+The claim migration adds a service-only four-argument approval function,
+rechecks expiry, current ownership, account eligibility, and archived/removed
+instruments under lock, and revokes execution of the unsafe three-argument
+overload. The account migration adds a version column and a locked,
+version-checked save function so a delayed request cannot overwrite a newer
+save. The old unversioned account entry point is revoked. Existing clients must
+reload. Existing instrument QR identifiers remain unchanged. The successive
+readiness migrations deliberately replace the prior readiness contract as each
+reviewed subsystem is added.
 
 Migration 17 changes expected account, instrument, and service-evidence conflicts to `PT409`. Hosted PostgREST retries `40001` serialization failures; using that transient error for a permanent stale-version rejection can cause requests to time out. `PT409` returns an explicit HTTP conflict. This follow-up preserves the original transaction logic, locks, and permissions; historical applied migrations remain unchanged. Include a hosted stale-save rejection in acceptance in addition to local SQL tests.
 
@@ -49,7 +83,52 @@ Wait for the PostgREST schema cache to recognize the new functions, then run:
 npm run release:database
 ```
 
-The service-only `qrguitar_release_readiness()` RPC checks the exact reviewed function implementations and signatures, client grants, private tables/buckets, policies, receipt uniqueness, editor versioning, and provenance triggers. All 14 checks must pass for release version `2026-09-17.2`. A missing RPC, incomplete response, changed implementation, or privilege drift blocks release. Inspect and fix the cause; do not regenerate fingerprints from an unreviewed live database just to make the check green.
+The service-only `qrguitar_release_readiness()` RPC checks the exact reviewed function implementations and signatures, client grants, private tables/buckets, policies, receipt uniqueness, editor versioning, payment ledgers and webhook queue, staged Profile-edit uploads, and provenance triggers. All 14 checks must pass for release version `2026-09-17.10`. A missing RPC, incomplete response, changed implementation, or privilege drift blocks release. Inspect and fix the cause; do not regenerate fingerprints from an unreviewed live database just to make the check green. Passing the repository generator tests proves that the committed readiness contract is internally consistent; it does not prove that production has applied these migrations.
+
+## Payment activation gate
+
+Deploying this application and schema does not activate a payment method. Keep
+all legacy new-sale paths disabled with `QRGUITAR_BILLING_ENABLED=false` and
+`QRGUITAR_DIRECT_PAYMENTS_ENABLED=false`. Keep
+`QRGUITAR_PAYPAL_ENABLED=false` until every item below is complete. Existing
+Stripe or direct-payment orders remain recoverable through their dedicated
+status paths while new checkout stays disabled.
+
+- Run PayPal Sandbox against an isolated test database and test origin. Confirm
+  each pack, cancellation, decline, interrupted response, duplicate callback,
+  webhook retry, refund, dispute, hold, and audited admin decision without
+  touching the production ledger.
+- Configure the production host privately with matching Live
+  `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_MERCHANT_ID`, and
+  `PAYPAL_WEBHOOK_ID`, plus `PAYPAL_ENVIRONMENT=live`,
+  `QRGUITAR_BILLING_ENVIRONMENT=live`, and a random server-only
+  `CRON_SECRET`. Never put their values in source, deployment arguments, chat,
+  screenshots, or public variables.
+- Register `https://www.qrguitar.com/api/billing/paypal/webhook` on that exact
+  Live REST app with the event set in `PAYPAL_CHECKOUT_SETUP.md`. Verify the app
+  can read orders, captures, refunds, and disputes for the receiving merchant.
+- Run an authenticated external schedule at least every five minutes against
+  `/api/internal/paypal-webhook-sweep`. Require a successful private heartbeat
+  before enabling sales. The application refuses new checkout when the latest
+  heartbeat is more than 15 minutes old, while preserving recovery for payments
+  already in flight.
+- Use a host plan whose terms permit commercial payment processing. Vercel
+  Hobby must keep Live checkout disabled. A lawful commercial host or eligible
+  Vercel plan, working HTTPS, and sufficient function/runtime limits must be
+  confirmed before `QRGUITAR_PAYPAL_ENABLED=true`.
+- Keep `QRGUITAR_PAYPAL_APPLE_PAY_ENABLED=false` until PayPal has approved the
+  capability, the exact production hostname is registered, the deployed
+  association bytes are verified, and a supported real device passes the
+  Sandbox acceptance flow.
+- After the final `.10` readiness check passes against production, verify the
+  webhook, sweep heartbeat, sanitized `/admin/payments` queue, and signed-in
+  billing page on the immutable staged deployment. A real-money Live acceptance
+  purchase requires the owner's separate authorization.
+
+See [Automatic PayPal checkout setup](PAYPAL_CHECKOUT_SETUP.md) for the exact
+event subscriptions, environment isolation, queue operation, and acceptance
+procedure. No statement in this runbook is evidence that production is already
+migrated, configured, or accepting money.
 
 ## Application release
 
