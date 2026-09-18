@@ -26,6 +26,7 @@ function consentQuestion() {
 export function OptionalTrackingConsent() {
   const [consent, setConsent] = useState<OptionalTrackingConsentState | null>(null);
   const [storageError, setStorageError] = useState(false);
+  const [managing, setManaging] = useState(false);
 
   useEffect(() => {
     if (!configuredOptionalTracking.enabled) return;
@@ -34,20 +35,40 @@ export function OptionalTrackingConsent() {
     return subscribeToOptionalTrackingConsent(update);
   }, []);
 
-  if (!configuredOptionalTracking.enabled || consent?.status !== "pending") return null;
+  if (!configuredOptionalTracking.enabled || !consent) return null;
 
   const choose = (decision: OptionalTrackingDecision) => {
     setStorageError(false);
     if (saveOptionalTrackingConsent(decision)) {
       setConsent(readOptionalTrackingConsent());
+      setManaging(false);
       return;
     }
     if (decision === "denied") {
-      setConsent({ status: "denied", purposes: configuredOptionalTracking.purposes });
+      setConsent(readOptionalTrackingConsent());
+      setManaging(true);
+      setStorageError(true);
       return;
     }
     setStorageError(true);
   };
+
+  if (consent.status === "accepted" && !managing) {
+    return (
+      <aside aria-label="Privacy choices" className={styles.preference}>
+        <span>Privacy choices</span>
+        <button type="button" onClick={() => choose("denied")}>Turn off</button>
+      </aside>
+    );
+  }
+
+  if (consent.status === "denied" && !managing) {
+    return (
+      <button className={styles.preferenceTrigger} type="button" onClick={() => setManaging(true)}>
+        Privacy choices
+      </button>
+    );
+  }
 
   return (
     <aside
@@ -56,14 +77,16 @@ export function OptionalTrackingConsent() {
       className={styles.notice}
       role="dialog"
     >
-      <p id="optional-tracking-consent-copy">{consentQuestion()}</p>
+      <p id="optional-tracking-consent-copy">
+        {consent.status === "pending" ? consentQuestion() : "Optional tracking is off. You can allow it here or keep it off."}
+      </p>
       <div className={styles.controls}>
         <Link className={styles.privacyLink} href="/privacy">Privacy</Link>
         <button type="button" onClick={() => choose("accepted")}>Accept</button>
-        <button type="button" onClick={() => choose("denied")}>Deny</button>
+        <button type="button" onClick={() => choose("denied")}>{consent.status === "pending" ? "Deny" : "Keep off"}</button>
       </div>
       {storageError ? (
-        <p className={styles.error} role="status">Your browser could not save that choice. Optional tracking stays off.</p>
+        <p className={styles.error} role="status">Your browser could not save that choice. Optional tracking is off for this page.</p>
       ) : null}
     </aside>
   );

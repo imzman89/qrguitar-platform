@@ -33,7 +33,7 @@ function fixture(kind, options = {}) {
   let props = { className: 'transfer', bodyClassName: 'body', instrument: { qrCode: 'QRG-A' }, user: { email: 'owner@example.invalid' },
     allowBuyerCode: true, latestTransfer: options.latestTransfer === null ? undefined : { ...transfer, ...options.latestTransfer },
     isSessionCurrent: () => sessionCurrent, onTransferCreated: value => { props.latestTransfer = value; dirty = true; }, onTransferChanged() {} };
-  const f = { writes: 0, copies: [], requests: [], timers };
+  const f = { writes: 0, copies: [], requests: [], tracking: [], timers };
   const hooks = {
     useState(initial) { const index = cursor++; if (!(index in values)) values[index] = typeof initial === 'function' ? initial() : initial; return [values[index], next => { f.writes++; const value = typeof next === 'function' ? next(values[index]) : next; if (!Object.is(value, values[index])) { values[index] = value; dirty = true; } }]; },
     useRef(initial) { const index = cursor++; return values[index] ||= { current: initial }; },
@@ -44,6 +44,8 @@ function fixture(kind, options = {}) {
   const noop = () => null;
   const env = { ...hooks, window, BadgeCheck: noop, Copy: noop, LogIn: noop, Repeat2: noop, ShieldCheck: noop, Mail: noop, Nav: noop, Footer: noop, Link: 'a',
     useParams: () => params, transferStatusLabel: value => value.status, getSupabaseAccessToken: async () => 'synthetic-token', AbortController,
+    optionalTrackingProductEvents: { ownershipTransferCompleted: 'ownership_transfer_completed' },
+    dispatchOptionalTrackingProductEvent: async event => { f.tracking.push(event); return true; },
     setTimeout: (fn, ms) => { const id = ++timerId; timers.set(id, { fn, ms }); return id; }, clearTimeout: id => timers.delete(id),
     createBrowserSupabaseClient: () => ({ auth: {
       getSession: async () => ({ data: { session: { access_token: 'synthetic-token', user: { id: 'actor-a' } } } }),
@@ -141,9 +143,11 @@ function acceptanceHandlers(copy, fetch) {
   const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX), selected = [];
   function visit(node) { if (ts.isFunctionDeclaration(node) && ['acceptTransfer', 'copyProfileLink'].includes(node.name?.text)) selected.push(node.getText(ast)); ts.forEachChild(node, visit); }
   visit(ast); assert.equal(selected.length, 2);
-  const state = { message: '', accepting: false, transfer: { ...transfer }, permanentPath: '', loadError: false };
+  const state = { message: '', accepting: false, transfer: { ...transfer }, permanentPath: '', loadError: false, tracking: [] };
   const env = { transfer: state.transfer, accepting: false, authRevision: { current: 1 }, feedbackRevision: { current: 0 }, acceptMutation: { current: null },
-    window: { navigator: { clipboard: { writeText: copy } }, location: { origin: 'https://www.qrguitar.com' } }, profileHref: '/i/QRG-A', getSupabaseAccessToken: async () => 'synthetic-token', fetch };
+    window: { navigator: { clipboard: { writeText: copy } }, location: { origin: 'https://www.qrguitar.com' } }, profileHref: '/i/QRG-A', getSupabaseAccessToken: async () => 'synthetic-token', fetch,
+    optionalTrackingProductEvents: { ownershipTransferCompleted: 'ownership_transfer_completed' },
+    dispatchOptionalTrackingProductEvent: async event => { state.tracking.push(event); return true; } };
   for (const key of Object.keys(state)) env['set' + key[0].toUpperCase() + key.slice(1)] = value => { state[key] = value; };
   const js = ts.transpileModule(selected.join('\n'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
   return { state, ...new Function(...Object.keys(env), js + '\nreturn {acceptTransfer, copyProfileLink};')(...Object.values(env)) };
@@ -152,6 +156,7 @@ test('transfer: acceptance started after a copy retains its confirmed outcome', 
   const d = deferred(), h = acceptanceHandlers(() => d.promise, async () => Response.json({ ok: true, transfer: { ...transfer, status: 'accepted' }, message: 'Ownership accepted.' }));
   const copying = h.copyProfileLink(); await h.acceptTransfer(); assert.equal(h.state.message, 'Ownership accepted.');
   d.resolve(); await copying; assert.equal(h.state.message, 'Ownership accepted.'); assert.equal(h.state.transfer.status, 'accepted');
+  assert.deepEqual(h.state.tracking, [{ name: 'ownership_transfer_completed', properties: { method: 'email_link' } }]);
 });
 test('transfer: same-tick copy during acceptance cannot steal feedback or delay a subsequent copy', async () => {
   const d = deferred(); let copies = 0;

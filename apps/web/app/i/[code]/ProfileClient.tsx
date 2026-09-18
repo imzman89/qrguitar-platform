@@ -42,6 +42,7 @@ import { fetchOwnerProfile, OwnerProfileError } from "../../../lib/owner-profile
 import { resolveInstrumentPresentation } from "../../../lib/instrument-profile-contract";
 import { getContentValue } from "../../../lib/content-registry";
 import { publicProfileUrl } from "../../../lib/profile-url";
+import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "../../../lib/optional-tracking-consent";
 
 type ProfileTab = "overview" | "specs" | "timeline" | "service" | "ownership" | "media" | "repairs" | "documents";
 const PROFILE_FETCH_TIMEOUT_MS = 28000;
@@ -76,6 +77,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
   const code = codeParam || initialInstrument?.qrCode || "";
   const queryTab = searchParams.get("tab");
   const [currentUserEmail, setCurrentUserEmail] = useState("");
+  const trackedProfileView = useRef("");
 
   const switchTab = (tab: ProfileTab) => {
     setActiveTab(tab);
@@ -374,6 +376,15 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
 
   const instrumentQrCode = instrument?.qrCode;
   const shareUrl = instrumentQrCode ? publicProfileUrl(instrumentQrCode) : "";
+
+  useEffect(() => {
+    if (ownerPreview || !instrumentQrCode || !instrument || instrument.visibility === "private" || trackedProfileView.current === instrumentQrCode) return;
+    trackedProfileView.current = instrumentQrCode;
+    void dispatchOptionalTrackingProductEvent({
+      name: optionalTrackingProductEvents.publicProfileViewed,
+      properties: { visibility: instrument.visibility === "unlisted" ? "unlisted" : "public" }
+    });
+  }, [instrument, instrumentQrCode, ownerPreview]);
 
   useEffect(() => {
     const activeRef = copyActiveRef;

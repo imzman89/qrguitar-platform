@@ -17,30 +17,49 @@ the visitor is asked again.
 
 Provider code must enter through `activateOptionalTracking(purpose, loader)` from
 `apps/web/lib/optional-tracking-consent.ts`. The loader runs only after a verified
-`accepted` choice and at most once for that activation. Missing, denied, malformed,
-stale, or inaccessible browser storage never authorizes the loader. Do not import a
-provider from the root layout or include a remote script before this callback runs.
-Do not queue or replay events that happened before acceptance.
+`accepted` choice and at most once while that activation remains active. Missing,
+denied, malformed, stale, or inaccessible browser storage never authorizes the
+loader. Do not import a provider from the root layout or include a remote script
+before this callback runs. Do not queue or replay events that happened before
+acceptance.
 
-The consent change event is `qrguitar:optional-tracking-consent`. Future integration
-code can use `subscribeToOptionalTrackingConsent` rather than reading browser storage
-directly.
+The loader may return a cleanup function. QRguitar invokes that cleanup immediately
+when the visitor withdraws consent and when the activation is disposed. A provider
+that starts timers, listeners, automatic page views, storage, or network activity
+must return cleanup that stops those behaviors. When a loader returns no cleanup,
+the boundary can stop future QRguitar event dispatch but cannot claim that the
+provider itself was unloaded or that data already sent was erased.
+
+The consent change event is `qrguitar:optional-tracking-consent`. Integration code
+can use `subscribeToOptionalTrackingConsent` rather than reading browser storage
+directly. The compact `Privacy choices` control remains available whenever optional
+tracking is configured. An accepted visitor can turn tracking off in one step.
+
+Product events cross one provider-neutral boundary:
+
+- `dispatchOptionalTrackingProductEvent` validates a fixed event/property schema,
+  requires configured and accepted `analytics`, and rejects unexpected fields.
+- `subscribeToOptionalTrackingProductEvents` receives only the sanitized event
+  detail. A provider adapter should subscribe inside `activateOptionalTracking` and
+  return the unsubscribe/provider cleanup function.
+- Success events use one-way session dedupe markers. Raw account, Profile, transfer,
+  and payment identifiers are never included in event detail or dedupe storage.
 
 Use the exported `optionalTrackingProductEvents` constants for registration and
 conversion events:
 
 | Export | Event name | Emit only when |
 | --- | --- | --- |
-| `publicProfileViewed` | `public_profile_viewed` | A public Profile has rendered successfully; use only anonymous aggregate properties. |
-| `qrLandingViewed` | `qr_landing_viewed` | A public Profile rendered with a verified QR-origin marker defined by the future integration. Do not infer a scan from every Profile visit. |
-| `registrationCompleted` | `account_registration_completed` | The server-confirmed new account is available. |
-| `profileCreated` | `profile_creation_completed` | The Profile creation transaction has committed. |
-| `checkoutStarted` | `credit_checkout_started` | A checkout order or session was created successfully. |
-| `purchaseCompleted` | `credit_purchase_completed` | The server ledger has durably granted the purchased credits. |
-| `ownershipTransferCompleted` | `ownership_transfer_completed` | The authoritative ownership transfer transaction has committed. |
+| `publicProfileViewed` | `public_profile_viewed` | A public or unlisted Profile has rendered successfully; sends only `visibility`. |
+| `qrLandingViewed` | `qr_landing_viewed` | **Reserved and intentionally blocked.** No trustworthy QR-origin marker exists yet, so QRguitar does not emit this event or infer a scan from a Profile visit. |
+| `registrationCompleted` | `account_registration_completed` | Supabase confirms a genuinely new identity; sends only `confirmation` (`email_pending` or `session_ready`). |
+| `profileCreated` | `profile_creation_completed` | The Profile creation API confirms its committed record; sends only `visibility`. |
+| `checkoutStarted` | `credit_checkout_started` | The payment server confirms a valid checkout order; sends only the fixed pack's `credits` and `valueUsd`. |
+| `purchaseCompleted` | `credit_purchase_completed` | An authoritative status read shows the server ledger has fulfilled the order; sends only `credits` and `valueUsd`. |
+| `ownershipTransferCompleted` | `ownership_transfer_completed` | The transfer transaction confirms `accepted`; sends only `method` (`email_link`, `buyer_code`, or `review`). |
 
 Never emit a success event from a button click, optimistic screen, return URL, or
 client-only payment result. Do not send names, email addresses, authentication data,
-instrument serial numbers, QRguitar IDs, public Profile URLs, transfer tokens, or
-free-form text to an optional tracking provider. Define and review a minimal typed
-property schema before adding any event properties.
+instrument serial numbers, QRguitar IDs, public Profile URLs, transfer tokens,
+payment/order IDs, or free-form text to an optional tracking provider. Extend the
+typed runtime sanitizer and its tests before adding any event property.

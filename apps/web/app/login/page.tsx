@@ -10,6 +10,7 @@ import { getContentValue } from "../../lib/content-registry";
 import { useSiteContent } from "../../lib/use-site-content";
 
 import { safeAuthRedirect } from "../../lib/auth-redirect";
+import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "../../lib/optional-tracking-consent";
 
 type LoginMode = "login" | "register" | "reset";
 type AuthOperation = { epoch: number; actor: string; revision: number };
@@ -172,6 +173,12 @@ export default function LoginPage() {
         ? supabase.auth.signUp({ email: email.trim(), password, options: { data: { display_name: name.trim() }, emailRedirectTo: `${window.location.origin}${safeNext}` } })
         : supabase.auth.signInWithPassword({ email: email.trim(), password }));
       if (error) { if (sameActor(operation)) setStatus(cleanAuthError(error.message)); return; }
+      if (mode === "register" && data.user?.id && Array.isArray(data.user.identities) && data.user.identities.length > 0) {
+        void dispatchOptionalTrackingProductEvent({
+          name: optionalTrackingProductEvents.registrationCompleted,
+          properties: { confirmation: data.session ? "session_ready" : "email_pending" }
+        }, { dedupeKey: data.user.id });
+      }
       if (mode === "register" && !data.session) {
         if (sameActor(operation)) setStatus("Account created. Check your email to confirm it, then sign in.");
         return;

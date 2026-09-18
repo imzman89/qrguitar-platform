@@ -63,8 +63,15 @@ export default async function PrivacyPage() {
               </p>
               <p>
                 {configuredOptionalTracking.enabled
-                  ? "Configured optional analytics or advertising measurement stays off until you choose Accept. Deny keeps it off. QRguitar stores only your consent choice in your browser."
+                  ? "Configured optional analytics or advertising measurement stays off until you choose Accept. Deny keeps it off. A compact Privacy choices control remains available so you can turn optional tracking off at any time. QRguitar stores your consent choice and anonymous one-way session markers that prevent duplicate success counts; those markers contain no account, Profile, transfer, or payment identifiers."
                   : "Optional analytics and advertising are not currently configured. If either is added later, it will stay off until you choose Accept. Deny will keep it off, and QRguitar will store only your consent choice in your browser."}
+              </p>
+              <p>
+                When optional analytics is enabled and accepted, QRguitar can measure successful public Profile views,
+                registrations, Profile creation, checkout starts, completed credit purchases, and completed ownership
+                transfers using fixed anonymous properties. QRguitar does not label an ordinary Profile visit as a QR scan.
+                Names, email addresses, serial numbers, QRguitar IDs, Profile URLs, transfer tokens, and payment IDs are
+                excluded from optional event details.
               </p>
             </div>
             <div className="legal-card legal-final-note">

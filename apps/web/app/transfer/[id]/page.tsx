@@ -8,6 +8,7 @@ import { Footer } from "../../../components/Footer";
 import { Nav } from "../../../components/Nav";
 import { transferStatusLabel, type DemoTransfer } from "../../../lib/local-demo";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../../lib/supabase-browser";
+import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "../../../lib/optional-tracking-consent";
 
 type TransferPayload = {
   ok?: boolean;
@@ -143,6 +144,12 @@ export default function TransferClaimPage() {
 
       setTransfer(payload.transfer);
       setPermanentPath(payload.permanentPath || "");
+      if (payload.transfer.status === "accepted") {
+        void dispatchOptionalTrackingProductEvent({
+          name: optionalTrackingProductEvents.ownershipTransferCompleted,
+          properties: { method: "email_link" }
+        }, { dedupeKey: payload.transfer.id });
+      }
       if (feedbackRevision.current === feedback) setMessage(payload.message || "Ownership accepted. The permanent QRguitar URL stayed the same.");
     } catch {
       if (authRevision.current !== revision) return;

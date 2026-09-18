@@ -33,7 +33,7 @@ function text(tree) {
   return React.Children.toArray(tree.props?.children).map(text).join(' ');
 }
 function fixture(page, options = {}) {
-  const f = { actor: options.actor ?? (page === 'reset-password' ? 'a' : ''), clears: 0, writes: 0, navigations: [], calls: [], reads: 0, disposed: false };
+  const f = { actor: options.actor ?? (page === 'reset-password' ? 'a' : ''), clears: 0, writes: 0, navigations: [], calls: [], tracking: [], reads: 0, disposed: false };
   const states = [], effects = [], listeners = new Set(), timers = new Map();
   let cursor = 0, effectCursor = 0, dirty = true, tree, now = 0, timerId = 0;
   const setTimer = (callback, delay) => { const id = ++timerId; timers.set(id, { at: now + delay, callback }); return id; };
@@ -60,7 +60,7 @@ function fixture(page, options = {}) {
       if (options[name]) return options[name](f, ...values);
       if (name === 'signOut') { f.event(''); return { error: null }; }
       if (name === 'signInWithPassword') { f.event('a'); return { data: { session: session('a'), user: { id: 'a' } }, error: null }; }
-      if (name === 'signUp') return { data: { session: null, user: { id: 'a' } }, error: null };
+      if (name === 'signUp') return { data: { session: null, user: { id: 'a', identities: [{ id: 'email-a' }] } }, error: null };
       return { data: { user: { id: f.actor } }, error: null };
     };
   }
@@ -79,6 +79,10 @@ function fixture(page, options = {}) {
     },
     '../../lib/content-registry': { getContentValue: (_content, key) => key }, '../../lib/use-site-content': { useSiteContent: () => ({}) },
     '../../lib/auth-redirect': { safeAuthRedirect: value => value?.startsWith('/') && !value.startsWith('//') && !value.startsWith('/login') ? value : '/dashboard' },
+    '../../lib/optional-tracking-consent': {
+      optionalTrackingProductEvents: { registrationCompleted: 'account_registration_completed' },
+      dispatchOptionalTrackingProductEvent: async event => { f.tracking.push(event); return true; },
+    },
   };
   const Component = compile('app/' + page + '/page.tsx', imports, globals).default;
   f.render = () => {
@@ -198,7 +202,22 @@ test('login: sign-in followed by failed session verification shows an honest rec
 });
 test('login: registration without a session honestly asks for email confirmation', async () => {
   const f = fixture('login', { search: '?mode=register&next=%2Fcreate' }); await f.flush(); f.input('name', 'Synthetic owner'); f.fill(); f.submit(); await f.flush();
-  assert.match(f.text(), /Check your email to confirm/); assert.equal(f.navigations.length, 0); assert.equal(f.calls[0].values[0].options.emailRedirectTo, 'https://www.qrguitar.com/create'); f.dispose();
+  assert.match(f.text(), /Check your email to confirm/); assert.equal(f.navigations.length, 0); assert.equal(f.calls[0].values[0].options.emailRedirectTo, 'https://www.qrguitar.com/create');
+  assert.deepEqual(f.tracking, [{ name: 'account_registration_completed', properties: { confirmation: 'email_pending' } }]); f.dispose();
+});
+test('login: registration with a confirmed session records the session-ready outcome', async () => {
+  const f = fixture('login', { search: '?mode=register&next=%2Fcreate', signUp: async fixtureState => {
+    fixtureState.event('a');
+    return { data: { session: session('a'), user: { id: 'a', identities: [{ id: 'email-a' }] } }, error: null };
+  } });
+  await f.flush(); f.input('name', 'Synthetic owner'); f.fill(); f.submit(); await f.flush();
+  assert.deepEqual(f.tracking, [{ name: 'account_registration_completed', properties: { confirmation: 'session_ready' } }]);
+  assert.deepEqual(f.navigations, ['/create']); f.dispose();
+});
+test('login: existing-email obfuscation never records a new registration', async () => {
+  const f = fixture('login', { search: '?mode=register&next=%2Fcreate', signUp: async () => ({ data: { session: null, user: { id: 'opaque-user', identities: [] } }, error: null }) });
+  await f.flush(); f.input('name', 'Synthetic owner'); f.fill(); f.submit(); await f.flush();
+  assert.match(f.text(), /Check your email to confirm/); assert.deepEqual(f.tracking, []); assert.equal(f.navigations.length, 0); f.dispose();
 });
 test('login: reset email uses the intended return path and does not navigate', async () => {
   const f = fixture('login', { search: '?mode=reset&next=%2Faccount' }); await f.flush(); f.input('email', 'owner@example.test'); f.submit(); await f.flush();

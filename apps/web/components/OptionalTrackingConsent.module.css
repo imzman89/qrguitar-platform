@@ -64,10 +64,67 @@
   font-size: 0.75rem;
 }
 
+.preference,
+.preferenceTrigger {
+  position: fixed;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  z-index: 120;
+  min-height: 36px;
+  border: 1px solid #46534b;
+  border-radius: 999px;
+  color: #e8ece5;
+  background: #111817;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 28%);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.preference {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 5px 4px 12px;
+}
+
+.preference button,
+.preferenceTrigger {
+  cursor: pointer;
+}
+
+.preference button {
+  min-height: 28px;
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: #111817;
+  background: #e6af57;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.preferenceTrigger {
+  padding: 6px 12px;
+}
+
+.preference button:focus-visible,
+.preferenceTrigger:focus-visible {
+  outline: 3px solid #e6af57;
+  outline-offset: 2px;
+}
+
 @media (max-width: 460px) {
   .notice {
     right: max(10px, env(safe-area-inset-right));
     bottom: max(10px, env(safe-area-inset-bottom));
     width: calc(100vw - 20px);
+  }
+
+  .preference,
+  .preferenceTrigger {
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
   }
 }

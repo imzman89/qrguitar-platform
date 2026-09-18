@@ -2,11 +2,17 @@ import type { BillingAuth } from "./billing-client";
 import type { DirectOffer } from "./direct-payments";
 import type { PayPalOrder, PayPalPaymentsSnapshot } from "./paypal-payments";
 import { createPaymentSessionScope, directOrderId, PaymentRequestError } from "./direct-payments-client";
+import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "./optional-tracking-consent";
 
 const record = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const packs: Record<string, [number, number]> = { profile_1: [1200, 1], profile_10: [5000, 10], profile_25: [9900, 25] };
 export const paypalProviderOrderId = (value: unknown) => typeof value === "string" && /^[A-Z0-9]{5,64}$/.test(value) ? value : "";
 const terminal = (status: string) => ["fulfilled", "cancelled", "needs_review"].includes(status);
+function trackingPack(offerKey: string) {
+  const specification = packs[offerKey];
+  if (!specification) return null;
+  return { credits: specification[1] as 1 | 10 | 25, valueUsd: (specification[0] / 100) as 12 | 50 | 99 };
+}
 export type PayPalClientOrder = PayPalOrder;
 export type PayPalSnapshot = PayPalPaymentsSnapshot;
 export type PayPalIntent = { requestId: string; offerKey: string; orderId: string; paypalOrderId: string; approvalObserved: boolean };
@@ -106,6 +112,11 @@ export function createPayPalPaymentsClient(deps: {
         remember({ requestId: pending.requestId, offerKey: pending.offerKey, orderId: pending.orderId, paypalOrderId: pending.paypalOrderId || "", approvalObserved: Boolean(approved) });
       } else if (state.intent?.orderId && order?.orderId === state.intent.orderId && terminal(order.status)) remember(null);
       publish({ phase: "ready", snapshot, refreshing: false, uncertain: Boolean(state.intent && !snapshot.pendingOrder), ...(order && terminal(order.status) ? { checkoutOpen: false, message: "" } : {}) }); schedulePoll();
+      const completedPack = order?.status === "fulfilled" ? trackingPack(order.offerKey) : null;
+      if (order && completedPack) void dispatchOptionalTrackingProductEvent({
+        name: optionalTrackingProductEvents.purchaseCompleted,
+        properties: completedPack
+      }, { dedupeKey: order.orderId });
     } catch (error) { if (scope.live(lease) && attempt === loadRevision) { stopPolling(); publish({ phase: "error", snapshot: null, refreshing: false, message: error instanceof Error ? error.message : "Could not check payment status." }); } }
   }
   async function start() { const lease = scope.lease(); try { await scope.start(); } catch (error) { if (scope.live(lease)) publish({ phase: "error", message: error instanceof Error ? error.message : "Sign-in is unavailable." }); } }
@@ -125,6 +136,11 @@ export function createPayPalPaymentsClient(deps: {
         || (intent.orderId && orderId !== intent.orderId) || (intent.paypalOrderId && paypalOrderId !== intent.paypalOrderId)) throw new Error("The checkout response could not be verified. Check its status before trying again.");
       remember({ ...intent, orderId, paypalOrderId }); publish({ uncertain: false });
       if (terminal(String(status))) { resolved = true; throw new Error("This payment is already resolved. Check its status above."); }
+      const startedPack = trackingPack(intent.offerKey);
+      if (startedPack) void dispatchOptionalTrackingProductEvent({
+        name: optionalTrackingProductEvents.checkoutStarted,
+        properties: startedPack
+      }, { dedupeKey: orderId });
       return paypalOrderId;
     } catch (error) { if (scope.live(lease)) publish({ checkoutOpen: false, uncertain: !resolved && Boolean(state.intent), message: resolved ? "This payment is already resolved. Check its status above." : `${error instanceof Error ? error.message : "Checkout could not open."} Your checkout is saved for a safe retry.` }); throw error; }
     finally { if (lock === operation) { lock = undefined; if (scope.live(lease)) { publish({ busy: "" }); if (resolved) await load(); } } }

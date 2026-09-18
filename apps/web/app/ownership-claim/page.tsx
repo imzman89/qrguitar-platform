@@ -10,6 +10,7 @@ import { createBrowserSupabaseClient } from "../../lib/supabase-browser";
 import { getContentValue } from "../../lib/content-registry";
 import { useSiteContent } from "../../lib/use-site-content";
 import { createClaimSessionGuard, ClaimRequestError, claimReturnPath, confirmedClaimMutation, serializeClaimBody, readClaimEvidence, MAX_CLAIM_EVIDENCE_BYTES } from "../../lib/ownership-claim-client";
+import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "../../lib/optional-tracking-consent";
 
 type EvidenceDraft = { name: string; dataUrl: string; type: string; bytes: number };
 type ClaimType = "owner_transfer" | "store_purchase" | "legacy_review";
@@ -182,7 +183,14 @@ function OwnershipClaimContent() {
     });
   }
   async function redeemBuyerCode() {
-    await writeClaim("/api/transfers", "PATCH", { action: "redeem_code", code: buyerCode, orderReference: buyerOrderReference }, "buyer", () => { setComplete(true); setBuyerCode(""); });
+    await writeClaim("/api/transfers", "PATCH", { action: "redeem_code", code: buyerCode, orderReference: buyerOrderReference }, "buyer", (payload) => {
+      const transfer = payload.transfer as { id: string; status: "accepted" };
+      void dispatchOptionalTrackingProductEvent({
+        name: optionalTrackingProductEvents.ownershipTransferCompleted,
+        properties: { method: "buyer_code" }
+      }, { dedupeKey: transfer.id });
+      setComplete(true); setBuyerCode("");
+    });
   }
   async function resubmitEvidence(claimId: string) {
     await writeClaim("/api/ownership-claims", "PATCH", { id: claimId, action: "resubmit", evidence: responseEvidence }, "evidence", (payload) => {

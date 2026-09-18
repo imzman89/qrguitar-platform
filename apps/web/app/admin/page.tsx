@@ -28,6 +28,7 @@ import { Nav } from "../../components/Nav";
 import { defaultSiteSettings, mergeSiteSettings, normalizeBrandLogoKey, type EditableSiteSettings } from "../../lib/site-settings";
 import { getSupabaseAccessToken } from "../../lib/supabase-browser";
 import { ACCOUNT_DELETION_UNAVAILABLE } from "../../lib/admin-account-deletion-status";
+import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "../../lib/optional-tracking-consent";
 
 type OverviewPayload = {
   ok?: boolean;
@@ -805,9 +806,15 @@ export default function AdminPage() {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ id: claim.id, action, note: reason })
     });
-    const payload = await response.json().catch(() => ({}));
+    const payload = await response.json().catch(() => ({})) as { ok?: boolean; message?: string };
     setBusy("");
     setMessage(payload.message || (response.ok ? "Ownership request updated." : "Ownership request update failed."));
+    if (response.ok && payload.ok === true && action === "approve") {
+      void dispatchOptionalTrackingProductEvent({
+        name: optionalTrackingProductEvents.ownershipTransferCompleted,
+        properties: { method: "review" }
+      }, { dedupeKey: claim.id });
+    }
     if (response.ok) await loadAdmin();
   }
 

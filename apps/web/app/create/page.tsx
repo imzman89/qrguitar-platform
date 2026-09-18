@@ -17,6 +17,7 @@ import { makePreviewQrCode, qrCodeFromSerial } from "../../lib/qrguitar-id";
 import { canonicalInstrumentBrand, establishedInstrumentBrands } from "../../lib/instrument-brands";
 import { getContentValue } from "../../lib/content-registry";
 import { useSiteContent } from "../../lib/use-site-content";
+import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "../../lib/optional-tracking-consent";
 
 const documentTypeOptions = [
   "Receipt",
@@ -513,6 +514,10 @@ export default function CreatePage() {
       }
 
       const finalCode = result.qrCode || qrCode;
+      void dispatchOptionalTrackingProductEvent({
+        name: optionalTrackingProductEvents.profileCreated,
+        properties: { visibility: form.visibility as "public" | "private" | "unlisted" }
+      }, { dedupeKey: finalCode });
       setCreatedCode(finalCode);
       setMessage("QRguitar Profile created.");
 
