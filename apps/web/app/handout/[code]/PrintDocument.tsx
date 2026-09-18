@@ -26,6 +26,7 @@ type Props = {
   includeLogo: boolean;
   includeUrl: boolean;
   includeInstruction: boolean;
+  scanInstruction: string;
   note: string;
   service: Service | null;
 };
@@ -44,7 +45,7 @@ export function PrintDocument(props: Props) {
     {qr}
     <div className={styles.profileScanCopy}>
       <span className={styles.sectionLabel}>Permanent QRguitar Profile</span>
-      {props.includeInstruction ? <><h3>Scan to open this QRguitar Profile</h3><p>View verified details, photographs, specifications and history.</p></> : null}
+      {props.includeInstruction ? <><h3>{props.scanInstruction}</h3><p>View verified details, photographs, specifications and history.</p></> : null}
       {props.includeUrl ? <span className={styles.profileUrl}>{profileUrl}</span> : null}
     </div>
   </section>;

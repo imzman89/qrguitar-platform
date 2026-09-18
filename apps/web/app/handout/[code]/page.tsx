@@ -538,7 +538,8 @@ export default function HandoutPage() {
                       timeline={activeFormat.timeline && includeTimeline ? timelineEntries.slice(0, 2).map((entry) => `${formatServiceDate(entry)} - ${entry.title}`) : []}
                       badges={renderBadges()} photo={activeFormat.photo && includePhoto ? photoUrl : ""} photoFit={photoFit}
                       qrDataUrl={qrDataUrl} profileUrl={profileUrl}
-                      includeLogo={includeLogo} includeUrl={includeUrlLabel} includeInstruction={includeScanInstruction} note={printNote}
+                      includeLogo={includeLogo} includeUrl={includeUrlLabel} includeInstruction={includeScanInstruction}
+                      scanInstruction={getContentValue(content, "printWorkspace.scanInstruction")} note={printNote}
                       service={selectedService ? {
                         title: selectedService.title, date: formatServiceDate(selectedService),
                         category: selectedService.category || selectedService.eventType || "Service",

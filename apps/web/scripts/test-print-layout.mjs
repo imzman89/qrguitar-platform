@@ -85,7 +85,7 @@ test('readiness rejects missing images, still-loading photos, and overflowing pa
   assert.equal(printReadiness([{ complete: true, naturalWidth: 1200 }], false), 'Ready to print.');
 });
 
-const base = { mode: 'handout', size: 'letter', orientation: 'portrait', theme: 'light', title: 'Workshop Profile', code: 'QRG-123456', serial: '', facts: ['Example brand'], details: [], specifications: [], timeline: [], badges: null, photo: '/photo.jpg', photoFit: 'contain', qrDataUrl: 'data:image/png;base64,test', profileUrl: 'https://www.qrguitar.com/i/QRG-123456', includeLogo: true, includeUrl: true, includeInstruction: true, note: '', service: null };
+const base = { mode: 'handout', size: 'letter', orientation: 'portrait', theme: 'light', title: 'Workshop Profile', code: 'QRG-123456', serial: '', facts: ['Example brand'], details: [], specifications: [], timeline: [], badges: null, photo: '/photo.jpg', photoFit: 'contain', qrDataUrl: 'data:image/png;base64,test', profileUrl: 'https://www.qrguitar.com/i/QRG-123456', includeLogo: true, includeUrl: true, includeInstruction: true, scanInstruction: 'Scan to open the permanent QRguitar Profile.', note: '', service: null };
 const render = overrides => renderToStaticMarkup(React.createElement(PrintDocument, { ...base, ...overrides }));
 for (const mode of ['label', 'hangtag', 'handout', 'service']) test(`${mode}: only one selected document, one title, and the permanent QR destination`, () => {
   const html = render({ mode });
@@ -104,10 +104,14 @@ test('Profile Sheet presents one integrated permanent-profile scan band', () => 
   const html = render({ mode: 'handout', serial: 'VISIBLE-123' });
   assert.equal((html.match(/class="profileScan"/g) || []).length, 1);
   assert.ok(html.includes('Permanent QRguitar Profile'));
-  assert.ok(html.includes('Scan to open this QRguitar Profile'));
+  assert.ok(html.includes('Scan to open the permanent QRguitar Profile.'));
   assert.equal((html.match(/QR code linking to https:\/\/www\.qrguitar\.com\/i\/QRG-123456/g) || []).length, 1);
   assert.ok(html.includes('class="profileIdentity"'));
   assert.doesNotMatch(html, /\binstrument\b/i);
+});
+
+test('Profile Sheet renders the published scan instruction', () => {
+  assert.ok(render({ mode: 'handout', scanInstruction: 'Open this Profile with your camera.' }).includes('Open this Profile with your camera.'));
 });
 
 test('every print format uses the canonical logo in the matching paper appearance', () => {

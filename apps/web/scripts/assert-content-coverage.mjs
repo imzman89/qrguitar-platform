@@ -74,8 +74,11 @@ for (const pageKey of ["home", "howItWorks", "catalog", "installers", "contact",
 for (const blockId of ["how-step-create", "how-feature-identity", "how-role-player", "how-faq-serial"]) {
   if (!settings.includes(blockId)) throw new Error(`How It Works composition is missing ${blockId}.`);
 }
-for (const marker of ["contentRegistry", "Search content", "Draft", "Published", "Revision history", "Advanced JSON"]) {
+for (const marker of ["contentRegistry", "Draft", "Published", "Revision history", "Advanced JSON"]) {
   if (!siteEditor.includes(marker)) throw new Error(`Content Studio is missing ${marker}.`);
+}
+if (!siteEditor.includes("cms-tree-search") || !siteEditor.includes('aria-label={`Search ${selected.page} content`}')) {
+  throw new Error("Content Studio is missing its page-scoped accessible content search.");
 }
 for (const key of [
   "global.navigation.dashboard", "global.footer.description", "home.hero.headline", "howItWorks.hero.headline",
