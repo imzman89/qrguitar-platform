@@ -443,8 +443,17 @@ export function normalizeEditorialComposition(value?: Partial<EditorialCompositi
 }
 
 function isSafeEditorialUrl(value: string) {
-  if (!value.trim()) return true;
-  return /^(\/[^/]|https?:\/\/|mailto:)/i.test(value.trim());
+  const candidate = value.trim();
+  if (!candidate) return true;
+  if (candidate.length > 2048 || /[\u0000-\u001f\u007f\\]/.test(candidate)) return false;
+  if (candidate.startsWith("/")) return !candidate.startsWith("//");
+  try {
+    const parsed = new URL(candidate);
+    if (parsed.protocol === "mailto:") return Boolean(parsed.pathname) && !parsed.username && !parsed.password;
+    return ["https:", "http:"].includes(parsed.protocol) && Boolean(parsed.hostname) && !parsed.username && !parsed.password;
+  } catch {
+    return false;
+  }
 }
 
 function containsUnsafeEditorialMarkup(value: string) {
@@ -479,8 +488,9 @@ export function validateEditorialComposition(composition: EditorialComposition) 
     }
     for (const section of page.sections) {
       const sectionPath = `${path}.${section.id || "unknown"}`;
-      if (!section.id.trim() || !section.name.trim()) errors[sectionPath] = "Section ID and name are required.";
-      if (containsUnsafeEditorialMarkup(section.name)) errors[sectionPath] = "Unsafe markup is not allowed.";
+      if (!section.id.trim()) errors[sectionPath] = "Section ID is required.";
+      if (!section.name.trim()) errors[`${sectionPath}.name`] = "Section name is required.";
+      if (containsUnsafeEditorialMarkup(section.name)) errors[`${sectionPath}.name`] = "Unsafe markup is not allowed.";
       if (section.blocks.length > 12) errors[`${sectionPath}.blocks`] = "Use no more than 12 blocks in one section.";
       const blockIds = section.blocks.map((block) => block.id);
       if (new Set(blockIds).size !== blockIds.length) errors[`${sectionPath}.blocks`] = "Block IDs must be unique.";
@@ -493,11 +503,13 @@ export function validateEditorialComposition(composition: EditorialComposition) 
       }
       for (const block of section.blocks) {
         const blockPath = `${sectionPath}.${block.id || "unknown"}`;
-        if (!block.id.trim() || !block.name.trim() || !block.title.trim()) errors[blockPath] = "Block ID, semantic name, and title are required.";
+        if (!block.id.trim()) errors[blockPath] = "Block ID is required.";
+        if (!block.name.trim()) errors[`${blockPath}.name`] = "Item name is required.";
+        if (!block.title.trim()) errors[`${blockPath}.title`] = "Title is required.";
         if (block.icon && !editorialIconAllowlist.includes(block.icon)) errors[`${blockPath}.icon`] = "Choose an approved icon.";
         if (block.ctaUrl && !isSafeEditorialUrl(block.ctaUrl)) errors[`${blockPath}.ctaUrl`] = "Use a local, HTTPS, HTTP, or mailto URL.";
-        if ([block.name, block.title, block.body, block.label || "", block.ctaLabel || "", block.ctaUrl || "", ...(block.items || [])].some(containsUnsafeEditorialMarkup)) {
-          errors[blockPath] = "Unsafe HTML or script content is not allowed.";
+        for (const [field, value] of Object.entries({ name: block.name, title: block.title, body: block.body, label: block.label || "", ctaLabel: block.ctaLabel || "", ctaUrl: block.ctaUrl || "", items: (block.items || []).join("\n") })) {
+          if (containsUnsafeEditorialMarkup(value)) errors[`${blockPath}.${field}`] = "Unsafe HTML or script content is not allowed.";
         }
       }
     }
@@ -796,6 +808,29 @@ export function validateBrandLogoEntries(value: unknown) {
       errors[`brandLogos.${key || brand || "unknown"}`] = "Use an HTTPS URL or a site-relative path beginning with one slash.";
     }
   }
+  return errors;
+}
+
+export function siteColorContrastRatio(foreground: string, background: string) {
+  const luminance = (value: string) => {
+    const hex = value.trim().replace(/^#/, "");
+    if (!/^[0-9a-f]{6}$/i.test(hex)) return null;
+    const channels = [0, 2, 4].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255)
+      .map((channel) => channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  };
+  const first = luminance(foreground), second = luminance(background);
+  return first === null || second === null ? null : (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+}
+
+export function validateSiteThemeContrast(colors: EditableSiteSettings["colors"]) {
+  const errors: Record<string, string> = {};
+  const text = siteColorContrastRatio(colors.text, colors.background);
+  const action = siteColorContrastRatio(colors.background, colors.cream);
+  const accent = siteColorContrastRatio(colors.gold, colors.background);
+  if (text !== null && text < 4.5) errors["colors.text"] = "Primary text needs at least 4.5:1 contrast against the background.";
+  if (action !== null && action < 4.5) errors["colors.cream"] = "Primary actions need at least 4.5:1 contrast against the background.";
+  if (accent !== null && accent < 3) errors["colors.gold"] = "Accent text needs at least 3:1 contrast against the background.";
   return errors;
 }
 

@@ -2,6 +2,60 @@ export type EditorVersions = { publishedVersion: string; draftVersion: string };
 export type EditorMutationPayload = Partial<EditorVersions> & { ok?: boolean; committed?: boolean; uncertain?: boolean; conflict?: boolean; superseded?: boolean; requestId?: string; message?: string; errors?: Record<string, string>; [key: string]: unknown };
 export type EditorAttempt = { body: string; localSnapshot: string; uncertain?: boolean };
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+type EditorEntry = { area: string; page: string; section: string; key: string; label: string; help: string };
+type EditorSelection = { area: string; page: string };
+type EditorLoadPayload = { ok?: boolean; editorActorId?: unknown; message?: string };
+type FetchEditorState = (input: RequestInfo | URL, init?: RequestInit) => Promise<Pick<Response, "ok" | "status" | "json">>;
+
+export class EditorLoadError extends Error {
+  constructor(message: string, public kind: "authorization" | "unavailable") { super(message); }
+}
+
+export async function loadSiteEditorState<T extends EditorLoadPayload>(
+  getAccessToken: () => Promise<string | null>,
+  fetchEditorState: FetchEditorState = fetch
+) {
+  let token: string | null;
+  try {
+    token = await getAccessToken();
+  } catch {
+    throw new EditorLoadError("Could not verify your admin session. Check your connection and retry.", "unavailable");
+  }
+  if (!token) throw new EditorLoadError("Sign in with an authorized admin account.", "authorization");
+
+  let response: Awaited<ReturnType<FetchEditorState>>;
+  try {
+    response = await fetchEditorState("/api/site-editor", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+  } catch {
+    throw new EditorLoadError("Could not reach Site Editor. Check your connection and retry.", "unavailable");
+  }
+  const payload = await response.json().catch(() => ({})) as T;
+  if (!response.ok || payload.ok !== true || typeof payload.editorActorId !== "string") {
+    const authorization = response.status === 401 || response.status === 403;
+    throw new EditorLoadError(
+      payload.message || (authorization ? "Admin access is required." : "Could not load Site Editor state. Retry when the service is available."),
+      authorization ? "authorization" : "unavailable"
+    );
+  }
+  return payload;
+}
+
+export function selectEditorEntries<T extends EditorEntry>(entries: T[], selection: EditorSelection, query: string) {
+  const currentPage = entries.filter((entry) => entry.area === selection.area && entry.page === selection.page);
+  const search = query.trim().toLowerCase();
+  const results = search
+    ? currentPage.filter((entry) => `${entry.key} ${entry.section} ${entry.label} ${entry.help}`.toLowerCase().includes(search))
+    : currentPage;
+  return { currentPage, results };
+}
+
+export function selectCompleteSectionSchema<T extends Pick<EditorEntry, "section">>(currentPage: T[], results: T[], openSection: string) {
+  const section = currentPage.some((entry) => entry.section === openSection)
+    ? openSection
+    : results[0]?.section || currentPage[0]?.section || "";
+  return currentPage.filter((entry) => entry.section === section);
+}
+
 export class EditorMutationError extends Error {
   constructor(message: string, public payload: EditorMutationPayload = {}, public uncertain = false) { super(message); }
 }

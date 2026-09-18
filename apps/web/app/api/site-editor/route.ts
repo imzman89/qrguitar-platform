@@ -3,7 +3,7 @@ import { revalidatePath, unstable_noStore as noStore } from "next/cache";
 import { NextResponse } from "next/server";
 import { getAdminContext, readAdminEmailList } from "../../../lib/admin-auth";
 import { validateContentValues } from "../../../lib/content-registry";
-import { mergeSiteSettings, publishedSiteSettingsKey, validateBrandLogoEntries, validateEditorialComposition, type EditableSiteSettings } from "../../../lib/site-settings";
+import { mergeSiteSettings, publishedSiteSettingsKey, validateBrandLogoEntries, validateEditorialComposition, validateSiteThemeContrast, type EditableSiteSettings } from "../../../lib/site-settings";
 import { createServerSupabaseClientWithTimeout } from "../../../lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -70,8 +70,13 @@ function validHex(value: string) {
   return /^#[0-9a-f]{6}$/i.test(value);
 }
 
-function validateSettings(settings: EditableSiteSettings, rawSettings?: Partial<EditableSiteSettings>) {
-  const errors = { ...validateBrandLogoEntries(rawSettings?.brandLogos), ...validateContentValues(settings.content), ...validateEditorialComposition(settings.composition) };
+function validateSettings(settings: EditableSiteSettings, rawSettings?: Partial<EditableSiteSettings>, publishing = false) {
+  const errors = {
+    ...validateBrandLogoEntries(rawSettings?.brandLogos),
+    ...validateContentValues(settings.content),
+    ...validateEditorialComposition(settings.composition),
+    ...(publishing ? validateSiteThemeContrast(settings.colors) : {})
+  };
   for (const [key, value] of Object.entries(settings.colors)) {
     if (!validHex(value)) errors[`colors.${key}`] = "Use a six-digit hex color.";
   }
@@ -147,7 +152,7 @@ export async function PUT(request: Request) {
     settings = mergeSiteSettings(rawSettings);
   }
   if (settings) {
-    const errors = validateSettings(settings, rawSettings);
+    const errors = validateSettings(settings, rawSettings, action === "publish");
     if (Object.keys(errors).length) return json({ ok: false, uncertain: false, message: "Fix the highlighted content before saving.", errors }, { status: 400 });
   }
   try {

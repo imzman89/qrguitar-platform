@@ -41,6 +41,16 @@ export async function POST(request: Request) {
   }
 
   const fields = body.fields || {};
+  const fieldKeys = Object.keys(fields);
+  const firstEntry = contentRegistryByKey.get(fieldKeys[0] || "");
+  const templatePrefix = firstEntry?.area === "Emails" ? firstEntry.key.slice(0, firstEntry.key.lastIndexOf(".")) : "";
+  const templateEntries = templatePrefix
+    ? Array.from(contentRegistryByKey.values()).filter((entry) => entry.area === "Emails" && entry.key.startsWith(`${templatePrefix}.`))
+    : [];
+  if (!templatePrefix || fieldKeys.length !== templateEntries.length || templateEntries.some((entry) => !(entry.key in fields))
+    || fieldKeys.some((key) => !key.startsWith(`${templatePrefix}.`))) {
+    return json({ ok: false, message: "Choose one complete email template before sending a test." }, 400);
+  }
   const values: Record<string, string> = {};
   for (const [key, rawValue] of Object.entries(fields)) {
     const entry = contentRegistryByKey.get(key);
@@ -76,7 +86,7 @@ export async function POST(request: Request) {
       actorEmail: admin.email,
       action: result.ok ? "site_email_test_sent" : "site_email_test_failed",
       targetType: "email_template",
-      targetId: Object.keys(values)[0]?.split(".").slice(0, 2).join(".") || "email",
+      targetId: templatePrefix,
       reason: "Authenticated Content Studio test",
       metadata: { status: result.status }
     });

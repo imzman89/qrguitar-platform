@@ -104,7 +104,7 @@ function dispatch(name, chain, e = event()) {
 function fixture(options = {}) {
   const changes = [], confirmations = [], values = [], effects = [];
   let cursor = 0, effectCursor = 0, dirty = true, tree;
-  let props = { pageKey: options.pageKey || "home", sections: options.sections || defaults(options.pageKey || "home") };
+  let props = { pageKey: options.pageKey || "home", sections: options.sections || defaults(options.pageKey || "home"), errors: options.errors || {} };
   const hooks = {
     useState(initial) {
       const index = cursor++;
@@ -138,6 +138,7 @@ function fixture(options = {}) {
     assert.ok(article, "section " + id + " exists"); return article;
   }
   const openButton = id => nodes(section(id), node => node.props?.className === "cms-section-open")[0];
+  const dragHandle = id => nodes(section(id), node => node.type === "button" && node.props?.className === "cms-section-drag-handle")[0];
   function open(id) { const button = openButton(id); if (!button.props["aria-expanded"]) button.props.onClick(); render(); }
   function row(sectionId, blockId) {
     const found = nodes(section(sectionId), node => node.type === "button" && node.props?.draggable && String(node.key).endsWith("$" + blockId))[0];
@@ -152,7 +153,7 @@ function fixture(options = {}) {
     assert.ok(found, label + " action exists"); return found;
   }
   return {
-    render, section, row, open, openButton, byLabel, action, changes, confirmations,
+    render, section, row, open, openButton, dragHandle, byLabel, action, changes, confirmations,
     get sections() { return props.sections; },
     setProps(patch) { props = { ...props, ...patch }; dirty = true; render(); },
     blockOrder(id) { return props.sections.find(section => section.id === id).blocks.map(block => block.id); },
@@ -183,16 +184,23 @@ test("a block dropped on another section header cannot move either section", () 
 
 test("a section drag reorders sections once without changing blocks", () => {
   const f = fixture(), beforeBlocks = f.sections.map(section => [section.id, section.blocks]);
-  const e = dispatch("onDragStart", [f.section("lifecycle")]);
+  const e = dispatch("onDragStart", [f.dragHandle("lifecycle"), f.section("lifecycle")]);
   dispatch("onDrop", [f.section("anatomy")], e);
   assert.equal(f.changes.length, 1);
   assert.deepEqual(ids(f.sections).slice(0, 4), ["hero", "archive", "anatomy", "lifecycle"]);
   for (const [id, blocks] of beforeBlocks) assert.deepEqual(f.sections.find(section => section.id === id).blocks, blocks);
 });
 
+test("the visible section handle supports keyboard reordering as a drag fallback", () => {
+  const f = fixture(); let prevented = false;
+  f.dragHandle("lifecycle").props.onKeyDown({ key: "ArrowUp", preventDefault() { prevented = true; } });
+  assert.equal(prevented, true); assert.equal(f.changes.length, 1);
+  assert.deepEqual(ids(f.sections).slice(0, 4), ["hero", "lifecycle", "archive", "anatomy"]);
+});
+
 test("section drag dropped on a content row does not become a block operation", () => {
   const f = fixture(); f.open("lifecycle");
-  const e = dispatch("onDragStart", [f.section("anatomy")]);
+  const e = dispatch("onDragStart", [f.dragHandle("anatomy"), f.section("anatomy")]);
   dispatch("onDrop", [f.row("lifecycle", "home-step-history"), f.section("lifecycle")], e);
   assert.equal(f.changes.length, 0);
 });
@@ -238,7 +246,7 @@ test("a retired drag payload cannot be replayed or used by another editor", () =
 
 test("a page change rejects old section identities and resets the open section", () => {
   const f = fixture(); f.open("lifecycle");
-  const e = dispatch("onDragStart", [f.section("lifecycle")]);
+  const e = dispatch("onDragStart", [f.dragHandle("lifecycle"), f.section("lifecycle")]);
   f.setProps({ pageKey: "howItWorks", sections: defaults("howItWorks") });
   dispatch("onDrop", [f.section("features")], e);
   assert.equal(f.changes.length, 0);
@@ -257,7 +265,7 @@ test("a replacement draft invalidates a pending drag even when page and IDs matc
 
 test("drag data read failure is ignored without changing or crashing the draft", () => {
   const f = fixture();
-  const e = dispatch("onDragStart", [f.section("lifecycle")]);
+  const e = dispatch("onDragStart", [f.dragHandle("lifecycle"), f.section("lifecycle")]);
   e.dataTransfer.getData = () => { throw new Error("Unavailable"); };
   assert.doesNotThrow(() => dispatch("onDrop", [f.section("anatomy")], e));
   assert.equal(f.changes.length, 0);
@@ -266,11 +274,11 @@ test("drag data read failure is ignored without changing or crashing the draft",
 test("required sections cannot move, be targets, or be crossed", () => {
   const sections = defaults("home"); sections[3].locked = true;
   const f = fixture({ sections });
-  let e = dispatch("onDragStart", [f.section("hero")]);
+  let e = dispatch("onDragStart", [f.dragHandle("hero"), f.section("hero")]);
   dispatch("onDrop", [f.section("lifecycle")], e);
-  e = dispatch("onDragStart", [f.section("lifecycle")]);
+  e = dispatch("onDragStart", [f.dragHandle("lifecycle"), f.section("lifecycle")]);
   dispatch("onDrop", [f.section("hero")], e);
-  e = dispatch("onDragStart", [f.section("lifecycle")]);
+  e = dispatch("onDragStart", [f.dragHandle("lifecycle"), f.section("lifecycle")]);
   dispatch("onDrop", [f.section("roles")], e);
   f.byLabel("Move Profile lifecycle down").props.onClick();
   assert.equal(f.changes.length, 0); assert.deepEqual(ids(f.sections), ids(sections));
@@ -383,4 +391,35 @@ test("normalization anchors every default locked slot and retains hidden/protect
   const errors = isolated.validateEditorialComposition(result);
   assert.match(errors["composition.home.hero"], /required section/);
   assert.match(errors["composition.home.lifecycle.blocks"], /Protected block/);
+});
+
+test("composition validation identifies and associates blank names, titles, and unsafe CTA URLs", () => {
+  const sections = defaults("home"), roles = sections.find(section => section.id === "roles"), block = roles.blocks[0];
+  roles.name = ""; block.name = ""; block.title = ""; block.ctaUrl = "javascript:alert(1)";
+  const composition = structuredClone(settings.defaultEditorialComposition); composition.home = { sections };
+  const errors = settings.validateEditorialComposition(composition);
+  assert.match(errors["composition.home.roles.name"], /name is required/i);
+  assert.match(errors[`composition.home.roles.${block.id}.name`], /name is required/i);
+  assert.match(errors[`composition.home.roles.${block.id}.title`], /title is required/i);
+  assert.match(errors[`composition.home.roles.${block.id}.ctaUrl`], /URL|script content/i);
+  const f = fixture({ sections, errors }); f.open("roles"); f.row("roles", block.id).props.onClick();
+  const invalidInputs = nodes(f.section("roles"), node => ["input", "textarea", "select"].includes(node.type) && node.props?.["aria-invalid"] === true);
+  assert.ok(invalidInputs.length >= 4);
+  for (const input of invalidInputs.filter(node => node.props["aria-describedby"])) {
+    assert.equal(nodes(f.section("roles"), node => node.props?.id === input.props["aria-describedby"]).length, 1);
+  }
+});
+
+for (const unsafe of ["javascript:alert(1)", "//attacker.example/path", "/safe\\escape", "https://user:secret@example.test/path", "data:text/html,bad"]) {
+  test(`composition rejects unsafe CTA URL ${unsafe}`, () => {
+    const composition = structuredClone(settings.defaultEditorialComposition);
+    const block = composition.home.sections.find(section => section.id === "roles").blocks[0]; block.ctaUrl = unsafe;
+    assert.ok(settings.validateEditorialComposition(composition)[`composition.home.roles.${block.id}.ctaUrl`]);
+  });
+}
+
+test("theme validation enforces the 3:1 accent publishing threshold", () => {
+  const colors = { ...settings.defaultSiteSettings.colors, background: "#000000", gold: "#555555" };
+  assert.match(settings.validateSiteThemeContrast(colors)["colors.gold"], /3:1/);
+  assert.equal(settings.validateSiteThemeContrast({ ...colors, gold: "#767676" })["colors.gold"], undefined);
 });

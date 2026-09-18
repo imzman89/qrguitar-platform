@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type DragEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { ArrowDown, ArrowUp, ChevronDown, Copy, Eye, EyeOff, GripVertical, Plus, RotateCcw, Trash2 } from "lucide-react";
 import {
   defaultEditorialComposition,
@@ -14,6 +14,7 @@ import {
 type Props = {
   pageKey: EditorialPageKey;
   sections: EditorialSection[];
+  errors?: Record<string, string>;
   onChange: (sections: EditorialSection[]) => void;
 };
 
@@ -34,7 +35,15 @@ function newBlockId(pageKey: EditorialPageKey, sectionId: string) {
   return `${pageKey}-${sectionId}-${unique}`;
 }
 
-export function SiteCompositionEditor({ pageKey, sections, onChange }: Props) {
+function validationId(path: string) {
+  return `composition-error-${path.replace(/[^a-z0-9]+/gi, "-")}`;
+}
+
+function controlId(path: string) {
+  return `composition-input-${path.replace(/[^a-z0-9]+/gi, "-")}`;
+}
+
+export function SiteCompositionEditor({ pageKey, sections, errors = {}, onChange }: Props) {
   const defaults = defaultEditorialComposition[pageKey].sections;
   const [openSectionId, setOpenSectionId] = useState(sections[0]?.id || "");
   const [focusedBlockId, setFocusedBlockId] = useState(sections[0]?.blocks[0]?.id || "");
@@ -93,11 +102,17 @@ export function SiteCompositionEditor({ pageKey, sections, onChange }: Props) {
     drag.current = null;
     const section = sections.find((item) => item.id === sectionId);
     const kind = blockId === undefined ? "section" : "block";
-    if (!section || (kind === "section" && (section.locked || event.target !== event.currentTarget))) return;
+    if (!section || (kind === "section" && section.locked)) return;
     const payload = JSON.stringify({ pageKey, sectionId, blockId, sequence: ++dragSequence.current });
     drag.current = { kind, pageKey, sectionId, blockId, sections, payload };
     event.dataTransfer.setData(dragMimeTypes[kind], payload);
     event.dataTransfer.effectAllowed = "move";
+  }
+
+  function moveSectionWithKeyboard(event: KeyboardEvent<HTMLButtonElement>, sectionIndex: number) {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    event.preventDefault();
+    reorderSection(sectionIndex, sectionIndex + (event.key === "ArrowUp" ? -1 : 1));
   }
 
   function currentDrag(kind: "section" | "block") {
@@ -185,17 +200,33 @@ export function SiteCompositionEditor({ pageKey, sections, onChange }: Props) {
           const isOpen = section.id === openSectionId;
           const focusedBlockIndex = Math.max(0, section.blocks.findIndex((block) => block.id === focusedBlockId));
           const focusedBlock = section.blocks[focusedBlockIndex];
+          const sectionPath = `composition.${pageKey}.${section.id || "unknown"}`;
+          const sectionNameError = errors[`${sectionPath}.name`];
+          const sectionStructureError = errors[sectionPath] || errors[`${sectionPath}.blocks`];
+          const hasSectionError = Object.entries(errors).some(([key, value]) => Boolean(value) && (key === sectionPath || key.startsWith(`${sectionPath}.`)));
+          const focusedBlockPath = focusedBlock ? `${sectionPath}.${focusedBlock.id || "unknown"}` : "";
+          const focusedError = (field: string) => errors[`${focusedBlockPath}.${field}`] || (field === "name" || field === "title" ? errors[focusedBlockPath] : "");
           return (
           <article
-            className={`${section.visible ? "cms-section-editor" : "cms-section-editor is-hidden"}${isOpen ? " is-open" : ""}`}
+            className={`${section.visible ? "cms-section-editor" : "cms-section-editor is-hidden"}${isOpen ? " is-open" : ""}${hasSectionError ? " has-error" : ""}`}
             key={section.id}
-            draggable={!section.locked}
-            onDragStart={(event) => beginDrag(event, section.id)}
-            onDragEnd={() => { drag.current = null; }}
             onDragOver={(event) => dragOver(event, "section", section)}
             onDrop={(event) => drop(event, "section", sectionIndex)}
           >
             <div className="cms-section-editor-head">
+              <button
+                type="button"
+                className="cms-section-drag-handle"
+                draggable={!section.locked}
+                disabled={section.locked}
+                aria-label={`Drag ${section.name || "unnamed section"} to reorder`}
+                title={section.locked ? "This section stays in its required position." : "Drag to reorder. Use the arrow keys or move buttons for keyboard control."}
+                onDragStart={(event) => beginDrag(event, section.id)}
+                onDragEnd={() => { drag.current = null; }}
+                onKeyDown={(event) => moveSectionWithKeyboard(event, sectionIndex)}
+              >
+                <GripVertical aria-hidden="true" size={18} />
+              </button>
               <button
                 type="button"
                 className="cms-section-open"
@@ -205,8 +236,7 @@ export function SiteCompositionEditor({ pageKey, sections, onChange }: Props) {
                   if (!focusedBlockId && section.blocks[0]) setFocusedBlockId(section.blocks[0].id);
                 }}
               >
-                <GripVertical aria-hidden="true" className={section.locked ? "is-locked" : ""} size={18} />
-                <span><strong>{section.name}</strong><small>{section.blocks.length ? `${section.blocks.length} content ${section.blocks.length === 1 ? "item" : "items"}` : "Page copy and layout"}</small></span>
+                <span><strong>{section.name || "Unnamed section"}</strong><small>{section.blocks.length ? `${section.blocks.length} content ${section.blocks.length === 1 ? "item" : "items"}` : "Page copy and layout"}</small></span>
                 <span className={section.visible ? "cms-visibility is-visible" : "cms-visibility"}>{section.visible ? "Shown" : "Hidden"}</span>
                 <ChevronDown className={isOpen ? "is-open" : ""} size={17} />
               </button>
@@ -218,13 +248,29 @@ export function SiteCompositionEditor({ pageKey, sections, onChange }: Props) {
               </div>
             </div>
 
+            {isOpen ? <div className="cms-section-fields">
+              <label className={sectionNameError ? "has-error" : ""} htmlFor={`composition-${pageKey}-${section.id}-name`}>
+                Section name
+                <input
+                  id={`composition-${pageKey}-${section.id}-name`}
+                  value={section.name}
+                  maxLength={100}
+                  aria-invalid={Boolean(sectionNameError)}
+                  aria-describedby={sectionNameError ? validationId(`${sectionPath}.name`) : undefined}
+                  onChange={(event) => updateSection(sectionIndex, { name: event.target.value })}
+                />
+                {sectionNameError ? <small id={validationId(`${sectionPath}.name`)} className="cms-validation-error" role="alert">{sectionNameError}</small> : null}
+              </label>
+              {sectionStructureError ? <p id={validationId(sectionPath)} className="cms-validation-error" role="alert">{sectionStructureError}</p> : null}
+            </div> : null}
+
             {isOpen && section.blocks.length ? (
               <div className="cms-block-focus-layout">
                 <div className="cms-block-list" role="list" aria-label={`${section.name} content items`}>
                   {section.blocks.map((block, blockIndex) => (
                   <button
                     type="button"
-                    className={`${block.visible ? "cms-block-row" : "cms-block-row is-hidden"}${focusedBlock?.id === block.id ? " is-active" : ""}`}
+                    className={`${block.visible ? "cms-block-row" : "cms-block-row is-hidden"}${focusedBlock?.id === block.id ? " is-active" : ""}${Object.entries(errors).some(([key, value]) => Boolean(value) && key.startsWith(`${sectionPath}.${block.id || "unknown"}`)) ? " has-error" : ""}`}
                     key={block.id}
                     draggable
                     onDragStart={(event) => beginDrag(event, section.id, block.id)}
@@ -234,15 +280,15 @@ export function SiteCompositionEditor({ pageKey, sections, onChange }: Props) {
                     onClick={() => setFocusedBlockId(block.id)}
                   >
                     <GripVertical size={15} aria-hidden="true" />
-                    <span><strong>{block.name}</strong><small>{block.title}</small></span>
+                    <span><strong>{block.name || "Unnamed item"}</strong><small>{block.title || "Untitled"}</small></span>
                     <em>{block.visible ? "Shown" : "Hidden"}</em>
                   </button>
                 ))}
                   <button type="button" className="cms-add-block" disabled={section.blocks.length >= 12} onClick={() => addBlock(sectionIndex)}><Plus size={15} /> Add item</button>
                 </div>
                 {focusedBlock ? (
-                  <section className="cms-focused-block" aria-label={`Edit ${focusedBlock.name}`}>
-                    <header><div><span>Selected item</span><h3>{focusedBlock.name}</h3></div><span className={focusedBlock.visible ? "cms-visibility is-visible" : "cms-visibility"}>{focusedBlock.visible ? "Shown" : "Hidden"}</span></header>
+                  <section className="cms-focused-block" aria-label={`Edit ${focusedBlock.name || "unnamed item"}`}>
+                    <header><div><span>Selected item</span><h3>{focusedBlock.name || "Unnamed item"}</h3></div><span className={focusedBlock.visible ? "cms-visibility is-visible" : "cms-visibility"}>{focusedBlock.visible ? "Shown" : "Hidden"}</span></header>
                       <div className="cms-block-actions">
                         <button type="button" disabled={focusedBlockIndex === 0} onClick={() => reorderBlock(sectionIndex, focusedBlockIndex, focusedBlockIndex - 1)}><ArrowUp size={14} /> Move up</button>
                         <button type="button" disabled={focusedBlockIndex === section.blocks.length - 1} onClick={() => reorderBlock(sectionIndex, focusedBlockIndex, focusedBlockIndex + 1)}><ArrowDown size={14} /> Move down</button>
@@ -251,16 +297,36 @@ export function SiteCompositionEditor({ pageKey, sections, onChange }: Props) {
                         <button type="button" className="is-danger" disabled={focusedBlock.protected || section.blocks.length <= 1} onClick={() => removeBlock(sectionIndex, focusedBlockIndex)}><Trash2 size={14} /> Remove</button>
                       </div>
                       <div className="cms-block-fields">
-                        <label>Item name<input value={focusedBlock.name} maxLength={80} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { name: event.target.value })} /></label>
-                        <label>Approved icon<select value={focusedBlock.icon || "help"} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { icon: event.target.value as EditorialBlock["icon"] })}>{editorialIconAllowlist.map((icon) => <option key={icon} value={icon}>{icon}</option>)}</select></label>
-                        <label className="is-wide">Title<input value={focusedBlock.title} maxLength={160} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { title: event.target.value })} /></label>
-                        <label className="is-wide">Supporting copy<textarea value={focusedBlock.body} rows={4} maxLength={1000} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { body: event.target.value })} /></label>
-                        {focusedBlock.label !== undefined ? <label>Label / price<input value={focusedBlock.label} maxLength={80} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { label: event.target.value })} /></label> : null}
+                        <label className={focusedError("name") ? "has-error" : ""} htmlFor={controlId(`${focusedBlockPath}.name`)}>
+                          Item name
+                          <input id={controlId(`${focusedBlockPath}.name`)} value={focusedBlock.name} maxLength={80} aria-invalid={Boolean(focusedError("name"))} aria-describedby={focusedError("name") ? validationId(`${focusedBlockPath}.name`) : undefined} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { name: event.target.value })} />
+                          {focusedError("name") ? <small id={validationId(`${focusedBlockPath}.name`)} className="cms-validation-error" role="alert">{focusedError("name")}</small> : null}
+                        </label>
+                        <label className={focusedError("icon") ? "has-error" : ""} htmlFor={controlId(`${focusedBlockPath}.icon`)}>
+                          Approved icon
+                          <select id={controlId(`${focusedBlockPath}.icon`)} value={focusedBlock.icon || "help"} aria-invalid={Boolean(focusedError("icon"))} aria-describedby={focusedError("icon") ? validationId(`${focusedBlockPath}.icon`) : undefined} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { icon: event.target.value as EditorialBlock["icon"] })}>{editorialIconAllowlist.map((icon) => <option key={icon} value={icon}>{icon}</option>)}</select>
+                          {focusedError("icon") ? <small id={validationId(`${focusedBlockPath}.icon`)} className="cms-validation-error" role="alert">{focusedError("icon")}</small> : null}
+                        </label>
+                        <label className={`is-wide${focusedError("title") ? " has-error" : ""}`} htmlFor={controlId(`${focusedBlockPath}.title`)}>
+                          Title
+                          <input id={controlId(`${focusedBlockPath}.title`)} value={focusedBlock.title} maxLength={160} aria-invalid={Boolean(focusedError("title"))} aria-describedby={focusedError("title") ? validationId(`${focusedBlockPath}.title`) : undefined} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { title: event.target.value })} />
+                          {focusedError("title") ? <small id={validationId(`${focusedBlockPath}.title`)} className="cms-validation-error" role="alert">{focusedError("title")}</small> : null}
+                        </label>
+                        <label className={`is-wide${focusedError("body") ? " has-error" : ""}`} htmlFor={controlId(`${focusedBlockPath}.body`)}>
+                          Supporting copy
+                          <textarea id={controlId(`${focusedBlockPath}.body`)} value={focusedBlock.body} rows={4} maxLength={1000} aria-invalid={Boolean(focusedError("body"))} aria-describedby={focusedError("body") ? validationId(`${focusedBlockPath}.body`) : undefined} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { body: event.target.value })} />
+                          {focusedError("body") ? <small id={validationId(`${focusedBlockPath}.body`)} className="cms-validation-error" role="alert">{focusedError("body")}</small> : null}
+                        </label>
+                        {focusedBlock.label !== undefined ? <label className={focusedError("label") ? "has-error" : ""}>Label / price<input value={focusedBlock.label} maxLength={80} aria-invalid={Boolean(focusedError("label"))} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { label: event.target.value })} />{focusedError("label") ? <small className="cms-validation-error" role="alert">{focusedError("label")}</small> : null}</label> : null}
                         {focusedBlock.ctaLabel !== undefined || focusedBlock.ctaUrl !== undefined ? <>
-                          <label>Button label<input value={focusedBlock.ctaLabel || ""} maxLength={80} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { ctaLabel: event.target.value })} /></label>
-                          <label>CTA URL<input value={focusedBlock.ctaUrl || ""} maxLength={300} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { ctaUrl: event.target.value })} /></label>
+                          <label className={focusedError("ctaLabel") ? "has-error" : ""}>Button label<input value={focusedBlock.ctaLabel || ""} maxLength={80} aria-invalid={Boolean(focusedError("ctaLabel"))} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { ctaLabel: event.target.value })} />{focusedError("ctaLabel") ? <small className="cms-validation-error" role="alert">{focusedError("ctaLabel")}</small> : null}</label>
+                          <label className={focusedError("ctaUrl") ? "has-error" : ""} htmlFor={controlId(`${focusedBlockPath}.ctaUrl`)}>
+                            CTA URL
+                            <input id={controlId(`${focusedBlockPath}.ctaUrl`)} value={focusedBlock.ctaUrl || ""} maxLength={300} aria-invalid={Boolean(focusedError("ctaUrl"))} aria-describedby={focusedError("ctaUrl") ? validationId(`${focusedBlockPath}.ctaUrl`) : undefined} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { ctaUrl: event.target.value })} />
+                            {focusedError("ctaUrl") ? <small id={validationId(`${focusedBlockPath}.ctaUrl`)} className="cms-validation-error" role="alert">{focusedError("ctaUrl")}</small> : null}
+                          </label>
                         </> : null}
-                        {focusedBlock.items !== undefined ? <label className="is-wide">List items<textarea value={focusedBlock.items.join("\n")} rows={4} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { items: event.target.value.split("\n").slice(0, 20) })} /><small>One item per line.</small></label> : null}
+                        {focusedBlock.items !== undefined ? <label className={`is-wide${focusedError("items") ? " has-error" : ""}`}>List items<textarea value={focusedBlock.items.join("\n")} rows={4} aria-invalid={Boolean(focusedError("items"))} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { items: event.target.value.split("\n").slice(0, 20) })} /><small className={focusedError("items") ? "cms-validation-error" : undefined}>{focusedError("items") || "One item per line."}</small></label> : null}
                       </div>
                   </section>
                 ) : null}

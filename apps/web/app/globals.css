@@ -14311,6 +14311,8 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 .cms-color-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
 .cms-color-field { display: grid; gap: 7px; }
 .cms-color-field > span { display: flex; align-items: center; gap: 8px; font-size: 11px; text-transform: capitalize; }
+.cms-color-field > small, .cms-inline-form label > small { color: var(--muted); font-size: 9px; line-height: 1.4; }
+.cms-color-field.has-error input, .cms-inline-form label.has-error input { border-color: rgba(224, 95, 86, .65); }
 .cms-color-field i { width: 17px; height: 17px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 50%; }
 .cms-theme-sample { margin-top: 20px; border: 1px solid; border-radius: 8px; padding: 28px; }
 .cms-theme-sample h3 { max-width: 520px; margin: 8px 0 20px; font-size: 29px; }
@@ -14683,15 +14685,30 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 }
 .cms-section-editor-head {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   padding: 13px 14px;
 }
+.cms-section-drag-handle {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  cursor: grab;
+}
+.cms-section-drag-handle:hover, .cms-section-drag-handle:focus-visible { border-color: rgba(240, 161, 43, .4); color: var(--gold-2); outline: none; }
+.cms-section-drag-handle:active { cursor: grabbing; }
+.cms-section-drag-handle:disabled { opacity: .4; cursor: not-allowed; }
 .cms-section-open {
   min-width: 0;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
   border: 0;
@@ -14717,6 +14734,12 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
   font-size: 9px;
   font-style: normal;
 }
+.cms-section-fields { display: grid; gap: 7px; border-top: 1px solid rgba(239, 236, 228, .08); padding: 12px 14px; }
+.cms-section-fields label { display: grid; gap: 6px; color: var(--muted); font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.cms-section-fields input { width: 100%; border: 1px solid rgba(239, 236, 228, .13); border-radius: 5px; padding: 9px; color: var(--text); background: #070d10; font: inherit; font-size: 11px; text-transform: none; }
+.cms-section-editor.has-error, .cms-block-row.has-error { border-color: rgba(224, 95, 86, .45); }
+.cms-section-fields label.has-error input, .cms-block-fields label.has-error input, .cms-block-fields label.has-error textarea, .cms-block-fields label.has-error select { border-color: rgba(224, 95, 86, .65); }
+.cms-validation-error { color: #ef9992 !important; font-size: 10px; line-height: 1.45; text-transform: none; }
 .cms-section-open em {
   border: 1px solid rgba(239, 236, 228, .09);
   border-radius: 999px;
@@ -15304,10 +15327,12 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
     width: 100%;
   }
 
-  .cms-section-editor-head,
   .cms-focused-block > header {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .cms-section-editor-head { grid-template-columns: auto minmax(0, 1fr); }
+  .cms-section-editor-head .cms-order-actions { grid-column: 1 / -1; padding-left: 40px; }
 
   .cms-section-controls,
   .cms-focused-block > header > div:last-child {

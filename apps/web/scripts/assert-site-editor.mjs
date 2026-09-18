@@ -23,7 +23,7 @@ const review = read("lib/site-editor-review.ts");
 for (const marker of ["site-editor:draft", "site-editor:revision:", "save_draft", "restore_revision", "validateContentValues", "mutate_site_editor", "read_site_editor_state"]) {
   if (!route.includes(marker)) throw new Error(`Site Editor API is missing ${marker}.`);
 }
-for (const marker of ["crashRecovery", "executeEditor", "publish", "restoreRevision", "discardDraft", "previewPath", "Revision history", "Advanced JSON", "Read-only by default", "Unlock editor", "Download backup", "Fix highlighted content and ensure primary text and actions meet 4.5:1 contrast before publishing.", "Send test to my admin email", "/api/site-editor/test-email"]) {
+for (const marker of ["crashRecovery", "executeEditor", "publish", "restoreRevision", "discardDraft", "previewPath", "Revision history", "Advanced JSON", "Read-only by default", "Unlock editor", "Download backup", "keep accent text at 3:1 before publishing", "Send test to my admin email", "/api/site-editor/test-email"]) {
   if (!page.includes(marker)) throw new Error(`Content Studio is missing ${marker}.`);
 }
 for (const marker of ["SiteCompositionEditor", "compositionPageKey", "settings.composition"]) {
@@ -38,8 +38,21 @@ for (const marker of ["validateEditorialComposition", "Block IDs must be unique"
 for (const marker of ["issueDraftPreview", "<iframe", "Desktop preview", "Tablet preview", "Mobile preview", "Open full preview", "Draft", "Published"]) {
   if (!page.includes(marker)) throw new Error(`Content Studio actual-page preview is missing ${marker}.`);
 }
+for (const marker of ["cms-section-drag-handle", "onDragStart={(event) => beginDrag(event, section.id)}", "moveSectionWithKeyboard", "aria-describedby", "cms-validation-error"]) {
+  if (!compositionEditor.includes(marker)) throw new Error(`Content Studio composition interaction is missing ${marker}.`);
+}
 for (const marker of ["if (!authorized || !previewOpen) return", "closePreview", "pagehide", "confirmDialogRef", "sidebarCloseRef", "Autosave will store it as the shared draft."]) {
   if (!page.includes(marker)) throw new Error(`Content Studio preview/accessibility lifecycle is missing ${marker}.`);
+}
+for (const marker of ["EditorLoadError", "loadSiteEditorState", "initialLoadFailure === \"unavailable\"", "Retrying Site Editor", "setLoadAttempt", "window.matchMedia(\"(max-width: 900px)\")", "document.body.style.overflow = previousOverflow"]) {
+  if (!page.includes(marker)) throw new Error(`Content Studio load/sidebar recovery is missing ${marker}.`);
+}
+for (const marker of ["selectEditorEntries", "selectCompleteSectionSchema", "activeSectionEntries.map", "emailTestFeedback", 'errors["seo.canonicalUrl"]', 'errors[`colors.${key}`]', "brandLogos.new.url"]) {
+  if (!page.includes(marker)) throw new Error(`Content Studio scoped editing feedback is missing ${marker}.`);
+}
+const emailTestFunction = page.slice(page.indexOf("  async function sendEmailTest()"), page.indexOf("  const tree = ("));
+if (emailTestFunction.includes("setStatus(") || emailTestFunction.includes("setMessage(")) {
+  throw new Error("Email-test feedback still mutates global draft persistence state.");
 }
 for (const marker of ["mutationLocked", "Resolve the current save issue with the recovery controls", "disabled={mutationLocked", "Retry the same save"]) {
   if (!page.includes(marker)) throw new Error(`Content Studio mutation recovery guard is missing ${marker}.`);

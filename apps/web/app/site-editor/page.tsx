@@ -52,13 +52,24 @@ import {
   isSafeBrandLogoUrl,
   mergeSiteSettings,
   normalizeBrandLogoKey,
+  siteColorContrastRatio,
   siteSettingsKey,
   validateBrandLogoEntries,
   validateEditorialComposition,
+  validateSiteThemeContrast,
   type EditableSiteSettings,
   type EditorialPageKey
 } from "../../lib/site-settings";
-import { createEditorMutationController, EditorMutationError, shouldReplaceEditorContent, type EditorMutationPayload } from "../../lib/site-editor-client";
+import {
+  createEditorMutationController,
+  EditorLoadError,
+  EditorMutationError,
+  loadSiteEditorState,
+  selectCompleteSectionSchema,
+  selectEditorEntries,
+  shouldReplaceEditorContent,
+  type EditorMutationPayload
+} from "../../lib/site-editor-client";
 import { settingsChangeReview } from "../../lib/site-editor-review";
 import { clearSitePreviewCookie, openSiteDraftPreview, sitePreviewGeneration, sitePreviewInvalidatedEvent } from "../../lib/site-preview-client";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
@@ -69,6 +80,7 @@ type EditorMode = "content" | "advanced";
 type SpecialPage = "Theme" | "Brand assets" | "Revision history" | "Copy coverage" | "Advanced JSON";
 type SelectedPage = { area: ContentArea | "Design" | "Advanced"; page: string };
 type ConfirmAction = { kind: "discard" } | { kind: "publish" } | { kind: "restore"; revision: Revision };
+type EmailTestFeedback = { tone: "pending" | "success" | "error"; message: string };
 
 type Revision = {
   id: string;
@@ -181,28 +193,6 @@ function pagePurpose(selected: SelectedPage) {
   return purposes[selected.page] || `Edit the approved customer-facing content for ${selected.page}.`;
 }
 
-function hexToRgb(value: string) {
-  const hex = value.trim().replace(/^#/, "");
-  if (!/^[0-9a-f]{6}$/i.test(hex)) return null;
-  return [0, 2, 4].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16));
-}
-
-function contrastRatio(foreground: string, background: string) {
-  const luminance = (value: string) => {
-    const rgb = hexToRgb(value);
-    if (!rgb) return null;
-    const channels = rgb.map((channel) => {
-      const normalized = channel / 255;
-      return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
-    });
-    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
-  };
-  const first = luminance(foreground);
-  const second = luminance(background);
-  if (first === null || second === null) return null;
-  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
-}
-
 function emailPreviewValue(value: string) {
   const samples: Record<string, string> = {
     profile_title: "1962 Sunburst Stratocaster",
@@ -235,7 +225,8 @@ function validateEditorSettings(settings: EditableSiteSettings, rawBrandLogos: u
   const errors: Record<string, string> = {
     ...validateBrandLogoEntries(rawBrandLogos),
     ...validateContentValues(settings.content),
-    ...validateEditorialComposition(settings.composition)
+    ...validateEditorialComposition(settings.composition),
+    ...validateSiteThemeContrast(settings.colors)
   };
   for (const [key, value] of Object.entries(settings.colors)) {
     if (!/^#[0-9a-f]{6}$/i.test(value)) errors[`colors.${key}`] = "Use a six-digit hex color.";
@@ -280,6 +271,8 @@ export default function SiteEditorPage() {
   const [message, setMessage] = useState("Checking admin access…");
   const [status, setStatus] = useState<"loading" | "saved" | "saving" | "dirty" | "error">("loading");
   const [authorized, setAuthorized] = useState(false);
+  const [initialLoadFailure, setInitialLoadFailure] = useState<"" | "authorization" | "unavailable">("");
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [previewSource, setPreviewSource] = useState<PreviewSource>("draft");
   const [previewUrl, setPreviewUrl] = useState("");
   const [previewError, setPreviewError] = useState("");
@@ -296,6 +289,7 @@ export default function SiteEditorPage() {
   const [brandName, setBrandName] = useState("");
   const [brandLogoUrl, setBrandLogoUrl] = useState("");
   const [emailSending, setEmailSending] = useState(false);
+  const [emailTestFeedback, setEmailTestFeedback] = useState<EmailTestFeedback | null>(null);
   const [copyExportFeedback, setCopyExportFeedback] = useState("");
   const copyExportAttempt = useRef(0);
   const [showCompare, setShowCompare] = useState(false);
@@ -311,17 +305,17 @@ export default function SiteEditorPage() {
   const confirmCloseRef = useRef<HTMLButtonElement>(null);
   const focusBeforeDialog = useRef<HTMLElement | null>(null);
 
-  const selectedEntries = useMemo(() => {
-    const search = query.trim().toLowerCase();
-    return contentRegistry.filter((entry) => {
-      const matchesPage = entry.area === selected.area && entry.page === selected.page;
-      const matchesSearch = !search || `${entry.key} ${entry.page} ${entry.section} ${entry.label} ${entry.help}`.toLowerCase().includes(search);
-      return (search ? matchesSearch : matchesPage);
-    });
+  const entrySelection = useMemo(() => {
+    return selectEditorEntries(contentRegistry, selected, query);
   }, [query, selected]);
-
-  const currentPageEntries = contentRegistry.filter((entry) => entry.area === selected.area && entry.page === selected.page);
+  const currentPageEntries = entrySelection.currentPage;
+  const selectedEntries = entrySelection.results;
   const fieldGroups = useMemo(() => groupEntries(selectedEntries), [selectedEntries]);
+  const activeSectionEntries = useMemo(
+    () => selectCompleteSectionSchema(currentPageEntries, selectedEntries, openFieldSection),
+    [currentPageEntries, openFieldSection, selectedEntries]
+  );
+  const activeSectionName = activeSectionEntries[0]?.section || "";
   const compositionPageKey = useMemo<EditorialPageKey | null>(() => {
     if (query) return null;
     const supported: Partial<Record<ContentArea, Record<string, EditorialPageKey>>> = {
@@ -333,14 +327,16 @@ export default function SiteEditorPage() {
       ? supported[selected.area as ContentArea]?.[selected.page] || null
       : null;
   }, [query, selected]);
-  const previewPath = currentPageEntries.find((entry) => entry.previewPath)?.previewPath || "/";
+  const previewPath = activeSectionEntries.find((entry) => entry.previewPath)?.previewPath
+    || currentPageEntries.find((entry) => entry.previewPath)?.previewPath
+    || "/";
   const changeReview = useMemo(() => settingsChangeReview(settings, published), [published, settings]);
   const changeCount = changeReview.length;
   const mutationLocked = Boolean(editorIssue) || writeBusy;
   const hasChanges = JSON.stringify(settings) !== JSON.stringify(published);
-  const textContrast = contrastRatio(settings.colors.text, settings.colors.background);
-  const actionContrast = contrastRatio(settings.colors.background, settings.colors.cream);
-  const accentContrast = contrastRatio(settings.colors.gold, settings.colors.background);
+  const textContrast = siteColorContrastRatio(settings.colors.text, settings.colors.background);
+  const actionContrast = siteColorContrastRatio(settings.colors.background, settings.colors.cream);
+  const accentContrast = siteColorContrastRatio(settings.colors.gold, settings.colors.background);
 
   useEffect(() => {
     setCopyExportFeedback("");
@@ -350,6 +346,10 @@ export default function SiteEditorPage() {
   useEffect(() => {
     setOpenFieldSection(fieldGroups[0]?.[0] || "");
   }, [fieldGroups]);
+
+  useEffect(() => {
+    setEmailTestFeedback(null);
+  }, [activeSectionName, selected.area, selected.page]);
 
   useEffect(() => {
     const updatePreviewLayout = () => {
@@ -383,15 +383,6 @@ export default function SiteEditorPage() {
     }
     setDraftMeta(payload.draftMeta || null); setRevisions(payload.revisions || []);
   }, [setSettings]);
-
-  async function api() {
-    const token = await getSupabaseAccessToken();
-    if (!token) throw new Error("Sign in with an authorized admin account.");
-    const response = await fetch("/api/site-editor", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
-    const payload = (await response.json().catch(() => ({}))) as SiteEditorPayload;
-    if (!response.ok || payload.ok !== true || typeof payload.editorActorId !== "string") throw new Error(payload.message || "Could not load Site Editor state.");
-    return payload;
-  }
 
   const initializeMutations = useCallback((actorId: string) => {
     actorRef.current = actorId;
@@ -441,11 +432,12 @@ export default function SiteEditorPage() {
       const submitted = settingsRef.current;
       if (!retry && action === "publish") {
         const validation = validateEditorSettings(submitted);
-        const text = contrastRatio(submitted.colors.text, submitted.colors.background);
-        const buttons = contrastRatio(submitted.colors.background, submitted.colors.cream);
+        const text = siteColorContrastRatio(submitted.colors.text, submitted.colors.background);
+        const buttons = siteColorContrastRatio(submitted.colors.background, submitted.colors.cream);
+        const accent = siteColorContrastRatio(submitted.colors.gold, submitted.colors.background);
         setErrors(validation);
-        if (Object.keys(validation).length || text === null || buttons === null || text < 4.5 || buttons < 4.5) {
-          setStatus("error"); setMessage("Fix highlighted content and ensure primary text and actions meet 4.5:1 contrast before publishing."); return;
+        if (Object.keys(validation).length || text === null || buttons === null || accent === null || text < 4.5 || buttons < 4.5 || accent < 3) {
+          setStatus("error"); setMessage("Fix highlighted content, keep primary text and actions at 4.5:1 contrast, and keep accent text at 3:1 before publishing."); return;
         }
       }
       const operation = (async () => {
@@ -525,11 +517,12 @@ export default function SiteEditorPage() {
   useEffect(() => {
     let cancelled = false;
     const started = sitePreviewGeneration();
-    void api()
+    void loadSiteEditorState<SiteEditorPayload>(getSupabaseAccessToken)
       .then((payload) => {
         if (cancelled || started !== sitePreviewGeneration()) return;
         applyPayload(payload, true);
         setAuthorized(true);
+        setInitialLoadFailure("");
         setStatus("saved");
         setMessage(payload.draft ? "Server draft loaded." : "Published content loaded.");
         loaded.current = true;
@@ -538,13 +531,14 @@ export default function SiteEditorPage() {
       .catch((error) => {
         if (cancelled) return;
         setAuthorized(false);
+        setInitialLoadFailure(error instanceof EditorLoadError ? error.kind : "unavailable");
         setStatus("error");
-        setMessage(error instanceof Error ? error.message : "Admin access required.");
+        setMessage(error instanceof Error ? error.message : "Could not load Site Editor. Retry when the service is available.");
       });
     return () => {
       cancelled = true;
     };
-  }, [applyPayload, initializeMutations]);
+  }, [applyPayload, initializeMutations, loadAttempt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -593,16 +587,29 @@ export default function SiteEditorPage() {
 
   useEffect(() => {
     if (!sidebarOpen) return;
+    const mobileSidebar = window.matchMedia("(max-width: 900px)");
+    if (!mobileSidebar.matches) {
+      setSidebarOpen(false);
+      return;
+    }
     const trigger = sidebarTriggerRef.current;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     sidebarCloseRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setSidebarOpen(false);
       else trapFocus(sidebarRef.current, event);
     };
+    const closeAtDesktop = (event: MediaQueryListEvent) => {
+      if (!event.matches) setSidebarOpen(false);
+    };
     window.addEventListener("keydown", onKeyDown);
+    mobileSidebar.addEventListener("change", closeAtDesktop);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
-      trigger?.focus();
+      mobileSidebar.removeEventListener("change", closeAtDesktop);
+      document.body.style.overflow = previousOverflow;
+      if (mobileSidebar.matches) trigger?.focus();
     };
   }, [sidebarOpen]);
 
@@ -647,7 +654,7 @@ export default function SiteEditorPage() {
       if (bind) next = bind(next, value);
       return next;
     });
-    setErrors((current) => ({ ...current, [key]: "" }));
+    setErrors((current) => ({ ...current, [key]: "", ...(key === "global.brand.name" ? { brandName: "" } : {}) }));
   }
 
   async function publish() { await executeEditor("publish", { note, area: `${selected.area} / ${selected.page}` }, true); }
@@ -709,7 +716,11 @@ export default function SiteEditorPage() {
   function saveBrandLogo() {
     const key = normalizeBrandLogoKey(brandName);
     const url = brandLogoUrl.trim();
-    if (!key || !isSafeBrandLogoUrl(url)) {
+    const formErrors: Record<string, string> = {};
+    if (!key) formErrors["brandLogos.new.name"] = "Enter a valid brand name.";
+    if (!isSafeBrandLogoUrl(url)) formErrors["brandLogos.new.url"] = "Use an HTTPS URL or a site-relative path beginning with one slash.";
+    if (Object.keys(formErrors).length) {
+      setErrors((current) => ({ ...current, ...formErrors }));
       setMessage("Enter a brand and a valid https URL or site-relative path.");
       setStatus("error");
       return;
@@ -717,17 +728,19 @@ export default function SiteEditorPage() {
     setSettings((current) => ({ ...current, brandLogos: { ...current.brandLogos, [key]: url } }));
     setBrandName("");
     setBrandLogoUrl("");
+    setErrors((current) => ({ ...current, "brandLogos.new.name": "", "brandLogos.new.url": "" }));
     setStatus("dirty");
     setMessage("Brand logo added to the draft.");
   }
 
   async function sendEmailTest() {
     setEmailSending(true);
-    setMessage("Sending a safe test to the authenticated admin…");
+    setEmailTestFeedback({ tone: "pending", message: "Sending a safe test to the authenticated admin…" });
     try {
       const token = await getSupabaseAccessToken();
       if (!token) throw new Error("Sign in with an authorized admin account.");
-      const fields = Object.fromEntries(selectedEntries.map((entry) => [entry.key, settings.content[entry.key] ?? entry.defaultValue]));
+      if (selected.area !== "Emails" || !activeSectionEntries.length) throw new Error("Choose an email template before sending a test.");
+      const fields = Object.fromEntries(activeSectionEntries.map((entry) => [entry.key, settings.content[entry.key] ?? entry.defaultValue]));
       const response = await fetch("/api/site-editor/test-email", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -736,11 +749,9 @@ export default function SiteEditorPage() {
       });
       const payload = (await response.json().catch(() => ({}))) as { message?: string };
       if (!response.ok) throw new Error(payload.message || "Test email failed.");
-      setStatus("saved");
-      setMessage(payload.message || "Test email sent to the authenticated admin.");
+      setEmailTestFeedback({ tone: "success", message: payload.message || "Test email sent to the authenticated admin." });
     } catch (error) {
-      setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Test email failed.");
+      setEmailTestFeedback({ tone: "error", message: error instanceof Error ? error.message : "Test email failed." });
     } finally {
       setEmailSending(false);
     }
@@ -774,7 +785,7 @@ export default function SiteEditorPage() {
       </div>
       <div className="cms-tree-search">
         <Search size={16} aria-hidden="true" />
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search content" aria-label="Search content" />
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${selected.page}`} aria-label={`Search ${selected.page} content`} />
       </div>
       {contentAreas.filter((area) => editorMode === "content" ? !["Emails", "SEO"].includes(area) : ["Emails", "SEO"].includes(area)).map((area) => (
         <details open={Boolean(query) || area === selected.area} key={area}>
@@ -830,6 +841,7 @@ export default function SiteEditorPage() {
         <SiteCompositionEditor
           pageKey={compositionPageKey}
           sections={settings.composition[compositionPageKey].sections}
+          errors={errors}
           onChange={(sections) => setSettings((current) => ({
             ...current,
             composition: {
@@ -852,22 +864,24 @@ export default function SiteEditorPage() {
               const value = settings.content[entry.key] ?? entry.defaultValue;
               const id = `content-${entry.key.replace(/[^a-z0-9]+/gi, "-")}`;
               const locked = ["security-locked", "data-derived", "browser-platform"].includes(entry.classification);
+              const validationError = errors[entry.key] || (entry.key === "global.brand.name" ? errors.brandName : "");
+              const helpId = `${id}-help`;
               return (
-                <label className={`${errors[entry.key] ? "cms-field has-error" : "cms-field"}${locked ? " is-locked" : ""}`} htmlFor={id} key={entry.key}>
+                <label className={`${validationError ? "cms-field has-error" : "cms-field"}${locked ? " is-locked" : ""}`} htmlFor={id} key={entry.key}>
                   <span className="cms-field-label">
                     <strong>{entry.label}</strong>
                     <span>{locked ? <small className="cms-classification is-locked">Managed by system</small> : null}<small>{value.length}/{entry.maxLength}</small></span>
                   </span>
                   {entry.type === "textarea" ? (
-                    <textarea id={id} value={value} rows={4} maxLength={entry.maxLength} readOnly={locked} aria-readonly={locked} onChange={(event) => updateContent(entry.key, event.target.value)} />
+                    <textarea id={id} value={value} rows={4} maxLength={entry.maxLength} readOnly={locked} aria-readonly={locked} aria-invalid={Boolean(validationError)} aria-describedby={helpId} onChange={(event) => updateContent(entry.key, event.target.value)} />
                   ) : entry.type === "select" ? (
-                    <select id={id} value={value} disabled={locked} aria-disabled={locked} onChange={(event) => updateContent(entry.key, event.target.value)}>
+                    <select id={id} value={value} disabled={locked} aria-disabled={locked} aria-invalid={Boolean(validationError)} aria-describedby={helpId} onChange={(event) => updateContent(entry.key, event.target.value)}>
                       {(entry.allowedValues || []).map((option) => <option value={option} key={option}>{option}</option>)}
                     </select>
                   ) : (
-                    <input id={id} type={entry.type === "email" ? "email" : "text"} value={value} maxLength={entry.maxLength} readOnly={locked} aria-readonly={locked} onChange={(event) => updateContent(entry.key, event.target.value)} />
+                    <input id={id} type={entry.type === "email" ? "email" : "text"} value={value} maxLength={entry.maxLength} readOnly={locked} aria-readonly={locked} aria-invalid={Boolean(validationError)} aria-describedby={helpId} onChange={(event) => updateContent(entry.key, event.target.value)} />
                   )}
-                  <span className="cms-field-help">{errors[entry.key] || (locked ? `${entry.help} This value is intentionally read-only.` : entry.help)}</span>
+                  <span id={helpId} className={validationError ? "cms-field-help cms-validation-error" : "cms-field-help"} role={validationError ? "alert" : undefined}>{validationError || (locked ? `${entry.help} This value is intentionally read-only.` : entry.help)}</span>
                   {entry.allowedVariables?.length ? (
                     <span className="cms-variable-list">Allowed variables: {entry.allowedVariables.map((variable) => <code key={variable}>{`{{${variable}}}`}</code>)}</span>
                   ) : null}
@@ -878,21 +892,21 @@ export default function SiteEditorPage() {
           </div> : null}
         </section>
       )})}
-      {!selectedEntries.length ? <div className="cms-empty"><Search size={22} /><h2>No content matched.</h2><p>Try a page name, field label, or content key.</p></div> : null}
+      {!selectedEntries.length ? <div className="cms-empty"><Search size={22} /><h2>No content matched on {selected.page}.</h2><p>Try a section name, field label, or content key from this page.</p></div> : null}
     </div>
   );
 
-  const emailSubject = selectedEntries.find((entry) => entry.key.endsWith(".subject"));
-  const emailPreheader = selectedEntries.find((entry) => entry.key.endsWith(".preheader"));
-  const emailHeading = selectedEntries.find((entry) => entry.key.endsWith(".heading"));
-  const emailBody = selectedEntries.find((entry) => entry.key.endsWith(".body"));
-  const emailCta = selectedEntries.find((entry) => entry.key.endsWith(".cta"));
-  const emailFooter = selectedEntries.find((entry) => entry.key.endsWith(".footer"));
+  const emailSubject = activeSectionEntries.find((entry) => entry.key.endsWith(".subject"));
+  const emailPreheader = activeSectionEntries.find((entry) => entry.key.endsWith(".preheader"));
+  const emailHeading = activeSectionEntries.find((entry) => entry.key.endsWith(".heading"));
+  const emailBody = activeSectionEntries.find((entry) => entry.key.endsWith(".body"));
+  const emailCta = activeSectionEntries.find((entry) => entry.key.endsWith(".cta"));
+  const emailFooter = activeSectionEntries.find((entry) => entry.key.endsWith(".footer"));
   const emailEditor = (
     <div className="cms-fields">
       {standardEditor}
       <section className="cms-field-group cms-email-studio">
-        <header><div><span>Safe preview</span><h2>Email preview</h2></div><Send size={20} /></header>
+        <header><div><span>Safe preview</span><h2>{activeSectionName ? `${activeSectionName} email` : "Email preview"}</h2></div><Send size={20} /></header>
         <p className="cms-section-intro">Whitelisted variables are replaced with sample values here. Previewing never sends an email or exposes a real token.</p>
         <div className="cms-email-preview">
           <div className="cms-email-envelope">
@@ -919,16 +933,17 @@ export default function SiteEditorPage() {
           </button>
           <small>The recipient is fixed to the authenticated admin account. Addresses cannot be entered here.</small>
         </div>
+        {emailTestFeedback ? <p className={`form-message is-${emailTestFeedback.tone}`} role={emailTestFeedback.tone === "error" ? "alert" : "status"} aria-live="polite">{emailTestFeedback.message}</p> : null}
       </section>
     </div>
   );
 
-  const seoTitleEntry = selectedEntries.find((entry) => entry.key.endsWith(".title"));
-  const seoDescriptionEntry = selectedEntries.find((entry) => entry.key.endsWith(".description"));
-  const seoOgTitleEntry = selectedEntries.find((entry) => entry.key.endsWith(".ogTitle"));
-  const seoOgDescriptionEntry = selectedEntries.find((entry) => entry.key.endsWith(".ogDescription"));
-  const seoImageEntry = selectedEntries.find((entry) => entry.key.endsWith(".image"));
-  const seoIndexingEntry = selectedEntries.find((entry) => entry.key.endsWith(".indexing"));
+  const seoTitleEntry = activeSectionEntries.find((entry) => entry.key.endsWith(".title"));
+  const seoDescriptionEntry = activeSectionEntries.find((entry) => entry.key.endsWith(".description"));
+  const seoOgTitleEntry = activeSectionEntries.find((entry) => entry.key.endsWith(".ogTitle"));
+  const seoOgDescriptionEntry = activeSectionEntries.find((entry) => entry.key.endsWith(".ogDescription"));
+  const seoImageEntry = activeSectionEntries.find((entry) => entry.key.endsWith(".image"));
+  const seoIndexingEntry = activeSectionEntries.find((entry) => entry.key.endsWith(".indexing"));
   const seoTitle = seoTitleEntry ? settings.content[seoTitleEntry.key] : settings.seo.title;
   const seoDescription = seoDescriptionEntry ? settings.content[seoDescriptionEntry.key] : settings.seo.description;
   const seoOgTitle = seoOgTitleEntry ? settings.content[seoOgTitleEntry.key] : seoTitle;
@@ -938,8 +953,21 @@ export default function SiteEditorPage() {
   const seoEditor = (
     <div className="cms-fields">
       {standardEditor}
+      {selected.page === "Global SEO" ? <section className="cms-field-group">
+        <header><div><span>Canonical origin</span><h2>Site URL</h2></div></header>
+        <div className="cms-field-list">
+          <label className={errors["seo.canonicalUrl"] ? "cms-field has-error" : "cms-field"} htmlFor="seo-canonical-url">
+            <span className="cms-field-label"><strong>Canonical site URL</strong></span>
+            <input id="seo-canonical-url" type="url" value={settings.seo.canonicalUrl} aria-invalid={Boolean(errors["seo.canonicalUrl"])} aria-describedby="seo-canonical-url-help" onChange={(event) => {
+              setSettings((current) => ({ ...current, seo: { ...current.seo, canonicalUrl: event.target.value } }));
+              setErrors((current) => ({ ...current, "seo.canonicalUrl": "" }));
+            }} />
+            <span id="seo-canonical-url-help" className={errors["seo.canonicalUrl"] ? "cms-field-help cms-validation-error" : "cms-field-help"} role={errors["seo.canonicalUrl"] ? "alert" : undefined}>{errors["seo.canonicalUrl"] || "Use the public QRguitar HTTPS origin for canonical metadata."}</span>
+          </label>
+        </div>
+      </section> : null}
       <section className="cms-field-group cms-seo-studio">
-        <header><div><span>Search and social</span><h2>Live SEO preview</h2></div><Search size={20} /></header>
+        <header><div><span>Search and social</span><h2>{activeSectionName ? `${activeSectionName} preview` : "Live SEO preview"}</h2></div><Search size={20} /></header>
         <div className="cms-seo-guidance">
           <span className={seoTitle.length >= 30 && seoTitle.length <= 60 ? "is-pass" : "is-warning"}>Title {seoTitle.length}/60</span>
           <span className={seoDescription.length >= 70 && seoDescription.length <= 160 ? "is-pass" : "is-warning"}>Description {seoDescription.length}/160</span>
@@ -967,13 +995,15 @@ export default function SiteEditorPage() {
       <p className="cms-section-intro">Change the small set of approved QRguitar color tokens. Preview contrast before publishing.</p>
       <div className="cms-color-grid">
         {Object.entries(settings.colors).map(([key, value]) => (
-          <label className="cms-color-field" key={key}>
+          <label className={errors[`colors.${key}`] ? "cms-color-field has-error" : "cms-color-field"} htmlFor={`theme-color-${key}`} key={key}>
             <span><i style={{ background: value }} />{key.replace(/([A-Z])/g, " $1")}</span>
-            <input type="text" value={value} maxLength={7} onChange={(event) => {
+            <input id={`theme-color-${key}`} type="text" value={value} maxLength={7} aria-invalid={Boolean(errors[`colors.${key}`])} aria-describedby={`theme-color-${key}-help`} onChange={(event) => {
               const next = { ...settings, colors: { ...settings.colors, [key]: event.target.value } };
               setSettings(next);
+              setErrors((current) => ({ ...current, [`colors.${key}`]: "" }));
               applyThemeSettings(next);
             }} />
+            <small id={`theme-color-${key}-help`} className={errors[`colors.${key}`] ? "cms-validation-error" : undefined}>{errors[`colors.${key}`] || "Six-digit hex color"}</small>
           </label>
         ))}
       </div>
@@ -1002,16 +1032,17 @@ export default function SiteEditorPage() {
         <header><div><span>Design system</span><h2>Brand assets</h2></div><ImageIcon size={20} /></header>
         <p className="cms-section-intro">Official brand logos are controlled here. Instrument owners cannot replace a brand identity.</p>
         <div className="cms-inline-form">
-          <label>Brand<input value={brandName} onChange={(event) => setBrandName(event.target.value)} placeholder="Fender" /></label>
-          <label>Transparent logo URL<input value={brandLogoUrl} onChange={(event) => setBrandLogoUrl(event.target.value)} placeholder="/brands/fender.svg" /></label>
+          <label className={errors["brandLogos.new.name"] ? "has-error" : ""} htmlFor="brand-logo-name">Brand<input id="brand-logo-name" value={brandName} aria-invalid={Boolean(errors["brandLogos.new.name"])} aria-describedby="brand-logo-name-help" onChange={(event) => { setBrandName(event.target.value); setErrors((current) => ({ ...current, "brandLogos.new.name": "" })); }} placeholder="Fender" /><small id="brand-logo-name-help" className={errors["brandLogos.new.name"] ? "cms-validation-error" : undefined}>{errors["brandLogos.new.name"] || "Brand key used by the logo registry."}</small></label>
+          <label className={errors["brandLogos.new.url"] ? "has-error" : ""} htmlFor="brand-logo-url">Transparent logo URL<input id="brand-logo-url" value={brandLogoUrl} aria-invalid={Boolean(errors["brandLogos.new.url"])} aria-describedby="brand-logo-url-help" onChange={(event) => { setBrandLogoUrl(event.target.value); setErrors((current) => ({ ...current, "brandLogos.new.url": "" })); }} placeholder="/brands/fender.svg" /><small id="brand-logo-url-help" className={errors["brandLogos.new.url"] ? "cms-validation-error" : undefined}>{errors["brandLogos.new.url"] || "HTTPS URL or a site-relative path."}</small></label>
           <button className="button secondary" type="button" onClick={saveBrandLogo}>Add to draft</button>
         </div>
+        {errors.brandLogos ? <p className="cms-validation-error" role="alert">{errors.brandLogos}</p> : null}
       </section>
       <section className="cms-field-group">
         <header><div><span>Registry</span><h2>Official logos</h2></div><span>{Object.keys(settings.brandLogos).length}</span></header>
         <div className="cms-asset-list">
           {Object.entries(settings.brandLogos).map(([key, url]) => (
-            <div key={key}><img src={url} alt="" loading="lazy" fetchPriority="low" decoding="async" width={520} height={120} referrerPolicy="no-referrer" /><div><strong>{key}</strong><small>{url}</small></div><button type="button" onClick={() => setSettings((current) => { const next = { ...current.brandLogos }; delete next[key]; return { ...current, brandLogos: next }; })}>Remove</button></div>
+            <div className={errors[`brandLogos.${key}`] ? "has-error" : ""} key={key}><img src={url} alt="" loading="lazy" fetchPriority="low" decoding="async" width={520} height={120} referrerPolicy="no-referrer" /><div><strong>{key}</strong><small>{url}</small>{errors[`brandLogos.${key}`] ? <small className="cms-validation-error" role="alert">{errors[`brandLogos.${key}`]}</small> : null}</div><button type="button" onClick={() => setSettings((current) => { const next = { ...current.brandLogos }; delete next[key]; return { ...current, brandLogos: next }; })}>Remove</button></div>
           ))}
           {!Object.keys(settings.brandLogos).length ? <p>No official logos have been added. Brand names continue to render as text.</p> : null}
         </div>
@@ -1077,7 +1108,7 @@ export default function SiteEditorPage() {
 
   if (!authorized) {
     return (
-      <><Nav /><main className="section cms-access"><div className="shell"><section className="card"><div className="eyebrow">Admin tools</div><h1>{status === "loading" ? "Checking Site Editor access." : "Admin access required."}</h1><p>{message}</p>{status !== "loading" ? <div className="form-actions"><Link className="button" href={`/login?next=${encodeURIComponent(editorContinuation)}`}>Sign in</Link>{adminEntry ? <Link className="button secondary" href="/admin"><ArrowLeft size={15} /> Back to Admin</Link> : null}</div> : null}</section></div></main><Footer /></>
+      <><Nav /><main className="section cms-access"><div className="shell"><section className="card"><div className="eyebrow">Admin tools</div><h1>{status === "loading" ? "Checking Site Editor access." : initialLoadFailure === "unavailable" ? "Site Editor is temporarily unavailable." : "Admin access required."}</h1><p>{message}</p>{status !== "loading" ? <div className="form-actions">{initialLoadFailure === "unavailable" ? <button className="button" type="button" onClick={() => { setInitialLoadFailure(""); setStatus("loading"); setMessage("Retrying Site Editor…"); setLoadAttempt((attempt) => attempt + 1); }}><RefreshCw size={15} /> Retry</button> : <Link className="button" href={`/login?next=${encodeURIComponent(editorContinuation)}`}>Sign in</Link>}{adminEntry ? <Link className="button secondary" href="/admin"><ArrowLeft size={15} /> Back to Admin</Link> : null}</div> : null}</section></div></main><Footer /></>
     );
   }
 
@@ -1115,7 +1146,7 @@ export default function SiteEditorPage() {
               <div>
                 <span>{selected.area} / {selected.page}</span>
                 <h1>{selected.page}</h1>
-                <p>{query ? `Search results for "${query}"` : pagePurpose(selected)}</p>
+                <p>{query ? `Search results for "${query}" on ${selected.page}` : pagePurpose(selected)}</p>
                 <div className="cms-editor-timestamps">
                   {draftMeta?.updatedAt
                     ? <span>Draft saved <strong>{formatTime(draftMeta.updatedAt)}</strong></span>
