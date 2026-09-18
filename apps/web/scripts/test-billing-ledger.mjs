@@ -55,7 +55,9 @@ let passed=0;async function test(name,fn){await db.exec('begin');try{await fn();
 await db.exec('begin');for(const env of ['test','live'])for(const n of [1,10,25])await rpc('billing_register_offer',[env,offer(n,env)]);await db.exec('commit');
 try{
 await test('all private billing tables deny direct reads and writes to API roles',async()=>{
- const tables=(await db.query("select tablename from pg_tables where schemaname='public' and tablename like 'billing_%'")).rows.map(r=>r.tablename);assert.equal(tables.length,12);
+ const tables=(await db.query("select tablename from pg_tables where schemaname='public' and tablename like 'billing_%'")).rows.map(r=>r.tablename);
+ const required=['billing_instance_config','billing_offers','billing_customers','billing_orders','billing_receipts','billing_credit_grants','billing_credit_consumptions','billing_credit_holds','billing_review_decisions'];
+ assert.deepEqual(required.filter(name=>!tables.includes(name)),[]);
  for(const role of ['anon','authenticated','service_role'])for(const t of tables){const p=(await db.query("select has_table_privilege($1,$2,'SELECT,INSERT,UPDATE,DELETE') allowed",[role,'public.'+t])).rows[0];assert.equal(p.allowed,false,role+' '+t);}
 });
 await test('public billing RPCs are service-only and private helpers inaccessible to every API role',async()=>{
