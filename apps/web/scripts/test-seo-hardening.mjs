@@ -29,6 +29,7 @@ const seo = loadTypeScript("lib/seo.ts", {
     instrumentDisplayName: record => record.name || [record.brand, record.model].filter(Boolean).join(" ") || record.qrCode
   }
 });
+const contentRegistry = loadTypeScript("lib/content-registry.ts");
 const indexing = loadTypeScript("lib/search-indexing.ts");
 
 test("canonical metadata and discovery files always use the www production origin", async () => {
@@ -160,6 +161,10 @@ test("metadata excerpts normalize whitespace and remain word and Unicode safe", 
   const emojiExcerpt = seo.metadataExcerpt("😀😀😀😀😀😀", 5);
   assert.equal(Array.from(emojiExcerpt).length, 5);
   assert.doesNotMatch(emojiExcerpt, /�/);
+  assert.equal(seo.metadataExcerpt("ab👩‍💻cde", 5), "ab👩‍💻c…");
+  assert.equal(seo.metadataExcerpt("ab🇺🇸cde", 4), "ab🇺🇸…");
+  assert.equal(seo.metadataExcerpt("abe\u0301cde", 4), "abe\u0301…");
+  assert.deepEqual(seo.fallbackMetadataGraphemes("👩‍💻🇺🇸e\u0301"), ["👩‍💻", "🇺🇸", "e\u0301"]);
 
   const summary = `A detailed instrument history with original paperwork and documented service. ${"Additional provenance remains visible in structured data. ".repeat(8)}`;
   const instrument = {
@@ -221,11 +226,25 @@ test("managed public metadata honors allowlisted indexing values and locks prote
   content["seo.catalog.indexing"] = "index, nofollow";
   assert.deepEqual((await siteMetadata.buildManagedPageMetadata("catalog", "/catalog")).robots, { index: true, follow: false });
   content["seo.catalog.indexing"] = "unsupported directive";
-  assert.deepEqual((await siteMetadata.buildManagedPageMetadata("catalog", "/catalog")).robots, { index: true, follow: true });
+  assert.deepEqual((await siteMetadata.buildManagedPageMetadata("catalog", "/catalog")).robots, { index: false, follow: false });
   assert.deepEqual(siteMetadata.resolveManagedPageRobots("catalog", "index, follow", false), { index: false, follow: false });
 
   const homeSource = fs.readFileSync(path.join(webRoot, "app/page.tsx"), "utf8");
+  const collectionsSource = fs.readFileSync(path.join(webRoot, "app/collections/page.tsx"), "utf8");
+  const editorSource = fs.readFileSync(path.join(webRoot, "app/site-editor/page.tsx"), "utf8");
+  const editorRouteSource = fs.readFileSync(path.join(webRoot, "app/api/site-editor/route.ts"), "utf8");
   assert.match(homeSource, /resolveManagedPageRobots\("home", getContentValue\(publishedSettings\.content, "seo\.home\.indexing"\)\)/);
+  assert.match(collectionsSource, /buildManagedPageMetadata\("collections", "\/collections"\)/);
+  assert.match(editorSource, /entry\.type === "select"/);
+  assert.match(editorRouteSource, /validateContentValues\(settings\.content\)/);
+
+  const publicIndexingEntry = contentRegistry.contentRegistryByKey.get("seo.catalog.indexing");
+  const protectedIndexingEntry = contentRegistry.contentRegistryByKey.get("seo.dashboard.indexing");
+  assert.equal(publicIndexingEntry.type, "select");
+  assert.deepEqual([...publicIndexingEntry.allowedValues], [...contentRegistry.seoIndexingValues]);
+  assert.equal(protectedIndexingEntry.classification, "security-locked");
+  const invalidSettings = { ...contentRegistry.defaultContentValues, "seo.catalog.indexing": "noindex" };
+  assert.match(contentRegistry.validateContentValues(invalidSettings)["seo.catalog.indexing"], /Choose one of/);
 });
 
 test("public user-controlled outbound links are qualified without changing trusted document links", () => {
@@ -278,7 +297,7 @@ test("collection structured data contains public discovery fields only and is sc
 
   for (const relative of ["app/collections/page.tsx", "app/collections/[handle]/page.tsx"]) {
     const source = fs.readFileSync(path.join(webRoot, relative), "utf8");
-    assert.match(source, /buildPageMetadata/, relative);
+    assert.match(source, relative.endsWith("[handle]/page.tsx") ? /buildPageMetadata/ : /buildManagedPageMetadata/, relative);
     assert.match(source, /application\/ld\+json/, relative);
     assert.match(source, /serializeJsonLd/, relative);
   }

@@ -14226,10 +14226,10 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 .cms-field-label > span { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; align-items: center; }
 .cms-field-label strong { font-size: 13px; }
 .cms-field-label small, .cms-field-help { color: var(--muted); font-size: 11px; line-height: 1.4; }
-.cms-field input, .cms-field textarea, .cms-inline-form input, .cms-preview-meta input, .cms-json, .cms-color-field input { width: 100%; border: 1px solid rgba(239, 236, 228, .14); border-radius: 6px; padding: 11px 12px; color: var(--text); background: #081014; font: inherit; }
-.cms-field input:focus, .cms-field textarea:focus, .cms-inline-form input:focus, .cms-preview-meta input:focus { border-color: rgba(240, 161, 43, .62); outline: 2px solid rgba(240, 161, 43, .1); }
-.cms-field.has-error input, .cms-field.has-error textarea { border-color: rgba(224, 95, 86, .55); }
-.cms-field.is-locked input, .cms-field.is-locked textarea { color: rgba(239, 236, 228, .72); background: rgba(8, 16, 20, .6); cursor: not-allowed; }
+.cms-field input, .cms-field textarea, .cms-field select, .cms-inline-form input, .cms-preview-meta input, .cms-json, .cms-color-field input { width: 100%; border: 1px solid rgba(239, 236, 228, .14); border-radius: 6px; padding: 11px 12px; color: var(--text); background: #081014; font: inherit; }
+.cms-field input:focus, .cms-field textarea:focus, .cms-field select:focus, .cms-inline-form input:focus, .cms-preview-meta input:focus { border-color: rgba(240, 161, 43, .62); outline: 2px solid rgba(240, 161, 43, .1); }
+.cms-field.has-error input, .cms-field.has-error textarea, .cms-field.has-error select { border-color: rgba(224, 95, 86, .55); }
+.cms-field.is-locked input, .cms-field.is-locked textarea, .cms-field.is-locked select { color: rgba(239, 236, 228, .72); background: rgba(8, 16, 20, .6); cursor: not-allowed; }
 .cms-classification { border: 1px solid rgba(239, 236, 228, .11); border-radius: 999px; padding: 3px 6px; color: var(--muted); font-size: 8px !important; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; }
 .cms-classification.is-editable-standard { color: #8edeb0; }.cms-classification.is-editable-advanced { color: #f0b45d; }.cms-classification.is-security-locked { color: #e8a09a; }.cms-classification.is-data-derived, .cms-classification.is-browser-platform { color: #aebac0; }
 .cms-field-reset { justify-self: start; display: inline-flex; align-items: center; gap: 5px; border: 0; padding: 2px 0; color: var(--gold-2); background: transparent; font-size: 10px; font-weight: 850; cursor: pointer; }

@@ -736,6 +736,10 @@ export default function SiteEditorPage() {
                   </span>
                   {entry.type === "textarea" ? (
                     <textarea id={id} value={value} rows={4} maxLength={entry.maxLength} readOnly={locked} aria-readonly={locked} onChange={(event) => updateContent(entry.key, event.target.value)} />
+                  ) : entry.type === "select" ? (
+                    <select id={id} value={value} disabled={locked} aria-disabled={locked} onChange={(event) => updateContent(entry.key, event.target.value)}>
+                      {(entry.allowedValues || []).map((option) => <option value={option} key={option}>{option}</option>)}
+                    </select>
                   ) : (
                     <input id={id} type={entry.type === "email" ? "email" : "text"} value={value} maxLength={entry.maxLength} readOnly={locked} aria-readonly={locked} onChange={(event) => updateContent(entry.key, event.target.value)} />
                   )}
@@ -805,6 +809,8 @@ export default function SiteEditorPage() {
   const seoDescription = seoDescriptionEntry ? settings.content[seoDescriptionEntry.key] : settings.seo.description;
   const seoOgTitle = seoOgTitleEntry ? settings.content[seoOgTitleEntry.key] : seoTitle;
   const seoOgDescription = seoOgDescriptionEntry ? settings.content[seoOgDescriptionEntry.key] : seoDescription;
+  const seoIndexingValue = seoIndexingEntry ? settings.content[seoIndexingEntry.key] : "index, follow";
+  const seoIndexingValid = !seoIndexingEntry || seoIndexingEntry.allowedValues?.includes(seoIndexingValue) === true;
   const seoEditor = (
     <div className="cms-fields">
       {standardEditor}
@@ -814,7 +820,7 @@ export default function SiteEditorPage() {
           <span className={seoTitle.length >= 30 && seoTitle.length <= 60 ? "is-pass" : "is-warning"}>Title {seoTitle.length}/60</span>
           <span className={seoDescription.length >= 70 && seoDescription.length <= 160 ? "is-pass" : "is-warning"}>Description {seoDescription.length}/160</span>
           <span className={seoImageEntry && settings.content[seoImageEntry.key] ? "is-pass" : "is-warning"}>{seoImageEntry ? "Social image set" : "Using global social image"}</span>
-          <span className={seoIndexingEntry && settings.content[seoIndexingEntry.key] === "noindex, nofollow" ? "is-warning" : "is-pass"}>{seoIndexingEntry ? settings.content[seoIndexingEntry.key] : "index, follow"}</span>
+          <span className={!seoIndexingValid || seoIndexingValue.startsWith("noindex") ? "is-warning" : "is-pass"}>{seoIndexingValid ? seoIndexingValue : "Invalid indexing value — page blocked"}</span>
         </div>
         <div className="cms-search-preview">
           <span>https://www.qrguitar.com{previewPath === "/" ? "" : previewPath}</span>

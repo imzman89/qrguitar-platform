@@ -1,4 +1,11 @@
-export type ContentFieldType = "text" | "textarea" | "email" | "url";
+export type ContentFieldType = "text" | "textarea" | "email" | "url" | "select";
+
+export const seoIndexingValues = [
+  "index, follow",
+  "index, nofollow",
+  "noindex, follow",
+  "noindex, nofollow"
+] as const;
 
 export type ContentArea =
   | "Global"
@@ -31,6 +38,7 @@ export type ContentRegistryEntry = {
   classification: ContentClassification;
   previewPath?: string;
   allowedVariables?: string[];
+  allowedValues?: readonly string[];
 };
 
 function field(
@@ -56,7 +64,8 @@ function field(
     classification: options.classification || "editable-standard",
     previewPath: options.previewPath,
     minLength: options.minLength,
-    allowedVariables: options.allowedVariables
+    allowedVariables: options.allowedVariables,
+    allowedValues: options.allowedValues
   };
 }
 
@@ -453,7 +462,14 @@ function seoPage(definition: SeoDefinition): ContentRegistryEntry[] {
     field(`seo.${definition.id}.ogTitle`, "SEO", "Per-page SEO", definition.page, "Social title", definition.title, { maxLength: 90, previewPath: definition.path, classification }),
     field(`seo.${definition.id}.ogDescription`, "SEO", "Per-page SEO", definition.page, "Social description", definition.description, { maxLength: 220, previewPath: definition.path, classification }),
     field(`seo.${definition.id}.image`, "SEO", "Per-page SEO", definition.page, "Social image", "/seo/qrguitar-og-v2.png", { type: "url", maxLength: 500, previewPath: definition.path, classification }),
-    field(`seo.${definition.id}.indexing`, "SEO", "Per-page SEO", definition.page, "Indexing state", definition.indexable === false ? "noindex, nofollow" : "index, follow", { maxLength: 40, previewPath: definition.path, classification: definition.indexable === false ? "security-locked" : "editable-advanced" })
+    field(`seo.${definition.id}.indexing`, "SEO", "Per-page SEO", definition.page, "Indexing state", definition.indexable === false ? "noindex, nofollow" : "index, follow", {
+      type: "select",
+      allowedValues: seoIndexingValues,
+      maxLength: 40,
+      previewPath: definition.path,
+      classification: definition.indexable === false ? "security-locked" : "editable-advanced",
+      help: "Choose whether search engines may index this page and follow its links."
+    })
   ];
 }
 
@@ -469,7 +485,7 @@ const seoRegistry: ContentRegistryEntry[] = [
     { id: "contact", page: "Contact", path: "/contact", title: "QRguitar Support and Contact", description: "Get help with QRguitar accounts, Profiles, QR codes, ownership handoffs, verification, and service workflows." },
     { id: "privacy", page: "Privacy", path: "/privacy", title: "Privacy | QRguitar", description: "Understand QRguitar Profile visibility, Serial Number privacy, account data, documents, and public information controls." },
     { id: "terms", page: "Terms", path: "/terms", title: "Terms | QRguitar", description: "Review the terms for QRguitar accounts, Profile content, ownership tools, acceptable use, and platform access." },
-    { id: "collections", page: "Public Collection defaults", path: "/collections", title: "Instrument Collection | QRguitar", description: "Explore a privacy-controlled public collection of QRguitar instrument Profiles." },
+    { id: "collections", page: "Member Collections", path: "/collections", title: "Member Collections | QRguitar", description: "Explore public instrument collections from QRguitar players, collectors, shops, builders, and service professionals." },
     { id: "dashboard", page: "Dashboard (protected)", path: "/dashboard", title: "Dashboard | QRguitar", description: "Private QRguitar owner workspace.", indexable: false },
     { id: "account", page: "Account (protected)", path: "/account", title: "Account | QRguitar", description: "Private QRguitar account workspace.", indexable: false },
     { id: "admin", page: "Admin (protected)", path: "/admin", title: "Admin | QRguitar", description: "Protected QRguitar administration.", indexable: false }
@@ -646,6 +662,9 @@ export function validateContentValues(value: Record<string, string>) {
     }
     if (entry.type === "url" && candidate && !isSafeUrl(candidate)) {
       errors[entry.key] = "Use an absolute https URL or a site-relative path.";
+    }
+    if (entry.allowedValues && !entry.allowedValues.includes(candidate)) {
+      errors[entry.key] = `Choose one of: ${entry.allowedValues.join(", ")}.`;
     }
     if (entry.allowedVariables) {
       const invalid = validateVariables(candidate, entry.allowedVariables);

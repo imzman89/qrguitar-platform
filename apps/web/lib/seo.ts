@@ -16,11 +16,67 @@ export function normalizeMetadataText(value: unknown) {
   return String(value ?? "").replace(/\s+/gu, " ").trim();
 }
 
-/** Keep metadata concise without splitting a Unicode code point or, when possible, a word. */
+function isMetadataGraphemeExtender(character: string) {
+  const codePoint = character.codePointAt(0) || 0;
+  return /\p{Mark}/u.test(character)
+    || (codePoint >= 0xfe00 && codePoint <= 0xfe0f)
+    || (codePoint >= 0xe0100 && codePoint <= 0xe01ef)
+    || (codePoint >= 0x1f3fb && codePoint <= 0x1f3ff)
+    || (codePoint >= 0xe0020 && codePoint <= 0xe007f);
+}
+
+function isRegionalIndicator(character: string) {
+  const codePoint = character.codePointAt(0) || 0;
+  return codePoint >= 0x1f1e6 && codePoint <= 0x1f1ff;
+}
+
+export function fallbackMetadataGraphemes(value: string) {
+  const characters = Array.from(value);
+  const graphemes: string[] = [];
+
+  for (let index = 0; index < characters.length;) {
+    let grapheme = characters[index++];
+
+    if (grapheme === "\r" && characters[index] === "\n") {
+      grapheme += characters[index++];
+    } else if (isRegionalIndicator(grapheme) && isRegionalIndicator(characters[index] || "")) {
+      grapheme += characters[index++];
+    }
+
+    while (index < characters.length && isMetadataGraphemeExtender(characters[index])) {
+      grapheme += characters[index++];
+    }
+
+    while (characters[index] === "\u200d" && index + 1 < characters.length) {
+      grapheme += characters[index++];
+      grapheme += characters[index++];
+      while (index < characters.length && isMetadataGraphemeExtender(characters[index])) {
+        grapheme += characters[index++];
+      }
+    }
+
+    graphemes.push(grapheme);
+  }
+
+  return graphemes;
+}
+
+export function metadataGraphemes(value: string) {
+  if (typeof Intl.Segmenter === "function") {
+    return Array.from(
+      new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(value),
+      (part) => part.segment
+    );
+  }
+
+  return fallbackMetadataGraphemes(value);
+}
+
+/** Keep metadata concise without splitting a Unicode grapheme or, when possible, a word. */
 export function metadataExcerpt(value: unknown, maxLength: number) {
   const normalized = normalizeMetadataText(value);
   const limit = Math.max(1, Math.floor(maxLength));
-  const characters = Array.from(normalized);
+  const characters = metadataGraphemes(normalized);
   if (characters.length <= limit) return normalized;
   if (limit === 1) return "…";
 

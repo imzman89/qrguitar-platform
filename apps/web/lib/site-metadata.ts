@@ -34,7 +34,7 @@ export function resolveManagedPageRobots(pageId: string, configuredValue: unknow
   }
 
   const normalized = String(configuredValue || "").trim().toLowerCase().replace(/\s*,\s*/g, ", ");
-  return ALLOWED_ROBOTS_VALUES.get(normalized) || { index: true, follow: true };
+  return ALLOWED_ROBOTS_VALUES.get(normalized) || { index: false, follow: false };
 }
 
 export async function buildManagedSiteMetadata(): Promise<Metadata> {

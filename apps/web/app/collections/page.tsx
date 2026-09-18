@@ -4,21 +4,17 @@ import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import { getPublicInstruments } from "../../lib/public-instruments";
 import { buildCollectionDirectory } from "../../lib/collection-directory";
-import { buildCollectionsDirectoryJsonLd, buildPageMetadata, serializeJsonLd } from "../../lib/seo";
+import { buildCollectionsDirectoryJsonLd, serializeJsonLd } from "../../lib/seo";
+import { buildManagedPageMetadata } from "../../lib/site-metadata";
 import { CollectionsDirectoryClient } from "./CollectionsDirectoryClient";
 import styles from "./collections.module.css";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export const metadata: Metadata = {
-  ...buildPageMetadata(
-    "Member Collections",
-    "Explore public instrument collections from QRguitar players, collectors, shops, builders, and service professionals.",
-    "/collections"
-  ),
-  title: "Member Collections | QRguitar"
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildManagedPageMetadata("collections", "/collections");
+}
 
 export default async function CollectionsDirectoryPage() {
   const records = await getPublicInstruments();
