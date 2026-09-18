@@ -276,7 +276,7 @@ export function messagingDatabaseError(error: unknown) {
   const value = error as { code?: string; message?: string } | null;
   const code = value?.code || "";
   if (code === "MM401") return { status: 401, message: "Sign in with an active account to continue." };
-  if (code === "MM403" || code === "42501") return { status: 403, message: "Messaging is unavailable for this member or conversation." };
+  if (code === "MM403" || code === "42501" || code === "PD423") return { status: 403, message: "Messaging is unavailable for this member or conversation." };
   if (code === "MM404") return { status: 404, message: "Conversation not found." };
   if (code === "MM409" || code === "23505") return { status: 409, message: value?.message || "This action conflicts with an earlier message operation." };
   if (code === "MM422") return { status: 422, message: value?.message || "An attachment is not ready." };

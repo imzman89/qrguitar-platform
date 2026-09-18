@@ -28,6 +28,7 @@ import { buildProfileIdentityFields, ProfileIdentity } from "../../../components
 import { ProfileStatusBadges } from "../../../components/ProfileStatusBadges";
 import { RecordShareButton } from "../../../components/RecordShareButton";
 import { SellerWebsiteLink } from "../../../components/SellerWebsiteLink";
+import { MemberMessageLink } from "../../../components/MemberMessageLink";
 import {
   getInstrumentVerificationStatus,
   type DemoTransfer,
@@ -851,11 +852,6 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
               <span>{instrument.brand || "QRguitar"}</span>
             </div>
             <h1>{instrumentDisplayName(instrument)}</h1>
-            {instrument.publicCollection ? (
-              <Link className="profile-collection-link" href={`/collections/${instrument.publicCollection.handle}`}>
-                {getContentValue(publicContent, "profile.attribution.collection")} {instrument.publicCollection.publicName}
-              </Link>
-            ) : null}
             <ProfileStatusBadges
               record={{
                 ...instrument,
@@ -864,8 +860,9 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
               }}
               includeCondition={false}
               className="profile-hero-badges"
+              ownerCollection={instrument.publicCollection}
             />
-            {instrument.publicCollection ? <SellerWebsiteLink {...instrument.publicCollection} /> : null}
+            {instrument.publicCollection ? <div className="profile-member-actions"><SellerWebsiteLink {...instrument.publicCollection} />{instrument.publicCollection.allowMessages ? <MemberMessageLink className="profile-message-link" handle={instrument.publicCollection.handle} profileCode={instrument.qrCode} label={`Message ${instrument.publicCollection.publicName}`} /> : null}</div> : null}
           </div>
         </section>
 

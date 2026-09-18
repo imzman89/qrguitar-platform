@@ -74,6 +74,10 @@ export type DemoInstrument = {
     publicName: string;
     accountType: string;
     websiteUrl?: string;
+    bio?: string;
+    location?: string;
+    avatarUrl?: string;
+    allowMessages?: boolean;
   };
   ownerUserEmail?: string;
   location: string;

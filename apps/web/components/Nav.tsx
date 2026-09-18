@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, Menu, UserRound, X } from "lucide-react";
+import { LogOut, Menu, MessageCircle, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { BrandLogo } from "./BrandLogo";
 import { useAuthNavigation } from "../lib/use-auth-navigation";
@@ -97,6 +97,7 @@ export function Nav() {
                 <UserRound size={18} aria-hidden="true" /><span>Account</span>
               </button>
               {accountMenuOpen ? <div className={styles.dropdown} id="account-navigation">
+                <Link href="/messages" onClick={() => { setIsOpen(false); setAccountMenuOpen(false); }}><MessageCircle size={16} aria-hidden="true" /> Messages</Link>
                 <Link href="/account" onClick={() => { setIsOpen(false); setAccountMenuOpen(false); }}>Account settings</Link>
                 <button type="button" disabled={signingOut} onClick={() => void logout()}><LogOut size={16} aria-hidden="true" /> {signingOut ? "Signing out..." : "Sign out"}</button>
                 {logoutError ? <p role="alert">{logoutError}</p> : null}

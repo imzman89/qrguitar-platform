@@ -39,8 +39,7 @@ export function CollectibleRecordCard({
   createdLabel = "",
   ctaLabel = "Open Profile",
   secondaryHref = "",
-  secondaryLabel = "",
-  content
+  secondaryLabel = ""
 }: CollectibleRecordCardProps) {
   const router = useRouter();
   const card = useMemo(() => resolveCollectibleCard(record), [record]);
@@ -54,7 +53,6 @@ export function CollectibleRecordCard({
   const showSecondaryText = variant !== "latest" && !secondaryHref && secondaryLabel;
   const summary = variant === "latest" || variant === "archive" ? "" : card.summary;
   const showGalleryControls = galleryImages.length > 1;
-  const attributionPrefix = content?.["cards.attribution.collection"] || "From the collection of";
 
   useEffect(() => {
     setActiveImageIndex(0);
@@ -217,7 +215,7 @@ export function CollectibleRecordCard({
             {summary ? <p className="collectible-card-summary">{summary}</p> : null}
           </Link>
 
-          <ProfileStatusBadges record={record} maxBadges={3} />
+          <ProfileStatusBadges record={record} maxBadges={3} ownerCollection={record.publicCollection} />
 
           <div className="collectible-card-facts" aria-label="Profile contents">
             {card.publicSerial ? (
@@ -232,12 +230,6 @@ export function CollectibleRecordCard({
             {card.photoCount ? <span><Camera size={13} /> {card.photoCount} {card.photoCount === 1 ? "photo" : "photos"}</span> : null}
             {card.publicDocumentCount ? <span><FileText size={13} /> {card.publicDocumentCount} {card.publicDocumentCount === 1 ? "document" : "documents"}</span> : null}
           </div>
-
-          {card.collection ? (
-            <Link className="collectible-card-collection-link" href={`/collections/${card.collection.handle}`} aria-label={`Open ${card.collection.publicName} collection`}>
-              {attributionPrefix} {card.collection.publicName}
-            </Link>
-          ) : null}
 
           <div className="collectible-card-actions">
             <Link className="collectible-card-cta" href={card.profileUrl}>{ctaLabel} <ArrowRight size={14} /></Link>

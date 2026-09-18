@@ -1,0 +1,387 @@
+"use client";
+
+import {
+  Archive,
+  ArrowLeft,
+  Ban,
+  ExternalLink,
+  FileImage,
+  Flag,
+  ImagePlus,
+  Inbox,
+  LoaderCircle,
+  MessageCircle,
+  RefreshCw,
+  Send,
+  ShieldCheck,
+  UserRound,
+  X
+} from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  MEMBER_MEDIA_BUCKET,
+  MEMBER_MEDIA_COUNT_LIMIT,
+  MEMBER_MEDIA_LIMIT,
+  MEMBER_MEDIA_TYPES,
+  type MemberConversationSummary,
+  type MemberConversationThread,
+  type MemberMessage
+} from "../lib/member-messaging";
+import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../lib/supabase-browser";
+import styles from "./MessagesClient.module.css";
+
+type Phase = "loading" | "ready" | "signed-out" | "error";
+type PendingSend = { operationId: string; message: string; files: File[]; uploaded: boolean };
+type UploadIntent = { uploadId: string; path: string; token: string };
+
+class MessageRequestError extends Error {
+  status: number;
+  uncertain: boolean;
+  constructor(message: string, status = 0, uncertain = false) {
+    super(message);
+    this.status = status;
+    this.uncertain = uncertain;
+  }
+}
+
+async function messageFetch<T>(url: string, init: RequestInit = {}) {
+  const token = await getSupabaseAccessToken();
+  if (!token) throw new MessageRequestError("Sign in to use QRguitar Messages.", 401);
+  try {
+    const response = await fetch(url, {
+      ...init,
+      cache: "no-store",
+      headers: { Authorization: `Bearer ${token}`, ...(init.body ? { "Content-Type": "application/json" } : {}), ...(init.headers || {}) },
+      signal: AbortSignal.timeout(15000)
+    });
+    const payload = await response.json().catch(() => null) as (T & { message?: string }) | null;
+    if (!response.ok || !payload) throw new MessageRequestError(payload?.message || "Messages could not complete that action.", response.status, response.status >= 500);
+    return payload;
+  } catch (error) {
+    if (error instanceof MessageRequestError) throw error;
+    throw new MessageRequestError("The result could not be confirmed. Check your connection and try again.", 0, true);
+  }
+}
+
+function memberRole(value: string) {
+  const labels: Record<string, string> = {
+    player: "Player / owner",
+    collector: "Collector",
+    shop: "Store / retailer",
+    builder: "Builder / brand",
+    luthier: "Luthier / repair shop"
+  };
+  return labels[value] || "QRguitar member";
+}
+
+function formatTime(value: string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  const sameDay = date.toDateString() === new Date().toDateString();
+  return new Intl.DateTimeFormat(undefined, sameDay ? { hour: "numeric", minute: "2-digit" } : { month: "short", day: "numeric" }).format(date);
+}
+
+function fileSize(bytes: number) {
+  return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+function MemberAvatar({ name, src }: { name: string; src: string }) {
+  const [failed, setFailed] = useState(false);
+  return src && !failed
+    ? <img className={styles.avatar} src={src} alt="" width={56} height={56} referrerPolicy="no-referrer" onError={() => setFailed(true)} />
+    : <span className={styles.avatarFallback} aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>;
+}
+
+export function MessagesClient({ conversationId = "", initialArchived = false }: { conversationId?: string; initialArchived?: boolean }) {
+  const router = useRouter();
+  const [phase, setPhase] = useState<Phase>("loading");
+  const [archived, setArchived] = useState(initialArchived);
+  const [conversations, setConversations] = useState<MemberConversationSummary[]>([]);
+  const [thread, setThread] = useState<MemberConversationThread | null>(null);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [draft, setDraft] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [sending, setSending] = useState(false);
+  const [uncertainSend, setUncertainSend] = useState(false);
+  const [connection, setConnection] = useState("Connecting");
+  const [reportMessage, setReportMessage] = useState<MemberMessage | null>(null);
+  const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("spam");
+  const [reportDetails, setReportDetails] = useState("");
+  const pendingSend = useRef<PendingSend | null>(null);
+  const messageEnd = useRef<HTMLDivElement | null>(null);
+  const firstThreadLoad = useRef(true);
+
+  const handleRequestError = useCallback((reason: unknown) => {
+    const failure = reason instanceof MessageRequestError ? reason : new MessageRequestError("Messages are temporarily unavailable.");
+    if (failure.status === 401) setPhase("signed-out");
+    else {
+      setError(failure.message);
+      setPhase((current) => current === "loading" ? "error" : current);
+    }
+    return failure;
+  }, []);
+
+  const loadInbox = useCallback(async (showLoading = true) => {
+    if (showLoading) setPhase("loading");
+    setError("");
+    try {
+      const payload = await messageFetch<{ ok: boolean; conversations: MemberConversationSummary[] }>(`/api/messages?archived=${archived}`);
+      setConversations(payload.conversations || []);
+      setPhase("ready");
+    } catch (reason) { handleRequestError(reason); }
+  }, [archived, handleRequestError]);
+
+  const loadThread = useCallback(async (showLoading = true) => {
+    if (!conversationId) return;
+    if (showLoading) setPhase("loading");
+    setError("");
+    try {
+      const payload = await messageFetch<{ ok: boolean; conversation: MemberConversationThread }>(`/api/messages/${conversationId}`);
+      setThread(payload.conversation);
+      setPhase("ready");
+      void messageFetch(`/api/messages/${conversationId}/controls`, { method: "POST", body: JSON.stringify({ action: "read" }) }).catch(() => undefined);
+    } catch (reason) { handleRequestError(reason); }
+  }, [conversationId, handleRequestError]);
+
+  useEffect(() => {
+    if (conversationId) void loadThread();
+    else void loadInbox();
+  }, [conversationId, loadInbox, loadThread]);
+
+  useEffect(() => {
+    if (!conversationId || phase === "signed-out") return;
+    const supabase = createBrowserSupabaseClient();
+    const channel = supabase.channel(`member-conversation:${conversationId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "member_messages", filter: `conversation_id=eq.${conversationId}` }, () => void loadThread(false))
+      .subscribe((status) => setConnection(status === "SUBSCRIBED" ? "Live" : status === "CHANNEL_ERROR" || status === "TIMED_OUT" ? "Reconnecting" : "Connecting"));
+    const refresh = () => { if (document.visibilityState === "visible") void loadThread(false); };
+    const timer = window.setInterval(refresh, 12000);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+      void supabase.removeChannel(channel);
+    };
+  }, [conversationId, loadThread, phase]);
+
+  useEffect(() => {
+    const latest = thread?.messages.at(-1)?.id;
+    if (!latest) return;
+    messageEnd.current?.scrollIntoView({ behavior: firstThreadLoad.current ? "auto" : "smooth", block: "end" });
+    firstThreadLoad.current = false;
+  }, [thread?.messages]);
+
+  function chooseFiles(selected: FileList | null) {
+    setNotice("");
+    const next = [...files, ...Array.from(selected || [])];
+    if (next.length > MEMBER_MEDIA_COUNT_LIMIT) return setNotice("A message can include up to four photos or videos.");
+    const invalid = next.find((file) => !(MEMBER_MEDIA_TYPES as readonly string[]).includes(file.type) || file.size < 1 || file.size > MEMBER_MEDIA_LIMIT);
+    if (invalid) return setNotice(`${invalid.name} is not a supported image or video under 15 MB.`);
+    setFiles(next);
+  }
+
+  async function discardPending(attempt: PendingSend | null) {
+    if (!attempt?.uploaded || !conversationId) return;
+    await messageFetch(`/api/messages/${conversationId}/uploads`, { method: "DELETE", body: JSON.stringify({ operationId: attempt.operationId }) }).catch(() => undefined);
+  }
+
+  async function sendMessage() {
+    if (!conversationId || sending) return;
+    const cleanDraft = draft.trim();
+    if (!cleanDraft && !files.length) return setNotice("Write a message or attach a photo or video.");
+    const attempt = pendingSend.current || { operationId: crypto.randomUUID(), message: cleanDraft, files: [...files], uploaded: false };
+    pendingSend.current = attempt;
+    setSending(true);
+    setError("");
+    setNotice("");
+    try {
+      if (attempt.files.length && !attempt.uploaded) {
+        const prepared = await messageFetch<{ ok: boolean; uploads: UploadIntent[] }>(`/api/messages/${conversationId}/uploads`, {
+          method: "POST",
+          body: JSON.stringify({
+            operationId: attempt.operationId,
+            files: attempt.files.map((file) => ({ uploadId: crypto.randomUUID(), fileName: file.name, mimeType: file.type, fileSizeBytes: file.size }))
+          })
+        });
+        attempt.uploaded = true;
+        const supabase = createBrowserSupabaseClient();
+        for (let index = 0; index < prepared.uploads.length; index += 1) {
+          const intent = prepared.uploads[index];
+          const uploaded = await supabase.storage.from(MEMBER_MEDIA_BUCKET).uploadToSignedUrl(intent.path, intent.token, attempt.files[index], {
+            contentType: attempt.files[index].type,
+            cacheControl: "3600"
+          });
+          if (uploaded.error) throw new MessageRequestError(`Could not upload ${attempt.files[index].name}.`, 422);
+        }
+      }
+      await messageFetch(`/api/messages/${conversationId}/send`, {
+        method: "POST",
+        body: JSON.stringify({ operationId: attempt.operationId, message: attempt.message })
+      });
+      pendingSend.current = null;
+      setUncertainSend(false);
+      setDraft("");
+      setFiles([]);
+      setNotice("Message sent.");
+      await loadThread(false);
+    } catch (reason) {
+      const failure = reason instanceof MessageRequestError ? reason : new MessageRequestError("The send could not be confirmed.", 0, true);
+      if (failure.uncertain) {
+        setUncertainSend(true);
+        setError(`${failure.message} Retry will use the same protected send operation.`);
+      } else {
+        await discardPending(attempt);
+        pendingSend.current = null;
+        setUncertainSend(false);
+        setError(failure.message);
+      }
+    } finally { setSending(false); }
+  }
+
+  async function runControl(action: "archive" | "unarchive" | "block" | "unblock") {
+    if (!conversationId || !thread) return;
+    setNotice("");
+    setError("");
+    try {
+      await messageFetch(`/api/messages/${conversationId}/controls`, { method: "POST", body: JSON.stringify({ action }) });
+      if (action === "archive" || action === "unarchive") router.push(`/messages${action === "archive" ? "?archived=true" : ""}`);
+      else await loadThread(false);
+    } catch (reason) { handleRequestError(reason); }
+  }
+
+  async function submitReport() {
+    if (!conversationId || !reportMessage) return;
+    setError("");
+    try {
+      await messageFetch(`/api/messages/${conversationId}/controls`, {
+        method: "POST",
+        body: JSON.stringify({ action: "report", messageId: reportMessage.id, reason: reportReason, details: reportDetails })
+      });
+      setReportMessage(null);
+      setReportDetails("");
+      setNotice("Report sent to QRguitar for review.");
+    } catch (reason) { handleRequestError(reason); }
+  }
+
+  const signinHref = `/login?next=${encodeURIComponent(conversationId ? `/messages/${conversationId}` : "/messages")}`;
+  if (phase === "loading") return <MessageState icon={<LoaderCircle className={styles.spin} />} title="Opening Messages" copy="Loading your private conversations." />;
+  if (phase === "signed-out") return <MessageState icon={<MessageCircle />} title="Sign in to Messages" copy="Private conversations are available to signed-in QRguitar members." action={<Link className="button" href={signinHref}>Sign in</Link>} />;
+  if (phase === "error" && !thread && !conversations.length) return <MessageState icon={<RefreshCw />} title="Messages are unavailable" copy={error} action={<button className="button" type="button" onClick={() => conversationId ? void loadThread() : void loadInbox()}>Try again</button>} />;
+
+  if (!conversationId) {
+    return (
+      <section className={styles.workspace} aria-labelledby="messages-title">
+        <header className={styles.inboxHeader}>
+          <div><span className="eyebrow">Private member conversations</span><h1 id="messages-title">Messages</h1><p>{"Connect with owners, stores, brands, builders, and repair professionals without exposing either member's email address."}</p></div>
+          <Link className="button secondary" href="/collections"><UserRound size={16} /> Find members</Link>
+        </header>
+        <div className={styles.segmented} aria-label="Message folders">
+          <button type="button" className={!archived ? styles.active : ""} onClick={() => setArchived(false)}><Inbox size={15} /> Inbox</button>
+          <button type="button" className={archived ? styles.active : ""} onClick={() => setArchived(true)}><Archive size={15} /> Archived</button>
+        </div>
+        {error ? <p className={styles.error} role="alert">{error}</p> : null}
+        <div className={styles.inboxList}>
+          {conversations.length ? conversations.map((conversation) => (
+            <Link className={`${styles.conversationCard} ${conversation.unread ? styles.unread : ""}`} href={`/messages/${conversation.id}`} key={conversation.id}>
+              <MemberAvatar name={conversation.member.publicName} src={conversation.member.avatarUrl} />
+              <div className={styles.conversationBody}>
+                <div className={styles.conversationTopline}><strong>{conversation.member.publicName}</strong><time>{conversation.lastMessage ? formatTime(conversation.lastMessage.createdAt) : "New"}</time></div>
+                <span>{memberRole(conversation.member.accountType)}{conversation.member.location ? ` / ${conversation.member.location}` : ""}</span>
+                {conversation.contextProfile ? <small>About {conversation.contextProfile.title}</small> : null}
+                <p>{conversation.lastMessage ? `${conversation.lastMessage.sentByMe ? "You: " : ""}${conversation.lastMessage.body}` : "Start the conversation."}</p>
+              </div>
+              {conversation.unread ? <i aria-label="Unread message" /> : null}
+            </Link>
+          )) : <MessageState compact icon={archived ? <Archive /> : <Inbox />} title={archived ? "No archived conversations" : "Your inbox is ready"} copy={archived ? "Archived conversations will stay here until you restore them." : "Open a member page or public QRguitar Profile to start a private conversation."} action={!archived ? <Link className="button" href="/collections">Browse member collections</Link> : undefined} />}
+        </div>
+      </section>
+    );
+  }
+
+  if (!thread) return null;
+  const lockComposer = uncertainSend || sending;
+  return (
+    <section className={styles.workspace} aria-labelledby="thread-title">
+      <header className={styles.threadHeader}>
+        <Link className={styles.backLink} href="/messages"><ArrowLeft size={17} /> Messages</Link>
+        <div className={styles.threadIdentity}><MemberAvatar name={thread.member.publicName} src={thread.member.avatarUrl} /><div><h1 id="thread-title">{thread.member.publicName}</h1><p>{memberRole(thread.member.accountType)}{thread.member.location ? ` / ${thread.member.location}` : ""}</p></div></div>
+        <span className={`${styles.connection} ${connection === "Live" ? styles.live : ""}`}><i /> {connection}</span>
+      </header>
+      <div className={styles.threadGrid}>
+        <div className={styles.threadPanel}>
+          {thread.hasOlderMessages ? <p className={styles.historyNote}>This view shows the latest 200 messages.</p> : null}
+          <div className={styles.messageList} aria-live="polite">
+            {!thread.messages.length ? <div className={styles.threadEmpty}><MessageCircle /><strong>Start the conversation</strong><p>Ask a focused question about the Profile, availability, service, or a potential transfer.</p></div> : null}
+            {thread.messages.map((message) => (
+              <article className={`${styles.message} ${message.sentByMe ? styles.mine : styles.theirs}`} key={message.id}>
+                {message.body ? <p>{message.body}</p> : null}
+                {message.attachments.length ? <div className={styles.mediaGrid}>{message.attachments.map((attachment) => attachment.mimeType.startsWith("image/") ? (
+                  <a href={attachment.signedUrl} target="_blank" rel="noopener noreferrer" key={attachment.id} aria-label={`Open ${attachment.fileName}`}><img src={attachment.signedUrl} alt={attachment.fileName} loading="lazy" /></a>
+                ) : (
+                  <video controls preload="metadata" key={attachment.id}><source src={attachment.signedUrl} type={attachment.mimeType} />Your browser cannot play this video.</video>
+                ))}</div> : null}
+                <footer><time dateTime={message.createdAt}>{formatTime(message.createdAt)}</time>{!message.sentByMe ? <button type="button" title="Report this message" onClick={() => setReportMessage(message)}><Flag size={12} /> Report</button> : null}</footer>
+              </article>
+            ))}
+            <div ref={messageEnd} />
+          </div>
+          {thread.blocked ? <div className={styles.blockNotice}><Ban size={18} /><div><strong>Messaging is paused</strong><p>{thread.blockedByMe ? "You blocked this member. Unblock them to continue the conversation." : "Messages cannot be sent in this conversation."}</p></div></div> : (
+            <div className={styles.composer}>
+              <label htmlFor="member-message-draft">Message</label>
+              <textarea id="member-message-draft" rows={3} maxLength={4000} value={draft} disabled={lockComposer} onChange={(event) => setDraft(event.target.value)} placeholder={`Message ${thread.member.publicName}`} />
+              {files.length ? <ul className={styles.fileList}>{files.map((file, index) => <li key={`${file.name}-${file.lastModified}-${index}`}><FileImage size={15} /><span><strong>{file.name}</strong><small>{fileSize(file.size)}</small></span><button type="button" disabled={lockComposer} title={`Remove ${file.name}`} onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={15} /></button></li>)}</ul> : null}
+              <div className={styles.composerActions}>
+                <label className={styles.attachButton}><ImagePlus size={17} /><span>Add media</span><input type="file" multiple accept={MEMBER_MEDIA_TYPES.join(",")} disabled={lockComposer || files.length >= 4} onChange={(event) => { chooseFiles(event.target.files); event.currentTarget.value = ""; }} /></label>
+                <span>{draft.length}/4000</span>
+                <button className="button" type="button" disabled={sending} onClick={() => void sendMessage()}>{sending ? <LoaderCircle className={styles.spin} size={16} /> : <Send size={16} />}{sending ? "Sending..." : uncertainSend ? "Retry send" : "Send"}</button>
+              </div>
+            </div>
+          )}
+          {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
+          {error ? <p className={styles.error} role="alert">{error}</p> : null}
+        </div>
+        <aside className={styles.memberPanel} aria-label="Member and conversation details">
+          <div className={styles.memberSummary}><MemberAvatar name={thread.member.publicName} src={thread.member.avatarUrl} /><div><strong>{thread.member.publicName}</strong><span>{memberRole(thread.member.accountType)}</span></div></div>
+          {thread.member.bio ? <p>{thread.member.bio}</p> : null}
+          <div className={styles.memberLinks}>
+            {thread.member.handle ? <Link href={`/collections/${thread.member.handle}`}><UserRound size={15} /> View member page</Link> : null}
+            {thread.member.websiteUrl ? <a href={thread.member.websiteUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={15} /> Visit website</a> : null}
+            {thread.contextProfile ? <Link href={thread.contextProfile.href}><ShieldCheck size={15} /> {thread.contextProfile.title}</Link> : null}
+          </div>
+          <div className={styles.threadControls}>
+            <button type="button" onClick={() => void runControl(thread.archived ? "unarchive" : "archive")}><Archive size={15} /> {thread.archived ? "Restore conversation" : "Archive conversation"}</button>
+            <button type="button" className={styles.danger} onClick={() => thread.blockedByMe ? void runControl("unblock") : setBlockConfirmOpen(true)}><Ban size={15} /> {thread.blockedByMe ? "Unblock member" : "Block member"}</button>
+          </div>
+        </aside>
+      </div>
+      {blockConfirmOpen ? <div className={styles.modalBackdrop} onMouseDown={(event) => { if (event.target === event.currentTarget) setBlockConfirmOpen(false); }}>
+        <section className={styles.reportDialog} role="dialog" aria-modal="true" aria-labelledby="block-member-title">
+          <header><div><span className="eyebrow">Conversation control</span><h2 id="block-member-title">Block {thread.member.publicName}?</h2></div><button type="button" title="Close block confirmation" onClick={() => setBlockConfirmOpen(false)}><X /></button></header>
+          <p>Neither member will be able to send messages in this conversation until you unblock them. You can reverse this at any time.</p>
+          <footer><button className="button secondary" type="button" onClick={() => setBlockConfirmOpen(false)}>Cancel</button><button className="button" type="button" onClick={() => { setBlockConfirmOpen(false); void runControl("block"); }}><Ban size={15} /> Block member</button></footer>
+        </section>
+      </div> : null}
+      {reportMessage ? <div className={styles.modalBackdrop} onMouseDown={(event) => { if (event.target === event.currentTarget) setReportMessage(null); }}>
+        <section className={styles.reportDialog} role="dialog" aria-modal="true" aria-labelledby="report-message-title">
+          <header><div><span className="eyebrow">Safety control</span><h2 id="report-message-title">Report message</h2></div><button type="button" title="Close report" onClick={() => setReportMessage(null)}><X /></button></header>
+          <p>QRguitar will review this message and the conversation context. The other member is not notified that you filed a report.</p>
+          <label><span>Reason</span><select value={reportReason} onChange={(event) => setReportReason(event.target.value)}><option value="spam">Spam</option><option value="harassment">Harassment</option><option value="fraud">Fraud or scam</option><option value="unsafe_content">Unsafe content</option><option value="other">Other</option></select></label>
+          <label><span>Details (optional)</span><textarea rows={4} maxLength={1000} value={reportDetails} onChange={(event) => setReportDetails(event.target.value)} /></label>
+          <footer><button className="button secondary" type="button" onClick={() => setReportMessage(null)}>Cancel</button><button className="button" type="button" onClick={() => void submitReport()}><Flag size={15} /> Send report</button></footer>
+        </section>
+      </div> : null}
+    </section>
+  );
+}
+
+function MessageState({ icon, title, copy, action, compact = false }: { icon: ReactNode; title: string; copy: string; action?: ReactNode; compact?: boolean }) {
+  return <div className={`${styles.state} ${compact ? styles.compactState : ""}`}>{icon}<h2>{title}</h2><p>{copy}</p>{action}</div>;
+}

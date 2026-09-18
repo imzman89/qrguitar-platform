@@ -24,6 +24,14 @@
 .empty h2, .empty p { margin: 0; }
 .empty h2 { color: var(--text); font-size: clamp(24px, 3vw, 32px); }
 .empty p { color: var(--muted); line-height: 1.65; }
+.memberHero { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: stretch; padding: clamp(22px, 4vw, 38px); border: 1px solid rgba(240,161,43,.24); border-radius: 8px; background: linear-gradient(135deg, rgba(240,161,43,.08), rgba(18,25,29,.5) 42%, rgba(18,25,29,.92)); box-shadow: 0 24px 70px rgba(0,0,0,.24); }
+.memberIdentity { min-width: 0; display: grid; grid-template-columns: 112px minmax(0,1fr); align-items: center; gap: 24px; }
+.memberIdentity > img { width: 112px; height: 112px; border: 1px solid rgba(240,161,43,.32); border-radius: 50%; object-fit: cover; }
+.memberBio { max-width: 720px; font-size: 15px; line-height: 1.65; }
+.memberActions { min-width: 190px; display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 22px; }
+.actionRow { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.actionRow > a { min-height: 44px; }
 .filters input:focus-visible, .filters select:focus-visible, .card:focus-visible, .navigation a:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
 @media (max-width: 1000px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 600px) { .grid, .filters { grid-template-columns: minmax(0, 1fr); } .filters { padding: 16px; gap: 14px; } }
+@media (max-width: 780px) { .memberHero { display: grid; grid-template-columns: 1fr; } .memberActions { min-width: 0; align-items: flex-start; } .actionRow { justify-content: flex-start; } }
+@media (max-width: 600px) { .grid, .filters { grid-template-columns: minmax(0, 1fr); } .filters { padding: 16px; gap: 14px; } .memberIdentity { grid-template-columns: 64px minmax(0,1fr); gap: 14px; } .memberIdentity > img { width: 64px; height: 64px; } .actionRow, .actionRow > a { width: 100%; } }

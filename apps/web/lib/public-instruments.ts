@@ -421,7 +421,11 @@ async function loadRelated(guitars: GuitarRow[], serviceRole = true) {
         handle: collection.handle,
         publicName: collection.publicName,
         accountType: collection.accountType,
-        websiteUrl: collection.websiteUrl
+        websiteUrl: collection.websiteUrl,
+        bio: collection.bio,
+        location: collection.location,
+        avatarUrl: collection.avatarUrl,
+        allowMessages: collection.allowMessages
       });
     }
   }

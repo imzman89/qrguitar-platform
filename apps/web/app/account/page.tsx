@@ -238,9 +238,9 @@ function AccountSettingsPage() {
               <label className="toggle-field"><input type="checkbox" checked={publicCollection.allowIndexing} onChange={(event) => setPublicCollection((current) => ({ ...current, allowIndexing: event.target.checked }))} /> Allow search engines to index this collection</label>
               <label className="toggle-field">
                 <input type="checkbox" checked={publicCollection.allowMessages} onChange={(event) => setPublicCollection((current) => ({ ...current, allowMessages: event.target.checked }))} />
-                Allow signed-in members to send private inquiries
+                Allow signed-in members to message you in QRguitar
               </label>
-              <p className="field-note">Your email stays private. QRguitar relays the first message, and you decide whether to reply.</p>
+              <p className="field-note">Your email stays private. Conversations stay inside QRguitar and can include up to four photos or short videos per message.</p>
               <div className="form-actions">
                 <button className="button" type="button" onClick={saveAccount} disabled={isWorking}>{isWorking ? "Saving..." : "Save public collection"}</button>
                 {publishedHref ? <Link className="button secondary" href={publishedHref} target="_blank" rel="noopener noreferrer">View saved public collection <ExternalLink size={15} /></Link> : null}

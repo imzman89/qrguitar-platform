@@ -1,4 +1,5 @@
-import { ShieldCheck, Siren } from "lucide-react";
+import { ShieldCheck, Siren, UserRound } from "lucide-react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   getInstrumentCondition,
@@ -12,6 +13,7 @@ type ProfileStatusBadgesProps = {
   includeCategory?: boolean;
   maxBadges?: number;
   className?: string;
+  ownerCollection?: DemoInstrument["publicCollection"];
 };
 
 export function ProfileStatusBadges({
@@ -19,7 +21,8 @@ export function ProfileStatusBadges({
   includeCondition = true,
   includeCategory = false,
   maxBadges,
-  className = ""
+  className = "",
+  ownerCollection
 }: ProfileStatusBadgesProps) {
   const condition = getInstrumentCondition(record);
   const verificationStatus = getInstrumentVerificationStatus(record);
@@ -46,6 +49,12 @@ export function ProfileStatusBadges({
   return (
     <div className={`record-badge-row ${className}`.trim()} aria-label="Profile status">
       {typeof maxBadges === "number" ? badges.slice(0, maxBadges) : badges}
+      {ownerCollection?.handle && ownerCollection.publicName ? (
+        <Link className="record-owner-link" href={`/collections/${ownerCollection.handle}`} aria-label={`View ${ownerCollection.publicName}'s member page and public collection`}>
+          <UserRound aria-hidden="true" />
+          <span>Owned by <strong>{ownerCollection.publicName}</strong></span>
+        </Link>
+      ) : null}
     </div>
   );
 }

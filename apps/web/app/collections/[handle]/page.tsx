@@ -10,8 +10,8 @@ import { loadPublicCollectionSettings } from "../../../lib/public-collection-pag
 import { getPublicInstruments } from "../../../lib/public-instruments";
 import { CollectionsClient } from "./CollectionsClient";
 import { loadPublishedSiteSettings } from "../../../lib/site-settings-server";
-import { CollectionInquiryForm } from "../../../components/CollectionInquiryForm";
 import { SellerWebsiteLink } from "../../../components/SellerWebsiteLink";
+import { MemberMessageLink } from "../../../components/MemberMessageLink";
 import { buildPageMetadata, buildPrivatePageMetadata, buildPublicCollectionJsonLd, metadataExcerpt, SEARCH_TITLE_MAX_LENGTH, serializeJsonLd } from "../../../lib/seo";
 import styles from "../collections.module.css";
 
@@ -56,23 +56,30 @@ export default async function CollectionPage({ params }: { params: Promise<{ han
     <Nav />
     <main className="page-shell collection-page">
       <nav className={styles.navigation} aria-label="Collection navigation"><Link href="/collections"><ArrowLeft size={16} aria-hidden="true" /> All member collections</Link><Link href="/catalog">Browse instrument Profiles</Link></nav>
-      <header className="collection-header">
-        <FallbackImage
-          src={settings.avatarUrl}
-          alt=""
-          width={112}
-          height={112}
-          loading="eager"
-          fetchPriority="low"
-          decoding="async"
-          referrerPolicy="no-referrer"
-          fallback={<div className="collection-avatar" aria-hidden="true">{settings.publicName.slice(0, 1).toUpperCase()}</div>}
-        />
-        <div><span className="eyebrow">Public Collection</span><h1>{settings.publicName}</h1><p className="collection-role">{role}{settings.location ? ` / ${settings.location}` : ""}</p>{settings.bio ? <p>{settings.bio}</p> : null}<SellerWebsiteLink {...settings} /></div>
-        <strong className="collection-count">{records.length}<small>Public {records.length === 1 ? "Profile" : "Profiles"}</small></strong>
+      <header className={`${styles.memberHero} collection-header`}>
+        <div className={styles.memberIdentity}>
+          <FallbackImage
+            src={settings.avatarUrl}
+            alt={`${settings.publicName} avatar`}
+            width={112}
+            height={112}
+            loading="eager"
+            fetchPriority="low"
+            decoding="async"
+            referrerPolicy="no-referrer"
+            fallback={<div className="collection-avatar" aria-hidden="true">{settings.publicName.slice(0, 1).toUpperCase()}</div>}
+          />
+          <div><span className="eyebrow">QRguitar member</span><h1>{settings.publicName}</h1><p className="collection-role">{role}{settings.location ? ` / ${settings.location}` : ""}</p>{settings.bio ? <p className={styles.memberBio}>{settings.bio}</p> : <p className={styles.memberBio}>{"Explore this member's public QRguitar Profiles."}</p>}</div>
+        </div>
+        <div className={styles.memberActions}>
+          <strong className="collection-count">{records.length}<small>Public {records.length === 1 ? "Profile" : "Profiles"}</small></strong>
+          <div className={styles.actionRow}>
+            {settings.allowMessages ? <MemberMessageLink handle={settings.handle} label={`Message ${settings.publicName}`} /> : null}
+            <SellerWebsiteLink {...settings} />
+          </div>
+        </div>
       </header>
       <CollectionsClient key={settings.handle} records={records} content={publishedSettings.content} />
-      {settings.allowMessages ? <CollectionInquiryForm handle={settings.handle} publicName={settings.publicName} profiles={records.map((record) => ({ code: record.qrCode, title: record.name || [record.brand, record.model].filter(Boolean).join(" ") || record.qrCode }))} /> : null}
     </main>
     <Footer />
   </>;

@@ -89,6 +89,11 @@ const object = (value: unknown): value is Record<string, unknown> => value !== n
 const validTime = (value: unknown): value is string => typeof value === "string" && validTimestamp(value);
 const nullableTime = (value: unknown): value is string | null => value === null || validTime(value);
 const fingerprint = (value: unknown): value is string => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+function memberMediaPath(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const match = value.match(/^([^/]+)\/([^/]+)\/([^/]+)\/([^/.]+)\.(jpg|png|webp|gif|mp4|webm)$/i);
+  return Boolean(match && match.slice(1, 5).every(uuid));
+}
 const safeText = (value: unknown, max: number): value is string => typeof value === "string" && value.length > 0 && value.length <= max && !/[\u0000-\u001f\u007f]/.test(value);
 const relationshipCodes = new Set([
   "current_owner", "safety_author", "owner_removal_author", "archive_author", "transfer_from_owner", "transfer_recipient",
@@ -541,6 +546,22 @@ export function createFulfillmentService(deps: FulfillmentDependencies) {
     if (!object(result.data) || result.data.ok !== true) throw mapped(null);
     return result.data;
   }
+  async function removeMemberMessagingData(client: AdminClient, actorId: string) {
+    const plan = await rpc(client, "prepare_member_messaging_account_deletion", { p_actor_id: actorId });
+    if (!exactObject(plan, ["ok", "bucket", "paths"]) || plan.ok !== true || plan.bucket !== "member-message-media"
+      || !Array.isArray(plan.paths) || !plan.paths.every(memberMediaPath)) throw mapped(null);
+    const paths = plan.paths;
+    if (new Set(paths).size !== paths.length) throw mapped(null);
+    for (let index = 0; index < paths.length; index += 100) {
+      let removed: { data?: unknown; error: StorageError };
+      try { removed = await bounded(() => client.storage.from("member-message-media").remove(paths.slice(index, index + 100))); }
+      catch (error) { if (error instanceof FulfillmentError) throw error; throw mapped(null); }
+      if (!removed || removed.error) throw mapped(removed?.error || null);
+    }
+    const completed = await rpc(client, "complete_member_messaging_account_deletion", { p_actor_id: actorId });
+    if (!exactObject(completed, ["ok", "removedConversations"]) || completed.ok !== true
+      || !Number.isInteger(completed.removedConversations) || Number(completed.removedConversations) < 0) throw mapped(null);
+  }
   type VerifiedAccess = { client: AdminClient; adminId: string; environmentAdmin: boolean; accountStatus: string };
   const env = (verified: VerifiedAccess, requestId: string) => ({ p_admin_id: verified.adminId, p_environment_admin: verified.environmentAdmin, p_request_id: requestId });
   const storagePending = () => new FulfillmentError(503, "storage_relocation_pending",
@@ -899,7 +920,9 @@ export function createFulfillmentService(deps: FulfillmentDependencies) {
       if (actorId) {
         // A provider failure is never treated as proof of deletion. The database
         // finalizer below independently requires the Auth row to be absent.
-        try { await bounded(() => current.client.auth.admin.deleteUser(actorId.toLowerCase())); } catch { /* verified below */ }
+        const normalizedActor = actorId.toLowerCase();
+        await removeMemberMessagingData(current.client, normalizedActor);
+        try { await bounded(() => current.client.auth.admin.deleteUser(normalizedActor)); } catch { /* verified below */ }
       }
       try {
         const completed = await rpc(current.client, "complete_account_deletion_fulfillment", {

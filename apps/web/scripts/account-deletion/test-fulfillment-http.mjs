@@ -100,6 +100,8 @@ function fixture(options = {}) {
     rpc: async (name, args) => {
       calls.rpc.push({ name, args });
       calls.events.push({ action: "rpc", name, args });
+      if (name === "prepare_member_messaging_account_deletion") return options.messagingPrepare || { data: { ok: true, bucket: "member-message-media", paths: [] }, error: null };
+      if (name === "complete_member_messaging_account_deletion") return options.messagingComplete || { data: { ok: true, removedConversations: 0 }, error: null };
       if (options.rpc) return options.rpc(name, args, calls);
       if (name === "prepare_account_deletion_fulfillment") return { data: prepared, error: null };
       if (name === "authorize_account_deletion_storage_relocation") {
@@ -377,10 +379,55 @@ await check("ready database state deletes the exact server-side actor and finali
   const f = fixture({ prepared: { ok: true, fulfillment: job("ready_for_auth_deletion"), ...reviews, storageRelocations: [], authActorId: ACTOR } });
   const result = await inspect(await f.handlers.item(f.request(), REQUEST));
   assert.equal(result.status, 200); assert.equal(result.body.fulfillment.state, "completed"); assert.deepEqual(f.calls.deleted, [ACTOR]);
-  assert.deepEqual(f.calls.rpc.map(call => call.name), ["prepare_account_deletion_fulfillment", "complete_account_deletion_fulfillment"]);
-  assert.equal(f.calls.rpc[1].args.p_operation_id, "60000000-0000-4000-8000-000000000006");
+  assert.deepEqual(f.calls.rpc.map(call => call.name), ["prepare_account_deletion_fulfillment", "prepare_member_messaging_account_deletion", "complete_member_messaging_account_deletion", "complete_account_deletion_fulfillment"]);
+  assert.equal(f.calls.rpc[3].args.p_operation_id, "60000000-0000-4000-8000-000000000006");
 });
 
+
+await check("private message media cleanup fails closed before Auth deletion", async () => {
+  const path = "60000000-0000-4000-8000-000000000006/" + ACTOR + "/70000000-0000-4000-8000-000000000007/80000000-0000-4000-8000-000000000008.jpg";
+  const f = fixture({
+    prepared: { ok: true, fulfillment: job("ready_for_auth_deletion"), ...reviews, storageRelocations: [], authActorId: ACTOR },
+    messagingPrepare: { data: { ok: true, bucket: "member-message-media", paths: [path] }, error: null },
+    storage: { remove: async () => ({ data: null, error: { message: "PRIVATE STORAGE" } }) }
+  });
+  const result = await inspect(await f.handlers.item(f.request(), REQUEST));
+  assert.equal(result.status, 503); assert.equal(result.body.retryable, true);
+  assert.deepEqual(f.calls.deleted, []);
+  assert.deepEqual(f.calls.rpc.map(call => call.name), ["prepare_account_deletion_fulfillment", "prepare_member_messaging_account_deletion"]);
+});
+
+await check("private message bytes are physically removed and cleanup retries safely", async () => {
+  const conversation = "60000000-0000-4000-8000-000000000006";
+  const peer = "20000000-0000-4000-8000-000000000002";
+  const actorPath = conversation + "/" + ACTOR + "/70000000-0000-4000-8000-000000000007/81000000-0000-4000-8000-000000000008.jpg";
+  const peerPath = conversation + "/" + peer + "/70000000-0000-4000-8000-000000000007/82000000-0000-4000-8000-000000000008.png";
+  const unrelatedPath = "90000000-0000-4000-8000-000000000009/" + peer + "/70000000-0000-4000-8000-000000000007/83000000-0000-4000-8000-000000000008.jpg";
+  let attempts = 0;
+  const f = fixture({
+    prepared: { ok: true, fulfillment: job("ready_for_auth_deletion"), ...reviews, storageRelocations: [], authActorId: ACTOR },
+    objects: [
+      { bucket: "member-message-media", path: actorPath, bytes: "actor-private-image-bytes", type: "image/jpeg" },
+      { bucket: "member-message-media", path: peerPath, bytes: "peer-private-image-bytes", type: "image/png" },
+      { bucket: "member-message-media", path: unrelatedPath, bytes: "unrelated-image-bytes", type: "image/jpeg" }
+    ],
+    messagingPrepare: { data: { ok: true, bucket: "member-message-media", paths: [actorPath, peerPath] }, error: null },
+    storage: { remove: async (bucket, paths, { objects }) => {
+      attempts += 1;
+      if (attempts === 1) return { data: null, error: { message: "TRANSIENT PRIVATE STORAGE FAILURE" } };
+      for (const objectPath of paths) objects.delete(bucket + String.fromCharCode(0) + objectPath);
+      return { data: paths.map(name => ({ name })), error: null };
+    } }
+  });
+  const first = await inspect(await f.handlers.item(f.request(), REQUEST));
+  assert.equal(first.status, 503); assert.equal(first.body.retryable, true); assert.deepEqual(f.calls.deleted, []);
+  const retried = await inspect(await f.handlers.item(f.request(), REQUEST));
+  assert.equal(retried.status, 200); assert.equal(retried.body.fulfillment.state, "completed");
+  assert.equal(f.objects.has(f.objectKey("member-message-media", actorPath)), false);
+  assert.equal(f.objects.has(f.objectKey("member-message-media", peerPath)), false);
+  assert.equal(f.objects.get(f.objectKey("member-message-media", unrelatedPath))?.bytes.toString(), "unrelated-image-bytes");
+  assert.deepEqual(f.calls.deleted, [ACTOR]);
+});
 await check("provider failure is never completion proof and remains safely retryable", async () => {
   const f = fixture({ prepared: { ok: true, fulfillment: job("ready_for_auth_deletion"), ...reviews, storageRelocations: [], authActorId: ACTOR }, authDelete: async () => ({ error: { status: 503, message: "PRIVATE PROVIDER" } }),
     rpc: async name => name === "prepare_account_deletion_fulfillment" ? { data: { ok: true, fulfillment: job("ready_for_auth_deletion"), ...reviews, storageRelocations: [], authActorId: ACTOR }, error: null }
