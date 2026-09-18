@@ -27,8 +27,10 @@ function DirectBillingContent({ existingOnly }: { existingOnly: boolean }) {
   }, [orderId]);
   const snapshot = state.snapshot && (!orderId || state.snapshot.directOrder?.orderId === orderId) ? state.snapshot : null;
   const order = snapshot?.pendingOrder || snapshot?.directOrder, selected = choice.actorId === state.actorId ? snapshot?.offers.find(offer => offer.key === choice.offerKey) : undefined;
-  useEffect(() => { if (selected && !state.intent) methodHeading.current?.focus(); }, [selected?.key, state.intent]);
-  useEffect(() => { if (order) orderFocus.current?.focus(); }, [order?.orderId, order?.status]);
+  const methodFocusKey = selected && !state.intent ? selected.key : "";
+  const orderFocusKey = order ? `${order.orderId}:${order.status}` : "";
+  useEffect(() => { if (methodFocusKey) methodHeading.current?.focus(); }, [methodFocusKey]);
+  useEffect(() => { if (orderFocusKey) orderFocus.current?.focus(); }, [orderFocusKey]);
   const available = snapshot ? snapshot.freeRemaining + snapshot.paidAvailable : 0;
   const blocked = state.busy || state.refreshing || state.phase !== "ready" || !snapshot || !snapshot.enabled || snapshot.hold || snapshot.commercialExempt || Boolean(state.intent);
   const returnPath = `/billing${existingOnly ? "/manual" : ""}${orderId ? `?orderId=${encodeURIComponent(orderId)}` : ""}`;
