@@ -7,6 +7,59 @@ export const CLI_VERSION = '2.117.0';
 export const PORTS = Object.freeze({ api: 55431, db: 55432, shadow: 55430, tls: 55439, app: 55440 });
 export const ORIGIN = `https://127.0.0.1:${PORTS.tls}`;
 export const APP_ORIGIN = `https://127.0.0.1:${PORTS.app}`;
+const COMMAND_CLASSES = new Set(['docker', 'supabase-cli', 'openssl', 'acceptance-child']);
+const SIGNALS = new Set(['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGABRT', 'SIGSEGV', 'SIGPIPE']);
+const SPAWN_CODES = new Set(['ENOENT', 'EACCES', 'EPERM', 'ETIMEDOUT', 'ENOBUFS', 'ECONNREFUSED']);
+export const DIAGNOSTIC_PHASES = Object.freeze([
+  'context', 'mode', 'fixture-absent', 'repository-path', 'fresh-containers', 'fresh-network', 'fixture-create',
+  'cli-version', 'cli-init', 'config-write', 'fixture-validate', 'network-create', 'network-validate-empty',
+  'cli-start', 'network-validate-running', 'containers-inspect', 'containers-validate', 'cli-status', 'status-parse',
+  'status-validate', 'status-save', 'tls-certificate', 'proxy-listen', 'infrastructure-save', 'acceptance-child',
+  'proxy-close', 'cleanup-validate', 'cleanup-config', 'cleanup-cli-stop', 'cleanup-network-list',
+  'cleanup-network-validate', 'cleanup-network-remove', 'cleanup-directory-remove'
+]);
+export function commandFailure(command, result) {
+  assert.ok(COMMAND_CLASSES.has(command), 'Unexpected diagnostic command family');
+  // Raw output is examined only against these fixed patterns. Never return a
+  // substring, command argument, exception message, URL, environment, or buffer.
+  const output = String(result.stderr || '') + '\n' + String(result.stdout || '');
+  let classifier = 'unclassified';
+  if (result.error?.code === 'ETIMEDOUT') classifier = 'command-timeout';
+  else if (result.error?.code === 'ENOENT') classifier = 'executable-missing';
+  else if (result.error?.code === 'ENOBUFS') classifier = 'output-limit';
+  else if (/cannot connect to the docker daemon|is the docker daemon running|error during connect/i.test(output)) classifier = 'docker-unavailable';
+  else if (/address already in use|port is already allocated|ports are not available|bind.*failed/i.test(output)) classifier = 'port-conflict';
+  else if (/no space left on device/i.test(output)) classifier = 'disk-full';
+  else if (/out of memory|cannot allocate memory|oomkilled/i.test(output)) classifier = 'memory-exhausted';
+  else if (/failed to parse config|invalid config|failed to decode|unmarshal|unknown (?:field|key)|unsupported.*config/i.test(output)) classifier = 'config-invalid';
+  else if (/unknown flag|unknown command|invalid.*exclude|unknown service/i.test(output)) classifier = 'cli-argument-invalid';
+  else if (/manifest unknown|pull access denied|toomanyrequests|failed to pull|error.*pulling|image.*not found/i.test(output)) classifier = 'image-fetch-failed';
+  else if (/unhealthy|health.?check|container.*not ready|failed to start.*container/i.test(output)) classifier = 'service-unhealthy';
+  else if (/network.*not found|network.*already exists|endpoint.*already exists/i.test(output)) classifier = 'network-conflict';
+  else if (/certificate|x509|unable to verify|ssl.*error/i.test(output)) classifier = 'tls-failed';
+  else if (/permission denied|operation not permitted/i.test(output)) classifier = 'permission-denied';
+  else if (/timed? out|ETIMEDOUT|deadline exceeded/i.test(output)) classifier = 'dependency-timeout';
+  else if (/ENOTFOUND|EAI_AGAIN|connection refused|ECONNREFUSED|could not resolve/i.test(output)) classifier = 'dependency-unreachable';
+  return Object.freeze({ command, exitCode: Number.isInteger(result.status) && result.status >= 0 && result.status <= 255 ? result.status : null,
+    signal: SIGNALS.has(result.signal) ? result.signal : result.signal ? 'other' : null,
+    spawnCode: SPAWN_CODES.has(result.error?.code) ? result.error.code : result.error?.code ? 'other' : null, classifier });
+}
+export function createDiagnostics(write = () => {}) {
+  const records = [], allowed = new Set(DIAGNOSTIC_PHASES), diagnostics = new WeakMap();
+  const record = value => { safeReport(value); records.push(value); write(value); };
+  const failure = error => diagnostics.get(error) || { classifier: error instanceof assert.AssertionError ? 'guard-rejected' : error instanceof SyntaxError ? 'invalid-json' : 'operation-failed' };
+  return {
+    commandError(command, result) { const error = new Error('Fixture command failed'); diagnostics.set(error, commandFailure(command, result)); return error; },
+    phase(name, run) {
+      assert.ok(allowed.has(name), 'Unknown diagnostic phase');
+      const started = Date.now(); record({ phase: name, event: 'start' });
+      const pass = value => { record({ phase: name, event: 'pass', elapsedMs: Date.now() - started }); return value; };
+      const fail = error => { record({ phase: name, event: 'fail', elapsedMs: Date.now() - started, failure: failure(error) }); throw error; };
+      try { const result = run(); return result && typeof result.then === 'function' ? result.then(pass, fail) : pass(result); } catch (error) { return fail(error); }
+    },
+    report() { return { schemaVersion: 1, scope: 'isolated-stack-infrastructure-diagnostics', events: structuredClone(records) }; }
+  };
+}
 export function context(env, platform = process.platform) {
   assert.equal(platform, 'linux', 'Only disposable Linux GitHub runners are supported');
   assert.equal(env.GITHUB_ACTIONS, 'true'); assert.equal(env.CI, 'true');
@@ -20,7 +73,10 @@ export function context(env, platform = process.platform) {
     assert.ok(!/^(SUPABASE_|NEXT_PUBLIC_SUPABASE_|QRGUITAR_(?:OWNER|ADMIN)_EMAILS|DATABASE_URL$|PG(?:HOST|PORT|USER|PASSWORD|DATABASE|SERVICE|SERVICEFILE)$|STRIPE_|DOCKER_(?:HOST|CONTEXT|TLS_VERIFY|CERT_PATH|CONFIG)$)/.test(key), 'Application, provider or remote Docker configuration is forbidden in the fixture environment');
   }
   assert.ok(!env.NODE_TLS_REJECT_UNAUTHORIZED && !env.NODE_EXTRA_CA_CERTS && !env.NODE_OPTIONS, 'External TLS/Node overrides are forbidden');
-  const project = `qrguitar-storage-acceptance-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}`;
+  // CLI 2.117 normalizes config-derived IDs to at most 40 characters, but
+  // explicit stop --project-id uses the raw value. Never let them diverge.
+  const project = `qrg-storage-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}`;
+  assert.ok(project.length <= 40, 'Fixture project must fit the CLI project identity limit');
   const root = path.join(env.RUNNER_TEMP, project);
   assert.notEqual(path.resolve(root), path.resolve(env.GITHUB_WORKSPACE));
   return { project, network: `${project}-loopback`, root, repo: env.GITHUB_WORKSPACE, marker: MARKER };
@@ -76,7 +132,8 @@ export function validateContainers(containers, ctx) {
   }
 }
 export function configToml(project) {
-  assert.match(project, /^qrguitar-storage-acceptance-[1-9][0-9]*-[1-9][0-9]*$/);
+  assert.match(project, /^qrg-storage-[1-9][0-9]*-[1-9][0-9]*$/);
+  assert.ok(project.length <= 40, 'Fixture project must fit the CLI project identity limit');
   return `project_id = "${project}"
 [api]
 enabled = true
