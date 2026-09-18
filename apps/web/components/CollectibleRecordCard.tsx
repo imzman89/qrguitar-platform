@@ -22,6 +22,7 @@ import { RecordShareButton } from "./RecordShareButton";
 type CollectibleRecordCardProps = {
   record: DemoInstrument;
   variant?: "latest" | "catalog" | "spotlight" | "archive";
+  prioritizeLeadImage?: boolean;
   eyebrow?: string;
   createdLabel?: string;
   ctaLabel?: string;
@@ -33,6 +34,7 @@ type CollectibleRecordCardProps = {
 export function CollectibleRecordCard({
   record,
   variant = "catalog",
+  prioritizeLeadImage = false,
   eyebrow = "",
   createdLabel = "",
   ctaLabel = "Open Profile",
@@ -167,9 +169,11 @@ export function CollectibleRecordCard({
                         className={`collectible-card-image ${loadedImages.includes(index) ? "is-loaded" : ""}`}
                         src={imageUrl}
                         alt={`${card.title} photo ${index + 1} of ${galleryImages.length}`}
-                        loading={index === 0 ? "eager" : "lazy"}
-                        fetchPriority={index === 0 ? "high" : "auto"}
+                        loading={prioritizeLeadImage && index === 0 ? "eager" : "lazy"}
+                        fetchPriority={prioritizeLeadImage && index === 0 ? "high" : "low"}
                         decoding="async"
+                        width={1200}
+                        height={900}
                         draggable={false}
                         onLoad={(event) => markImageReady(index, event.currentTarget)}
                         onError={() => setFailedImages((current) => current.includes(index) ? current : [...current, index])}

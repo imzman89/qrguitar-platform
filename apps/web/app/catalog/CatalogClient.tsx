@@ -317,8 +317,14 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
                 <p>Fetching the latest QRguitar Profiles now.</p>
               </div>
             ) : visibleRecords.length ? (
-              visibleRecords.map((record) => (
-                <CollectibleRecordCard record={record} variant="catalog" key={record.qrCode} content={content} />
+              visibleRecords.map((record, index) => (
+                <CollectibleRecordCard
+                  record={record}
+                  variant="catalog"
+                  key={record.qrCode}
+                  content={content}
+                  prioritizeLeadImage={index === 0}
+                />
               ))
             ) : (
               <div className="card catalog-empty">
