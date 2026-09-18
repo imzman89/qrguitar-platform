@@ -1738,8 +1738,8 @@ export async function PATCH(request: Request) {
       visibility: body.visibility === "private" ? "private" : body.visibility === "unlisted" ? "unlisted" : "public",
       summary: String(body.summary || "").trim()
     };
-    if (!input.qrCode || !input.brand || !input.model || (!input.serial && !input.serialNotUsed)) {
-      throw new ProfileSaveError("Brand, model, and Serial Number are required unless the instrument does not use one.");
+    if (!input.qrCode || !input.brand || !input.model || !input.instrumentType || (!input.serial && !input.serialNotUsed)) {
+      throw new ProfileSaveError("Brand, model, instrument type, and Serial Number are required unless the instrument does not use one.");
     }
     if (input.serial && normalizeSerialBuildId(input.serial).length < 4) {
       throw new ProfileSaveError("Serial Number must contain at least four letters or numbers.");

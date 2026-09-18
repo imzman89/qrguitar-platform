@@ -46,6 +46,7 @@ includes(homepageShowcase, '<span className={styles.kicker}>{card.typeLabel}</sp
 excludes(homepageShowcase, "THE INSTRUMENT", "The homepage showcase must not replace a specific saved category with a generic label.");
 includes(instrumentApi, 'instrumentType: specValue(specs, "Type")', "Profile cards must receive the saved Type selection from the API.");
 excludes(instrumentApi, 'instrumentType: specValue(specs, "Type") || guitar.model', "A model name must never be substituted for the user-selected Profile type.");
+includes(instrumentApi, '!input.instrumentType', "Profile edits must preserve a user-selected Type instead of allowing cards to lose their category.");
 includes(card, "maxBadges={3}", "Collectible cards must cap compact status badges.");
 includes(card, "galleryImages.length > 1", "One-photo Profiles must not render gallery controls.");
 includes(card, "onPointerMove={handlePointerMove}", "Card galleries must support pointer dragging.");
