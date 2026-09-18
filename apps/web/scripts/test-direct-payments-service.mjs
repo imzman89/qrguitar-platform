@@ -104,8 +104,9 @@ try {
     assert.equal((await db.query('select count(*)::int n from billing_orders where owner_id=$1', [OWNER])).rows[0].n, 1);
   });
   await check('payer responses redact private receiving identity and stable internal key', () => {
-    assert.equal(placed.recipient.address, null); assert.equal(placed.recipient.accountKey, 'venmo');
+    assert.equal(placed.recipient.address, null); assert.equal(placed.recipient.paymentUrl, null); assert.equal(placed.recipient.accountKey, 'venmo');
     assert.ok(!JSON.stringify(placed).includes('private-fixture-identity')); assert.ok(!JSON.stringify(placed).includes('fixture-business'));
+    assert.ok(!JSON.stringify(placed).includes('fixture-merchant'));
   });
   await check('pending direct order appears separately from legacy Stripe checkout', async () => {
     const value = await service.status(OWNER); assert.equal(value.pendingOrder.orderId, placed.orderId); assert.equal(value.unresolvedOrder, null); assert.equal(value.paidAvailable, 0);

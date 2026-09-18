@@ -1,10 +1,11 @@
 # Profile credit billing
 
-The default customer billing page now uses the direct business payment candidate.
-Its setup, manual verification, and recovery workflow are documented in
-[DIRECT_PAYMENTS_OPERATIONS.md](DIRECT_PAYMENTS_OPERATIONS.md). The Stripe-specific
+The default customer billing candidate uses automatic PayPal checkout, documented
+in [PAYPAL_CHECKOUT_SETUP.md](PAYPAL_CHECKOUT_SETUP.md). Earlier direct-link payments
+remain recoverable through `/billing/manual`; their receipt review is documented
+in [DIRECT_PAYMENTS_OPERATIONS.md](DIRECT_PAYMENTS_OPERATIONS.md). The Stripe-specific
 configuration and webhook instructions below apply to the retained legacy
-integration. Both flows share the protected Profile credit ledger.
+integration. All flows share the protected Profile credit ledger.
 
 Billing is disabled by default. Adding this code or applying its schema does not
 activate purchases, create a Stripe account, or charge a customer.
@@ -133,6 +134,14 @@ ID, and a recorded reason. Release only after checking the actual receipt/provid
 state. A released receipt cannot be reopened by an altered retry; a new verified
 review event can create a new hold. There is no automatic refund, deletion, or
 credit restoration operation in this release.
+
+Automatic PayPal exceptions and its durable webhook delivery queue are operated
+from `/admin/payments` as described in
+[PAYPAL_CHECKOUT_SETUP.md](PAYPAL_CHECKOUT_SETUP.md). The browser receives only a
+sanitized evidence projection. PayPal hold decisions delegate to the same
+`billing_resolve_review` contract above; delivery retries are separately audited
+and advance one bounded processing step. Neither operation can fabricate a
+payment or add credits.
 
 ## Outstanding merchant decisions before enabling purchases
 

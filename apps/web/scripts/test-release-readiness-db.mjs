@@ -1,16 +1,19 @@
-import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import{fileURLToPath,pathToFileURL}from'node:url';import{createRequire}from'node:module';
+import assert from 'node:assert/strict';import fs from 'node:fs';import path from'node:path';import{createHash}from'node:crypto';import{fileURLToPath,pathToFileURL}from'node:url';import{createRequire}from'node:module';
 const scripts=path.dirname(fileURLToPath(import.meta.url));
 const option=name=>{const i=process.argv.indexOf(name);return i<0?null:process.argv[i+1];};
 const repo=path.resolve(option('--repo')||path.resolve(scripts,'../../..')),overlay=option('--migration-root');
 const source=overlay?path.resolve(overlay):repo;
 const manifest=JSON.parse(fs.readFileSync(path.join(source,'apps/web/scripts/release-readiness-manifest.json'),'utf8'));
+const migrationSha=relative=>createHash('sha256').update(fs.readFileSync(path.join(source,relative),'utf8').replaceAll('\r\n','\n')).digest('hex');
+assert.equal(manifest.paypalWebhookSourceSha256,migrationSha('supabase/migrations/20260918132000_paypal_webhook_inbox.sql'));
+assert.equal(manifest.paypalAdminReviewSourceSha256,migrationSha('supabase/migrations/20260918133000_paypal_admin_reviews.sql'));
 const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite');
 const {installRepositorySchema}=await import(pathToFileURL(path.join(repo,'apps/web/scripts/security/postgres-fixture.mjs')));
 const db=new PGlite();await installRepositorySchema(db,repo,overlay?'20260917190000':undefined);
 if(overlay)for(const file of fs.readdirSync(path.join(source,'supabase/migrations')).filter(file=>file.endsWith('.sql')&&file>='20260917190000').sort())await db.exec(fs.readFileSync(path.join(source,'supabase/migrations',file),'utf8').replaceAll('\r\n','\n'));await db.exec("insert into storage.buckets(id,name,public)values('instrument-media','instrument-media',false),('instrument-documents','instrument-documents',false),('service-evidence','service-evidence',false) on conflict(id)do update set public=false;");
 const ready=async()=> (await db.query('select public.qrguitar_release_readiness() result')).rows[0].result;
 let passed=0;async function test(name,fn){await db.exec('begin');try{await fn();console.log('PASS '+name);passed++;}finally{await db.exec('rollback');}}
-function assertShape(result){assert.deepEqual(Object.keys(result).sort(),['checks','ready','releaseVersion']);assert.equal(result.releaseVersion,'2026-09-17.7');assert.equal(typeof result.ready,'boolean');assert.deepEqual(result.checks.map(c=>c.name),manifest.checks);assert.equal(new Set(result.checks.map(c=>c.name)).size,manifest.checks.length);for(const check of result.checks){assert.deepEqual(Object.keys(check).sort(),['name','ok']);assert.equal(typeof check.ok,'boolean');}}
+function assertShape(result){assert.deepEqual(Object.keys(result).sort(),['checks','ready','releaseVersion']);assert.equal(result.releaseVersion,'2026-09-17.9');assert.equal(typeof result.ready,'boolean');assert.deepEqual(result.checks.map(c=>c.name),manifest.checks);assert.equal(new Set(result.checks.map(c=>c.name)).size,manifest.checks.length);for(const check of result.checks){assert.deepEqual(Object.keys(check).sort(),['name','ok']);assert.equal(typeof check.ok,'boolean');}}
 async function expectFalse(name){const result=await ready();assertShape(result);assert.equal(result.ready,false);assert.equal(result.checks.find(c=>c.name===name)?.ok,false);}
 await test('complete schema returns exact version and all14 checks true',async()=>{const result=await ready();assertShape(result);assert.equal(result.ready,true,JSON.stringify(result));assert.equal(result.checks.length,14);assert.ok(result.checks.every(c=>c.ok));});
 await test('anonymous and authenticated callers cannot execute the readiness routine',async()=>{for(const role of['anon','authenticated']){await db.exec('savepoint deny');try{await db.exec('set role '+role);await assert.rejects(ready,e=>e.code==='42501');}finally{await db.exec('rollback to savepoint deny');}}});
@@ -92,5 +95,41 @@ await test('global direct receipt uniqueness remains required after receiver con
 await test('one payment claim per order remains a required database constraint',async()=>{
   const constraint=manifest.billingConstraints.find(c=>c.table==='billing_direct_claims'&&c.definition==='UNIQUE (order_id)');assert.ok(constraint);
   await db.exec('alter table billing_direct_claims drop constraint '+constraint.name);await expectFalse('receipt_constraints');
+});
+await test('unreviewed PayPal settlement RPC overload cannot bypass exact capture checks',async()=>{
+  await db.exec("create function public.billing_paypal_apply_capture(uuid) returns jsonb language sql as $$select '{}'::jsonb$$;");await expectFalse('function_security');
+});
+await test('unreviewed private PayPal helper overload cannot bypass the approved protocol',async()=>{
+  await db.exec("create function public._billing_paypal_webhook_headers(text) returns void language plpgsql as $$begin null;end$$;");await expectFalse('function_security');
+});
+await test('durable recovery cannot ship without its service-only claim-due RPC',async()=>{
+  const signature=manifest.paypalBillingFunctionSignatures.find(item=>item.startsWith('public.billing_paypal_webhook_claim_due('));assert.ok(signature);
+  await db.exec('drop function '+signature);await expectFalse('required_functions');
+});
+await test('checkout cannot ship without the scheduler-readiness gate',async()=>{
+  const signature=manifest.paypalBillingFunctionSignatures.find(item=>item.startsWith('public.billing_paypal_webhook_scheduler_ready('));assert.ok(signature);
+  await db.exec('drop function '+signature);await expectFalse('required_functions');
+});
+await test('scheduler heartbeat identity remains exact',async()=>{
+  const constraint=manifest.billingConstraints.find(item=>item.table==='billing_paypal_webhook_heartbeats'&&item.type==='p');assert.ok(constraint);
+  await db.exec('alter table billing_paypal_webhook_heartbeats drop constraint '+constraint.name);
+  await expectFalse('receipt_constraints');
+});
+await test('automatic/manual provider receipt identity remains globally unique',async()=>{
+  await db.exec('alter table billing_provider_references drop constraint billing_provider_references_pkey');await expectFalse('receipt_constraints');
+});
+await test('PayPal order identity cannot be bound to two local purchases',async()=>{
+  const constraint=manifest.billingConstraints.find(c=>c.table==='billing_paypal_bindings'&&c.definition==='UNIQUE (environment, paypal_order_id)');assert.ok(constraint);
+  await db.exec('alter table billing_paypal_bindings drop constraint '+constraint.name);await expectFalse('receipt_constraints');
+});
+await test('durable webhook scheduling index must remain nonunique',async()=>{
+  const index=manifest.billingIndexes.find(item=>item.name==='billing_paypal_webhook_due');assert.equal(index?.unique,false);
+  await db.exec('drop index billing_paypal_webhook_due;'+index.definition.replace('CREATE INDEX','CREATE UNIQUE INDEX'));
+  await expectFalse('receipt_constraints');
+});
+await test('webhook delivery state constraint remains exact',async()=>{
+  const constraint=manifest.billingConstraints.find(item=>item.table==='billing_paypal_webhook_deliveries'&&item.name.endsWith('_state_check'));assert.ok(constraint);
+  await db.exec('alter table billing_paypal_webhook_deliveries drop constraint '+constraint.name);
+  await expectFalse('receipt_constraints');
 });
 console.log('Completed '+passed+' actual PostgreSQL readiness tests.');await db.close();

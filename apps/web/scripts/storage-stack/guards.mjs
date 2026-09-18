@@ -10,7 +10,7 @@ export const APP_ORIGIN = `https://127.0.0.1:${PORTS.app}`;
 export const READINESS_LABELS = Object.freeze(['catalog_readable', 'required_functions', 'function_security', 'blocked_function_grants',
   'private_tables', 'private_table_grants', 'server_only_policies', 'private_storage_buckets', 'private_storage_policy',
   'receipt_constraints', 'editor_versioning', 'schema_columns', 'public_schema_create', 'self_security']);
-const READINESS_VERSIONS = new Set(['2026-09-10.1', '2026-09-17.1', '2026-09-17.2', '2026-09-17.3', '2026-09-17.4', '2026-09-17.5', '2026-09-17.6', '2026-09-17.7']);
+const READINESS_VERSIONS = new Set(['2026-09-10.1', '2026-09-17.1', '2026-09-17.2', '2026-09-17.3', '2026-09-17.4', '2026-09-17.5', '2026-09-17.6', '2026-09-17.7', '2026-09-17.8', '2026-09-17.9']);
 export function readinessProjection(value, manifest) {
   // Labels and versions come from this fixed diagnostic vocabulary, never from
   // an arbitrary RPC field. Malformed/missing/duplicate entries are null, not true.

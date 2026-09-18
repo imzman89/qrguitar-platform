@@ -151,7 +151,7 @@ test("admin account switch clears order details and abandons late decisions", as
   pending.resolve(json({ order: order({ status: "closed" }) })); await writing; assert.equal(f.client.getState().actorId, B);
 });
 
-function renderBilling(state, query = "", choice = { actorId: "", offerKey: "" }) {
+function renderBilling(state, query = "", choice = { actorId: "", offerKey: "" }, props = {}) {
   const React = require("react"), { renderToStaticMarkup } = require("react-dom/server"), component = { exports: {} }; let states = 0;
   const compiled = ts.transpileModule(fs.readFileSync(path.join(web, "app/billing/DirectBillingPage.tsx"), "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   new Function("require", "module", "exports", compiled)(specifier => {
@@ -165,7 +165,7 @@ function renderBilling(state, query = "", choice = { actorId: "", offerKey: "" }
     if (specifier.endsWith(".module.css")) return { __esModule: true, default: new Proxy({}, { get: (_target, name) => String(name) }) };
     return require(specifier);
   }, component, component.exports);
-  return renderToStaticMarkup(React.createElement(component.exports.default));
+  return renderToStaticMarkup(React.createElement(component.exports.default, props));
 }
 const ready = patch => ({ ...initialDirectPaymentsState(), phase: "ready", actorId: A, snapshot: snapshot(), ...patch });
 test("real payer UI puts free capacity first and collapses optional packs", () => {
@@ -193,6 +193,12 @@ test("PayPal shows one clear checkout path and copies required order reference f
   const next = order({ method: "paypal", recipient: { ...order().recipient, paymentUrl: "https://www.paypal.com/ncp/payment/EXAMPLE" } });
   const html = renderBilling(ready({ snapshot: snapshot({ methods, directOrder: next, pendingOrder: next }) }));
   assert.ok(html.indexOf('aria-label="Copy order reference"') < html.indexOf("Open secure checkout")); assert.match(html, /Paste this into the Order reference field/); assert.doesNotMatch(html, /Copy amount in usd|Amount in USD/);
+});
+test("legacy recovery route is status-only and cannot initiate or self-report a payment", () => {
+  const next = order();
+  const html = renderBilling(ready({ snapshot: snapshot({ directOrder: next, pendingOrder: next }) }), "", { actorId: "", offerKey: "" }, { existingOnly: true });
+  assert.match(html, /Legacy payment recovery/); assert.match(html, /Contact QRguitar/); assert.match(html, /Don’t send another payment/);
+  assert.doesNotMatch(html, /I sent the payment|Open Venmo|Copy order reference|Choose a one-time Profile pack/);
 });
 test("query flags alone never produce a payment success", () => {
   const html = renderBilling(ready(), "paid=true&success=true"); assert.doesNotMatch(html, /Payment confirmed|credits have been recorded/);

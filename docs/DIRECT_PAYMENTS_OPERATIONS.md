@@ -1,7 +1,13 @@
 # Direct Profile credit payments
 
-The default `/billing` page uses QRguitar orders, approved business payment links,
-and manual receipt verification. QRguitar does not collect card numbers, bank
+The retained `/billing/manual` page recovers earlier QRguitar orders paid through
+approved business payment links with manual receipt verification. The default
+`/billing` candidate now uses [automatic PayPal checkout](PAYPAL_CHECKOUT_SETUP.md).
+New manual order creation, provider-link display, and payer self-report are
+retired. Keep `QRGUITAR_DIRECT_PAYMENTS_ENABLED=false`; the recovery page shows
+only sanitized order status and support actions, and payer API responses omit
+the stored receiving address, account key, and payment URL.
+QRguitar does not collect card numbers, bank
 credentials, or provider passwords. Customers complete payment with the provider;
 an active QRguitar administrator checks the receiving account before adding credits.
 This is a one-time purchase flow, not automatic recurring billing.
@@ -91,7 +97,11 @@ payments do not require Stripe keys, Price IDs, or a Stripe webhook. Existing
 legacy routes are retained for previously created orders; their separate operation
 is documented in [BILLING_OPERATIONS.md](BILLING_OPERATIONS.md).
 
-## Customer and operator workflow
+## Historical order and operator workflow
+
+The first two steps describe how a retained order may originally have been
+created. They are audit context only; the current recovery page cannot initiate
+them or accept an **I sent the payment** report.
 
 1. The signed-in customer chooses a pack and a configured payment method. The
    server saves an order with its amount, provider, receiving details, and request

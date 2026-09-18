@@ -8,6 +8,7 @@ import { Footer } from "../../../components/Footer";
 import { createBrowserSupabaseClient } from "../../../lib/supabase-browser";
 import { createAdminPaymentsClient, initialAdminPaymentsState } from "../../../lib/direct-payments-client";
 import type { DirectOrder } from "../../../lib/direct-payments";
+import PayPalReviewQueue from "./PayPalReviewQueue";
 import styles from "../../billing/billing.module.css";
 
 const money = (amount: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount / 100);
@@ -25,8 +26,10 @@ export default function AdminPaymentsPage() {
   const selected = selection.actorId === state.actorId ? state.orders.find(order => order.orderId === selection.orderId) : undefined;
   return <><Nav /><main className={styles.page}><div className={styles.shell}>
     <Link href="/admin" className={styles.back}>Admin / Payment review</Link>
-    <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>Direct payments</p><h1>Verify receipt. Add credits.</h1></div>{state.phase === "ready" && <button className={styles.secondary} disabled={state.busy || state.refreshing} onClick={() => void controller.current?.reload()}><RefreshCw size={16} aria-hidden="true" />{state.refreshing ? "Checking…" : "Refresh queue"}</button>}</div>
-    <p className={styles.intro}>Match each order against the transaction in QRguitar’s receiving account. Customer reports and screenshots do not confirm payment.</p>
+    <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>Payment operations</p><h1>Review payments and holds.</h1></div>{state.phase === "ready" && <button className={styles.secondary} disabled={state.busy || state.refreshing} onClick={() => void controller.current?.reload()}><RefreshCw size={16} aria-hidden="true" />{state.refreshing ? "Checking…" : "Refresh manual queue"}</button>}</div>
+    <p className={styles.intro}>Automatic PayPal exceptions use provider-verified evidence. Manual orders still require matching the actual transaction in QRguitar’s receiving account; customer reports and screenshots do not confirm payment.</p>
+    <PayPalReviewQueue />
+    <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>Legacy manual payments</p><h2>Verify received funds</h2></div></div>
     {state.phase === "loading" && <p role="status">Checking admin access and loading payments…</p>}
     {state.phase === "signed-out" && <section className={styles.notice}><h2>Sign in with an admin account.</h2><Link className={styles.primary} href={`/login?next=${encodeURIComponent("/admin/payments")}`}>Sign in</Link></section>}
     {state.phase === "error" && <section className={`${styles.notice} ${styles.error}`} role="alert"><h2>Payment review is unavailable.</h2><p>{state.message}</p><button className={styles.secondary} disabled={state.refreshing} onClick={() => void controller.current?.reload()}>Try again</button></section>}

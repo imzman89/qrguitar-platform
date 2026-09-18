@@ -19,16 +19,18 @@ when the allowance changes. Separately approved business exceptions remain intac
 
 ## Free Stack
 
-- Web hosting: Vercel free tier
+- Web hosting: Vercel preferred; commercial launch requires a paid Vercel plan
 - Database/auth/storage: Supabase free tier
-- Payments: business payment links with owner confirmation; no added monthly payment platform fee
+- Payments: automatic PayPal business checkout; provider transaction fees apply
 
-Payment collection stays disabled until the receiving accounts and confirmation
-workflow are configured and tested. Direct payments must be confirmed against an
-actual business-account receipt before credits are granted. Do not build
-credit-card fields into the app or treat a buyer's payment claim as proof.
-See [Direct payment operations](docs/DIRECT_PAYMENTS_OPERATIONS.md) for private
-configuration, the three fixed packs, manual receipt review, and isolated tests.
+Payment collection stays disabled until the receiving account, server capture,
+and verified webhooks are configured and tested. A server-verified completed
+payment adds credits automatically. Card details stay with PayPal; a browser
+callback or buyer's payment claim is never proof of payment.
+See [PayPal checkout setup](docs/PAYPAL_CHECKOUT_SETUP.md) for merchant settings,
+isolated tests, and the separate Apple Pay activation requirements. The retained
+[/billing/manual workflow](docs/DIRECT_PAYMENTS_OPERATIONS.md) supports earlier
+direct-link payments and their receipt review.
 
 ## Quick Start
 
@@ -96,7 +98,7 @@ Optional placeholders:
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
 NEXT_PUBLIC_SUPPORT_EMAIL=support@qrguitar.com
-NEXT_PUBLIC_CONTACT_EMAIL=gary@qrguitar.com
+NEXT_PUBLIC_CONTACT_EMAIL=support@qrguitar.com
 EMAIL_FROM=QRguitar <noreply@qrguitar.com>
 SMTP_FROM=noreply@qrguitar.com
 SMTP_REPLY_TO=support@qrguitar.com
@@ -235,7 +237,7 @@ Keep these in `.env.example`, `apps/web/.env.example`, and Vercel:
 
 ```text
 NEXT_PUBLIC_SUPPORT_EMAIL=support@qrguitar.com
-NEXT_PUBLIC_CONTACT_EMAIL=gary@qrguitar.com
+NEXT_PUBLIC_CONTACT_EMAIL=support@qrguitar.com
 EMAIL_FROM=QRguitar <noreply@qrguitar.com>
 SMTP_FROM=noreply@qrguitar.com
 SMTP_REPLY_TO=support@qrguitar.com

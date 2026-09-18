@@ -1,21 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isCheckoutPath, securityHeaders } from "./lib/security-headers";
 
 const SITE_PREVIEW_COOKIE = "qrguitar_site_preview";
-
-const sitePreviewCsp = [
-  "default-src 'self'",
-  "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co",
-  "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co",
-  "frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com",
-      "frame-ancestors 'self'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "object-src 'none'",
-  "upgrade-insecure-requests"
-].join("; ");
 
 const LEGACY_HANDOUT_CODE = "QRG-E9DFA48DCC74";
 const CANONICAL_HANDOUT_CODE = "QRG-SI98092154";
@@ -41,8 +27,9 @@ export function middleware(request: NextRequest) {
   if (request.nextUrl.pathname === "/api/site-editor/preview" || request.cookies.has(SITE_PREVIEW_COOKIE)) {
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
     response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
-    response.headers.set("Content-Security-Policy", sitePreviewCsp);
-    response.headers.set("X-Frame-Options", "SAMEORIGIN");
+    for (const header of securityHeaders({ preview: true, checkout: isCheckoutPath(request.nextUrl.pathname) })) {
+      response.headers.set(header.key, header.value);
+    }
   }
   return response;
 }

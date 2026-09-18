@@ -59,7 +59,8 @@ export function createDirectPaymentsService<Context>(deps: Dependencies<Context>
       orderId: row.orderId, ownerId: row.ownerId, requestId: row.requestKey, offerKey: approved.key,
       method: row.provider, status: row.status === "fulfilled" ? "fulfilled" : row.status === "expired" ? "closed" : row.claim ? "pending_review" : "awaiting_payment",
       reference: `QRG-${row.orderId}`, offer: { ...approved },
-      recipient: { accountKey: adminView ? recipient.accountKey : row.provider, displayName: recipient.displayName, paymentUrl, address: adminView ? recipient.address as string | null : null },
+      recipient: { accountKey: adminView ? recipient.accountKey : row.provider, displayName: recipient.displayName,
+        paymentUrl: adminView ? paymentUrl : null, address: adminView ? recipient.address as string | null : null },
       createdAt: row.createdAt, payerReference: typeof claim.reference === "string" ? claim.reference : null
     };
   }

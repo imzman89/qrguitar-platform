@@ -54,7 +54,7 @@ try{
   await db.exec("insert into storage.buckets(id,name,public) values('instrument-media','instrument-media',false),('instrument-documents','instrument-documents',false) on conflict(id) do update set public=false;begin read only;set local role service_role");
   const ready=(await db.query('select qrguitar_release_readiness() value')).rows[0].value;
   await db.exec('rollback');assert.equal(ready.ready,true,JSON.stringify(ready));assert.equal(ready.releaseVersion,'2026-09-17.7');
-  const files=[['supabase/migrations/20260918121000_release_readiness.sql',generated],['apps/web/scripts/release-readiness-manifest.json',JSON.stringify(manifest,null,2)+'\n']];
+  const files=[['supabase/migrations/20260918121000_release_readiness.sql',generated]];
   for(const [relative,content] of files){const target=path.join(repo,relative);
     if(process.argv.includes('--write'))fs.writeFileSync(target,content);else assert.equal(normalize(fs.readFileSync(target,'utf8')),content,'Generated artifact drift: '+relative);
     console.log(sha(content)+'  '+relative);

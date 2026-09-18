@@ -31,7 +31,6 @@ export function readDirectOrder(value: unknown, ownerId?: string, requestedOrder
     || typeof recipient.accountKey !== "string" || !recipient.accountKey.trim() || typeof recipient.displayName !== "string" || !recipient.displayName.trim()
     || (recipient.address !== null && (typeof recipient.address !== "string" || !recipient.address.trim()))
     || (recipient.paymentUrl !== null && !directPaymentUrl(String(row.method), recipient.paymentUrl))
-    || !recipient.paymentUrl
     || (row.payerReference !== null && typeof row.payerReference !== "string")) throw new Error("Payment instructions could not be verified. Refresh before sending money.");
   return { ...row, offer } as DirectOrder;
 }
@@ -60,9 +59,9 @@ function readSnapshot(value: unknown, ownerId: string, requestedOrder: string): 
 type Lease = { actorId: string; revision: number };
 type SessionDependencies = { auth: () => BillingAuth; fetch?: typeof fetch; timeoutMs?: number };
 class StalePayment extends Error {}
-class PaymentRequestError extends Error { constructor(message: string, readonly status: number) { super(message); } }
+export class PaymentRequestError extends Error { constructor(message: string, readonly status: number, readonly code = "") { super(message); } }
 /** Authentication is checked before and after each bounded request; old-account responses never publish. */
-function createSessionScope(deps: SessionDependencies, onActor: (actorId: string) => void) {
+export function createPaymentSessionScope(deps: SessionDependencies, onActor: (actorId: string) => void) {
   let actorId = "", revision = 0, known = false, disposed = false, auth: BillingAuth | undefined, unsubscribe: (() => void) | undefined;
   const pending = new Set<AbortController>();
   const live = (lease: Lease) => !disposed && lease.actorId === actorId && lease.revision === revision;
@@ -102,7 +101,7 @@ function createSessionScope(deps: SessionDependencies, onActor: (actorId: string
         return { response, payload: record(await response.json()) };
       });
       check(lease); await session(lease);
-      if (!result.response.ok || result.payload.ok !== true) throw new PaymentRequestError(typeof result.payload.message === "string" ? result.payload.message : "Payment status is unavailable. Refresh to try again.", result.response.status);
+      if (!result.response.ok || result.payload.ok !== true) throw new PaymentRequestError(typeof result.payload.message === "string" ? result.payload.message : "Payment status is unavailable. Refresh to try again.", result.response.status, typeof result.payload.code === "string" ? result.payload.code : "");
       return result.payload;
     },
     dispose() { disposed = true; revision++; pending.forEach(controller => controller.abort()); pending.clear(); unsubscribe?.(); }
@@ -125,7 +124,7 @@ export function createDirectPaymentsClient(deps: SessionDependencies & { storage
     publish({ intent, claim }); const value = { intent, claim }; memory.set(state.actorId, value);
     try { if (intent || claim) storage().setItem(key(), JSON.stringify(value)); else storage().removeItem(key()); } catch { /* The server also recovers the account's pending order. */ }
   }
-  const scope = createSessionScope(deps, actorId => {
+  const scope = createPaymentSessionScope(deps, actorId => {
     loadRevision++; lock = undefined; publish({ ...initialDirectPaymentsState(), actorId, phase: actorId ? "loading" : "signed-out" });
     if (!actorId) return;
     const saved = memory.get(actorId); if (saved) publish(saved);
@@ -200,7 +199,7 @@ export function createAdminPaymentsClient(deps: SessionDependencies & { randomUU
     memory.set(state.actorId, value); publish({ pendingDecision: value });
     try { if (value) storage().setItem(storageKey(), JSON.stringify(value)); else storage().removeItem(storageKey()); } catch { /* Preserve the same operation in memory when storage is denied. */ }
   }
-  const scope = createSessionScope(deps, actorId => {
+  const scope = createPaymentSessionScope(deps, actorId => {
     attempt++; lock = undefined; publish({ ...initialAdminPaymentsState(), actorId, phase: actorId ? "loading" : "signed-out" });
     if (!actorId) return;
     if (memory.has(actorId)) publish({ pendingDecision: memory.get(actorId) || null });
