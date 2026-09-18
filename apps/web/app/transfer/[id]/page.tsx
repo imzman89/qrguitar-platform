@@ -28,6 +28,8 @@ export default function TransferClaimPage() {
   const [requiresAccess, setRequiresAccess] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const authRevision = useRef(0);
+  const feedbackRevision = useRef(0);
+  const acceptMutation = useRef<{ revision: number } | null>(null);
   const [signedIn, setSignedIn] = useState(false);
   const [accepting, setAccepting] = useState(false);
 
@@ -111,11 +113,13 @@ export default function TransferClaimPage() {
   }, [permanentPath, transfer?.guitarQrCode]);
 
   async function acceptTransfer() {
-    if (!transfer) {
+    if (!transfer || accepting || acceptMutation.current?.revision === authRevision.current) {
       return;
     }
 
     const revision = authRevision.current;
+    const mutation = { revision }; acceptMutation.current = mutation;
+    const feedback = ++feedbackRevision.current;
     setAccepting(true);
     setMessage("");
     try {
@@ -133,33 +137,38 @@ export default function TransferClaimPage() {
       if (authRevision.current !== revision) return;
 
       if (!response.ok || !payload?.ok || !payload.transfer) {
-        setMessage(payload?.message || "Could not accept this transfer.");
+        if (feedbackRevision.current === feedback) setMessage(payload?.message || "Could not accept this transfer.");
         return;
       }
 
       setTransfer(payload.transfer);
       setPermanentPath(payload.permanentPath || "");
-      setMessage(payload.message || "Ownership accepted. The permanent QRguitar URL stayed the same.");
+      if (feedbackRevision.current === feedback) setMessage(payload.message || "Ownership accepted. The permanent QRguitar URL stayed the same.");
     } catch {
       if (authRevision.current !== revision) return;
       setLoadError(true);
-      setMessage("We could not confirm the transfer. Reload its status before trying again.");
+      if (feedbackRevision.current === feedback) setMessage("We could not confirm the transfer. Reload its status before trying again.");
     } finally {
+      if (acceptMutation.current === mutation) acceptMutation.current = null;
       if (authRevision.current === revision) setAccepting(false);
     }
   }
 
   async function copyProfileLink() {
-    if (typeof window === "undefined") {
+    if (typeof window === "undefined" || accepting || acceptMutation.current?.revision === authRevision.current) {
       return;
     }
 
+    const revision = authRevision.current;
+    const feedback = ++feedbackRevision.current;
+    const current = () => authRevision.current === revision && feedbackRevision.current === feedback;
+    setMessage("");
     try {
       if (!window.navigator.clipboard) throw new Error("Clipboard unavailable");
       await window.navigator.clipboard.writeText(`${window.location.origin}${profileHref}`);
-      setMessage("Profile link copied.");
+      if (current()) setMessage("Profile link copied.");
     } catch {
-      setMessage("Could not copy the link. Open the Profile and copy its address from your browser.");
+      if (current()) setMessage("Could not copy the link. Open the Profile and copy its address from your browser.");
     }
   }
 
@@ -252,7 +261,7 @@ export default function TransferClaimPage() {
                 <Link className="button" href={"/dashboard/profile/" + encodeURIComponent(transfer.guitarQrCode)}>
                   View Profile
                 </Link>
-                <button className="button secondary" type="button" onClick={() => void copyProfileLink()}>
+                <button className="button secondary" type="button" disabled={accepting} onClick={() => void copyProfileLink()}>
                   <Copy size={16} />
                   Copy Record Link
                 </button>

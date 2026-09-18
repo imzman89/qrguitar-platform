@@ -568,7 +568,7 @@ export default function DashboardPage() {
               {actionRecord.serial ? <button type="button" disabled={visibilityPendingCodes.includes(actionRecord.qrCode)} aria-busy={visibilityPendingCodes.includes(actionRecord.qrCode)} onClick={() => void updateSerialVisibility(actionRecord, !actionRecord.showSerialPublic)}><EyeOff size={15} /> {actionRecord.showSerialPublic ? "Hide Serial Number" : "Show Serial Number"}</button> : null}
               <Link href={`/edit/${actionRecord.qrCode}#privacy-safety`}><ShieldCheck size={15} /> Visibility &amp; safety</Link>
             </section>
-            <TransferPanel className={styles.transferPanel} bodyClassName={styles.transferPanelBody} instrument={actionRecord} user={user} allowBuyerCode={collectionAccountType === "shop" || collectionAccountType === "builder"} latestTransfer={latestTransferForInstrument(transfers, actionRecord.qrCode)} onTransferCreated={(transfer) => { if (sessionEmail.current === user?.email) setTransfers((current) => [transfer, ...current.filter((item) => item.id !== transfer.id)]); }} onTransferChanged={refreshInstruments} />
+            <TransferPanel className={styles.transferPanel} bodyClassName={styles.transferPanelBody} instrument={actionRecord} user={user} isSessionCurrent={() => accountRevision.current === renderedAccountRevision} allowBuyerCode={collectionAccountType === "shop" || collectionAccountType === "builder"} latestTransfer={latestTransferForInstrument(transfers, actionRecord.qrCode)} onTransferCreated={(transfer) => { if (sessionEmail.current === user?.email) setTransfers((current) => [transfer, ...current.filter((item) => item.id !== transfer.id)]); }} onTransferChanged={refreshInstruments} />
             <section className={styles.drawerDanger}><b>Danger zone</b><button className={styles.dangerAction} type="button" onClick={() => void removeFromCollection(actionRecord)}>{getContentValue(content, "dashboard.card.remove")}</button></section>
           </div>
         </ActionDrawer>
@@ -583,6 +583,7 @@ function TransferPanel({
   bodyClassName,
   instrument,
   user,
+  isSessionCurrent,
   allowBuyerCode,
   latestTransfer,
   onTransferCreated,
@@ -592,6 +593,7 @@ function TransferPanel({
   bodyClassName: string;
   instrument: DemoInstrument;
   user: DemoUser | null;
+  isSessionCurrent: () => boolean;
   allowBuyerCode: boolean;
   latestTransfer?: DemoTransfer;
   onTransferCreated: (transfer: DemoTransfer) => void;
@@ -606,6 +608,8 @@ function TransferPanel({
   const [buyerCode, setBuyerCode] = useState("");
   const [orderReference, setOrderReference] = useState("");
   const [saving, setSaving] = useState(false);
+  const feedbackLifetime = useRef({ active: false, revision: 0 });
+  const transferMutation = useRef<symbol | null>(null);
 
   const claimUrl =
     typeof window !== "undefined" && latestTransfer ? `${window.location.origin}${latestTransfer.claimPath}` : "";
@@ -613,29 +617,50 @@ function TransferPanel({
   const hasPendingTransfer = latestTransfer?.status === "sent";
   const transferStatus = latestTransfer ? transferStatusLabel(latestTransfer) : null;
 
+  useEffect(() => {
+    const lifetime = feedbackLifetime.current;
+    lifetime.active = true; lifetime.revision++;
+    return () => { lifetime.active = false; lifetime.revision++; };
+  }, [instrument.qrCode, user?.email, latestTransfer?.id, latestTransfer?.status, visibleClaimUrl, buyerCode, handoffMode]);
+
+  function beginFeedback() {
+    const lifetime = feedbackLifetime.current;
+    const revision = ++lifetime.revision;
+    return (nextMessage: string) => {
+      if (lifetime.active && lifetime.revision === revision && isSessionCurrent()) setMessage(nextMessage);
+    };
+  }
+
   async function copyClaimLink() {
-    if (!visibleClaimUrl) {
+    if (!visibleClaimUrl || saving || transferMutation.current || !isSessionCurrent()) {
       return;
     }
 
+    const feedback = beginFeedback();
+    feedback("");
     try {
       if (!window.navigator.clipboard) throw new Error("Clipboard unavailable");
       await window.navigator.clipboard.writeText(visibleClaimUrl);
-      setMessage("Claim link copied.");
-    } catch { setMessage("Could not copy the claim link. Select and copy the displayed link."); }
+      feedback("Claim link copied.");
+    } catch { feedback("Could not copy the claim link. Select and copy the displayed link."); }
   }
 
   async function copyBuyerCode() {
-    if (!buyerCode) return;
+    if (!buyerCode || saving || transferMutation.current || !isSessionCurrent()) return;
+    const feedback = beginFeedback();
+    feedback("");
     try {
       if (!window.navigator.clipboard) throw new Error("Clipboard unavailable");
       await window.navigator.clipboard.writeText(buyerCode);
-      setMessage("Private buyer code copied.");
-    } catch { setMessage("Could not copy the code. Select and copy the displayed buyer code."); }
+      feedback("Private buyer code copied.");
+    } catch { feedback("Could not copy the code. Select and copy the displayed buyer code."); }
   }
 
   async function createTransfer() {
-    setMessage("");
+    if (transferMutation.current) return;
+    const mutation = Symbol(); transferMutation.current = mutation;
+    const feedback = beginFeedback();
+    feedback("");
     setSaving(true);
     try {
       const token = await getSupabaseAccessToken();
@@ -659,7 +684,7 @@ function TransferPanel({
         | null;
 
       if (!response.ok || !result?.ok || !result.transfer) {
-        setMessage(result?.message || "Could not create transfer.");
+        feedback(result?.message || "Could not create transfer.");
         return;
       }
 
@@ -669,21 +694,24 @@ function TransferPanel({
       setLastCreatedClaimUrl(nextClaimUrl);
       setBuyerCode(String(result.buyerCode || ""));
       onTransferCreated(result.transfer);
-      setMessage(result.message || "Transfer prepared. Check its invitation status before sharing.");
+      feedback(result.message || "Transfer prepared. Check its invitation status before sharing.");
     } catch {
-      setMessage("We could not confirm that action. Reload your collection to check its status before trying again.");
+      feedback("We could not confirm that action. Reload your collection to check its status before trying again.");
       onTransferChanged();
     } finally {
+      if (transferMutation.current === mutation) transferMutation.current = null;
       setSaving(false);
     }
   }
 
   async function cancelTransfer() {
-    if (!latestTransfer) {
+    if (!latestTransfer || transferMutation.current) {
       return;
     }
 
-    setMessage("");
+    const mutation = Symbol(); transferMutation.current = mutation;
+    const feedback = beginFeedback();
+    feedback("");
     setSaving(true);
     try {
       const token = await getSupabaseAccessToken();
@@ -700,7 +728,7 @@ function TransferPanel({
         | null;
 
       if (!response.ok || !result?.ok) {
-        setMessage(result?.message || "Could not cancel transfer.");
+        feedback(result?.message || "Could not cancel transfer.");
         return;
       }
 
@@ -710,20 +738,23 @@ function TransferPanel({
       if (result.transfer) {
         onTransferCreated(result.transfer);
       }
-      setMessage(result.message || "Transfer cancelled.");
+      feedback(result.message || "Transfer cancelled.");
       onTransferChanged();
     } catch {
-      setMessage("We could not confirm that action. Reload your collection to check its status before trying again.");
+      feedback("We could not confirm that action. Reload your collection to check its status before trying again.");
       onTransferChanged();
     } finally {
+      if (transferMutation.current === mutation) transferMutation.current = null;
       setSaving(false);
     }
   }
 
   async function resendBuyerInvitation() {
-    if (!latestTransfer) return;
+    if (!latestTransfer || transferMutation.current) return;
+    const mutation = Symbol(); transferMutation.current = mutation;
+    const feedback = beginFeedback();
     setSaving(true);
-    setMessage("");
+    feedback("");
     try {
       const token = await getSupabaseAccessToken();
       const response = await fetch("/api/transfers", {
@@ -732,11 +763,12 @@ function TransferPanel({
         body: JSON.stringify({ id: latestTransfer.id, action: "resend" })
       });
       const result = await response.json().catch(() => null) as { ok?: boolean; message?: string } | null;
-      setMessage(result?.message || (response.ok && result?.ok ? "Invitation resent." : "Could not confirm the invitation. Check its status before trying again."));
+      feedback(result?.message || (response.ok && result?.ok ? "Invitation resent." : "Could not confirm the invitation. Check its status before trying again."));
     } catch {
-      setMessage("We could not confirm that action. Reload your collection to check its status before trying again.");
+      feedback("We could not confirm that action. Reload your collection to check its status before trying again.");
       onTransferChanged();
     } finally {
+      if (transferMutation.current === mutation) transferMutation.current = null;
       setSaving(false);
     }
   }
@@ -796,7 +828,7 @@ function TransferPanel({
           ) : null}
           {hasPendingTransfer ? (
             <div className="transfer-actions">
-              {!latestTransfer?.handoffPrepared ? <button className="button secondary" type="button" onClick={() => void copyClaimLink()}><Copy size={16} />Copy Claim Link</button> : null}
+              {!latestTransfer?.handoffPrepared ? <button className="button secondary" type="button" disabled={saving} onClick={() => void copyClaimLink()}><Copy size={16} />Copy Claim Link</button> : null}
               {latestTransfer?.handoffPrepared && latestTransfer.toEmail ? <button className="button secondary" type="button" onClick={() => void resendBuyerInvitation()} disabled={saving}><Mail size={16} />Resend Sign-in Email</button> : null}
               {latestTransfer ? (
                 <button
@@ -818,7 +850,7 @@ function TransferPanel({
           {buyerCode ? (
             <div className="buyer-code-box" role="status">
               <span>Copy this code now</span><strong>{buyerCode}</strong><small>It is shown once. {orderReference ? "Give the buyer the matching order or receipt reference too. " : ""}Cancelling the handoff revokes it.</small>
-              <button className="button secondary" type="button" onClick={() => void copyBuyerCode()}><Copy size={16} /> Copy Buyer Code</button>
+              <button className="button secondary" type="button" disabled={saving} onClick={() => void copyBuyerCode()}><Copy size={16} /> Copy Buyer Code</button>
             </div>
           ) : null}
         </div>
@@ -834,7 +866,7 @@ function TransferPanel({
             <strong>{[latestTransfer.toName, latestTransfer.toEmail].filter(Boolean).join(" - ") || "Recipient not email-bound"}</strong>
             {latestTransfer.handoffPrepared ? <small>{latestTransfer.expiresAt ? `Expires ${new Date(latestTransfer.expiresAt).toLocaleString()}. ` : ""}The private code is never stored in readable form. Revoke and prepare a new handoff if it was not copied.</small> : <code>{visibleClaimUrl}</code>}
             {latestTransfer.status === "sent" && !latestTransfer.handoffPrepared ? (
-              <button className="button secondary" type="button" onClick={() => void copyClaimLink()}>
+              <button className="button secondary" type="button" disabled={saving} onClick={() => void copyClaimLink()}>
                 <Copy size={16} />
                 Copy Claim Link
               </button>

@@ -251,6 +251,8 @@ export default function SiteEditorPage() {
   const [brandName, setBrandName] = useState("");
   const [brandLogoUrl, setBrandLogoUrl] = useState("");
   const [emailSending, setEmailSending] = useState(false);
+  const [copyExportFeedback, setCopyExportFeedback] = useState("");
+  const copyExportAttempt = useRef(0);
   const [showCompare, setShowCompare] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const loaded = useRef(false);
@@ -287,6 +289,11 @@ export default function SiteEditorPage() {
   const textContrast = contrastRatio(settings.colors.text, settings.colors.background);
   const actionContrast = contrastRatio(settings.colors.background, settings.colors.cream);
   const accentContrast = contrastRatio(settings.colors.gold, settings.colors.background);
+
+  useEffect(() => {
+    setCopyExportFeedback("");
+    return () => { copyExportAttempt.current += 1; };
+  }, [settings, advancedJson, authorized, selected.area, selected.page, writeBusy, emailSending]);
 
   useEffect(() => {
     setOpenFieldSection(fieldGroups[0]?.[0] || "");
@@ -558,6 +565,21 @@ export default function SiteEditorPage() {
     link.click();
     URL.revokeObjectURL(url);
     setMessage("Settings backup downloaded.");
+  }
+
+  async function copySettingsExport() {
+    if (!authorized || !actorRef.current) return;
+    const attempt = ++copyExportAttempt.current;
+    const actor = actorRef.current, snapshot = settingsRef.current, generation = sitePreviewGeneration();
+    const isCurrent = () => copyExportAttempt.current === attempt && actorRef.current === actor
+      && settingsRef.current === snapshot && sitePreviewGeneration() === generation;
+    setCopyExportFeedback("Copying export…");
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(snapshot, null, 2));
+      if (isCurrent()) setCopyExportFeedback("Settings export copied.");
+    } catch {
+      if (isCurrent()) setCopyExportFeedback("Could not copy automatically. Use Download backup to save the settings export.");
+    }
   }
 
   function saveBrandLogo() {
@@ -917,8 +939,9 @@ export default function SiteEditorPage() {
         <button type="button" className="button secondary" onClick={downloadSettingsBackup}><Save size={16} /> Download backup</button>
         <button type="button" className="button secondary" onClick={() => setAdvancedUnlocked((value) => !value)}>{advancedUnlocked ? <LockKeyhole size={16} /> : <UnlockKeyhole size={16} />} {advancedUnlocked ? "Lock editor" : "Unlock editor"}</button>
         <button type="button" className="button secondary" onClick={loadAdvancedJson} disabled={!advancedUnlocked}><Upload size={16} /> Validate and load draft</button>
-        <button type="button" className="button secondary" onClick={() => void navigator.clipboard.writeText(JSON.stringify(settings, null, 2))}><Clipboard size={16} /> Copy export</button>
+        <button type="button" className="button secondary" onClick={() => void copySettingsExport()}><Clipboard size={16} /> Copy export</button>
       </div>
+      {copyExportFeedback ? <p className="form-message" role="status" aria-live="polite">{copyExportFeedback}</p> : null}
     </section>
   );
 

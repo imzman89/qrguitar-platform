@@ -57,6 +57,9 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
   const [transfers, setTransfers] = useState<DemoTransfer[]>([]);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
   const [shareNotice, setShareNotice] = useState<"idle" | "copied" | "failed">("idle");
+  const copyRevisionRef = useRef(0);
+  const copyActiveRef = useRef(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [actionNotice, setActionNotice] = useState<"transfer" | "documents" | "owner" | null>(null);
   const [mediaIndex, setMediaIndex] = useState(0);
   const [activeMedia, setActiveMedia] = useState<string | null>(null);
@@ -373,6 +376,18 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
   const shareUrl = instrumentQrCode ? publicProfileUrl(instrumentQrCode) : "";
 
   useEffect(() => {
+    copyActiveRef.current = true;
+    setCopyStatus("idle");
+    setShareNotice("idle");
+    return () => {
+      copyActiveRef.current = false;
+      copyRevisionRef.current++;
+      if (copyTimerRef.current !== undefined) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = undefined;
+    };
+  }, [shareUrl]);
+
+  useEffect(() => {
     if (!instrumentQrCode) {
       return;
     }
@@ -537,22 +552,37 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
   }
 
   async function copyProfileUrl() {
-    if (!shareUrl) {
+    if (!shareUrl || !copyActiveRef.current) {
       return;
     }
 
+    const attempt = ++copyRevisionRef.current;
+    const isCurrent = () => copyActiveRef.current && copyRevisionRef.current === attempt;
+    if (copyTimerRef.current !== undefined) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = undefined;
+    setCopyStatus("idle");
+    setShareNotice("idle");
+
     try {
       await navigator.clipboard.writeText(shareUrl);
+      if (!isCurrent()) return;
       setCopyStatus("copied");
       setShareNotice("copied");
-      setTimeout(() => {
+      copyTimerRef.current = setTimeout(() => {
+        if (!isCurrent()) return;
         setCopyStatus("idle");
         setShareNotice("idle");
+        copyTimerRef.current = undefined;
       }, 1400);
     } catch {
+      if (!isCurrent()) return;
       setCopyStatus("idle");
       setShareNotice("failed");
-      setTimeout(() => setShareNotice("idle"), 1800);
+      copyTimerRef.current = setTimeout(() => {
+        if (!isCurrent()) return;
+        setShareNotice("idle");
+        copyTimerRef.current = undefined;
+      }, 1800);
     }
   }
 

@@ -25,6 +25,8 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
   const [text, setText] = useState("");
   const [rows, setRows] = useState<BulkRow[]>([]);
   const [message, setMessage] = useState("");
+  const [templateCopyState, setTemplateCopyState] = useState<"" | "copying" | "copied" | "manual">("");
+  const templateCopyAttempt = useRef(0);
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [filter, setFilter] = useState<"all" | "ready" | "attention" | "duplicate" | "invalid" | "draft" | "created">("all");
@@ -54,6 +56,7 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
     const changeAccount = (nextOwner: string) => {
       if (!alive || (activeAccount.current === nextOwner && nextOwner)) return;
       const changed = activeAccount.current !== nextOwner;
+      templateCopyAttempt.current += 1; setTemplateCopyState("");
       activeAccount.current = nextOwner;
       // Batched A → signed-out/B → A events still invalidate the released lease,
       // even when React sees the same final owner ID as the previous render.
@@ -71,7 +74,7 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
     } catch {
       changeAccount("");
     }
-    return () => { alive = false; stop(); draftLease.current?.release(); };
+    return () => { alive = false; templateCopyAttempt.current += 1; stop(); draftLease.current?.release(); };
   }, []);
 
   useEffect(() => {
@@ -199,8 +202,11 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
   }
 
   async function copyTemplate() {
-    try { await navigator.clipboard.writeText(template); setMessage("Template copied."); }
-    catch { setMessage("Could not copy automatically. Select the template above and copy it manually."); }
+    const attempt = ++templateCopyAttempt.current, actor = activeAccount.current;
+    const isCurrent = () => templateCopyAttempt.current === attempt && activeAccount.current === actor;
+    setTemplateCopyState("copying");
+    try { await navigator.clipboard.writeText(template); if (isCurrent()) setTemplateCopyState("copied"); }
+    catch { if (isCurrent()) setTemplateCopyState("manual"); }
   }
 
   async function createProfiles() {
@@ -266,6 +272,8 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
   return (
     <section className="bulk-import-workspace">
       <header className="bulk-import-heading"><div><span className="eyebrow">Bulk Import</span><h1>{getContentValue(content, "bulkImport.hero.headline")}</h1><p>{getContentValue(content, "bulkImport.hero.body")}</p></div><button className="button secondary" type="button" onClick={() => void copyTemplate()}><Clipboard size={16} /> {getContentValue(content, "bulkImport.actions.template")}</button></header>
+      {templateCopyState ? <p className="form-message" role="status" aria-live="polite">{templateCopyState === "copying" ? "Copying template…" : templateCopyState === "copied" ? "Template copied." : "Could not copy automatically. Select and copy the template below."}</p> : null}
+      {templateCopyState === "manual" ? <label className="field custom-wide"><span>Copyable import template</span><textarea aria-label="Bulk import template" readOnly rows={4} value={template} spellCheck={false} onFocus={(event) => event.currentTarget.select()} /></label> : null}
       <ol className="import-steps" aria-label="Import workflow"><li className={text ? "is-complete" : "is-active"}><b>1</b><span>Add inventory</span></li><li className={rows.length ? "is-complete" : ""}><b>2</b><span>Map columns</span></li><li className={rows.length ? "is-active" : ""}><b>3</b><span>Review rows</span></li><li><b>4</b><span>Create Private Profiles</span></li></ol>
       <div className="bulk-import-grid">
         <div className="bulk-import-intro">

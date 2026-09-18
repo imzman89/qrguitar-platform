@@ -83,7 +83,7 @@ await test("unmount aborts request and ignores its late response", async () => {
 });
 async function runAccept(fetch, during) {
   const state={accepting:false,message:"",loadError:false,transfer:record,permanentPath:""};
-  const revision={current:1}; const env={fetch,transfer:record,authRevision:revision,getSupabaseAccessToken:async()=>"fixture-token"};
+  const revision={current:1}; const env={fetch,transfer:record,authRevision:revision,feedbackRevision:{current:0},acceptMutation:{current:null},accepting:false,getSupabaseAccessToken:async()=>"fixture-token"};
   for(const key of Object.keys(state))env["set"+key[0].toUpperCase()+key.slice(1)] = value => {state[key]=value;};
   const pending=compile(accept,env,"acceptTransfer")(); if(during)await during(revision); await pending; return state;
 }
@@ -103,7 +103,7 @@ await test("accept response after account change cannot expose previous transfer
 });
 for(const mode of ["missing","reject","success"]) await test("clipboard "+mode+" reports the actual outcome",async()=>{
   const messages=[];const clipboard=mode==="missing"?undefined:{writeText:async value=>{assert.equal(value,"https://qrguitar.com/i/QRG-FIXTURE");if(mode==="reject")throw new Error("denied");}};
-  await compile(copy,{window:{navigator:{clipboard},location:{origin:"https://qrguitar.com"}},profileHref:"/i/QRG-FIXTURE",setMessage:m=>messages.push(m)},"copyProfileLink")();
+  await compile(copy,{window:{navigator:{clipboard},location:{origin:"https://qrguitar.com"}},profileHref:"/i/QRG-FIXTURE",authRevision:{current:0},feedbackRevision:{current:0},acceptMutation:{current:null},accepting:false,setMessage:m=>messages.push(m)},"copyProfileLink")();
   assert.match(messages.at(-1), mode==="success"?/Profile link copied/:/Could not copy/);
 });
 console.log(count + " transfer UI behavior cases passed; no external messages or account writes.");
