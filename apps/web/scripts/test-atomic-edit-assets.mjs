@@ -102,7 +102,7 @@ function mockDb({readError=false,rpcError=null,rpcData={ok:true,qrCode:"QRG-ORIG
     async rpc(){calls.rpc++;return {data:rpcData,error:rpcError};}
   };
 }
-const edit=(extra={})=>({qrCode:"QRG-ORIGINAL123",brand:"Fender",model:"Strat",serial:"ORIGINAL123",photos:[mediaPath],...extra});
+const edit=(extra={})=>({qrCode:"QRG-ORIGINAL123",brand:"Fender",model:"Strat",serial:"ORIGINAL123",instrumentType:"Electric Guitar",photos:[mediaPath],...extra});
 await test("existing document read failure returns failure before uploading or mutating",async()=>{
   const db=mockDb({readError:true});const result=await run(edit(),db);
   assert.equal(result.body.ok,false);assert.equal(db.calls.rpc,0);
