@@ -46,7 +46,7 @@ export function OptionalTrackingConsent() {
     }
     if (decision === "denied") {
       setConsent(readOptionalTrackingConsent());
-      setManaging(true);
+      setManaging(false);
       setStorageError(true);
       return;
     }
@@ -64,9 +64,14 @@ export function OptionalTrackingConsent() {
 
   if (consent.status === "denied" && !managing) {
     return (
-      <button className={styles.preferenceTrigger} type="button" onClick={() => setManaging(true)}>
-        Privacy choices
-      </button>
+      <>
+        <button className={styles.preferenceTrigger} type="button" onClick={() => setManaging(true)}>
+          Privacy choices
+        </button>
+        {storageError ? (
+          <span className={styles.statusOnly} role="status">Your browser could not save that choice. Optional tracking is off for this page.</span>
+        ) : null}
+      </>
     );
   }
 

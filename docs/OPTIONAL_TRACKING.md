@@ -42,24 +42,42 @@ Product events cross one provider-neutral boundary:
 - `subscribeToOptionalTrackingProductEvents` receives only the sanitized event
   detail. A provider adapter should subscribe inside `activateOptionalTracking` and
   return the unsubscribe/provider cleanup function.
-- Success events use one-way session dedupe markers. Raw account, Profile, transfer,
-  and payment identifiers are never included in event detail or dedupe storage.
+- Business success events require a private business dedupe key. The boundary derives
+  a stable `qrg_evt_v1_...` SHA-256 token using the event name and key, then stores at
+  most 128 tokens for the configured purposes in local browser storage. The raw key is
+  never stored or included in event detail. These tokens are pseudonymous rather than
+  anonymous: a party that already knows a source identifier may be able to link its
+  derived token.
+- If the browser cannot derive a SHA-256 token, business conversion dispatch fails
+  closed. Repeatable public Profile page views do not need this token.
+- When the Web Locks API is available, the boundary serializes the same conversion
+  across tabs before checking shared local storage. Without cross-context locking or
+  durable storage, only same-page best-effort dedupe is possible.
+- Every provider adapter **must** pass `idempotencyToken` as that provider's event,
+  transaction, or dedupe identifier. This is what suppresses the same conversion
+  across devices and after local storage is cleared. Do not enable a provider that
+  cannot honor the token for business conversion events.
+- Denying optional tracking clears the local conversion markers. If the visitor later
+  accepts again, QRguitar may emit the same stable token; the provider must still
+  dedupe it. Clearing browser storage has the same limitation.
+- `public_profile_viewed` is a normal repeatable page-view event. It has no business
+  dedupe key or `idempotencyToken`.
 
 Use the exported `optionalTrackingProductEvents` constants for registration and
 conversion events:
 
 | Export | Event name | Emit only when |
 | --- | --- | --- |
-| `publicProfileViewed` | `public_profile_viewed` | A public or unlisted Profile has rendered successfully; sends only `visibility`. |
+| `publicProfileViewed` | `public_profile_viewed` | A public or unlisted Profile has rendered successfully; sends only `visibility` and remains repeatable. |
 | `qrLandingViewed` | `qr_landing_viewed` | **Reserved and intentionally blocked.** No trustworthy QR-origin marker exists yet, so QRguitar does not emit this event or infer a scan from a Profile visit. |
-| `registrationCompleted` | `account_registration_completed` | Supabase confirms a genuinely new identity; sends only `confirmation` (`email_pending` or `session_ready`). |
-| `profileCreated` | `profile_creation_completed` | The Profile creation API confirms its committed record; sends only `visibility`. |
-| `checkoutStarted` | `credit_checkout_started` | The payment server confirms a valid checkout order; sends only the fixed pack's `credits` and `valueUsd`. |
-| `purchaseCompleted` | `credit_purchase_completed` | An authoritative status read shows the server ledger has fulfilled the order; sends only `credits` and `valueUsd`. |
-| `ownershipTransferCompleted` | `ownership_transfer_completed` | The transfer transaction confirms `accepted`; sends only `method` (`email_link`, `buyer_code`, or `review`). |
+| `registrationCompleted` | `account_registration_completed` | Supabase confirms a genuinely new identity; sends `confirmation` (`email_pending` or `session_ready`) plus `idempotencyToken`. |
+| `profileCreated` | `profile_creation_completed` | The Profile creation API confirms its committed record; sends `visibility` plus `idempotencyToken`. |
+| `checkoutStarted` | `credit_checkout_started` | The payment server confirms a valid checkout order; sends the fixed pack's `credits` and `valueUsd` plus `idempotencyToken`. |
+| `purchaseCompleted` | `credit_purchase_completed` | An authoritative status read shows the server ledger has fulfilled the order; sends `credits` and `valueUsd` plus `idempotencyToken`. |
+| `ownershipTransferCompleted` | `ownership_transfer_completed` | The transfer transaction confirms `accepted`; sends `method` (`email_link`, `buyer_code`, or `review`) plus `idempotencyToken`. |
 
 Never emit a success event from a button click, optimistic screen, return URL, or
 client-only payment result. Do not send names, email addresses, authentication data,
-instrument serial numbers, QRguitar IDs, public Profile URLs, transfer tokens,
-payment/order IDs, or free-form text to an optional tracking provider. Extend the
+instrument serial numbers, public Profile URLs, free-form text, or raw QRguitar,
+transfer, payment, or order identifiers to an optional tracking provider. Extend the
 typed runtime sanitizer and its tests before adding any event property.

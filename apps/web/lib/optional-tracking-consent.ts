@@ -3,6 +3,8 @@ export const OPTIONAL_TRACKING_PRODUCT_EVENT = "qrguitar:optional-tracking-produ
 export const OPTIONAL_TRACKING_CONSENT_STORAGE_PREFIX = "qrguitar.optionalTrackingConsent.v1";
 const OPTIONAL_TRACKING_DEDUPE_STORAGE_PREFIX = "qrguitar.optionalTrackingEvents.v1";
 const MAX_DEDUPE_MARKERS = 128;
+const OPTIONAL_TRACKING_IDEMPOTENCY_PREFIX = "qrg_evt_v1_";
+const OPTIONAL_TRACKING_LOCK_PREFIX = "qrguitar.optionalTrackingEvent.v1";
 
 export const optionalTrackingPurposes = ["analytics", "advertising"] as const;
 export type OptionalTrackingPurpose = (typeof optionalTrackingPurposes)[number];
@@ -29,15 +31,18 @@ type CreditPackSize = 1 | 10 | 25;
 type CreditPackValueUsd = 12 | 50 | 99;
 type TransferMethod = "email_link" | "buyer_code" | "review";
 
-export type OptionalTrackingProductEventInput =
-  | Readonly<{ name: typeof optionalTrackingProductEvents.publicProfileViewed; properties: Readonly<{ visibility: Exclude<ProfileVisibility, "private"> }> }>
+type RepeatableProductEventInput =
+  Readonly<{ name: typeof optionalTrackingProductEvents.publicProfileViewed; properties: Readonly<{ visibility: Exclude<ProfileVisibility, "private"> }> }>;
+
+type BusinessProductEventInput =
   | Readonly<{ name: typeof optionalTrackingProductEvents.registrationCompleted; properties: Readonly<{ confirmation: RegistrationConfirmation }> }>
   | Readonly<{ name: typeof optionalTrackingProductEvents.profileCreated; properties: Readonly<{ visibility: ProfileVisibility }> }>
   | Readonly<{ name: typeof optionalTrackingProductEvents.checkoutStarted; properties: Readonly<{ credits: CreditPackSize; valueUsd: CreditPackValueUsd }> }>
   | Readonly<{ name: typeof optionalTrackingProductEvents.purchaseCompleted; properties: Readonly<{ credits: CreditPackSize; valueUsd: CreditPackValueUsd }> }>
   | Readonly<{ name: typeof optionalTrackingProductEvents.ownershipTransferCompleted; properties: Readonly<{ method: TransferMethod }> }>;
 
-export type OptionalTrackingProductEventDetail = OptionalTrackingProductEventInput;
+export type OptionalTrackingProductEventInput = RepeatableProductEventInput | BusinessProductEventInput;
+export type OptionalTrackingProductEventDetail = RepeatableProductEventInput | (BusinessProductEventInput & Readonly<{ idempotencyToken: string }>);
 
 export type OptionalTrackingConfig = Readonly<{
   enabled: boolean;
@@ -65,11 +70,16 @@ export interface OptionalTrackingEventTarget {
   dispatchEvent(event: Event): boolean;
 }
 
+export interface OptionalTrackingLockManager {
+  request<T>(name: string, callback: () => Promise<T>): Promise<T>;
+}
+
 export type OptionalTrackingRuntime = Readonly<{
   config?: OptionalTrackingConfig;
   storage?: OptionalTrackingStorage | null;
   dedupeStorage?: OptionalTrackingStorage | null;
   eventTarget?: OptionalTrackingEventTarget | null;
+  lockManager?: OptionalTrackingLockManager | null;
 }>;
 
 export type OptionalTrackingCleanup = () => void | Promise<void>;
@@ -90,10 +100,19 @@ function browserStorage(): OptionalTrackingStorage | null {
 function browserDedupeStorage(): OptionalTrackingStorage | null {
   if (typeof window === "undefined") return null;
   try {
-    return window.sessionStorage;
+    return window.localStorage;
   } catch {
     return null;
   }
+}
+
+function browserLockManager(): OptionalTrackingLockManager | null {
+  if (typeof navigator === "undefined" || !navigator.locks) return null;
+  const locks = navigator.locks;
+  async function request<T>(name: string, callback: () => Promise<T>): Promise<T> {
+    return await locks.request<Promise<T>>(name, () => callback());
+  }
+  return { request };
 }
 
 function browserEventTarget(): OptionalTrackingEventTarget | null {
@@ -142,6 +161,10 @@ function runtimeEventTarget(runtime?: OptionalTrackingRuntime) {
   return runtime && "eventTarget" in runtime ? runtime.eventTarget || null : browserEventTarget();
 }
 
+function runtimeLockManager(runtime?: OptionalTrackingRuntime) {
+  return runtime && "lockManager" in runtime ? runtime.lockManager || null : browserLockManager();
+}
+
 function readStoredDecision(config: OptionalTrackingConfig, storage: OptionalTrackingStorage | null) {
   if (!config.enabled || !storage) return null;
   try {
@@ -176,13 +199,15 @@ function createDetailEvent<T>(name: string, detail: T) {
   return event;
 }
 
-function clearEventDedupe(config: OptionalTrackingConfig, runtime?: OptionalTrackingRuntime) {
-  const scope = `${config.purposes.join("-")}:`;
-  for (const value of inMemoryEventDedupe) if (value.startsWith(scope)) inMemoryEventDedupe.delete(value);
-  try {
-    runtimeDedupeStorage(runtime)?.setItem(optionalTrackingDedupeStorageKey(config), "[]");
-  } catch {
-    // Withdrawal still gates dispatch and provider activation when storage is blocked.
+function clearEventDedupe(runtime?: OptionalTrackingRuntime) {
+  inMemoryEventDedupe.clear();
+  const storage = runtimeDedupeStorage(runtime);
+  for (const purposes of [["analytics"], ["advertising"], ["analytics", "advertising"]] as const) {
+    try {
+      storage?.setItem(optionalTrackingDedupeStorageKey({ enabled: true, purposes }), "[]");
+    } catch {
+      // Withdrawal still gates dispatch and provider activation when storage is blocked.
+    }
   }
 }
 
@@ -207,7 +232,7 @@ export function saveOptionalTrackingConsent(decision: OptionalTrackingDecision, 
     if (!persisted) return false;
     pageDeniedConfigurations.delete(key);
   } else {
-    clearEventDedupe(config, runtime);
+    clearEventDedupe(runtime);
   }
 
   runtimeEventTarget(runtime)?.dispatchEvent(createDetailEvent(OPTIONAL_TRACKING_CONSENT_EVENT, { decision, purposes: config.purposes }));
@@ -225,7 +250,10 @@ export function subscribeToOptionalTrackingConsent(
   const storageUpdate: EventListener = (event) => {
     const config = runtimeConfig(runtime);
     const key = "key" in event ? (event as StorageEvent).key : null;
-    if (key === null || key === optionalTrackingConsentStorageKey(config)) update(event);
+    if (key === null || key === optionalTrackingConsentStorageKey(config)) {
+      if (readOptionalTrackingConsent(runtime).status === "denied") clearEventDedupe(runtime);
+      update(event);
+    }
   };
   target.addEventListener(OPTIONAL_TRACKING_CONSENT_EVENT, update);
   target.addEventListener("storage", storageUpdate);
@@ -311,7 +339,7 @@ function exactKeys(value: Record<string, unknown>, keys: readonly string[]) {
   return present.length === expected.length && expected.every((key, index) => key === present[index]);
 }
 
-function productEventDetail(value: unknown): OptionalTrackingProductEventDetail | null {
+function productEventInput(value: unknown): OptionalTrackingProductEventInput | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const input = value as { name?: unknown; properties?: unknown };
   if (!exactKeys(input as Record<string, unknown>, ["name", "properties"]) || !input.properties || typeof input.properties !== "object" || Array.isArray(input.properties)) return null;
@@ -333,12 +361,29 @@ function productEventDetail(value: unknown): OptionalTrackingProductEventDetail 
     && [1, 10, 25].includes(properties.credits) && [12, 50, 99].includes(properties.valueUsd)) {
     const expectedValue = { 1: 12, 10: 50, 25: 99 }[properties.credits as CreditPackSize];
     if (properties.valueUsd !== expectedValue) return null;
-    return Object.freeze({ name, properties: Object.freeze({ credits: properties.credits as CreditPackSize, valueUsd: properties.valueUsd as CreditPackValueUsd }) }) as OptionalTrackingProductEventDetail;
+    return Object.freeze({ name, properties: Object.freeze({ credits: properties.credits as CreditPackSize, valueUsd: properties.valueUsd as CreditPackValueUsd }) }) as BusinessProductEventInput;
   }
   if (name === optionalTrackingProductEvents.ownershipTransferCompleted && exactKeys(properties, ["method"]) && ["email_link", "buyer_code", "review"].includes(properties.method as string)) {
     return Object.freeze({ name, properties: Object.freeze({ method: properties.method as TransferMethod }) });
   }
   return null;
+}
+
+function validIdempotencyToken(value: unknown): value is string {
+  return typeof value === "string" && new RegExp(`^${OPTIONAL_TRACKING_IDEMPOTENCY_PREFIX}[a-f0-9]{64}$`).test(value);
+}
+
+function productEventDetail(value: unknown): OptionalTrackingProductEventDetail | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const name = record.name;
+  const repeatable = name === optionalTrackingProductEvents.publicProfileViewed;
+  if (!exactKeys(record, repeatable ? ["name", "properties"] : ["idempotencyToken", "name", "properties"])) return null;
+  const input = productEventInput({ name, properties: record.properties });
+  if (!input) return null;
+  if (repeatable) return input as RepeatableProductEventInput;
+  if (!validIdempotencyToken(record.idempotencyToken)) return null;
+  return Object.freeze({ ...input, idempotencyToken: record.idempotencyToken }) as OptionalTrackingProductEventDetail;
 }
 
 async function dedupeDigest(value: string) {
@@ -351,44 +396,81 @@ async function dedupeDigest(value: string) {
   }
 }
 
-async function firstEventForKey(name: OptionalTrackingProductEventInput["name"], key: string, runtime?: OptionalTrackingRuntime) {
+async function idempotencyToken(name: BusinessProductEventInput["name"], key: string) {
+  const digest = await dedupeDigest(`qrguitar:optional-tracking:v1:${name}:${key}`);
+  return digest ? `${OPTIONAL_TRACKING_IDEMPOTENCY_PREFIX}${digest}` : null;
+}
+
+async function withDedupeLock<T>(token: string, work: () => T | Promise<T>, runtime?: OptionalTrackingRuntime) {
+  const locks = runtimeLockManager(runtime);
+  if (!locks) return work();
+  let entered = false;
+  try {
+    return await locks.request(`${OPTIONAL_TRACKING_LOCK_PREFIX}:${token}`, async () => {
+      entered = true;
+      return await work();
+    });
+  } catch {
+    // If lock acquisition itself is unavailable, same-context memory and durable
+    // storage still provide best-effort dedupe. Never repeat work that had entered.
+    return entered ? null : work();
+  }
+}
+
+async function firstEventForToken(token: string, runtime?: OptionalTrackingRuntime) {
   const config = runtimeConfig(runtime);
-  const rawMemoryKey = `${config.purposes.join("-")}:${name}:${key}`;
-  if (inMemoryEventDedupe.has(rawMemoryKey)) return false;
-  const digest = await dedupeDigest(`${name}:${key}`);
-  if (!canUseOptionalTracking("analytics", runtime)) return false;
-  if (digest) {
+  const memoryKey = `${config.purposes.join("-")}:${token}`;
+  const claimed = await withDedupeLock(token, () => {
+    if (!canUseOptionalTracking("analytics", runtime) || inMemoryEventDedupe.has(memoryKey)) return false;
     const storage = runtimeDedupeStorage(runtime);
     const storageKey = optionalTrackingDedupeStorageKey(config);
     try {
       const parsed = JSON.parse(storage?.getItem(storageKey) || "[]");
-      const markers = Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string" && /^[a-f0-9]{64}$/.test(item)).slice(-MAX_DEDUPE_MARKERS) : [];
-      if (markers.includes(digest)) {
-        inMemoryEventDedupe.add(rawMemoryKey);
+      const markers = Array.isArray(parsed) ? parsed.filter(validIdempotencyToken).slice(-MAX_DEDUPE_MARKERS) : [];
+      if (markers.includes(token)) {
+        inMemoryEventDedupe.add(memoryKey);
         return false;
       }
-      storage?.setItem(storageKey, JSON.stringify([...markers, digest].slice(-MAX_DEDUPE_MARKERS)));
+      storage?.setItem(storageKey, JSON.stringify([...markers, token].slice(-MAX_DEDUPE_MARKERS)));
     } catch {
-      // In-memory dedupe still prevents React/effect replays for this page lifetime.
+      // In-memory dedupe still prevents same-page replays when durable storage fails.
     }
-  }
-  inMemoryEventDedupe.add(rawMemoryKey);
-  return true;
+    inMemoryEventDedupe.add(memoryKey);
+    return true;
+  }, runtime);
+  return claimed === true;
 }
 
+export function dispatchOptionalTrackingProductEvent(
+  input: RepeatableProductEventInput,
+  options?: Readonly<{ runtime?: OptionalTrackingRuntime; dedupeKey?: never }>
+): Promise<boolean>;
+export function dispatchOptionalTrackingProductEvent(
+  input: BusinessProductEventInput,
+  options: Readonly<{ dedupeKey: string; runtime?: OptionalTrackingRuntime }>
+): Promise<boolean>;
 export async function dispatchOptionalTrackingProductEvent(
   input: OptionalTrackingProductEventInput,
   options: Readonly<{ dedupeKey?: string; runtime?: OptionalTrackingRuntime }> = {}
 ) {
-  const detail = productEventDetail(input);
+  const sanitized = productEventInput(input);
   const runtime = options.runtime;
-  if (!detail || !canUseOptionalTracking("analytics", runtime)) return false;
-  if (options.dedupeKey) {
-    if (options.dedupeKey.length > 256 || !await firstEventForKey(detail.name, options.dedupeKey, runtime)) return false;
-  }
-  if (!canUseOptionalTracking("analytics", runtime)) return false;
+  if (!sanitized || !canUseOptionalTracking("analytics", runtime)) return false;
   const target = runtimeEventTarget(runtime);
   if (!target) return false;
+
+  let detail: OptionalTrackingProductEventDetail;
+  if (sanitized.name === optionalTrackingProductEvents.publicProfileViewed) {
+    if (options.dedupeKey !== undefined) return false;
+    detail = sanitized as RepeatableProductEventInput;
+  } else {
+    const key = options.dedupeKey;
+    if (!key || key.length > 256) return false;
+    const token = await idempotencyToken(sanitized.name, key);
+    if (!token || !canUseOptionalTracking("analytics", runtime) || !await firstEventForToken(token, runtime)) return false;
+    detail = Object.freeze({ ...sanitized, idempotencyToken: token }) as OptionalTrackingProductEventDetail;
+  }
+  if (!canUseOptionalTracking("analytics", runtime)) return false;
   target.dispatchEvent(createDetailEvent(OPTIONAL_TRACKING_PRODUCT_EVENT, detail));
   return true;
 }

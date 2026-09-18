@@ -12,18 +12,38 @@ const require = process.env.QRGUITAR_SOURCE_ROOT
   : createRequire(import.meta.url);
 const ts = require("typescript");
 
-async function loadConsentModule() {
+let moduleSequence = 0;
+async function loadConsentModule(label = "main") {
   const source = fs.readFileSync(path.join(webRoot, "lib/optional-tracking-consent.ts"), "utf8");
   const javascript = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 }
   }).outputText;
-  return import(`data:text/javascript;base64,${Buffer.from(javascript).toString("base64")}`);
+  const isolated = `${javascript}\n// isolated test module: ${label}-${moduleSequence++}`;
+  return import(`data:text/javascript;base64,${Buffer.from(isolated).toString("base64")}`);
 }
 
 class MemoryStorage {
   values = new Map();
   getItem(key) { return this.values.get(key) ?? null; }
   setItem(key, value) { this.values.set(key, value); }
+}
+
+class SerialLockManager {
+  tails = new Map();
+  names = [];
+  async request(name, callback) {
+    this.names.push(name);
+    const previous = this.tails.get(name) || Promise.resolve();
+    let release;
+    const current = new Promise((resolve) => { release = resolve; });
+    this.tails.set(name, current);
+    await previous;
+    try { return await callback(); }
+    finally {
+      release();
+      if (this.tails.get(name) === current) this.tails.delete(name);
+    }
+  }
 }
 
 const consent = await loadConsentModule();
@@ -53,6 +73,8 @@ test("registration and conversion names are stable, explicit, and provider-neutr
   assert.match(guide, /Do not queue or replay events that happened before\s+acceptance/);
   assert.match(guide, /Never emit a success event from a button click/);
   assert.match(guide, /Reserved and intentionally blocked/);
+  assert.match(guide, /provider adapter \*\*must\*\* pass `idempotencyToken`/i);
+  assert.match(guide, /pseudonymous rather than\s+anonymous/);
 });
 
 test("missing, malformed, denied, and purpose-stale choices all fail closed", () => {
@@ -170,7 +192,7 @@ test("product events require accepted analytics, sanitize detail, and never repl
   stop();
 });
 
-test("success dedupe is one-way in storage and omits raw identifiers from event detail", async () => {
+test("business success detail carries only a stable pseudonymous token and bounded properties", async () => {
   const storage = new MemoryStorage(), dedupeStorage = new MemoryStorage(), target = new EventTarget();
   const runtime = { config: analytics, storage, dedupeStorage, eventTarget: target };
   consent.saveOptionalTrackingConsent("accepted", runtime);
@@ -180,15 +202,120 @@ test("success dedupe is one-way in storage and omits raw identifiers from event 
   const purchase = { name: consent.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 10, valueUsd: 50 } };
   assert.equal(await consent.dispatchOptionalTrackingProductEvent(purchase, { runtime, dedupeKey: privateOrderId }), true);
   assert.equal(await consent.dispatchOptionalTrackingProductEvent(purchase, { runtime, dedupeKey: privateOrderId }), false);
-  assert.deepEqual(received, [purchase]);
+  assert.equal(received.length, 1);
+  assert.deepEqual(received[0].properties, purchase.properties);
+  assert.deepEqual(Object.keys(received[0]).sort(), ["idempotencyToken", "name", "properties"]);
+  assert.match(received[0].idempotencyToken, /^qrg_evt_v1_[a-f0-9]{64}$/);
   assert.doesNotMatch(JSON.stringify(received), new RegExp(privateOrderId));
   assert.doesNotMatch(JSON.stringify([...dedupeStorage.values.entries()]), new RegExp(privateOrderId));
-  assert.match(JSON.stringify([...dedupeStorage.values.entries()]), /[a-f0-9]{64}/);
+  assert.match(JSON.stringify([...dedupeStorage.values.entries()]), /qrg_evt_v1_[a-f0-9]{64}/);
+
+  const forged = new Event(consent.OPTIONAL_TRACKING_PRODUCT_EVENT);
+  Object.defineProperty(forged, "detail", { value: { ...received[0], email: "private@example.test" } });
+  target.dispatchEvent(forged);
+  assert.equal(received.length, 1);
 });
 
-test("every supported event enforces its bounded anonymous property schema", async () => {
+test("durable conversion markers retain only the latest bounded token set", async () => {
+  const isolated = await loadConsentModule("bounded-markers");
+  const storage = new MemoryStorage(), dedupeStorage = new MemoryStorage(), target = new EventTarget();
+  const runtime = { config: isolated.parseOptionalTrackingConfig("analytics"), storage, dedupeStorage, eventTarget: target };
+  isolated.saveOptionalTrackingConsent("accepted", runtime);
+  const event = { name: isolated.optionalTrackingProductEvents.profileCreated, properties: { visibility: "private" } };
+  for (let index = 0; index < 130; index++) {
+    assert.equal(await isolated.dispatchOptionalTrackingProductEvent(event, { runtime, dedupeKey: `private-profile-${index}` }), true);
+  }
+  const stored = JSON.parse([...dedupeStorage.values.values()][0]);
+  assert.equal(stored.length, 128);
+  assert.ok(stored.every((value) => /^qrg_evt_v1_[a-f0-9]{64}$/.test(value)));
+  assert.doesNotMatch(JSON.stringify(stored), /private-profile-/);
+});
+
+test("conversion dedupe survives tabs and browser sessions and serializes concurrent tabs", async () => {
+  const tabA = await loadConsentModule("tab-a"), tabB = await loadConsentModule("tab-b"), laterSession = await loadConsentModule("later-session");
+  const sharedConsent = new MemoryStorage(), sharedDedupe = new MemoryStorage(), locks = new SerialLockManager();
+  const targetA = new EventTarget(), targetB = new EventTarget(), targetLater = new EventTarget();
+  const configA = tabA.parseOptionalTrackingConfig("analytics"), configB = tabB.parseOptionalTrackingConfig("analytics"), configLater = laterSession.parseOptionalTrackingConfig("analytics");
+  const runtimeA = { config: configA, storage: sharedConsent, dedupeStorage: sharedDedupe, eventTarget: targetA, lockManager: locks };
+  const runtimeB = { config: configB, storage: sharedConsent, dedupeStorage: sharedDedupe, eventTarget: targetB, lockManager: locks };
+  const runtimeLater = { config: configLater, storage: sharedConsent, dedupeStorage: sharedDedupe, eventTarget: targetLater, lockManager: locks };
+  assert.equal(tabA.saveOptionalTrackingConsent("accepted", runtimeA), true);
+  let delivered = 0;
+  tabA.subscribeToOptionalTrackingProductEvents(() => { delivered++; }, runtimeA);
+  tabB.subscribeToOptionalTrackingProductEvents(() => { delivered++; }, runtimeB);
+  laterSession.subscribeToOptionalTrackingProductEvents(() => { delivered++; }, runtimeLater);
+  const businessKey = "55555555-5555-4555-8555-555555555555";
+  const eventA = { name: tabA.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 25, valueUsd: 99 } };
+  const eventB = { name: tabB.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 25, valueUsd: 99 } };
+  const outcomes = await Promise.all([
+    tabA.dispatchOptionalTrackingProductEvent(eventA, { runtime: runtimeA, dedupeKey: businessKey }),
+    tabB.dispatchOptionalTrackingProductEvent(eventB, { runtime: runtimeB, dedupeKey: businessKey })
+  ]);
+  assert.deepEqual(outcomes.sort(), [false, true]);
+  assert.equal(delivered, 1);
+  assert.ok(locks.names.length >= 2);
+  assert.equal(new Set(locks.names).size, 1);
+  assert.doesNotMatch(locks.names[0], new RegExp(businessKey));
+
+  const laterEvent = { name: laterSession.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 25, valueUsd: 99 } };
+  assert.equal(await laterSession.dispatchOptionalTrackingProductEvent(laterEvent, { runtime: runtimeLater, dedupeKey: businessKey }), false);
+  assert.equal(delivered, 1);
+});
+
+test("same-page concurrent conversions dedupe even without durable storage or locks", async () => {
+  const isolated = await loadConsentModule("same-page-race");
   const storage = new MemoryStorage(), target = new EventTarget();
-  const runtime = { config: analytics, storage, eventTarget: target };
+  const runtime = { config: isolated.parseOptionalTrackingConfig("analytics"), storage, dedupeStorage: null, eventTarget: target, lockManager: null };
+  isolated.saveOptionalTrackingConsent("accepted", runtime);
+  let delivered = 0;
+  isolated.subscribeToOptionalTrackingProductEvents(() => { delivered++; }, runtime);
+  const event = { name: isolated.optionalTrackingProductEvents.profileCreated, properties: { visibility: "public" } };
+  const outcomes = await Promise.all([
+    isolated.dispatchOptionalTrackingProductEvent(event, { runtime, dedupeKey: "QRG-RACE-001" }),
+    isolated.dispatchOptionalTrackingProductEvent(event, { runtime, dedupeKey: "QRG-RACE-001" })
+  ]);
+  assert.deepEqual(outcomes.sort(), [false, true]);
+  assert.equal(delivered, 1);
+});
+
+test("consent withdrawal clears local markers while stable provider tokens survive reacceptance", async () => {
+  const isolated = await loadConsentModule("consent-toggle");
+  const storage = new MemoryStorage(), dedupeStorage = new MemoryStorage(), target = new EventTarget();
+  const runtime = { config: isolated.parseOptionalTrackingConfig("analytics"), storage, dedupeStorage, eventTarget: target };
+  const received = [];
+  isolated.subscribeToOptionalTrackingProductEvents((event) => received.push(event), runtime);
+  const event = { name: isolated.optionalTrackingProductEvents.ownershipTransferCompleted, properties: { method: "review" } };
+  const key = "transfer-private-001";
+  isolated.saveOptionalTrackingConsent("accepted", runtime);
+  assert.equal(await isolated.dispatchOptionalTrackingProductEvent(event, { runtime, dedupeKey: key }), true);
+  const firstToken = received[0].idempotencyToken;
+  assert.equal(isolated.saveOptionalTrackingConsent("denied", runtime), true);
+  assert.equal(await isolated.dispatchOptionalTrackingProductEvent(event, { runtime, dedupeKey: key }), false);
+  assert.match(JSON.stringify([...dedupeStorage.values.values()]), /\[\]/);
+  assert.equal(isolated.saveOptionalTrackingConsent("accepted", runtime), true);
+  assert.equal(await isolated.dispatchOptionalTrackingProductEvent(event, { runtime, dedupeKey: key }), true);
+  assert.equal(received.length, 2);
+  assert.equal(received[1].idempotencyToken, firstToken);
+});
+
+test("public Profile views remain repeatable and never carry a business idempotency token", async () => {
+  const isolated = await loadConsentModule("repeatable-views");
+  const storage = new MemoryStorage(), dedupeStorage = new MemoryStorage(), target = new EventTarget();
+  const runtime = { config: isolated.parseOptionalTrackingConfig("analytics"), storage, dedupeStorage, eventTarget: target };
+  const received = [];
+  isolated.saveOptionalTrackingConsent("accepted", runtime);
+  isolated.subscribeToOptionalTrackingProductEvents((event) => received.push(event), runtime);
+  const event = { name: isolated.optionalTrackingProductEvents.publicProfileViewed, properties: { visibility: "public" } };
+  assert.equal(await isolated.dispatchOptionalTrackingProductEvent(event, { runtime }), true);
+  assert.equal(await isolated.dispatchOptionalTrackingProductEvent(event, { runtime }), true);
+  assert.deepEqual(received, [event, event]);
+  assert.equal(dedupeStorage.values.size, 0);
+  assert.equal(await isolated.dispatchOptionalTrackingProductEvent(event, { runtime, dedupeKey: "must-not-dedupe-page-views" }), false);
+});
+
+test("every supported event enforces its bounded non-identifying property schema", async () => {
+  const storage = new MemoryStorage(), target = new EventTarget();
+  const dedupeStorage = new MemoryStorage(), runtime = { config: analytics, storage, dedupeStorage, eventTarget: target };
   consent.saveOptionalTrackingConsent("accepted", runtime);
   const events = [
     { name: consent.optionalTrackingProductEvents.publicProfileViewed, properties: { visibility: "unlisted" } },
@@ -198,7 +325,12 @@ test("every supported event enforces its bounded anonymous property schema", asy
     { name: consent.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 25, valueUsd: 99 } },
     { name: consent.optionalTrackingProductEvents.ownershipTransferCompleted, properties: { method: "buyer_code" } }
   ];
-  for (const event of events) assert.equal(await consent.dispatchOptionalTrackingProductEvent(event, { runtime }), true);
+  for (const [index, event] of events.entries()) {
+    const repeatable = event.name === consent.optionalTrackingProductEvents.publicProfileViewed;
+    assert.equal(await consent.dispatchOptionalTrackingProductEvent(event, repeatable ? { runtime } : { runtime, dedupeKey: `business-${index}` }), true);
+  }
+  assert.equal(await consent.dispatchOptionalTrackingProductEvent(events[1], { runtime }), false);
+  assert.equal(await consent.dispatchOptionalTrackingProductEvent(events[2], { runtime, dedupeKey: "" }), false);
   for (const invalid of [
     { name: consent.optionalTrackingProductEvents.publicProfileViewed, properties: { visibility: "private" } },
     { name: consent.optionalTrackingProductEvents.registrationCompleted, properties: { confirmation: "clicked" } },
@@ -207,7 +339,7 @@ test("every supported event enforces its bounded anonymous property schema", asy
     { name: consent.optionalTrackingProductEvents.checkoutStarted, properties: { credits: 10, valueUsd: 99 } },
     { name: consent.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 10, valueUsd: "50" } },
     { name: consent.optionalTrackingProductEvents.ownershipTransferCompleted, properties: { method: "token" } }
-  ]) assert.equal(await consent.dispatchOptionalTrackingProductEvent(invalid, { runtime }), false);
+  ]) assert.equal(await consent.dispatchOptionalTrackingProductEvent(invalid, { runtime, dedupeKey: "invalid" }), false);
 });
 
 test("blocked browser storage is handled without granting consent", () => {
@@ -235,6 +367,8 @@ test("the UI contract stays compact, accessible, balanced, and hidden without ex
   assert.match(component, /href="\/privacy"/);
   assert.match(component, /aria-label="Privacy choices"/);
   assert.match(component, /onClick=\{\(\) => choose\("denied"\)\}>Turn off/);
+  assert.match(component, /setManaging\(false\);\s*setStorageError\(true\)/);
+  assert.match(component, /className=\{styles\.statusOnly\} role="status"/);
   assert.match(css, /width:\s*min\(430px,/);
   assert.match(css, /min-height:\s*44px/);
   assert.match(css, /\.privacyLink,\s*\n\.controls button/);
@@ -242,7 +376,8 @@ test("the UI contract stays compact, accessible, balanced, and hidden without ex
   assert.match(layout, /<OptionalTrackingConsent \/>/);
   assert.match(privacy, /Cookies and browser storage/);
   assert.match(privacy, /remain available if you deny optional tracking/);
-  assert.match(privacy, /anonymous one-way session markers/);
+  assert.match(privacy, /pseudonymous conversion markers made with a one-way hash/);
+  assert.match(privacy, /it is not anonymous/);
   assert.doesNotMatch(layout + component, /googletag|gtag|facebook|segment|posthog|plausible|analytics\.js/i);
 });
 
