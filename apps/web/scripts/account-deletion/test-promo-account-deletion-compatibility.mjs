@@ -65,6 +65,12 @@ try {
     and proname=any(array['_account_deletion_blockers','_account_deletion_retained_pii','prepare_account_deletion_fulfillment'])
     order by proname`)).rows;
   await db.exec(compatibilitySource);
+  const hasDurableFulfillment = (await db.query(
+    "select to_regclass('public.account_deletion_fulfillments') is not null value"
+  )).rows[0].value;
+  const expectedFence = hasDurableFulfillment
+    ? "_account_deletion_write_fence"
+    : "_account_deletion_promo_write_fence";
 
   await check("the additive migration pins narrow helpers, nullable operator identity, and all four privacy fences", async () => {
     const afterSources = (await db.query(`select proname,prosrc from pg_proc where pronamespace='public'::regnamespace
@@ -93,19 +99,49 @@ try {
     assert.equal(triggers.length, 6);
     assert.deepEqual(triggers.filter(item => item.name.startsWith("account_deletion_fence_")).map(item => item.table_name).sort(),
       ["billing_order_promotions", "billing_promo_admin_events", "billing_promo_codes", "billing_promo_quote_limits"]);
+    for (const trigger of triggers.filter(item => item.name.startsWith("account_deletion_fence_")))
+      assert.match(trigger.definition, new RegExp(expectedFence));
     assert.match(triggers.find(item => item.name === "billing_promo_admin_events_immutable").definition, /_billing_promo_admin_event_guard/);
 
     const helpers = (await db.query(`select oid::regprocedure::text signature from pg_proc
       where pronamespace='public'::regnamespace and proname=any($1::text[]) order by proname`, [[
         "_account_deletion_promo_blockers", "_account_deletion_promo_redact_json",
         "_account_deletion_promo_retained_pii", "_account_deletion_promo_scrub_profile",
-        "_account_deletion_promo_text_has_identity", "_billing_promo_admin_event_guard"
+        "_account_deletion_promo_text_has_identity", "_account_deletion_promo_write_fence",
+        "_billing_promo_admin_event_guard"
       ]])).rows;
-    assert.equal(helpers.length, 6);
+    assert.equal(helpers.length, 7);
     for (const helper of helpers) for (const role of ["anon", "authenticated", "service_role"])
       assert.equal((await db.query("select has_function_privilege($1,$2,'EXECUTE') allowed", [role, helper.signature])).rows[0].allowed, false);
   });
 
+  if (!hasDurableFulfillment) {
+    await check("the partial-schema fallback freezes promotion actor links during an active deletion request", async () => {
+      await seed();
+      await db.query("insert into billing_promo_quote_limits(owner_id,environment) values($1,'test')", [ACTOR]);
+      const requestId = (await request()).request.requestId;
+
+      await fail(() => db.query(
+        "update billing_promo_quote_limits set owner_id=$2 where owner_id=$1 and environment='test'",
+        [ACTOR, OTHER]
+      ), "PD423");
+      await fail(() => db.query(
+        "insert into billing_promo_quote_limits(owner_id,environment) values($1,'live')",
+        [ACTOR]
+      ), "PD423");
+
+      await db.query("select set_config('qrguitar.account_deletion_request',$1,true)", [requestId]);
+      await db.query(
+        "update billing_promo_quote_limits set owner_id=$2 where owner_id=$1 and environment='test'",
+        [ACTOR, OTHER]
+      );
+      await db.exec("select set_config('qrguitar.account_deletion_request','',true)");
+      assert.equal((await db.query(
+        "select count(*)::int n from billing_promo_quote_limits where owner_id=$1",
+        [ACTOR]
+      )).rows[0].n, 0);
+    });
+  } else {
   await check("a demoted former administrator is scrubbed without deleting factual promotion or audit history", async () => {
     await seed({ actorRole: "admin" });
     const promotion = await insertPromotion();
@@ -195,6 +231,7 @@ try {
     assert.equal((await db.query("select account_status from profiles where id=$1", [ACTOR])).rows[0].account_status, "active");
     assert.equal((await db.query("select owner_id from billing_order_promotions where order_id=$1", [orderId])).rows[0].owner_id, ACTOR);
   });
+  }
 } finally {
   await db.close();
 }

@@ -160,11 +160,102 @@ create trigger billing_promo_admin_events_immutable before update or delete
   on public.billing_promo_admin_events for each row
   execute function public._billing_promo_admin_event_guard();
 
--- These use the same actor/email advisory locks and tombstone checks as the
--- fulfillment baseline. Deletes remain available to the reviewed cleanup.
-do $fences$
-declare item text; table_name text; columns text; trigger_name text;
+-- Feature branches can install the promotion ledger before the durable
+-- fulfillment migration is present. Keep those schemas fenced too: this
+-- fallback takes the same privacy locks, blocks association with an active or
+-- removed account, and permits only the reviewed request to detach its actor.
+-- Integrated releases bind the triggers to _account_deletion_write_fence
+-- below, retaining that function's additional fulfillment tombstone checks.
+create function public._account_deletion_promo_write_fence() returns trigger
+language plpgsql security definer set search_path=pg_catalog,public as $$
+declare column_name text; actor uuid; old_actor uuid; new_actor uuid; status text;
+  email_column text; email_value text; old_email text; new_email text;
+  actors uuid[]:='{}'::uuid[]; emails text[]:='{}'::text[]; new_emails text[]:='{}'::text[];
+  permitted text:=nullif(current_setting('qrguitar.account_deletion_request',true),'');
 begin
+  foreach column_name in array tg_argv loop
+    if left(column_name,7)='email__' then
+      email_column:=substr(column_name,8); old_email:=null; new_email:=null;
+      if tg_op<>'INSERT' then old_email:=lower(btrim(nullif(to_jsonb(old)->>email_column,''))); end if;
+      if tg_op<>'DELETE' then new_email:=lower(btrim(nullif(to_jsonb(new)->>email_column,''))); end if;
+      if old_email is not null then emails:=array_append(emails,old_email); end if;
+      if new_email is not null then
+        emails:=array_append(emails,new_email);
+        if tg_op='INSERT' or new_email is distinct from old_email then
+          new_emails:=array_append(new_emails,new_email);
+        end if;
+      end if;
+      continue;
+    end if;
+    old_actor:=null; new_actor:=null;
+    begin
+      if tg_op<>'INSERT' then old_actor:=nullif(to_jsonb(old)->>column_name,'')::uuid; end if;
+      if tg_op<>'DELETE' then new_actor:=nullif(to_jsonb(new)->>column_name,'')::uuid; end if;
+    exception when invalid_text_representation then
+      raise exception using errcode='22023',message='Invalid account identity.';
+    end;
+    if old_actor is not null then actors:=array_append(actors,old_actor); end if;
+    if new_actor is not null then actors:=array_append(actors,new_actor); end if;
+  end loop;
+
+  for actor in select distinct value from unnest(actors) value order by value loop
+    if not pg_try_advisory_xact_lock(hashtextextended('qrguitar:privacy-request:'||actor::text,0)) then
+      raise exception using errcode='PD423',message='This account has a privacy change in progress; retry the operation.';
+    end if;
+  end loop;
+  for email_value in select distinct value from unnest(emails) value order by value loop
+    if not pg_try_advisory_xact_lock(hashtextextended('qrguitar:privacy-email:'||email_value,0)) then
+      raise exception using errcode='PD423',message='This recipient has a privacy change in progress; retry the operation.';
+    end if;
+  end loop;
+
+  if tg_op='UPDATE' then
+    foreach column_name in array tg_argv loop
+      if left(column_name,7)='email__' then continue; end if;
+      old_actor:=nullif(to_jsonb(old)->>column_name,'')::uuid;
+      new_actor:=nullif(to_jsonb(new)->>column_name,'')::uuid;
+      if old_actor is not null and new_actor is distinct from old_actor
+        and exists(select 1 from public.account_deletion_requests r
+          where r.actor_id=old_actor and r.status='requested' and r.id::text is distinct from permitted) then
+        raise exception using errcode='PD423',message='This account is frozen for privacy fulfillment.';
+      end if;
+    end loop;
+  end if;
+
+  if tg_op='DELETE' then return old; end if;
+  foreach column_name in array tg_argv loop
+    if left(column_name,7)='email__' then continue; end if;
+    new_actor:=nullif(to_jsonb(new)->>column_name,'')::uuid;
+    if new_actor is not null then
+      select p.account_status::text into status from public.profiles p where p.id=new_actor for share;
+      if status='removed' or exists(select 1 from public.account_deletion_requests r
+        where r.actor_id=new_actor and r.status='requested' and r.id::text is distinct from permitted) then
+        raise exception using errcode='PD423',message='This account is frozen for privacy fulfillment.';
+      end if;
+    end if;
+  end loop;
+  foreach email_value in array new_emails loop
+    if email_value is not null and exists(
+      select 1 from auth.users u join public.account_deletion_requests r on r.actor_id=u.id
+      where lower(btrim(u.email))=email_value and r.status='requested' and r.id::text is distinct from permitted
+    ) then
+      raise exception using errcode='PD423',message='This recipient is frozen for privacy fulfillment.';
+    end if;
+  end loop;
+  return new;
+end $$;
+
+-- Use the durable fulfillment fence whenever it is installed. The fallback is
+-- deliberately selected only for partial schemas used by feature branches and
+-- database fixtures; no trigger is ever omitted.
+do $fences$
+declare item text; table_name text; columns text; trigger_name text; fence_function text;
+begin
+  fence_function:=case
+    when to_regprocedure('public._account_deletion_write_fence()') is not null
+      then '_account_deletion_write_fence'
+    else '_account_deletion_promo_write_fence'
+  end;
   foreach item in array array[
     'billing_order_promotions:owner_id',
     'billing_promo_codes:created_by,updated_by',
@@ -175,8 +266,8 @@ begin
     trigger_name:='account_deletion_fence_'||table_name;
     execute format('drop trigger if exists %I on public.%I',trigger_name,table_name);
     execute format(
-      'create trigger %I before insert or update on public.%I for each row execute function public._account_deletion_write_fence(%s)',
-      trigger_name,table_name,
+      'create trigger %I before insert or update on public.%I for each row execute function public.%I(%s)',
+      trigger_name,table_name,fence_function,
       (select string_agg(quote_literal(value),',') from unnest(string_to_array(columns,',')) value)
     );
   end loop;
@@ -273,6 +364,7 @@ create trigger account_deletion_promo_profile_redaction
 
 revoke all on function public._account_deletion_promo_text_has_identity(text,uuid,text),
   public._account_deletion_promo_redact_json(jsonb,uuid,text),
+  public._account_deletion_promo_write_fence(),
   public._billing_promo_admin_event_guard(),
   public._account_deletion_promo_blockers(uuid),
   public._account_deletion_promo_retained_pii(uuid,text),
