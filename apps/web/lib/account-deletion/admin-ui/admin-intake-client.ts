@@ -12,7 +12,7 @@ export type QueueStorageReview = { relocationId:string; bucket:"instrument-media
   state:"planned"|"copy_authorized"|"deletion_authorized"|"references_updated" };
 export type QueueStorageInspection = { requestId:string; relocationId:string; sourceFingerprint:string; mimeType:string; byteSize:number; objectUrl:string; structureValid:boolean; metadataFindings:string[]; safeToRetain:boolean };
 export type QueueCustodyEvidenceItem={evidenceId:string;objectFingerprint:string;byteSize:number;mimeType:string;reviewed:boolean;byteSha256:string|null;reviewedAt:string|null};
-export type QueueCustodyEvidence={claimId:string;guitarId:string;profileFingerprint:string;evidence:QueueCustodyEvidenceItem[]};
+export type QueueCustodyEvidence={claimId:string;guitarId:string;profileFingerprint:string;inventoryFingerprint:string;pageIndex:number;pageCount:number;evidenceCount:number;reviewedCount:number;evidence:QueueCustodyEvidenceItem[]};
 export type QueueCustodyInspection={requestId:string;claimId:string;evidenceId:string;objectFingerprint:string;mimeType:string;byteSize:number;objectUrl:string};
 export type QueueReviewJson = null | boolean | number | string | QueueReviewJson[] | { [key:string]: QueueReviewJson };
 export type QueueReviewSection = { code:string; label:string; recordCount:number; contentDigest:string; records:QueueReviewJson[] };
@@ -26,8 +26,8 @@ export type QueueAction = { action: "prepare" } | { action: "attest_profile"; gu
   | { action:"inspect_retention"; domain:"billing"|"service"; expectedFingerprint:string; pageIndex:number }
   | { action:"redact_profile"; guitarId:string; expectedFingerprint:string; terms:string[] }
   | { action:"attest_storage"; relocationId:string; expectedFingerprint:string; decision:"retain"|"delete" }
-  | { action:"inspect_custody"; claimId:string; expectedFingerprint:string }
-  | { action:"attest_custody_evidence"; claimId:string; evidenceId:string; expectedFingerprint:string; expectedObjectFingerprint:string }
+  | { action:"inspect_custody"; claimId:string; expectedFingerprint:string; pageIndex:number }
+  | { action:"attest_custody_evidence"; claimId:string; evidenceId:string; expectedFingerprint:string; expectedObjectFingerprint:string; pageIndex:number }
   | { action:"release_custody"; claimId:string; expectedFingerprint:string };
 export type QueueCursor = { requestedAt: string; requestId: string };
 export type QueueState = {
@@ -133,7 +133,9 @@ function reviewSnapshot(value:unknown):QueueReviewSnapshot{
   throw new Error("Invalid review snapshot");
 }
 function custodyEvidence(value:unknown):QueueCustodyEvidence{
-  if(!exact(value,["claimId","guitarId","profileFingerprint","evidence"])||!uuid(value.claimId)||!uuid(value.guitarId)||!fingerprint(value.profileFingerprint)
+  if(!exact(value,["claimId","guitarId","profileFingerprint","inventoryFingerprint","pageIndex","pageCount","evidenceCount","reviewedCount","evidence"])||!uuid(value.claimId)||!uuid(value.guitarId)||!fingerprint(value.profileFingerprint)||!fingerprint(value.inventoryFingerprint)
+    ||!Number.isInteger(value.pageIndex)||Number(value.pageIndex)<0||!Number.isInteger(value.pageCount)||Number(value.pageCount)<1||Number(value.pageIndex)>=Number(value.pageCount)
+    ||!Number.isInteger(value.evidenceCount)||Number(value.evidenceCount)<1||!Number.isInteger(value.reviewedCount)||Number(value.reviewedCount)<0||Number(value.reviewedCount)>Number(value.evidenceCount)
     ||!Array.isArray(value.evidence)||value.evidence.length<1||value.evidence.length>32)throw new Error("Invalid custody evidence");
   const rows=value.evidence.map(item=>{if(!exact(item,["evidenceId","objectFingerprint","byteSize","mimeType","reviewed","byteSha256","reviewedAt"])
       ||!uuid(item.evidenceId)||!fingerprint(item.objectFingerprint)||!Number.isSafeInteger(item.byteSize)||Number(item.byteSize)<1||Number(item.byteSize)>16*1024*1024
@@ -142,8 +144,8 @@ function custodyEvidence(value:unknown):QueueCustodyEvidence{
       ||item.reviewed!==(item.byteSha256!==null)||item.reviewed!==(item.reviewedAt!==null))throw new Error("Invalid custody evidence");
     return{evidenceId:item.evidenceId.toLowerCase(),objectFingerprint:item.objectFingerprint,byteSize:Number(item.byteSize),mimeType:item.mimeType as string,
       reviewed:item.reviewed,byteSha256:item.byteSha256 as string|null,reviewedAt:item.reviewedAt as string|null};});
-  if(new Set(rows.map(item=>item.evidenceId)).size!==rows.length)throw new Error("Invalid custody evidence");
-  return{claimId:value.claimId.toLowerCase(),guitarId:value.guitarId.toLowerCase(),profileFingerprint:value.profileFingerprint,evidence:rows};
+  if(new Set(rows.map(item=>item.evidenceId)).size!==rows.length||Number(value.evidenceCount)>Number(value.pageCount)*32||Number(value.evidenceCount)<=(Number(value.pageCount)-1)*32)throw new Error("Invalid custody evidence");
+  return{claimId:value.claimId.toLowerCase(),guitarId:value.guitarId.toLowerCase(),profileFingerprint:value.profileFingerprint,inventoryFingerprint:value.inventoryFingerprint,pageIndex:Number(value.pageIndex),pageCount:Number(value.pageCount),evidenceCount:Number(value.evidenceCount),reviewedCount:Number(value.reviewedCount),evidence:rows};
 }
 function fulfillmentResult(value:unknown){
   const hasSnapshot=object(value)&&Object.hasOwn(value,"reviewSnapshot"),hasCustody=object(value)&&Object.hasOwn(value,"custodyEvidence");
@@ -307,7 +309,8 @@ export function createAdminIntakeClient(deps: { auth: () => QueueAuth; fetch?: t
     if((action.action==="inspect_profile"||action.action==="inspect_retention")&&(!Number.isInteger(action.pageIndex)||action.pageIndex<0))return;
     if ((action.action==="attest_retention"||action.action==="inspect_retention")&&(!["billing","service"].includes(action.domain)||!fingerprint(action.expectedFingerprint)))return;
     if((action.action==="release_custody"||action.action==="inspect_custody")&&(!uuid(action.claimId)||!fingerprint(action.expectedFingerprint)))return;
-    if(action.action==="attest_custody_evidence"&&(!uuid(action.claimId)||!uuid(action.evidenceId)||!fingerprint(action.expectedFingerprint)||!fingerprint(action.expectedObjectFingerprint)))return;
+    if(action.action==="inspect_custody"&&(!Number.isInteger(action.pageIndex)||action.pageIndex<0))return;
+    if(action.action==="attest_custody_evidence"&&(!uuid(action.claimId)||!uuid(action.evidenceId)||!fingerprint(action.expectedFingerprint)||!fingerprint(action.expectedObjectFingerprint)||!Number.isInteger(action.pageIndex)||action.pageIndex<0))return;
     if(action.action==="attest_storage"&&(!uuid(action.relocationId)||!fingerprint(action.expectedFingerprint)||!["retain","delete"].includes(action.decision)))return;
     if(action.action==="attest_retention"&&action.decisionCode!==(action.domain==="billing"?"lawful_financial_retention_reviewed":"service_history_privacy_reviewed"))return;
     if(action.action==="redact_profile"){
@@ -328,8 +331,8 @@ export function createAdminIntakeClient(deps: { auth: () => QueueAuth; fetch?: t
       const next=fulfillmentResult(payload);
       if(action.action==="inspect_profile"&&(!next.reviewSnapshot||next.reviewSnapshot.kind!=="profile"||next.reviewSnapshot.profile.guitarId!==action.guitarId||next.reviewSnapshot.contentFingerprint!==action.expectedFingerprint||next.reviewSnapshot.pageIndex!==action.pageIndex))throw new Error("Review snapshot mismatch");
       if(action.action==="inspect_retention"&&(!next.reviewSnapshot||next.reviewSnapshot.kind!=="retention"||next.reviewSnapshot.retention.domain!==action.domain||next.reviewSnapshot.contentFingerprint!==action.expectedFingerprint||next.reviewSnapshot.pageIndex!==action.pageIndex))throw new Error("Review snapshot mismatch");
-      if(action.action==="inspect_custody"&&(!next.custodyEvidence||next.custodyEvidence.claimId!==action.claimId||next.custodyEvidence.profileFingerprint!==action.expectedFingerprint))throw new Error("Custody inventory mismatch");
-      if(action.action==="attest_custody_evidence"&&(!next.custodyEvidence||next.custodyEvidence.claimId!==action.claimId||next.custodyEvidence.profileFingerprint!==action.expectedFingerprint
+      if(action.action==="inspect_custody"&&(!next.custodyEvidence||next.custodyEvidence.claimId!==action.claimId||next.custodyEvidence.profileFingerprint!==action.expectedFingerprint||next.custodyEvidence.pageIndex!==action.pageIndex))throw new Error("Custody inventory mismatch");
+      if(action.action==="attest_custody_evidence"&&(!next.custodyEvidence||next.custodyEvidence.claimId!==action.claimId||next.custodyEvidence.profileFingerprint!==action.expectedFingerprint||next.custodyEvidence.pageIndex!==action.pageIndex
         ||!next.custodyEvidence.evidence.some(item=>item.evidenceId===action.evidenceId&&item.objectFingerprint===action.expectedObjectFingerprint&&item.reviewed)))throw new Error("Custody receipt mismatch");
       if(!["inspect_profile","inspect_retention"].includes(action.action)&&next.reviewSnapshot)throw new Error("Unexpected review snapshot");
       if(!["inspect_custody","attest_custody_evidence"].includes(action.action)&&next.custodyEvidence)throw new Error("Unexpected custody inventory");
@@ -341,7 +344,7 @@ export function createAdminIntakeClient(deps: { auth: () => QueueAuth; fetch?: t
       if(action.action==="attest_custody_evidence"||action.action==="prepare"||action.action==="release_custody")clearCustodyInspection();
       const preservesProfileReview=action.action==="inspect_custody"||action.action==="attest_custody_evidence";
       publish({requests:state.requests.map(row=>row.requestId===requestId?{...row,fulfillment:next.fulfillment,profileReviews:next.profileReviews,retentionReviews:next.retentionReviews,storageReviews:next.storageReviews}:row),actionRequestId:"",actionMessage:message,actionError:"",reviewRequestId:next.reviewSnapshot?requestId:(preservesProfileReview?state.reviewRequestId:""),reviewSnapshot:next.reviewSnapshot||(preservesProfileReview?state.reviewSnapshot:null),storageInspection:action.action==="attest_storage"||action.action==="prepare"?null:state.storageInspection,custodyEvidence:next.custodyEvidence||((action.action==="prepare"||action.action==="release_custody")?null:state.custodyEvidence),custodyInspection:action.action==="attest_custody_evidence"||action.action==="prepare"||action.action==="release_custody"?null:state.custodyInspection});
-      if(next.fulfillment.state==="completed"&&action.action!=="inspect_profile"&&action.action!=="inspect_retention"){await load(false);if(live(authRevision,workRevision))publish({actionMessage:message});}
+      if(next.fulfillment.state==="completed"&&!['inspect_profile','inspect_retention','inspect_custody','attest_custody_evidence'].includes(action.action)){await load(false);if(live(authRevision,workRevision))publish({actionMessage:message});}
     } catch(error) {
       if(!live(authLease,workLease)||error instanceof Stale)return;
       if(error instanceof Denied) publish({...initialQueueState(),actorId:actor,phase:error.status===403?"forbidden":"signed-out"});

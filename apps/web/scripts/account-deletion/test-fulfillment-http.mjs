@@ -54,10 +54,10 @@ const preparedWith = (storageRelocations, blockers = ["storage_cleanup_required"
   storageReviews: storageRelocations.filter(plan => plan.disposition === "retain" || plan.contentReviewDecision !== null).map(storageReview),
   storageRelocations, authActorId: null });
 const section = (code, records = []) => ({ code, label: code, recordCount: records.length, contentDigest: "d".repeat(64), records });
-const profileSnapshot = (overrides = {}) => ({ ok:true, kind:"profile", policyVersion:1, contentFingerprint:profileFingerprint, truncated:false,
+const profileSnapshot = (overrides = {}) => ({ ok:true, kind:"profile", policyVersion:1, contentFingerprint:profileFingerprint, truncated:false, pageIndex:0,pageCount:1,pageDigest:"1".repeat(64),deliveredPages:1,allPagesDelivered:true,
   profile:{ guitarId:profileReviews[0].guitarId, qrCode:"QRG-REVIEW", relationshipCodes:["current_owner"], sections:profileSectionCodes.map(code=>section(code,
     code==="guitar"?[{name:"1965 Stratocaster",location:"Nashville",safety_note:"Private owner note"}]:code==="media"?[{alt:"Front of the instrument",mime_type:"image/jpeg"}]:code==="documents"?[{name:"Purchase receipt",private_notes:"Original paper copy"}]:code==="siteContent"?[{content_value:{internalVerificationNote:"Inspected finish and neck stamp"}}]:[])) },...overrides });
-const retentionSnapshot = (domain="billing", overrides={}) => ({ ok:true, kind:"retention", policyVersion:1, contentFingerprint:domain==="billing"?billingFingerprint:serviceFingerprint, truncated:false,
+const retentionSnapshot = (domain="billing", overrides={}) => ({ ok:true, kind:"retention", policyVersion:1, contentFingerprint:domain==="billing"?billingFingerprint:serviceFingerprint, truncated:false, pageIndex:0,pageCount:1,pageDigest:"2".repeat(64),deliveredPages:1,allPagesDelivered:true,
   retention:{domain,sections:(domain==="billing"?billingSectionCodes:serviceSectionCodes).map(code=>section(code,code===(domain==="billing"?"orders":"submissions")?[{status:"settled",note:"Factual retained record"}]:[]))},...overrides });
 const job = (state, blockers = []) => ({ requestId: REQUEST, state, blockers, revision: state === "completed" ? "2" : "1", startedAt: now, reviewedAt: now,
   storageQuiesceUntil: state === "blocked" ? null : now, databaseAnonymizedAt: ["blocked", "quiescing_storage"].includes(state) ? null : now,
@@ -111,7 +111,7 @@ function fixture(options = {}) {
       if (name === "complete_account_deletion_fulfillment") return { data: { ok: true, fulfillment: job("completed"), ...reviews }, error: null };
       if (name === "read_account_deletion_fulfillment") return { data: { ok: true, fulfillment: prepared.fulfillment, profileReviews, retentionReviews,
         storageReviews: prepared.storageReviews || [] }, error: null };
-      if (name === "read_account_deletion_review_snapshot") return { data: args.p_kind === "profile" ? profileSnapshot() : retentionSnapshot(args.p_domain), error: null };
+      if (name === "inspect_account_deletion_review_page") return { data: args.p_kind === "profile" ? profileSnapshot() : retentionSnapshot(args.p_domain), error: null };
       if (name === "redact_account_deletion_profile_review") return { data: { ok:true, redaction:{ guitarId:args.p_guitar_id, policyVersion:1,
         beforeFingerprint:args.p_expected_fingerprint, afterFingerprint:"e".repeat(64), termCount:args.p_terms.length, termsDigest:"f".repeat(64) }, profileReviews }, error:null };
       if (name === "attest_account_deletion_profile_review") return { data: { ok: true, review: { approved: true, guitarId: args.p_guitar_id, policyVersion: 1, contentFingerprint: args.p_expected_fingerprint }, profileReviews }, error: null };
@@ -450,15 +450,15 @@ await check("custody release rejects malformed receipts and never reports a hand
 
 await check("private Profile and retention inspections expose complete fingerprint-bound ordinary and nested review content", async () => {
   const f=fixture();
-  const profile=await inspect(await f.handlers.item(f.request("POST",{operationId:randomUUID(),action:"inspect_profile",guitarId:profileReviews[0].guitarId,expectedFingerprint:profileFingerprint}),REQUEST));
-  const billing=await inspect(await f.handlers.item(f.request("POST",{operationId:randomUUID(),action:"inspect_retention",domain:"billing",expectedFingerprint:billingFingerprint}),REQUEST));
+  const profile=await inspect(await f.handlers.item(f.request("POST",{operationId:randomUUID(),action:"inspect_profile",guitarId:profileReviews[0].guitarId,expectedFingerprint:profileFingerprint,pageIndex:0}),REQUEST));
+  const billing=await inspect(await f.handlers.item(f.request("POST",{operationId:randomUUID(),action:"inspect_retention",domain:"billing",expectedFingerprint:billingFingerprint,pageIndex:0}),REQUEST));
   assert.equal(profile.status,200);assert.equal(billing.status,200);assert.equal(profile.body.reviewSnapshot.kind,"profile");assert.equal(billing.body.reviewSnapshot.kind,"retention");
   const profileSections=new Map(profile.body.reviewSnapshot.profile.sections.map(item=>[item.code,item]));
   assert.equal(profileSections.get("guitar").records[0].name,"1965 Stratocaster");assert.equal(profileSections.get("media").records[0].alt,"Front of the instrument");
   assert.equal(profileSections.get("documents").records[0].private_notes,"Original paper copy");assert.equal(profileSections.get("siteContent").records[0].content_value.internalVerificationNote,"Inspected finish and neck stamp");
   assert.equal(profile.body.reviewSnapshot.profile.sections.length,profileSectionCodes.length);assert.equal(billing.body.reviewSnapshot.retention.sections.length,billingSectionCodes.length);
-  assert.deepEqual(f.calls.rpc.map(call=>call.name),["read_account_deletion_review_snapshot","read_account_deletion_fulfillment","read_account_deletion_review_snapshot","read_account_deletion_fulfillment"]);
-  assert.deepEqual(f.calls.rpc[0].args,{p_admin_id:ADMIN,p_environment_admin:false,p_request_id:REQUEST,p_kind:"profile",p_guitar_id:profileReviews[0].guitarId,p_domain:null,p_expected_fingerprint:profileFingerprint});
+  assert.deepEqual(f.calls.rpc.map(call=>call.name),["inspect_account_deletion_review_page","read_account_deletion_fulfillment","inspect_account_deletion_review_page","read_account_deletion_fulfillment"]);
+  assert.equal(f.calls.rpc[0].args.p_admin_id,ADMIN);assert.equal(f.calls.rpc[0].args.p_operation_id,profile.body.reviewSnapshot?f.calls.rpc[0].args.p_operation_id:null);assert.equal(f.calls.rpc[0].args.p_page_index,0);assert.equal(f.calls.rpc[0].args.p_kind,"profile");
 });
 
 await check("Profile redaction sends exact normalized terms and requires a fresh fulfillment read", async()=>{
@@ -473,8 +473,8 @@ await check("truncated or unsafe review snapshots cannot become an attestable br
   for(const snapshot of [profileSnapshot({truncated:true,profile:{...profileSnapshot().profile,sections:profileSnapshot().profile.sections.map(item=>({...item,records:[]}))}}),
     profileSnapshot({profile:{...profileSnapshot().profile,sections:profileSnapshot().profile.sections.map(item=>item.code==="documents"?{...item,records:[{name:"Unsafe",storage_path:"private/path"}],recordCount:1}:item)}}),
     profileSnapshot({profile:{...profileSnapshot().profile,sections:profileSnapshot().profile.sections.map(item=>item.code==="guitar"?{...item,records:[{name:"Unsafe",ownerScope:"20000000-0000-4000-8000-000000000002"}],recordCount:1}:item)}})]){
-    const f=fixture({rpc:async(name)=>name==="read_account_deletion_review_snapshot"?{data:snapshot,error:null}:name==="read_account_deletion_fulfillment"?{data:{ok:true,fulfillment:job("blocked",["profile_history_privacy_review_required"]),...reviews},error:null}:{data:null,error:{code:"XX"}}});
-    const result=await inspect(await f.handlers.item(f.request("POST",{operationId:randomUUID(),action:"inspect_profile",guitarId:profileReviews[0].guitarId,expectedFingerprint:profileFingerprint}),REQUEST));
+    const f=fixture({rpc:async(name)=>name==="inspect_account_deletion_review_page"?{data:snapshot,error:null}:name==="read_account_deletion_fulfillment"?{data:{ok:true,fulfillment:job("blocked",["profile_history_privacy_review_required"]),...reviews},error:null}:{data:null,error:{code:"XX"}}});
+    const result=await inspect(await f.handlers.item(f.request("POST",{operationId:randomUUID(),action:"inspect_profile",guitarId:profileReviews[0].guitarId,expectedFingerprint:profileFingerprint,pageIndex:0}),REQUEST));
     if(snapshot.truncated){assert.equal(result.status,200);assert.equal(result.body.reviewSnapshot.truncated,true);assert.ok(result.body.reviewSnapshot.profile.sections.every(item=>item.records.length===0));}
     else{assert.equal(result.status,503);assert.equal(Object.hasOwn(result.body,"reviewSnapshot"),false);}
   }

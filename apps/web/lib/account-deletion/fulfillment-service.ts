@@ -52,8 +52,8 @@ export type FulfillmentAction =
   | { action: "inspect_retention"; operationId: string; domain: "billing" | "service"; expectedFingerprint: string; pageIndex:number }
   | { action: "redact_profile"; operationId: string; guitarId: string; expectedFingerprint: string; terms: string[] }
   | { action: "attest_storage"; operationId: string; relocationId: string; expectedFingerprint: string; decision: "retain" | "delete" }
-  | { action: "inspect_custody"; operationId:string; claimId:string; expectedFingerprint:string }
-  | { action: "attest_custody_evidence"; operationId:string; claimId:string; evidenceId:string; expectedFingerprint:string; expectedObjectFingerprint:string }
+  | { action: "inspect_custody"; operationId:string; claimId:string; expectedFingerprint:string; pageIndex:number }
+  | { action: "attest_custody_evidence"; operationId:string; claimId:string; evidenceId:string; expectedFingerprint:string; expectedObjectFingerprint:string; pageIndex:number }
   | { action: "release_custody"; operationId: string; claimId: string; expectedFingerprint: string };
 
 type RpcError = { code?: string; message?: string } | null;
@@ -131,7 +131,7 @@ export type StorageInspection = { bytes: Uint8Array; mimeType: string; byteSize:
   structureValid: boolean; metadataFindings: string[]; safeToRetain: boolean };
 export type CustodyEvidenceItem = { evidenceId:string; objectFingerprint:string; byteSize:number; mimeType:string;
   reviewed:boolean; byteSha256:string|null; reviewedAt:string|null };
-export type CustodyEvidenceInventory = { claimId:string; guitarId:string; profileFingerprint:string; evidence:CustodyEvidenceItem[] };
+export type CustodyEvidenceInventory = { claimId:string; guitarId:string; profileFingerprint:string; inventoryFingerprint:string; pageIndex:number; pageCount:number; evidenceCount:number; reviewedCount:number; evidence:CustodyEvidenceItem[] };
 export type CustodyInspection = StorageInspection & { claimId:string; evidenceId:string; objectFingerprint:string };
 const storageRelocationLimit = 8;
 const maxStorageReviewBytes = 16 * 1024 * 1024;
@@ -314,8 +314,10 @@ function storageSource(value: unknown, requestRelocationId: string, expectedFing
 }
 
 function custodyEvidenceInventory(value:unknown,claimId:string,expectedFingerprint:string):CustodyEvidenceInventory {
-  if(!exactObject(value,["ok","claim"])||value.ok!==true||!exactObject(value.claim,["claimId","guitarId","profileFingerprint","evidence"])
-    ||value.claim.claimId!==claimId||!uuid(value.claim.guitarId)||value.claim.profileFingerprint!==expectedFingerprint
+  if(!exactObject(value,["ok","claim"])||value.ok!==true||!exactObject(value.claim,["claimId","guitarId","profileFingerprint","inventoryFingerprint","pageIndex","pageCount","evidenceCount","reviewedCount","evidence"])
+    ||value.claim.claimId!==claimId||!uuid(value.claim.guitarId)||value.claim.profileFingerprint!==expectedFingerprint||!fingerprint(value.claim.inventoryFingerprint)
+    ||!Number.isInteger(value.claim.pageIndex)||Number(value.claim.pageIndex)<0||!Number.isInteger(value.claim.pageCount)||Number(value.claim.pageCount)<1||Number(value.claim.pageIndex)>=Number(value.claim.pageCount)
+    ||!Number.isInteger(value.claim.evidenceCount)||Number(value.claim.evidenceCount)<1||!Number.isInteger(value.claim.reviewedCount)||Number(value.claim.reviewedCount)<0||Number(value.claim.reviewedCount)>Number(value.claim.evidenceCount)
     ||!Array.isArray(value.claim.evidence)||value.claim.evidence.length<1||value.claim.evidence.length>32)throw mapped(null);
   const evidence=value.claim.evidence.map(item=>{
     if(!exactObject(item,["evidenceId","objectFingerprint","byteSize","mimeType","reviewed","byteSha256","reviewedAt"])
@@ -326,10 +328,9 @@ function custodyEvidenceInventory(value:unknown,claimId:string,expectedFingerpri
     return{evidenceId:String(item.evidenceId).toLowerCase(),objectFingerprint:String(item.objectFingerprint),byteSize:Number(item.byteSize),
       mimeType:String(item.mimeType),reviewed:item.reviewed as boolean,byteSha256:item.byteSha256 as string|null,reviewedAt:item.reviewedAt as string|null};
   });
-  if(new Set(evidence.map(item=>item.evidenceId)).size!==evidence.length)throw mapped(null);
-  return{claimId,guitarId:String(value.claim.guitarId).toLowerCase(),profileFingerprint:expectedFingerprint,evidence};
+  if(new Set(evidence.map(item=>item.evidenceId)).size!==evidence.length||evidence.length>32||Number(value.claim.evidenceCount)>(Number(value.claim.pageCount)*32)||Number(value.claim.evidenceCount)<=((Number(value.claim.pageCount)-1)*32))throw mapped(null);
+  return{claimId,guitarId:String(value.claim.guitarId).toLowerCase(),profileFingerprint:expectedFingerprint,inventoryFingerprint:String(value.claim.inventoryFingerprint),pageIndex:Number(value.claim.pageIndex),pageCount:Number(value.claim.pageCount),evidenceCount:Number(value.claim.evidenceCount),reviewedCount:Number(value.claim.reviewedCount),evidence};
 }
-
 function custodySource(value:unknown,claimId:string,evidenceId:string,expectedObjectFingerprint:string){
   if(!exactObject(value,["ok","source"])||value.ok!==true
     ||!exactObject(value.source,["claimId","evidenceId","bucket","sourcePath","objectFingerprint","sourceSize","sourceMimeType"])
@@ -449,14 +450,14 @@ function actionDto(value: unknown): FulfillmentAction {
     return { action: "attest_storage", operationId, relocationId: value.relocationId.toLowerCase(),
       expectedFingerprint: value.expectedFingerprint, decision: value.decision as "retain" | "delete" };
   }
-  if (value.action === "inspect_custody" && exactObject(value,["operationId","action","claimId","expectedFingerprint"])
-    && uuid(value.claimId) && fingerprint(value.expectedFingerprint)) {
-    return { action:"inspect_custody", operationId, claimId:value.claimId.toLowerCase(), expectedFingerprint:value.expectedFingerprint };
+  if (value.action === "inspect_custody" && exactObject(value,["operationId","action","claimId","expectedFingerprint","pageIndex"])
+    && uuid(value.claimId) && fingerprint(value.expectedFingerprint)&&Number.isInteger(value.pageIndex)&&Number(value.pageIndex)>=0) {
+    return { action:"inspect_custody", operationId, claimId:value.claimId.toLowerCase(), expectedFingerprint:value.expectedFingerprint, pageIndex:Number(value.pageIndex) };
   }
-  if (value.action === "attest_custody_evidence" && exactObject(value,["operationId","action","claimId","evidenceId","expectedFingerprint","expectedObjectFingerprint"])
-    && uuid(value.claimId) && uuid(value.evidenceId) && fingerprint(value.expectedFingerprint) && fingerprint(value.expectedObjectFingerprint)) {
+  if (value.action === "attest_custody_evidence" && exactObject(value,["operationId","action","claimId","evidenceId","expectedFingerprint","expectedObjectFingerprint","pageIndex"])
+    && uuid(value.claimId) && uuid(value.evidenceId) && fingerprint(value.expectedFingerprint) && fingerprint(value.expectedObjectFingerprint)&&Number.isInteger(value.pageIndex)&&Number(value.pageIndex)>=0) {
     return { action:"attest_custody_evidence", operationId, claimId:value.claimId.toLowerCase(), evidenceId:value.evidenceId.toLowerCase(),
-      expectedFingerprint:value.expectedFingerprint, expectedObjectFingerprint:value.expectedObjectFingerprint };
+      expectedFingerprint:value.expectedFingerprint, expectedObjectFingerprint:value.expectedObjectFingerprint, pageIndex:Number(value.pageIndex) };
   }
   if (value.action === "release_custody" && exactObject(value, ["operationId", "action", "claimId", "expectedFingerprint"])
     && uuid(value.claimId) && fingerprint(value.expectedFingerprint)) {
@@ -844,7 +845,7 @@ export function createFulfillmentService(deps: FulfillmentDependencies) {
       }
       if(action.action==="inspect_custody"){
         const inventory=custodyEvidenceInventory(await rpc(current.client,"read_account_deletion_custody_evidence_inventory",{
-          ...env(current,normalizedRequest),p_claim_id:action.claimId,p_expected_profile_fingerprint:action.expectedFingerprint
+          ...env(current,normalizedRequest),p_claim_id:action.claimId,p_expected_profile_fingerprint:action.expectedFingerprint,p_page_index:action.pageIndex
         }),action.claimId,action.expectedFingerprint);
         return{ok:true as const,...await readSnapshot(current,normalizedRequest),custodyEvidence:inventory};
       }
@@ -862,7 +863,7 @@ export function createFulfillmentService(deps: FulfillmentDependencies) {
           ||attested.review.byteSha256!==inspected.byteSha256||attested.review.byteSize!==inspected.byteSize||attested.review.mimeType!==inspected.mimeType
           ||!validTime(attested.review.reviewedAt))throw mapped(null);
         const inventory=custodyEvidenceInventory(await rpc(current.client,"read_account_deletion_custody_evidence_inventory",{
-          ...env(current,normalizedRequest),p_claim_id:action.claimId,p_expected_profile_fingerprint:action.expectedFingerprint
+          ...env(current,normalizedRequest),p_claim_id:action.claimId,p_expected_profile_fingerprint:action.expectedFingerprint,p_page_index:action.pageIndex
         }),action.claimId,action.expectedFingerprint);
         return{ok:true as const,...await readSnapshot(current,normalizedRequest),custodyEvidence:inventory};
       }      if (action.action === "release_custody") {

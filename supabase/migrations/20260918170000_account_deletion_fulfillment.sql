@@ -2147,8 +2147,8 @@ create function public.inspect_account_deletion_review_page(
   p_domain text,p_expected_fingerprint text,p_page_index integer
 ) returns jsonb language plpgsql security definer set search_path=pg_catalog,public as $$
 declare job public.account_deletion_fulfillments; scope_row public.account_deletion_profile_review_scopes;
-  actual bytea; safe_graph jsonb; page_rows jsonb; sections jsonb; total_rows integer; page_count integer;
-  page_digest bytea; scope_key text; existing public.account_deletion_review_page_receipts; output jsonb;
+  actual bytea; safe_graph jsonb; page_rows jsonb; sections jsonb; total_rows integer; v_page_count integer;
+  v_page_digest bytea; v_scope_key text; existing public.account_deletion_review_page_receipts; output jsonb;
 begin
   if p_request_id is null or p_operation_id is null or p_kind not in ('profile','retention')
     or coalesce(p_expected_fingerprint,'')!~'^[a-f0-9]{64}$' or p_page_index is null or p_page_index<0 then
@@ -2172,13 +2172,13 @@ begin
     perform pg_advisory_xact_lock(hashtextextended('qrguitar:profile-graph:'||p_guitar_id::text,0));
     select * into scope_row from public.account_deletion_profile_review_scopes where request_id=p_request_id and guitar_id=p_guitar_id;
     if not found then raise exception using errcode='PD404',message='This Profile is not in the deletion review scope.';end if;
-    actual:=public._account_deletion_profile_fingerprint(p_request_id,p_guitar_id);scope_key:=p_guitar_id::text;
+    actual:=public._account_deletion_profile_fingerprint(p_request_id,p_guitar_id);v_scope_key:=p_guitar_id::text;
     safe_graph:=public._account_deletion_review_safe_jsonb(public._account_deletion_profile_review_graph(p_request_id,p_guitar_id))-'ownerScope';
   else
     if p_guitar_id is not null or p_domain not in ('billing','service') then raise exception using errcode='22023',message='A retention review requires its domain.';end if;
     perform pg_advisory_xact_lock(hashtextextended('qrguitar:account-deletion-retention:'||p_request_id::text||':'||p_domain,0));
     if p_domain='billing' then perform pg_advisory_xact_lock(hashtextextended('qrguitar:billing-ledger',0));end if;
-    actual:=public._account_deletion_retention_fingerprint(p_request_id,p_domain);scope_key:=p_domain;
+    actual:=public._account_deletion_retention_fingerprint(p_request_id,p_domain);v_scope_key:=p_domain;
     safe_graph:=public._account_deletion_review_safe_jsonb(public._account_deletion_redact_identity_jsonb(
       public._account_deletion_strip_internal_identity(case when p_domain='billing' then public._account_deletion_billing_graph(job.actor_id,null)
         else public._account_deletion_service_graph(job.actor_id,null) end),job.actor_id,lower(coalesce(job.target_email,'')),job.subject_token));
@@ -2186,8 +2186,8 @@ begin
   if actual is null or encode(actual,'hex')<>p_expected_fingerprint then raise exception using errcode='PD412',message='Reviewed records changed; load the latest fingerprint.';end if;
   select count(*)::integer into total_rows from jsonb_each(safe_graph) e
     cross join lateral jsonb_array_elements(case when jsonb_typeof(e.value)='array' then e.value else jsonb_build_array(e.value) end) v;
-  page_count:=greatest(1,ceil(total_rows/50.0)::integer);
-  if p_page_index>=page_count then raise exception using errcode='22023',message='This review page does not exist.';end if;
+  v_page_count:=greatest(1,ceil(total_rows/50.0)::integer);
+  if p_page_index>=v_page_count then raise exception using errcode='22023',message='This review page does not exist.';end if;
   with flattened as (
     select e.key section_code,v.value record,v.ordinality,row_number() over(order by e.key,v.ordinality) rn
     from jsonb_each(safe_graph) e cross join lateral
@@ -2195,27 +2195,27 @@ begin
   ), selected as (select * from flattened where rn between p_page_index*50+1 and (p_page_index+1)*50),
   grouped as (select section_code,jsonb_agg(record order by ordinality) records from selected group by section_code)
   select coalesce(jsonb_object_agg(section_code,records),'{}'::jsonb) into page_rows from grouped;
-  page_digest:=sha256(convert_to(p_expected_fingerprint||':'||p_page_index::text||':'||page_count::text||':'||page_rows::text,'UTF8'));
+  v_page_digest:=sha256(convert_to(p_expected_fingerprint||':'||p_page_index::text||':'||v_page_count::text||':'||page_rows::text,'UTF8'));
   select coalesce(jsonb_agg(jsonb_build_object('code',e.key,'label',initcap(regexp_replace(e.key,'([A-Z])',' \1','g')),
     'recordCount',case when jsonb_typeof(e.value)='array' then jsonb_array_length(e.value) else 1 end,
     'contentDigest',encode(sha256(convert_to(e.value::text,'UTF8')),'hex'),'records',coalesce(page_rows->e.key,'[]'::jsonb)) order by e.key),'[]'::jsonb)
     into sections from jsonb_each(safe_graph) e where p_kind='retention' or e.key not in ('policyVersion','requestId','guitarId','scope');
   select * into existing from public.account_deletion_review_page_receipts where operation_id=p_operation_id;
   if found then
-    if existing.request_id<>p_request_id or existing.kind<>p_kind or existing.scope_key<>scope_key
-      or existing.content_fingerprint<>actual or existing.page_index<>p_page_index or existing.page_count<>page_count or existing.page_digest<>page_digest then
+    if existing.request_id<>p_request_id or existing.kind<>p_kind or existing.scope_key<>v_scope_key
+      or existing.content_fingerprint<>actual or existing.page_index<>p_page_index or existing.page_count<>v_page_count or existing.page_digest<>v_page_digest then
       raise exception using errcode='PD409',message='This operation UUID belongs to another review page.';end if;
   else
     insert into public.account_deletion_review_page_receipts(operation_id,request_id,kind,scope_key,content_fingerprint,page_index,page_count,page_digest,reviewed_by,result)
-      values(p_operation_id,p_request_id,p_kind,scope_key,actual,p_page_index,page_count,page_digest,p_admin_id,
-        jsonb_build_object('contentFingerprint',p_expected_fingerprint,'pageIndex',p_page_index,'pageCount',page_count,'pageDigest',encode(page_digest,'hex')));
+      values(p_operation_id,p_request_id,p_kind,v_scope_key,actual,p_page_index,v_page_count,v_page_digest,p_admin_id,
+        jsonb_build_object('contentFingerprint',p_expected_fingerprint,'pageIndex',p_page_index,'pageCount',v_page_count,'pageDigest',encode(v_page_digest,'hex')));
   end if;
   output:=jsonb_build_object('ok',true,'kind',p_kind,'policyVersion',1,'contentFingerprint',p_expected_fingerprint,'truncated',false,
-    'pageIndex',p_page_index,'pageCount',page_count,'pageDigest',encode(page_digest,'hex'),
+    'pageIndex',p_page_index,'pageCount',v_page_count,'pageDigest',encode(v_page_digest,'hex'),
     'deliveredPages',(select count(distinct r.page_index) from public.account_deletion_review_page_receipts r where r.request_id=p_request_id
-      and r.kind=p_kind and r.scope_key=scope_key and r.content_fingerprint=actual and r.page_count=page_count),
-    'allPagesDelivered',(select count(distinct r.page_index)=page_count from public.account_deletion_review_page_receipts r where r.request_id=p_request_id
-      and r.kind=p_kind and r.scope_key=scope_key and r.content_fingerprint=actual and r.page_count=page_count));
+      and r.kind=p_kind and r.scope_key=v_scope_key and r.content_fingerprint=actual and r.page_count=v_page_count),
+    'allPagesDelivered',(select count(distinct r.page_index)=v_page_count from public.account_deletion_review_page_receipts r where r.request_id=p_request_id
+      and r.kind=p_kind and r.scope_key=v_scope_key and r.content_fingerprint=actual and r.page_count=v_page_count));
   if p_kind='profile' then return output||jsonb_build_object('profile',jsonb_build_object('guitarId',p_guitar_id,
     'qrCode',(select qr_code from public.guitars where id=p_guitar_id),'relationshipCodes',to_jsonb(scope_row.relationship_codes),'sections',sections));end if;
   return output||jsonb_build_object('retention',jsonb_build_object('domain',p_domain,'sections',sections));
@@ -2424,9 +2424,9 @@ begin
     raise exception using errcode='PD404',message='This Profile is not in the deletion review scope.';end if;
   actual:=public._account_deletion_profile_fingerprint(p_request_id,p_guitar_id);
   if encode(actual,'hex')<>p_expected_fingerprint then raise exception using errcode='PD412',message='Profile content changed; review the latest fingerprint.';end if;
-  if not public._account_deletion_review_graph_within_bounds(
-      public._account_deletion_review_safe_jsonb(public._account_deletion_profile_review_graph(p_request_id,p_guitar_id))) then
-    raise exception using errcode='PD413',message='This Profile review is too large for one verified inspection.';end if;
+  if not exists(select 1 from public.account_deletion_review_page_receipts r where r.request_id=p_request_id and r.kind='profile'
+      and r.scope_key=p_guitar_id::text and r.content_fingerprint=actual group by r.page_count having count(distinct r.page_index)=r.page_count) then
+    raise exception using errcode='PD428',message='Every current Profile review page must be inspected before confirmation.';end if;
   result:=jsonb_build_object('approved',true,'guitarId',p_guitar_id,'policyVersion',1,'contentFingerprint',p_expected_fingerprint);
   insert into public.account_deletion_profile_review_attestations(operation_id,request_id,guitar_id,content_fingerprint,reviewed_by,result)
     values(p_operation_id,p_request_id,p_guitar_id,actual,p_admin_id,result);
@@ -2473,11 +2473,10 @@ begin
   graph:=case when p_domain='billing' then public._account_deletion_billing_graph(job.actor_id,null)
     else public._account_deletion_service_graph(job.actor_id,null) end;
   if not public._account_deletion_graph_has_rows(graph) then raise exception using errcode='PD409',message='This retention review is not required.';end if;
-  if not public._account_deletion_review_graph_within_bounds(public._account_deletion_review_safe_jsonb(
-      public._account_deletion_redact_identity_jsonb(public._account_deletion_strip_internal_identity(graph),
-        job.actor_id,lower(coalesce(job.target_email,'')),job.subject_token))) then
-    raise exception using errcode='PD413',message='This retention review is too large for one verified inspection.';end if;
   actual:=sha256(convert_to(graph::text,'UTF8'));
+  if not exists(select 1 from public.account_deletion_review_page_receipts r where r.request_id=p_request_id and r.kind='retention'
+      and r.scope_key=p_domain and r.content_fingerprint=actual group by r.page_count having count(distinct r.page_index)=r.page_count) then
+    raise exception using errcode='PD428',message='Every current retention review page must be inspected before confirmation.';end if;
   if encode(actual,'hex')<>p_expected_fingerprint then raise exception using errcode='PD412',message='Retained records changed; review the latest fingerprint.';end if;
   result:=jsonb_build_object('approved',true,'domain',p_domain,'decisionCode',p_decision_code,
     'policyVersion',1,'contentFingerprint',p_expected_fingerprint);
@@ -3557,12 +3556,12 @@ $$;
 
 create function public.read_account_deletion_custody_evidence_inventory(
   p_admin_id uuid,p_environment_admin boolean,p_request_id uuid,p_claim_id uuid,p_expected_profile_fingerprint text,p_page_index integer
-) returns jsonb language plpgsql security definer set search_path=pg_catalog,public as $
+) returns jsonb language plpgsql security definer set search_path=pg_catalog,public as $$
 declare job public.account_deletion_fulfillments; claim_row public.ownership_claims; guitar_id uuid; actual bytea; evidence jsonb; all_evidence jsonb;
   evidence_count integer; page_count integer; inventory_fingerprint text;
 begin
-  if p_request_id is null or p_claim_id is null or coalesce(p_expected_profile_fingerprint,'')!~'^[a-f0-9]{64}
-    raise exception using errcode='22023',message='An exact custody claim and Profile fingerprint are required.';end if;
+  if p_request_id is null or p_claim_id is null or coalesce(p_expected_profile_fingerprint,'')!~'^[a-f0-9]{64}$' or p_page_index is null or p_page_index<0 then
+    raise exception using errcode='22023',message='An exact custody claim, Profile fingerprint, and page are required.';end if;
   perform public._account_deletion_admin(p_admin_id,p_environment_admin);
   select * into job from public.account_deletion_fulfillments where request_id=p_request_id;
   select * into claim_row from public.ownership_claims where id=p_claim_id;
@@ -3571,13 +3570,12 @@ begin
     or not exists(select 1 from public.account_deletion_profile_custody c
       where c.request_id=p_request_id and c.guitar_id=claim_row.guitar_id and c.state='privacy_review_required') then
     raise exception using errcode='PD409',message='This proof set is not eligible for custody review.';end if;
-  guitar_id:=claim_row.guitar_id;
-  actual:=public._account_deletion_profile_fingerprint(p_request_id,guitar_id);
-  if encode(actual,'hex')<>p_expected_profile_fingerprint then
-    raise exception using errcode='PD412',message='The custody Profile changed; inspect the current review.';end if;
+  guitar_id:=claim_row.guitar_id;actual:=public._account_deletion_profile_fingerprint(p_request_id,guitar_id);
+  if encode(actual,'hex')<>p_expected_profile_fingerprint then raise exception using errcode='PD412',message='The custody Profile changed; inspect the current review.';end if;
   select count(*)::integer into evidence_count from public.ownership_claim_evidence where claim_id=p_claim_id;
   if evidence_count<1 then raise exception using errcode='PD409',message='At least one custody proof is required.';end if;
-  page_count:=ceil(evidence_count/32.0)::integer;if p_page_index>=page_count then raise exception using errcode='22023',message='This custody proof page does not exist.';end if;
+  page_count:=ceil(evidence_count/32.0)::integer;
+  if p_page_index>=page_count then raise exception using errcode='22023',message='This custody proof page does not exist.';end if;
   all_evidence:=public._account_deletion_custody_evidence_reviews_json(p_request_id,p_claim_id);
   select coalesce(jsonb_agg(value order by ordinality),'[]'::jsonb) into evidence from jsonb_array_elements(all_evidence) with ordinality
     where ordinality between p_page_index*32+1 and (p_page_index+1)*32;
@@ -3585,7 +3583,7 @@ begin
     into inventory_fingerprint from jsonb_array_elements(all_evidence);
   return jsonb_build_object('ok',true,'claim',jsonb_build_object('claimId',p_claim_id,'guitarId',guitar_id,
     'profileFingerprint',p_expected_profile_fingerprint,'inventoryFingerprint',inventory_fingerprint,'pageIndex',p_page_index,
-    'pageCount',page_count,'evidenceCount',evidence_count,'evidence',evidence));
+    'pageCount',page_count,'evidenceCount',evidence_count,'reviewedCount',(select count(*) from jsonb_array_elements(all_evidence) where (value->>'reviewed')::boolean),'evidence',evidence));
 end $$;
 
 create function public.read_account_deletion_custody_evidence_source(
@@ -3755,437 +3753,6 @@ begin
   actual:=public._account_deletion_profile_fingerprint(p_request_id,v_guitar_id);
   if encode(actual,'hex')<>p_expected_fingerprint then
     raise exception using errcode='PD412',message='Profile or claim evidence changed; inspect the latest private snapshot.';end if;
-  perform 1 from public.ownership_claim_evidence e where e.claim_id=p_claim_id order by e.id for update;
-  perform 1 from storage.objects o where o.bucket_id='instrument-documents' and exists(
-    select 1 from public.ownership_claim_evidence e where e.claim_id=p_claim_id and e.storage_path=o.name)
-    order by o.name for update;
-  if exists(select 1 from public.ownership_claim_evidence e
-      left join storage.objects o on o.bucket_id='instrument-documents' and o.name=e.storage_path
-      where e.claim_id=p_claim_id and (o.id is null or not exists(
-        select 1 from public.account_deletion_custody_evidence_reviews v
-        where v.request_id=p_request_id and v.claim_id=p_claim_id and v.evidence_id=e.id
-          and v.guitar_id=v_guitar_id
-          and v.object_path_fingerprint=sha256(convert_to(job.subject_token::text||':instrument-documents:'||e.storage_path,'UTF8'))
-          and v.object_fingerprint=public._account_deletion_storage_object_fingerprint('instrument-documents',e.storage_path,job.subject_token)
-          and v.object_version is not distinct from to_jsonb(o)->>'version'
-          and coalesce(o.metadata->>'size','')~'^[0-9]{1,19}$' and (o.metadata->>'size')::bigint=v.byte_size
-          and coalesce(o.metadata->>'mimetype',o.metadata->>'contentType') is not distinct from v.mime_type))) then
-    raise exception using errcode='PD428',message='Every current private proof file must be inspected and attested before custody release.';end if;
-  perform set_config('qrguitar.account_deletion_custody_release',p_request_id::text,true);
-  perform public.approve_ownership_claim(p_claim_id,p_admin_id,
-    'Custody released after fingerprint-bound privacy and ownership-evidence review.',true);
-  update public.guitars set visibility='private',updated_at=greatest(updated_at,v_released_at)
-    where id=v_guitar_id and owner_id=claim_row.claimant_user_id;
-  update public.account_deletion_profile_custody set state='released',released_claim_id=p_claim_id,
-    released_to=claim_row.claimant_user_id,released_by=p_admin_id,release_subject=claimant_subject,released_at=v_released_at
-    where request_id=p_request_id and guitar_id=v_guitar_id;
-  perform set_config('qrguitar.account_deletion_custody_release','',true);
-  result:=jsonb_build_object('requestId',p_request_id,'claimId',p_claim_id,'guitarId',v_guitar_id,
-    'policyVersion',1,'contentFingerprint',p_expected_fingerprint,'evidenceCount',evidence_count,
-    'visibility','private','releasedAt',v_released_at);
-  insert into public.account_deletion_custody_release_receipts(
-    operation_id,claim_id,request_id,guitar_id,claimant_id,claimant_subject,content_fingerprint,evidence_count,reviewed_by,result)
-    values(p_operation_id,p_claim_id,p_request_id,v_guitar_id,claim_row.claimant_user_id,claimant_subject,actual,evidence_count,p_admin_id,result);
-  return jsonb_build_object('ok',true,'release',result);
-end $$;
-
--- The intake migration predates fulfillment and originally took the actor lock
--- before touching the request. Storage actions use the request lock first, so
--- keep cancellation in that same global order before its UPDATE trigger removes
--- blocked fulfillment children.
-create or replace function public.cancel_account_deletion_request(
-  p_actor_id uuid,p_request_id uuid,p_operation_id uuid,p_expected_revision bigint
-) returns jsonb language plpgsql security definer set search_path=pg_catalog,public as $$
-declare saved public.account_deletion_requests; receipt public.account_deletion_request_receipts;
-  current_revision bigint; receipt_cutoff timestamptz; recent_operations integer;
-begin
-  if p_request_id is null or p_operation_id is null or p_expected_revision is null or p_expected_revision<0 then
-    raise exception using errcode='22023',message='Request and operation IDs and nonnegative expected revision are required.';
-  end if;
-  perform pg_advisory_xact_lock(hashtextextended('qrguitar:deletion-operation:'||p_operation_id::text,0));
-  perform pg_advisory_xact_lock(hashtextextended('qrguitar:account-deletion:'||p_request_id::text,0));
-  perform public._account_deletion_lock_actor(p_actor_id);
-  select * into receipt from public.account_deletion_request_receipts where actor_id=p_actor_id and operation_id=p_operation_id;
-  if found then
-    if receipt.action<>'cancel' or receipt.request_id<>p_request_id or receipt.expected_revision<>p_expected_revision then
-      raise exception using errcode='PD409',message='This operation ID belongs to a different action, request, or expected revision.';
-    end if;
-    return public._account_deletion_receipt_json(receipt);
-  end if;
-  select coalesce((select revision from public.account_deletion_actor_revisions where actor_id=p_actor_id),0) into current_revision;
-  if p_expected_revision<>current_revision then
-    raise exception using errcode='PD412',message='Request state changed. Read current status and confirm a new action.';
-  end if;
-  select * into saved from public.account_deletion_requests where id=p_request_id and actor_id=p_actor_id for update;
-  if not found then raise exception using errcode='PD404',message='Account deletion request was not found.';end if;
-  receipt_cutoff:=clock_timestamp()-interval '1 hour';
-  select count(*) into recent_operations from (
-    select 1 from public.account_deletion_request_receipts where actor_id=p_actor_id and recorded_at>=receipt_cutoff
-    order by recorded_at desc limit 60) recent;
-  if recent_operations >= (case when saved.status='requested' then 60 else 59 end) then
-    raise exception using errcode='PD429',message='Too many new request actions. Retry this action later.';
-  end if;
-  if saved.status='requested' then
-    update public.account_deletion_requests set status='cancelled',cancelled_at=greatest(clock_timestamp(),requested_at)
-      where id=saved.id returning * into saved;
-  elsif saved.status<>'cancelled' then
-    raise exception using errcode='PD409',message='This request can no longer be cancelled.';
-  end if;
-  insert into public.account_deletion_request_receipts(actor_id,operation_id,action,request_id,expected_revision)
-    values(p_actor_id,p_operation_id,'cancel',saved.id,p_expected_revision) returning * into receipt;
-  insert into public.account_deletion_actor_revisions(actor_id,revision) values(p_actor_id,1)
-    on conflict(actor_id) do update set revision=public.account_deletion_actor_revisions.revision+1;
-  return public._account_deletion_receipt_json(receipt);
-end $$;
-
-create or replace function public._account_deletion_intake_guard() returns trigger
-language plpgsql security definer set search_path=pg_catalog,public as $$
-declare permitted text:=current_setting('qrguitar.account_deletion_request',true);
-begin
-  if tg_table_name='account_deletion_request_receipts' then
-    if tg_op='DELETE' and (permitted=old.request_id::text or exists(
-      select 1 from public.account_deletion_fulfillments f
-      where f.request_id::text=permitted and f.actor_id=old.actor_id and f.state in ('blocked','quiescing_storage')
-    )) then return old; end if;
-    raise exception using errcode='42501',message='Account request receipts are immutable.';
-  end if;
-  if tg_op='UPDATE' and old.actor_id is not null and new.actor_id is null
-    and new.id=old.id and new.status=old.status and new.requested_at=old.requested_at and new.cancelled_at is not distinct from old.cancelled_at then
-    if permitted=old.id::text or exists(
-      select 1 from public.account_deletion_fulfillments f
-      where f.request_id::text=permitted and f.actor_id=old.actor_id and f.state in ('blocked','quiescing_storage')
-    ) then return new; end if;
-  end if;
-  if tg_op='UPDATE' and old.status='requested' and new.status='cancelled'
-    and exists(select 1 from public.account_deletion_fulfillments where request_id=old.id) then
-    if exists(select 1 from public.account_deletion_fulfillments where request_id=old.id and state='blocked') then
-      if exists(select 1 from public.account_deletion_fulfillment_receipts r
-          where r.request_id=old.id and r.action='profile_redact') then
-        raise exception using errcode='PD409',message='Reviewed privacy redaction has already changed retained history; this request can no longer be cancelled.';
-      end if;
-      if exists(select 1 from public.account_deletion_storage_relocations r where r.request_id=old.id and (
-          r.state<>'planned' or exists(select 1 from storage.objects o where o.bucket_id=r.bucket_id and o.name=r.destination_path))) then
-        raise exception using errcode='PD409',message='Storage relocation has started; finish its verified cleanup before cancelling.';end if;
-      perform set_config('qrguitar.account_deletion_request',old.id::text,true);
-      delete from public.account_deletion_profile_review_attestations where request_id=old.id;
-      delete from public.account_deletion_retention_attestations where request_id=old.id;
-      delete from public.account_deletion_storage_content_reviews where request_id=old.id;
-      delete from public.account_deletion_storage_relocations where request_id=old.id;
-      delete from public.account_deletion_profile_review_scopes where request_id=old.id;
-      delete from public.account_deletion_fulfillment_receipts where request_id=old.id;
-      delete from public.account_deletion_fulfillments where request_id=old.id;
-    else
-      raise exception using errcode='PD409',message='Privacy fulfillment has started; this request can no longer be cancelled.';
-    end if;
-  end if;
-  if tg_op='DELETE' or new.id is distinct from old.id or new.actor_id is distinct from old.actor_id
-    or new.requested_at is distinct from old.requested_at or old.status<>'requested' or new.status<>'cancelled'
-    or new.cancelled_at is null then
-    raise exception using errcode='42501',message='Only request cancellation is available outside the reviewed fulfillment protocol.';
-  end if;
-  return new;
-end $$;
-
-create or replace function public.read_account_deletion_queue(
-  p_actor_id uuid,p_environment_admin boolean default false,
-  p_before_requested_at timestamptz default null,p_before_id uuid default null,p_limit integer default 50
-) returns jsonb language plpgsql stable security definer set search_path=pg_catalog,public as $$
-declare rows jsonb;
-begin
-  perform public._account_deletion_admin(p_actor_id,p_environment_admin);
-  if p_limit is null or p_limit<1 or p_limit>100 or ((p_before_requested_at is null)<>(p_before_id is null)) then
-    raise exception using errcode='22023',message='A valid bounded queue cursor and limit are required.';
-  end if;
-  select coalesce(jsonb_agg(item.value order by item.requested_at desc,item.id desc),'[]'::jsonb) into rows from (
-    select r.requested_at,r.id,public._account_deletion_request_json(r)||jsonb_build_object('actorId',r.actor_id,'fulfillment',
-      case when f.request_id is null then null else public._account_deletion_admin_fulfillment_json(f) end,
-      'profileReviews',case when f.request_id is null then '[]'::jsonb else public._account_deletion_profile_reviews_json(f.request_id) end,
-      'retentionReviews',case when f.request_id is null then '[]'::jsonb else public._account_deletion_retention_reviews_json(f.request_id) end,
-      'storageReviews',case when f.request_id is null then '[]'::jsonb else public._account_deletion_storage_reviews_json(f.request_id) end) value
-    from public.account_deletion_requests r left join public.account_deletion_fulfillments f on f.request_id=r.id
-    where r.status='requested' and (r.actor_id is not null or f.state='ready_for_auth_deletion' or
-      (f.state='completed' and exists(select 1 from public.account_deletion_profile_custody c
-        where c.request_id=f.request_id and c.state='privacy_review_required')))
-      and (p_before_requested_at is null or (r.requested_at,r.id)<(p_before_requested_at,p_before_id))
-    order by r.requested_at desc,r.id desc limit p_limit
-  ) item;
-  return jsonb_build_object('ok',true,'requests',rows);
-end $$;
-
--- Self-service status must stop offering cancellation once the durable write
--- freeze has started. This response contains only the same safe state DTO used
--- by the administrator queue; target identity and private blocker details are
--- never selected from Auth or the fulfillment table.
-create or replace function public.read_account_deletion_requests(p_actor_id uuid,p_request_id uuid default null) returns jsonb
-language plpgsql stable security definer set search_path=pg_catalog,public as $$
-declare requested jsonb; active_request jsonb; latest_request jsonb; actor_revision text; fulfillment jsonb;
-begin
-  if p_actor_id is null or not exists(select 1 from auth.users where id=p_actor_id) then
-    raise exception using errcode='PD401',message='Verified account identity is unavailable.';
-  end if;
-  if p_request_id is not null then
-    select public._account_deletion_request_json(r) into requested
-      from public.account_deletion_requests r left join public.account_deletion_fulfillments f on f.request_id=r.id
-      where r.id=p_request_id and (r.actor_id=p_actor_id or f.actor_id=p_actor_id);
-    if not found then raise exception using errcode='PD404',message='Account deletion request was not found.'; end if;
-  end if;
-  select public._account_deletion_request_json(r),
-    case when f.request_id is null then null else public._account_deletion_fulfillment_json(f) end
-    into active_request,fulfillment
-    from public.account_deletion_requests r left join public.account_deletion_fulfillments f on f.request_id=r.id
-    where r.status='requested' and (r.actor_id=p_actor_id or f.actor_id=p_actor_id)
-    order by r.requested_at desc,r.id desc limit 1;
-  select public._account_deletion_request_json(r) into latest_request
-    from public.account_deletion_requests r left join public.account_deletion_fulfillments f on f.request_id=r.id
-    where r.actor_id=p_actor_id or f.actor_id=p_actor_id order by r.requested_at desc,r.id desc limit 1;
-  select coalesce((select revision from public.account_deletion_actor_revisions where actor_id=p_actor_id),0)::text into actor_revision;
-  return jsonb_build_object('ok',true,'revision',actor_revision,'request',requested,'activeRequest',active_request,
-    'latestRequest',latest_request,'fulfillment',fulfillment);
-end $$;
-
-revoke all on function public._account_deletion_fulfillment_guard(),public._account_deletion_custody_fence(),public._account_deletion_write_fence(),
-  public._account_deletion_admin(uuid,boolean),public._account_deletion_fulfillment_json(public.account_deletion_fulfillments),
-  public._account_deletion_text_has_identity(text,uuid,text),public._account_deletion_unscoped_personal_content(uuid,text),
-  public._account_deletion_billing_personal_content(uuid,text),public._account_deletion_blockers(uuid,uuid,text,text[]),
-  public._account_deletion_retained_pii(uuid,uuid,text) from public,anon,authenticated,service_role;
-do $private_account_deletion_helpers$
-declare helper record;
-begin
-  for helper in select oid::regprocedure signature from pg_proc
-    where pronamespace='public'::regnamespace and proname like '\_account\_deletion\_%' escape '\' loop
-    execute format('revoke all on function %s from public,anon,authenticated,service_role',helper.signature);
-  end loop;
-end $private_account_deletion_helpers$;
-revoke all on function public.prepare_account_deletion_fulfillment(uuid,boolean,uuid,uuid,text[]),
-  public.complete_account_deletion_fulfillment(uuid,boolean,uuid,uuid),
-  public.read_account_deletion_fulfillment(uuid,boolean,uuid),
-  public.read_account_deletion_review_snapshot(uuid,boolean,uuid,text,uuid,text,text),
-  public.inspect_account_deletion_review_page(uuid,boolean,uuid,uuid,text,uuid,text,text,integer),
-  public.redact_account_deletion_profile_review(uuid,boolean,uuid,uuid,uuid,text,text[]),
-  public.attest_account_deletion_profile_review(uuid,boolean,uuid,uuid,uuid,text,boolean),
-  public.attest_account_deletion_retention_review(uuid,boolean,uuid,uuid,text,text,text,boolean),
-  public.read_account_deletion_storage_review_source(uuid,boolean,uuid,uuid,text),
-  public.attest_account_deletion_storage_content(uuid,boolean,uuid,uuid,uuid,text,text,bigint,text,text,boolean),
-  public.read_account_deletion_custody_evidence_inventory(uuid,boolean,uuid,uuid,text,integer),
-  public.read_account_deletion_custody_evidence_source(uuid,boolean,uuid,uuid,uuid,text),
-  public.attest_account_deletion_custody_evidence(uuid,boolean,uuid,uuid,uuid,uuid,text,text,text,bigint,text,boolean),
-  public.authorize_account_deletion_storage_relocation(uuid,boolean,uuid,uuid,uuid,text,bigint,text),
-  public.finalize_account_deletion_storage_relocation(uuid,boolean,uuid,uuid,uuid,text,bigint),
-  public.complete_account_deletion_storage_relocation(uuid,boolean,uuid,uuid,uuid),
-  public.release_account_deletion_profile_custody(uuid,boolean,uuid,uuid,uuid,text,boolean)
-  from public,anon,authenticated,service_role;
-grant execute on function public.prepare_account_deletion_fulfillment(uuid,boolean,uuid,uuid,text[]),
-  public.complete_account_deletion_fulfillment(uuid,boolean,uuid,uuid),
-  public.read_account_deletion_fulfillment(uuid,boolean,uuid),
-  public.read_account_deletion_review_snapshot(uuid,boolean,uuid,text,uuid,text,text),
-  public.inspect_account_deletion_review_page(uuid,boolean,uuid,uuid,text,uuid,text,text,integer),
-  public.redact_account_deletion_profile_review(uuid,boolean,uuid,uuid,uuid,text,text[]),
-  public.attest_account_deletion_profile_review(uuid,boolean,uuid,uuid,uuid,text,boolean),
-  public.attest_account_deletion_retention_review(uuid,boolean,uuid,uuid,text,text,text,boolean),
-  public.read_account_deletion_storage_review_source(uuid,boolean,uuid,uuid,text),
-  public.attest_account_deletion_storage_content(uuid,boolean,uuid,uuid,uuid,text,text,bigint,text,text,boolean),
-  public.read_account_deletion_custody_evidence_inventory(uuid,boolean,uuid,uuid,text,integer),
-  public.read_account_deletion_custody_evidence_source(uuid,boolean,uuid,uuid,uuid,text),
-  public.attest_account_deletion_custody_evidence(uuid,boolean,uuid,uuid,uuid,uuid,text,text,text,bigint,text,boolean),
-  public.authorize_account_deletion_storage_relocation(uuid,boolean,uuid,uuid,uuid,text,bigint,text),
-  public.finalize_account_deletion_storage_relocation(uuid,boolean,uuid,uuid,uuid,text,bigint),
-  public.complete_account_deletion_storage_relocation(uuid,boolean,uuid,uuid,uuid),
-  public.release_account_deletion_profile_custody(uuid,boolean,uuid,uuid,uuid,text,boolean)
-  to service_role;
-
-notify pgrst,'reload schema';
-commit;
- or p_page_index is null or p_page_index<0 then
-    raise exception using errcode='22023',message='An exact custody claim and Profile fingerprint are required.';end if;
-  perform public._account_deletion_admin(p_admin_id,p_environment_admin);
-  select * into job from public.account_deletion_fulfillments where request_id=p_request_id;
-  select * into claim_row from public.ownership_claims where id=p_claim_id;
-  if job.request_id is null or claim_row.id is null or job.state<>'completed' or claim_row.status<>'admin_review' or claim_row.claimant_user_id is null
-    or not exists(select 1 from public.profiles where id=claim_row.claimant_user_id and account_status='active')
-    or not exists(select 1 from public.account_deletion_profile_custody c
-      where c.request_id=p_request_id and c.guitar_id=claim_row.guitar_id and c.state='privacy_review_required') then
-    raise exception using errcode='PD409',message='This proof set is not eligible for custody review.';end if;
-  guitar_id:=claim_row.guitar_id;
-  actual:=public._account_deletion_profile_fingerprint(p_request_id,guitar_id);
-  if encode(actual,'hex')<>p_expected_profile_fingerprint then
-    raise exception using errcode='PD412',message='The custody Profile changed; inspect the current review.';end if;
-  if (select count(*) from public.ownership_claim_evidence where claim_id=p_claim_id) not between 1 and 32 then
-    raise exception using errcode='PD413',message='This custody proof set cannot be reviewed safely in one bounded operation.';end if;
-  evidence:=public._account_deletion_custody_evidence_reviews_json(p_request_id,p_claim_id);
-  return jsonb_build_object('ok',true,'claim',jsonb_build_object('claimId',p_claim_id,'guitarId',guitar_id,
-    'profileFingerprint',p_expected_profile_fingerprint,'evidence',evidence));
-end $$;
-
-create function public.read_account_deletion_custody_evidence_source(
-  p_admin_id uuid,p_environment_admin boolean,p_request_id uuid,p_claim_id uuid,p_evidence_id uuid,p_expected_object_fingerprint text
-) returns jsonb language plpgsql security definer set search_path=pg_catalog,public,storage as $$
-declare job public.account_deletion_fulfillments; evidence public.ownership_claim_evidence; claim_row public.ownership_claims; actual bytea;
-begin
-  if p_request_id is null or p_claim_id is null or p_evidence_id is null
-    or coalesce(p_expected_object_fingerprint,'')!~'^[a-f0-9]{64}$' then
-    raise exception using errcode='22023',message='An exact custody proof fingerprint is required.';end if;
-  perform public._account_deletion_admin(p_admin_id,p_environment_admin);
-  perform pg_advisory_xact_lock(hashtextextended('qrguitar:account-deletion:'||p_request_id::text,0));
-  select * into job from public.account_deletion_fulfillments where request_id=p_request_id for update;
-  select * into claim_row from public.ownership_claims where id=p_claim_id for share;
-  select * into evidence from public.ownership_claim_evidence where id=p_evidence_id and claim_id=p_claim_id for share;
-  if job.request_id is null or claim_row.id is null or job.state<>'completed' or evidence.id is null or claim_row.status<>'admin_review'
-    or not exists(select 1 from public.account_deletion_profile_custody c
-      where c.request_id=p_request_id and c.guitar_id=claim_row.guitar_id and c.state='privacy_review_required') then
-    raise exception using errcode='PD409',message='This custody proof is not available for review.';end if;
-  perform 1 from storage.objects where bucket_id='instrument-documents' and name=evidence.storage_path for share;
-  if not found then raise exception using errcode='PD428',message='The custody proof object is missing.';end if;
-  actual:=public._account_deletion_storage_object_fingerprint('instrument-documents',evidence.storage_path,job.subject_token);
-  if encode(actual,'hex')<>p_expected_object_fingerprint then
-    raise exception using errcode='PD412',message='The custody proof changed; inspect the current object.';end if;
-  return jsonb_build_object('ok',true,'source',jsonb_build_object('claimId',p_claim_id,'evidenceId',p_evidence_id,
-    'bucket','instrument-documents','sourcePath',evidence.storage_path,'objectFingerprint',p_expected_object_fingerprint,
-    'sourceSize',case when coalesce((select metadata->>'size' from storage.objects where bucket_id='instrument-documents' and name=evidence.storage_path),'')~'^[0-9]{1,19}$'
-      then ((select metadata->>'size' from storage.objects where bucket_id='instrument-documents' and name=evidence.storage_path))::bigint end,
-    'sourceMimeType',(select coalesce(metadata->>'mimetype',metadata->>'contentType') from storage.objects
-      where bucket_id='instrument-documents' and name=evidence.storage_path)));
-end $$;
-
-create function public.attest_account_deletion_custody_evidence(
-  p_admin_id uuid,p_environment_admin boolean,p_request_id uuid,p_operation_id uuid,p_claim_id uuid,p_evidence_id uuid,
-  p_expected_profile_fingerprint text,p_expected_object_fingerprint text,p_byte_sha256 text,p_byte_size bigint,
-  p_mime_type text,p_confirm_reviewed boolean
-) returns jsonb language plpgsql security definer set search_path=pg_catalog,public,storage as $$
-declare job public.account_deletion_fulfillments; claim_row public.ownership_claims; evidence public.ownership_claim_evidence;
-  existing public.account_deletion_custody_evidence_reviews; profile_actual bytea; object_actual bytea;
-  path_actual bytea; object_version text; result jsonb;
-begin
-  if p_request_id is null or p_operation_id is null or p_claim_id is null or p_evidence_id is null
-    or coalesce(p_expected_profile_fingerprint,'')!~'^[a-f0-9]{64}$'
-    or coalesce(p_expected_object_fingerprint,'')!~'^[a-f0-9]{64}$'
-    or coalesce(p_byte_sha256,'')!~'^[a-f0-9]{64}$' or p_byte_size is null or p_byte_size<0
-    or p_mime_type not in ('image/jpeg','image/png','image/webp','application/pdf')
-    or p_confirm_reviewed is distinct from true then
-    raise exception using errcode='22023',message='Exact inspected custody proof bytes and explicit confirmation are required.';end if;
-  perform public._account_deletion_admin(p_admin_id,p_environment_admin);
-  perform pg_advisory_xact_lock(hashtextextended('qrguitar:deletion-operation:'||p_operation_id::text,0));
-  select * into existing from public.account_deletion_custody_evidence_reviews where operation_id=p_operation_id;
-  if found then
-    if existing.request_id<>p_request_id or existing.claim_id<>p_claim_id or existing.evidence_id<>p_evidence_id
-      or encode(existing.profile_fingerprint,'hex')<>p_expected_profile_fingerprint
-      or encode(existing.object_fingerprint,'hex')<>p_expected_object_fingerprint
-      or encode(existing.byte_sha256,'hex')<>p_byte_sha256 or existing.byte_size<>p_byte_size
-      or existing.mime_type<>p_mime_type then
-      raise exception using errcode='PD409',message='This operation UUID belongs to another custody proof review.';end if;
-    return jsonb_build_object('ok',true,'review',existing.result,
-      'evidence',public._account_deletion_custody_evidence_reviews_json(p_request_id,p_claim_id));
-  end if;
-  if exists(select 1 from public.account_deletion_fulfillment_receipts where operation_id=p_operation_id)
-    or exists(select 1 from public.account_deletion_profile_review_attestations where operation_id=p_operation_id)
-    or exists(select 1 from public.account_deletion_retention_attestations where operation_id=p_operation_id)
-    or exists(select 1 from public.account_deletion_storage_content_reviews where operation_id=p_operation_id)
-    or exists(select 1 from public.account_deletion_custody_release_receipts where operation_id=p_operation_id)
-    or exists(select 1 from public.account_deletion_storage_relocations
-      where finalize_operation_id=p_operation_id or complete_operation_id=p_operation_id) then
-    raise exception using errcode='PD409',message='This operation UUID belongs to another deletion action.';end if;
-  perform pg_advisory_xact_lock(hashtextextended('qrguitar:account-deletion:'||p_request_id::text,0));
-  select * into job from public.account_deletion_fulfillments where request_id=p_request_id for update;
-  select * into claim_row from public.ownership_claims where id=p_claim_id;
-  if job.request_id is null or claim_row.id is null or job.state<>'completed' or claim_row.status<>'admin_review' or claim_row.claimant_user_id is null
-    or not exists(select 1 from public.account_deletion_profile_custody c
-      where c.request_id=p_request_id and c.guitar_id=claim_row.guitar_id and c.state='privacy_review_required') then
-    raise exception using errcode='PD409',message='This custody proof is not eligible for review.';end if;
-  perform pg_advisory_xact_lock(hashtextextended('qrguitar:profile-graph:'||claim_row.guitar_id::text,0));
-  perform 1 from public.guitars where id=claim_row.guitar_id for update;
-  select * into evidence from public.ownership_claim_evidence where id=p_evidence_id and claim_id=p_claim_id for update;
-  if not found then raise exception using errcode='PD404',message='Custody claim evidence was not found.';end if;
-  profile_actual:=public._account_deletion_profile_fingerprint(p_request_id,claim_row.guitar_id);
-  if encode(profile_actual,'hex')<>p_expected_profile_fingerprint then
-    raise exception using errcode='PD412',message='The custody Profile changed; inspect it again.';end if;
-  perform 1 from storage.objects where bucket_id='instrument-documents' and name=evidence.storage_path for update;
-  if not found then raise exception using errcode='PD428',message='The custody proof object is missing.';end if;
-  object_actual:=public._account_deletion_storage_object_fingerprint('instrument-documents',evidence.storage_path,job.subject_token);
-  path_actual:=sha256(convert_to(job.subject_token::text||':instrument-documents:'||evidence.storage_path,'UTF8'));
-  select to_jsonb(o)->>'version' into object_version from storage.objects o
-    where o.bucket_id='instrument-documents' and o.name=evidence.storage_path;
-  if encode(object_actual,'hex')<>p_expected_object_fingerprint
-    or coalesce((select metadata->>'size' from storage.objects where bucket_id='instrument-documents' and name=evidence.storage_path),'')!~'^[0-9]{1,19}$'
-    or ((select metadata->>'size' from storage.objects where bucket_id='instrument-documents' and name=evidence.storage_path))::bigint<>p_byte_size
-    or (select coalesce(metadata->>'mimetype',metadata->>'contentType') from storage.objects
-      where bucket_id='instrument-documents' and name=evidence.storage_path) is distinct from p_mime_type then
-    raise exception using errcode='PD412',message='The custody proof bytes changed; inspect them again.';end if;
-  result:=jsonb_build_object('claimId',p_claim_id,'evidenceId',p_evidence_id,
-    'profileFingerprint',p_expected_profile_fingerprint,'objectFingerprint',p_expected_object_fingerprint,
-    'byteSha256',p_byte_sha256,'byteSize',p_byte_size,'mimeType',p_mime_type,'reviewedAt',clock_timestamp());
-  insert into public.account_deletion_custody_evidence_reviews(
-    operation_id,request_id,claim_id,evidence_id,guitar_id,profile_fingerprint,object_fingerprint,
-    object_path_fingerprint,object_version,byte_sha256,byte_size,mime_type,reviewed_by,result)
-    values(p_operation_id,p_request_id,p_claim_id,p_evidence_id,claim_row.guitar_id,profile_actual,object_actual,
-      path_actual,object_version,decode(p_byte_sha256,'hex'),p_byte_size,p_mime_type,p_admin_id,result);
-  return jsonb_build_object('ok',true,'review',result,
-    'evidence',public._account_deletion_custody_evidence_reviews_json(p_request_id,p_claim_id));
-end $$;
-
--- Permanent QR Profiles remain private after account deletion until a
--- fingerprint-bound, evidence-backed claim is approved. This RPC is the sole
--- custody-release boundary and deliberately leaves publication to the new
--- owner's ordinary Profile controls.
-create function public.release_account_deletion_profile_custody(
-  p_admin_id uuid,p_environment_admin boolean,p_request_id uuid,p_operation_id uuid,
-  p_claim_id uuid,p_expected_fingerprint text,p_confirm_reviewed boolean
-) returns jsonb language plpgsql security definer set search_path=pg_catalog,public as $$
-declare job public.account_deletion_fulfillments; custody public.account_deletion_profile_custody;
-  claim_row public.ownership_claims; receipt public.account_deletion_custody_release_receipts;
-  v_guitar_id uuid; actual bytea; evidence_count integer; claimant_subject uuid:=gen_random_uuid();
-  v_released_at timestamptz:=clock_timestamp(); result jsonb;
-begin
-  if p_request_id is null or p_operation_id is null or p_claim_id is null
-    or coalesce(p_expected_fingerprint,'') !~ '^[a-f0-9]{64}$' or p_confirm_reviewed is distinct from true then
-    raise exception using errcode='22023',message='An exact custody claim, Profile fingerprint, and review confirmation are required.';
-  end if;
-  perform public._account_deletion_admin(p_admin_id,p_environment_admin);
-  perform pg_advisory_xact_lock(hashtextextended('qrguitar:deletion-operation:'||p_operation_id::text,0));
-  select * into receipt from public.account_deletion_custody_release_receipts where operation_id=p_operation_id;
-  if found then
-    if receipt.request_id<>p_request_id or receipt.claim_id<>p_claim_id
-      or encode(receipt.content_fingerprint,'hex')<>p_expected_fingerprint then
-      raise exception using errcode='PD409',message='This operation UUID belongs to another custody action.';end if;
-    return jsonb_build_object('ok',true,'release',receipt.result);
-  end if;
-  if exists(select 1 from public.account_deletion_fulfillment_receipts where operation_id=p_operation_id)
-    or exists(select 1 from public.account_deletion_profile_review_attestations where operation_id=p_operation_id)
-    or exists(select 1 from public.account_deletion_retention_attestations where operation_id=p_operation_id)
-    or exists(select 1 from public.account_deletion_storage_content_reviews where operation_id=p_operation_id)
-    or exists(select 1 from public.account_deletion_custody_evidence_reviews where operation_id=p_operation_id)
-    or exists(select 1 from public.account_deletion_review_page_receipts where operation_id=p_operation_id)
-    or exists(select 1 from public.account_deletion_storage_relocations
-      where finalize_operation_id=p_operation_id or complete_operation_id=p_operation_id) then
-    raise exception using errcode='PD409',message='This operation UUID belongs to another deletion action.';end if;
-  perform pg_advisory_xact_lock(hashtextextended('qrguitar:account-deletion:'||p_request_id::text,0));
-  select c.guitar_id into v_guitar_id from public.ownership_claims c
-    join public.account_deletion_profile_custody h on h.request_id=p_request_id and h.guitar_id=c.guitar_id
-      and h.state='privacy_review_required'
-    where c.id=p_claim_id;
-  if not found then raise exception using errcode='PD404',message='This claim is not for an active custody Profile.';end if;
-  perform pg_advisory_xact_lock(hashtextextended('qrguitar:profile-graph:'||v_guitar_id::text,0));
-  select * into job from public.account_deletion_fulfillments where request_id=p_request_id for update;
-  if not found or job.state<>'completed' then
-    raise exception using errcode='PD409',message='Profile custody can be released only after account deletion completes.';end if;
-  perform 1 from public.guitars where id=v_guitar_id for update;
-  select * into custody from public.account_deletion_profile_custody
-    where request_id=p_request_id and guitar_id=v_guitar_id for update;
-  if not found or custody.state<>'privacy_review_required' then
-    raise exception using errcode='PD409',message='This custody hold is no longer active.';end if;
-  select * into claim_row from public.ownership_claims where id=p_claim_id and guitar_id=v_guitar_id for update;
-  if not found or claim_row.status<>'admin_review' or claim_row.claimant_user_id is null
-    or claim_row.current_owner_id is not null then
-    raise exception using errcode='PD409',message='A pending administrator claim for the ownerless Profile is required.';end if;
-  if not exists(select 1 from public.profiles where id=claim_row.claimant_user_id and account_status='active') then
-    raise exception using errcode='PD409',message='The claimant account is unavailable.';end if;
-  select count(*)::integer into evidence_count from public.ownership_claim_evidence where claim_id=p_claim_id;
-  if evidence_count<1 then raise exception using errcode='PD409',message='At least one retained proof item is required.';end if;
-  if evidence_count>32 then raise exception using errcode='PD413',message='This custody proof set cannot be released in one bounded review.';end if;
-  actual:=public._account_deletion_profile_fingerprint(p_request_id,v_guitar_id);
-  if encode(actual,'hex')<>p_expected_fingerprint then
-    raise exception using errcode='PD412',message='Profile or claim evidence changed; inspect the latest private snapshot.';end if;
-  if not public._account_deletion_review_graph_within_bounds(public._account_deletion_review_safe_jsonb(
-      public._account_deletion_profile_review_graph(p_request_id,v_guitar_id))) then
-    raise exception using errcode='PD413',message='This custody review is too large for one verified inspection.';end if;
   perform 1 from public.ownership_claim_evidence e where e.claim_id=p_claim_id order by e.id for update;
   perform 1 from storage.objects o where o.bucket_id='instrument-documents' and exists(
     select 1 from public.ownership_claim_evidence e where e.claim_id=p_claim_id and e.storage_path=o.name)

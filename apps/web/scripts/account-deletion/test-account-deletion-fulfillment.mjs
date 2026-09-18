@@ -42,10 +42,14 @@ async function prepare(requestId, operationId = randomUUID(), admin = ADMIN, env
 }
 async function attestReviews(requestId, snapshot) {
   for (const review of snapshot.profileReviews || []) if (!review.attested) {
+    let page=0,count=1;do {const inspected=(await db.query("select public.inspect_account_deletion_review_page($1,false,$2,$3,'profile',$4,null,$5,$6) result",
+      [ADMIN,requestId,randomUUID(),review.guitarId,review.contentFingerprint,page])).rows[0].result;count=inspected.pageCount;page+=1;} while(page<count);
     await db.query("select public.attest_account_deletion_profile_review($1,false,$2,$3,$4,$5,true)",
       [ADMIN, requestId, randomUUID(), review.guitarId, review.contentFingerprint]);
   }
   for (const review of snapshot.retentionReviews || []) if (review.required && !review.attested) {
+    let page=0,count=1;do {const inspected=(await db.query("select public.inspect_account_deletion_review_page($1,false,$2,$3,'retention',null,$4,$5,$6) result",
+      [ADMIN,requestId,randomUUID(),review.domain,review.contentFingerprint,page])).rows[0].result;count=inspected.pageCount;page+=1;} while(page<count);
     const decision = review.domain === "billing" ? "lawful_financial_retention_reviewed" : "service_history_privacy_reviewed";
     await db.query("select public.attest_account_deletion_retention_review($1,false,$2,$3,$4,$5,$6,true)",
       [ADMIN, requestId, randomUUID(), review.domain, review.contentFingerprint, decision]);
@@ -129,12 +133,13 @@ try {
       "public.complete_account_deletion_fulfillment(uuid,boolean,uuid,uuid)",
       "public.read_account_deletion_fulfillment(uuid,boolean,uuid)",
       "public.read_account_deletion_review_snapshot(uuid,boolean,uuid,text,uuid,text,text)",
+      "public.inspect_account_deletion_review_page(uuid,boolean,uuid,uuid,text,uuid,text,text,integer)",
       "public.redact_account_deletion_profile_review(uuid,boolean,uuid,uuid,uuid,text,text[])",
       "public.attest_account_deletion_profile_review(uuid,boolean,uuid,uuid,uuid,text,boolean)",
       "public.attest_account_deletion_retention_review(uuid,boolean,uuid,uuid,text,text,text,boolean)",
       "public.read_account_deletion_storage_review_source(uuid,boolean,uuid,uuid,text)",
       "public.attest_account_deletion_storage_content(uuid,boolean,uuid,uuid,uuid,text,text,bigint,text,text,boolean)",
-      "public.read_account_deletion_custody_evidence_inventory(uuid,boolean,uuid,uuid,text)",
+      "public.read_account_deletion_custody_evidence_inventory(uuid,boolean,uuid,uuid,text,integer)",
       "public.read_account_deletion_custody_evidence_source(uuid,boolean,uuid,uuid,uuid,text)",
       "public.attest_account_deletion_custody_evidence(uuid,boolean,uuid,uuid,uuid,uuid,text,text,text,bigint,text,boolean)",
       "public.authorize_account_deletion_storage_relocation(uuid,boolean,uuid,uuid,uuid,text,bigint,text)",
@@ -561,7 +566,7 @@ try {
     const custodyQueue = (await db.query("select public.read_account_deletion_queue($1,false,null,null,50) result", [ADMIN])).rows[0].result.requests;
     assert.equal(custodyQueue.length, 1); assert.equal(custodyQueue[0].fulfillment.state, "completed");
     const profileReview = custodyQueue[0].profileReviews.find(item => item.guitarId === g.id); assert.ok(profileReview);
-    const proofInventory = (await db.query("select public.read_account_deletion_custody_evidence_inventory($1,false,$2,$3,$4) result",
+    const proofInventory = (await db.query("select public.read_account_deletion_custody_evidence_inventory($1,false,$2,$3,$4,0) result",
       [ADMIN, id, claim.id, profileReview.contentFingerprint])).rows[0].result;
     assert.equal(proofInventory.claim.evidence.length, 1); assert.equal(proofInventory.claim.evidence[0].reviewed, false);
     const proofFingerprint = proofInventory.claim.evidence[0].objectFingerprint;
@@ -592,9 +597,9 @@ try {
     let evolvedQueue = (await db.query("select public.read_account_deletion_queue($1,false,null,null,50) result", [ADMIN])).rows[0].result.requests;
     let evolvedProfile = evolvedQueue[0].profileReviews.find(item => item.guitarId === g.id);
     assert.notEqual(evolvedProfile.contentFingerprint, profileReview.contentFingerprint);
-    await fail(() => db.query("select public.read_account_deletion_custody_evidence_inventory($1,false,$2,$3,$4)",
+    await fail(() => db.query("select public.read_account_deletion_custody_evidence_inventory($1,false,$2,$3,$4,0)",
       [ADMIN, id, claim.id, profileReview.contentFingerprint]), "PD412");
-    let evolvedInventory = (await db.query("select public.read_account_deletion_custody_evidence_inventory($1,false,$2,$3,$4) result",
+    let evolvedInventory = (await db.query("select public.read_account_deletion_custody_evidence_inventory($1,false,$2,$3,$4,0) result",
       [ADMIN, id, claim.id, evolvedProfile.contentFingerprint])).rows[0].result;
     assert.equal(evolvedInventory.claim.evidence.find(item => item.evidenceId === proof.id).reviewed, true);
     let proofBItem = evolvedInventory.claim.evidence.find(item => item.evidenceId === proofB.id);
@@ -608,7 +613,7 @@ try {
     await db.query("update ownership_claim_evidence set storage_path='claims/proof-b-replaced.pdf',file_name='proof-b-replaced.pdf' where id=$1", [proofB.id]);
     evolvedQueue = (await db.query("select public.read_account_deletion_queue($1,false,null,null,50) result", [ADMIN])).rows[0].result.requests;
     evolvedProfile = evolvedQueue[0].profileReviews.find(item => item.guitarId === g.id);
-    evolvedInventory = (await db.query("select public.read_account_deletion_custody_evidence_inventory($1,false,$2,$3,$4) result",
+    evolvedInventory = (await db.query("select public.read_account_deletion_custody_evidence_inventory($1,false,$2,$3,$4,0) result",
       [ADMIN, id, claim.id, evolvedProfile.contentFingerprint])).rows[0].result;
     proofBItem = evolvedInventory.claim.evidence.find(item => item.evidenceId === proofB.id);
     assert.equal(proofBItem.reviewed, false);
@@ -700,6 +705,32 @@ try {
     const row = (await db.query("select owner_id,visibility from guitars where id=$1", [g.id])).rows[0]; assert.deepEqual(row, { owner_id: null, visibility: "private" });
     assert.equal((await db.query("select count(*)::int n from guitars where id=$1 and visibility='public' and owner_id is not null and admin_archived_at is null and owner_removed_at is null", [g.id])).rows[0].n, 0);
     await fail(() => db.query("update profiles set account_status='active',display_name='Restored Person' where id=$1", [ACTOR]), "PD423");
+  });
+
+  await check("large Profile histories require every deterministic page and stale as one aggregate", async () => {
+    await seed(); const g=await guitar();
+    for(let n=0;n<550;n+=1) await db.query("insert into guitar_specs(guitar_id,label,value,sort_order) values($1,$2,$3,$4)",[g.id,"Large field "+n,"x".repeat(1200)+n,n]);
+    const id=(await request()).request.requestId,prepared=await prepare(id),review=prepared.profileReviews.find(item=>item.guitarId===g.id);assert.ok(review);
+    await fail(()=>db.query("select public.attest_account_deletion_profile_review($1,false,$2,$3,$4,$5,true)",[ADMIN,id,randomUUID(),g.id,review.contentFingerprint]),"PD428");
+    let page=0,count=1;do {const inspected=(await db.query("select public.inspect_account_deletion_review_page($1,false,$2,$3,'profile',$4,null,$5,$6) result",[ADMIN,id,randomUUID(),g.id,review.contentFingerprint,page])).rows[0].result;assert.equal(inspected.pageIndex,page);assert.ok(inspected.profile.sections.reduce((sum,section)=>sum+section.records.length,0)<=50);count=inspected.pageCount;page+=1;}while(page<count);
+    assert.ok(count>10);
+    await db.query("select public.attest_account_deletion_profile_review($1,false,$2,$3,$4,$5,true)",[ADMIN,id,randomUUID(),g.id,review.contentFingerprint]);
+    await db.query("insert into guitar_specs(guitar_id,label,value,sort_order) values($1,'Mutation','new personal record',9999)",[g.id]);
+    await fail(()=>db.query("select public.attest_account_deletion_profile_review($1,false,$2,$3,$4,$5,true)",[ADMIN,id,randomUUID(),g.id,review.contentFingerprint]),"PD412");
+  });
+
+  await check("more than 32 custody proofs paginate and release only after every exact byte receipt", async () => {
+    await seed();const g=await guitar(),id=(await request()).request.requestId;await prepareReady(id);await db.query("delete from auth.users where id=$1",[ACTOR]);await complete(id);
+    const claim=(await db.query("insert into ownership_claims(guitar_id,claim_type,status,current_owner_id,claimant_user_id) values($1,'legacy_review','admin_review',null,$2) returning id",[g.id,OTHER])).rows[0];
+    await db.query("insert into storage.buckets(id,name,public) values('instrument-documents','instrument-documents',false) on conflict(id) do nothing");
+    for(let n=0;n<33;n+=1){const objectPath="claims/many-"+n+".pdf";await db.query("insert into ownership_claim_evidence(claim_id,uploaded_by,evidence_type,file_name,storage_path) values($1,$2,'receipt',$3,$4)",[claim.id,OTHER,"proof-"+n+".pdf",objectPath]);await db.query("insert into storage.objects(bucket_id,name,owner_id,metadata,user_metadata,version) values('instrument-documents',$1,$2,$3,'{}',$4)",[objectPath,OTHER,{size:8,mimetype:"application/pdf"},"v-"+n]);}
+    const queued=(await db.query("select public.read_account_deletion_queue($1,false,null,null,50) result",[ADMIN])).rows[0].result.requests[0],profile=queued.profileReviews.find(item=>item.guitarId===g.id);assert.ok(profile);
+    const pages=[];for(let page=0;page<2;page+=1){const inventory=(await db.query("select public.read_account_deletion_custody_evidence_inventory($1,false,$2,$3,$4,$5) result",[ADMIN,id,claim.id,profile.contentFingerprint,page])).rows[0].result.claim;pages.push(inventory);assert.equal(inventory.pageCount,2);assert.equal(inventory.evidenceCount,33);assert.equal(inventory.evidence.length,page===0?32:1);}
+    assert.equal(pages[0].inventoryFingerprint,pages[1].inventoryFingerprint);
+    await fail(()=>db.query("select public.release_account_deletion_profile_custody($1,false,$2,$3,$4,$5,true)",[ADMIN,id,randomUUID(),claim.id,profile.contentFingerprint]),"PD428");
+    for(const inventory of pages)for(const item of inventory.evidence)await db.query("select public.attest_account_deletion_custody_evidence($1,false,$2,$3,$4,$5,$6,$7,$8,$9,$10,true)",[ADMIN,id,randomUUID(),claim.id,item.evidenceId,profile.contentFingerprint,item.objectFingerprint,"ab".repeat(32),8,"application/pdf"]);
+    const current=(await db.query("select public.read_account_deletion_custody_evidence_inventory($1,false,$2,$3,$4,1) result",[ADMIN,id,claim.id,profile.contentFingerprint])).rows[0].result.claim;assert.equal(current.reviewedCount,33);
+    const released=(await db.query("select public.release_account_deletion_profile_custody($1,false,$2,$3,$4,$5,true) result",[ADMIN,id,randomUUID(),claim.id,profile.contentFingerprint])).rows[0].result;assert.equal(released.release.evidenceCount,33);
   });
 
   await check("protocol tables and tombstones cannot be rewritten directly", async () => {
