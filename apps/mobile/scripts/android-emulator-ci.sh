@@ -17,6 +17,14 @@ image='system-images;android-35;google_apis;x86_64'
 
 case "${1:-}" in
   provision)
+    # The official runner preinstalls several .NET SDKs. This Android-only job
+    # never uses them. Reclaim only that fixed, verified directory on the fresh
+    # hosted VM; never apply this cleanup on a developer machine or self-hosted VM.
+    if [[ -d /usr/share/dotnet ]]; then
+      [[ ! -L /usr/share/dotnet && "$(realpath /usr/share/dotnet)" == /usr/share/dotnet ]]
+      du -sh /usr/share/dotnet
+      timeout 120 sudo rm -rf --one-file-system -- /usr/share/dotnet
+    fi
     # Standard runners include several multi-GB NDKs. Keep the exact NDK used
     # above; uninstall only these unused versions from this disposable runner.
     for unused_ndk in '28.2.13676358' '29.0.14206865'; do
@@ -37,24 +45,18 @@ case "${1:-}" in
     "$ANDROID_HOME/emulator/emulator" -accel-check
     mkdir -p "$ANDROID_AVD_HOME"
     printf 'no\n' | "$avdmanager" create avd --name qrguitar-acceptance --package "$image" --abi google_apis/x86_64
-    # API 35 defaults to a 6-GiB data image; this fixture needs only a few APKs.
-    python3 - <<'PY'
-import os
-from pathlib import Path
-config = Path(os.environ['ANDROID_AVD_HOME']) / 'qrguitar-acceptance.avd/config.ini'
-lines = config.read_text().splitlines()
-values = dict(line.split('=', 1) for line in lines if '=' in line)
-values['disk.dataPartition.size'] = '3G'
-config.write_text('\n'.join(f'{key}={value}' for key, value in values.items()) + '\n')
-PY
+    # Keep the image's data-partition default. The emulator's API35 userdata
+    # template needs 7372.8 MB even when config.ini asks for a smaller partition.
     df -h "$ANDROID_AVD_HOME"
+    available_kb=$(df --output=avail "$ANDROID_AVD_HOME" | tail -n 1 | tr -d ' ')
+    [[ "$available_kb" -ge 12582912 ]] || { echo 'Insufficient free disk before APK build (need 12 GiB, including emulator headroom).' >&2; exit 1; }
     ;;
   test)
     emulator_pid=''
     cleanup() {
       result=$?
       trap - EXIT
-      timeout 10 "$adb" -s "$ANDROID_SERIAL" logcat -d 'QRGInstalledAcceptance:I' '*:S' | tail -n 500 || true
+      timeout 10 "$adb" -s "$ANDROID_SERIAL" logcat -d 'QRGInstalledAcceptance:I' 'QRGReadyDeath:I' '*:S' | tail -n 500 || true
       if [[ "$result" -ne 0 ]]; then
         tail -n 120 "$RUNNER_TEMP/qrguitar-emulator.log" || true
         timeout 10 "$adb" -s "$ANDROID_SERIAL" logcat -d -b crash -t 200 || true
@@ -65,7 +67,8 @@ PY
     }
     trap cleanup EXIT
     available_kb=$(df --output=avail "$ANDROID_AVD_HOME" | tail -n 1 | tr -d ' ')
-    [[ "$available_kb" -ge 5242880 ]] || { echo 'Insufficient free disk for bounded emulator acceptance (need 5 GiB).' >&2; exit 1; }
+    df -h "$ANDROID_AVD_HOME"
+    [[ "$available_kb" -ge 9437184 ]] || { echo 'Insufficient free disk for emulator acceptance (need 9 GiB).' >&2; exit 1; }
     "$adb" start-server
     "$ANDROID_HOME/emulator/emulator" -avd qrguitar-acceptance -port 5554 \
       -no-window -no-audio -no-boot-anim -no-snapshot -wipe-data \
@@ -102,6 +105,9 @@ PY
     timeout 600 ./gradlew :qrguitar-photo-picker:connectedDebugAndroidTest :app:connectedDebugAndroidTest \
       --continue --no-daemon --max-workers=2 -I /tmp/qrguitar-installed-ndk.gradle \
       -Pandroid.builder.sdkDownload=false -PreactNativeArchitectures=x86_64 --stacktrace
+    # Run independently of the ordinary JUnit suites. The killed staging phase
+    # is a harness event, not a passing test; recovery requires a separate proof.
+    timeout 300 python3 -B "$GITHUB_WORKSPACE/apps/mobile/scripts/android-ready-process-death.py"
     ;;
   *) echo 'Expected provision or test.' >&2; exit 2 ;;
 esac

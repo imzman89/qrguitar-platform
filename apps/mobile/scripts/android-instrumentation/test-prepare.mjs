@@ -15,6 +15,7 @@ test('generated Gradle overlay embeds debug bundle with app-target runner and is
   const value = patchGradle(gradle);
   assert.match(value, /debuggableVariants = \[\]/);
   assert.match(value, /AndroidJUnitRunner/);
+  assert.match(value, /testInstrumentationRunnerArguments class: 'com\.qrguitar\.acceptance\.InstalledAcceptanceTest'/);
   assert.equal(patchGradle(value), value);
   assert.ok(value.startsWith(gradle.trimEnd()));
 });
@@ -36,6 +37,7 @@ test('debug manifest removes only Internet permission and labels fixture, idempo
 test('wrong app identity, altered host, existing policy and partial overlays fail closed', () => {
   assert.throws(() => patchGradle(gradle.replace('com.qrguitar.app', 'com.other.app')));
   assert.throws(() => patchGradle(gradle + '\ndebuggableVariants = ["debug"]'));
+  assert.throws(() => patchGradle(gradle + '\ntestInstrumentationRunnerArguments class: "unexpected.Test"'));
   assert.throws(() => patchGradle(patchGradle(gradle).replace('runner:1.6.2', 'runner:changed')));
   assert.throws(() => patchApplication(app.replace('context = applicationContext', 'context = anotherContext')));
   assert.throws(() => patchApplication(app + '\nuseDevSupport = true'));
@@ -51,8 +53,10 @@ function fixture() {
   put('android/app/build.gradle', gradle);
   put('android/app/src/main/java/com/qrguitar/app/MainApplication.kt', app);
   put('android/app/src/debug/AndroidManifest.xml', manifest);
-  put('scripts/android-instrumentation/java/com/qrguitar/acceptance/InstalledAcceptanceTest.java',
-      fs.readFileSync(path.join(mobile, 'scripts/android-instrumentation/java/com/qrguitar/acceptance/InstalledAcceptanceTest.java')));
+  for (const name of ['InstalledAcceptanceTest.java', 'ReadyProcessDeathAcceptanceTest.java']) {
+    put('scripts/android-instrumentation/java/com/qrguitar/acceptance/' + name,
+        fs.readFileSync(path.join(mobile, 'scripts/android-instrumentation/java/com/qrguitar/acceptance/' + name)));
+  }
   return { root, put };
 }
 function withFixture(run) {
@@ -64,9 +68,9 @@ function withFixture(run) {
     fs.rmSync(resolved, { recursive: true, force: true });
   }
 }
-test('check mode validates all four outputs without writing generated files', () => withFixture(({ root }) => {
+test('check mode validates all five outputs without writing generated files', () => withFixture(({ root }) => {
   const outputs = prepareInstalledTest(root, { check: true });
-  assert.equal(outputs.length, 4);
+  assert.equal(outputs.length, 5);
   assert.equal(fs.readFileSync(path.join(root, 'android/app/build.gradle'), 'utf8'), gradle);
   assert.equal(fs.existsSync(path.join(root, 'android/app/src/androidTest')), false);
 }));

@@ -15,6 +15,8 @@ react {
 android {
     defaultConfig {
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        // The intentional-death helper runs only through the separate host controller.
+        testInstrumentationRunnerArguments class: 'com.qrguitar.acceptance.InstalledAcceptanceTest'
     }
 }
 dependencies {
@@ -38,6 +40,7 @@ export function patchGradle(source) {
   assert.ok(!normalized.includes(endMarker), 'Partial acceptance overlay');
   assert.ok(!/^\s*debuggableVariants\s*=/m.test(normalized), 'Unexpected existing variant override');
   assert.ok(!/^\s*testInstrumentationRunner\s/m.test(normalized), 'Unexpected existing app test runner');
+  assert.ok(!/^\s*testInstrumentationRunnerArguments\s/m.test(normalized), 'Unexpected existing app test arguments');
   return normalized.trimEnd() + '\n\n' + gradleOverlay + '\n';
 }
 
@@ -107,7 +110,7 @@ export function prepareInstalledTest(mobileRoot, { check = false } = {}) {
   ];
   const testRoot = path.join(root, 'scripts/android-instrumentation/java/com/qrguitar/acceptance');
   const names = fs.readdirSync(testRoot).filter(name => name.endsWith('.java')).sort();
-  assert.deepEqual(names, ['InstalledAcceptanceTest.java'], 'Unexpected instrumentation overlay files');
+  assert.deepEqual(names, ['InstalledAcceptanceTest.java', 'ReadyProcessDeathAcceptanceTest.java'], 'Unexpected instrumentation overlay files');
   for (const name of names) {
     const content = fs.readFileSync(path.join(testRoot, name), 'utf8');
     assert.ok(content.startsWith(marker), 'Instrumentation ownership marker missing');

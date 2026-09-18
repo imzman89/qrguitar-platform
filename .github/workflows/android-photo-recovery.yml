@@ -67,6 +67,7 @@ jobs:
       - name: Prepare test-only installed app
         run: |
           node --test apps/mobile/scripts/android-instrumentation/test-prepare.mjs
+          python3 -B apps/mobile/scripts/test-android-ready-process-death.py
           node apps/mobile/scripts/prepare-installed-test.mjs
       - name: Provision a disposable Android emulator
         run: bash apps/mobile/scripts/android-emulator-ci.sh provision
@@ -141,4 +142,28 @@ jobs:
               valid &= tests >= minimum and not (failures or errors or skipped)
           if not valid:
               raise SystemExit(1)
+          PY
+      - name: Report durable-ready process-death acceptance
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          report = json.loads((Path(os.environ['RUNNER_TEMP']) / 'qrguitar-ready-death.json').read_text())
+          expected = {
+              'protocol': 1, 'status': 'passed', 'passed': True, 'phase': 'confirmed',
+              'scope': 'durable_ready_sigkill_restart', 'stagingIsPassingTest': False,
+              'stagingInstrumentationTestsPassed': 0,
+              'killSignal': 'SIGKILL', 'originalProcessGone': True,
+              'stagingInstrumentationTerminated': True, 'recoveryInstrumentationTests': 1,
+          }
+          for key, value in expected.items():
+              assert type(report.get(key)) is type(value) and report[key] == value, key
+          recovery = report['recovery']
+          assert recovery['phase'] == 'verified_acknowledged'
+          for key in ('readyCiphertextPreserved', 'realGrantReopened', 'acknowledgementRepeated',
+                      'grantReleased', 'encryptedPhotoDeleted', 'fixtureDeleted', 'nativeTombstoneRetained'):
+              assert recovery.get(key) is True, key
+          print('One durable-ready process-death scenario passed; recovery instrumentation passed one test.')
+          print('Killed staging is not counted as a passing test. Pending-picker death and signed-in draft acceptance remain outside this gate.')
           PY
