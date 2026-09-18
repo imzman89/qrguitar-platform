@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { isCheckoutPath, securityHeaders } from "./lib/security-headers";
 import { isNoindexPathname } from "./lib/search-indexing";
 
-const SITE_PREVIEW_COOKIE = "qrguitar_site_preview";
-
 const LEGACY_HANDOUT_CODE = "QRG-E9DFA48DCC74";
 const CANONICAL_HANDOUT_CODE = "QRG-SI98092154";
 
@@ -24,11 +22,15 @@ export function middleware(request: NextRequest) {
     canonicalUrl.pathname = `/handout/${CANONICAL_HANDOUT_CODE}`;
     return NextResponse.redirect(canonicalUrl, 308);
   }
-  const response = NextResponse.next();
+  const draftPreviewRequest = request.nextUrl.searchParams.get("cmsPreview") === "draft";
+  const requestHeaders = new Headers(request.headers);
+  if (draftPreviewRequest) requestHeaders.set("x-qrguitar-site-preview", "draft");
+  else requestHeaders.delete("x-qrguitar-site-preview");
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
   if (isNoindexPathname(request.nextUrl.pathname)) {
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
   }
-  if (request.nextUrl.pathname === "/api/site-editor/preview" || request.cookies.has(SITE_PREVIEW_COOKIE)) {
+  if (request.nextUrl.pathname === "/api/site-editor/preview" || draftPreviewRequest) {
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
     response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
     for (const header of securityHeaders({ preview: true, checkout: isCheckoutPath(request.nextUrl.pathname) })) {

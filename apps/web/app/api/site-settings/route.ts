@@ -41,21 +41,31 @@ export async function GET(request: Request) {
     });
   }
 
-  const preview = await isSitePreviewAuthorized(sitePreviewTokenFromCookie(request.headers.get("cookie") || ""), supabase);
-  const { data, error } = await supabase
+  const previewRequested = new URL(request.url).searchParams.get("cmsPreview") === "draft";
+  const preview = previewRequested && await isSitePreviewAuthorized(sitePreviewTokenFromCookie(request.headers.get("cookie") || ""), supabase);
+  if (preview) {
+    const draft = await supabase
+      .from("site_content")
+      .select("content_value")
+      .eq("content_key", sitePreviewDraftKey)
+      .maybeSingle<SiteContentRow>();
+    const draftContent = (draft.data?.content_value as { settings?: Partial<EditableSiteSettings> } | null)?.settings || null;
+    if (!draft.error && draftContent) {
+      return noStoreJson({ ok: true, preview: "draft", settings: mergeSiteSettings(draftContent) });
+    }
+  }
+
+  const published = await supabase
     .from("site_content")
     .select("content_value")
-    .eq("content_key", preview ? sitePreviewDraftKey : publishedSiteSettingsKey)
+    .eq("content_key", publishedSiteSettingsKey)
     .maybeSingle<SiteContentRow>();
 
-  if (error) {
+  if (published.error) {
     return noStoreJson({ ok: false, settings: defaultSiteSettings, message: "Published site settings are unavailable." });
   }
 
-  const content = preview
-    ? ((data?.content_value as { settings?: Partial<EditableSiteSettings> } | null)?.settings || null)
-    : data?.content_value;
-  return noStoreJson({ ok: true, preview: preview ? "draft" : "published", settings: content ? mergeSiteSettings(content) : null });
+  return noStoreJson({ ok: true, preview: "published", settings: published.data?.content_value ? mergeSiteSettings(published.data.content_value) : defaultSiteSettings });
 }
 
 export async function PUT(request: Request) {

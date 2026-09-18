@@ -3,7 +3,7 @@ import { revalidatePath, unstable_noStore as noStore } from "next/cache";
 import { NextResponse } from "next/server";
 import { getAdminContext, readAdminEmailList } from "../../../lib/admin-auth";
 import { validateContentValues } from "../../../lib/content-registry";
-import { mergeSiteSettings, publishedSiteSettingsKey, validateEditorialComposition, type EditableSiteSettings } from "../../../lib/site-settings";
+import { mergeSiteSettings, publishedSiteSettingsKey, validateBrandLogoEntries, validateEditorialComposition, type EditableSiteSettings } from "../../../lib/site-settings";
 import { createServerSupabaseClientWithTimeout } from "../../../lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -70,8 +70,8 @@ function validHex(value: string) {
   return /^#[0-9a-f]{6}$/i.test(value);
 }
 
-function validateSettings(settings: EditableSiteSettings) {
-  const errors = { ...validateContentValues(settings.content), ...validateEditorialComposition(settings.composition) };
+function validateSettings(settings: EditableSiteSettings, rawSettings?: Partial<EditableSiteSettings>) {
+  const errors = { ...validateBrandLogoEntries(rawSettings?.brandLogos), ...validateContentValues(settings.content), ...validateEditorialComposition(settings.composition) };
   for (const [key, value] of Object.entries(settings.colors)) {
     if (!validHex(value)) errors[`colors.${key}`] = "Use a six-digit hex color.";
   }
@@ -131,6 +131,7 @@ export async function PUT(request: Request) {
   }
   let revisionValue: Record<string, unknown> | null = null;
   let settings: EditableSiteSettings | null = null;
+  let rawSettings: Partial<EditableSiteSettings> | undefined;
   if (action === "restore_revision") {
     if (typeof body.revisionId !== "string" || !body.revisionId.startsWith(REVISION_PREFIX)) return json({ ok: false, uncertain: false, message: "Select a valid revision." }, { status: 400 });
     try {
@@ -142,10 +143,11 @@ export async function PUT(request: Request) {
     } catch { return json({ ok: false, uncertain: false, message: "Could not read that revision." }, { status: 503 }); }
   } else if (action !== "discard_draft") {
     if (!body.settings || typeof body.settings !== "object" || Array.isArray(body.settings)) return json({ ok: false, uncertain: false, message: "Settings are required." }, { status: 400 });
-    settings = mergeSiteSettings(body.settings as Partial<EditableSiteSettings>);
+    rawSettings = body.settings as Partial<EditableSiteSettings>;
+    settings = mergeSiteSettings(rawSettings);
   }
   if (settings) {
-    const errors = validateSettings(settings);
+    const errors = validateSettings(settings, rawSettings);
     if (Object.keys(errors).length) return json({ ok: false, uncertain: false, message: "Fix the highlighted content before saving.", errors }, { status: 400 });
   }
   try {

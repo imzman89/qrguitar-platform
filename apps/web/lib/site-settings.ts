@@ -770,10 +770,39 @@ export function normalizeBrandLogoKey(value?: string | null) {
     .replace(/^-+|-+$/g, "");
 }
 
+export function isSafeBrandLogoUrl(value?: string | null) {
+  const candidate = String(value || "").trim();
+  if (!candidate || candidate.length > 2048 || /[\u0000-\u001f\u007f\\]/.test(candidate)) return false;
+  if (candidate.startsWith("/")) return !candidate.startsWith("//");
+  try {
+    const parsed = new URL(candidate);
+    return parsed.protocol === "https:" && !parsed.username && !parsed.password;
+  } catch {
+    return false;
+  }
+}
+
+export function validateBrandLogoEntries(value: unknown) {
+  const errors: Record<string, string> = {};
+  if (value === undefined) return errors;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    errors.brandLogos = "Brand logos must be a keyed list of approved image URLs.";
+    return errors;
+  }
+  for (const [brand, url] of Object.entries(value)) {
+    const key = normalizeBrandLogoKey(brand);
+    if (!key) errors[`brandLogos.${brand || "unknown"}`] = "Enter a valid brand name.";
+    if (typeof url !== "string" || !isSafeBrandLogoUrl(url)) {
+      errors[`brandLogos.${key || brand || "unknown"}`] = "Use an HTTPS URL or a site-relative path beginning with one slash.";
+    }
+  }
+  return errors;
+}
+
 export function normalizeBrandLogos(value?: Record<string, string> | null) {
   const entries = Object.entries(value || {})
     .map(([brand, url]) => [normalizeBrandLogoKey(brand), String(url || "").trim()] as const)
-    .filter(([brand, url]) => brand && /^(https?:\/\/|\/)/i.test(url));
+    .filter(([brand, url]) => brand && isSafeBrandLogoUrl(url));
 
   return Object.fromEntries(entries);
 }
@@ -793,7 +822,8 @@ export function readSiteSettings() {
 
 export async function fetchPublishedSiteSettings() {
   try {
-    const response = await fetch(`/api/site-settings?fresh=${Date.now()}`, {
+    const draftPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("cmsPreview") === "draft";
+    const response = await fetch(`/api/site-settings?fresh=${Date.now()}${draftPreview ? "&cmsPreview=draft" : ""}`, {
       cache: "no-store",
       headers: {
         "Cache-Control": "no-store"

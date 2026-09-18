@@ -13,7 +13,7 @@ function enqueue<T>(task: () => Promise<T>): Promise<T> {
 async function deleteCookie() {
   cleanupRequired = true;
   const response = await fetch("/api/site-editor/preview", {
-    method: "DELETE", credentials: "same-origin", cache: "no-store", signal: AbortSignal.timeout(15000)
+    method: "DELETE", credentials: "same-origin", cache: "no-store", keepalive: true, signal: AbortSignal.timeout(15000)
   });
   if (!response.ok) throw new Error("Could not clear the draft preview. Retry when the connection is available.");
   cleanupRequired = false;

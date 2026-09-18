@@ -47,13 +47,17 @@ import {
 import {
   applyThemeSettings,
   defaultSiteSettings,
+  isSafeBrandLogoUrl,
   mergeSiteSettings,
   normalizeBrandLogoKey,
   siteSettingsKey,
+  validateBrandLogoEntries,
+  validateEditorialComposition,
   type EditableSiteSettings,
   type EditorialPageKey
 } from "../../lib/site-settings";
 import { createEditorMutationController, EditorMutationError, shouldReplaceEditorContent, type EditorMutationPayload } from "../../lib/site-editor-client";
+import { settingsChangeReview } from "../../lib/site-editor-review";
 import { clearSitePreviewCookie, openSiteDraftPreview, sitePreviewGeneration, sitePreviewInvalidatedEvent } from "../../lib/site-preview-client";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
 
@@ -210,6 +214,42 @@ function emailPreviewValue(value: string) {
   return value.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (match, key: string) => samples[key] || match);
 }
 
+const focusableSelector = [
+  "a[href]", "button:not([disabled])", "input:not([disabled])", "select:not([disabled])",
+  "textarea:not([disabled])", "[tabindex]:not([tabindex='-1'])"
+].join(",");
+
+function trapFocus(container: HTMLElement | null, event: KeyboardEvent) {
+  if (event.key !== "Tab" || !container) return;
+  const focusable = Array.from(container.querySelectorAll<HTMLElement>(focusableSelector))
+    .filter((element) => !element.hidden && element.getAttribute("aria-hidden") !== "true");
+  if (!focusable.length) { event.preventDefault(); container.focus(); return; }
+  const first = focusable[0], last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+}
+
+function validateEditorSettings(settings: EditableSiteSettings, rawBrandLogos: unknown = settings.brandLogos) {
+  const errors: Record<string, string> = {
+    ...validateBrandLogoEntries(rawBrandLogos),
+    ...validateContentValues(settings.content),
+    ...validateEditorialComposition(settings.composition)
+  };
+  for (const [key, value] of Object.entries(settings.colors)) {
+    if (!/^#[0-9a-f]{6}$/i.test(value)) errors[`colors.${key}`] = "Use a six-digit hex color.";
+  }
+  if (!settings.brandName.trim()) errors.brandName = "Brand name is required.";
+  try {
+    const canonical = new URL(settings.seo.canonicalUrl);
+    if (canonical.protocol !== "https:" || canonical.hostname !== "www.qrguitar.com" || canonical.username || canonical.password) {
+      errors["seo.canonicalUrl"] = "Use the canonical QRguitar HTTPS origin.";
+    }
+  } catch {
+    errors["seo.canonicalUrl"] = "Enter a valid canonical URL.";
+  }
+  return errors;
+}
+
 export default function SiteEditorPage() {
   const [selected, setSelected] = useState<SelectedPage>({ area: "Marketing", page: "Homepage" });
   const [settings, setSettingsState] = useState<EditableSiteSettings>(defaultSiteSettings);
@@ -257,6 +297,14 @@ export default function SiteEditorPage() {
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const loaded = useRef(false);
   const lastServerDraft = useRef("");
+  const sidebarTriggerRef = useRef<HTMLButtonElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const sidebarCloseRef = useRef<HTMLButtonElement>(null);
+  const previewTriggerRef = useRef<HTMLButtonElement>(null);
+  const previewPanelRef = useRef<HTMLElement>(null);
+  const confirmDialogRef = useRef<HTMLElement>(null);
+  const confirmCloseRef = useRef<HTMLButtonElement>(null);
+  const focusBeforeDialog = useRef<HTMLElement | null>(null);
 
   const selectedEntries = useMemo(() => {
     const search = query.trim().toLowerCase();
@@ -281,10 +329,8 @@ export default function SiteEditorPage() {
       : null;
   }, [query, selected]);
   const previewPath = currentPageEntries.find((entry) => entry.previewPath)?.previewPath || "/";
-  const changedKeys = useMemo(
-    () => Object.keys(settings.content).filter((key) => settings.content[key] !== published.content[key]),
-    [published.content, settings.content]
-  );
+  const changeReview = useMemo(() => settingsChangeReview(settings, published), [published, settings]);
+  const changeCount = changeReview.length;
   const hasChanges = JSON.stringify(settings) !== JSON.stringify(published);
   const textContrast = contrastRatio(settings.colors.text, settings.colors.background);
   const actionContrast = contrastRatio(settings.colors.background, settings.colors.cream);
@@ -301,7 +347,15 @@ export default function SiteEditorPage() {
 
   useEffect(() => {
     const updatePreviewLayout = () => {
-      if (window.innerWidth < 1000) setPreviewOpen(false);
+      if (window.innerWidth < 1000) {
+        setPreviewOpen((open) => {
+          if (open) {
+            setPreviewUrl("");
+            void clearSitePreviewCookie().catch(() => undefined);
+          }
+          return false;
+        });
+      }
       setDevice(window.innerWidth < 640 ? "mobile" : window.innerWidth < 1000 ? "tablet" : "desktop");
     };
     updatePreviewLayout();
@@ -370,7 +424,7 @@ export default function SiteEditorPage() {
       const localSnapshot = retry ? controller.pending?.localSnapshot || JSON.stringify(settingsRef.current) : JSON.stringify(settingsRef.current);
       const submitted = settingsRef.current;
       if (!retry && action === "publish") {
-        const validation = validateContentValues(submitted.content);
+        const validation = validateEditorSettings(submitted);
         const text = contrastRatio(submitted.colors.text, submitted.colors.background);
         const buttons = contrastRatio(submitted.colors.background, submitted.colors.cream);
         setErrors(validation);
@@ -420,6 +474,24 @@ export default function SiteEditorPage() {
     });
   }
   async function clearDraftPreview() { await clearSitePreviewCookie(); }
+  const closePreview = useCallback(() => {
+    setPreviewOpen(false);
+    setPreviewUrl("");
+    setPreviewError("");
+    void clearSitePreviewCookie().catch((error) => {
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : "Could not clear the draft preview cookie.");
+    });
+  }, []);
+
+  useEffect(() => {
+    const clearOnExit = () => { void clearSitePreviewCookie().catch(() => undefined); };
+    window.addEventListener("pagehide", clearOnExit);
+    return () => {
+      window.removeEventListener("pagehide", clearOnExit);
+      clearOnExit();
+    };
+  }, []);
 
   useEffect(() => {
     const invalidate = () => {
@@ -460,7 +532,7 @@ export default function SiteEditorPage() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!authorized) return;
+    if (!authorized || !previewOpen) return;
     if (previewSource === "published") {
       setPreviewError("");
       setPreviewUrl("");
@@ -487,7 +559,36 @@ export default function SiteEditorPage() {
     return () => {
       cancelled = true;
     };
-  }, [authorized, previewPath, previewSource, previewVersion]);
+  }, [authorized, previewOpen, previewPath, previewSource, previewVersion]);
+
+  useEffect(() => {
+    if (!previewOpen) return;
+    const trigger = previewTriggerRef.current;
+    previewPanelRef.current?.focus();
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !confirmAction) closePreview();
+    };
+    window.addEventListener("keydown", close);
+    return () => {
+      window.removeEventListener("keydown", close);
+      trigger?.focus();
+    };
+  }, [previewOpen, confirmAction, closePreview]);
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const trigger = sidebarTriggerRef.current;
+    sidebarCloseRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSidebarOpen(false);
+      else trapFocus(sidebarRef.current, event);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      trigger?.focus();
+    };
+  }, [sidebarOpen]);
 
   useEffect(() => {
     if (!loaded.current || !authorized) return;
@@ -507,11 +608,18 @@ export default function SiteEditorPage() {
 
   useEffect(() => {
     if (!confirmAction) return;
-    const close = (event: KeyboardEvent) => {
+    focusBeforeDialog.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    confirmCloseRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setConfirmAction(null);
+      else trapFocus(confirmDialogRef.current, event);
     };
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      focusBeforeDialog.current?.focus();
+      focusBeforeDialog.current = null;
+    };
   }, [confirmAction]);
 
   function updateContent(key: string, value: string) {
@@ -539,16 +647,16 @@ export default function SiteEditorPage() {
     try {
       const parsed = JSON.parse(advancedJson) as Partial<EditableSiteSettings>;
       const next = hydrateLegacyContent(mergeSiteSettings(parsed));
-      const validation = validateContentValues(next.content);
+      const validation = validateEditorSettings(next, parsed.brandLogos);
       if (Object.keys(validation).length) {
         setErrors(validation);
-        setMessage("JSON is valid, but content validation failed.");
+        setMessage("JSON is valid, but the imported settings need corrections before they can be loaded.");
         setStatus("error");
         return;
       }
       setSettings(next);
       applyThemeSettings(next);
-      setMessage("Validated JSON loaded into the draft. Save Draft to keep it.");
+      setMessage("Validated JSON loaded. Autosave will store it as the shared draft.");
       setStatus("dirty");
     } catch {
       setMessage("Settings JSON is not valid JSON.");
@@ -585,7 +693,7 @@ export default function SiteEditorPage() {
   function saveBrandLogo() {
     const key = normalizeBrandLogoKey(brandName);
     const url = brandLogoUrl.trim();
-    if (!key || !/^(https?:\/\/|\/)/i.test(url)) {
+    if (!key || !isSafeBrandLogoUrl(url)) {
       setMessage("Enter a brand and a valid https URL or site-relative path.");
       setStatus("error");
       return;
@@ -696,7 +804,7 @@ export default function SiteEditorPage() {
           </details>
         </>
       )}
-      {changedKeys.length ? <div className="cms-recent-edit"><span>Draft activity</span><strong>{changedKeys.length} unpublished {changedKeys.length === 1 ? "field" : "fields"}</strong><small>{selected.page} is open</small></div> : null}
+      {changeCount ? <div className="cms-recent-edit"><span>Draft activity</span><strong>{changeCount} unpublished {changeCount === 1 ? "change" : "changes"}</strong><small>{selected.page} is open</small></div> : null}
     </nav>
   );
 
@@ -963,24 +1071,24 @@ export default function SiteEditorPage() {
       <main className={previewOpen ? "cms-page is-preview-open" : "cms-page"}>
         <header className="cms-commandbar">
           <div>
-            <button type="button" className="cms-mobile-tree" onClick={() => setSidebarOpen(true)} aria-label="Open content tree" aria-expanded={sidebarOpen}><Menu size={18} /></button>
+            <button ref={sidebarTriggerRef} type="button" className="cms-mobile-tree" onClick={() => setSidebarOpen(true)} aria-label="Open content tree" aria-expanded={sidebarOpen} aria-controls="cms-content-tree"><Menu size={18} /></button>
             <div><span>Content Studio</span><strong>{selected.page}</strong></div>
           </div>
           <div className={`cms-save-state is-${status}`} aria-live="polite">
             {status === "saving" ? <RefreshCw size={14} className="spin" /> : status === "saved" ? <Check size={14} /> : status === "error" ? <X size={14} /> : <Cloud size={14} />}
-            <span>{status === "dirty" ? `${changedKeys.length || 1} unpublished ${changedKeys.length === 1 ? "change" : "changes"}` : status === "saving" ? "Saving draft…" : message}</span>
+            <span>{status === "dirty" ? `${changeCount || 1} unpublished ${changeCount === 1 ? "change" : "changes"}` : status === "saving" ? "Saving draft…" : message}</span>
             {editorIssue ? <div role="alert"><button type="button" onClick={exportLocalChanges}>Export local changes</button>{editorIssue === "uncertain" ? <button type="button" disabled={writeBusy} onClick={() => void executeEditor("", {}, true, true)}>Retry the same save</button> : null}{editorIssue === "error" && !mutationsRef.current?.storageProblem ? <button type="button" disabled={writeBusy} onClick={() => { setEditorIssue(""); setStatus("dirty"); }}>Resume saving</button> : null}<button type="button" disabled={writeBusy} onClick={() => { exportLocalChanges(); window.location.reload(); }}>Export and reload latest</button></div> : null}
           </div>
           <div className="cms-command-actions">
             <button type="button" className="button secondary" onClick={() => setConfirmAction({ kind: "discard" })} disabled={!draftMeta && !hasChanges}>Discard draft</button>
-            <button type="button" className="button secondary" onClick={() => setPreviewOpen((value) => !value)} aria-expanded={previewOpen}><Eye size={16} /> {previewOpen ? "Hide preview" : "Preview"}</button>
+            <button ref={previewTriggerRef} type="button" className="button secondary" onClick={() => previewOpen ? closePreview() : setPreviewOpen(true)} aria-expanded={previewOpen} aria-controls="cms-site-preview"><Eye size={16} /> {previewOpen ? "Hide preview" : "Preview"}</button>
             <button type="button" className="button" onClick={() => setConfirmAction({ kind: "publish" })} disabled={status === "saving" || !hasChanges}><Send size={16} /> Publish</button>
           </div>
         </header>
 
         <div className={previewOpen ? "cms-workspace" : "cms-workspace is-preview-collapsed"}>
-          <aside className={sidebarOpen ? "cms-sidebar is-open" : "cms-sidebar"}>
-            <div className="cms-sidebar-head"><div><span>QRguitar</span><strong>Site content</strong></div><button type="button" onClick={() => setSidebarOpen(false)} aria-label="Close content tree"><PanelLeftClose size={18} /></button></div>
+          <aside ref={sidebarRef} id="cms-content-tree" className={sidebarOpen ? "cms-sidebar is-open" : "cms-sidebar"} role={sidebarOpen ? "dialog" : undefined} aria-modal={sidebarOpen ? true : undefined} aria-label="Site content navigation" tabIndex={sidebarOpen ? -1 : undefined}>
+            <div className="cms-sidebar-head"><div><span>QRguitar</span><strong>Site content</strong></div><button ref={sidebarCloseRef} type="button" onClick={() => setSidebarOpen(false)} aria-label="Close content tree"><PanelLeftClose size={18} /></button></div>
             {tree}
           </aside>
           {sidebarOpen ? <button type="button" className="cms-sidebar-backdrop" onClick={() => setSidebarOpen(false)} aria-label="Close content tree" /> : null}
@@ -998,18 +1106,19 @@ export default function SiteEditorPage() {
                   <span>Published <strong>{formatTime(publishedAt)}</strong></span>
                 </div>
               </div>
-              <button type="button" className="button secondary cms-review-changes" onClick={() => setShowCompare((value) => !value)} disabled={!changedKeys.length}><Clock3 size={16} /> {changedKeys.length ? `Review ${changedKeys.length} ${changedKeys.length === 1 ? "change" : "changes"}` : "No changes"}</button>
+              <button type="button" className="button secondary cms-review-changes" onClick={() => setShowCompare((value) => !value)} disabled={!changeCount} aria-expanded={showCompare} aria-controls="cms-change-review"><Clock3 size={16} /> {changeCount ? `Review ${changeCount} ${changeCount === 1 ? "change" : "changes"}` : "No changes"}</button>
             </div>
             {showCompare ? (
-              <section className="cms-compare">
+              <section className="cms-compare" id="cms-change-review" aria-label="Draft changes compared with published settings">
                 <header><strong>Draft compared with published</strong><button type="button" onClick={() => setShowCompare(false)} aria-label="Close comparison"><X size={16} /></button></header>
-                {changedKeys.length ? changedKeys.slice(0, 50).map((key) => <div key={key}><code>{key}</code><span>{published.content[key] || "(empty)"}</span><strong>→</strong><span>{settings.content[key] || "(empty)"}</span></div>) : <p>No content fields differ from the published version.</p>}
+                {changeCount ? changeReview.slice(0, 100).map((change) => <div key={change.key}><code><small>{change.category}</small>{change.key}</code><span>{change.before}</span><strong>→</strong><span>{change.after}</span></div>) : <p>No settings differ from the published version.</p>}
+                {changeCount > 100 ? <p>Showing the first 100 of {changeCount} changes. Download a backup to review the complete settings document.</p> : null}
               </section>
             ) : null}
             {selected.area === "Design" && selected.page === "Theme" ? themeEditor : selected.area === "Design" ? brandEditor : selected.page === "Revision history" ? historyEditor : selected.page === "Copy coverage" ? coverageEditor : selected.page === "Advanced JSON" ? advancedEditor : selected.area === "Emails" ? emailEditor : selected.area === "SEO" ? seoEditor : standardEditor}
           </section>
 
-          {previewOpen ? <aside className="cms-preview-panel">
+          {previewOpen ? <aside ref={previewPanelRef} id="cms-site-preview" className="cms-preview-panel" role="region" aria-label={`${previewSource === "draft" ? "Draft" : "Published"} site preview`} tabIndex={-1}>
             <div className="cms-preview-toolbar">
               <div className="cms-segmented" role="group" aria-label="Preview source">
                 <button type="button" className={previewSource === "draft" ? "active" : ""} onClick={() => setPreviewSource("draft")}>Draft</button>
@@ -1022,7 +1131,7 @@ export default function SiteEditorPage() {
               </div>
               <button type="button" onClick={() => setPreviewVersion((value) => value + 1)} aria-label="Refresh preview"><RefreshCw size={16} /></button>
               <a href={previewUrl || previewPath} target="_blank" rel="noreferrer" aria-label="Open full preview"><Eye size={16} /></a>
-              <button type="button" className="cms-preview-close" onClick={() => setPreviewOpen(false)} aria-label="Close preview"><PanelRightClose size={16} /><span>Close</span></button>
+              <button type="button" className="cms-preview-close" onClick={closePreview} aria-label="Close preview"><PanelRightClose size={16} /><span>Close</span></button>
             </div>
             <div className={`cms-preview-frame is-${device}`}>
               {previewError ? <div className="cms-preview-error"><strong>Preview unavailable</strong><p>{previewError}</p><button type="button" onClick={() => setPreviewVersion((value) => value + 1)}>Try again</button></div> : null}
@@ -1037,17 +1146,17 @@ export default function SiteEditorPage() {
         </div>
         {confirmAction ? (
           <div className="cms-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmAction(null); }}>
-            <section className="cms-modal" role="dialog" aria-modal="true" aria-labelledby="cms-confirm-title">
-              <header><div><span>Publishing safety</span><h2 id="cms-confirm-title">{confirmAction.kind === "discard" ? "Discard shared draft?" : confirmAction.kind === "publish" ? `Publish ${selected.page}?` : "Restore this revision?"}</h2></div><button type="button" onClick={() => setConfirmAction(null)} aria-label="Close confirmation"><X size={18} /></button></header>
-              <p>{confirmAction.kind === "discard"
+            <section ref={confirmDialogRef} className="cms-modal" role="dialog" aria-modal="true" aria-labelledby="cms-confirm-title" aria-describedby="cms-confirm-description" tabIndex={-1}>
+              <header><div><span>Publishing safety</span><h2 id="cms-confirm-title">{confirmAction.kind === "discard" ? "Discard shared draft?" : confirmAction.kind === "publish" ? `Publish ${selected.page}?` : "Restore this revision?"}</h2></div><button ref={confirmCloseRef} type="button" onClick={() => setConfirmAction(null)} aria-label="Close confirmation"><X size={18} /></button></header>
+              <p id="cms-confirm-description">{confirmAction.kind === "discard"
                 ? "This removes the current shared draft and returns the editor to the published version. Published pages will not change."
                 : confirmAction.kind === "publish"
-                  ? `${changedKeys.length || 1} unpublished ${changedKeys.length === 1 ? "change" : "changes"} will be published globally. The prior live version stays available in revision history.`
+                  ? `${changeCount || 1} unpublished ${changeCount === 1 ? "change" : "changes"} will be published globally. The prior live version stays available in revision history.`
                   : `This copies the version published ${formatTime(confirmAction.revision.publishedAt)} into the shared draft. It will not go live until you publish it.`}</p>
               {confirmAction.kind === "publish" ? <label className="cms-release-note">Release note (optional)<input value={note} onChange={(event) => setNote(event.target.value)} placeholder={`What changed on ${selected.page}?`} maxLength={180} /></label> : null}
               <div className="cms-modal-actions">
                 <button type="button" className="button secondary" onClick={() => setConfirmAction(null)}>Cancel</button>
-                <button type="button" className="button" onClick={() => {
+                <button type="button" className="button" disabled={writeBusy} onClick={() => {
                   const action = confirmAction;
                   setConfirmAction(null);
                   if (action.kind === "discard") void discardDraft();

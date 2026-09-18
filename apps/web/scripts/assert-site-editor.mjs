@@ -17,6 +17,7 @@ const howItWorksClient = read("app/how-it-works/HowItWorksClient.tsx");
 const layout = read("app/layout.tsx");
 const metadata = read("lib/site-metadata.ts");
 const themeRuntime = read("components/ThemeRuntime.tsx");
+const review = read("lib/site-editor-review.ts");
 
 for (const marker of ["site-editor:draft", "site-editor:revision:", "save_draft", "restore_revision", "validateContentValues", "mutate_site_editor", "read_site_editor_state"]) {
   if (!route.includes(marker)) throw new Error(`Site Editor API is missing ${marker}.`);
@@ -36,18 +37,27 @@ for (const marker of ["validateEditorialComposition", "Block IDs must be unique"
 for (const marker of ["issueDraftPreview", "<iframe", "Desktop preview", "Tablet preview", "Mobile preview", "Open full preview", "Draft", "Published"]) {
   if (!page.includes(marker)) throw new Error(`Content Studio actual-page preview is missing ${marker}.`);
 }
+for (const marker of ["if (!authorized || !previewOpen) return", "closePreview", "pagehide", "confirmDialogRef", "sidebarCloseRef", "Autosave will store it as the shared draft."]) {
+  if (!page.includes(marker)) throw new Error(`Content Studio preview/accessibility lifecycle is missing ${marker}.`);
+}
+for (const marker of ["Theme", "Brand assets", "Composition", "SEO", "settingsChangeReview"]) {
+  if (!review.includes(marker)) throw new Error(`Content Studio change review is missing ${marker}.`);
+}
 for (const marker of ["getAdminContext", "createSitePreviewToken", "isSitePreviewAuthorized", "safePreviewPath", "httpOnly", "X-Robots-Tag", "noindex, nofollow"]) {
   if (!previewRoute.includes(marker)) throw new Error(`Site Editor preview route is missing ${marker}.`);
 }
 for (const marker of ["createHmac", "timingSafeEqual", "PREVIEW_TTL_SECONDS", "verifySitePreviewToken"]) {
   if (!preview.includes(marker)) throw new Error(`Site Editor preview authorization is missing ${marker}.`);
 }
-for (const marker of ["sitePreviewCookie", "sitePreviewDraftKey", "isSitePreviewAuthorized"]) {
+for (const marker of ["sitePreviewCookie", "sitePreviewDraftKey", "isSitePreviewAuthorized", "x-qrguitar-site-preview", "loadSiteSettingsRequest"]) {
   if (!settingsServer.includes(marker)) throw new Error(`Draft preview content source is missing ${marker}.`);
 }
-for (const marker of ["qrguitar_site_preview", "X-Robots-Tag", "noindex, nofollow", "no-store"]) {
+for (const marker of ["cmsPreview", "x-qrguitar-site-preview", "X-Robots-Tag", "noindex, nofollow", "no-store"]) {
   if (!middleware.includes(marker)) throw new Error(`Preview middleware is missing ${marker}.`);
 }
+if (!settingsServer.includes('source: "published"') || !settingsServer.includes("publishedSiteSettingsKey")) throw new Error("Missing draft previews do not fall back to published settings.");
+if (!layout.includes("site-draft-preview-banner") || !layout.includes("You are viewing unpublished Site Editor changes.")) throw new Error("Draft preview pages lack a persistent unpublished-content indicator.");
+if (!route.includes("validateBrandLogoEntries") || !settings.includes('parsed.protocol === "https:"')) throw new Error("Brand logo URLs are not validated as HTTPS or site-relative on the server.");
 if (/mock\s+(draft\s+)?preview/i.test(page)) throw new Error("Content Studio still contains a mock-only preview.");
 for (const marker of ["resolveVisibleEditorialSections", "loadPublishedSiteSettings", "revalidatePublishedSettings", 'revalidatePath("/", "layout")']) {
   if (![settings, howItWorksPage, howItWorksClient, route].some((source) => source.includes(marker))) {

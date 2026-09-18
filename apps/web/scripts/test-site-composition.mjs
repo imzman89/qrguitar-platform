@@ -27,6 +27,38 @@ function loader() {
 }
 const load = loader();
 const settings = load("apps/web/lib/site-settings.ts");
+const review = load("apps/web/lib/site-editor-review.ts");
+test("change review includes content, theme, logos, composition and SEO without mirrored duplicates", () => {
+  const live = structuredClone(settings.defaultSiteSettings);
+  const draft = structuredClone(live);
+  draft.content["home.hero.headline"] = "A reviewed headline";
+  draft.hero.headline = "A reviewed headline";
+  draft.colors.gold = "#abcdef";
+  draft.brandLogos.fender = "/brands/fender.svg";
+  draft.composition.home.sections[1].visible = !draft.composition.home.sections[1].visible;
+  draft.seo.twitterHandle = "@qrguitarpreview";
+  const changes = review.settingsChangeReview(draft, live);
+  const keys = changes.map(change => change.key);
+  assert.ok(keys.includes("content.home.hero.headline"));
+  assert.ok(keys.includes("colors.gold"));
+  assert.ok(keys.includes("brandLogos.fender"));
+  assert.ok(keys.includes("composition.home"));
+  assert.ok(keys.includes("seo.twitterHandle"));
+  assert.equal(keys.includes("hero.headline"), false);
+  assert.deepEqual(new Set(changes.map(change => change.category)), new Set(["Content", "Theme", "Brand assets", "Composition", "SEO"]));
+});
+test("brand logo URLs permit only HTTPS or one-slash site-relative paths", () => {
+  for (const value of ["https://assets.example.test/logo.svg", "/brands/logo.svg", "/brands/logo.svg?v=2"]) {
+    assert.equal(settings.isSafeBrandLogoUrl(value), true, value);
+  }
+  for (const value of ["http://assets.example.test/logo.svg", "//assets.example.test/logo.svg", "javascript:alert(1)", "data:image/svg+xml,bad", "/brands\\logo.svg", "https://user:secret@example.test/logo.svg"]) {
+    assert.equal(settings.isSafeBrandLogoUrl(value), false, value);
+  }
+  assert.deepEqual(settings.normalizeBrandLogos({ safe: "/brands/logo.svg", remote: "https://assets.example.test/logo.svg", insecure: "http://assets.example.test/logo.svg", protocolRelative: "//assets.example.test/logo.svg" }), {
+    safe: "/brands/logo.svg",
+    remote: "https://assets.example.test/logo.svg"
+  });
+});
 test("saved beta allowance copy upgrades to five without changing the 25-credit pack", () => {
   const saved = settings.mergeSiteSettings({
     composition: { home: { sections: [{
