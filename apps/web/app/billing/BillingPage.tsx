@@ -51,7 +51,8 @@ function BillingContent({ mode }: { mode: Mode }) {
       </section>}
       <section className={styles.balance} aria-labelledby="balance-title">
         <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>Your account</p><h2 id="balance-title">Profile balance</h2></div><button type="button" className={styles.secondary} disabled={state.busy || state.refreshing} onClick={() => void controller.current?.reload()}><RefreshCw size={15} aria-hidden="true" />{state.refreshing ? "Refreshing…" : "Refresh status"}</button></div>
-        <dl className={styles.stats}><div><dt>Free Profiles remaining</dt><dd>{snapshot.freeRemaining}<span> / {snapshot.freeLimit}</span></dd></div><div><dt>Paid credits available</dt><dd>{snapshot.paidAvailable}</dd></div><div><dt>Profiles you own</dt><dd>{snapshot.ownedProfiles}</dd></div></dl>
+        <dl className={styles.stats}><div><dt>Free Profiles remaining</dt><dd>{snapshot.freeRemaining}<span> / {snapshot.freeLimit}</span></dd></div><div><dt>Paid credits available</dt><dd>{snapshot.paidAvailable}</dd></div><div><dt>Profiles on your account</dt><dd>{snapshot.ownedProfiles}</dd></div></dl>
+        <p className={styles.muted}>Includes Profiles removed from your active collection. Your dashboard shows active Profiles.</p>
         <div className={styles.balanceFoot}><span>{snapshot.paidGranted} paid credits received · {snapshot.paidConsumed} used{snapshot.hold ? ` · ${snapshot.paidRemaining} held` : ""}</span><Link href="/create">Create a Profile <ArrowRight size={15} aria-hidden="true" /></Link></div>
       </section>
       {snapshot.commercialExempt && <section className={styles.notice}><h2>Your account already has expanded Profile access.</h2><p>You do not need to purchase credits under your current approved plan.</p></section>}
