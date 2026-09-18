@@ -33,6 +33,7 @@ function ServiceWorkEditor({ qrCode, requestedId }: { qrCode: string; requestedI
   const [state, setState] = useState(initialWorkbenchState);
   const [evidenceType, setEvidenceType] = useState("work_order");
   const [removalId, setRemovalId] = useState("");
+  const [discardUploadId, setDiscardUploadId] = useState("");
   const { provider, form, submission, busy, message } = state;
 
   useEffect(() => {
@@ -44,7 +45,8 @@ function ServiceWorkEditor({ qrCode, requestedId }: { qrCode: string; requestedI
     return () => { unsubscribe(); current.dispose(); if (controller.current === current) controller.current = null; };
   }, [qrCode, requestedId]);
 
-  useEffect(() => { setRemovalId(""); }, [state.actorId, submission?.id]);
+  useEffect(() => { setRemovalId(""); setDiscardUploadId(""); if (evidenceInput.current) evidenceInput.current.value = ""; }, [state.actorId, submission?.id]);
+  useEffect(() => { setDiscardUploadId(""); }, [state.evidenceRecovery.attempt?.uploadId, state.evidenceRecovery.revision]);
 
   useEffect(() => {
     if (!requestedId && submission?.id && !busy && !state.uncertain && state.phase === "ready") {
@@ -57,7 +59,9 @@ function ServiceWorkEditor({ qrCode, requestedId }: { qrCode: string; requestedI
   const saveSubmission = (action: "save_draft" | "submit" | "revise") => controller.current?.save(action);
   const uploadEvidence = (file: File | null) => controller.current?.upload(file, evidenceType);
   const closed = Boolean(submission && !["draft", "changes_requested"].includes(submission.status));
-  const disabled = Boolean(busy) || closed || Boolean(state.uncertain);
+  const recovery = state.evidenceRecovery;
+  const recoveryBlocked = Boolean(submission && (recovery.phase !== "confirmed" || recovery.attempt || recovery.pendingCount > 0));
+  const disabled = Boolean(busy) || closed || Boolean(state.uncertain) || recoveryBlocked;
 
   return <><Nav /><main className="service-work-page"><section className="section"><div className="shell service-work-shell">
     <Link className="text-link service-back" href={`/i/${encodeURIComponent(qrCode)}`}><ArrowLeft size={16} /> Back to Profile</Link>
@@ -96,7 +100,23 @@ function ServiceWorkEditor({ qrCode, requestedId }: { qrCode: string; requestedI
       </div></section>
       </fieldset>
       <section className="service-form-section"><div className="service-form-title"><span>4</span><div><h2>{getContentValue(content, "serviceProviders.evidence.label")}</h2><p>{getContentValue(content, "serviceProviders.evidence.help")}</p></div></div>
-        <fieldset disabled={disabled} className={styles.uploadFieldset}><div className="service-evidence-upload"><select aria-label="Evidence type" value={evidenceType} onChange={(e) => setEvidenceType(e.target.value)}><option value="work_order">Work order</option><option value="invoice">Invoice</option><option value="service_slip">Service slip</option><option value="before_photo">Before photo</option><option value="after_photo">After photo</option><option value="measurement_sheet">Measurement sheet</option><option value="receipt">Receipt</option><option value="other">Other evidence</option></select><button className="button secondary" type="button" disabled={!submission || disabled} onClick={() => evidenceInput.current?.click()}><Upload size={16} aria-hidden="true" /> {busy === "evidence" ? "Uploading..." : "Upload evidence"}</button><input ref={evidenceInput} type="file" aria-label="Private evidence file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(e) => { const file = e.target.files?.[0] || null; e.target.value = ""; void uploadEvidence(file); }} hidden disabled={!submission || disabled} /><span>{submission?.evidenceCount || 0} file(s)</span></div></fieldset>
+        {submission && <div className={styles.recovery}>
+          <div className={styles.evidenceHeading}><h3>Upload recovery</h3><button className="button secondary" type="button" disabled={Boolean(busy) || recovery.phase === "checking"} onClick={() => { setDiscardUploadId(""); void controller.current?.checkEvidenceRecovery(); }}>{recovery.phase === "checking" ? "Checking upload status…" : "Check upload status"}</button></div>
+          <p className={styles.help}>Checking and reloading only read saved information. They never upload or attach a file.</p>
+          {recovery.phase === "checking" && <p role="status">Checking for an unfinished upload…</p>}
+          {recovery.error && <p role="alert" className={styles.error}>{recovery.error}</p>}
+          {recovery.phase === "confirmed" && !recovery.attempt && <p className={styles.help}>No unfinished upload was found.</p>}
+          {recovery.attempt && <div className={styles.pendingUpload}>
+            <strong>{recovery.attempt.fileName}</strong>{recovery.attempt.size > 0 && <span>{recovery.attempt.evidenceType.replace(/_/g, " ")} · {Math.max(1, Math.round(recovery.attempt.size / 1024))} KB</span>}
+            {recovery.pendingCount > 1 && <p>{recovery.pendingCount} unfinished uploads need review. Resolve this attempt to see the next one.</p>}
+            <p>{!recovery.attempt.canDiscard ? "This account cannot change this unfinished upload right now. Check upload status after account access is restored." : recovery.attempt.bytes === "uploaded" ? closed ? "The file arrived, but this request is closed. You can discard the unfinished upload; it has not been attached." : "The file arrived and is waiting to be attached. Finish this upload or discard it before choosing another file." : recovery.attempt.bytes === "missing" ? "The file has not arrived. Check again if an upload may still be running, or discard this attempt before choosing a file again." : recovery.attempt.bytes === "mismatch" ? "The saved file does not match this upload. Discard this unfinished attempt before choosing another file." : "The result of this upload is not yet confirmed. Check its saved status before continuing."}</p>
+            <div className={styles.recoveryActions}>
+              {!closed && recovery.attempt.canFinish && recovery.attempt.bytes === "uploaded" && <button className="button" type="button" disabled={Boolean(busy) || recovery.phase !== "confirmed"} onClick={() => void controller.current?.finishEvidence()}>{busy === "finish-evidence" ? "Finishing…" : "Finish existing upload"}</button>}
+              {recovery.attempt.canDiscard && (discardUploadId === recovery.attempt.uploadId ? <div className={styles.confirmation}><span>Discard this unfinished attempt? It will not attach a file. Already attached evidence is kept.</span><button className="button secondary" type="button" disabled={Boolean(busy) || recovery.phase !== "confirmed"} onClick={() => { setDiscardUploadId(""); void controller.current?.discardEvidence(); }}>Confirm discard</button><button className="button secondary" type="button" disabled={Boolean(busy)} onClick={() => setDiscardUploadId("")}>Keep attempt</button></div> : <button className="button secondary" type="button" disabled={Boolean(busy) || recovery.phase !== "confirmed"} onClick={() => setDiscardUploadId(recovery.attempt!.uploadId)}>Discard unfinished attempt</button>)}
+            </div>
+          </div>}
+        </div>}
+        <fieldset disabled={disabled || !recovery.canPrepare} className={styles.uploadFieldset}><div className="service-evidence-upload"><select aria-label="Evidence type" value={evidenceType} onChange={(e) => setEvidenceType(e.target.value)}><option value="work_order">Work order</option><option value="invoice">Invoice</option><option value="service_slip">Service slip</option><option value="before_photo">Before photo</option><option value="after_photo">After photo</option><option value="measurement_sheet">Measurement sheet</option><option value="receipt">Receipt</option><option value="other">Other evidence</option></select><button className="button secondary" type="button" disabled={!submission || disabled || !recovery.canPrepare} onClick={() => evidenceInput.current?.click()}><Upload size={16} aria-hidden="true" /> {busy === "evidence" ? "Uploading..." : "Upload evidence"}</button><input ref={evidenceInput} type="file" aria-label="Private evidence file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(e) => { const file = e.target.files?.[0] || null; e.target.value = ""; void uploadEvidence(file); }} hidden disabled={!submission || disabled || !recovery.canPrepare} /><span>{submission?.evidenceCount || 0} file(s)</span></div></fieldset>
         <p className={styles.help}>JPG, PNG, WebP, or PDF, up to 15 MB per file. Save a draft before attaching files.</p>
         {submission && <div className={styles.evidence}>
           <div className={styles.evidenceHeading}><h3>Attached evidence</h3><button className="button secondary" type="button" disabled={Boolean(busy) || state.evidenceLoading} onClick={() => { setRemovalId(""); void controller.current?.loadEvidence(); }}>{state.evidenceLoading ? "Loading files…" : state.evidence ? "Refresh file links" : "Load attached files"}</button></div>

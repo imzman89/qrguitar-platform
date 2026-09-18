@@ -12,6 +12,9 @@ const sourceRoot = process.env.QRGUITAR_LOCK_OBSERVER_SOURCE_ROOT
 const coherent = { blockers: [101], wait_event_type: 'Lock', wait_event: 'transactionid' };
 const transition = { blockers: [101], wait_event_type: null, wait_event: null };
 const idle = { blockers: [], wait_event_type: null, wait_event: null };
+const basicQuery = 'select pg_blocking_pids(pid) blockers, wait_event_type, wait_event from pg_stat_activity where pid=$1';
+const evidenceQuery = "select pg_blocking_pids(pid) blockers, wait_event_type, wait_event, exists(select 1 from pg_locks blocked join pg_locks held on held.locktype='advisory' and blocked.locktype=held.locktype and blocked.database is not distinct from held.database and blocked.classid=held.classid and blocked.objid=held.objid and blocked.objsubid=held.objsubid where blocked.pid=$1 and not blocked.granted and held.pid=$2 and held.granted) advisory_pair from pg_stat_activity where pid=$1";
+const advisory = { blockers: [101], wait_event_type: 'Lock', wait_event: 'advisory', advisory_pair: true };
 
 function harness(script, samples, options = {}) {
   const source = fs.readFileSync(path.join(sourceRoot, script), 'utf8');
@@ -25,8 +28,9 @@ function harness(script, samples, options = {}) {
     else resolveB({ evidenceId: 'synthetic-existing-row' });
   }
   const observer = { async query(sql, args) {
-    assert.equal(sql, 'select pg_blocking_pids(pid) blockers, wait_event_type, wait_event from pg_stat_activity where pid=$1');
-    assert.deepEqual(Array.from(args), [202]);
+    const evidence = script === 'test-evidence-postgres-concurrency.mjs';
+    assert.equal(sql, evidence ? evidenceQuery : basicQuery);
+    assert.deepEqual(Array.from(args), evidence ? [202, 101] : [202]);
     const index = pollCount++;
     events.push('observe:' + index);
     if (options.queryFailure) throw Error('Synthetic observer failure');
@@ -53,10 +57,66 @@ function harness(script, samples, options = {}) {
   }, { filename: script });
   async function run(commit = true) {
     return race('synthetic-lock-observation', async () => { events.push('A:work'); return { first: true }; },
-      async () => { events.push('B:work'); if (options.earlySettled) releaseB(); return pendingB; }, commit);
+      async () => { events.push('B:work'); if (options.earlySettled) releaseB(); return pendingB; }, commit, options.expectedLock ?? null);
   }
   return { run, events, report, get polls() { return pollCount; } };
 }
+
+const evidenceRunner = 'test-evidence-postgres-concurrency.mjs';
+test('evidence advisory barrier waits for true matching pair with live coherent lock facts', async () => {
+  const h = harness(evidenceRunner, [coherent, { ...advisory, advisory_pair: false }, { ...advisory, advisory_pair: 'true' }, advisory], { expectedLock: 'advisory' });
+  const result = await h.run();
+  assert.equal(result.second.ok, true); assert.equal(h.polls, 4); assert.equal(h.report.barriers.length, 1);
+  assert.equal(h.report.barriers[0].advisory_pair, true); assert.equal(h.report.barriers[0].expectedLock, 'advisory');
+  assert(h.events.indexOf('A:commit') > h.events.indexOf('observe:3'));
+  assert.equal(h.events.slice(0, h.events.indexOf('observe:3')).some(e => e === 'A:commit' || e === 'A:rollback'), false);
+});
+test('evidence matching advisory pair cannot replace A blocker or current Lock wait', async () => {
+  for (const row of [
+    { ...advisory, blockers: [] }, { ...advisory, blockers: [999] },
+    { ...advisory, wait_event_type: null, wait_event: null },
+    { ...advisory, wait_event_type: 'Client', wait_event: 'ClientRead' }
+  ]) {
+    const h = harness(evidenceRunner, [row], { expectedLock: 'advisory', clockStep: 6000 });
+    await assert.rejects(h.run(), /Missing actual PostgreSQL lock barrier/);
+    assert.equal(h.report.barriers.length, 0); assert.equal(h.events.includes('A:commit'), false);
+    assert(h.events.includes('A:rollback')); assert(h.events.includes('A:close')); assert(h.events.includes('B:close'));
+  }
+});
+test('evidence advisory pair and blocker facts from separate samples cannot be combined', async () => {
+  const h = harness(evidenceRunner, [{ ...advisory, blockers: [] }, { ...coherent, advisory_pair: false }], { expectedLock: 'advisory', clockStep: 2000 });
+  await assert.rejects(h.run(), /Missing actual PostgreSQL lock barrier/);
+  assert.equal(h.polls, 3); assert.equal(h.report.barriers.length, 0); assert.equal(h.events.includes('A:commit'), false);
+});
+test('evidence missing advisory match exhausts deadline despite ordinary coherent blocker', async () => {
+  const h = harness(evidenceRunner, [{ ...coherent, advisory_pair: false }], { expectedLock: 'advisory', clockStep: 2000 });
+  await assert.rejects(h.run(), /Missing actual PostgreSQL lock barrier/);
+  assert.equal(h.polls, 3); assert.equal(h.report.barriers.length, 0); assert.equal(h.events.includes('A:commit'), false);
+  assert(h.events.includes('A:rollback')); assert(h.events.includes('A:close')); assert(h.events.includes('B:close'));
+});
+test('evidence stale advisory pair cannot accept B which settled during observation', async () => {
+  const h = harness(evidenceRunner, [advisory], { expectedLock: 'advisory', settleDuringRead: true });
+  await assert.rejects(h.run(), /did not wait/);
+  assert.equal(h.report.barriers.length, 0); assert.equal(h.events.includes('A:commit'), false);
+});
+test('evidence valid advisory barrier preserves intentional A rollback and waiting B result', async () => {
+  const h = harness(evidenceRunner, [advisory], { expectedLock: 'advisory' });
+  const result = await h.run(false);
+  assert.equal(result.second.ok, true); assert.equal(h.report.barriers.length, 1); assert.equal(h.polls, 1);
+  assert.equal(h.events.includes('A:commit'), false); assert(h.events.indexOf('A:rollback') > h.events.indexOf('observe:0'));
+});
+test('evidence valid advisory barrier preserves SQL rejection and connection cleanup', async () => {
+  const h = harness(evidenceRunner, [advisory], { expectedLock: 'advisory', bReject: true });
+  const result = await h.run();
+  assert.equal(result.second.ok, false); assert.equal(result.second.code, 'PT409'); assert.equal(h.report.barriers.length, 1);
+  assert(h.events.includes('B:rollback')); assert(h.events.includes('A:close')); assert(h.events.includes('B:close'));
+});
+test('evidence advisory observer failure never releases A as a successful barrier', async () => {
+  const h = harness(evidenceRunner, [advisory], { expectedLock: 'advisory', queryFailure: true });
+  await assert.rejects(h.run(), /Synthetic observer failure/);
+  assert.equal(h.report.barriers.length, 0); assert.equal(h.events.includes('A:commit'), false);
+  assert(h.events.includes('A:rollback')); assert(h.events.includes('A:close')); assert(h.events.includes('B:close'));
+});
 
 for (const script of ['test-intake-postgres-concurrency.mjs', 'test-billing-concurrency.mjs', 'test-evidence-postgres-concurrency.mjs']) {
   test(script + ': transitional blocker/null wait sample does not release A before coherent proof', async () => {

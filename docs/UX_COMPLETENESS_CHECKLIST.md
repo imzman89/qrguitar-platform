@@ -1,5 +1,7 @@
 # QRguitar UX Completeness Checklist
 
+These are acceptance requirements, not checked-off results. Product rules reflect the September 17, 2026 approved credit packs and free transfers. Each release must record its actual browser, device and provider evidence; automated coverage alone does not prove every platform works.
+
 ## Editable Content
 
 - Homepage copy must be editable from one content source.
@@ -21,11 +23,12 @@
 
 ## Brand / Builder / Shop Flow
 
-- Brand, builder, shop, or customer can buy the $99 25-code pack or higher.
-- $99 25-code purchase enables one included/free first-owner transfer per code.
+- Every workspace has the approved 25 free owned-Profile allowance unless a protected entitlement explicitly applies.
+- After payment activation, customers can buy permanent Profile credits: US$12/1, US$50/10 or US$99/25.
+- Workspace selection never grants paid, verified-provider or administrator permissions.
 - Brand can pre-register each guitar.
 - Brand can attach specs, photos, docs, provenance, and builder verification.
-- Brand can transfer ownership to purchaser for free when using an included first-owner transfer.
+- Brand can transfer ownership to the purchaser for free; subsequent transfers are also free.
 - Purchaser receives claim link.
 - Purchaser verifies email before ownership changes.
 - Purchaser accepts ownership without paying transfer fee.
@@ -48,7 +51,7 @@
 - Mobile web scan profile.
 - Mobile web create/edit flow.
 - PWA install support before native apps.
-- Native iOS/Android apps are not version 1.
+- Native preparation must be distinguished from signed, installed iOS/Android acceptance and store distribution.
 - QR scan profile should feel app-native on mobile.
 
 ## Public Profile Modes
@@ -71,7 +74,14 @@
 - Save guitars to Supabase.
 - Save photos/documents to Supabase Storage.
 - Generate permanent QR URLs from database IDs.
-- Add Stripe checkout for single, packs, bulk, business, and enterprise.
+- Activate only the approved Stripe credit packs after real hosted test checkout, webhook, refund and entitlement acceptance. Future commercial subscriptions require a separate product decision.
 - Add transfer claim emails.
 - Add admin tools for site copy, pricing copy, verification, and support.
 - Add analytics for scans and funnel tracking.
+
+## Recovery and privacy
+
+- Interrupted uploads must preserve a discoverable attempt across reloads and account changes without duplicate attachment or cross-account exposure.
+- Status checks must be read-only; finishing or discarding an unresolved upload must be an explicit action.
+- Account deletion must preserve permanent instrument history while removing personal information. Request intake must not be presented as completed erasure.
+- Restore the database and file archive in an isolated environment before claiming complete recovery readiness.

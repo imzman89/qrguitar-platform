@@ -1,5 +1,7 @@
 # QRguitar Product Plan
 
+Product rules updated September 17, 2026. The approved launch offer is permanent Profile credits above 25 free owned Profiles, with free ownership transfers. Pricing experiments below the current contract must not be treated as active products. This plan is a requirements document, not evidence that all launch gates are complete.
+
 ## MVP
 
 The MVP proves the core loop:
@@ -47,37 +49,32 @@ Each guitar profile should support:
 - Shop
 - Admin
 
-## Paid Features
+## Approved Profile credits
 
-- Single instrument lifetime QR: $12
-- 10-code pack: $50
-- 25-code pack: $99
-- Included first ownership handoff for each code in $99+ purchases
-- Commercial starter plan from $199/year
-- Higher business tiers later for shops, builders, inventory tools, branding, and support
+- 25 free owned Profiles per owner, with protected existing entitlement exceptions documented in `BILLING_OPERATIONS.md`.
+- One-time permanent credits: US$12 for 1, US$50 for 10, US$99 for 25.
+- Unused purchased credits do not expire. One is consumed for a successful new Profile when the free allowance is full. Failure and exact retry cannot charge twice.
+- Ownership transfers are free. A transfer does not restore a consumed credit.
+- Checkout remains disabled until merchant provisioning and hosted test acceptance pass.
 
-## Suggested Commercial Pricing Ladder
+## Future commercial proposals
 
-- Commercial Starter: $199/year for small builders, repair shops, and retailers that need business branding and basic inventory/profile tools.
-- Commercial Plus: future $399-$599/year tier for larger shops that need batch tools, staff accounts, advanced media/documents, analytics, and priority support.
-- Enterprise: custom pricing for high-volume brands, distributors, integrations, data migration, and white-glove onboarding.
+Business subscriptions, team seats and enterprise packages need a separate approved scope and price. Earlier annual pricing suggestions are not active offers. Choosing a shop, builder or service-provider workspace tailors tools and navigation, not paid entitlement or verification.
 
-Keep the first business plan accessible, but do not bundle every high-touch support feature into the $199/year plan.
+## Free Ownership Handoff Rule
 
-## Included Ownership Handoff Rule
-
-When an actual brand, builder, shop, retailer, or customer buys the $99 25-code pack or any higher plan:
+For brands, builders, shops, retailers and individual owners, regardless of a credit purchase:
 
 1. Each instrument receives a permanent QRguitar ID before sale.
 2. The brand can pre-fill the guitar profile with build specs, photos, documents, and provenance.
-3. At purchase handoff, the brand enters the guitar purchaser's email or phone.
+3. At purchase handoff, the owner enters the purchaser's email for the implemented claim-link workflow.
 4. QRguitar sends the purchaser a claim link.
 5. The purchaser creates/logs into an account and accepts ownership.
-6. The first ownership transfer for each purchased code is included/free for that purchaser.
+6. The ownership transfer is free, including subsequent transfers.
 7. The permanent QR link does not change.
 8. Builder provenance remains attached after ownership transfers.
 
-Example: a 25-code pack includes 25 first-owner transfers. A 50-code purchase includes 50 first-owner transfers. This handoff must work cleanly on desktop, tablet, iOS, and Android. The purchaser should never have to understand admin tools, pay a transfer fee for the included first handoff, or create duplicate guitar records.
+This handoff must work cleanly on desktop, tablet, iOS and Android. The purchaser should not need admin tools, a transfer payment or a duplicate Profile. Device and email-delivery acceptance must be recorded separately from code tests.
 
 ## Editable Website Copy
 

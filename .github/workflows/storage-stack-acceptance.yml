@@ -1,0 +1,64 @@
+name: Isolated Auth and Storage byte acceptance
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'supabase/**'
+      - 'apps/web/app/api/service-evidence/**'
+      - 'apps/web/lib/service-evidence-upload.ts'
+      - 'apps/web/lib/supabase-server.ts'
+      - 'apps/web/lib/admin-auth.ts'
+      - 'apps/web/lib/service-workflow.ts'
+      - 'apps/web/scripts/storage-stack/**'
+      - 'package-lock.json'
+      - '.github/workflows/storage-stack-acceptance.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'supabase/**'
+      - 'apps/web/app/api/service-evidence/**'
+      - 'apps/web/lib/service-evidence-upload.ts'
+      - 'apps/web/lib/supabase-server.ts'
+      - 'apps/web/lib/admin-auth.ts'
+      - 'apps/web/lib/service-workflow.ts'
+      - 'apps/web/scripts/storage-stack/**'
+      - 'package-lock.json'
+      - '.github/workflows/storage-stack-acceptance.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  local-supabase:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      QRGUITAR_STORAGE_STACK_FIXTURE: qrguitar-disposable-storage-stack-v1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install lockfile dependencies
+        run: npm ci
+      - name: Exercise fixture guards without network or Docker
+        run: node --test apps/web/scripts/storage-stack/test-guards.mjs
+      - name: Run real local Auth Storage PostgREST and PostgreSQL acceptance
+        timeout-minutes: 20
+        run: node apps/web/scripts/storage-stack/stack.mjs run
+      - name: Remove only this job's disposable stack
+        if: always()
+        timeout-minutes: 3
+        run: node apps/web/scripts/storage-stack/stack.mjs cleanup
+      - name: Retain credential-free acceptance evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: storage-stack-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/storage-stack/*.json
+          if-no-files-found: warn
+          retention-days: 7

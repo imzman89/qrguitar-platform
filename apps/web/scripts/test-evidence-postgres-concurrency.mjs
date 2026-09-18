@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 
 export const FIXTURE_MARKER = 'isolated-evidence-postgresql-17';
-const DATABASE = 'qrguitar_evidence_qa', USER = 'qrguitar_evidence_fixture', EXPECTED_CASES = 8;
+const DATABASE = 'qrguitar_evidence_qa', USER = 'qrguitar_evidence_fixture', EXPECTED_CASES = 16;
 export function validateFixtureConnection(environment) {
   assert.equal(environment.QRGUITAR_EVIDENCE_FIXTURE, FIXTURE_MARKER, 'Explicit isolated evidence fixture marker is required');
   const raw = environment.QRGUITAR_EVIDENCE_DATABASE_URL;
@@ -36,6 +36,7 @@ export async function main(args = process.argv.slice(2), environment = process.e
   }
   assert.ok(options.has('--repo') && options.has('--evidence-sql'), '--repo and --evidence-sql must explicitly select the reviewed sources');
   const repo = fs.realpathSync(options.get('--repo')), evidencePath = fs.realpathSync(options.get('--evidence-sql'));
+  assert.equal(evidencePath,fs.realpathSync(path.join(repo,'supabase/migrations/20260917220000_service_evidence_recovery.sql')),'Select the exact integrated durable-recovery migration');
   const here = path.dirname(fileURLToPath(import.meta.url));
   const { Client } = createRequire(path.join(repo, 'apps/web/package.json'))('pg');
   const runId = 'evidence-' + new Date().toISOString().replace(/[:.]/g, '-') + '-' + randomBytes(4).toString('hex');
@@ -68,32 +69,50 @@ export async function main(args = process.argv.slice(2), environment = process.e
   const begin = client => client.query("begin; set local role service_role; set local request.jwt.claim.role='service_role'");
   async function service(work) { await begin(observer); try { const value = await work(observer); await observer.query('commit'); return value; } catch (error) { await observer.query('rollback'); throw error; } }
   const metadata = { evidence_type: 'receipt', file_name: 'Synthetic.pdf', mime_type: 'application/pdf', file_size_bytes: 42 };
-  const prepare = (client, f) => result(client, 'select public.prepare_service_evidence_upload($1,$2,false,$3,$4::jsonb) result', [f.submission, f.actor, f.upload, JSON.stringify(metadata)]);
-  const complete = (client, f) => result(client, 'select public.commit_service_evidence_upload($1,$2,false,$3) result', [f.submission, f.actor, f.upload]);
+  async function mutation(client,sql,args,f) {
+    const value=await result(client,sql,args);
+    assert.equal(value.ok,true);assert.match(value.revision,/^(0|[1-9][0-9]*)$/);
+    assert.equal(value.receipt.uploadId,f.upload);assert.equal(value.receipt.submissionId,f.submission);assert.equal(value.receipt.actorId,f.actor);
+    assert.equal(value.receipt.expectedRevision,f.expectedRevision);
+    return value.receipt;
+  }
+  const prepare = (client, f) => mutation(client, 'select public.prepare_service_evidence_upload($1,$2,false,$3,$4::jsonb,$5::bigint) result', [f.submission, f.actor, f.upload, JSON.stringify(metadata),f.expectedRevision],f);
+  const complete = (client, f) => mutation(client, 'select public.commit_service_evidence_upload($1,$2,false,$3,$4::bigint) result', [f.submission, f.actor, f.upload,f.expectedRevision],f);
+  const discard = (client, f) => mutation(client, 'select public.discard_service_evidence_upload($1,$2,false,$3,$4::bigint) result', [f.submission, f.actor, f.upload,f.expectedRevision],f);
+  const read = (client,f) => result(client,'select public.read_service_evidence_uploads($1,$2,false,$3) result',[f.submission,f.actor,f.upload]);
+  async function readOnly(f) {
+    await observer.query("begin read only;set local role service_role;set local request.jwt.claim.role='service_role'");
+    try { const state=await read(observer,f);assert.equal(state.protocolVersion,2);assert.equal(state.actorId,f.actor);assert.equal(state.submissionId,f.submission);await observer.query('commit');return state; }
+    catch(error){await observer.query('rollback');throw error;}
+  }
   const remove = (client, f, evidenceId) => result(client, "select public.commit_service_evidence($1,$2,false,'delete',$3::jsonb) result", [f.submission, f.actor, JSON.stringify({ id: evidenceId })]);
   const submit = async (client, f) => (await client.query("update public.service_submissions set status='submitted' where id=$1 and status='draft' returning status", [f.submission])).rows[0];
   const lockAccount = async (client, f) => (await client.query("update public.profiles set account_status='locked' where id=$1 returning account_status", [f.actor])).rows[0];
-  async function fixture() {
-    const f = { actor: randomUUID(), owner: randomUUID(), guitar: randomUUID(), submission: randomUUID(), upload: randomUUID() };
+  async function fixture(reserve=true) {
+    const f = { actor: randomUUID(), owner: randomUUID(), guitar: randomUUID(), submission: randomUUID(), upload: randomUUID(),expectedRevision:'0' };
     await observer.query('insert into auth.users(id,email) values($1,$2),($3,$4)', [f.actor, 'synthetic-' + f.actor + '@example.invalid', f.owner, 'synthetic-' + f.owner + '@example.invalid']);
     await observer.query("insert into public.profiles(id,display_name) values($1,'Synthetic provider'),($2,'Synthetic owner')", [f.actor, f.owner]);
     const code = 'QRG-' + randomBytes(8).toString('hex').toUpperCase();
     await observer.query("insert into public.guitars(id,owner_id,qr_code,permanent_path,name,brand) values($1,$2,$3,$4,'Synthetic','Synthetic')", [f.guitar, f.owner, code, '/i/' + code]);
     await observer.query('insert into public.service_submissions(id,guitar_id,provider_user_id,owner_user_id) values($1,$2,$3,$4)', [f.submission, f.guitar, f.actor, f.owner]);
-    const receipt = await service(c => prepare(c, f));
-    await observer.query("insert into storage.objects(id,bucket_id,name,metadata) values($1,'service-evidence',$2,$3::jsonb)", [randomUUID(), receipt.storagePath, JSON.stringify({ size: 42, mimetype: 'application/pdf' })]);
+    if(reserve) { const receipt = await service(c => prepare(c, f));await arrived(receipt); }
     return f;
   }
+  const arrived = receipt => observer.query("insert into storage.objects(id,bucket_id,name,metadata) values($1,'service-evidence',$2,$3::jsonb)", [randomUUID(), receipt.storagePath, JSON.stringify({ size: 42, mimetype: 'application/pdf' })]);
   async function assertCounts(f, state, evidence, uploaded, removed = 0) {
     const actual = (await observer.query("select (select count(*)::integer from public.service_evidence_uploads where upload_id=$1) receipts, (select state from public.service_evidence_uploads where upload_id=$1) state, (select count(*)::integer from public.service_submission_evidence where submission_id=$2) evidence, (select count(*)::integer from public.service_submission_activity where submission_id=$2 and action='evidence_uploaded') uploaded, (select count(*)::integer from public.service_submission_activity where submission_id=$2 and action='evidence_removed') removed", [f.upload, f.submission])).rows[0];
     assert.deepEqual(actual, { receipts: 1, state, evidence, uploaded, removed });
+  }
+  async function assertScope(f,{revision,receipts,discards,evidence,activity}) {
+    const actual=(await observer.query("select coalesce((select revision::text from service_evidence_upload_scopes where submission_id=$1 and actor_id=$2),'0') revision,(select count(*)::int from service_evidence_uploads where submission_id=$1 and actor_id=$2) receipts,(select count(*)::int from service_evidence_upload_discard_receipts where submission_id=$1 and actor_id=$2) discards,(select count(*)::int from service_submission_evidence where submission_id=$1) evidence,(select count(*)::int from service_submission_activity where submission_id=$1) activity",[f.submission,f.actor])).rows[0];
+    assert.deepEqual(actual,{revision,receipts,discards,evidence,activity});
   }
   function rejected(value, code) { assert.equal(value.ok, false); assert.equal(value.code, code); }
   const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 
   // A retains its transaction locks after its RPC; B runs on another backend.
   // A third backend proves B is blocked by A before A is released. No timing-only acceptance.
-  async function race(name, aWork, bWork, commit = true) {
+  async function race(name, aWork, bWork, commit = true, expectedLock = null) {
     let a, b, pending, settled = false;
     try {
       a = await connect(name + ':A'); b = await connect(name + ':B');
@@ -103,14 +122,15 @@ export async function main(args = process.argv.slice(2), environment = process.e
       pending = bWork(b, first).then(value => ({ ok: true, value }), error => ({ ok: false, code: error.code, message: message(error) })).then(value => { settled = true; return value; });
       let barrier; const deadline = Date.now() + 6000;
       while (Date.now() < deadline) {
-        const row = (await observer.query('select pg_blocking_pids(pid) blockers, wait_event_type, wait_event from pg_stat_activity where pid=$1', [bPid])).rows[0];
+        const row = (await observer.query("select pg_blocking_pids(pid) blockers, wait_event_type, wait_event, exists(select 1 from pg_locks blocked join pg_locks held on held.locktype='advisory' and blocked.locktype=held.locktype and blocked.database is not distinct from held.database and blocked.classid=held.classid and blocked.objid=held.objid and blocked.objsubid=held.objsubid where blocked.pid=$1 and not blocked.granted and held.pid=$2 and held.granted) advisory_pair from pg_stat_activity where pid=$1", [bPid,aPid])).rows[0];
         // Activity wait fields and lock-manager blockers can reflect different instants.
         // Retain A's transaction until one sample proves both, with B still pending.
-        if (!settled && row?.blockers?.includes(aPid) && row.wait_event_type === 'Lock') { barrier = { name, aPid, bPid, observerPid: report.observerPid, ...row }; break; }
+        if (!settled && row?.blockers?.includes(aPid) && row.wait_event_type === 'Lock' && (expectedLock!=='advisory'||row.advisory_pair===true)) { barrier = { name, aPid, bPid, observerPid: report.observerPid,expectedLock, ...row }; break; }
         if (settled) throw new Error('B did not wait on A: ' + JSON.stringify(await pending));
         await pause(10);
       }
       assert.ok(barrier, 'Missing actual PostgreSQL lock barrier'); assert.equal(barrier.wait_event_type, 'Lock');
+      if(expectedLock==='advisory')assert.equal(barrier.advisory_pair,true,'Cross-submission schedule must prove the global UUID advisory lock');
       report.barriers.push(barrier); log('BARRIER ' + JSON.stringify(barrier));
       await a.query(commit ? 'commit' : 'rollback'); const second = await pending;
       await b.query(second.ok ? 'commit' : 'rollback'); return { first, second };
@@ -156,19 +176,66 @@ export async function main(args = process.argv.slice(2), environment = process.e
     await test('account lock precedes completion: current restriction denies mutation', async () => {
       const f = await fixture();
       const got = await race('lock-before-complete', c => lockAccount(c,f), c => complete(c,f));
-      assert.equal(got.first.account_status,'locked'); rejected(got.second,'42501'); await assertCounts(f,'prepared',0,0);
+      assert.equal(got.first.account_status,'locked'); rejected(got.second,'SE403'); await assertCounts(f,'prepared',0,0);
     });
     await test('completion holds account share lock until commit then account can lock', async () => {
       const f = await fixture();
       const got = await race('complete-before-lock', c => complete(c,f), c => lockAccount(c,f));
       assert.equal(got.first.state,'committed'); assert.equal(got.second.ok,true); assert.equal(got.second.value.account_status,'locked');
-      await assertCounts(f,'committed',1,1); await assert.rejects(service(c=>complete(c,f)),error=>error.code==='42501');
+      await assertCounts(f,'committed',1,1); await assert.rejects(service(c=>complete(c,f)),error=>error.code==='SE403');
     });
     await test('rolled-back first completion leaves waiting retry to commit exactly once', async () => {
       const f = await fixture();
       const got = await race('complete-rollback', c => complete(c,f), c => complete(c,f),false);
       assert.equal(got.second.ok,true); assert.equal(got.second.value.state,'committed'); assert.notEqual(got.second.value.evidence.id,got.first.evidence.id);
       await assertCounts(f,'committed',1,1);
+    });
+    await test('stale revision-zero prepare loses after winner completes before releasing its lock',async()=>{
+      const winner=await fixture(false),delayed={...winner,upload:randomUUID()};
+      const initial=await readOnly(delayed);assert.equal(initial.revision,'0');assert.equal(initial.pendingCount,0);
+      const got=await race('prepare-complete-before-stale-prepare',async c=>{
+        const receipt=await prepare(c,winner);await arrived(receipt);
+        const completed=await complete(c,winner);
+        const concurrent=await readOnly(delayed);assert.equal(concurrent.revision,'0');assert.equal(concurrent.pendingCount,0);assert.equal(concurrent.requested,null);
+        return completed;
+      },c=>prepare(c,delayed));
+      assert.equal(got.first.state,'committed');rejected(got.second,'SE412');
+      await assertScope(winner,{revision:'1',receipts:1,discards:0,evidence:1,activity:1});
+      const state=await readOnly(delayed);assert.equal(state.latest.uploadId,winner.upload);assert.equal(state.requested,null);assert.equal(state.revision,'1');
+    });
+    await test('absent discard fences an already dispatched delayed prepare',async()=>{
+      const f=await fixture(false);const got=await race('absent-discard-before-prepare',c=>discard(c,f),c=>prepare(c,f));
+      assert.equal(got.first.state,'discarded');assert.equal(got.first.metadata,null);rejected(got.second,'SE410');
+      await assertScope(f,{revision:'1',receipts:0,discards:1,evidence:0,activity:0});assert.deepEqual((await readOnly(f)).requested,got.first);
+    });
+    await test('prepare wins before absent-discard request: same receipt is terminally discarded',async()=>{
+      const f=await fixture(false);const got=await race('prepare-before-discard',c=>prepare(c,f),c=>discard(c,f));
+      assert.equal(got.first.state,'prepared');assert.equal(got.second.ok,true);assert.equal(got.second.value.state,'discarded');assert.equal(got.second.value.storagePath,got.first.storagePath);
+      await assertScope(f,{revision:'2',receipts:1,discards:1,evidence:0,activity:0});await assert.rejects(service(c=>complete(c,f)),e=>e.code==='SE410');
+    });
+    await test('completion before discard returns committed receipt without deleting evidence',async()=>{
+      const f=await fixture();const got=await race('complete-before-discard',c=>complete(c,f),c=>discard(c,f));
+      assert.equal(got.second.ok,true);assert.deepEqual(got.second.value,got.first);await assertScope(f,{revision:'1',receipts:1,discards:0,evidence:1,activity:1});
+    });
+    await test('discard before completion prevents evidence resurrection and leaves bytes untouched',async()=>{
+      const f=await fixture();const got=await race('discard-before-complete',c=>discard(c,f),c=>complete(c,f));
+      assert.equal(got.first.state,'discarded');rejected(got.second,'SE410');await assertScope(f,{revision:'2',receipts:1,discards:1,evidence:0,activity:0});
+      assert.equal((await observer.query("select count(*)::int n from storage.objects where bucket_id='service-evidence' and name=$1",[got.first.storagePath])).rows[0].n,1);
+    });
+    await test('same UUID different submissions: prepare wins before foreign absent discard',async()=>{
+      const original=await fixture(false),foreign={...await fixture(false),upload:original.upload};assert.notEqual(original.submission,foreign.submission);assert.notEqual(original.actor,foreign.actor);
+      const got=await race('cross-submission-prepare-before-discard',c=>prepare(c,original),c=>discard(c,foreign),true,'advisory');
+      assert.equal(got.first.state,'prepared');rejected(got.second,'PT409');await assertScope(original,{revision:'1',receipts:1,discards:0,evidence:0,activity:0});await assertScope(foreign,{revision:'0',receipts:0,discards:0,evidence:0,activity:0});assert.equal((await readOnly(foreign)).requested,null);
+    });
+    await test('same UUID different submissions: absent discard wins before foreign prepare',async()=>{
+      const original=await fixture(false),foreign={...await fixture(false),upload:original.upload};assert.notEqual(original.submission,foreign.submission);assert.notEqual(original.actor,foreign.actor);
+      const got=await race('cross-submission-discard-before-prepare',c=>discard(c,original),c=>prepare(c,foreign),true,'advisory');
+      assert.equal(got.first.state,'discarded');rejected(got.second,'PT409');await assertScope(original,{revision:'1',receipts:0,discards:1,evidence:0,activity:0});await assertScope(foreign,{revision:'0',receipts:0,discards:0,evidence:0,activity:0});assert.equal((await readOnly(foreign)).requested,null);
+    });
+    await test('rolled-back absent discard leaves waiting original prepare accepted once',async()=>{
+      const f=await fixture(false);const got=await race('absent-discard-rollback',c=>discard(c,f),c=>prepare(c,f),false);
+      assert.equal(got.first.state,'discarded');assert.equal(got.second.ok,true);assert.equal(got.second.value.state,'prepared');await assertScope(f,{revision:'1',receipts:1,discards:0,evidence:0,activity:0});
+      const state=await readOnly(f);assert.equal(state.pendingCount,1);assert.equal(state.requested.state,'prepared');assert.equal(state.pending.storageState,'missing');
     });
     assert.equal(report.tests.length,EXPECTED_CASES); assert.equal(report.barriers.length,EXPECTED_CASES);
   }
@@ -188,12 +255,13 @@ export async function main(args = process.argv.slice(2), environment = process.e
     await observer.query("insert into storage.buckets(id,name,public) values('instrument-media','instrument-media',false),('instrument-documents','instrument-documents',false),('service-evidence','service-evidence',false) on conflict(id) do update set public=false");
     report.baselineReadiness = await result(observer,'select qrguitar_release_readiness() result');
     assert.equal(report.baselineReadiness.ready,true,'Canonical baseline readiness failed');
+    assert.equal(report.baselineReadiness.releaseVersion,'2026-09-17.6','Integrate the exact .6 schema and readiness before running this v2 acceptance job');
     // If --evidence-sql is already an installed canonical migration, do not replay it.
     const included = sourceFiles().some(file => fs.realpathSync(path.join(repo,file)) === evidencePath);
     report.evidenceInstalledByRepositoryFixture = included;
-    if (!included) await observer.query(fs.readFileSync(evidencePath,'utf8'));
+    assert.equal(included,true,'The selected recovery SQL must already be part of the canonical fixture, never an untracked post-readiness overlay');
     report.installedSignatures = (await observer.query("select p.oid::regprocedure::text signature, encode(sha256(convert_to(replace(p.prosrc,chr(13)||chr(10),chr(10)),'UTF8')),'hex') source_hash from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like '%service_evidence%' order by signature")).rows;
-    for (const signature of ['prepare_service_evidence_upload(uuid,uuid,boolean,uuid,jsonb)','commit_service_evidence_upload(uuid,uuid,boolean,uuid)','commit_service_evidence(uuid,uuid,boolean,text,jsonb)']) {
+    for (const signature of ['prepare_service_evidence_upload(uuid,uuid,boolean,uuid,jsonb,bigint)','commit_service_evidence_upload(uuid,uuid,boolean,uuid,bigint)','discard_service_evidence_upload(uuid,uuid,boolean,uuid,bigint)','read_service_evidence_uploads(uuid,uuid,boolean,uuid)','commit_service_evidence(uuid,uuid,boolean,text,jsonb)']) {
       assert.ok(report.installedSignatures.some(row => row.signature === signature),'Missing evidence RPC: '+signature);
     }
     await tests();

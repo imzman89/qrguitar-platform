@@ -55,12 +55,12 @@ jobs:
       - run: npm ci
       - name: Check fixture guards without connecting
         run: node --test apps/web/scripts/test-evidence-postgres-config.mjs
-      - name: Prove eight PostgreSQL scheduling barriers
+      - name: Prove sixteen PostgreSQL scheduling barriers
         timeout-minutes: 5
         run: >-
           node apps/web/scripts/test-evidence-postgres-concurrency.mjs
           --repo .
-          --evidence-sql supabase/migrations/20260917210000_service_evidence_uploads.sql
+          --evidence-sql supabase/migrations/20260917220000_service_evidence_recovery.sql
           --report-dir test-results/evidence-concurrency
         env:
           QRGUITAR_EVIDENCE_FIXTURE: isolated-evidence-postgresql-17

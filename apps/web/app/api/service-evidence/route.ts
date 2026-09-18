@@ -7,8 +7,9 @@ import {
 } from "../../../lib/service-workflow";
 import {
   SERVICE_EVIDENCE_UPLOAD_CONTROL_BYTES, SERVICE_EVIDENCE_UPLOAD_MAX_BYTES, SERVICE_EVIDENCE_UPLOAD_BUCKET,
-  cleanServiceEvidenceUploadId, normalizeServiceEvidenceUpload, serviceEvidenceStoragePath, validServiceEvidenceSignedUploadUrl,
-  type ServiceEvidenceUpload
+  cleanServiceEvidenceUploadId, cleanServiceEvidenceRevision, normalizeServiceEvidenceUpload, validServiceEvidenceSignedUploadUrl,
+  parseServiceEvidenceUploadReceipt, parseServiceEvidenceUploadDiscovery,
+  type ServiceEvidenceUpload, type ServiceEvidenceUploadReceipt
 } from "../../../lib/service-evidence-upload";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +44,8 @@ async function authorize(request: Request, submission: ServiceSubmissionRow, act
 }
 
 export async function GET(request: Request) {
+  const requestUrl = new URL(request.url);
+  if (requestUrl.searchParams.has("uploadState") || requestUrl.searchParams.has("uploadId")) return discoverUploads(request, requestUrl);
   const auth = await getAuthenticatedUser(request);
   if (!auth.user) return json({ ok: false, message: auth.error || "Sign in required." }, 401);
   const supabase = createServerSupabaseClient();
@@ -94,48 +97,66 @@ async function uploadBody(request: Request): Promise<{ body?: unknown; status?: 
   } catch { void reader.cancel().catch(() => undefined); return { status: 400 }; }
   finally { reader.releaseLock(); }
 }
-function uploadFailure(code: string, message: string, status: number, input?: ServiceEvidenceUpload, retryable = false, uncertain = false) {
-  return json({ ok: false, code, message, retryable, uncertain,
+type UploadBinding = { expectedActorId: string; submissionId: string; uploadId?: string; expectedRevision?: string | null; action?: string };
+function uploadFailure(code: string, message: string, status: number, input?: UploadBinding, retryable = false, uncertain = false) {
+  return json({ ok: false, protocolVersion: 2, code, message, retryable, uncertain,
     ...(uncertain && input?.action === "complete" ? { commitStatus: "unknown" } : {}),
-    ...(input ? { uploadId: input.uploadId, submissionId: input.submissionId, actorId: input.expectedActorId } : {}) }, status);
+    ...(input ? { uploadId: input.uploadId, submissionId: input.submissionId, actorId: input.expectedActorId,
+      ...(Object.hasOwn(input, "expectedRevision") ? { expectedRevision: input.expectedRevision } : {}) } : {}) }, status);
 }
-function uploadRpcFailure(error: { code?: string }, input: ServiceEvidenceUpload) {
+function uploadRpcFailure(error: { code?: string }, input?: UploadBinding) {
   const code = error.code;
+  if (code === "SE426") return uploadFailure("upload_upgrade_required", "Refresh the full page to continue with the updated upload recovery tools.", 426, input);
+  if (code === "SE403") return uploadFailure("evidence_write_forbidden", "You cannot access or change this private upload.", 403, input);
+  if (code === "SE412") return uploadFailure("upload_revision_changed", "Another upload changed this submission. Check upload status before continuing.", 412, input);
+  if (code === "SE428") return uploadFailure("upload_pending", "Resolve the unfinished upload before choosing another file.", 409, input);
   if (code === "SE409") return uploadFailure("upload_deleted", "This evidence upload was removed. Choose the file again to start a new upload.", 409, input);
+  if (code === "SE410") return uploadFailure("upload_discarded", "This unfinished upload was discarded. Choose the file again to start a new upload.", 409, input);
   if (code === "SE404") return uploadFailure("upload_not_ready", "The file has not arrived yet. Retry this same upload.", 409, input, true);
-  if (code === "SE422") return uploadFailure("upload_metadata_mismatch", "The stored file does not match this upload. Keep this attempt for review and select a new file.", 409, input);
-  if (code === "PT409" || code === "40001") return uploadFailure("upload_conflict", "The upload or submission changed. Reload before continuing.", 409, input);
-  if (code === "42501") return uploadFailure("evidence_write_forbidden", "You cannot change this private evidence.", 403, input);
+  if (code === "SE422") return uploadFailure("upload_metadata_mismatch", "The stored file does not match this upload. Check its status and discard the unfinished attempt before choosing another file.", 409, input);
+  if (code === "PT409") return uploadFailure("upload_conflict", "The upload identity or submission changed. Check upload status before continuing.", 409, input);
   if (code === "P0002") return uploadFailure("submission_not_found", "The service submission was not found.", 404, input);
   if (code === "22023") return uploadFailure("invalid_upload", "This evidence upload is invalid. Select the file again.", 400, input);
-  return uploadFailure("upload_unconfirmed", "This upload could not be confirmed. Reload the submission before retrying this same file.", 503, input, true, true);
+  return uploadFailure("upload_unconfirmed", "This upload could not be confirmed. Check upload status before continuing.", 503, input, true, true);
 }
-type UploadReceipt = {
-  ok: true; uploadId: string; submissionId: string; actorId: string; state: "prepared" | "committed";
-  bucket: string; storagePath: string; metadata: { evidence_type: string; file_name: string; mime_type: string; file_size_bytes: number };
-  evidence: (EvidenceRow & { submission_id: string; uploaded_by_user_id: string }) | null; deletedAt: null;
-};
-function uploadReceipt(value: unknown, input: ServiceEvidenceUpload): UploadReceipt | null {
-  if (!value || typeof value !== "object") return null;
-  const row = value as UploadReceipt, metadata = row.metadata;
-  if (row.ok !== true || row.uploadId !== input.uploadId || row.submissionId !== input.submissionId || row.actorId !== input.expectedActorId
-    || row.bucket !== SERVICE_EVIDENCE_UPLOAD_BUCKET || row.storagePath !== serviceEvidenceStoragePath(input.submissionId, input.expectedActorId, input.uploadId, input.mimeType)
-    || !metadata || metadata.evidence_type !== input.evidenceType || metadata.file_name !== input.fileName || metadata.mime_type !== input.mimeType || metadata.file_size_bytes !== input.size
-    || row.deletedAt !== null || (row.state !== "prepared" && row.state !== "committed")) return null;
-  if (row.state === "committed") {
-    const evidence = row.evidence;
-    if (!evidence || !cleanServiceEvidenceUploadId(evidence.id) || evidence.submission_id !== input.submissionId || evidence.uploaded_by_user_id !== input.expectedActorId
-      || evidence.evidence_type !== metadata.evidence_type || evidence.file_name !== metadata.file_name
-      || evidence.mime_type !== metadata.mime_type || evidence.file_size_bytes !== metadata.file_size_bytes || evidence.storage_path !== row.storagePath
-      || typeof evidence.created_at !== "string" || !Number.isFinite(Date.parse(evidence.created_at))) return null;
-  } else if (row.evidence !== null) return null;
-  return row;
+function uploadResult(value: unknown, input: ServiceEvidenceUpload): { revision: string; receipt: ServiceEvidenceUploadReceipt } | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const result = value as Record<string, unknown>, revision = cleanServiceEvidenceRevision(result.revision);
+  if (result.ok !== true || revision === null || Object.keys(result).length !== 3 || !Object.hasOwn(result, "receipt")
+    || (input.expectedRevision !== null && BigInt(revision) <= BigInt(input.expectedRevision))) return null;
+  const receipt = parseServiceEvidenceUploadReceipt(result.receipt, { actorId: input.expectedActorId, submissionId: input.submissionId, uploadId: input.uploadId, expectedRevision: input.expectedRevision });
+  if (!receipt || (input.action === "prepare" && (!receipt.metadata || receipt.metadata.evidence_type !== input.evidenceType
+    || receipt.metadata.file_name !== input.fileName || receipt.metadata.mime_type !== input.mimeType || receipt.metadata.file_size_bytes !== input.size))) return null;
+  return { revision, receipt };
 }
-function uploadBinding(receipt: UploadReceipt) {
-  return { uploadId: receipt.uploadId, submissionId: receipt.submissionId, actorId: receipt.actorId, bucket: receipt.bucket, storagePath: receipt.storagePath };
+function uploadBinding(receipt: ServiceEvidenceUploadReceipt, revision: string) {
+  return { protocolVersion: 2, uploadId: receipt.uploadId, submissionId: receipt.submissionId, actorId: receipt.actorId,
+    expectedRevision: receipt.expectedRevision, revision, bucket: receipt.bucket, storagePath: receipt.storagePath };
 }
-function uploadCommitted(receipt: UploadReceipt, replayed: boolean) {
-  return json({ ok: true, phase: "committed", committed: true, replayed, ...uploadBinding(receipt), evidence: evidenceResponse(receipt.evidence!), message: "Private evidence uploaded." });
+function uploadCommitted(receipt: ServiceEvidenceUploadReceipt, revision: string) {
+  return json({ ok: true, phase: "committed", committed: true, ...uploadBinding(receipt, revision), evidence: receipt.evidence, message: "Private evidence uploaded." });
+}
+async function discoverUploads(request: Request, url: URL) {
+  let binding: UploadBinding | undefined;
+  try {
+    const auth = await bounded(getAuthenticatedUser(request));
+    if (!auth.user) return uploadFailure("auth_required", "Sign in again to check your unfinished uploads.", 401);
+    const actorId = cleanServiceEvidenceUploadId(auth.user.id), submissionId = cleanServiceEvidenceUploadId(url.searchParams.get("submissionId"));
+    const uploadId = url.searchParams.has("uploadId") ? cleanServiceEvidenceUploadId(url.searchParams.get("uploadId")) : undefined;
+    const keys = [...url.searchParams.keys()];
+    if (!actorId || !submissionId || uploadId === "" || url.searchParams.get("uploadState") !== "1"
+      || new Set(keys).size !== keys.length || keys.some(key => !["submissionId", "uploadState", "uploadId"].includes(key))) return uploadFailure("invalid_upload", "Use a valid submission and upload identity to check upload status.", 400);
+    binding = { expectedActorId: actorId, submissionId, ...(uploadId ? { uploadId } : {}) };
+    const supabase = createServerSupabaseClient();
+    if (!supabase) return uploadFailure("evidence_unavailable", "Upload status is temporarily unavailable.", 503, binding, true);
+    const admin = await bounded(getAdminContext(request));
+    const read = await bounded(supabase.rpc("read_service_evidence_uploads", { p_submission_id: submissionId, p_actor_id: actorId,
+      p_is_admin: admin.ok && admin.user?.id === auth.user.id, p_upload_id: uploadId || null }));
+    if (read.error) return uploadRpcFailure(read.error, binding);
+    const discovery = parseServiceEvidenceUploadDiscovery(read.data, { actorId, submissionId, ...(uploadId ? { uploadId } : {}) });
+    if (!discovery) return uploadFailure("upload_unconfirmed", "Upload status could not be confirmed. Check again before continuing.", 503, binding, true, true);
+    return json(discovery);
+  } catch { return uploadFailure("upload_unconfirmed", "Upload status could not be confirmed. Check again before continuing.", 503, binding, true, true); }
 }
 export async function POST(request: Request) {
   let input: ServiceEvidenceUpload | undefined;
@@ -149,6 +170,8 @@ export async function POST(request: Request) {
     if (origin && origin !== new URL(request.url).origin) return uploadFailure("origin_forbidden", "This upload request came from another site.", 403);
     const parsed = await uploadBody(request);
     if (parsed.status) return uploadFailure(parsed.status === 413 ? "upload_control_too_large" : "invalid_upload", "Upload instructions must be valid JSON no larger than 16 KiB. File bytes must be uploaded directly.", parsed.status);
+    if (parsed.body && typeof parsed.body === "object" && !Array.isArray(parsed.body) && (parsed.body as Record<string, unknown>).protocolVersion !== 2)
+      return uploadFailure("upload_upgrade_required", "Refresh the full page to continue with the updated upload recovery tools.", 426);
     input = normalizeServiceEvidenceUpload(parsed.body) || undefined;
     if (!input) {
       const body = parsed.body as { size?: unknown; mimeType?: unknown } | null;
@@ -160,33 +183,38 @@ export async function POST(request: Request) {
     if (!access.ok) return uploadFailure("account_write_blocked", access.message, access.status, input);
     const admin = await bounded(getAdminContext(request));
     const isAdmin = admin.ok && admin.user?.id === auth.user.id;
-    const args = { p_submission_id: input.submissionId, p_actor_id: auth.user.id, p_is_admin: isAdmin, p_upload_id: input.uploadId };
-    // The locked RPC authorizes the provider/submission and immutable metadata. It can
-    // return a committed receipt after submission closes, without creating another row.
+    const args = { p_submission_id: input.submissionId, p_actor_id: auth.user.id, p_is_admin: isAdmin, p_upload_id: input.uploadId, p_expected_revision: input.expectedRevision };
+    if (input.action !== "prepare") {
+      // Finishing/discarding uses only the original durable identity. It never prepares,
+      // replaces file bytes, or signs a new upload as a side effect of recovery.
+      const result = await bounded(supabase.rpc(input.action === "complete" ? "commit_service_evidence_upload" : "discard_service_evidence_upload", args));
+      if (result.error) return uploadRpcFailure(result.error, input);
+      const final = uploadResult(result.data, input);
+      if (!final || (input.action === "complete" ? final.receipt.state !== "committed" : final.receipt.state === "prepared"))
+        return uploadFailure("upload_unconfirmed", "The upload change could not be confirmed. Check its status before continuing.", 503, input, true, true);
+      if (input.action === "complete") return uploadCommitted(final.receipt, final.revision);
+      return json({ ok: true, phase: final.receipt.state, ...uploadBinding(final.receipt, final.revision), receipt: final.receipt,
+        message: final.receipt.state === "discarded" ? "Unfinished upload discarded. You can choose a file again." : final.receipt.state === "committed" ? "This upload was already attached. Its evidence has been kept." : "This upload was already removed." });
+    }
     const prepared = await bounded(supabase.rpc("prepare_service_evidence_upload", { ...args,
       p_evidence: { evidence_type: input.evidenceType, file_name: input.fileName, mime_type: input.mimeType, file_size_bytes: input.size } }));
     if (prepared.error) return uploadRpcFailure(prepared.error, input);
-    const receipt = uploadReceipt(prepared.data, input);
-    if (!receipt) return uploadFailure("upload_unconfirmed", "The saved upload identity could not be confirmed. Retry this same upload.", 503, input, true, true);
-    if (receipt.state === "committed") return uploadCommitted(receipt, true);
+    const result = uploadResult(prepared.data, input), receipt = result?.receipt;
+    if (!result || !receipt || (receipt.state !== "prepared" && receipt.state !== "committed") || !receipt.storagePath || !receipt.metadata)
+      return uploadFailure("upload_unconfirmed", "The saved upload identity could not be confirmed. Check upload status before continuing.", 503, input, true, true);
+    if (receipt.state === "committed") return uploadCommitted(receipt, result.revision);
     const storage = supabase.storage.from(receipt.bucket), info = await bounded(storage.info(receipt.storagePath));
     if (!info.error && info.data) {
       const actual = info.data, expected = receipt.metadata;
-      if (actual.name !== receipt.storagePath || actual.bucketId !== receipt.bucket || actual.size !== expected.file_size_bytes || actual.contentType !== expected.mime_type || actual.isDeleteMarker) return uploadFailure("upload_metadata_mismatch", "The stored file does not match this upload. Keep this attempt for review and select a new file.", 409, input);
-      if (input.action === "prepare") return json({ ok: true, phase: "uploaded", ...uploadBinding(receipt) });
-      const committed = await bounded(supabase.rpc("commit_service_evidence_upload", args));
-      if (committed.error) return uploadRpcFailure(committed.error, input);
-      const final = uploadReceipt(committed.data, input);
-      if (!final || final.state !== "committed") return uploadFailure("upload_unconfirmed", "The evidence save could not be confirmed. Reload the submission before retrying this same file.", 503, input, true, true);
-      return uploadCommitted(final, false);
+      if (actual.name !== receipt.storagePath || actual.bucketId !== receipt.bucket || actual.size !== expected.file_size_bytes || actual.contentType !== expected.mime_type || actual.isDeleteMarker) return uploadFailure("upload_metadata_mismatch", "The stored file does not match this upload. Check its status and discard the unfinished attempt before choosing another file.", 409, input);
+      return json({ ok: true, phase: "uploaded", ...uploadBinding(receipt, result.revision) });
     }
     const error = info.error as { status?: number; statusCode?: string; code?: string } | null;
     const missing = error?.status === 404 || error?.statusCode === "404" || error?.code === "NoSuchKey" || error?.code === "not_found";
     if (!missing) return uploadFailure("upload_verification_unavailable", "The stored file could not be checked. Retry this same upload.", 503, input, true, true);
-    if (input.action === "complete") return uploadFailure("upload_not_ready", "The file has not arrived yet. Retry this same upload.", 409, input, true);
     const signed = await bounded(storage.createSignedUploadUrl(receipt.storagePath, { upsert: false }));
     if (signed.error || !signed.data || signed.data.path !== receipt.storagePath || !validServiceEvidenceSignedUploadUrl(signed.data.signedUrl, getSupabaseEnvStatus().supabaseUrl, receipt.storagePath)) return uploadFailure("signed_upload_unavailable", "A secure upload could not be prepared. Retry this same file.", 503, input, true, true);
-    return json({ ok: true, phase: "upload", ...uploadBinding(receipt), signedUrl: signed.data.signedUrl });
+    return json({ ok: true, phase: "upload", ...uploadBinding(receipt, result.revision), signedUrl: signed.data.signedUrl });
   } catch { return uploadFailure("upload_unconfirmed", "This upload could not be confirmed. Reload the submission before retrying this same file.", 503, input, true, Boolean(input)); }
 }
 

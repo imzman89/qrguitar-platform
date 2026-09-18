@@ -95,8 +95,7 @@ try{
   assert.equal(result.releaseVersion,'2026-09-17.5');assert.equal(result.ready,true,JSON.stringify(result));
   assert.deepEqual(result.checks.map(check=>check.name),historicalChecks);assert(result.checks.every(check=>check.ok));
   const outputs=new Map([
-    ['supabase/migrations/20260917211000_release_readiness.sql',sql],
-    ['apps/web/scripts/release-readiness-manifest.json',JSON.stringify(manifest,null,2)+'\n']
+    ['supabase/migrations/20260917211000_release_readiness.sql',sql]
   ]);
   for(const [relative,content] of outputs){const destination=path.join(output,relative);
     if(process.argv.includes('--write')){fs.mkdirSync(path.dirname(destination),{recursive:true});fs.writeFileSync(destination,content);}

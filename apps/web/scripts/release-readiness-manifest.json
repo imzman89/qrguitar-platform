@@ -1,5 +1,5 @@
 {
-  "releaseVersion": "2026-09-17.5",
+  "releaseVersion": "2026-09-17.6",
   "checks": [
     "catalog_readable",
     "required_functions",
@@ -52,7 +52,11 @@
     "public.read_account_deletion_requests(uuid,uuid)",
     "public.submit_account_deletion_request(uuid,uuid,bigint)",
     "public.commit_service_evidence_upload(uuid,uuid,boolean,uuid)",
-    "public.prepare_service_evidence_upload(uuid,uuid,boolean,uuid,jsonb)"
+    "public.commit_service_evidence_upload(uuid,uuid,boolean,uuid,bigint)",
+    "public.discard_service_evidence_upload(uuid,uuid,boolean,uuid,bigint)",
+    "public.prepare_service_evidence_upload(uuid,uuid,boolean,uuid,jsonb)",
+    "public.prepare_service_evidence_upload(uuid,uuid,boolean,uuid,jsonb,bigint)",
+    "public.read_service_evidence_uploads(uuid,uuid,boolean,uuid)"
   ],
   "blockedFunctions": [
     "public.create_instrument_profile_unregistered(uuid,text,text,jsonb,boolean,text)",
@@ -80,11 +84,15 @@
     "public._account_deletion_lock_actor(uuid)",
     "public._account_deletion_receipt_json(account_deletion_request_receipts)",
     "public._account_deletion_request_json(account_deletion_requests)",
+    "public._service_evidence_upload_advance(uuid,uuid)",
     "public._service_evidence_upload_authority(service_submissions,uuid,boolean)",
     "public._service_evidence_upload_bucket()",
     "public._service_evidence_upload_deleted()",
     "public._service_evidence_upload_guard()",
-    "public._service_evidence_upload_json(service_evidence_uploads)"
+    "public._service_evidence_upload_json(service_evidence_uploads)",
+    "public._service_evidence_upload_recovery_authority(service_submissions,uuid,boolean)",
+    "public._service_evidence_upload_recovery_guard()",
+    "public._service_evidence_upload_recovery_json(uuid,uuid,uuid,boolean,boolean)"
   ],
   "fingerprints": [
     {
@@ -799,6 +807,17 @@
       ]
     },
     {
+      "signature": "public._service_evidence_upload_advance(uuid,uuid)",
+      "source_hash": "62043d13e0a569936427aac1b39ec8094c675da45cf49af9053603c5e9be1f98",
+      "arguments": "p_submission_id uuid, p_actor_id uuid",
+      "result": "bigint",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
       "signature": "public._service_evidence_upload_authority(service_submissions,uuid,boolean)",
       "source_hash": "05feb9cff502672a2f8ab19b5160add8c9bf596f9c86916e9fc038b7680eda8d",
       "arguments": "p_submission service_submissions, p_actor_id uuid, p_is_admin boolean",
@@ -833,7 +852,7 @@
     },
     {
       "signature": "public._service_evidence_upload_guard()",
-      "source_hash": "dfb760ef2b7c34e9adf355fe4ed16f0ac05f953b3c9a1e6d58ed86fa955585aa",
+      "source_hash": "d390ead0a0d153c21abb647ddd4eb0e0f65c15cba001b263118b6ac3609112a7",
       "arguments": "",
       "result": "trigger",
       "definer": true,
@@ -854,8 +873,41 @@
       ]
     },
     {
+      "signature": "public._service_evidence_upload_recovery_authority(service_submissions,uuid,boolean)",
+      "source_hash": "21208affb9c058e2a7adf5ab562b9dc96b9eb3474f58557785933f4bbccb1be3",
+      "arguments": "p_submission service_submissions, p_actor_id uuid, p_is_admin boolean",
+      "result": "void",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._service_evidence_upload_recovery_guard()",
+      "source_hash": "21cba80be612f0baf9c2ed4413be1058f90fd427d95af2350221f779d4be52ac",
+      "arguments": "",
+      "result": "trigger",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._service_evidence_upload_recovery_json(uuid,uuid,uuid,boolean,boolean)",
+      "source_hash": "20f48aaa429f76430ca42a7fbd937e786b4bf0db95990e289fcf5a55d0b1204c",
+      "arguments": "p_submission_id uuid, p_actor_id uuid, p_upload_id uuid, p_active boolean, p_editable boolean",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
       "signature": "public.commit_service_evidence_upload(uuid,uuid,boolean,uuid)",
-      "source_hash": "cddf9aed8634e943119f93190de1443779206f8c78bf1fcd9d5948e842a37979",
+      "source_hash": "47344bf02e59665367f07ddc2128e3bc21554398800c61fb9732226ccb13b247",
       "arguments": "p_submission_id uuid, p_actor_id uuid, p_is_admin boolean, p_upload_id uuid",
       "result": "jsonb",
       "definer": true,
@@ -865,12 +917,56 @@
       ]
     },
     {
+      "signature": "public.commit_service_evidence_upload(uuid,uuid,boolean,uuid,bigint)",
+      "source_hash": "0cc4f13bb3607447be68cd91f10a19c4507c2c358affdbb50d6f02171463aadb",
+      "arguments": "p_submission_id uuid, p_actor_id uuid, p_is_admin boolean, p_upload_id uuid, p_expected_revision bigint",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.discard_service_evidence_upload(uuid,uuid,boolean,uuid,bigint)",
+      "source_hash": "adb9acbd4722f5192ae8bf0a85198d9f8e15c8a0fbaabc900bbff6fd26c7519c",
+      "arguments": "p_submission_id uuid, p_actor_id uuid, p_is_admin boolean, p_upload_id uuid, p_expected_revision bigint",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
       "signature": "public.prepare_service_evidence_upload(uuid,uuid,boolean,uuid,jsonb)",
-      "source_hash": "ac879ad5f5865c4a94d2f07ecbd3c58a3c0cb4563fe352c5c6ce856dce05a7af",
+      "source_hash": "47344bf02e59665367f07ddc2128e3bc21554398800c61fb9732226ccb13b247",
       "arguments": "p_submission_id uuid, p_actor_id uuid, p_is_admin boolean, p_upload_id uuid, p_evidence jsonb",
       "result": "jsonb",
       "definer": true,
       "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.prepare_service_evidence_upload(uuid,uuid,boolean,uuid,jsonb,bigint)",
+      "source_hash": "8475a9025bac32250c853fe2697368243453f0f61df89a85e77282ffa33b4384",
+      "arguments": "p_submission_id uuid, p_actor_id uuid, p_is_admin boolean, p_upload_id uuid, p_evidence jsonb, p_expected_revision bigint",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.read_service_evidence_uploads(uuid,uuid,boolean,uuid)",
+      "source_hash": "f9d0095ef43c575086d69998589d91ae6036f948ffd3a0789e8a2ec4b0d78294",
+      "arguments": "p_submission_id uuid, p_actor_id uuid, p_is_admin boolean, p_upload_id uuid DEFAULT NULL::uuid",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
       "settings": [
         "search_path=pg_catalog, public"
       ]
@@ -1698,6 +1794,54 @@
       "not_null": false
     },
     {
+      "table": "service_evidence_upload_discard_receipts",
+      "name": "upload_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "service_evidence_upload_discard_receipts",
+      "name": "submission_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "service_evidence_upload_discard_receipts",
+      "name": "actor_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "service_evidence_upload_discard_receipts",
+      "name": "expected_revision",
+      "type": "bigint",
+      "not_null": false
+    },
+    {
+      "table": "service_evidence_upload_discard_receipts",
+      "name": "discarded_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "service_evidence_upload_scopes",
+      "name": "submission_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "service_evidence_upload_scopes",
+      "name": "actor_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "service_evidence_upload_scopes",
+      "name": "revision",
+      "type": "bigint",
+      "not_null": true
+    },
+    {
       "table": "service_evidence_uploads",
       "name": "upload_id",
       "type": "uuid",
@@ -1778,6 +1922,18 @@
     {
       "table": "service_evidence_uploads",
       "name": "deleted_at",
+      "type": "timestamp with time zone",
+      "not_null": false
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "expected_revision",
+      "type": "bigint",
+      "not_null": false
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "discarded_at",
       "type": "timestamp with time zone",
       "not_null": false
     }
@@ -1862,6 +2018,16 @@
       "account_deletion_requests",
       "account_deletion_requests_intake_only",
       "CREATE TRIGGER account_deletion_requests_intake_only BEFORE DELETE OR UPDATE ON public.account_deletion_requests FOR EACH ROW EXECUTE FUNCTION _account_deletion_intake_guard()"
+    ],
+    [
+      "service_evidence_upload_discard_receipts",
+      "service_evidence_upload_discard_identity",
+      "CREATE TRIGGER service_evidence_upload_discard_identity BEFORE UPDATE ON public.service_evidence_upload_discard_receipts FOR EACH ROW EXECUTE FUNCTION _service_evidence_upload_recovery_guard()"
+    ],
+    [
+      "service_evidence_upload_scopes",
+      "service_evidence_upload_scope_revision",
+      "CREATE TRIGGER service_evidence_upload_scope_revision BEFORE UPDATE ON public.service_evidence_upload_scopes FOR EACH ROW EXECUTE FUNCTION _service_evidence_upload_recovery_guard()"
     ],
     [
       "service_evidence_uploads",
@@ -2637,16 +2803,26 @@
     }
   ],
   "serviceEvidenceTables": [
+    "service_evidence_upload_discard_receipts",
+    "service_evidence_upload_scopes",
     "service_evidence_uploads"
   ],
   "serviceEvidenceFunctionSignatures": [
+    "public._service_evidence_upload_advance(uuid,uuid)",
     "public._service_evidence_upload_authority(service_submissions,uuid,boolean)",
     "public._service_evidence_upload_bucket()",
     "public._service_evidence_upload_deleted()",
     "public._service_evidence_upload_guard()",
     "public._service_evidence_upload_json(service_evidence_uploads)",
+    "public._service_evidence_upload_recovery_authority(service_submissions,uuid,boolean)",
+    "public._service_evidence_upload_recovery_guard()",
+    "public._service_evidence_upload_recovery_json(uuid,uuid,uuid,boolean,boolean)",
     "public.commit_service_evidence_upload(uuid,uuid,boolean,uuid)",
-    "public.prepare_service_evidence_upload(uuid,uuid,boolean,uuid,jsonb)"
+    "public.commit_service_evidence_upload(uuid,uuid,boolean,uuid,bigint)",
+    "public.discard_service_evidence_upload(uuid,uuid,boolean,uuid,bigint)",
+    "public.prepare_service_evidence_upload(uuid,uuid,boolean,uuid,jsonb)",
+    "public.prepare_service_evidence_upload(uuid,uuid,boolean,uuid,jsonb,bigint)",
+    "public.read_service_evidence_uploads(uuid,uuid,boolean,uuid)"
   ],
   "serviceEvidenceSourceSha256": "a24e44c5d96f50caf678eb3f7ff16f6e45ef9b27ae4551e7db3c0351549fe943",
   "serviceEvidenceBucket": {
@@ -2661,6 +2837,46 @@
     ]
   },
   "serviceEvidenceDefaults": [
+    {
+      "table": "service_evidence_upload_discard_receipts",
+      "name": "upload_id",
+      "expression": null
+    },
+    {
+      "table": "service_evidence_upload_discard_receipts",
+      "name": "submission_id",
+      "expression": null
+    },
+    {
+      "table": "service_evidence_upload_discard_receipts",
+      "name": "actor_id",
+      "expression": null
+    },
+    {
+      "table": "service_evidence_upload_discard_receipts",
+      "name": "expected_revision",
+      "expression": null
+    },
+    {
+      "table": "service_evidence_upload_discard_receipts",
+      "name": "discarded_at",
+      "expression": "clock_timestamp()"
+    },
+    {
+      "table": "service_evidence_upload_scopes",
+      "name": "submission_id",
+      "expression": null
+    },
+    {
+      "table": "service_evidence_upload_scopes",
+      "name": "actor_id",
+      "expression": null
+    },
+    {
+      "table": "service_evidence_upload_scopes",
+      "name": "revision",
+      "expression": "0"
+    },
     {
       "table": "service_evidence_uploads",
       "name": "upload_id",
@@ -2730,9 +2946,67 @@
       "table": "service_evidence_uploads",
       "name": "deleted_at",
       "expression": null
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "expected_revision",
+      "expression": null
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "discarded_at",
+      "expression": null
     }
   ],
   "serviceEvidenceConstraints": [
+    {
+      "table": "service_evidence_upload_discard_receipts",
+      "name": "service_evidence_upload_discard_receipt_expected_revision_check",
+      "definition": "CHECK (((expected_revision IS NULL) OR (expected_revision >= 0)))",
+      "type": "c"
+    },
+    {
+      "table": "service_evidence_upload_discard_receipts",
+      "name": "service_evidence_upload_discard_receipts_actor_id_fkey",
+      "definition": "FOREIGN KEY (actor_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "type": "f"
+    },
+    {
+      "table": "service_evidence_upload_discard_receipts",
+      "name": "service_evidence_upload_discard_receipts_pkey",
+      "definition": "PRIMARY KEY (upload_id)",
+      "type": "p"
+    },
+    {
+      "table": "service_evidence_upload_discard_receipts",
+      "name": "service_evidence_upload_discard_receipts_submission_id_fkey",
+      "definition": "FOREIGN KEY (submission_id) REFERENCES service_submissions(id) ON DELETE CASCADE",
+      "type": "f"
+    },
+    {
+      "table": "service_evidence_upload_scopes",
+      "name": "service_evidence_upload_scopes_actor_id_fkey",
+      "definition": "FOREIGN KEY (actor_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "type": "f"
+    },
+    {
+      "table": "service_evidence_upload_scopes",
+      "name": "service_evidence_upload_scopes_pkey",
+      "definition": "PRIMARY KEY (submission_id, actor_id)",
+      "type": "p"
+    },
+    {
+      "table": "service_evidence_upload_scopes",
+      "name": "service_evidence_upload_scopes_revision_check",
+      "definition": "CHECK ((revision >= 0))",
+      "type": "c"
+    },
+    {
+      "table": "service_evidence_upload_scopes",
+      "name": "service_evidence_upload_scopes_submission_id_fkey",
+      "definition": "FOREIGN KEY (submission_id) REFERENCES service_submissions(id) ON DELETE CASCADE",
+      "type": "f"
+    },
     {
       "table": "service_evidence_uploads",
       "name": "service_evidence_uploads_actor_id_fkey",
@@ -2748,7 +3022,7 @@
     {
       "table": "service_evidence_uploads",
       "name": "service_evidence_uploads_check1",
-      "definition": "CHECK ((((state = 'prepared'::text) AND (evidence_id IS NULL) AND (evidence_result IS NULL) AND (committed_at IS NULL) AND (deleted_at IS NULL)) OR ((state = ANY (ARRAY['committed'::text, 'deleted'::text])) AND (evidence_id IS NOT NULL) AND (jsonb_typeof(evidence_result) = 'object'::text) AND ((evidence_result ->> 'id'::text) IS NOT NULL) AND ((evidence_result ->> 'id'::text) = (evidence_id)::text) AND (committed_at IS NOT NULL) AND (committed_at >= prepared_at) AND (((state = 'committed'::text) AND (deleted_at IS NULL)) OR ((state = 'deleted'::text) AND (deleted_at IS NOT NULL) AND (deleted_at >= committed_at))))))",
+      "definition": "CHECK ((((state = 'prepared'::text) AND (evidence_id IS NULL) AND (evidence_result IS NULL) AND (committed_at IS NULL) AND (deleted_at IS NULL) AND (discarded_at IS NULL)) OR ((state = 'discarded'::text) AND (evidence_id IS NULL) AND (evidence_result IS NULL) AND (committed_at IS NULL) AND (deleted_at IS NULL) AND (discarded_at IS NOT NULL) AND (discarded_at >= prepared_at)) OR ((state = ANY (ARRAY['committed'::text, 'deleted'::text])) AND (evidence_id IS NOT NULL) AND (jsonb_typeof(evidence_result) = 'object'::text) AND ((evidence_result ->> 'id'::text) IS NOT NULL) AND ((evidence_result ->> 'id'::text) = (evidence_id)::text) AND (committed_at IS NOT NULL) AND (committed_at >= prepared_at) AND (discarded_at IS NULL) AND (((state = 'committed'::text) AND (deleted_at IS NULL)) OR ((state = 'deleted'::text) AND (deleted_at IS NOT NULL) AND (deleted_at >= committed_at))))))",
       "type": "c"
     },
     {
@@ -2761,6 +3035,12 @@
       "table": "service_evidence_uploads",
       "name": "service_evidence_uploads_evidence_type_check",
       "definition": "CHECK ((evidence_type = ANY (ARRAY['invoice'::text, 'work_order'::text, 'service_slip'::text, 'before_photo'::text, 'after_photo'::text, 'measurement_sheet'::text, 'receipt'::text, 'other'::text])))",
+      "type": "c"
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "service_evidence_uploads_expected_revision_check",
+      "definition": "CHECK (((expected_revision IS NULL) OR (expected_revision >= 0)))",
       "type": "c"
     },
     {
@@ -2790,7 +3070,7 @@
     {
       "table": "service_evidence_uploads",
       "name": "service_evidence_uploads_state_check",
-      "definition": "CHECK ((state = ANY (ARRAY['prepared'::text, 'committed'::text, 'deleted'::text])))",
+      "definition": "CHECK ((state = ANY (ARRAY['prepared'::text, 'committed'::text, 'deleted'::text, 'discarded'::text])))",
       "type": "c"
     },
     {
@@ -2808,10 +3088,34 @@
   ],
   "serviceEvidenceIndexes": [
     {
+      "table": "service_evidence_upload_discard_receipts",
+      "name": "service_evidence_upload_discard_receipts_pkey",
+      "definition": "CREATE UNIQUE INDEX service_evidence_upload_discard_receipts_pkey ON public.service_evidence_upload_discard_receipts USING btree (upload_id)",
+      "unique": true
+    },
+    {
+      "table": "service_evidence_upload_discard_receipts",
+      "name": "service_evidence_upload_discards_actor",
+      "definition": "CREATE INDEX service_evidence_upload_discards_actor ON public.service_evidence_upload_discard_receipts USING btree (submission_id, actor_id, discarded_at, upload_id)",
+      "unique": false
+    },
+    {
+      "table": "service_evidence_upload_scopes",
+      "name": "service_evidence_upload_scopes_pkey",
+      "definition": "CREATE UNIQUE INDEX service_evidence_upload_scopes_pkey ON public.service_evidence_upload_scopes USING btree (submission_id, actor_id)",
+      "unique": true
+    },
+    {
       "table": "service_evidence_uploads",
       "name": "service_evidence_uploads_evidence_id_key",
       "definition": "CREATE UNIQUE INDEX service_evidence_uploads_evidence_id_key ON public.service_evidence_uploads USING btree (evidence_id)",
       "unique": true
+    },
+    {
+      "table": "service_evidence_uploads",
+      "name": "service_evidence_uploads_pending",
+      "definition": "CREATE INDEX service_evidence_uploads_pending ON public.service_evidence_uploads USING btree (submission_id, actor_id, prepared_at, upload_id) WHERE (state = 'prepared'::text)",
+      "unique": false
     },
     {
       "table": "service_evidence_uploads",
@@ -2834,8 +3138,17 @@
   ],
   "serviceEvidencePolicies": [
     {
+      "table": "service_evidence_upload_discard_receipts",
+      "name": "service_evidence_upload_discards_no_direct_access"
+    },
+    {
+      "table": "service_evidence_upload_scopes",
+      "name": "service_evidence_upload_scopes_no_direct_access"
+    },
+    {
       "table": "service_evidence_uploads",
       "name": "service_evidence_uploads_no_direct_access"
     }
-  ]
+  ],
+  "serviceEvidenceRecoverySourceSha256": "1c3a791f583fee5509a09b972568321e2796a1835d095ff6b61404beef660dae"
 }

@@ -10,9 +10,8 @@ const repo=path.resolve(option('--repo',path.resolve(here,'../../..')));
 const overlay=path.resolve(option('--migration-root',repo));
 const uploadPath=path.resolve(option('--upload-sql',path.join(overlay,'supabase/migrations/20260917210000_service_evidence_uploads.sql')));
 const readinessPath=path.join(overlay,'supabase/migrations/20260917211000_release_readiness.sql');
-const manifestPath=path.join(overlay,'apps/web/scripts/release-readiness-manifest.json');
 const sha=value=>createHash('sha256').update(value).digest('hex'),normalized=value=>value.replaceAll('\r\n','\n');
-const upload=fs.readFileSync(uploadPath,'utf8'),readiness=fs.readFileSync(readinessPath,'utf8'),manifest=JSON.parse(fs.readFileSync(manifestPath,'utf8'));
+const upload=fs.readFileSync(uploadPath,'utf8'),readiness=fs.readFileSync(readinessPath,'utf8'),manifest=JSON.parse(readiness.match(/\$manifest\$([\s\S]*?)\$manifest\$/)[1]);
 assert.equal(manifest.releaseVersion,'2026-09-17.5');assert.equal(sha(normalized(upload)),manifest.serviceEvidenceSourceSha256);
 const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite');
 const {installRepositorySchema}=await import(pathToFileURL(path.join(repo,'apps/web/scripts/security/postgres-fixture.mjs')).href);
@@ -66,5 +65,5 @@ try{
   await test('historical billing security remains enforced',async()=>{await db.exec('grant select on public.billing_orders to service_role');await failed('private_table_grants');});
   await test('historical intake receipt fence remains enforced',async()=>{await db.exec('alter table public.account_deletion_request_receipts disable trigger account_deletion_receipts_immutable');await failed('schema_columns');});
   assert.equal(sha(fs.readFileSync(uploadPath)),sha(upload),'Upload SQL changed during test');assert.equal(sha(fs.readFileSync(readinessPath)),sha(readiness),'Readiness SQL changed during test');
-  console.log(JSON.stringify({passed,failed:0,runtime:'actual isolated PGlite catalog faults with rollback; no remote calls',uploadSha256:sha(normalized(upload)),readinessSha256:sha(normalized(readiness)),manifestSha256:sha(fs.readFileSync(manifestPath))}));
+  console.log(JSON.stringify({passed,failed:0,runtime:'actual isolated PGlite catalog faults with rollback; no remote calls',uploadSha256:sha(normalized(upload)),readinessSha256:sha(normalized(readiness)),manifestSha256:sha(JSON.stringify(manifest,null,2)+'\n')}));
 }catch(error){console.error('FAIL after '+passed+' cases: '+error.message+' ['+(error.code||'assertion')+']');process.exitCode=1;}finally{await db.close();globalThis.fetch=savedFetch;}
