@@ -27,17 +27,17 @@ import { useSiteContent } from "../../../lib/use-site-content";
 import styles from "./print-suite.module.css";
 import { PrintDocument } from "./PrintDocument";
 import { publicProfileUrl } from "../../../lib/profile-url";
-import { normalizePrintOptions, printDetailFacts, printFormats as formatConfig, printGeometry, printReadiness, type PrintMode, type PrintSize, type PrintOrientation } from "../../../lib/print-layout";
+import { normalizePrintOptions, printFormats as formatConfig, printGeometry, printReadiness, type PrintMode, type PrintSize, type PrintOrientation } from "../../../lib/print-layout";
 
 type PrintScope = "public" | "owner";
 
 const modeOrder: PrintMode[] = ["label", "hangtag", "handout", "service"];
 
 const modeDescriptions: Record<PrintMode, string> = {
-  label: "A small QR label for a case, hang tag, or instrument paperwork.",
-  hangtag: "A photo, identity, and QR card for a counter, case, or retail display.",
-  handout: "A complete one-page customer handout with photo, facts, status, and QR.",
-  service: "A printable summary of one approved service-history entry."
+  label: "A 3.5 x 2.25 label for a case, hang tag, or product paperwork.",
+  hangtag: "A retail-ready 4 x 6 display card with photograph and QR.",
+  handout: "A complete Letter or A4 Profile Sheet for the owner or customer.",
+  service: "A one-page record of one approved service-history entry."
 };
 
 const printSizeLabels: Record<PrintSize, string> = {
@@ -107,7 +107,7 @@ export default function HandoutPage() {
   const [printScope, setPrintScope] = useState<PrintScope>("public");
   const [printSize, setPrintSize] = useState<PrintSize>(requested.size);
   const [orientation, setOrientation] = useState<PrintOrientation>(requested.orientation);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const theme = "light" as const;
   const [zoom, setZoom] = useState(100);
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
   const [includePhoto, setIncludePhoto] = useState(true);
@@ -254,7 +254,6 @@ export default function HandoutPage() {
     ...(instrument.customFields || []).map((field) => [field.label, field.value])
   ].filter((entry): entry is string[] => Boolean(entry[0] && entry[1])).slice(0, 8) : [];
   const primaryFacts = instrument ? [instrument.brand, instrument.year, location].filter(Boolean) : [];
-  const detailFacts = printDetailFacts(condition, originalityStatus, saleStatus, includeAvailability);
   const isPrivate = instrument?.visibility === "private";
   const activeFormat = formatConfig[mode];
   const availableModes = modeOrder.filter((candidate) => candidate !== "service" || printableServiceEntries.length > 0);
@@ -338,7 +337,6 @@ export default function HandoutPage() {
     const config = formatConfig[mode];
     setPrintSize(config.defaultSize);
     setOrientation(config.orientations[0]);
-    setTheme("light");
     setSelectedPhoto("");
     setPhotoFit("contain");
     setPrintNote("");
@@ -453,9 +451,8 @@ export default function HandoutPage() {
                 </div>
 
                 <div className={styles.controlGrid}>
-                  <label>Paper<select value={printSize} onChange={(event) => setPrintSize(event.target.value as PrintSize)}>{activeFormat.sizes.map((size) => <option value={size} key={size}>{printSizeLabels[size]}</option>)}</select></label>
+                  {activeFormat.sizes.length > 1 ? <label>Paper<select value={printSize} onChange={(event) => setPrintSize(event.target.value as PrintSize)}>{activeFormat.sizes.map((size) => <option value={size} key={size}>{printSizeLabels[size]}</option>)}</select></label> : null}
                   {activeFormat.orientations.length > 1 ? <label>Orientation<select value={orientation} onChange={(event) => setOrientation(event.target.value as PrintOrientation)}>{activeFormat.orientations.map((value) => <option value={value} key={value}>{value === "portrait" ? "Portrait" : "Landscape"}</option>)}</select></label> : null}
-                  <label>Appearance<select value={theme} onChange={(event) => setTheme(event.target.value as "light" | "dark")}><option value="light">White paper (low ink)</option><option value="dark">Dark background</option></select></label>
                 </div>
 
                 {ownerAuthorized ? (
@@ -483,7 +480,7 @@ export default function HandoutPage() {
 
                 {activeFormat.photo && includePhoto && galleryImages.length ? <div className={styles.controlGrid}>
                   {galleryImages.length > 1 ? <label>Photograph<select value={photoUrl} onChange={(event) => setSelectedPhoto(event.target.value)}>{galleryImages.map((url, index) => <option value={url} key={url}>{index === 0 ? "Main photograph" : `Photograph ${index + 1}`}</option>)}</select></label> : null}
-                  <label>Photo framing<select value={photoFit} onChange={(event) => setPhotoFit(event.target.value as "contain" | "cover")}><option value="contain">Show whole instrument</option><option value="cover">Fill photo area</option></select></label>
+                  <label>Photo framing<select value={photoFit} onChange={(event) => setPhotoFit(event.target.value as "contain" | "cover")}><option value="contain">Show whole photo</option><option value="cover">Fill photo area</option></select></label>
                 </div> : null}
                 {mode === "service" ? <label className={styles.choice}><input type="checkbox" checked={includeServiceDetails} onChange={(event) => setIncludeServiceDetails(event.target.checked)} /> Full service details</label> : null}
                 <label className={styles.controlSection}><span className={styles.controlLabel}>Title on this printout</span><input type="text" maxLength={120} value={printTitle ?? title} onChange={(event) => setPrintTitle(event.target.value)} /></label>
@@ -532,7 +529,9 @@ export default function HandoutPage() {
                       title={printedTitle} code={canonicalCode} serial={serialDisplay}
                       facts={primaryFacts}
                       details={[
-                        ...(detailFacts.length ? [["Details", detailFacts.join(" / ")] as [string, string]] : []),
+                        ...(condition ? [["Condition", condition] as [string, string]] : []),
+                        ...(originalityStatus ? [["Originality", originalityStatus] as [string, string]] : []),
+                        ...(includeAvailability && saleStatus ? [["Availability", saleStatus] as [string, string]] : []),
                         ...(includeAttribution && instrument.publicCollection?.publicName ? [["Collection", instrument.publicCollection.publicName] as [string, string]] : [])
                       ]}
                       specifications={activeFormat.specifications && includeSpecifications ? printableSpecs.map(([label, value]) => [label, value]) : []}
