@@ -8,6 +8,8 @@ import {
   netlifyRuntimeConstraintViolations
 } from "../../../scripts/check-netlify-runtime-constraints.mjs";
 import {
+  default as paypalWebhookSweepSchedule,
+  PAYPAL_SWEEP_MAX_RESPONSE_BYTES,
   PAYPAL_SWEEP_SCHEDULE,
   PAYPAL_SWEEP_TIMEOUT_MS,
   PAYPAL_SWEEP_URL,
@@ -18,9 +20,11 @@ import {
 const safeScheduler = `
 export const PAYPAL_SWEEP_SCHEDULE = "*/5 * * * *";
 export const PAYPAL_SWEEP_TIMEOUT_MS = 15000;
+export const PAYPAL_SWEEP_MAX_RESPONSE_BYTES = 1024;
 export const PAYPAL_SWEEP_URL = "https://www.qrguitar.com/api/internal/paypal-webhook-sweep";
 export const config = { schedule: "*/5 * * * *" };
-export default async function handler() {}
+export async function runPayPalWebhookSweepSchedule() {}
+export default async function handler() { await runPayPalWebhookSweepSchedule(); }
 `;
 
 const safeNetlifyConfig = `
@@ -157,6 +161,7 @@ test("Netlify runtime preflight requires the exact bounded production recovery s
   const unsafeScheduler = `
     export const PAYPAL_SWEEP_SCHEDULE = "@hourly";
     export const PAYPAL_SWEEP_TIMEOUT_MS = 30000;
+    export const PAYPAL_SWEEP_MAX_RESPONSE_BYTES = 1024;
     export const PAYPAL_SWEEP_URL = "https://preview.invalid/api/internal/paypal-webhook-sweep";
     export const config = { schedule: PAYPAL_SWEEP_SCHEDULE };
   `;
@@ -172,6 +177,26 @@ test("Netlify runtime preflight requires the exact bounded production recovery s
     removeFixture(root);
   }
 });
+
+for (const [name, handler] of [
+  ["no-op", "export default async function handler() {}"],
+  ["floating", "export default async function handler() { runPayPalWebhookSweepSchedule(); }"]
+]) {
+  test(`Netlify runtime preflight rejects a ${name} default recovery handler`, () => {
+    const unsafeScheduler = safeScheduler.replace(
+      "export default async function handler() { await runPayPalWebhookSweepSchedule(); }",
+      handler
+    );
+    const root = fixture("export const maxDuration = 60;\n", safeProfilePatch, unsafeScheduler);
+    try {
+      const violations = netlifyRuntimeConstraintViolations(root);
+      assert.equal(violations.length, 1);
+      assert.match(violations[0], /default Netlify handler does not await or return/);
+    } finally {
+      removeFixture(root);
+    }
+  });
+}
 
 test("Netlify runtime preflight requires both reviewed payment self-rewrite limits", () => {
   const unsafeNetlifyConfig = `
@@ -220,6 +245,7 @@ test("Netlify PayPal schedule authenticates one bounded canonical request withou
   assert.equal(PAYPAL_SWEEP_SCHEDULE, "*/5 * * * *");
   assert.deepEqual(paypalSweepConfig, { schedule: PAYPAL_SWEEP_SCHEDULE });
   assert(PAYPAL_SWEEP_TIMEOUT_MS > 0 && PAYPAL_SWEEP_TIMEOUT_MS < 30000);
+  assert.equal(PAYPAL_SWEEP_MAX_RESPONSE_BYTES, 1024);
   assert.equal(call.url, PAYPAL_SWEEP_URL);
   assert.equal(call.options.method, "POST");
   assert.equal(call.options.redirect, "error");
@@ -229,6 +255,97 @@ test("Netlify PayPal schedule authenticates one bounded canonical request withou
   assert.equal(result.completed, 1);
   assert.deepEqual(messages, ["PayPal webhook sweep schedule completed successfully."]);
   assert(!messages.join(" ").includes(secret));
+});
+
+test("default Netlify handler delegates to the authenticated recovery request", { concurrency: false }, async t => {
+  const secret = "abcdef0123456789abcdef0123456789";
+  const previousSecret = process.env.CRON_SECRET;
+  const previousFetch = globalThis.fetch;
+  const previousInfo = console.info;
+  const previousError = console.error;
+  let calls = 0;
+  t.after(() => {
+    if (previousSecret === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = previousSecret;
+    globalThis.fetch = previousFetch;
+    console.info = previousInfo;
+    console.error = previousError;
+  });
+  process.env.CRON_SECRET = secret;
+  globalThis.fetch = async () => {
+    calls++;
+    return Response.json({
+      ok: true,
+      claimed: 0,
+      applied: 0,
+      completed: 0,
+      quarantined: 0,
+      deadlineReached: false
+    });
+  };
+  console.info = () => {};
+  console.error = () => { throw new Error("default handler logged an unexpected error"); };
+
+  await paypalWebhookSweepSchedule();
+  assert.equal(calls, 1);
+});
+
+test("Netlify PayPal schedule enforces streamed bytes despite absent or lying lengths", async () => {
+  const secret = "89abcdef012345678989abcdef01234567";
+  for (const declaredLength of [null, "1"]) {
+    let cancelled = false;
+    const privateBody = "payer@example.invalid-" + "x".repeat(PAYPAL_SWEEP_MAX_RESPONSE_BYTES);
+    const encoded = new TextEncoder().encode(privateBody);
+    const response = new Response(new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoded.subarray(0, 700));
+        controller.enqueue(encoded.subarray(700));
+      },
+      cancel() { cancelled = true; }
+    }), {
+      headers: declaredLength === null ? {} : { "Content-Length": declaredLength }
+    });
+    const messages = [];
+    await assert.rejects(
+      () => runPayPalWebhookSweepSchedule({
+        environment: { CRON_SECRET: secret },
+        fetchImpl: async () => response,
+        logger: {
+          info: message => messages.push(message),
+          error: message => messages.push(message)
+        }
+      }),
+      /invalid or oversized response/
+    );
+    assert.equal(cancelled, true);
+    assert(!messages.join(" ").includes("payer@example.invalid"));
+    assert(!messages.join(" ").includes(secret));
+  }
+});
+
+test("Netlify PayPal schedule rejects oversized declared lengths and extra response fields", async () => {
+  const secret = "76543210fedcba9876543210fedcba98";
+  const valid = {
+    ok: true,
+    claimed: 0,
+    applied: 0,
+    completed: 0,
+    quarantined: 0,
+    deadlineReached: false
+  };
+  for (const response of [
+    new Response("{}", { headers: { "Content-Length": String(PAYPAL_SWEEP_MAX_RESPONSE_BYTES + 1) } }),
+    Response.json({ ...valid, unexpected: "private-provider-data" })
+  ]) {
+    await assert.rejects(
+      () => runPayPalWebhookSweepSchedule({
+        environment: { CRON_SECRET: secret },
+        fetchImpl: async () => response,
+        logger: { info() {}, error() {} }
+      }),
+      /invalid or oversized response|endpoint result was invalid/
+    );
+  }
 });
 
 test("Netlify PayPal schedule fails closed without exposing configuration or response data", async () => {

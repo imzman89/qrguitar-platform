@@ -61,7 +61,8 @@ endpoint manually or on its daily cron while new sales remain disabled.
 
 The Netlify adapter includes its own five-minute Scheduled Function on every
 published deploy. It calls the fixed `https://www.qrguitar.com` sweep endpoint,
-blocks redirects, and aborts after 15 seconds. Configure `CRON_SECRET` privately
+blocks redirects, aborts after 15 seconds, reads at most 1 KiB, and accepts only
+the exact six-field operational response. Configure `CRON_SECRET` privately
 in the Netlify project before publishing; the scheduled bridge and application
 must receive the same value. Scheduled failures throw a fixed error into the
 function log without including the secret, response body, provider data, or

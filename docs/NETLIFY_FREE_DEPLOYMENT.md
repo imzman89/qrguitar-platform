@@ -41,7 +41,7 @@ Run the source preflight before any Netlify release:
 npm run check:netlify
 ```
 
-It fails closed when a route declares more than 60 seconds, the Profile editor sends inline file data in PATCH JSON, or the PayPal recovery schedule is missing, slower than five-minute intervals, pointed away from the canonical production endpoint, or allowed to run for 30 seconds. The current candidate passes those source checks: the editor sends storage paths, application routes stay within 60 seconds, and the scheduled request aborts after 15 seconds. The 6 MB response ceiling still needs production acceptance because static analysis cannot prove every dynamic response size.
+It fails closed when a route declares more than 60 seconds, the Profile editor sends inline file data in PATCH JSON, or the PayPal recovery schedule is missing, disconnected from its default handler, slower than five-minute intervals, pointed away from the canonical production endpoint, allowed to run for 30 seconds, or missing its reviewed 1 KiB response limit. The current candidate passes those source checks: the editor sends storage paths, application routes stay within 60 seconds, and the scheduled request aborts after 15 seconds. The 6 MB response ceiling still needs production acceptance because static analysis cannot prove every dynamic response size.
 
 ## Local release state and required configuration
 
@@ -60,7 +60,7 @@ QRGUITAR_NETLIFY_CANONICAL_ORIGIN=https://www.qrguitar.com
 
 ## PayPal recovery schedule and traffic limits
 
-[`netlify/functions/paypal-webhook-sweep.mjs`](../netlify/functions/paypal-webhook-sweep.mjs) runs `*/5 * * * *` on published deploys. It sends one authenticated POST to the fixed canonical endpoint `https://www.qrguitar.com/api/internal/paypal-webhook-sweep`, refuses redirects, aborts after 15 seconds, validates the bounded response, and logs only fixed operational messages or an HTTP status. It never logs the bearer secret, response body, provider record, or customer data. A failure throws so it is visible in Netlify function logs. It does not replace the database's 15-minute checkout heartbeat gate.
+[`netlify/functions/paypal-webhook-sweep.mjs`](../netlify/functions/paypal-webhook-sweep.mjs) runs `*/5 * * * *` on published deploys. It sends one authenticated POST to the fixed canonical endpoint `https://www.qrguitar.com/api/internal/paypal-webhook-sweep`, refuses redirects, aborts after 15 seconds, and streams at most 1 KiB before JSON parsing. It rejects an oversized declared or actual body and requires the exact six-field operational response. Logs contain only fixed operational messages or an HTTP status, never the bearer secret, response body, provider record, or customer data. A failure throws so it is visible in Netlify function logs. It does not replace the database's 15-minute checkout heartbeat gate.
 
 Before publication, add the same random 32–256 character `CRON_SECRET` used by the application to the Netlify project's environment variables. Enter it in the Netlify UI; do not place it in `netlify.toml`, source, or a release command. Scheduled Functions are available on all plans, execute automatically only on published deploys, cannot be invoked by a production URL, and have a 30-second limit. The Functions page can run the function manually on a draft for testing. See [Scheduled Functions](https://docs.netlify.com/build/functions/scheduled-functions/) and [function environment variables](https://docs.netlify.com/build/functions/environment-variables/).
 

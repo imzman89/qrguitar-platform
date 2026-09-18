@@ -87,20 +87,42 @@ function inspectPayPalScheduler(root) {
     ? resolvedString(propertyAssignment(config, "schedule")?.initializer, constants)
     : null;
   const timeout = resolvedNumber(constants.get("PAYPAL_SWEEP_TIMEOUT_MS"), constants);
+  const maxResponseBytes = resolvedNumber(constants.get("PAYPAL_SWEEP_MAX_RESPONSE_BYTES"), constants);
   const target = resolvedString(constants.get("PAYPAL_SWEEP_URL"), constants);
-  const hasDefaultHandler = sourceFile.statements.some(statement =>
+  const defaultHandler = sourceFile.statements.find(statement =>
     ts.isFunctionDeclaration(statement) &&
     statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.DefaultKeyword)
+  );
+  const delegatesToSweep = Boolean(
+    defaultHandler?.body?.statements.some(statement => {
+      const expression = ts.isExpressionStatement(statement)
+        ? statement.expression
+        : ts.isReturnStatement(statement)
+          ? statement.expression
+          : null;
+      const awaited = expression && ts.isAwaitExpression(expression) ? expression.expression : null;
+      const delegated = awaited || (ts.isReturnStatement(statement) ? expression : null);
+      return Boolean(
+        delegated &&
+          ts.isCallExpression(delegated) &&
+          ts.isIdentifier(delegated.expression) &&
+          delegated.expression.text === "runPayPalWebhookSweepSchedule"
+      );
+    })
   );
   const issues = [];
   if (schedule !== "*/5 * * * *") issues.push("the PayPal recovery schedule is not fixed at five-minute intervals");
   if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout >= 30000) {
     issues.push("the PayPal recovery request timeout is not bounded below Netlify's 30-second scheduled-function limit");
   }
+  if (maxResponseBytes !== 1024) {
+    issues.push("the PayPal recovery response is not fixed at the reviewed 1 KiB byte limit");
+  }
   if (target !== "https://www.qrguitar.com/api/internal/paypal-webhook-sweep") {
     issues.push("the PayPal recovery schedule does not target the canonical production sweep endpoint");
   }
-  if (!hasDefaultHandler) issues.push("the PayPal recovery schedule has no default Netlify handler");
+  if (!defaultHandler) issues.push("the PayPal recovery schedule has no default Netlify handler");
+  else if (!delegatesToSweep) issues.push("the default Netlify handler does not await or return PayPal recovery");
   return issues;
 }
 

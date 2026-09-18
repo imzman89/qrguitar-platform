@@ -2,6 +2,7 @@ const SECRET_PATTERN = /^[^\s\x00-\x1f\x7f]{32,256}$/;
 
 export const PAYPAL_SWEEP_SCHEDULE = "*/5 * * * *";
 export const PAYPAL_SWEEP_TIMEOUT_MS = 15_000;
+export const PAYPAL_SWEEP_MAX_RESPONSE_BYTES = 1_024;
 export const PAYPAL_SWEEP_URL =
   "https://www.qrguitar.com/api/internal/paypal-webhook-sweep";
 
@@ -15,9 +16,16 @@ function validCount(value) {
 }
 
 function validSweepResult(value) {
+  const keys = value && typeof value === "object" && !Array.isArray(value)
+    ? Object.keys(value).sort()
+    : [];
+  const expectedKeys = ["applied", "claimed", "completed", "deadlineReached", "ok", "quarantined"];
   return Boolean(
     value &&
       typeof value === "object" &&
+      !Array.isArray(value) &&
+      keys.length === expectedKeys.length &&
+      keys.every((key, index) => key === expectedKeys[index]) &&
       value.ok === true &&
       validCount(value.claimed) &&
       validCount(value.applied) &&
@@ -25,6 +33,44 @@ function validSweepResult(value) {
       validCount(value.quarantined) &&
       typeof value.deadlineReached === "boolean"
   );
+}
+
+async function readBoundedResponseText(response) {
+  const declaredLength = response.headers?.get?.("content-length");
+  if (declaredLength !== null && declaredLength !== undefined) {
+    const bytes = /^\d+$/.test(declaredLength) ? Number(declaredLength) : Number.NaN;
+    if (!Number.isSafeInteger(bytes) || bytes > PAYPAL_SWEEP_MAX_RESPONSE_BYTES) {
+      try { await response.body?.cancel(); } catch {}
+      throw new Error("invalid response length");
+    }
+  }
+
+  if (!response.body || typeof response.body.getReader !== "function") {
+    throw new Error("missing response body");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let bytesRead = 0;
+  let text = "";
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (!chunk || typeof chunk.done !== "boolean") throw new Error("invalid response stream");
+      if (chunk.done) break;
+      if (!(chunk.value instanceof Uint8Array)) throw new Error("invalid response chunk");
+      bytesRead += chunk.value.byteLength;
+      if (bytesRead > PAYPAL_SWEEP_MAX_RESPONSE_BYTES) {
+        try { await reader.cancel(); } catch {}
+        throw new Error("response too large");
+      }
+      text += decoder.decode(chunk.value, { stream: true });
+    }
+    text += decoder.decode();
+    return text;
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 function stop(logger, message) {
@@ -65,9 +111,9 @@ export async function runPayPalWebhookSweepSchedule({
 
   let result;
   try {
-    result = await response.json();
+    result = JSON.parse(await readBoundedResponseText(response));
   } catch {
-    stop(logger, "PayPal webhook sweep schedule failed: the endpoint returned invalid JSON.");
+    stop(logger, "PayPal webhook sweep schedule failed: the endpoint returned an invalid or oversized response.");
   }
   if (!validSweepResult(result)) {
     stop(logger, "PayPal webhook sweep schedule failed: the endpoint result was invalid.");
