@@ -6,6 +6,7 @@ import { PwaRuntime } from "../components/PwaRuntime";
 import type { CSSProperties, ReactNode } from "react";
 import { ThemeRuntime } from "../components/ThemeRuntime";
 import { SessionLifecycle } from "../components/SessionLifecycle";
+import { OptionalTrackingConsent } from "../components/OptionalTrackingConsent";
 import { buildOrganizationJsonLd } from "../lib/seo";
 import { buildManagedSiteMetadata } from "../lib/site-metadata";
 import { loadPublishedSiteSettings } from "../lib/site-settings-server";
@@ -48,6 +49,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
         />
         <PwaRuntime>{children}</PwaRuntime>
+        <OptionalTrackingConsent />
       </body>
     </html>
   );

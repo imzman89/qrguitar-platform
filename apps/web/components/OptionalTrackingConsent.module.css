@@ -1,0 +1,73 @@
+.notice {
+  position: fixed;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  z-index: 120;
+  width: min(430px, calc(100vw - 28px));
+  border: 1px solid #46534b;
+  border-radius: 8px;
+  padding: 12px;
+  color: #f2f4ed;
+  background: #111817;
+  box-shadow: 0 16px 38px rgb(0 0 0 / 38%);
+}
+
+.notice p {
+  margin: 0;
+  color: #ced5ce;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: minmax(72px, 1fr) repeat(2, minmax(76px, 0.8fr));
+  gap: 8px;
+  align-items: center;
+  margin-top: 9px;
+}
+
+.privacyLink,
+.controls button {
+  min-height: 44px;
+  border: 1px solid #68786b;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 11px;
+  color: #f2f4ed;
+  background: #18201e;
+  box-shadow: none;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.privacyLink:hover,
+.controls button:hover {
+  border-color: #e6af57;
+  color: #fff8e9;
+  background: #222c27;
+}
+
+.privacyLink:focus-visible,
+.controls button:focus-visible {
+  outline: 3px solid #e6af57;
+  outline-offset: 2px;
+}
+
+.notice .error {
+  margin-top: 8px;
+  color: #f0aaa4;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 460px) {
+  .notice {
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    width: calc(100vw - 20px);
+  }
+}

@@ -4,6 +4,7 @@ import { Nav } from "../../components/Nav";
 import { getContentValue } from "../../lib/content-registry";
 import { loadPublishedSiteSettings } from "../../lib/site-settings-server";
 import { buildManagedPageMetadata } from "../../lib/site-metadata";
+import { configuredOptionalTracking } from "../../lib/optional-tracking-consent";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildManagedPageMetadata("privacy", "/privacy");
@@ -49,6 +50,19 @@ export default async function PrivacyPage() {
                 <p>{section.copy}</p>
               </div>
             ))}
+            <div className="legal-card">
+              <h2>Cookies and browser storage</h2>
+              <p>
+                QRguitar uses essential cookies and browser storage for sign-in, session security, authorized
+                previews, app preferences, and drafts or pending work you choose to save. These product features
+                remain available if you deny optional tracking.
+              </p>
+              <p>
+                {configuredOptionalTracking.enabled
+                  ? "Configured optional analytics or advertising measurement stays off until you choose Accept. Deny keeps it off. QRguitar stores only your consent choice in your browser."
+                  : "Optional analytics and advertising are not currently configured. If either is added later, it will stay off until you choose Accept. Deny will keep it off, and QRguitar will store only your consent choice in your browser."}
+              </p>
+            </div>
             <div className="legal-card legal-final-note">
               <p>{getContentValue(settings.content, "privacy.finalNote")}</p>
               <a href="mailto:support@qrguitar.com">support@qrguitar.com</a>
