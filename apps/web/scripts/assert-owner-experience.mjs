@@ -41,6 +41,14 @@ ok(dashboard.includes("ActionDrawer") && dashboard.includes("dashboard.card.more
 ok(quickEdit.includes("beforeunload") && quickEdit.includes("Save Quick Edit") && quickEdit.includes("showSerialPublic") && quickEdit.includes("safetyStatus"), "Quick Edit contract missing");
 ok(siteSettings.includes("Luthiers / Technicians") && siteSettings.includes("Buyers") && siteSettings.includes("Collectors") && siteSettings.includes("Shops"), "How It Works role paths missing");
 ok(howItWorks.includes('blocks("lifecycle").map((item, index)') && howItWorks.includes('String(index + 1).padStart(2, "0")') && !howItWorks.includes("Step ${index + 1}"), "How It Works numbering is duplicated");
-ok(sitemap.includes("eligibleCollections") && sitemap.includes("collection.enabled") && sitemap.includes("collection.allowIndexing") && styles.includes("editor-save-bar") && styles.includes("import-mapping-grid"), "Collection sitemap or workspace styling missing");
+ok(
+  sitemap.includes("eligibleCollections")
+    && sitemap.includes("settings.enabled")
+    && sitemap.includes("settings.allowIndexing")
+    && sitemap.includes("publicCollectionHandles.has(settings.handle)")
+    && styles.includes("editor-save-bar")
+    && styles.includes("import-mapping-grid"),
+  "Collection sitemap or workspace styling missing"
+);
 
 console.log("Owner experience assertions passed.");
