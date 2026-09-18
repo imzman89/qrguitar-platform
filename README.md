@@ -2,6 +2,11 @@
 
 QRguitar public beta: permanent digital records for guitars, amps, pedals, builders, shops, collectors, and future owners.
 
+Standard accounts include 5 free owned Profiles. Additional nonexpiring Profile
+credits are US$12/1, US$50/10, or US$99/25 when purchases are enabled. Transfers
+are free. Existing Profiles stay available and never consume credits retroactively
+when the allowance changes. Separately approved business exceptions remain intact.
+
 ## What This Includes
 
 - Next.js web app
@@ -14,11 +19,18 @@ QRguitar public beta: permanent digital records for guitars, amps, pedals, build
 
 ## Free Stack
 
-- Web hosting: Vercel free tier
+- Web hosting: Vercel preferred; commercial launch requires a paid Vercel plan
 - Database/auth/storage: Supabase free tier
-- Payments later: Stripe, no monthly fee
+- Payments: automatic PayPal business checkout; provider transaction fees apply
 
-Payments are not active in this MVP. When payments are added, QRguitar must use Stripe Checkout or Stripe Customer Portal only. Do not build credit-card fields into the app.
+Payment collection stays disabled until the receiving account, server capture,
+and verified webhooks are configured and tested. A server-verified completed
+payment adds credits automatically. Card details stay with PayPal; a browser
+callback or buyer's payment claim is never proof of payment.
+See [PayPal checkout setup](docs/PAYPAL_CHECKOUT_SETUP.md) for merchant settings,
+isolated tests, and the separate Apple Pay activation requirements. The retained
+[/billing/manual workflow](docs/DIRECT_PAYMENTS_OPERATIONS.md) supports earlier
+direct-link payments and their receipt review.
 
 ## Quick Start
 
@@ -88,7 +100,7 @@ Optional placeholders:
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
 NEXT_PUBLIC_SUPPORT_EMAIL=support@qrguitar.com
-NEXT_PUBLIC_CONTACT_EMAIL=gary@qrguitar.com
+NEXT_PUBLIC_CONTACT_EMAIL=support@qrguitar.com
 EMAIL_FROM=QRguitar <noreply@qrguitar.com>
 SMTP_FROM=noreply@qrguitar.com
 SMTP_REPLY_TO=support@qrguitar.com
@@ -227,7 +239,7 @@ Keep these in `.env.example`, `apps/web/.env.example`, and Vercel:
 
 ```text
 NEXT_PUBLIC_SUPPORT_EMAIL=support@qrguitar.com
-NEXT_PUBLIC_CONTACT_EMAIL=gary@qrguitar.com
+NEXT_PUBLIC_CONTACT_EMAIL=support@qrguitar.com
 EMAIL_FROM=QRguitar <noreply@qrguitar.com>
 SMTP_FROM=noreply@qrguitar.com
 SMTP_REPLY_TO=support@qrguitar.com
@@ -375,4 +387,5 @@ https://www.qrguitar.com/dashboard
 
 When an owner starts a transfer from the dashboard, QRguitar creates a pending claim link and asks Supabase Auth to email the recipient a sign-in link that opens `/transfer/[id]`. The recipient must sign in with that same email address before accepting ownership. The permanent QRguitar URL stays unchanged.
 
-During beta, transfer emails depend on the existing Supabase Auth SMTP configuration. Keep Stripe/payment handling separate until paid/free transfer rules are finalized.
+During beta, transfer emails depend on the existing Supabase Auth SMTP configuration.
+Ownership transfers are free and remain separate from Profile credit purchases.

@@ -90,9 +90,9 @@ This is the field map to preserve while building the QRguitar customer experienc
 - Transfer notes
 - Private owner notes
 - Proof of purchase document
-- Included first purchaser ownership transfer for $99 25-code packs and higher plans
+- Free ownership transfers for all Profiles
 - Bulk handoff claim link
-- Transfer fee waived reason
+- Transfer policy: no fee
 
 ## Repair And Service History
 
@@ -198,4 +198,4 @@ This is the field map to preserve while building the QRguitar customer experienc
 - Download certificate
 - Manage pricing/plan when live
 - Edit public website copy from one content/admin location
-- Claim a guitar from a builder/shop transfer link without paying a fee when the code came from a $99 25-code pack or higher plan
+- Claim a guitar from a builder/shop transfer link without paying a transfer fee

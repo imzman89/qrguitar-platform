@@ -55,7 +55,7 @@ jobs:
       - run: npm ci
       - name: Verify fixture connection guards without connecting
         run: node --test apps/web/scripts/test-billing-concurrency-config.mjs
-      - name: Prove ten PostgreSQL scheduling barriers
+      - name: Prove fifty-two PostgreSQL scheduling barriers
         timeout-minutes: 5
         run: node apps/web/scripts/test-billing-concurrency.mjs --repo . --report-dir test-results/billing-concurrency
         env:

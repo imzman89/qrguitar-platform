@@ -4,6 +4,9 @@ export type GuitarStatus = "verified" | "unverified" | "transferred" | "archived
 export type FieldVisibility = "public" | "private" | "transfer_only";
 export type PlanTier = "single" | "pack_10" | "pack_25" | "bulk_50" | "business" | "enterprise";
 
+/** Standard owned-Profile allowance; the server ledger enforces paid capacity. */
+export const FREE_PROFILE_ALLOWANCE = 5;
+
 export type GuitarProfile = {
   id: string;
   qrCode: string;
@@ -211,24 +214,22 @@ export const sampleGuitar: GuitarProfile = {
 };
 
 export const defaultTransferPolicy: TransferPolicy = {
-  transferFeeCents: 700,
+  transferFeeCents: 0,
   purchaserPaysTransferFee: false,
   freeForIncludedPlan: true,
-  minimumIncludedTransferCodeCount: 25,
+  minimumIncludedTransferCodeCount: 0,
   includedTransfersPerPurchasedCode: 1
 };
 
 export function entitlementsForCodePurchase(codeCount: number): AccountEntitlements {
-  const includesFirstTransfers = codeCount >= defaultTransferPolicy.minimumIncludedTransferCodeCount;
-  const isBrandScale = includesFirstTransfers;
-
   return {
     planTier: codeCount >= 50 ? "bulk_50" : codeCount >= 25 ? "pack_25" : codeCount >= 10 ? "pack_10" : "single",
     purchasedCodeCount: codeCount,
     remainingCodeCount: codeCount,
-    freeOwnershipTransfersIncluded: includesFirstTransfers,
-    remainingFreeOwnershipTransfers: includesFirstTransfers ? codeCount * defaultTransferPolicy.includedTransfersPerPurchasedCode : 0,
-    businessBrandingEnabled: isBrandScale,
-    bulkHandoffEnabled: includesFirstTransfers
+    freeOwnershipTransfersIncluded: true,
+    remainingFreeOwnershipTransfers: "unlimited",
+    // Purchases never grant separately approved business privileges.
+    businessBrandingEnabled: false,
+    bulkHandoffEnabled: false
   };
 }

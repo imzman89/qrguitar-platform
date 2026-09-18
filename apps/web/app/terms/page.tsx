@@ -31,6 +31,10 @@ export default async function TermsPage() {
     {
       title: getContentValue(settings.content, "terms.sections.beta.heading"),
       copy: getContentValue(settings.content, "terms.sections.beta.body")
+    },
+    {
+      title: getContentValue(settings.content, "terms.sections.payments.heading"),
+      copy: getContentValue(settings.content, "terms.sections.payments.body")
     }
   ];
 

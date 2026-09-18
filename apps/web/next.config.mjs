@@ -1,33 +1,7 @@
 import { resolveBuildIdentity } from "./lib/build-identity.mjs";
+import { securityHeaders } from "./lib/security-headers.ts";
 
 /** @type {import('next').NextConfig} */
-const securityHeaders = [
-  {
-    key: "Content-Security-Policy",
-    value: [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co",
-      "font-src 'self' data:",
-      "connect-src 'self' https://*.supabase.co",
-      "frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-      "object-src 'none'",
-      "upgrade-insecure-requests"
-    ].join("; ")
-  },
-  { key: "X-Frame-Options", value: "DENY" },
-  { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  {
-    key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=(), interest-cohort=()"
-  }
-];
-
 const buildIdentity = resolveBuildIdentity(process.env, {
   environment: "local",
   buildTimestamp: new Date().toISOString(),
@@ -58,8 +32,12 @@ const nextConfig = {
         source: "/:path*",
         headers: [
           { key: "Cache-Control", value: "no-store, max-age=0, must-revalidate" },
-          ...securityHeaders
+          ...securityHeaders()
         ]
+      },
+      {
+        source: "/billing/:path*",
+        headers: securityHeaders({ checkout: true })
       }
     ];
   }

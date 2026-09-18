@@ -255,7 +255,7 @@ export async function main(args = process.argv.slice(2), environment = process.e
     await observer.query("insert into storage.buckets(id,name,public) values('instrument-media','instrument-media',false),('instrument-documents','instrument-documents',false),('service-evidence','service-evidence',false) on conflict(id) do update set public=false");
     report.baselineReadiness = await result(observer,'select qrguitar_release_readiness() result');
     assert.equal(report.baselineReadiness.ready,true,'Canonical baseline readiness failed');
-    assert.equal(report.baselineReadiness.releaseVersion,'2026-09-17.6','Integrate the exact .6 schema and readiness before running this v2 acceptance job');
+    assert.equal(report.baselineReadiness.releaseVersion,'2026-09-17.9','Integrate the exact .9 schema and readiness before running this v2 acceptance job');
     // If --evidence-sql is already an installed canonical migration, do not replay it.
     const included = sourceFiles().some(file => fs.realpathSync(path.join(repo,file)) === evidencePath);
     report.evidenceInstalledByRepositoryFixture = included;

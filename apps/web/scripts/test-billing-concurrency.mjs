@@ -143,12 +143,12 @@ export async function main(args = process.argv.slice(2), environment = process.e
   async function tests() {
     await result(observer, 'select billing_register_offer($1,$2::jsonb) result', ['live', offer]);
     for (const commit of [true, false]) await test('last prepaid credit: A ' + (commit ? 'commit' : 'rollback'), async () => {
-      const owner = await user(); await owned(owner, 25); const order = await linked(owner); await fulfill(observer, owner, order, payment(order));
+      const owner = await user(); await owned(owner, 5); const order = await linked(owner); await fulfill(observer, owner, order, payment(order));
       const a = await upload(owner), b = await upload(owner);
       const raceResult = await race('last-credit-' + commit, client => create(client, a), client => create(client, b), commit);
       assert.equal(raceResult.first.ok, true); assert.equal(raceResult.second.ok, !commit);
       if (commit) assert.equal(raceResult.second.code, 'QG001'); else assert.equal(raceResult.second.value.ok, true);
-      const actual = await counts(owner); assert.deepEqual(actual, { profiles: 26, creates: 1, uploads: 1, grants: 1, debits: 1, unresolved: 0 });
+      const actual = await counts(owner); assert.deepEqual(actual, { profiles: 6, creates: 1, uploads: 1, grants: 1, debits: 1, unresolved: 0 });
       const balance = await status(owner); assert.equal(balance.paidGranted, 1); assert.equal(balance.paidConsumed, 1); assert.equal(balance.paidAvailable, 0);
       const rows = (await observer.query('select upload_id,state from instrument_staged_uploads where owner_id=$1', [owner.id])).rows;
       assert.equal(rows.find(row => row.upload_id === (commit ? a.upload : b.upload)).state, 'consumed');
@@ -179,7 +179,136 @@ export async function main(args = process.argv.slice(2), environment = process.e
       assert.equal((await reserve(observer, owner, commit ? aKey : bKey)).orderId, rows[0].id);
       log('OUTCOME ' + JSON.stringify({ case: 'reserve-' + sameKey + '-' + commit, unresolvedOrders: 1, loserSqlstate: raceResult.second.code }));
     });
-    assert.equal(report.tests.length, 10); assert.equal(report.barriers.length, 10);
+    // Direct business payment races use the same real advisory/row/unique-index barriers.
+    const operator = await user(); await observer.query("update profiles set role='admin' where id=$1", [operator.id]);
+    const recipient = { accountKey: 'synthetic-business', displayName: 'Synthetic QRguitar', paymentUrl: 'https://venmo.com/synthetic-fixture', address: 'synthetic-fixture' };
+    const directOrder = (owner, account = recipient) => result(observer, 'select billing_direct_reserve_order($1,$2,$3,$4,$5,$6::jsonb) result', [owner.id, 'live', randomUUID(), 'profile_1', 'venmo', account]);
+    const directVerify = (client, order, id, reference) => result(client, 'select billing_direct_verify_order($1,$2,$3,$4,$5,$6,$7,$8) result', ['live', order.orderId, operator.id, id, reference, 1200, 'usd', 'Verified completed payment in synthetic receiving account.']);
+    const directClose = (client, order, id) => result(client, 'select billing_direct_close_order($1,$2,$3,$4,$5) result', ['live', order.orderId, operator.id, id, 'Reviewed synthetic receiving account; no payment arrived.']);
+    for (const sameId of [true, false]) for (const commit of [true, false]) await test('direct duplicate verification '+sameId+': A '+(commit?'commit':'rollback'), async () => {
+      const owner=await user(), order=await directOrder(owner), aId=randomUUID(), bId=sameId?aId:randomUUID(), reference='DIRECT-'+randomUUID();
+      const outcome=await race('direct-verify-'+sameId+'-'+commit, client=>directVerify(client,order,aId,reference), client=>directVerify(client,order,bId,reference),commit);
+      assert.equal(outcome.first.granted,true);assert.equal(outcome.second.ok,true);assert.equal(outcome.second.value.granted,!commit);
+      assert.equal((await counts(owner)).grants,1);assert.equal((await status(owner)).paidGranted,1);
+      assert.equal((await directVerify(observer,order,bId,reference)).alreadyGranted,true);
+    });
+    for (const commit of [true, false]) await test('direct shared receipt across owners/config rotation: A '+(commit?'commit':'rollback'), async () => {
+      const ownerA=await user(),ownerB=await user(),orderA=await directOrder(ownerA),orderB=await directOrder(ownerB,{...recipient,accountKey:'rotated-synthetic-key'}),reference='RECEIPT-'+randomUUID();
+      const outcome=await race('direct-unique-receipt-'+commit,client=>directVerify(client,orderA,randomUUID(),reference),client=>directVerify(client,orderB,randomUUID(),reference.replaceAll('-','').toLowerCase()),commit);
+      assert.equal(outcome.first.granted,true);assert.equal(outcome.second.ok,!commit);if(commit)assert.equal(outcome.second.code,'PT409');
+      const a=await status(ownerA),b=await status(ownerB);assert.equal(a.paidGranted,commit?1:0);assert.equal(b.paidGranted,commit?0:1);
+      assert.equal(a.paidGranted+b.paidGranted,1);
+    });
+    for (const commit of [true, false]) await test('direct close then verify: A '+(commit?'commit':'rollback'), async () => {
+      const owner=await user(),order=await directOrder(owner),reference='LATE-'+randomUUID();
+      const outcome=await race('direct-close-verify-'+commit,client=>directClose(client,order,randomUUID()),client=>directVerify(client,order,randomUUID(),reference),commit);
+      assert.equal(outcome.first.status,'expired');assert.equal(outcome.second.ok,true);assert.equal(outcome.second.value.granted,true);
+      const balance=await status(owner);assert.equal(balance.paidGranted,1);assert.equal(balance.hold,commit);assert.equal(balance.paidAvailable,commit?0:1);
+    });
+    for (const commit of [true, false]) await test('direct verify then close: A '+(commit?'commit':'rollback'), async () => {
+      const owner=await user(),order=await directOrder(owner),reference='RECEIVED-'+randomUUID();
+      const outcome=await race('direct-verify-close-'+commit,client=>directVerify(client,order,randomUUID(),reference),client=>directClose(client,order,randomUUID()),commit);
+      assert.equal(outcome.first.granted,true);assert.equal(outcome.second.ok,!commit);if(commit)assert.equal(outcome.second.code,'PT409');
+      const saved=await result(observer,'select billing_direct_get_order($1,$2,$3) result',[owner.id,'live',order.orderId]);
+      assert.equal(saved.status,commit?'fulfilled':'expired');assert.equal((await status(owner)).paidGranted,commit?1:0);
+    });
+    const merchant='SYNTHETICMERCHANT',paypalId=()=>randomUUID().replaceAll('-','').toUpperCase();
+    const ppReserve=(client,owner,key)=>result(client,'select billing_paypal_reserve_order($1,$2,$3,$4,$5) result',[owner.id,'live',key,'profile_1',merchant]);
+    const ppBind=(client,owner,order,provider)=>result(client,'select billing_paypal_bind_order($1,$2,$3,$4,$5) result',[owner.id,'live',order.orderId,provider,merchant]);
+    const ppOrder=async owner=>ppBind(observer,owner,await ppReserve(observer,owner,randomUUID()),paypalId());
+    const ppReceipt=(order,capture=paypalId())=>({paypalOrderId:order.paypalOrderId,captureId:capture,merchantId:merchant,referenceId:order.orderId,customId:order.orderId,invoiceId:'QRG-'+order.orderId,amount:1200,currency:'USD',status:'COMPLETED'});
+    const ppCapture=(client,order,receipt)=>result(client,'select billing_paypal_apply_capture($1,$2,$3::jsonb) result',['live',order.orderId,receipt]);
+    const ppClose=(client,order)=>result(client,'select billing_paypal_close_order($1,$2,$3,$4,$5) result',['live',order.orderId,order.paypalOrderId,merchant,'VOIDED']);
+    const ppReview=(client,order,receipt,event)=>result(client,'select billing_paypal_record_review($1,$2,$3,$4,$5::jsonb) result',['live',order.orderId,event,'refund',{...receipt,status:'REFUNDED'}]);
+    for(const sameKey of [true,false])for(const commit of [true,false])await test('PayPal reserve '+sameKey+': A '+(commit?'commit':'rollback'),async()=>{
+      const owner=await user(),aKey=randomUUID(),bKey=sameKey?aKey:randomUUID();
+      const outcome=await race('paypal-reserve-'+sameKey+'-'+commit,c=>ppReserve(c,owner,aKey),c=>ppReserve(c,owner,bKey),commit);
+      assert.equal(outcome.second.ok,sameKey||!commit);if(commit&&!sameKey)assert.equal(outcome.second.code,'PT409');
+      if(commit&&sameKey)assert.deepEqual(outcome.second.value,outcome.first);
+      assert.equal((await counts(owner)).unresolved,1);assert.equal((await status(owner)).paidGranted,0);
+    });
+    for(const commit of [true,false])await test('PayPal order binding across owners: A '+(commit?'commit':'rollback'),async()=>{
+      const ownerA=await user(),ownerB=await user(),a=await ppReserve(observer,ownerA,randomUUID()),b=await ppReserve(observer,ownerB,randomUUID()),provider=paypalId();
+      const outcome=await race('paypal-bind-'+commit,c=>ppBind(c,ownerA,a,provider),c=>ppBind(c,ownerB,b,provider),commit);
+      assert.equal(outcome.second.ok,!commit);if(commit)assert.equal(outcome.second.code,'PT409');
+      assert.equal((await observer.query('select count(*)::int n from billing_paypal_bindings where paypal_order_id=$1',[provider])).rows[0].n,1);
+    });
+    for(const commit of [true,false])await test('PayPal capture response/webhook duplicate: A '+(commit?'commit':'rollback'),async()=>{
+      const owner=await user(),order=await ppOrder(owner),receipt=ppReceipt(order);
+      const outcome=await race('paypal-capture-duplicate-'+commit,c=>ppCapture(c,order,receipt),c=>ppCapture(c,order,receipt),commit);
+      assert.equal(outcome.first.granted,true);assert.equal(outcome.second.ok,true);assert.equal(outcome.second.value.granted,!commit);
+      assert.equal((await counts(owner)).grants,1);assert.equal((await status(owner)).paidAvailable,1);
+      assert.equal((await observer.query("select count(*)::int n from billing_receipts where order_id=$1 and kind='payment'",[order.orderId])).rows[0].n,1);
+    });
+    for(const commit of [true,false])await test('PayPal capture identity across owners: A '+(commit?'commit':'rollback'),async()=>{
+      const ownerA=await user(),ownerB=await user(),a=await ppOrder(ownerA),b=await ppOrder(ownerB),capture=paypalId();
+      const outcome=await race('paypal-capture-identity-'+commit,c=>ppCapture(c,a,ppReceipt(a,capture)),c=>ppCapture(c,b,ppReceipt(b,capture)),commit);
+      assert.equal(outcome.second.ok,!commit);if(commit)assert.equal(outcome.second.code,'PT409');
+      assert.equal((await status(ownerA)).paidGranted,commit?1:0);assert.equal((await status(ownerB)).paidGranted,commit?0:1);
+    });
+    for(const automaticFirst of[true,false])for(const commit of[true,false])await test('PayPal automatic/manual receipt collision '+automaticFirst+': A '+(commit?'commit':'rollback'),async()=>{
+      const autoOwner=await user(),manualOwner=await user(),auto=await ppOrder(autoOwner),capture=paypalId();
+      const manual=await result(observer,'select billing_direct_reserve_order($1,$2,$3,$4,$5,$6::jsonb) result',[manualOwner.id,'live',randomUUID(),'profile_1','paypal',{...recipient,accountKey:'synthetic-paypal',paymentUrl:'https://www.paypal.com/ncp/payment/SYNTHETIC'}]);
+      const automatic=c=>ppCapture(c,auto,ppReceipt(auto,capture)),manualVerification=c=>directVerify(c,manual,randomUUID(),capture.toLowerCase());
+      const outcome=await race('paypal-manual-collision-'+automaticFirst+'-'+commit,automaticFirst?automatic:manualVerification,automaticFirst?manualVerification:automatic,commit);
+      assert.equal(outcome.second.ok,!commit);if(commit)assert.equal(outcome.second.code,'PT409');
+      const autoWins=automaticFirst===commit;
+      assert.equal((await status(autoOwner)).paidGranted,autoWins?1:0);assert.equal((await status(manualOwner)).paidGranted,autoWins?0:1);
+    });
+    for(const commit of[true,false])await test('PayPal void then late capture: A '+(commit?'commit':'rollback'),async()=>{
+      const owner=await user(),order=await ppOrder(owner),receipt=ppReceipt(order);
+      const outcome=await race('paypal-close-capture-'+commit,c=>ppClose(c,order),c=>ppCapture(c,order,receipt),commit);
+      assert.equal(outcome.second.ok,true);assert.equal(outcome.second.value.granted,true);
+      const balance=await status(owner);assert.equal(balance.paidGranted,1);assert.equal(balance.hold,commit);assert.equal(balance.paidAvailable,commit?0:1);
+    });
+    for(const refundFirst of[true,false])for(const commit of[true,false])await test('PayPal refund/capture ordering '+refundFirst+': A '+(commit?'commit':'rollback'),async()=>{
+      const owner=await user(),order=await ppOrder(owner),receipt=ppReceipt(order),event=paypalId();
+      const capture=c=>ppCapture(c,order,receipt),refund=c=>ppReview(c,order,receipt,event);
+      const outcome=await race('paypal-refund-capture-'+refundFirst+'-'+commit,refundFirst?refund:capture,refundFirst?capture:refund,commit);
+      assert.equal(outcome.second.ok,true);const balance=await status(owner);
+      assert.equal(balance.paidGranted,refundFirst||commit?1:0);assert.equal(balance.hold,!refundFirst||commit);
+      assert.equal(balance.paidAvailable,refundFirst&&!commit?1:0);
+    });
+    const ppReverseApproval=(client,order,event)=>result(client,'select billing_paypal_reverse_approval($1,$2,$3,$4,$5) result',['live',order.orderId,order.paypalOrderId,merchant,event]);
+    for(const approvalFirst of[true,false])for(const commit of[true,false])await test('PayPal approval reversal/capture ordering '+approvalFirst+': A '+(commit?'commit':'rollback'),async()=>{
+      const owner=await user(),order=await ppOrder(owner),receipt=ppReceipt(order),event=paypalId();
+      const capture=c=>ppCapture(c,order,receipt),reversal=c=>ppReverseApproval(c,order,event);
+      const outcome=await race('paypal-approval-reversal-capture-'+approvalFirst+'-'+commit,approvalFirst?reversal:capture,approvalFirst?capture:reversal,commit);
+      assert.equal(outcome.second.ok,true);const balance=await status(owner);
+      assert.equal(balance.paidGranted,approvalFirst||commit?1:0);assert.equal(balance.hold,commit);
+      assert.equal(balance.paidAvailable,approvalFirst&&!commit?1:0);
+      const saved=await result(observer,'select billing_paypal_get_order($1,$2,$3) result',[owner.id,'live',order.orderId]);
+      assert.equal(saved.status,approvalFirst||commit?'fulfilled':'expired');
+    });
+    const ppExpire=(client,owner,order)=>result(client,'select billing_paypal_expire_unbound($1,$2,$3) result',[owner.id,'live',order.orderId]);
+    const ppFailure=(client,order,receipt)=>result(client,'select billing_paypal_record_failure($1,$2,$3::jsonb) result',['live',order.orderId,{...receipt,status:'DENIED'}]);
+    async function agedPayPal(owner){
+      const orderId=randomUUID(),request=randomUUID(),approved={key:'profile_1',version:1,currency:'usd',amount:1200,credits:1};
+      await observer.query("insert into billing_orders(id,owner_id,environment,request_key,offer,created_at) values($1,$2,'live',$3,$4,'2000-01-01T00:00:00Z')",[orderId,owner.id,request,approved]);
+      await observer.query("insert into billing_paypal_orders(order_id,owner_id,environment,merchant_id) values($1,$2,'live',$3)",[orderId,owner.id,merchant]);
+      return result(observer,'select billing_paypal_get_order($1,$2,$3) result',[owner.id,'live',orderId]);
+    }
+    for(const expiryFirst of[true,false])for(const commit of[true,false])await test('PayPal aged expiry/bind ordering '+expiryFirst+': A '+(commit?'commit':'rollback'),async()=>{
+      const owner=await user(),order=await agedPayPal(owner),provider=paypalId();
+      const expiry=c=>ppExpire(c,owner,order),binding=c=>ppBind(c,owner,order,provider);
+      const outcome=await race('paypal-expiry-bind-'+expiryFirst+'-'+commit,expiryFirst?expiry:binding,expiryFirst?binding:expiry,commit);
+      assert.equal(outcome.second.ok,true);
+      const saved=await result(observer,'select billing_paypal_get_order($1,$2,$3) result',[owner.id,'live',order.orderId]);
+      const expired=expiryFirst===commit;assert.equal(saved.status,expired?'expired':'open');
+      assert.equal((await counts(owner)).unresolved,expired?0:1);assert.equal((await status(owner)).paidGranted,0);assert.equal((await status(owner)).hold,false);
+      if(expiryFirst||commit)assert.equal(saved.paypalOrderId,provider);else assert.equal(saved.paypalOrderId,null);
+    });
+    for(const failureFirst of[true,false])for(const commit of[true,false])await test('PayPal ordinary failure/capture ordering '+failureFirst+': A '+(commit?'commit':'rollback'),async()=>{
+      const owner=await user(),order=await ppOrder(owner),receipt=ppReceipt(order);
+      const capture=c=>ppCapture(c,order,receipt),failure=c=>ppFailure(c,order,receipt);
+      const outcome=await race('paypal-failure-capture-'+failureFirst+'-'+commit,failureFirst?failure:capture,failureFirst?capture:failure,commit);
+      assert.equal(outcome.second.ok,true);const balance=await status(owner);
+      assert.equal(balance.paidGranted,failureFirst||commit?1:0);assert.equal(balance.hold,commit);
+      assert.equal(balance.paidAvailable,failureFirst&&!commit?1:0);
+      const saved=await result(observer,'select billing_paypal_get_order($1,$2,$3) result',[owner.id,'live',order.orderId]);
+      assert.equal(saved.status,failureFirst||commit?'fulfilled':'expired');
+    });
+    assert.equal(report.tests.length, 52); assert.equal(report.barriers.length, 52);
   }
   try {
     observer = await connect('observer');
@@ -207,7 +336,7 @@ export async function main(args = process.argv.slice(2), environment = process.e
     report.passed = report.tests.filter(item => item.ok).length; report.failed = report.tests.filter(item => !item.ok).length;
     report.allConnectionsClosed = clients.size === 0 && report.cleanupErrors.length === 0;
     report.finishedAt = new Date().toISOString();
-    report.accepted = !report.fatal && !report.failed && !report.clientErrors.length && report.allConnectionsClosed && report.passed === 10 && report.barriers.length === 10;
+    report.accepted = !report.fatal && !report.failed && !report.clientErrors.length && report.allConnectionsClosed && report.passed === 52 && report.barriers.length === 52;
     fs.writeFileSync(reportFile, JSON.stringify(report, null, 2));
     log(JSON.stringify({ accepted: report.accepted, passed: report.passed, failed: report.failed, barriers: report.barriers.length, allConnectionsClosed: report.allConnectionsClosed, reportFile }));
   }

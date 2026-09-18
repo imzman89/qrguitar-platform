@@ -32,6 +32,10 @@ export default async function PrivacyPage() {
     {
       title: getContentValue(settings.content, "privacy.sections.security.heading"),
       copy: getContentValue(settings.content, "privacy.sections.security.body")
+    },
+    {
+      title: getContentValue(settings.content, "privacy.sections.payments.heading"),
+      copy: getContentValue(settings.content, "privacy.sections.payments.body")
     }
   ];
 

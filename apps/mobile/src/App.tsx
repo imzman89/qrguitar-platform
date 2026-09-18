@@ -27,6 +27,7 @@ import {
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Image } from "expo-image";
+import { FREE_PROFILE_ALLOWANCE } from "@qrguitar/shared";
 import * as ImagePicker from "expo-image-picker";
 import { getNativeAuth, type NativeAuthSnapshot } from "./lib/auth";
 import {
@@ -1494,8 +1495,8 @@ function Create({
       />
       <Text style={styles.small}>
         Your draft stays on this device. A Profile is saved only after the
-        server confirms it. Public beta includes up to 25 Profiles for standard
-        accounts.
+        server confirms it. Standard accounts include {FREE_PROFILE_ALLOWANCE} free Profiles.
+        Existing Profiles stay available when the allowance is full.
       </Text>
     </ScrollView>
   );
