@@ -58,6 +58,20 @@ test("optional tracking is disabled for empty or partly invalid configuration", 
   assert.deepEqual(both, { enabled: true, purposes: ["analytics", "advertising"] });
 });
 
+test("every authoritative cent value from USD 0.30 through one cent below list price is preserved", () => {
+  for (const [credits, listCents] of [[1, 1200], [10, 5000], [25, 9900]]) {
+    assert.deepEqual(consent.sanitizeOptionalTrackingCreditPack({ credits, valueUsd: listCents / 100, pricing: "standard" }),
+      { credits, valueUsd: listCents / 100, pricing: "standard" });
+    for (const pricing of ["promotion", "internal_test"]) {
+      for (let cents = 30; cents < listCents; cents++) {
+        assert.deepEqual(consent.sanitizeOptionalTrackingCreditPack({ credits, valueUsd: cents / 100, pricing }),
+          { credits, valueUsd: cents / 100, pricing });
+      }
+    }
+  }
+  assert.equal(consent.sanitizeOptionalTrackingCreditPack({ credits: 1, valueUsd: 0.581, pricing: "promotion" }), null);
+});
+
 test("registration and conversion names are stable, explicit, and provider-neutral", () => {
   assert.deepEqual(consent.optionalTrackingProductEvents, {
     publicProfileViewed: "public_profile_viewed",
@@ -138,6 +152,25 @@ test("a loader runs once only after a verified accepted choice", () => {
   stop();
 });
 
+test("denied-to-accepted reactivation persists for a fresh document without activating providers in the denied page", () => {
+  const storage = new MemoryStorage(), target = new EventTarget();
+  const runtime = { config: analytics, storage, eventTarget: target };
+  let loads = 0, notices = 0;
+  consent.saveOptionalTrackingConsent("denied", runtime);
+  const stopNotice = consent.subscribeToOptionalTrackingConsent(() => { notices++; }, runtime);
+  const stop = consent.activateOptionalTracking("analytics", () => { loads++; }, runtime);
+  assert.equal(consent.saveOptionalTrackingConsentForReload(runtime), true);
+  assert.equal(loads, 0);
+  assert.equal(notices, 0);
+  assert.equal(storage.getItem(consent.optionalTrackingConsentStorageKey(analytics)), "accepted");
+  stop(); stopNotice();
+
+  const freshRuntime = { config: analytics, storage, eventTarget: new EventTarget() };
+  const freshStop = consent.activateOptionalTracking("analytics", () => { loads++; }, freshRuntime);
+  assert.equal(loads, 1);
+  freshStop();
+});
+
 test("provider cleanup runs on withdrawal, reactivation, disposal, and an async consent race", async () => {
   const storage = new MemoryStorage();
   const target = new EventTarget();
@@ -199,7 +232,7 @@ test("business success detail carries only a stable pseudonymous token and bound
   const received = [];
   consent.subscribeToOptionalTrackingProductEvents((event) => received.push(event), runtime);
   const privateOrderId = "44444444-4444-4444-8444-444444444444";
-  const purchase = { name: consent.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 10, valueUsd: 50 } };
+  const purchase = { name: consent.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 10, valueUsd: 50, pricing: "standard" } };
   assert.equal(await consent.dispatchOptionalTrackingProductEvent(purchase, { runtime, dedupeKey: privateOrderId }), true);
   assert.equal(await consent.dispatchOptionalTrackingProductEvent(purchase, { runtime, dedupeKey: privateOrderId }), false);
   assert.equal(received.length, 1);
@@ -245,8 +278,8 @@ test("conversion dedupe survives tabs and browser sessions and serializes concur
   tabB.subscribeToOptionalTrackingProductEvents(() => { delivered++; }, runtimeB);
   laterSession.subscribeToOptionalTrackingProductEvents(() => { delivered++; }, runtimeLater);
   const businessKey = "55555555-5555-4555-8555-555555555555";
-  const eventA = { name: tabA.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 25, valueUsd: 99 } };
-  const eventB = { name: tabB.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 25, valueUsd: 99 } };
+  const eventA = { name: tabA.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 25, valueUsd: 99, pricing: "standard" } };
+  const eventB = { name: tabB.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 25, valueUsd: 99, pricing: "standard" } };
   const outcomes = await Promise.all([
     tabA.dispatchOptionalTrackingProductEvent(eventA, { runtime: runtimeA, dedupeKey: businessKey }),
     tabB.dispatchOptionalTrackingProductEvent(eventB, { runtime: runtimeB, dedupeKey: businessKey })
@@ -257,7 +290,7 @@ test("conversion dedupe survives tabs and browser sessions and serializes concur
   assert.equal(new Set(locks.names).size, 1);
   assert.doesNotMatch(locks.names[0], new RegExp(businessKey));
 
-  const laterEvent = { name: laterSession.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 25, valueUsd: 99 } };
+  const laterEvent = { name: laterSession.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 25, valueUsd: 99, pricing: "standard" } };
   assert.equal(await laterSession.dispatchOptionalTrackingProductEvent(laterEvent, { runtime: runtimeLater, dedupeKey: businessKey }), false);
   assert.equal(delivered, 1);
 });
@@ -321,8 +354,8 @@ test("every supported event enforces its bounded non-identifying property schema
     { name: consent.optionalTrackingProductEvents.publicProfileViewed, properties: { visibility: "unlisted" } },
     { name: consent.optionalTrackingProductEvents.registrationCompleted, properties: { confirmation: "email_pending" } },
     { name: consent.optionalTrackingProductEvents.profileCreated, properties: { visibility: "private" } },
-    { name: consent.optionalTrackingProductEvents.checkoutStarted, properties: { credits: 1, valueUsd: 12 } },
-    { name: consent.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 25, valueUsd: 99 } },
+    { name: consent.optionalTrackingProductEvents.checkoutStarted, properties: { credits: 1, valueUsd: 12, pricing: "standard" } },
+    { name: consent.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 25, valueUsd: 0.3, pricing: "internal_test" } },
     { name: consent.optionalTrackingProductEvents.ownershipTransferCompleted, properties: { method: "buyer_code" } }
   ];
   for (const [index, event] of events.entries()) {
@@ -335,9 +368,13 @@ test("every supported event enforces its bounded non-identifying property schema
     { name: consent.optionalTrackingProductEvents.publicProfileViewed, properties: { visibility: "private" } },
     { name: consent.optionalTrackingProductEvents.registrationCompleted, properties: { confirmation: "clicked" } },
     { name: consent.optionalTrackingProductEvents.profileCreated, properties: { visibility: "public", email: "private@example.com" } },
-    { name: consent.optionalTrackingProductEvents.checkoutStarted, properties: { credits: "10", valueUsd: 50 } },
-    { name: consent.optionalTrackingProductEvents.checkoutStarted, properties: { credits: 10, valueUsd: 99 } },
-    { name: consent.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 10, valueUsd: "50" } },
+    { name: consent.optionalTrackingProductEvents.checkoutStarted, properties: { credits: "10", valueUsd: 50, pricing: "standard" } },
+    { name: consent.optionalTrackingProductEvents.checkoutStarted, properties: { credits: 10, valueUsd: 99, pricing: "standard" } },
+    { name: consent.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 10, valueUsd: "50", pricing: "standard" } },
+    { name: consent.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 10, valueUsd: 50, pricing: "promotion" } },
+    { name: consent.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 10, valueUsd: 0.29, pricing: "internal_test" } },
+    { name: consent.optionalTrackingProductEvents.profileCreated, properties: { visibility: { toString: () => "public" } } },
+    { name: consent.optionalTrackingProductEvents.ownershipTransferCompleted, properties: { method: { toString: () => "review" } } },
     { name: consent.optionalTrackingProductEvents.ownershipTransferCompleted, properties: { method: "token" } }
   ]) assert.equal(await consent.dispatchOptionalTrackingProductEvent(invalid, { runtime, dedupeKey: "invalid" }), false);
 });
@@ -367,6 +404,7 @@ test("the UI contract stays compact, accessible, balanced, and hidden without ex
   assert.match(component, /href="\/privacy"/);
   assert.match(component, /aria-label="Privacy choices"/);
   assert.match(component, /onClick=\{\(\) => choose\("denied"\)\}>Turn off/);
+  assert.match(component, /saveOptionalTrackingConsentForReload\(\)[\s\S]*window\.location\.reload\(\)/);
   assert.match(component, /setManaging\(false\);\s*setStorageError\(true\)/);
   assert.match(component, /className=\{styles\.statusOnly\} role="status"/);
   assert.match(css, /width:\s*min\(430px,/);

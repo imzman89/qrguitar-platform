@@ -7,6 +7,7 @@ import {
   configuredOptionalTracking,
   readOptionalTrackingConsent,
   saveOptionalTrackingConsent,
+  saveOptionalTrackingConsentForReload,
   subscribeToOptionalTrackingConsent,
   type OptionalTrackingConsentState,
   type OptionalTrackingDecision
@@ -40,6 +41,14 @@ export function OptionalTrackingConsent() {
 
   const choose = (decision: OptionalTrackingDecision) => {
     setStorageError(false);
+    if (decision === "accepted" && consent.status === "denied") {
+      if (saveOptionalTrackingConsentForReload()) {
+        window.location.reload();
+        return;
+      }
+      setStorageError(true);
+      return;
+    }
     if (saveOptionalTrackingConsent(decision)) {
       setConsent(readOptionalTrackingConsent());
       setManaging(false);

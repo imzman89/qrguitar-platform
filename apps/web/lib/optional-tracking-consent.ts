@@ -28,8 +28,9 @@ export type OptionalTrackingConsentStatus = "not-configured" | "pending" | Optio
 type ProfileVisibility = "public" | "unlisted" | "private";
 type RegistrationConfirmation = "email_pending" | "session_ready";
 type CreditPackSize = 1 | 10 | 25;
-type CreditPackValueUsd = 12 | 50 | 99;
+type CreditPackPricing = "standard" | "promotion" | "internal_test";
 type TransferMethod = "email_link" | "buyer_code" | "review";
+export type OptionalTrackingCreditPack = Readonly<{ credits: CreditPackSize; valueUsd: number; pricing: CreditPackPricing }>;
 
 type RepeatableProductEventInput =
   Readonly<{ name: typeof optionalTrackingProductEvents.publicProfileViewed; properties: Readonly<{ visibility: Exclude<ProfileVisibility, "private"> }> }>;
@@ -37,8 +38,8 @@ type RepeatableProductEventInput =
 type BusinessProductEventInput =
   | Readonly<{ name: typeof optionalTrackingProductEvents.registrationCompleted; properties: Readonly<{ confirmation: RegistrationConfirmation }> }>
   | Readonly<{ name: typeof optionalTrackingProductEvents.profileCreated; properties: Readonly<{ visibility: ProfileVisibility }> }>
-  | Readonly<{ name: typeof optionalTrackingProductEvents.checkoutStarted; properties: Readonly<{ credits: CreditPackSize; valueUsd: CreditPackValueUsd }> }>
-  | Readonly<{ name: typeof optionalTrackingProductEvents.purchaseCompleted; properties: Readonly<{ credits: CreditPackSize; valueUsd: CreditPackValueUsd }> }>
+  | Readonly<{ name: typeof optionalTrackingProductEvents.checkoutStarted; properties: OptionalTrackingCreditPack }>
+  | Readonly<{ name: typeof optionalTrackingProductEvents.purchaseCompleted; properties: OptionalTrackingCreditPack }>
   | Readonly<{ name: typeof optionalTrackingProductEvents.ownershipTransferCompleted; properties: Readonly<{ method: TransferMethod }> }>;
 
 export type OptionalTrackingProductEventInput = RepeatableProductEventInput | BusinessProductEventInput;
@@ -211,7 +212,11 @@ function clearEventDedupe(runtime?: OptionalTrackingRuntime) {
   }
 }
 
-export function saveOptionalTrackingConsent(decision: OptionalTrackingDecision, runtime?: OptionalTrackingRuntime) {
+function persistOptionalTrackingConsent(
+  decision: OptionalTrackingDecision,
+  runtime: OptionalTrackingRuntime | undefined,
+  notify: boolean
+) {
   const config = runtimeConfig(runtime);
   const storage = runtimeStorage(runtime);
   if (!config.enabled) return false;
@@ -235,8 +240,21 @@ export function saveOptionalTrackingConsent(decision: OptionalTrackingDecision, 
     clearEventDedupe(runtime);
   }
 
-  runtimeEventTarget(runtime)?.dispatchEvent(createDetailEvent(OPTIONAL_TRACKING_CONSENT_EVENT, { decision, purposes: config.purposes }));
+  if (notify) {
+    runtimeEventTarget(runtime)?.dispatchEvent(createDetailEvent(OPTIONAL_TRACKING_CONSENT_EVENT, { decision, purposes: config.purposes }));
+  }
   return persisted;
+}
+
+export function saveOptionalTrackingConsent(decision: OptionalTrackingDecision, runtime?: OptionalTrackingRuntime) {
+  return persistOptionalTrackingConsent(decision, runtime, true);
+}
+
+// Re-enabling after withdrawal reloads the document. Persist first without
+// notifying providers in the denied document; the fresh document then starts
+// providers from a verified accepted state and a new consent epoch.
+export function saveOptionalTrackingConsentForReload(runtime?: OptionalTrackingRuntime) {
+  return persistOptionalTrackingConsent("accepted", runtime, false);
 }
 
 export function subscribeToOptionalTrackingConsent(
@@ -339,6 +357,24 @@ function exactKeys(value: Record<string, unknown>, keys: readonly string[]) {
   return present.length === expected.length && expected.every((key, index) => key === present[index]);
 }
 
+export function sanitizeOptionalTrackingCreditPack(value: unknown): OptionalTrackingCreditPack | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const properties = value as Record<string, unknown>;
+  if (!exactKeys(properties, ["credits", "pricing", "valueUsd"]) || typeof properties.credits !== "number"
+    || typeof properties.valueUsd !== "number" || typeof properties.pricing !== "string"
+    || (properties.credits !== 1 && properties.credits !== 10 && properties.credits !== 25)
+    || (properties.pricing !== "standard" && properties.pricing !== "promotion" && properties.pricing !== "internal_test")
+    || !Number.isFinite(properties.valueUsd)) return null;
+  const valueCents = Math.round(properties.valueUsd * 100);
+  if (!Number.isSafeInteger(valueCents) || Math.abs(properties.valueUsd - valueCents / 100) > 1e-9) return null;
+  const listValueCents = { 1: 1200, 10: 5000, 25: 9900 }[properties.credits];
+  const validValue = properties.pricing === "standard"
+    ? valueCents === listValueCents
+    : valueCents >= 30 && valueCents < listValueCents;
+  if (!validValue) return null;
+  return Object.freeze({ credits: properties.credits, valueUsd: valueCents / 100, pricing: properties.pricing });
+}
+
 function productEventInput(value: unknown): OptionalTrackingProductEventInput | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const input = value as { name?: unknown; properties?: unknown };
@@ -346,24 +382,25 @@ function productEventInput(value: unknown): OptionalTrackingProductEventInput | 
   const properties = input.properties as Record<string, unknown>;
   const name = input.name;
 
-  if (name === optionalTrackingProductEvents.publicProfileViewed && exactKeys(properties, ["visibility"]) && ["public", "unlisted"].includes(properties.visibility as string)) {
+  if (name === optionalTrackingProductEvents.publicProfileViewed && exactKeys(properties, ["visibility"])
+    && typeof properties.visibility === "string" && ["public", "unlisted"].includes(properties.visibility)) {
     return Object.freeze({ name, properties: Object.freeze({ visibility: properties.visibility as "public" | "unlisted" }) });
   }
-  if (name === optionalTrackingProductEvents.registrationCompleted && exactKeys(properties, ["confirmation"]) && ["email_pending", "session_ready"].includes(properties.confirmation as string)) {
+  if (name === optionalTrackingProductEvents.registrationCompleted && exactKeys(properties, ["confirmation"])
+    && typeof properties.confirmation === "string" && ["email_pending", "session_ready"].includes(properties.confirmation)) {
     return Object.freeze({ name, properties: Object.freeze({ confirmation: properties.confirmation as RegistrationConfirmation }) });
   }
-  if (name === optionalTrackingProductEvents.profileCreated && exactKeys(properties, ["visibility"]) && ["public", "unlisted", "private"].includes(properties.visibility as string)) {
+  if (name === optionalTrackingProductEvents.profileCreated && exactKeys(properties, ["visibility"])
+    && typeof properties.visibility === "string" && ["public", "unlisted", "private"].includes(properties.visibility)) {
     return Object.freeze({ name, properties: Object.freeze({ visibility: properties.visibility as ProfileVisibility }) });
   }
   if ((name === optionalTrackingProductEvents.checkoutStarted || name === optionalTrackingProductEvents.purchaseCompleted)
-    && exactKeys(properties, ["credits", "valueUsd"])
-    && typeof properties.credits === "number" && typeof properties.valueUsd === "number"
-    && [1, 10, 25].includes(properties.credits) && [12, 50, 99].includes(properties.valueUsd)) {
-    const expectedValue = { 1: 12, 10: 50, 25: 99 }[properties.credits as CreditPackSize];
-    if (properties.valueUsd !== expectedValue) return null;
-    return Object.freeze({ name, properties: Object.freeze({ credits: properties.credits as CreditPackSize, valueUsd: properties.valueUsd as CreditPackValueUsd }) }) as BusinessProductEventInput;
+    && exactKeys(properties, ["credits", "pricing", "valueUsd"])) {
+    const pack = sanitizeOptionalTrackingCreditPack(properties);
+    return pack ? Object.freeze({ name, properties: pack }) as BusinessProductEventInput : null;
   }
-  if (name === optionalTrackingProductEvents.ownershipTransferCompleted && exactKeys(properties, ["method"]) && ["email_link", "buyer_code", "review"].includes(properties.method as string)) {
+  if (name === optionalTrackingProductEvents.ownershipTransferCompleted && exactKeys(properties, ["method"])
+    && typeof properties.method === "string" && ["email_link", "buyer_code", "review"].includes(properties.method)) {
     return Object.freeze({ name, properties: Object.freeze({ method: properties.method as TransferMethod }) });
   }
   return null;

@@ -2,16 +2,31 @@ import type { BillingAuth } from "./billing-client";
 import type { DirectOffer } from "./direct-payments";
 import type { PayPalOrder, PayPalPaymentsSnapshot } from "./paypal-payments";
 import { createPaymentSessionScope, directOrderId, PaymentRequestError } from "./direct-payments-client";
-import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "./optional-tracking-consent";
+import {
+  canUseOptionalTracking,
+  dispatchOptionalTrackingProductEvent,
+  optionalTrackingProductEvents,
+  subscribeToOptionalTrackingConsent,
+  type OptionalTrackingRuntime
+} from "./optional-tracking-consent";
 
 const record = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const packs: Record<string, [number, number]> = { profile_1: [1200, 1], profile_10: [5000, 10], profile_25: [9900, 25] };
 export const paypalProviderOrderId = (value: unknown) => typeof value === "string" && /^[A-Z0-9]{5,64}$/.test(value) ? value : "";
 const terminal = (status: string) => ["fulfilled", "cancelled", "needs_review"].includes(status);
-function trackingPack(offerKey: string) {
-  const specification = packs[offerKey];
-  if (!specification) return null;
-  return { credits: specification[1] as 1 | 10 | 25, valueUsd: (specification[0] / 100) as 12 | 50 | 99 };
+type TrackingPricing = "standard" | "promotion" | "internal_test";
+type PurchaseTrackingArm = Readonly<{ actorId: string; consentEpoch: string; orderId: string; offerKey: string }>;
+function trackingPack(offer: DirectOffer) {
+  const pricingValue = (offer as DirectOffer & { pricing?: unknown }).pricing;
+  const pricing: TrackingPricing = pricingValue === "promotion" || pricingValue === "internal_test" ? pricingValue : "standard";
+  return { credits: offer.credits as 1 | 10 | 25, valueUsd: offer.amount / 100, pricing };
+}
+function readPurchaseTrackingArm(value: unknown): PurchaseTrackingArm | null {
+  const row = record(value);
+  return Object.keys(row).length === 4 && directOrderId(row.actorId) && directOrderId(row.consentEpoch) && directOrderId(row.orderId)
+    && typeof row.offerKey === "string" && Object.hasOwn(packs, row.offerKey)
+    ? { actorId: row.actorId as string, consentEpoch: row.consentEpoch as string, orderId: row.orderId as string, offerKey: row.offerKey }
+    : null;
 }
 export type PayPalClientOrder = PayPalOrder;
 export type PayPalSnapshot = PayPalPaymentsSnapshot;
@@ -64,21 +79,65 @@ function readIntent(value: unknown): PayPalIntent | null {
 export function createPayPalPaymentsClient(deps: {
   auth: () => BillingAuth; fetch?: typeof fetch; timeoutMs?: number; storage?: () => Pick<Storage, "getItem" | "setItem" | "removeItem">;
   randomUUID?: () => string; orderId?: string; returnFlow?: boolean; pollMs?: number; maxPolls?: number;
+  trackingRuntime?: OptionalTrackingRuntime;
 }) {
   let state = initialPayPalPaymentsState(), disposed = false, loadRevision = 0, lock: symbol | undefined, timer: ReturnType<typeof setTimeout> | undefined, polls = 0;
+  let purchaseTrackingArm: PurchaseTrackingArm | null = null;
   const observations = new Map<string, "processing" | "needs_review">();
   const listeners = new Set<(state: PayPalPaymentsState) => void>(), memory = new Map<string, PayPalIntent | null>(), queryOrder = directOrderId(deps.orderId);
   const publish = (patch: Partial<PayPalPaymentsState>) => { if (!disposed) { state = { ...state, ...patch }; listeners.forEach(listener => listener(state)); } };
   const storage = () => deps.storage ? deps.storage() : window.sessionStorage, storageKey = () => `qrguitar:paypal-checkout:${state.actorId}`;
+  const trackingStorageKey = "qrguitar:paypal-purchase-tracking:v1";
+  const trackingEpochStorageKey = "qrguitar:paypal-purchase-tracking-epoch:v1";
+  const analyticsAllowed = () => canUseOptionalTracking("analytics", deps.trackingRuntime);
+  function consentEpoch() {
+    if (!analyticsAllowed()) return "";
+    try {
+      const existing = directOrderId(storage().getItem(trackingEpochStorageKey));
+      if (existing) return existing;
+      const created = crypto.randomUUID();
+      storage().setItem(trackingEpochStorageKey, created);
+      return storage().getItem(trackingEpochStorageKey) === created ? created : "";
+    } catch { return ""; }
+  }
+  function clearPurchaseTrackingArm() {
+    purchaseTrackingArm = null;
+    try { storage().removeItem(trackingStorageKey); } catch { /* Consent gating does not depend on storage cleanup succeeding. */ }
+  }
+  function rememberPurchaseTrackingArm(arm: PurchaseTrackingArm | null) {
+    if (!arm || !analyticsAllowed()) { clearPurchaseTrackingArm(); return; }
+    purchaseTrackingArm = arm;
+    try { storage().setItem(trackingStorageKey, JSON.stringify(arm)); } catch { /* The current controller still keeps its consent-epoch arm in memory. */ }
+  }
+  function restorePurchaseTrackingArm() {
+    purchaseTrackingArm = null;
+    if (!state.actorId) return;
+    if (!analyticsAllowed()) { clearPurchaseTrackingArm(); return; }
+    try {
+      const epoch = consentEpoch();
+      const stored = readPurchaseTrackingArm(JSON.parse(storage().getItem(trackingStorageKey) || "null"));
+      purchaseTrackingArm = stored && epoch && stored.actorId === state.actorId && stored.consentEpoch === epoch ? stored : null;
+      if (!purchaseTrackingArm) storage().removeItem(trackingStorageKey);
+    } catch { clearPurchaseTrackingArm(); }
+  }
   function remember(intent: PayPalIntent | null) { memory.set(state.actorId, intent); publish({ intent }); try { if (intent) storage().setItem(storageKey(), JSON.stringify(intent)); else storage().removeItem(storageKey()); } catch { /* Server pendingOrder also recovers established checkouts. */ } }
   function stopPolling() { if (timer) clearTimeout(timer); timer = undefined; publish({ polling: false }); }
   const scope = createPaymentSessionScope(deps, actorId => {
+    const previousActor = state.actorId;
+    if (previousActor && previousActor !== actorId) clearPurchaseTrackingArm();
     loadRevision++; lock = undefined; polls = 0; observations.clear(); stopPolling(); publish({ ...initialPayPalPaymentsState(), actorId, phase: actorId ? "loading" : "signed-out" });
+    restorePurchaseTrackingArm();
     if (!actorId) return;
     if (memory.has(actorId)) publish({ intent: memory.get(actorId) || null });
     else try { publish({ intent: readIntent(JSON.parse(storage().getItem(storageKey()) || "null")) }); } catch { /* No credentials are stored in checkout state. */ }
     void Promise.resolve().then(load);
   });
+  const unsubscribeTrackingConsent = subscribeToOptionalTrackingConsent((consent) => {
+    if (consent.status !== "accepted" || !consent.purposes.includes("analytics")) {
+      clearPurchaseTrackingArm();
+      try { storage().removeItem(trackingEpochStorageKey); } catch { /* A stale arm cannot dispatch while consent remains denied. */ }
+    }
+  }, deps.trackingRuntime);
   function observe(value: unknown, ownerId: string, orderId: string) {
     const order = readOrder(value, ownerId, orderId), intent = state.intent;
     if (intent?.orderId === orderId && intent.paypalOrderId && intent.paypalOrderId !== order.paypalOrderId) throw new Error("Your payment could not be verified. Check its status before trying again.");
@@ -112,11 +171,20 @@ export function createPayPalPaymentsClient(deps: {
         remember({ requestId: pending.requestId, offerKey: pending.offerKey, orderId: pending.orderId, paypalOrderId: pending.paypalOrderId || "", approvalObserved: Boolean(approved) });
       } else if (state.intent?.orderId && order?.orderId === state.intent.orderId && terminal(order.status)) remember(null);
       publish({ phase: "ready", snapshot, refreshing: false, uncertain: Boolean(state.intent && !snapshot.pendingOrder), ...(order && terminal(order.status) ? { checkoutOpen: false, message: "" } : {}) }); schedulePoll();
-      const completedPack = order?.status === "fulfilled" ? trackingPack(order.offerKey) : null;
-      if (order && completedPack) void dispatchOptionalTrackingProductEvent({
+      const currentConsentEpoch = purchaseTrackingArm && analyticsAllowed() ? consentEpoch() : "";
+      const armed = order?.status === "fulfilled" && currentConsentEpoch
+        && purchaseTrackingArm?.actorId === lease.actorId
+        && purchaseTrackingArm.consentEpoch === currentConsentEpoch
+        && purchaseTrackingArm.orderId === order.orderId
+        && purchaseTrackingArm.offerKey === order.offerKey;
+      const completedPack = order && armed ? trackingPack(order.offer) : null;
+      if (order && completedPack) {
+        clearPurchaseTrackingArm();
+        void dispatchOptionalTrackingProductEvent({
         name: optionalTrackingProductEvents.purchaseCompleted,
         properties: completedPack
-      }, { dedupeKey: order.orderId });
+        }, { dedupeKey: order.orderId, runtime: deps.trackingRuntime });
+      }
     } catch (error) { if (scope.live(lease) && attempt === loadRevision) { stopPolling(); publish({ phase: "error", snapshot: null, refreshing: false, message: error instanceof Error ? error.message : "Could not check payment status." }); } }
   }
   async function start() { const lease = scope.lease(); try { await scope.start(); } catch (error) { if (scope.live(lease)) publish({ phase: "error", message: error instanceof Error ? error.message : "Sign-in is unavailable." }); } }
@@ -136,11 +204,14 @@ export function createPayPalPaymentsClient(deps: {
         || (intent.orderId && orderId !== intent.orderId) || (intent.paypalOrderId && paypalOrderId !== intent.paypalOrderId)) throw new Error("The checkout response could not be verified. Check its status before trying again.");
       remember({ ...intent, orderId, paypalOrderId }); publish({ uncertain: false });
       if (terminal(String(status))) { resolved = true; throw new Error("This payment is already resolved. Check its status above."); }
-      const startedPack = trackingPack(intent.offerKey);
+      const selectedOffer = snapshot.offers.find((offer) => offer.key === intent.offerKey);
+      const epoch = consentEpoch();
+      if (selectedOffer && epoch) rememberPurchaseTrackingArm({ actorId: state.actorId, consentEpoch: epoch, orderId, offerKey: intent.offerKey });
+      const startedPack = selectedOffer ? trackingPack(selectedOffer) : null;
       if (startedPack) void dispatchOptionalTrackingProductEvent({
         name: optionalTrackingProductEvents.checkoutStarted,
         properties: startedPack
-      }, { dedupeKey: orderId });
+      }, { dedupeKey: orderId, runtime: deps.trackingRuntime });
       return paypalOrderId;
     } catch (error) { if (scope.live(lease)) publish({ checkoutOpen: false, uncertain: !resolved && Boolean(state.intent), message: resolved ? "This payment is already resolved. Check its status above." : `${error instanceof Error ? error.message : "Checkout could not open."} Your checkout is saved for a safe retry.` }); throw error; }
     finally { if (lock === operation) { lock = undefined; if (scope.live(lease)) { publish({ busy: "" }); if (resolved) await load(); } } }
@@ -189,6 +260,6 @@ export function createPayPalPaymentsClient(deps: {
   function sdkError(expectedActor: string) { if (!disposed && expectedActor === state.actorId) { const resolved = terminal(state.snapshot?.order?.status || ""); publish({ checkoutOpen: false, message: resolved ? "This payment is already resolved. Check its status above." : state.message || "Checkout couldn’t finish. Try again, or check the status of your saved payment.", uncertain: !resolved && Boolean(state.intent) }); } }
   return { getState: () => state, subscribe(listener: (state: PayPalPaymentsState) => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }, start, createOrder, capture, reconcile, completeReturn, beginWalletCheckout, cancelled, sdkError,
     reload: () => { polls = 0; stopPolling(); return state.actorId ? load() : start(); },
-    dispose() { disposed = true; stopPolling(); scope.dispose(); listeners.clear(); state = initialPayPalPaymentsState(); }
+    dispose() { disposed = true; stopPolling(); unsubscribeTrackingConsent(); scope.dispose(); listeners.clear(); state = initialPayPalPaymentsState(); purchaseTrackingArm = null; }
   };
 }

@@ -7,7 +7,7 @@ import test from "node:test";
 
 const web = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."), require = createRequire(path.join(web, "package.json")), ts = require("typescript"), modules = new Map();
 function load(name) { if (modules.has(name)) return modules.get(name); const module = { exports: {} }; const compiled = ts.transpileModule(fs.readFileSync(path.join(web, `lib/${name}.ts`), "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText; new Function("require", "exports", "module", compiled)(specifier => specifier.startsWith("./") ? load(specifier.slice(2)) : require(specifier), module.exports, module); modules.set(name, module.exports); return module.exports; }
-const client = load("paypal-payments-client"), sdkModule = load("paypal-browser-sdk"), appleModule = load("paypal-apple-pay");
+const client = load("paypal-payments-client"), tracking = load("optional-tracking-consent"), sdkModule = load("paypal-browser-sdk"), appleModule = load("paypal-apple-pay");
 const A = "11111111-1111-4111-8111-111111111111", B = "22222222-2222-4222-8222-222222222222", ID = "33333333-3333-4333-8333-333333333333", ORDER = "44444444-4444-4444-8444-444444444444", ID2 = "55555555-5555-4555-8555-555555555555", PAYPAL = "5O190127TN364715T";
 const offers = [{ key: "profile_1", amount: 1200, credits: 1 }, { key: "profile_10", amount: 5000, credits: 10 }, { key: "profile_25", amount: 9900, credits: 25 }].map(value => ({ ...value, version: 1, currency: "usd", permanent: true, freeAllowance: 5 }));
 const order = (patch = {}) => ({ orderId: ORDER, ownerId: A, requestId: ID, offerKey: "profile_10", paypalOrderId: PAYPAL, status: "approval_pending", offer: offers[1], createdAt: "2026-09-18T12:00:00.000Z", ...patch });
@@ -27,10 +27,21 @@ function fixture(t, options = {}) {
     return json({ order: f.status.order });
   });
   f.client = client.createPayPalPaymentsClient({ auth: () => auth, fetch: async (url, init) => { f.calls.push({ url, init }); return f.respond(url, init); }, timeoutMs: f.timeoutMs ?? 1000, orderId: f.orderId, returnFlow: f.returnFlow, pollMs: f.pollMs ?? 5, maxPolls: f.maxPolls ?? 2,
-    randomUUID: () => { f.uuidCalls++; return f.uuidCalls === 1 ? ID : ID2; }, storage: () => { if (f.storageDenied) throw new Error("Storage denied"); return { getItem: key => f.stored.get(key) || null, setItem: (key, value) => f.stored.set(key, value), removeItem: key => f.stored.delete(key) }; } });
+    randomUUID: () => { f.uuidCalls++; return f.uuidCalls === 1 ? ID : ID2; }, trackingRuntime: f.trackingRuntime,
+    storage: () => { if (f.storageDenied) throw new Error("Storage denied"); return { getItem: key => f.stored.get(key) || null, setItem: (key, value) => f.stored.set(key, value), removeItem: key => f.stored.delete(key) }; } });
   f.change = id => { f.session = session(id); callback("SIGNED_IN", f.session); };
   f.ready = async () => { await f.client.start(); await until(() => ["ready", "signed-out", "error"].includes(f.client.getState().phase)); };
   f.posts = () => f.calls.filter(call => call.init.method === "POST"); t.after(() => f.client.dispose()); return f;
+}
+function trackingFixture(decision = "accepted") {
+  const values = new Map(), dedupeValues = new Map(), target = new EventTarget();
+  const storage = { getItem: key => values.get(key) || null, setItem: (key, value) => values.set(key, value) };
+  const dedupeStorage = { getItem: key => dedupeValues.get(key) || null, setItem: (key, value) => dedupeValues.set(key, value) };
+  const runtime = { config: tracking.parseOptionalTrackingConfig("analytics"), storage, dedupeStorage, eventTarget: target };
+  assert.equal(tracking.saveOptionalTrackingConsent(decision, runtime), true);
+  const events = [];
+  const stop = tracking.subscribeToOptionalTrackingProductEvents(event => events.push(event), runtime);
+  return { runtime, events, stop };
 }
 test("signed-out payer cannot create orders", async t => { const f = fixture(t, { session: null }); await f.ready(); await assert.rejects(f.client.createOrder("profile_10", A)); assert.equal(f.calls.length, 0); });
 test("status loads five-free account without creating an order", async t => { const f = fixture(t); await f.ready(); assert.equal(f.client.getState().snapshot.freeLimit, 5); assert.equal(f.posts().length, 0); assert.equal(f.calls[0].init.cache, "no-store"); });
@@ -76,6 +87,78 @@ test("a held pending order remains reviewable without hiding the account balance
 });
 test("approval captures through server then shows only verified ledger credit", async t => {
   const f = fixture(t); await f.ready(); await f.client.createOrder("profile_10", A); assert.equal(await f.client.capture(PAYPAL, A), "confirmed"); assert.deepEqual(JSON.parse(f.posts()[1].init.body), { orderId: ORDER }); assert.equal(f.client.getState().snapshot.paidAvailable, 10); assert.equal(f.client.getState().snapshot.order.status, "fulfilled"); assert.equal(f.client.getState().intent, null); assert.equal(f.stored.size, 0);
+});
+test("a purchase completed while analytics is denied is never replayed after later acceptance or a revisit", async t => {
+  const analytics = trackingFixture("denied"); t.after(analytics.stop);
+  const f = fixture(t, { trackingRuntime: analytics.runtime });
+  await f.ready(); await f.client.createOrder("profile_10", A); await f.client.capture(PAYPAL, A); await tick();
+  assert.deepEqual(analytics.events, []);
+  assert.equal(tracking.saveOptionalTrackingConsent("accepted", analytics.runtime), true);
+  await f.client.reload(); await tick();
+  const revisit = fixture(t, { trackingRuntime: analytics.runtime, stored: f.stored, status: f.status });
+  await revisit.ready(); await tick();
+  assert.equal(analytics.events.some(event => event.name === tracking.optionalTrackingProductEvents.purchaseCompleted), false);
+});
+test("withdrawing consent destroys the active checkout arm and reacceptance cannot revive it", async t => {
+  const analytics = trackingFixture(); t.after(analytics.stop);
+  const f = fixture(t, { trackingRuntime: analytics.runtime });
+  await f.ready(); await f.client.createOrder("profile_10", A); await until(() => analytics.events.length === 1);
+  assert.equal(analytics.events[0].name, tracking.optionalTrackingProductEvents.checkoutStarted);
+  assert.equal(tracking.saveOptionalTrackingConsent("denied", analytics.runtime), true);
+  await f.client.capture(PAYPAL, A); assert.equal(tracking.saveOptionalTrackingConsent("accepted", analytics.runtime), true);
+  await f.client.reload(); await tick();
+  assert.equal(analytics.events.some(event => event.name === tracking.optionalTrackingProductEvents.purchaseCompleted), false);
+  assert.equal([...f.stored.keys()].some(key => key.includes("purchase-tracking")), false);
+});
+test("account switches never apply one actor's checkout arm to another and a signed-out consent reset invalidates the old arm", async t => {
+  const analytics = trackingFixture(); t.after(analytics.stop);
+  const f = fixture(t, { trackingRuntime: analytics.runtime });
+  await f.ready(); await f.client.createOrder("profile_10", A); await until(() => analytics.events.length === 1);
+  assert.equal(f.stored.has("qrguitar:paypal-purchase-tracking:v1"), true);
+
+  f.status = snapshot({ order: order({ orderId: ID2, ownerId: B, requestId: ID2, status: "fulfilled" }), paidGranted: 10, paidRemaining: 10, paidAvailable: 10 });
+  f.change(B); await until(() => f.client.getState().actorId === B && f.client.getState().phase === "ready"); await tick();
+  assert.equal(analytics.events.some(event => event.name === tracking.optionalTrackingProductEvents.purchaseCompleted), false);
+  assert.equal(f.stored.has("qrguitar:paypal-purchase-tracking:v1"), false);
+
+  f.change(""); await until(() => f.client.getState().phase === "signed-out");
+  tracking.saveOptionalTrackingConsent("denied", analytics.runtime);
+  tracking.saveOptionalTrackingConsent("accepted", analytics.runtime);
+  f.status = snapshot({ order: order({ status: "fulfilled" }), paidGranted: 10, paidRemaining: 10, paidAvailable: 10 });
+  f.change(A); await until(() => f.client.getState().actorId === A && f.client.getState().phase === "ready"); await tick();
+  assert.equal(analytics.events.some(event => event.name === tracking.optionalTrackingProductEvents.purchaseCompleted), false);
+  assert.equal(f.stored.has("qrguitar:paypal-purchase-tracking:v1"), false);
+});
+test("a still-consented checkout arm survives controller reload and tracks only its authoritative fulfilled ledger snapshot", async t => {
+  const analytics = trackingFixture(); t.after(analytics.stop);
+  const first = fixture(t, { trackingRuntime: analytics.runtime });
+  await first.ready(); await first.client.createOrder("profile_10", A); await until(() => analytics.events.length === 1);
+  first.client.dispose();
+  const fulfilled = order({ status: "fulfilled" });
+  const returned = fixture(t, { trackingRuntime: analytics.runtime, stored: first.stored, orderId: ORDER, returnFlow: true,
+    status: snapshot({ order: fulfilled, paidGranted: 10, paidRemaining: 10, paidAvailable: 10 }) });
+  await returned.ready(); await until(() => analytics.events.some(event => event.name === tracking.optionalTrackingProductEvents.purchaseCompleted));
+  const purchase = analytics.events.find(event => event.name === tracking.optionalTrackingProductEvents.purchaseCompleted);
+  assert.deepEqual(purchase.properties, { credits: 10, valueUsd: 50, pricing: "standard" });
+  await returned.client.reload(); await tick();
+  assert.equal(analytics.events.filter(event => event.name === tracking.optionalTrackingProductEvents.purchaseCompleted).length, 1);
+});
+test("a current consented checkout and capture emit checkout then purchase from verified server amounts", async t => {
+  const analytics = trackingFixture(); t.after(analytics.stop);
+  const f = fixture(t, { trackingRuntime: analytics.runtime });
+  f.respond = async (url, init) => {
+    if (url.startsWith("/api/billing/paypal/status")) return json(f.status);
+    const body = JSON.parse(init.body);
+    if (url.endsWith("/create")) { const next = order({ orderId: ID2, requestId: body.requestId }); f.status = snapshot({ order: next, pendingOrder: next }); return json({ orderId: ID2, paypalOrderId: PAYPAL }); }
+    if (url.endsWith("/capture")) { const next = order({ ...f.status.pendingOrder, orderId: ID2, status: "fulfilled" }); f.status = snapshot({ order: next, paidGranted: 10, paidAvailable: 10, paidRemaining: 10 }); return json({ order: next }); }
+    return json({ order: f.status.order });
+  };
+  await f.ready(); await f.client.createOrder("profile_10", A); assert.equal(await f.client.capture(PAYPAL, A), "confirmed");
+  await until(() => analytics.events.length === 2);
+  assert.deepEqual(analytics.events.map(event => [event.name, event.properties]), [
+    [tracking.optionalTrackingProductEvents.checkoutStarted, { credits: 10, valueUsd: 50, pricing: "standard" }],
+    [tracking.optionalTrackingProductEvents.purchaseCompleted, { credits: 10, valueUsd: 50, pricing: "standard" }]
+  ]);
 });
 test("mismatched SDK approval never calls capture", async t => { const f = fixture(t); await f.ready(); await f.client.createOrder("profile_10", A); await assert.rejects(f.client.capture("FOREIGNORDER12345", A)); assert.equal(f.posts().length, 1); });
 test("a completed capture response alone cannot fabricate credits", async t => {

@@ -1,6 +1,7 @@
 import {
   canUseOptionalTracking,
   optionalTrackingProductEvents,
+  sanitizeOptionalTrackingCreditPack,
   subscribeToOptionalTrackingProductEvents,
   type OptionalTrackingProductEventDetail,
   type OptionalTrackingRuntime
@@ -13,9 +14,9 @@ import {
 export const GOOGLE_ANALYTICS_SCRIPT_ID = "qrguitar-google-analytics";
 export const GOOGLE_ANALYTICS_SCRIPT_ORIGIN = "https://www.googletagmanager.com";
 export const GOOGLE_ANALYTICS_SYNTHETIC_ORIGIN = "https://www.qrguitar.com";
+const GOOGLE_ANALYTICS_RUNTIME_STATE = "__qrguitarGoogleAnalyticsRuntime";
 
 const IDEMPOTENCY_TOKEN_PATTERN = /^qrg_evt_v1_[a-f0-9]{64}$/;
-const CREDIT_PACK_VALUES = Object.freeze({ 1: 12, 10: 50, 25: 99 } as const);
 const GA_COOKIE_PATTERN = /^_ga(?:_[a-z0-9]+)?$/i;
 
 export type GoogleAnalyticsRouteCategory =
@@ -51,7 +52,7 @@ export type GoogleAnalyticsEvent = Readonly<{
   parameters: Readonly<Record<string, unknown>>;
 }>;
 
-type GoogleAnalyticsCommand = readonly unknown[];
+type GoogleAnalyticsCommand = IArguments;
 type ScriptPort = {
   async: boolean;
   id: string;
@@ -69,6 +70,11 @@ type WindowPort = {
   location: { hostname: string; pathname: string };
   [key: string]: unknown;
 };
+type GoogleAnalyticsOwnedRuntime = Readonly<{
+  layer: GoogleAnalyticsCommand[];
+  previousLayer: unknown;
+  token: symbol;
+}>;
 
 export type GoogleAnalyticsRuntime = Readonly<{
   document?: DocumentPort | null;
@@ -94,13 +100,12 @@ function businessToken(value: unknown) {
 }
 
 function creditPack(properties: Record<string, unknown>) {
-  if (!exactKeys(properties, ["credits", "valueUsd"])) return null;
-  if (properties.credits !== 1 && properties.credits !== 10 && properties.credits !== 25) return null;
-  const credits = properties.credits;
-  const value = CREDIT_PACK_VALUES[credits];
-  if (properties.valueUsd !== value) return null;
+  const sanitized = sanitizeOptionalTrackingCreditPack(properties);
+  if (!sanitized) return null;
+  const { credits, pricing, valueUsd: value } = sanitized;
   return Object.freeze({
     credits,
+    pricing,
     value,
     items: Object.freeze([Object.freeze({
       item_id: `profile_credit_pack_${credits}`,
@@ -140,10 +145,12 @@ export function mapOptionalTrackingEventToGoogleAnalytics(value: unknown): Googl
   }
 
   if (event.name === optionalTrackingProductEvents.profileCreated) {
-    if (!exactKeys(properties, ["visibility"]) || !["public", "unlisted", "private"].includes(String(properties.visibility))) return null;
+    if (!exactKeys(properties, ["visibility"]) || typeof properties.visibility !== "string"
+      || !["public", "unlisted", "private"].includes(properties.visibility)) return null;
+    const visibility = properties.visibility;
     return Object.freeze({
       name: "profile_created",
-      parameters: Object.freeze({ profile_visibility: properties.visibility, event_id: eventId })
+      parameters: Object.freeze({ profile_visibility: visibility, event_id: eventId })
     });
   }
 
@@ -154,6 +161,7 @@ export function mapOptionalTrackingEventToGoogleAnalytics(value: unknown): Googl
       currency: "USD",
       value: pack.value,
       profile_credits: pack.credits,
+      pricing_tier: pack.pricing,
       items: pack.items,
       event_id: eventId
     };
@@ -166,10 +174,12 @@ export function mapOptionalTrackingEventToGoogleAnalytics(value: unknown): Googl
   }
 
   if (event.name === optionalTrackingProductEvents.ownershipTransferCompleted) {
-    if (!exactKeys(properties, ["method"]) || !["email_link", "buyer_code", "review"].includes(String(properties.method))) return null;
+    if (!exactKeys(properties, ["method"]) || typeof properties.method !== "string"
+      || !["email_link", "buyer_code", "review"].includes(properties.method)) return null;
+    const method = properties.method;
     return Object.freeze({
       name: "ownership_transfer_completed",
-      parameters: Object.freeze({ transfer_method: properties.method, event_id: eventId })
+      parameters: Object.freeze({ transfer_method: method, event_id: eventId })
     });
   }
 
@@ -268,11 +278,18 @@ export function startGoogleAnalytics(
 
   const measurementId = config.measurementId;
   const disableKey = `ga-disable-${measurementId}`;
-  const previousLayer = windowPort.dataLayer;
+  const priorOwnedRuntime = windowPort[GOOGLE_ANALYTICS_RUNTIME_STATE] as GoogleAnalyticsOwnedRuntime | undefined;
+  const previousLayer = priorOwnedRuntime ? priorOwnedRuntime.previousLayer : windowPort.dataLayer;
   const layer: GoogleAnalyticsCommand[] = [];
+  const ownedRuntime = Object.freeze({ layer, previousLayer, token: Symbol("qrguitar-ga4-runtime") });
+  windowPort[GOOGLE_ANALYTICS_RUNTIME_STATE] = ownedRuntime;
   windowPort.dataLayer = layer;
   windowPort[disableKey] = false;
-  const command = (...values: unknown[]) => { layer.push(Object.freeze([...values])); };
+  const command: (...values: unknown[]) => void = function () {
+    // gtag.js reads the Arguments objects queued by the canonical gtag wrapper.
+    // Keeping this exact shape is required by the real provider script.
+    layer.push(arguments);
+  };
   const deniedConsent = Object.freeze({
     ad_personalization: "denied",
     ad_storage: "denied",
@@ -327,12 +344,15 @@ export function startGoogleAnalytics(
     if (!active) return;
     active = false;
     unsubscribe();
-    command("consent", "update", deniedConsent);
-    windowPort[disableKey] = true;
     if (routeDispatcher === ownRouteDispatcher) routeDispatcher = null;
     script.remove();
-    documentPort.getElementById(GOOGLE_ANALYTICS_SCRIPT_ID)?.remove();
+    if (windowPort[GOOGLE_ANALYTICS_RUNTIME_STATE] !== ownedRuntime) return;
+    command("consent", "update", deniedConsent);
+    windowPort[disableKey] = true;
+    const currentScript = documentPort.getElementById(GOOGLE_ANALYTICS_SCRIPT_ID);
+    if (currentScript === script) currentScript.remove();
     removeGoogleAnalyticsCookies(documentPort, windowPort.location.hostname);
+    delete windowPort[GOOGLE_ANALYTICS_RUNTIME_STATE];
     if (previousLayer === undefined) delete windowPort.dataLayer;
     else windowPort.dataLayer = previousLayer;
   };

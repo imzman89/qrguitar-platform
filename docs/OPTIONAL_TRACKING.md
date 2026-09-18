@@ -15,6 +15,11 @@ hidden. A saved choice applies only to the exact configured purposes. Changing t
 purposes or consent schema makes the old choice stale, so loading fails closed and
 the visitor is asked again.
 
+The choice UI appears only when at least one provider for a requested purpose is
+actually installed and valid. GA4 analytics is currently the only installed provider.
+An advertising-only setting, or a mixed setting with a missing or invalid GA4 ID,
+therefore stays hidden and loads nothing.
+
 Provider code must enter through `activateOptionalTracking(purpose, loader)` from
 `apps/web/lib/optional-tracking-consent.ts`. The loader runs only after a verified
 `accepted` choice and at most once while that activation remains active. Missing,
@@ -34,6 +39,9 @@ The consent change event is `qrguitar:optional-tracking-consent`. Integration co
 can use `subscribeToOptionalTrackingConsent` rather than reading browser storage
 directly. The compact `Privacy choices` control remains available whenever optional
 tracking is configured. An accepted visitor can turn tracking off in one step.
+Re-enabling after withdrawal first persists the new choice and then reloads the
+document. The denied document never starts a provider; the fresh document verifies
+the stored choice and begins a new consent epoch.
 
 Product events cross one provider-neutral boundary:
 
@@ -76,8 +84,8 @@ conversion events:
 | `qrLandingViewed` | `qr_landing_viewed` | **Reserved and intentionally blocked.** No trustworthy QR-origin marker exists yet, so QRguitar does not emit this event or infer a scan from a Profile visit. |
 | `registrationCompleted` | `account_registration_completed` | Supabase confirms a genuinely new identity; sends `confirmation` (`email_pending` or `session_ready`) plus `idempotencyToken`. |
 | `profileCreated` | `profile_creation_completed` | The Profile creation API confirms its committed record; sends `visibility` plus `idempotencyToken`. |
-| `checkoutStarted` | `credit_checkout_started` | The payment server confirms a valid checkout order; sends the fixed pack's `credits` and `valueUsd` plus `idempotencyToken`. |
-| `purchaseCompleted` | `credit_purchase_completed` | An authoritative status read shows the server ledger has fulfilled the order; sends `credits` and `valueUsd` plus `idempotencyToken`. |
+| `checkoutStarted` | `credit_checkout_started` | The payment server confirms a valid checkout order; sends its bounded `credits`, authoritative `valueUsd`, `pricing` (`standard`, `promotion`, or `internal_test`), and `idempotencyToken`. |
+| `purchaseCompleted` | `credit_purchase_completed` | An authoritative status read shows the server ledger has fulfilled an order armed during the same still-accepted browser consent epoch; sends the ledger's `credits`, charged `valueUsd`, bounded `pricing`, and `idempotencyToken`. Historical fulfilled orders are not replayed. |
 | `ownershipTransferCompleted` | `ownership_transfer_completed` | The transfer transaction confirms `accepted`; sends `method` (`email_link`, `buyer_code`, or `review`) plus `idempotencyToken`. |
 
 Never emit a success event from a button click, optimistic screen, return URL, or
@@ -85,6 +93,15 @@ client-only payment result. Do not send names, email addresses, authentication d
 instrument serial numbers, public Profile URLs, free-form text, or raw QRguitar,
 transfer, payment, or order identifiers to an optional tracking provider. Extend the
 typed runtime sanitizer and its tests before adding any event property.
+
+Revenue is never reconstructed from a client-side list-price table. `standard` must
+match the approved pack list price. `promotion` and `internal_test` must be below that
+price and at least USD 0.30. A purchase value must come from the fulfilled server
+ledger snapshot after provider capture validation. After any promotion integration,
+the ledger and client response must expose the amount actually charged and its pricing
+classification. If an owner live test is free or that authoritative charged amount is
+unavailable, suppress its purchase event; never substitute list price. The current
+USD 0.30 owner live-test contract is classified as `internal_test`.
 
 ## Google Analytics 4 adapter
 
@@ -123,8 +140,8 @@ The event mapping is deliberately small:
 | `public_profile_viewed` | `public_profile_viewed` | `profile_visibility` only |
 | `account_registration_completed` | `sign_up` | fixed `method`, bounded confirmation, `event_id` |
 | `profile_creation_completed` | `profile_created` | bounded visibility, `event_id` |
-| `credit_checkout_started` | `begin_checkout` | fixed USD pack value and synthetic pack item, `event_id` |
-| `credit_purchase_completed` | `purchase` | fixed USD pack value and synthetic pack item, `event_id`, matching `transaction_id` |
+| `credit_checkout_started` | `begin_checkout` | authoritative USD value, bounded pricing class and synthetic pack item, `event_id` |
+| `credit_purchase_completed` | `purchase` | authoritative charged USD value, bounded pricing class and synthetic pack item, `event_id`, matching `transaction_id` |
 | `ownership_transfer_completed` | `ownership_transfer_completed` | bounded method, `event_id` |
 
 Withdrawal stops QRguitar dispatch, sends a denied consent update, sets Google's measurement-disable flag, removes the injected script, and makes a best-effort attempt
@@ -150,6 +167,12 @@ Before setting the two environment values in production:
 5. Turn tracking off and verify that no later route or product event is dispatched, the
    measurement-disable flag is set, the injected script is removed, and `_ga` cookies
    are expired where the browser permits it.
+
+The repository browser smoke test automates the pre-consent, accepted, withdrawn, and
+reaccepted lifecycle against a synthetic Measurement ID. Run
+`npm run test:google-analytics-browser --workspace @qrguitar/web`; it creates an
+isolated production build with synthetic public configuration and intercepts Google
+endpoints locally. It does not send test traffic or identifiers to Google.
 
 Official implementation references: [basic consent mode](https://developers.google.com/tag-platform/security/concepts/consent-mode),
 [manual page views](https://developers.google.com/analytics/devguides/collection/ga4/views),

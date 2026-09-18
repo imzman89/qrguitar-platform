@@ -80,7 +80,10 @@ test("GA4 configuration requires a strict Measurement ID and the analytics purpo
   assert.deepEqual(gaConfig.parseGoogleAnalyticsConfig("G-ABC12345", "advertising"), { enabled: false, measurementId: null });
   assert.deepEqual(gaConfig.parseGoogleAnalyticsConfig("G-ABC12345", "analytics,unknown"), { enabled: false, measurementId: null });
   assert.equal(gaConfig.hasConfiguredOptionalTrackingProvider(consent.parseOptionalTrackingConfig("analytics"), { enabled: false, measurementId: null }), false);
+  assert.equal(gaConfig.hasConfiguredOptionalTrackingProvider(consent.parseOptionalTrackingConfig("advertising"), { enabled: false, measurementId: null }), false);
+  assert.equal(gaConfig.hasConfiguredOptionalTrackingProvider(consent.parseOptionalTrackingConfig("analytics,advertising"), { enabled: false, measurementId: null }), false);
   assert.equal(gaConfig.hasConfiguredOptionalTrackingProvider(consent.parseOptionalTrackingConfig("analytics"), analytics), true);
+  assert.equal(gaConfig.hasConfiguredOptionalTrackingProvider(consent.parseOptionalTrackingConfig("analytics,advertising"), analytics), true);
 });
 
 test("route mapping exposes only coarse allowlisted categories and synthetic context", () => {
@@ -112,25 +115,31 @@ test("event mapping is bounded, useful, and rejects malformed or identifying pay
     ga.mapOptionalTrackingEventToGoogleAnalytics({ name: "public_profile_viewed", properties: { visibility: "public" } }),
     ga.mapOptionalTrackingEventToGoogleAnalytics({ idempotencyToken: token, name: "account_registration_completed", properties: { confirmation: "session_ready" } }),
     ga.mapOptionalTrackingEventToGoogleAnalytics({ idempotencyToken: token, name: "profile_creation_completed", properties: { visibility: "private" } }),
-    ga.mapOptionalTrackingEventToGoogleAnalytics({ idempotencyToken: token, name: "credit_checkout_started", properties: { credits: 10, valueUsd: 50 } }),
-    ga.mapOptionalTrackingEventToGoogleAnalytics({ idempotencyToken: token, name: "credit_purchase_completed", properties: { credits: 25, valueUsd: 99 } }),
+    ga.mapOptionalTrackingEventToGoogleAnalytics({ idempotencyToken: token, name: "credit_checkout_started", properties: { credits: 10, valueUsd: 50, pricing: "standard" } }),
+    ga.mapOptionalTrackingEventToGoogleAnalytics({ idempotencyToken: token, name: "credit_purchase_completed", properties: { credits: 25, valueUsd: 0.3, pricing: "internal_test" } }),
     ga.mapOptionalTrackingEventToGoogleAnalytics({ idempotencyToken: token, name: "ownership_transfer_completed", properties: { method: "buyer_code" } })
   ];
   assert.deepEqual(mapped.map(event => event?.name), ["public_profile_viewed", "sign_up", "profile_created", "begin_checkout", "purchase", "ownership_transfer_completed"]);
   for (const event of mapped.slice(1)) assert.equal(event.parameters.event_id, token);
   assert.equal(mapped[3].parameters.currency, "USD");
   assert.equal(mapped[3].parameters.value, 50);
+  assert.equal(mapped[3].parameters.pricing_tier, "standard");
   assert.deepEqual(mapped[3].parameters.items, [{ item_id: "profile_credit_pack_10", item_name: "10 Profile credits", item_category: "profile_credits", price: 50, quantity: 1 }]);
   assert.equal(mapped[4].parameters.transaction_id, token);
-  assert.equal(mapped[4].parameters.value, 99);
+  assert.equal(mapped[4].parameters.value, 0.3);
+  assert.equal(mapped[4].parameters.pricing_tier, "internal_test");
 
   for (const malformed of [
     null,
     { name: "public_profile_viewed", properties: { visibility: "public", qrgCode: "QRG-SECRET" } },
-    { idempotencyToken: token, name: "credit_checkout_started", properties: { credits: 10, valueUsd: 99 } },
-    { idempotencyToken: "raw-order-id", name: "credit_purchase_completed", properties: { credits: 1, valueUsd: 12 } },
+    { idempotencyToken: token, name: "credit_checkout_started", properties: { credits: 10, valueUsd: 99, pricing: "standard" } },
+    { idempotencyToken: "raw-order-id", name: "credit_purchase_completed", properties: { credits: 1, valueUsd: 12, pricing: "standard" } },
+    { idempotencyToken: token, name: "credit_purchase_completed", properties: { credits: 1, valueUsd: 12, pricing: "promotion" } },
+    { idempotencyToken: token, name: "credit_purchase_completed", properties: { credits: 1, valueUsd: 0.29, pricing: "internal_test" } },
     { idempotencyToken: token, name: "profile_creation_completed", properties: { visibility: "private", email: "owner@example.test" } },
-    { idempotencyToken: token, name: "ownership_transfer_completed", properties: { method: "raw-token" } }
+    { idempotencyToken: token, name: "profile_creation_completed", properties: { visibility: { toString: () => "private" } } },
+    { idempotencyToken: token, name: "ownership_transfer_completed", properties: { method: "raw-token" } },
+    { idempotencyToken: token, name: "ownership_transfer_completed", properties: { method: { toString: () => "review" } } }
   ]) assert.equal(ga.mapOptionalTrackingEventToGoogleAnalytics(malformed), null);
 });
 
@@ -158,9 +167,10 @@ test("the provider has zero pre-consent side effects, catches accepted initial e
   assert.equal(documentPort.scripts[0].src, "https://www.googletagmanager.com/gtag/js?id=G-ABC12345");
   assert.notEqual(windowPort.dataLayer, previousLayer);
   const activeLayer = windowPort.dataLayer;
+  assert.ok(activeLayer.every(command => Object.prototype.toString.call(command) === "[object Arguments]"));
   assert.equal(await consent.dispatchOptionalTrackingProductEvent({
     name: "credit_purchase_completed",
-    properties: { credits: 10, valueUsd: 50 }
+    properties: { credits: 10, valueUsd: 50, pricing: "standard" }
   }, { runtime: trackingRuntime, dedupeKey: "raw-order-id-must-never-leave" }), true);
   assert.equal(ga.dispatchGoogleAnalyticsRoute("/i/QRG-ANOTHER-SECRET"), true);
 
@@ -183,10 +193,35 @@ test("the provider has zero pre-consent side effects, catches accepted initial e
   assert.ok(documentPort.cookieWrites.some(value => value.startsWith("_ga=")));
   assert.ok(documentPort.cookieWrites.some(value => value.startsWith("_ga_ABC12345=")));
   assert.ok(documentPort.cookieWrites.every(value => !value.startsWith("qrguitar_session=")));
-  assert.deepEqual(activeLayer.at(-1), ["consent", "update", {
+  assert.deepEqual(Array.from(activeLayer.at(-1)), ["consent", "update", {
     ad_personalization: "denied", ad_storage: "denied", ad_user_data: "denied", analytics_storage: "denied"
   }]);
   stop();
+});
+
+test("a stale activation cleanup cannot tear down a newer accepted GA4 runtime", () => {
+  const storage = new MemoryStorage(), target = new EventTarget();
+  const trackingRuntime = { config: consent.parseOptionalTrackingConfig("analytics"), storage, eventTarget: target };
+  consent.saveOptionalTrackingConsent("accepted", trackingRuntime);
+  const originalLayer = { existing: true };
+  const windowPort = { dataLayer: originalLayer, location: { hostname: "www.qrguitar.com", pathname: "/privacy" } };
+  const documentPort = new FakeDocument();
+  const firstCleanup = ga.startGoogleAnalytics(analytics, { document: documentPort, trackingRuntime, window: windowPort });
+  const firstLayer = windowPort.dataLayer;
+  const secondCleanup = ga.startGoogleAnalytics(analytics, { document: documentPort, trackingRuntime, window: windowPort });
+  const secondLayer = windowPort.dataLayer, secondScript = documentPort.scripts.at(-1);
+  const firstLayerLength = firstLayer.length;
+  assert.notEqual(firstLayer, secondLayer);
+  firstCleanup();
+  assert.equal(firstLayer.length, firstLayerLength, "stale cleanup must not update the provider's global consent state");
+  assert.equal(windowPort.dataLayer, secondLayer);
+  assert.equal(secondScript.removed, false);
+  assert.equal(windowPort["ga-disable-G-ABC12345"], false);
+  assert.deepEqual(documentPort.cookieWrites, []);
+  secondCleanup();
+  assert.equal(windowPort.dataLayer, originalLayer);
+  assert.equal(secondScript.removed, true);
+  assert.equal(windowPort["ga-disable-G-ABC12345"], true);
 });
 
 test("CSP expands only for valid accepted-purpose configuration and never grants ad origins", () => {
@@ -219,6 +254,7 @@ test("layout, environment, privacy, and operator docs preserve the consent contr
   assert.match(runtime, /useEffect[\s\S]*dispatchGoogleAnalyticsRoute\(pathname\)/);
   assert.ok(layout.indexOf("<GoogleAnalyticsRuntime />") < layout.indexOf("<PwaRuntime>"));
   assert.match(consentUi, /hasConfiguredOptionalTrackingProvider\(\)/);
+  assert.match(consentUi, /saveOptionalTrackingConsentForReload\(\)[\s\S]*window\.location\.reload\(\)/);
   assert.match(privacy, /cannot erase information Google already received/);
   assert.match(guide, /does not by itself guarantee provider-side or cross-device deduplication/);
   assert.match(guide, /GA4 does not promise equivalent automatic deduplication for other web events/);

@@ -31,13 +31,13 @@ export const configuredGoogleAnalytics = parseGoogleAnalyticsConfig(
   process.env.NEXT_PUBLIC_OPTIONAL_TRACKING_PURPOSES
 );
 
-// Analytics-only consent is useful only when its reviewed provider is really
-// configured. Other optional purposes keep their provider-neutral boundary.
+// A choice is useful only when this build has a reviewed provider for it.
+// GA4 is currently the only installed optional-tracking provider.
 export function hasConfiguredOptionalTrackingProvider(
   tracking: OptionalTrackingConfig = configuredOptionalTracking,
   googleAnalytics: GoogleAnalyticsConfig = configuredGoogleAnalytics
 ) {
-  return tracking.enabled && tracking.purposes.some(
-    (purpose) => purpose !== "analytics" || googleAnalytics.enabled
-  );
+  return tracking.enabled
+    && tracking.purposes.includes("analytics")
+    && googleAnalytics.enabled;
 }
