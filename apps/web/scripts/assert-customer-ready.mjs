@@ -33,7 +33,7 @@ excludes(printSuite, "document.write", "Print Suite must not generate popup docu
 excludes(printSuite, "about:blank", "Print Suite must not print from a blank popup.");
 includes(printCss, "@media print", "Print Suite must provide scoped print layout rules.");
 includes(printCss, "overflow: visible !important", "The active print root must not retain a scrolling preview viewport.");
-includes(printDocumentCss, "width: 3.3in", "Compact labels must fit their physical page margins.");
+includes(printDocumentCss, ".label { width: 100%; height: 100%; min-height: 0;", "Compact labels must fill their physical stock without forcing overflow.");
 includes(printDocumentCss, "break-inside: avoid", "Printable sections must avoid accidental page splitting.");
 includes(printSuite, "printReadiness(images", "Print must check actual image readiness and overflow.");
 

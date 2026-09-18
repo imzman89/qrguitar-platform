@@ -51,11 +51,13 @@ test('QR and sharing surfaces use the common public URL contract', () => {
   }
 });
 
-test('every format starts on normal Letter paper and accepts only supported dimensions', () => {
-  for (const mode of Object.keys(printFormats)) {
-    assert.equal(normalizePrintOptions(mode, null, null).size, 'letter');
-    assert.deepEqual(normalizePrintOptions(mode, 'unknown', 'diagonal'), { size: 'letter', orientation: 'portrait' });
-  }
+test('every format starts on its intended physical stock and accepts only supported dimensions', () => {
+  assert.deepEqual(normalizePrintOptions('label', null, null), { size: 'compact', orientation: 'portrait' });
+  assert.deepEqual(normalizePrintOptions('hangtag', null, null), { size: '4x6', orientation: 'portrait' });
+  assert.deepEqual(normalizePrintOptions('handout', null, null), { size: 'letter', orientation: 'portrait' });
+  assert.deepEqual(normalizePrintOptions('service', null, null), { size: 'letter', orientation: 'portrait' });
+  assert.deepEqual(normalizePrintOptions('label', 'letter', 'landscape'), { size: 'compact', orientation: 'portrait' });
+  assert.deepEqual(normalizePrintOptions('hangtag', 'letter', 'diagonal'), { size: '4x6', orientation: 'portrait' });
   assert.deepEqual(normalizePrintOptions('handout', 'compact', 'landscape'), { size: 'letter', orientation: 'portrait' });
   assert.deepEqual(normalizePrintOptions('hangtag', '4x6', 'landscape'), { size: '4x6', orientation: 'landscape' });
 });
@@ -83,12 +85,12 @@ test('readiness rejects missing images, still-loading photos, and overflowing pa
   assert.equal(printReadiness([{ complete: true, naturalWidth: 1200 }], false), 'Ready to print.');
 });
 
-const base = { mode: 'handout', size: 'letter', orientation: 'portrait', theme: 'light', title: 'Workshop instrument', code: 'QRG-123456', serial: '', facts: ['Example brand'], details: [], specifications: [], timeline: [], badges: null, photo: '/photo.jpg', photoFit: 'contain', qrDataUrl: 'data:image/png;base64,test', profileUrl: 'https://www.qrguitar.com/i/QRG-123456', includeLogo: true, includeUrl: true, includeInstruction: true, note: '', service: null };
+const base = { mode: 'handout', size: 'letter', orientation: 'portrait', theme: 'light', title: 'Workshop Profile', code: 'QRG-123456', serial: '', facts: ['Example brand'], details: [], specifications: [], timeline: [], badges: null, photo: '/photo.jpg', photoFit: 'contain', qrDataUrl: 'data:image/png;base64,test', profileUrl: 'https://www.qrguitar.com/i/QRG-123456', includeLogo: true, includeUrl: true, includeInstruction: true, note: '', service: null };
 const render = overrides => renderToStaticMarkup(React.createElement(PrintDocument, { ...base, ...overrides }));
 for (const mode of ['label', 'hangtag', 'handout', 'service']) test(`${mode}: only one selected document, one title, and the permanent QR destination`, () => {
   const html = render({ mode });
   assert.equal((html.match(/data-print-document/g) || []).length, 1);
-  assert.equal((html.match(/<h2>Workshop instrument<\/h2>/g) || []).length, 1);
+  assert.equal((html.match(/<h2>Workshop Profile<\/h2>/g) || []).length, 1);
   assert.ok(html.includes(`data-mode="${mode}"`));
   assert.ok(html.includes('QR code linking to https://www.qrguitar.com/i/QRG-123456'));
   assert.ok(!html.includes('Serial Number'));
@@ -98,18 +100,39 @@ test('serial only prints when supplied by the privacy-resolved presentation', ()
   assert.ok(render({ serial: 'VISIBLE-123' }).includes('VISIBLE-123'));
 });
 
-test('every print format uses the same canonical logo as the application', () => {
+test('Profile Sheet presents one integrated permanent-profile scan band', () => {
+  const html = render({ mode: 'handout', serial: 'VISIBLE-123' });
+  assert.equal((html.match(/class="profileScan"/g) || []).length, 1);
+  assert.ok(html.includes('Permanent QRguitar Profile'));
+  assert.ok(html.includes('Scan to open this QRguitar Profile'));
+  assert.equal((html.match(/QR code linking to https:\/\/www\.qrguitar\.com\/i\/QRG-123456/g) || []).length, 1);
+  assert.ok(html.includes('class="profileIdentity"'));
+  assert.doesNotMatch(html, /\binstrument\b/i);
+});
+
+test('every print format uses the canonical logo in the matching paper appearance', () => {
   const { BrandLogo } = compile('components/BrandLogo.tsx');
   const logo = renderToStaticMarkup(React.createElement(BrandLogo));
-  const source = logo.match(/src="([^"]+)"/)?.[1];
-  assert.ok(source);
-  for (const mode of ['label', 'hangtag', 'handout', 'service']) {
-    const html = render({ mode });
-    assert.ok(html.includes(`src="${source}"`));
-    assert.ok(html.includes('alt="QRguitar logo"'));
-    assert.ok(!html.includes('>QRguitar</strong>'));
-    assert.ok(!render({ mode, includeLogo: false }).includes(`src="${source}"`));
+  assert.ok(logo.includes('src="/qrguitar-logo-white-orange.svg"'));
+  for (const theme of ['light', 'dark']) {
+    const source = theme === 'light' ? '/qrguitar-logo-ink-orange.svg' : '/qrguitar-logo-white-orange.svg';
+    for (const mode of ['label', 'hangtag', 'handout', 'service']) {
+      const html = render({ mode, theme });
+      assert.ok(html.includes(`src="${source}"`));
+      assert.ok(html.includes('alt="QRguitar logo"'));
+      assert.ok(!html.includes('>QRguitar</strong>'));
+      assert.ok(!render({ mode, theme, includeLogo: false }).includes(`src="${source}"`));
+    }
   }
+});
+
+test('paper logo keeps QR orange, guitar ink, and the approved transparent geometry', () => {
+  const original = fs.readFileSync(path.join(web, 'public/qrguitar-logo-white-orange.svg'), 'utf8').replace(/\r\n/g, '\n').trim();
+  const paper = fs.readFileSync(path.join(web, 'public/qrguitar-logo-ink-orange.svg'), 'utf8').replace(/\r\n/g, '\n').trim();
+  assert.equal(paper, original.replace('fill="#f8f6f2"', 'fill="#172022"'));
+  assert.match(paper, /x="0" y="83" fill="#f0a12b"[^>]*>QR<\/text>/);
+  assert.match(paper, /x="112" y="83" fill="#172022"[^>]*>guitar<\/text>/);
+  assert.ok(!paper.includes('<rect'));
 });
 test('adjustments affect the printout without altering its identifier or QR URL', () => {
   const html = render({ photo: '/alternate.jpg', photoFit: 'cover', note: 'Collect after 3pm.', details: [['Details', 'Used']] });
