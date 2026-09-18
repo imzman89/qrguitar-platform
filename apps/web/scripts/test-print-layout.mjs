@@ -98,18 +98,26 @@ test('serial only prints when supplied by the privacy-resolved presentation', ()
   assert.ok(render({ serial: 'VISIBLE-123' }).includes('VISIBLE-123'));
 });
 
-test('every print format uses the same canonical logo as the application', () => {
+test('every print format uses the canonical logo in the matching paper appearance', () => {
   const { BrandLogo } = compile('components/BrandLogo.tsx');
   const logo = renderToStaticMarkup(React.createElement(BrandLogo));
-  const source = logo.match(/src="([^"]+)"/)?.[1];
-  assert.ok(source);
-  for (const mode of ['label', 'hangtag', 'handout', 'service']) {
-    const html = render({ mode });
-    assert.ok(html.includes(`src="${source}"`));
-    assert.ok(html.includes('alt="QRguitar logo"'));
-    assert.ok(!html.includes('>QRguitar</strong>'));
-    assert.ok(!render({ mode, includeLogo: false }).includes(`src="${source}"`));
+  assert.ok(logo.includes('src="/qrguitar-logo-white-orange.svg"'));
+  for (const theme of ['light', 'dark']) {
+    const source = theme === 'light' ? '/qrguitar-logo-ink-orange.svg' : '/qrguitar-logo-white-orange.svg';
+    for (const mode of ['label', 'hangtag', 'handout', 'service']) {
+      const html = render({ mode, theme });
+      assert.ok(html.includes(`src="${source}"`));
+      assert.ok(html.includes('alt="QRguitar logo"'));
+      assert.ok(!html.includes('>QRguitar</strong>'));
+      assert.ok(!render({ mode, theme, includeLogo: false }).includes(`src="${source}"`));
+    }
   }
+});
+
+test('paper logo changes only white lettering to ink and retains the approved geometry and orange', () => {
+  const original = fs.readFileSync(path.join(web, 'public/qrguitar-logo-white-orange.svg'), 'utf8').replace(/\r\n/g, '\n').trim();
+  const paper = fs.readFileSync(path.join(web, 'public/qrguitar-logo-ink-orange.svg'), 'utf8').replace(/\r\n/g, '\n').trim();
+  assert.equal(paper, original.replace('fill="#f8f6f2"', 'fill="#172022"'));
 });
 test('adjustments affect the printout without altering its identifier or QR URL', () => {
   const html = render({ photo: '/alternate.jpg', photoFit: 'cover', note: 'Collect after 3pm.', details: [['Details', 'Used']] });

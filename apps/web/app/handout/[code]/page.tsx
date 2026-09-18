@@ -6,7 +6,7 @@ import { loadHandoutInstrument } from "../../../lib/handout-load";
 
 import Link from "next/link";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
-import { ArrowLeft, CheckCircle2, ExternalLink, FileText, Printer, QrCode, RotateCcw, ShieldCheck, Siren, SlidersHorizontal, X, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ExternalLink, FileText, Maximize, Printer, QrCode, RotateCcw, ShieldCheck, Siren, SlidersHorizontal, X, ZoomIn, ZoomOut } from "lucide-react";
 import QRCode from "qrcode";
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -508,9 +508,10 @@ export default function HandoutPage() {
               <div className={`${styles.previewToolbar} no-print`}>
                 <div><strong>{printModeLabel(mode)}</strong><span>{printSizeLabels[printSize]} / {orientation}{readyToPrint ? " / 1 page" : ""}</span></div>
                 <div className={styles.zoomControls} aria-label="Preview zoom">
-                  <button type="button" aria-label="Zoom out" onClick={() => setZoom((current) => Math.max(75, current - 25))}><ZoomOut size={15} /></button>
-                  <span>{zoom === 100 ? "Fit" : `${zoom}%`}</span>
-                  <button type="button" aria-label="Zoom in" onClick={() => setZoom((current) => Math.min(150, current + 25))}><ZoomIn size={15} /></button>
+                  <button type="button" aria-label="Zoom out" title="Zoom out" disabled={zoom <= 75} onClick={() => setZoom((current) => Math.max(75, current - 25))}><ZoomOut size={17} /></button>
+                  <button type="button" aria-label="Fit page" title="Fit page" onClick={() => setZoom(100)}><Maximize size={17} /></button>
+                  <output aria-live="polite" aria-label="Preview scale">{Math.round(previewScale * 100)}%</output>
+                  <button type="button" aria-label="Zoom in" title="Zoom in" disabled={zoom >= 300} onClick={() => setZoom((current) => Math.min(300, current + 25))}><ZoomIn size={17} /></button>
                 </div>
               </div>
 

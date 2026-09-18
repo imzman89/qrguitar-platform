@@ -37,7 +37,7 @@ function Facts({ facts }: { facts: Fact[] }) {
 export function PrintDocument(props: Props) {
   const { mode, title, code, serial, photo, profileUrl, service } = props;
   const qr = <img className={styles.qr} src={props.qrDataUrl || undefined} alt={`QR code linking to ${profileUrl}`} />;
-  const brand = props.includeLogo ? <span className={styles.brandPlate}><BrandLogo className={styles.logo} /></span> : <span />;
+  const brand = props.includeLogo ? <span className={styles.brandPlate}><BrandLogo className={styles.logo} appearance={props.theme === "light" ? "paper" : "dark"} /></span> : <span />;
   const photograph = photo ? <div className={styles.photograph}><img src={photo} alt={title} style={{ objectFit: props.photoFit }} loading="eager" decoding="sync" /></div> : null;
   const identity: Fact[] = [["QRguitar ID", code], ...(serial ? [["Serial Number", serial] as Fact] : [])];
   const footer = <footer className={styles.footer}>{props.note ? <p>{props.note}</p> : null}{props.includeUrl ? <span>{profileUrl}</span> : null}</footer>;
