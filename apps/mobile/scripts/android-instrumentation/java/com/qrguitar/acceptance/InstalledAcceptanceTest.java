@@ -159,7 +159,7 @@ public final class InstalledAcceptanceTest {
     clickLabel("Scan");
     requireLabel("Find a Profile");
     requireLabel("QRguitar ID or Profile link");
-    requireLabel("Open Profile");
+    requireLabelAfterScrolling("Open Profile");
     assertFalse("Offline smoke must not grant camera access",
         context.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED);
     clickLabel("Explore");
