@@ -1,7 +1,11 @@
 name: Android photo recovery
 on:
   push:
-    branches: [codex/android-photo-selection-recovery]
+    branches: [master]
+    paths:
+      - apps/mobile/**
+      - package-lock.json
+      - .github/workflows/android-photo-recovery.yml
   pull_request:
     paths:
       - apps/mobile/**
@@ -28,6 +32,13 @@ jobs:
       - run: npm run typecheck --workspace @qrguitar/mobile
       - run: npm run lint --workspace @qrguitar/mobile
       - run: npm test --workspace @qrguitar/mobile
+      - name: Export all runtimes with fixture configuration
+        run: npm run export:all --workspace @qrguitar/mobile -- --source-maps --max-workers 2
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: https://build-only.supabase.co
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CI_fixture_only_not_for_deployment
+          EXPO_PUBLIC_API_ORIGIN: https://www.qrguitar.com
+      - run: npm run test:runtime-bundles --workspace @qrguitar/mobile
       - name: Generate Android project and verify module discovery
         working-directory: apps/mobile
         run: |
