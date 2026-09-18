@@ -1,5 +1,5 @@
 import type { BillingAuth } from "./billing-client";
-import type { DirectOffer } from "./direct-payments";
+import type { AppliedPromotion, DirectOffer } from "./direct-payments";
 import type { PayPalOrder, PayPalPaymentsSnapshot } from "./paypal-payments";
 import { createPaymentSessionScope, directOrderId, PaymentRequestError } from "./direct-payments-client";
 import {
@@ -14,12 +14,15 @@ const record = (value: unknown): Record<string, unknown> => value && typeof valu
 const packs: Record<string, [number, number]> = { profile_1: [1200, 1], profile_10: [5000, 10], profile_25: [9900, 25] };
 export const paypalProviderOrderId = (value: unknown) => typeof value === "string" && /^[A-Z0-9]{5,64}$/.test(value) ? value : "";
 const terminal = (status: string) => ["fulfilled", "cancelled", "needs_review"].includes(status);
-type TrackingPricing = "standard" | "promotion" | "internal_test";
 type PurchaseTrackingArm = Readonly<{ actorId: string; consentEpoch: string; orderId: string; offerKey: string }>;
-function trackingPack(offer: DirectOffer) {
-  const pricingValue = (offer as DirectOffer & { pricing?: unknown }).pricing;
-  const pricing: TrackingPricing = pricingValue === "promotion" || pricingValue === "internal_test" ? pricingValue : "standard";
-  return { credits: offer.credits as 1 | 10 | 25, valueUsd: offer.amount / 100, pricing };
+export function paypalTrackingProperties(offer: DirectOffer) {
+  const specification = packs[offer.key];
+  const pricing = offer.promotion?.classification || "standard";
+  if (!specification || offer.credits !== specification[1] || !Number.isSafeInteger(offer.amount) || offer.amount < 30 || offer.amount > specification[0]
+    || !["standard", "promotion", "internal_test"].includes(pricing)
+    || (pricing === "standard") !== (offer.amount === specification[0])) return null;
+  return { credits: specification[1] as 1 | 10 | 25, valueUsd: offer.amount / 100,
+    pricing: pricing as "standard" | "promotion" | "internal_test" };
 }
 function readPurchaseTrackingArm(value: unknown): PurchaseTrackingArm | null {
   const row = record(value);
@@ -30,7 +33,10 @@ function readPurchaseTrackingArm(value: unknown): PurchaseTrackingArm | null {
 }
 export type PayPalClientOrder = PayPalOrder;
 export type PayPalSnapshot = PayPalPaymentsSnapshot;
-export type PayPalIntent = { requestId: string; offerKey: string; orderId: string; paypalOrderId: string; approvalObserved: boolean };
+export type PayPalIntent = {
+  requestId: string; offerKey: string; orderId: string; paypalOrderId: string; approvalObserved: boolean;
+  promoCode: string; promoId: string; promoRevision: number | null; expectedAmount: number | null;
+};
 export type PayPalPaymentsState = {
   phase: "loading" | "ready" | "signed-out" | "error"; actorId: string; snapshot: PayPalSnapshot | null;
   intent: PayPalIntent | null; busy: "" | "creating" | "capturing" | "reconciling"; refreshing: boolean;
@@ -39,8 +45,25 @@ export type PayPalPaymentsState = {
 export const initialPayPalPaymentsState = (): PayPalPaymentsState => ({ phase: "loading", actorId: "", snapshot: null, intent: null, busy: "", refreshing: false, message: "", uncertain: false, polling: false, checkoutOpen: false });
 function readOffer(value: unknown): DirectOffer {
   const row = record(value), spec = typeof row.key === "string" && Object.hasOwn(packs, row.key) ? packs[row.key] : null;
-  if (!spec || row.amount !== spec[0] || row.credits !== spec[1] || row.currency !== "usd" || row.version !== 1 || row.permanent !== true || row.freeAllowance !== 5) throw new Error("The selected Profile pack could not be verified. Refresh to try again.");
-  return row as DirectOffer;
+  if (!spec || !Number.isSafeInteger(row.amount) || Number(row.amount) < 30 || Number(row.amount) > spec[0]
+    || row.credits !== spec[1] || row.currency !== "usd" || row.version !== 1 || row.permanent !== true || row.freeAllowance !== 5)
+    throw new Error("The selected Profile pack could not be verified. Refresh to try again.");
+  if (row.promotion == null) {
+    if (row.amount !== spec[0] || row.listAmount !== undefined) throw new Error("The selected Profile pack could not be verified. Refresh to try again.");
+    return row as DirectOffer;
+  }
+  const promotion = record(row.promotion);
+  if (!directOrderId(promotion.id) || typeof promotion.code !== "string" || !/^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(promotion.code)
+    || typeof promotion.name !== "string" || promotion.name.length < 1 || promotion.name.length > 80
+    || !Number.isSafeInteger(promotion.revision) || Number(promotion.revision) < 1
+    || !["fixed_total", "amount_off", "percent_off"].includes(String(promotion.discountType))
+    || !Number.isSafeInteger(promotion.discountValue) || Number(promotion.discountValue) < 1
+    || !["promotion", "internal_test"].includes(String(promotion.classification))
+    || promotion.originalAmount !== spec[0] || row.listAmount !== spec[0] || promotion.finalAmount !== row.amount
+    || !Number.isSafeInteger(promotion.discountAmount) || Number(promotion.discountAmount) < 1
+    || Number(promotion.originalAmount) - Number(promotion.discountAmount) !== Number(promotion.finalAmount)
+    || Number(promotion.finalAmount) >= spec[0]) throw new Error("The applied promo could not be verified. Apply it again.");
+  return { ...row, promotion: promotion as AppliedPromotion } as DirectOffer;
 }
 function readOrder(value: unknown, ownerId: string, requestedOrder = ""): PayPalClientOrder {
   const row = record(value), offer = readOffer(row.offer);
@@ -72,9 +95,20 @@ function readSnapshot(value: unknown, ownerId: string, requestedOrder: string): 
 }
 function readIntent(value: unknown): PayPalIntent | null {
   const row = record(value);
+  const promoCode = row.promoCode == null ? "" : row.promoCode, promoId = row.promoId == null ? "" : row.promoId;
+  const hasPromo = typeof promoCode === "string" && promoCode.length > 0;
   return directOrderId(row.requestId) && typeof row.offerKey === "string" && Object.hasOwn(packs, row.offerKey)
     && (row.orderId === "" || directOrderId(row.orderId)) && (row.paypalOrderId === "" || paypalProviderOrderId(row.paypalOrderId))
-    && typeof row.approvalObserved === "boolean" ? row as PayPalIntent : null;
+    && typeof row.approvalObserved === "boolean"
+    && ((!hasPromo && promoCode === "" && promoId === "" && row.promoRevision == null && row.expectedAmount == null)
+      || (hasPromo && /^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(promoCode as string) && directOrderId(promoId)
+        && Number.isSafeInteger(row.promoRevision) && Number(row.promoRevision) > 0
+        && Number.isSafeInteger(row.expectedAmount) && Number(row.expectedAmount) >= 30))
+    ? { requestId: row.requestId as string, offerKey: row.offerKey as string, orderId: row.orderId as string,
+        paypalOrderId: row.paypalOrderId as string, approvalObserved: row.approvalObserved as boolean,
+        promoCode: promoCode as string, promoId: promoId as string,
+        promoRevision: hasPromo ? row.promoRevision as number : null, expectedAmount: hasPromo ? row.expectedAmount as number : null }
+    : null;
 }
 export function createPayPalPaymentsClient(deps: {
   auth: () => BillingAuth; fetch?: typeof fetch; timeoutMs?: number; storage?: () => Pick<Storage, "getItem" | "setItem" | "removeItem">;
@@ -168,7 +202,9 @@ export function createPayPalPaymentsClient(deps: {
       const snapshot = { ...authoritative, order: displayObservation(authoritative.order), pendingOrder: displayObservation(authoritative.pendingOrder) }, order = snapshot.order;
       if (snapshot.pendingOrder) {
         const pending = snapshot.pendingOrder, approved = state.intent?.orderId === pending.orderId && state.intent.approvalObserved;
-        remember({ requestId: pending.requestId, offerKey: pending.offerKey, orderId: pending.orderId, paypalOrderId: pending.paypalOrderId || "", approvalObserved: Boolean(approved) });
+        remember({ requestId: pending.requestId, offerKey: pending.offerKey, orderId: pending.orderId, paypalOrderId: pending.paypalOrderId || "", approvalObserved: Boolean(approved),
+          promoCode: pending.offer.promotion?.code || "", promoId: pending.offer.promotion?.id || "",
+          promoRevision: pending.offer.promotion?.revision || null, expectedAmount: pending.offer.promotion ? pending.offer.amount : null });
       } else if (state.intent?.orderId && order?.orderId === state.intent.orderId && terminal(order.status)) remember(null);
       publish({ phase: "ready", snapshot, refreshing: false, uncertain: Boolean(state.intent && !snapshot.pendingOrder), ...(order && terminal(order.status) ? { checkoutOpen: false, message: "" } : {}) }); schedulePoll();
       const currentConsentEpoch = purchaseTrackingArm && analyticsAllowed() ? consentEpoch() : "";
@@ -177,7 +213,7 @@ export function createPayPalPaymentsClient(deps: {
         && purchaseTrackingArm.consentEpoch === currentConsentEpoch
         && purchaseTrackingArm.orderId === order.orderId
         && purchaseTrackingArm.offerKey === order.offerKey;
-      const completedPack = order && armed ? trackingPack(order.offer) : null;
+      const completedPack = order && armed ? paypalTrackingProperties(order.offer) : null;
       if (order && completedPack) {
         clearPurchaseTrackingArm();
         void dispatchOptionalTrackingProductEvent({
@@ -188,32 +224,67 @@ export function createPayPalPaymentsClient(deps: {
     } catch (error) { if (scope.live(lease) && attempt === loadRevision) { stopPolling(); publish({ phase: "error", snapshot: null, refreshing: false, message: error instanceof Error ? error.message : "Could not check payment status." }); } }
   }
   async function start() { const lease = scope.lease(); try { await scope.start(); } catch (error) { if (scope.live(lease)) publish({ phase: "error", message: error instanceof Error ? error.message : "Sign-in is unavailable." }); } }
-  async function createOrder(offerKey: string, expectedActor: string): Promise<string> {
+  async function quotePromotion(offerKey: string, promoCodeInput: string, expectedActor: string): Promise<DirectOffer> {
+    const snapshot = state.snapshot, promoCode = promoCodeInput.trim().toUpperCase();
+    if (disposed || lock || state.refreshing || state.phase !== "ready" || !snapshot || expectedActor !== state.actorId || state.intent
+      || !snapshot.enabled || snapshot.hold || snapshot.commercialExempt || snapshot.legacyOrderId
+      || !snapshot.offers.some(offer => offer.key === offerKey) || !/^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(promoCode))
+      throw new Error("Enter a valid promo code and try again.");
+    const lease = scope.lease(), result = await scope.request(lease, "/api/billing/paypal/promo", { offerKey, promoCode });
+    if (!scope.live(lease)) throw new Error("Your sign-in changed. Apply the promo code again.");
+    const offer = readOffer(result.offer);
+    if (offer.key !== offerKey || offer.promotion?.code !== promoCode) throw new Error("The applied promo could not be verified. Apply it again.");
+    return offer;
+  }
+  async function createOrder(offerKey: string, expectedActor: string, pricedOffer?: DirectOffer): Promise<string> {
     const snapshot = state.snapshot;
     if (disposed || lock || state.refreshing || state.phase !== "ready" || !snapshot || !state.actorId || expectedActor !== state.actorId
       || (!state.intent && (!snapshot.enabled || snapshot.hold || snapshot.commercialExempt || snapshot.legacyOrderId || !snapshot.offers.some(offer => offer.key === offerKey)))
       || (state.intent && state.intent.offerKey !== offerKey)) throw new Error("Refresh your account before opening checkout.");
+    const suppliedPromotion = pricedOffer?.promotion;
+    if (!state.intent && pricedOffer && (pricedOffer.key !== offerKey || (suppliedPromotion ? pricedOffer.amount !== suppliedPromotion.finalAmount : pricedOffer.amount !== packs[offerKey]?.[0])))
+      throw new Error("Apply the promo code again before checkout.");
     const lease = scope.lease(), operation = Symbol("create-paypal"); let resolved = false; lock = operation; loadRevision++; stopPolling(); publish({ busy: "creating", message: "", checkoutOpen: true });
     try {
-      if (!state.intent) { const requestId = directOrderId(deps.randomUUID ? deps.randomUUID() : crypto.randomUUID()); if (!requestId) throw new Error("Could not save your checkout. Please try again."); remember({ requestId, offerKey, orderId: "", paypalOrderId: "", approvalObserved: false }); }
+      if (!state.intent) { const requestId = directOrderId(deps.randomUUID ? deps.randomUUID() : crypto.randomUUID()); if (!requestId) throw new Error("Could not save your checkout. Please try again."); remember({ requestId, offerKey, orderId: "", paypalOrderId: "", approvalObserved: false,
+        promoCode: suppliedPromotion?.code || "", promoId: suppliedPromotion?.id || "",
+        promoRevision: suppliedPromotion?.revision || null, expectedAmount: suppliedPromotion ? pricedOffer!.amount : null }); }
       const intent = state.intent!;
-      const result = await scope.request(lease, "/api/billing/paypal/create", { offerKey: intent.offerKey, requestId: intent.requestId });
+      const result = await scope.request(lease, "/api/billing/paypal/create", { offerKey: intent.offerKey, requestId: intent.requestId,
+        ...(intent.promoCode ? { promoCode: intent.promoCode, promoId: intent.promoId, promoRevision: intent.promoRevision, expectedAmount: intent.expectedAmount } : {}) });
       const orderId = directOrderId(result.orderId), paypalOrderId = paypalProviderOrderId(result.paypalOrderId), status = result.status;
+      const returnedOffer = result.offer === undefined && !intent.promoCode
+        ? snapshot.offers.find(offer => offer.key === intent.offerKey)
+          || (snapshot.pendingOrder?.offerKey === intent.offerKey ? snapshot.pendingOrder.offer : undefined)
+          || (snapshot.order?.offerKey === intent.offerKey ? snapshot.order.offer : undefined)
+        : readOffer(result.offer);
       if ((status !== undefined && !["reserved", "approval_pending", "processing", "fulfilled", "cancelled", "needs_review"].includes(String(status)))
         || !orderId || (!paypalOrderId && !(terminal(String(status)) && result.paypalOrderId === null))
+        || !returnedOffer || returnedOffer.key !== intent.offerKey || (returnedOffer.promotion?.code || "") !== intent.promoCode
+        || (intent.promoCode && (returnedOffer.promotion?.id !== intent.promoId || returnedOffer.promotion?.revision !== intent.promoRevision || returnedOffer.amount !== intent.expectedAmount))
         || (intent.orderId && orderId !== intent.orderId) || (intent.paypalOrderId && paypalOrderId !== intent.paypalOrderId)) throw new Error("The checkout response could not be verified. Check its status before trying again.");
       remember({ ...intent, orderId, paypalOrderId }); publish({ uncertain: false });
       if (terminal(String(status))) { resolved = true; throw new Error("This payment is already resolved. Check its status above."); }
-      const selectedOffer = snapshot.offers.find((offer) => offer.key === intent.offerKey);
       const epoch = consentEpoch();
-      if (selectedOffer && epoch) rememberPurchaseTrackingArm({ actorId: state.actorId, consentEpoch: epoch, orderId, offerKey: intent.offerKey });
-      const startedPack = selectedOffer ? trackingPack(selectedOffer) : null;
+      const startedPack = paypalTrackingProperties(returnedOffer);
+      if (startedPack && epoch) rememberPurchaseTrackingArm({ actorId: state.actorId, consentEpoch: epoch, orderId, offerKey: intent.offerKey });
       if (startedPack) void dispatchOptionalTrackingProductEvent({
         name: optionalTrackingProductEvents.checkoutStarted,
         properties: startedPack
       }, { dedupeKey: orderId, runtime: deps.trackingRuntime });
       return paypalOrderId;
-    } catch (error) { if (scope.live(lease)) publish({ checkoutOpen: false, uncertain: !resolved && Boolean(state.intent), message: resolved ? "This payment is already resolved. Check its status above." : `${error instanceof Error ? error.message : "Checkout could not open."} Your checkout is saved for a safe retry.` }); throw error; }
+    } catch (error) {
+      if (scope.live(lease)) {
+        const rejected = error instanceof PaymentRequestError && error.status >= 400 && error.status < 500;
+        if (rejected) remember(null);
+        publish({ checkoutOpen: false, uncertain: !resolved && !rejected && Boolean(state.intent), message: resolved
+          ? "This payment is already resolved. Check its status above."
+          : rejected
+            ? `${error.message} Refresh your account or reapply the promo before trying again.`
+            : `${error instanceof Error ? error.message : "Checkout could not open."} Your checkout is saved for a safe retry.` });
+      }
+      throw error;
+    }
     finally { if (lock === operation) { lock = undefined; if (scope.live(lease)) { publish({ busy: "" }); if (resolved) await load(); } } }
   }
   async function capture(paypalOrderId: string, expectedActor: string): Promise<"confirmed" | "pending" | "restart"> {
@@ -258,7 +329,7 @@ export function createPayPalPaymentsClient(deps: {
     publish({ checkoutOpen: true, message: "" }); return true;
   }
   function sdkError(expectedActor: string) { if (!disposed && expectedActor === state.actorId) { const resolved = terminal(state.snapshot?.order?.status || ""); publish({ checkoutOpen: false, message: resolved ? "This payment is already resolved. Check its status above." : state.message || "Checkout couldn’t finish. Try again, or check the status of your saved payment.", uncertain: !resolved && Boolean(state.intent) }); } }
-  return { getState: () => state, subscribe(listener: (state: PayPalPaymentsState) => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }, start, createOrder, capture, reconcile, completeReturn, beginWalletCheckout, cancelled, sdkError,
+  return { getState: () => state, subscribe(listener: (state: PayPalPaymentsState) => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }, start, quotePromotion, createOrder, capture, reconcile, completeReturn, beginWalletCheckout, cancelled, sdkError,
     reload: () => { polls = 0; stopPolling(); return state.actorId ? load() : start(); },
     dispose() { disposed = true; stopPolling(); unsubscribeTrackingConsent(); scope.dispose(); listeners.clear(); state = initialPayPalPaymentsState(); purchaseTrackingArm = null; }
   };

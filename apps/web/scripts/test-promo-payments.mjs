@@ -37,6 +37,8 @@ const baseOffer = { key: "profile_10", version: 1, currency: "usd", amount: 5000
 const promotion = { id: PROMO, code: "GARYWON", name: "Owner payment test", revision: 1, discountType: "fixed_total", discountValue: 30,
   classification: "internal_test", originalAmount: 5000, discountAmount: 4970, finalAmount: 30 };
 const promotedOffer = { ...baseOffer, amount: 30, listAmount: 5000, promotion };
+const applePromotion = { ...promotion, code: "GARYAPPLE", name: "Apple Pay acceptance test", discountValue: 100, discountAmount: 4900, finalAmount: 100 };
+const applePromotedOffer = { ...baseOffer, amount: 100, listAmount: 5000, promotion: applePromotion };
 const databaseOffer = { key: "profile_10", version: 1, currency: "usd", amount: 30, credits: 10 };
 const rawOrder = (patch = {}) => ({ orderId: ORDER, ownerId: OWNER, environment: "test", requestKey: REQUEST, status: "open",
   offer: databaseOffer, provider: "paypal", merchantId: MERCHANT, paypalOrderId: PAYPAL, captureId: null, hold: false,
@@ -75,9 +77,21 @@ function serviceFixture({ rows = {}, gateway = {}, actor = { id: OWNER, accountS
 test("service quotes GARYWON as an internal thirty-cent pack from the authoritative RPC", async () => {
   const fixture = serviceFixture({ rows: { billing_promo_quote: args => {
     assert.deepEqual(args, { p_owner_id: OWNER, p_environment: "test", p_offer_key: "profile_10", p_code: "GARYWON", p_internal_access: true });
-    return { offer: databaseOffer, promotion };
+    return { available: true, rateLimited: false, offer: databaseOffer, promotion };
   } } });
   assert.deepEqual(await fixture.service.quote({}, { offerKey: "profile_10", promoCode: "  garywon " }), { offer: promotedOffer });
+});
+
+test("promo quote failures do not disclose code state and rate limiting remains explicit", async () => {
+  for (const body of [{ available: false, rateLimited: false }, { available: false, rateLimited: false, private: true }]) {
+    const fixture = serviceFixture({ rows: { billing_promo_quote: body } });
+    await assert.rejects(fixture.service.quote({}, { offerKey: "profile_10", promoCode: "MAYBE" }), error =>
+      error.status === 400 && error.code === "promo_unavailable" && error.message === "That promo code isn’t available.");
+  }
+  const limited = serviceFixture({ rows: { billing_promo_quote: { available: false, rateLimited: true } } });
+  await assert.rejects(limited.service.quote({}, { offerKey: "profile_10", promoCode: "MAYBE" }), error => error.status === 429 && error.code === "promo_rate_limited");
+  const malformed = serviceFixture();
+  await assert.rejects(malformed.service.quote({}, { offerKey: "profile_10", promoCode: "x" }), error => error.status === 400 && error.code === "promo_unavailable");
 });
 
 test("service forwards quote identity and amount to atomic reservation and creates PayPal for $0.30", async () => {
@@ -97,12 +111,24 @@ test("service forwards quote identity and amount to atomic reservation and creat
 });
 
 test("a stale promo quote fails before a provider order can be created", async () => {
-  const stale = Object.assign(new Error("stale"), { code: "PT409" });
+  const stale = Object.assign(new Error("stale"), { code: "PT410" });
   const fixture = serviceFixture({ rows: { billing_paypal_find_order: { order: null }, billing_account_status: account,
     billing_paypal_reserve_promoted_order: () => { throw stale; } } });
   await rejectsCode(fixture.service.create({}, { offerKey: "profile_10", requestId: REQUEST, promoCode: "GARYWON",
-    promoId: PROMO, promoRevision: 1, expectedAmount: 30 }), "payment_conflict");
+    promoId: PROMO, promoRevision: 1, expectedAmount: 30 }), "promo_unavailable");
   assert.equal(fixture.gatewayCalls.length, 0);
+});
+
+test("direct create cannot distinguish an unknown code from forged fields for a real code", async () => {
+  for (const databaseCode of ["PT404", "PT410"]) {
+    const rejected = Object.assign(new Error("private database reason"), { code: databaseCode });
+    const fixture = serviceFixture({ rows: { billing_paypal_find_order: { order: null }, billing_account_status: account,
+      billing_paypal_reserve_promoted_order: () => { throw rejected; } } });
+    await assert.rejects(fixture.service.create({}, { offerKey: "profile_10", requestId: REQUEST, promoCode: "GUESSED",
+      promoId: PROMO, promoRevision: 1, expectedAmount: 30 }), error =>
+      error.status === 400 && error.code === "promo_unavailable" && error.message === "That promo code isn’t available.");
+    assert.equal(fixture.gatewayCalls.length, 0);
+  }
 });
 
 test("service rejects provider order and capture totals above or below the frozen thirty cents", async () => {
@@ -183,6 +209,26 @@ test("a lost create response persists the exact promo preconditions for a safe r
     promoId: PROMO, promoRevision: 1, expectedAmount: 30 });
 });
 
+test("definitive stale, paused, or limited promo rejection clears the local intent across reloads", async t => {
+  for (const reason of ["The promo changed.", "The promo is paused.", "The promo reached its use limit."]) {
+    const storage = new Map();
+    const fixture = clientFixture(t, { storage, responder: async (url) => {
+      if (url.includes("/status")) return json(snapshot());
+      if (url.endsWith("/promo")) return json({ offer: promotedOffer });
+      return Response.json({ ok: false, code: "promo_unavailable", message: reason }, { status: 400 });
+    } });
+    await fixture.ready(); const quote = await fixture.client.quotePromotion("profile_10", "GARYWON", OWNER);
+    await assert.rejects(fixture.client.createOrder("profile_10", OWNER, quote), error => error.status === 400 && error.code === "promo_unavailable");
+    assert.equal(fixture.client.getState().intent, null); assert.equal(fixture.client.getState().uncertain, false);
+    assert.match(fixture.client.getState().message, /reapply the promo/i); assert.equal(storage.size, 0);
+    const postsBeforeReload = fixture.posts().length; await fixture.client.reload();
+    assert.equal(fixture.posts().length, postsBeforeReload); assert.equal(fixture.client.getState().intent, null);
+    fixture.client.dispose();
+    const recreated = clientFixture(t, { storage }); await recreated.ready();
+    assert.equal(recreated.client.getState().intent, null); assert.equal(recreated.posts().length, 0);
+  }
+});
+
 test("browser client rejects tampered promo quotes and changed create responses", async t => {
   const tamperedQuote = { ...promotedOffer, amount: 31 };
   const quoteFixture = clientFixture(t, { responder: async url => url.includes("/status") ? json(snapshot()) : json({ offer: tamperedQuote }) });
@@ -203,7 +249,7 @@ test("PayPal button adapter supplies the promoted offer to the controller", asyn
   assert.equal(await options.createOrder(), PAYPAL); assert.deepEqual(calls[0], ["profile_10", OWNER, promotedOffer]);
 });
 
-test("Apple Pay opens a 0.30 sheet and uses the same promoted server preconditions after authorization", async () => {
+test("Apple Pay skips the thirty-cent test and uses the protected one-dollar acceptance offer", async () => {
   const calls = [], sessions = [], state = { actorId: OWNER };
   class Session {
     static STATUS_SUCCESS = 1; static STATUS_FAILURE = 0;
@@ -216,13 +262,16 @@ test("Apple Pay opens a 0.30 sheet and uses the same promoted server preconditio
     capture: async (...args) => { calls.push(["capture", ...args]); return "confirmed"; }, cancelled: async () => {}, sdkError() {} };
   const applepay = { config: async () => ({}), validateMerchant: async () => ({ merchantSession: {} }),
     confirmOrder: async input => { calls.push(["confirm", input]); return {}; } };
-  const checkout = appleModule.createApplePayCheckout({ applepay, config: { isEligible: true, countryCode: "US", merchantCapabilities: ["supports3DS"], supportedNetworks: ["visa"] },
+  const belowMinimum = appleModule.createApplePayCheckout({ applepay, config: { isEligible: true, countryCode: "US", merchantCapabilities: ["supports3DS"], supportedNetworks: ["visa"] },
     Session, controller, actorId: OWNER, offer: promotedOffer, merchantName: "QRguitar", timeoutMs: 100 });
+  assert.equal(belowMinimum.start(), false); assert.equal(sessions.length, 0); belowMinimum.dispose();
+  const checkout = appleModule.createApplePayCheckout({ applepay, config: { isEligible: true, countryCode: "US", merchantCapabilities: ["supports3DS"], supportedNetworks: ["visa"] },
+    Session, controller, actorId: OWNER, offer: applePromotedOffer, merchantName: "QRguitar", timeoutMs: 100 });
   try {
-    assert.equal(checkout.start(), true); assert.deepEqual(sessions[0].request.total, { label: "QRguitar", type: "final", amount: "0.30" });
+    assert.equal(checkout.start(), true); assert.deepEqual(sessions[0].request.total, { label: "QRguitar", type: "final", amount: "1.00" });
     sessions[0].onpaymentauthorized({ payment: { token: { encrypted: "PAYPAL_ONLY" } } });
     await until(() => calls.some(call => call[0] === "capture"));
-    assert.deepEqual(calls.find(call => call[0] === "create"), ["create", "profile_10", OWNER, promotedOffer]);
+    assert.deepEqual(calls.find(call => call[0] === "create"), ["create", "profile_10", OWNER, applePromotedOffer]);
     assert.deepEqual(calls.find(call => call[0] === "capture"), ["capture", PAYPAL, OWNER]);
   } finally { checkout.dispose(); }
 });
