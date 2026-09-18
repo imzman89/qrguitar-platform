@@ -40,6 +40,7 @@ import {
   MAX_NATIVE_PHOTOS,
   MAX_NATIVE_IMAGE_BYTES,
   type NativePhoto,
+  type NativeProfileDraft,
   type NativeProfileInput,
 } from "./lib/profile-draft";
 import { createUiMutationQueue, waitForDraftIdle } from "./lib/ui-actions";
@@ -981,6 +982,8 @@ function Create({
     [selecting, setSelecting] = useState(false);
   const mounted = useRef(true),
     pickerBusy = useRef(false),
+    recoveryRequested = useRef(false),
+    recoveryQueued = useRef(false),
     autosaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
       undefined,
     ),
@@ -997,13 +1000,6 @@ function Create({
   useEffect(() => {
     latest.current = { input, photos, ready };
   }, [input, photos, ready]);
-  const restoreDraft = useCallback(async () => {
-    let draft = await controller.loadDraft();
-    if (photoPicker) draft = await photoPicker.recover(actorId, controller, lifetime.current.signal) || draft;
-    if (!mounted.current) return;
-    if (draft) { setInput(draft.input); setPhotos(draft.photos); }
-    setReady(true);
-  }, [actorId, controller, photoPicker]);
   const flushEditableDraft = useCallback(async () => {
     clearTimeout(autosaveTimer.current);
     await waitForDraftIdle(controller, lifetime.current.signal);
@@ -1013,6 +1009,47 @@ function Create({
       current.photos.length !== latest.current.photos.length || current.photos.some((photo, index) => photo !== latest.current.photos[index])
     )) await controller.saveDraft(latest.current.input, latest.current.photos);
   }, [controller]);
+  const showDraft = useCallback((draft: NativeProfileDraft) => {
+    if (!mounted.current || lifetime.current.signal.aborted) return;
+    // A queued recovery can run before React commits these setters. Its flush
+    // must see the photos that just committed, not the previous render's form.
+    latest.current = { input: draft.input, photos: draft.photos, ready: true };
+    setInput(draft.input); setPhotos(draft.photos);
+  }, []);
+  const restoreDraft = useCallback(async () => {
+    await flushEditableDraft();
+    let draft = await controller.loadDraft();
+    if (photoPicker) draft = await photoPicker.recover(actorId, controller, lifetime.current.signal) || draft;
+    if (!mounted.current || lifetime.current.signal.aborted) return;
+    if (draft) showDraft(draft);
+    latest.current = { ...latest.current, ready: true };
+    setReady(true);
+  }, [actorId, controller, flushEditableDraft, photoPicker, showDraft]);
+  const requestPhotoRecovery = useCallback(function requestRecovery() {
+    if (!photoPicker || !mounted.current || lifetime.current.signal.aborted) return;
+    recoveryRequested.current = true;
+    if (!latest.current.ready) return;
+    if (recoveryQueued.current) return;
+    recoveryQueued.current = true;
+    setSelecting(true);
+    // Queue behind an active selection/save; an identified native result can
+    // arrive before start() returns, without another AppState transition.
+    void mutations.run(async () => {
+      while (recoveryRequested.current && mounted.current && !lifetime.current.signal.aborted) {
+        recoveryRequested.current = false;
+        await flushEditableDraft();
+        if (!mounted.current || lifetime.current.signal.aborted) return;
+        const draft = await photoPicker.recover(actorId, controller, lifetime.current.signal);
+        if (draft) showDraft(draft);
+        if (mounted.current && !lifetime.current.signal.aborted) setLocalError("");
+      }
+    }).catch(error => { if (mounted.current) setLocalError(messageOf(error)); })
+      .finally(() => {
+        recoveryQueued.current = false;
+        if (mounted.current) setSelecting(pickerBusy.current);
+        if (recoveryRequested.current) requestRecovery();
+      });
+  }, [actorId, controller, flushEditableDraft, mutations, photoPicker, showDraft]);
   useEffect(() => {
     const lifetimeController = lifetime.current;
     mounted.current = true;
@@ -1023,25 +1060,23 @@ function Create({
       });
     return () => {
       mounted.current = false;
+      recoveryRequested.current = false;
       lifetimeController.abort();
       unsub();
       controller.dispose();
     };
   }, [controller, restoreDraft]);
   useEffect(() => {
-    if (!photoPicker || !ready) return;
+    if (!photoPicker) return;
     const subscription = AppState.addEventListener("change", next => {
-      if (next !== "active" || pickerBusy.current || mutations.getBusy()) return;
-      pickerBusy.current = true; setSelecting(true);
-      void mutations.run(async () => {
-        await flushEditableDraft();
-        const draft = await photoPicker.recover(actorId, controller, lifetime.current.signal);
-        if (mounted.current && draft) { setInput(draft.input); setPhotos(draft.photos); }
-      }).catch(error => { if (mounted.current) setLocalError(messageOf(error)); })
-        .finally(() => { pickerBusy.current = false; if (mounted.current) setSelecting(false); });
+      if (next === "active") requestPhotoRecovery();
     });
-    return () => subscription.remove();
-  }, [actorId, controller, flushEditableDraft, mutations, photoPicker, ready]);
+    const unsubscribe = photoPicker.subscribe(actorId, requestPhotoRecovery);
+    return () => { subscription.remove(); unsubscribe(); };
+  }, [actorId, photoPicker, requestPhotoRecovery]);
+  useEffect(() => {
+    if (ready && recoveryRequested.current) requestPhotoRecovery();
+  }, [ready, requestPhotoRecovery]);
   useEffect(() => {
     if (!ready || locked) return;
     const pending = new AbortController();
@@ -1091,8 +1126,15 @@ function Create({
     value: NativeProfileInput[K],
   ) {
     if (mutations.getBusy()) return;
-    setInput((old) => ({ ...old, [key]: value }));
+    const next = { ...latest.current.input, [key]: value };
+    latest.current = { ...latest.current, input: next };
+    setInput(next);
     setLocalError("");
+  }
+  function changePhotos(next: NativePhoto[]) {
+    if (mutations.getBusy() || locked) return;
+    latest.current = { ...latest.current, photos: next };
+    setPhotos(next);
   }
   async function choosePhoto() {
     if (
@@ -1108,11 +1150,11 @@ function Create({
     setLocalError("");
     try {
       if (photoPicker) {
-        const draft = await mutations.run(async () => {
+        await mutations.run(async () => {
           await flushEditableDraft();
-          return photoPicker.pick(actorId, controller, latest.current.input, latest.current.photos, lifetime.current.signal);
+          const draft = await photoPicker.pick(actorId, controller, latest.current.input, latest.current.photos, lifetime.current.signal);
+          if (draft) showDraft(draft);
         });
-        if (mounted.current && draft) { setInput(draft.input); setPhotos(draft.photos); }
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -1125,12 +1167,12 @@ function Create({
       });
       if (!mounted.current || result.canceled) return;
       const next = result.assets.map(photoFromPickerAsset);
-      setPhotos((old) => [...old, ...next].slice(0, MAX_NATIVE_PHOTOS));
+      changePhotos([...latest.current.photos, ...next].slice(0, MAX_NATIVE_PHOTOS));
     } catch (error) {
       if (mounted.current) setLocalError(messageOf(error));
     } finally {
       pickerBusy.current = false;
-      if (mounted.current) setSelecting(false);
+      if (mounted.current && !recoveryQueued.current) setSelecting(false);
     }
   }
   async function save() {
@@ -1173,11 +1215,12 @@ function Create({
       await mutations.run(async () => {
         await waitForDraftIdle(controller, lifetime.current.signal);
         await controller.discardDraft();
+        if (mounted.current && !lifetime.current.signal.aborted) {
+          const clearedInput = { ...emptyInput, ownerName: displayName };
+          latest.current = { input: clearedInput, photos: [], ready: true };
+          setInput(clearedInput); setPhotos([]);
+        }
       });
-      if (mounted.current) {
-        setInput({ ...emptyInput, ownerName: displayName });
-        setPhotos([]);
-      }
     } catch (error) {
       if (mounted.current) setLocalError(messageOf(error));
     }
@@ -1284,7 +1327,7 @@ function Create({
                 compact
                 disabled={locked || submitting}
                 onPress={() =>
-                  setPhotos((old) => old.filter((p) => p.id !== photo.id))
+                  changePhotos(latest.current.photos.filter((p) => p.id !== photo.id))
                 }
               />
               {index > 0 ? (
@@ -1294,9 +1337,9 @@ function Create({
                   compact
                   disabled={locked || submitting}
                   onPress={() =>
-                    setPhotos((old) => [
+                    changePhotos([
                       photo,
-                      ...old.filter((p) => p.id !== photo.id),
+                      ...latest.current.photos.filter((p) => p.id !== photo.id),
                     ])
                   }
                 />

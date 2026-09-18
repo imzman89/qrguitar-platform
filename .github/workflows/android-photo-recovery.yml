@@ -1,0 +1,72 @@
+name: Android photo recovery
+on:
+  push:
+    branches: [codex/android-photo-selection-recovery]
+  pull_request:
+    paths:
+      - apps/mobile/**
+      - package-lock.json
+      - .github/workflows/android-photo-recovery.yml
+permissions:
+  contents: read
+concurrency:
+  group: android-photo-recovery-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  android-module:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run typecheck --workspace @qrguitar/mobile
+      - run: npm run lint --workspace @qrguitar/mobile
+      - run: npm test --workspace @qrguitar/mobile
+      - name: Generate Android project and verify module discovery
+        working-directory: apps/mobile
+        run: |
+          npx expo prebuild --platform android --no-install
+          npx expo-modules-autolinking resolve --platform android --json > /tmp/qrguitar-autolinking.json
+          node -e 'const a=require("/tmp/qrguitar-autolinking.json"); const m=a.modules.find(m=>m.packageName==="qrguitar-photo-picker"); if(!m?.projects.some(p=>p.name==="qrguitar-photo-picker" && p.modules.some(m=>m.classifier==="com.qrguitar.picker.QrguitarPhotoPickerModule"))) process.exit(1); console.log(JSON.stringify(m,null,2));'
+      - name: Use preinstalled Android toolchain without SDK downloads
+        run: |
+          test -d "$ANDROID_HOME/platforms/android-36"
+          test -d "$ANDROID_HOME/build-tools/36.0.0"
+          test -d "$ANDROID_HOME/ndk/27.3.13750724"
+          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+          # Select the standard runner's installed NDK only for this generated CI build.
+          cat > /tmp/qrguitar-installed-ndk.gradle <<'GRADLE'
+          beforeProject { project ->
+            if (project == project.rootProject) {
+              project.ext.ndkVersion = '27.3.13750724'
+            }
+          }
+          GRADLE
+      - name: Compile Android module and run real encrypted-store tests
+        working-directory: apps/mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew :qrguitar-photo-picker:testDebugUnitTest :qrguitar-photo-picker:assembleDebug --no-daemon --max-workers=2 -I /tmp/qrguitar-installed-ndk.gradle -Pandroid.builder.sdkDownload=false --stacktrace
+      - name: Report native test results
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          files = list(Path('apps/mobile/modules/qrguitar-photo-picker/android/build/test-results/testDebugUnitTest').glob('TEST-*.xml'))
+          tests = failures = errors = skipped = 0
+          for file in files:
+              suite = ET.parse(file).getroot()
+              counts = {key: int(suite.attrib.get(key, '0')) for key in ('tests', 'failures', 'errors', 'skipped')}
+              print(suite.attrib.get('name'), counts)
+              tests += counts['tests']; failures += counts['failures']; errors += counts['errors']; skipped += counts['skipped']
+          print(f'Total native tests: {tests}; failures: {failures}; errors: {errors}; skipped: {skipped}')
+          if tests < 15 or failures or errors or skipped:
+              raise SystemExit(1)
+          PY

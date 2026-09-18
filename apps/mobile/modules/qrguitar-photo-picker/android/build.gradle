@@ -1,0 +1,24 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.qrguitar'
+version = '0.1.0'
+
+android {
+  namespace 'com.qrguitar.picker'
+  defaultConfig {
+    versionCode 1
+    versionName '0.1.0'
+    testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+  }
+  testOptions { unitTests.includeAndroidResources = true }
+}
+
+dependencies {
+  implementation 'androidx.activity:activity-ktx:1.11.0'
+  implementation 'androidx.exifinterface:exifinterface:1.4.1'
+  testImplementation 'junit:junit:4.13.2'
+  testImplementation 'org.robolectric:robolectric:4.15.1'
+}

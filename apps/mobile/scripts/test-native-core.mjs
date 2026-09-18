@@ -14,6 +14,7 @@ function load(name) {
   const output = ts.transpileModule(fs.readFileSync(path.join(lib, name + '.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const module = { exports: {} }; cache.set(name, module.exports);
   const mockedRequire = id => {
+    if (id === '../../modules/qrguitar-photo-picker') return { __esModule: true, default: null };
     if (id.startsWith('./')) return load(id.slice(2));
     if (id === 'react-native-url-polyfill/auto') return {};
     if (id === 'react-native') return { Platform: { OS: 'android' }, AppState: {} };
@@ -29,6 +30,7 @@ const authLib = load('auth');
 const apiLib = load('api');
 const draftLib = load('profile-draft');
 const pickerLib = load('photo-picker');
+const identifiedPickerLib = load('identified-photo-picker');
 const { createEncryptedStorage, createNativeAuth, NativeSessionChangedError } = authLib;
 const { createNativeApi, NativeApiError } = apiLib;
 const tick = () => new Promise(resolve => setImmediate(resolve));
@@ -625,4 +627,166 @@ test('account change during confirmed discard checkpoints a consumed result befo
   await assert.rejects(discarding,NativeSessionChangedError);const retained=JSON.parse(f.storage.values.get(selectionKey));assert.equal(retained.actorId,actor);assert.equal(retained.resultReceived,true);assert.equal(retained.photos,undefined);
   f.auth.change(actor);const own=f.restart(),before=f.pickerCalls.pending;await own.picker.discard(actor);
   assert.equal(f.pickerCalls.pending,before);assert.equal(f.storage.values.has(selectionKey),false);assert.equal(JSON.stringify(await own.controller.loadDraft()),original);assert.equal(own.calls.length,0);
+});
+
+const identifiedKey = id => 'qrguitar.android-photo-selection.v2.' + id;
+function identifiedFixture(options = {}) {
+  const f = draftFixture(options), journal = new Map(), nativeCalls = [], events = new Set();
+  const publish = record => { journal.set(record.selectionId, structuredClone(record)); for (const event of events) event({selectionId:record.selectionId,status:record.status}); return structuredClone(record); };
+  const bridge = {
+    isAvailable: () => options.available !== false,
+    startSelectionAsync: async (id, settings) => {
+      nativeCalls.push(['start',id,settings]);
+      assert.equal(JSON.parse(await f.storage.getItem(identifiedKey(f.auth.getSnapshot().session.user.id))).selectionId,id);
+      if (journal.has(id)) return structuredClone(journal.get(id));
+      const record = options.pending ? {selectionId:id,status:'pending'} : {selectionId:id,status:'ready',resultId:randomUUID(),photos:options.photos || [photo()]};
+      return publish(record);
+    },
+    readSelectionAsync: async id => { nativeCalls.push(['read',id]); return structuredClone(journal.get(id) || {selectionId:id,status:'missing'}); },
+    acknowledgeSelectionAsync: async (id,resultId) => {
+      nativeCalls.push(['ack',id,resultId]);
+      const current=journal.get(id);
+      if (current?.status==='acknowledged') return structuredClone(current);
+      assert.equal(current?.status,'ready');assert.equal(current.resultId,resultId);
+      return publish({selectionId:id,status:'acknowledged'});
+    },
+    discardSelectionAsync: async id => { nativeCalls.push(['discard',id]); return publish({selectionId:id,status:'discarded'}); },
+    subscribe: listener => { events.add(listener);return ()=>events.delete(listener); },
+  };
+  const dependencies={auth:f.auth,storage:f.storage,randomId:randomUUID,bridge,...(options.legacy?{legacy:options.legacy}:{})};
+  const picker=identifiedPickerLib.makeIdentifiedNativePhotoPicker(dependencies);
+  function restart(actorId=actor) {
+    const controller=draftLib.makeProfileDraftController(actorId,{auth:f.auth,storage:f.storage,api:f.api,randomId:randomUUID});
+    return {controller,picker:identifiedPickerLib.makeIdentifiedNativePhotoPicker(dependencies)};
+  }
+  return {...f,picker,bridge,journal,nativeCalls,publish,dependencies,restart,
+    marker: (id=actor)=>JSON.parse(f.storage.values.get(identifiedKey(id)) || 'null')};
+}
+
+test('identified native result is acknowledged only after the real encrypted draft receipt commits',async()=>{
+  const f=identifiedFixture(),ack=f.bridge.acknowledgeSelectionAsync;
+  f.bridge.acknowledgeSelectionAsync=async(id,resultId)=>{
+    const saved=JSON.parse(await f.storage.getItem('qrguitar.profile-draft.v1.'+actor)).draft;
+    assert.equal(saved.lastPhotoSelectionId,id);assert.equal(saved.photos.length,1);
+    return ack(id,resultId);
+  };
+  const draft=await f.picker.pick(actor,f.controller,input,[]);
+  assert.equal(draft.photos.length,1);assert.equal(f.marker(),null);assert.equal(f.journal.get(draft.lastPhotoSelectionId).status,'acknowledged');assert.equal(f.calls.length,0);
+});
+
+for(const committed of [false,true])test('identified intent-save failure '+(committed?'after':'before')+' commit never launches native',async()=>{
+  const f=identifiedFixture(),save=f.storage.setItem;
+  f.storage.setItem=async(key,value)=>{if(key===identifiedKey(actor)){if(committed)await save(key,value);throw Error('secure intent unavailable');}return save(key,value);};
+  await assert.rejects(f.picker.pick(actor,f.controller,input,[photo()]),/intent unavailable/);
+  assert.equal(f.nativeCalls.length,0);assert.equal(f.controller.getState().draft.photos.length,1);
+  f.storage.setItem=save;
+  if(committed){const own=f.restart();await own.picker.discard(actor);assert.equal(f.journal.get([...f.journal.keys()][0]).status,'discarded');assert.equal(f.marker(),null);}
+});
+
+for(const committed of [false,true])test('identified result survives process loss when application storage fails '+(committed?'after':'before')+' commit',async()=>{
+  const f=identifiedFixture(),save=f.storage.setItem;let failure=true;
+  f.storage.setItem=async(key,value)=>{if(key==='qrguitar.profile-draft.v1.'+actor&&JSON.parse(value).draft.lastPhotoSelectionId&&failure){failure=false;if(committed)await save(key,value);throw Error('application write failed');}return save(key,value);};
+  await assert.rejects(f.picker.pick(actor,f.controller,input,[]),/write failed/);
+  const id=f.marker().selectionId,original=structuredClone(f.journal.get(id));assert.equal(original.status,'ready');assert.equal(f.nativeCalls.filter(c=>c[0]==='ack').length,0);
+  const own=f.restart(),draft=await own.picker.recover(actor,own.controller);
+  assert.deepEqual(draft.photos,original.photos);assert.equal(draft.lastPhotoSelectionId,id);assert.equal(f.marker(),null);assert.equal(f.journal.get(id).status,'acknowledged');assert.equal(f.calls.length,0);
+});
+
+for(const committed of [false,true])test('native ack failure '+(committed?'after':'before')+' commit reconciles without duplicate photos or launching a replacement',async()=>{
+  const f=identifiedFixture(),ack=f.bridge.acknowledgeSelectionAsync;let fail=true;
+  f.bridge.acknowledgeSelectionAsync=async(...args)=>{if(fail){fail=false;if(committed)await ack(...args);throw Error('ack response lost');}return ack(...args);};
+  const first=await f.picker.pick(actor,f.controller,input,[]),id=f.marker().selectionId;
+  assert.equal(first.photos.length,1);assert.equal(f.nativeCalls.filter(c=>c[0]==='start').length,1);
+  const own=f.restart(),recovered=await own.picker.pick(actor,own.controller,{...input,brand:'Never a replacement'},[]);
+  assert.deepEqual(recovered.photos,first.photos);assert.equal(recovered.input.brand,input.brand);assert.equal(f.marker(),null);assert.equal(f.journal.get(id).status,'acknowledged');assert.equal(f.nativeCalls.filter(c=>c[0]==='start').length,1);
+});
+
+for(const committed of [false,true])test('marker cleanup failure '+(committed?'after':'before')+' commit retains durable photos across coordinator restart',async()=>{
+  const f=identifiedFixture(),remove=f.storage.removeItem;let fail=true;
+  f.storage.removeItem=async key=>{if(key===identifiedKey(actor)&&fail){fail=false;if(committed)await remove(key);throw Error('cleanup unavailable');}return remove(key);};
+  const first=await f.picker.pick(actor,f.controller,input,[]),own=f.restart();
+  await own.picker.recover(actor,own.controller);
+  assert.deepEqual((await own.controller.loadDraft()).photos,first.photos);assert.equal(f.marker(),null);assert.equal(f.nativeCalls.filter(c=>c[0]==='start').length,1);
+});
+
+test('native request IDs keep unresolved selections separate across accounts and reject an old A-B-A lease',async()=>{
+  const f=identifiedFixture({pending:true});await f.picker.pick(actor,f.controller,input,[]);const first=f.marker();
+  f.auth.change(otherActor);const other=f.restart(otherActor);await other.picker.pick(otherActor,other.controller,{...input,brand:'Other'},[]);const second=f.marker(otherActor);assert.notEqual(first.selectionId,second.selectionId);
+  const selectedA={selectionId:first.selectionId,status:'ready',resultId:randomUUID(),photos:[photo()]};f.publish(selectedA);
+  assert.equal(await other.picker.recover(otherActor,other.controller),null);assert.equal((await other.controller.loadDraft()).photos.length,0);assert.equal(f.journal.get(first.selectionId).status,'ready');
+  f.auth.change(actor);const own=f.restart(),gate=deferred(),read=f.bridge.readSelectionAsync;f.bridge.readSelectionAsync=()=>gate.promise;
+  const pending=own.picker.recover(actor,own.controller);await tick();f.auth.change(otherActor);f.auth.change(actor);gate.resolve(selectedA);await assert.rejects(pending,NativeSessionChangedError);assert.equal(f.journal.get(first.selectionId).status,'ready');
+  f.bridge.readSelectionAsync=read;const fresh=f.restart(),restored=await fresh.picker.recover(actor,fresh.controller);assert.deepEqual(restored.photos,selectedA.photos);assert.equal(f.journal.get(second.selectionId).status,'pending');
+});
+
+test('identified pending and missing requests can be deliberately discarded with draft preserved',async()=>{
+  for(const missing of [false,true]){
+    const f=identifiedFixture({pending:true});await f.picker.pick(actor,f.controller,input,[photo()]);const id=f.marker().selectionId,before=JSON.stringify(f.controller.getState().draft);
+    if(missing)f.journal.delete(id);
+    await assert.rejects(f.picker.pick(actor,f.controller,input,[]),/still pending/);
+    await f.picker.discard(actor);assert.equal(f.journal.get(id).status,'discarded');assert.equal(f.marker(),null);assert.equal(JSON.stringify(await f.controller.loadDraft()),before);
+    assert.equal(f.calls.length,0);
+  }
+});
+
+for(const committed of [false,true])test('discard native failure '+(committed?'after':'before')+' commit is not treated as successful marker removal',async()=>{
+  const f=identifiedFixture({pending:true});await f.picker.pick(actor,f.controller,input,[]);const id=f.marker().selectionId,discard=f.bridge.discardSelectionAsync;let fail=true;
+  f.bridge.discardSelectionAsync=async(...args)=>{if(fail){fail=false;if(committed)await discard(...args);throw Error('discard unavailable');}return discard(...args);};
+  await assert.rejects(f.picker.discard(actor),/unavailable/);assert.equal(f.marker().selectionId,id);
+  const own=f.restart();await own.picker.discard(actor);assert.equal(f.marker(),null);assert.equal(f.journal.get(id).status,'discarded');
+});
+
+test('ready result with foreign ID, bad count or duplicate IDs never corrupts the recoverable intent',async()=>{
+  for(const invalid of [r=>({...r,selectionId:randomUUID()}),r=>({...r,photos:Array.from({length:9},()=>photo())}),r=>({...r,photos:[r.photos[0],r.photos[0]]})]){
+    const f=identifiedFixture({pending:true});await f.picker.pick(actor,f.controller,input,[photo()]);const id=f.marker().selectionId,before=JSON.stringify(f.controller.getState().draft),read=f.bridge.readSelectionAsync;
+    f.bridge.readSelectionAsync=async()=>invalid({selectionId:id,status:'ready',resultId:randomUUID(),photos:[photo()]});
+    await assert.rejects(f.picker.recover(actor,f.controller));assert.equal(f.nativeCalls.filter(c=>c[0]==='ack').length,0);assert.equal(f.marker().selectionId,id);assert.equal(JSON.stringify(await f.controller.loadDraft()),before);
+    f.bridge.readSelectionAsync=read;await f.picker.discard(actor);assert.equal(f.marker(),null);
+  }
+});
+
+test('a valid native payload that exceeds combined draft byte limits stays native until deliberate discard',async()=>{
+  const bytes=Buffer.alloc(9*1024*1024);bytes.set([255,216,255,224]);const large=()=>({id:randomUUID(),dataUrl:'data:image/jpeg;base64,'+bytes.toString('base64')});
+  const f=identifiedFixture({photos:[large(),large()]});await assert.rejects(f.picker.pick(actor,f.controller,input,[]),/16 MiB/);
+  assert.equal(f.journal.get(f.marker().selectionId).status,'ready');assert.equal(f.marker().photos,undefined);assert.equal((await f.controller.loadDraft()).photos.length,0);assert.equal(f.nativeCalls.filter(c=>c[0]==='ack').length,0);
+  const own=f.restart();await own.picker.discard(actor);assert.equal(f.marker(),null);
+});
+
+test('frozen or replaced drafts cannot receive native photos and retain a usable discard path',async()=>{
+  for(const frozen of [false,true]){
+    const f=identifiedFixture({pending:true});await f.picker.pick(actor,f.controller,input,[photo()]);const id=f.marker().selectionId;
+    if(frozen){f.api.createProfile=async()=>{throw new NativeApiError('unknown',{uncertain:true});};await assert.rejects(f.controller.createOrRetry());}
+    else{await f.controller.discardDraft();await f.controller.saveDraft(input,[]);}
+    const before=JSON.stringify(f.controller.getState().draft);f.publish({selectionId:id,status:'ready',resultId:randomUUID(),photos:[photo()]});
+    await assert.rejects(f.picker.recover(actor,f.controller));assert.equal(f.journal.get(id).status,'ready');await f.picker.discard(actor);assert.equal(JSON.stringify(await f.controller.loadDraft()),before);
+  }
+});
+
+test('identified cancellation clears only its marker and does not upload or change draft',async()=>{
+  const f=identifiedFixture({pending:true});await f.picker.pick(actor,f.controller,input,[photo()]);const id=f.marker().selectionId,before=JSON.stringify(f.controller.getState().draft);
+  f.publish({selectionId:id,status:'cancelled'});assert.equal(await f.picker.recover(actor,f.controller),null);assert.equal(f.marker(),null);assert.equal(JSON.stringify(await f.controller.loadDraft()),before);assert.equal(f.calls.length,0);
+});
+
+test('absent native capability fails before intent or anonymous fallback while saved draft still loads',async()=>{
+  const f=identifiedFixture({available:false});await f.controller.saveDraft(input,[photo()]);const before=JSON.stringify(f.controller.getState().draft);
+  await assert.rejects(f.picker.pick(actor,f.controller,input,[]),/updated QRguitar app/);assert.equal(f.marker(),null);assert.equal(f.nativeCalls.length,0);assert.equal(await f.picker.recover(actor,f.controller),null);assert.equal(JSON.stringify(await f.controller.loadDraft()),before);
+});
+
+test('native event subscription filters request identity, current account lease and unsubscribe',async()=>{
+  const f=identifiedFixture({pending:true});await f.picker.pick(actor,f.controller,input,[]);let notifications=0;const stop=f.picker.subscribe(actor,()=>notifications++),id=f.marker().selectionId;
+  f.publish({selectionId:randomUUID(),status:'cancelled'});await tick();assert.equal(notifications,0);
+  f.publish({selectionId:id,status:'ready',resultId:randomUUID(),photos:[photo()]});await tick();assert.equal(notifications,1);
+  f.auth.change(otherActor);f.publish({selectionId:id,status:'cancelled'});await tick();assert.equal(notifications,1);f.auth.change(actor);stop();f.publish({selectionId:id,status:'cancelled'});await tick();assert.equal(notifications,1);
+});
+
+test('legacy excessive asset count leaves a terminal readable selection that the owner can discard',async()=>{
+  const selected=selectedResult(),f=pickerFixture({launch:async()=>({...selected,assets:Array.from({length:9},()=>selected.assets[0])})});
+  await assert.rejects(f.picker.pick(actor,f.controller,input,[]));const saved=JSON.parse(f.storage.values.get(selectionKey));assert.equal(saved.resultReceived,true);assert.equal(saved.photos,undefined);
+  const own=f.restart();await own.picker.discard(actor);assert.equal(f.storage.values.has(selectionKey),false);assert.equal((await own.controller.loadDraft()).photos.length,0);
+});
+
+test('legacy unresolved selection can be abandoned only by its owner after the anonymous launch channel is retired',async()=>{
+  const f=pickerFixture({launch:async()=>{throw Error('activity interrupted');}});await assert.rejects(f.picker.pick(actor,f.controller,input,[photo()]));const before=f.pickerCalls.pending;
+  const recovery=pickerLib.makeNativePhotoPicker({...f.dependencies,retiredAnonymousChannel:true});f.auth.change(otherActor);assert.equal(await recovery.hasPending(otherActor),false);await recovery.discard(otherActor);assert.equal(f.storage.values.has(selectionKey),true);
+  f.auth.change(actor);assert.equal(await recovery.hasPending(actor),true);await recovery.discard(actor);assert.equal(f.pickerCalls.pending,before);assert.equal(f.storage.values.has(selectionKey),false);assert.equal((await f.controller.loadDraft()).photos.length,1);
 });
