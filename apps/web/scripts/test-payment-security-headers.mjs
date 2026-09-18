@@ -89,42 +89,74 @@ test("Next configuration applies the checkout override only to the billing tree"
 });
 
 const middlewareCode = ts.transpileModule(fs.readFileSync(path.join(web, "middleware.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-function middleware(pathname, preview) {
+function middleware(pathname, { previewCookie = false, previewHeader = "" } = {}) {
   const module = { exports: {} };
   new Function("require", "module", "exports", "process", middlewareCode)(name => {
-    if (name === "next/server") return { NextResponse: { next: () => new Response(null), redirect: (url, status) => new Response(null, { status, headers: { location: String(url) } }) } };
+    if (name === "next/server") return { NextResponse: { next: ({ request } = {}) => {
+      const response = new Response(null);
+      Object.defineProperty(response, "forwardedHeaders", { value: new Headers(request?.headers) });
+      return response;
+    }, redirect: (url, status) => new Response(null, { status, headers: { location: String(url) } }) } };
     if (name === "./lib/security-headers") return policy;
     if (name === "./lib/search-indexing") return indexing;
     throw Error(`Unexpected middleware import: ${name}`);
   }, module, module.exports, { env: { NODE_ENV: "production" } });
-  return module.exports.middleware({ headers: new Headers({ host: "www.qrguitar.com" }), nextUrl: new URL(pathname, "https://www.qrguitar.com"), cookies: { has: name => preview && name === "qrguitar_site_preview" } });
+  const headers = new Headers({ host: "www.qrguitar.com" });
+  if (previewHeader) headers.set("x-qrguitar-site-preview", previewHeader);
+  return module.exports.middleware({ headers, nextUrl: new URL(pathname, "https://www.qrguitar.com"), cookies: { has: name => previewCookie && name === "qrguitar_site_preview" } });
 }
 
-test("preview middleware preserves same-origin framing, no-index and no-store without granting checkout elsewhere", () => {
-  for (const pathname of ["/", "/login", "/api/site-editor/preview"]) {
-    const response = middleware(pathname, true);
+test("an explicit draft query activates preview headers and forwards only the internal draft marker", () => {
+  for (const pathname of ["/?cmsPreview=draft", "/login?cmsPreview=draft"]) {
+    const response = middleware(pathname);
     assert.equal(response.headers.get("x-frame-options"), "SAMEORIGIN");
     assert.deepEqual(sources(response.headers, "frame-ancestors"), ["'self'"]);
     assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow");
     assert.match(response.headers.get("cache-control"), /no-store/);
     assert.match(response.headers.get("permissions-policy"), /payment=\(\)/);
     assert.equal(permits(response.headers, "script-src", "https://www.paypal.com/sdk/js"), false);
+    assert.equal(response.forwardedHeaders.get("x-qrguitar-site-preview"), "draft");
   }
 });
 
-test("an editor preview cookie cannot accidentally disable the real checkout SDK", () => {
-  const response = middleware("/billing", true);
+test("the site-editor preview endpoint always receives preview response headers", () => {
+  const response = middleware("/api/site-editor/preview");
+  assert.equal(response.headers.get("x-frame-options"), "SAMEORIGIN");
+  assert.deepEqual(sources(response.headers, "frame-ancestors"), ["'self'"]);
+  assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow");
+  assert.match(response.headers.get("cache-control"), /no-store/);
+  assert.equal(response.forwardedHeaders.get("x-qrguitar-site-preview"), null);
+});
+
+test("a preview cookie alone cannot activate draft preview or preserve a spoofed marker", () => {
+  for (const previewHeader of ["", "draft"]) {
+    const response = middleware("/catalog", { previewCookie: true, previewHeader });
+    assert.equal(response.headers.get("content-security-policy"), null);
+    assert.equal(response.headers.get("x-frame-options"), null);
+    assert.equal(response.headers.get("x-robots-tag"), null);
+    assert.equal(response.headers.get("cache-control"), null);
+    assert.equal(response.forwardedHeaders.get("x-qrguitar-site-preview"), null);
+  }
+});
+
+test("draft billing preview keeps checkout SDK permissions inside preview restrictions", () => {
+  const response = middleware("/billing?cmsPreview=draft");
   assert.ok(permits(response.headers, "script-src", "https://www.paypal.com/sdk/js"));
   assert.ok(permits(response.headers, "script-src", "https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js"));
   assert.ok(permits(response.headers, "frame-src", "https://applepay.cdn-apple.com/"));
   assert.deepEqual(sources(response.headers, "frame-ancestors"), ["'self'"]);
   assert.equal(response.headers.get("x-frame-options"), "SAMEORIGIN");
+  assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow");
   assert.match(response.headers.get("cache-control"), /no-store/);
+  assert.match(response.headers.get("permissions-policy"), /payment=\(self /);
+  assert.equal(response.headers.get("cross-origin-opener-policy"), "same-origin-allow-popups");
+  assert.equal(response.forwardedHeaders.get("x-qrguitar-site-preview"), "draft");
 });
 
 test("ordinary middleware requests do not relax global frame or payment restrictions", () => {
-  const response = middleware("/billing", false);
+  const response = middleware("/billing");
   assert.equal(response.headers.get("content-security-policy"), null);
   assert.equal(response.headers.get("x-frame-options"), null);
   assert.equal(response.headers.get("permissions-policy"), null);
+  assert.equal(response.forwardedHeaders.get("x-qrguitar-site-preview"), null);
 });
