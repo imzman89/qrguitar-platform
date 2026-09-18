@@ -33,10 +33,16 @@ const text=view=>{
  };visit(view.toJSON());return parts.join(' ');
 };
 function fixture(options={}){
- const events=new Set(),authListeners=new Set(),permissionListeners=new Set();
- const calls={signIn:[],signUp:[],create:[],save:[],discard:0,dispose:0,requestPermission:0,picker:0,pendingPicker:0,links:[],profiles:[]};
+ const events=new Set(),authListeners=new Set(),permissionListeners=new Set(),selectionListeners=new Map(),capturedSelectionCallbacks=[],nativeSelectionListeners=new Set(),nativeResults=new Map();
+ const calls={signIn:[],signUp:[],create:[],save:[],discard:0,dispose:0,requestPermission:0,picker:0,pendingPicker:0,pickerRecover:[],pickerDiscard:[],nativeStarts:[],nativeReads:[],nativeAcks:[],nativeDiscards:[],links:[],profiles:[]};
  const stored=new Map(options.selectionIntent?[['qrguitar.android-photo-selection.v1',JSON.stringify(options.selectionIntent)]]:[]);
  const storage={getItem:async key=>stored.get(key)??null,setItem:async(key,value)=>{stored.set(key,value);},removeItem:async key=>{await options.removeSelection?.(key);stored.delete(key);}};
+ const nativeModule={protocolVersion:1,
+  startSelectionAsync:async(id,settings)=>{calls.nativeStarts.push({id,settings});const selected=options.nativeStart?await options.nativeStart(id,settings):options.picker?await options.picker():{canceled:true};const result=selected.status?selected:selected.canceled?{selectionId:id,status:'cancelled'}:{selectionId:id,status:'ready',resultId:'result-111111111111',photos:selected.assets.map(asset=>({id:asset.id||'native-photo-111111111111',dataUrl:'data:image/jpeg;base64,'+asset.base64}))};nativeResults.set(id,result);return result;},
+  readSelectionAsync:async id=>{calls.nativeReads.push(id);return nativeResults.get(id)||{selectionId:id,status:'missing'};},
+  acknowledgeSelectionAsync:async(id,resultId)=>{calls.nativeAcks.push({id,resultId});const result={selectionId:id,status:'acknowledged'};nativeResults.set(id,result);return result;},
+  discardSelectionAsync:async id=>{calls.nativeDiscards.push(id);const result={selectionId:id,status:'discarded'};nativeResults.set(id,result);return result;},
+  addListener(event,listener){assert.equal(event,'onSelectionChanged');nativeSelectionListeners.add(listener);return{remove(){nativeSelectionListeners.delete(listener);}};}};
  class SessionChanged extends Error{constructor(){super('Your account session changed.');}}
  let snapshot=options.snapshot||{status:'signed-in',session:{user:{id:'owner-111111111111',email:'owner@example.invalid',user_metadata:{display_name:'Owner'}}},revision:1,message:''};
  let permission=options.permission||{granted:false,canAskAgain:true};
@@ -62,27 +68,48 @@ function fixture(options={}){
  for(const name of ['ActivityIndicator','KeyboardAvoidingView','Modal','Pressable','RefreshControl','ScrollView','Switch','Text','View'])bridge[name]=name;
  const mocks={'react':React,'react-native':bridge,'react-native-safe-area-context':{SafeAreaProvider:'SafeAreaProvider',SafeAreaView:'SafeAreaView'},'expo-status-bar':{StatusBar:'StatusBar'},'expo-image':{Image:'Image'},
   'expo-image-picker':{launchImageLibraryAsync:async()=>{calls.picker++;return options.picker?options.picker():{canceled:true};},getPendingResultAsync:async()=>{calls.pendingPicker++;return options.pendingPicker?options.pendingPicker():null;}},
+  'qrguitar-photo-picker':{__esModule:true,default:options.nativeModuleAvailable===false?null:nativeModule},
   'expo-crypto':{randomUUID:require('node:crypto').randomUUID},
   'expo-camera':{CameraView:'CameraView',useCameraPermissions(){const [p,set]=React.useState(permission);React.useEffect(()=>{permissionListeners.add(set);return()=>permissionListeners.delete(set);},[]);return [p,requestPermission,getPermission];}},
   'auth':{getNativeAuth:()=>auth,getNativeStorage:()=>storage,NativeSessionChangedError:SessionChanged},'api':{getNativeApi:()=>api,safeNativeImageUrl:value=>typeof value==='string'&&value.startsWith('https://')?value:null},
-  'profile-draft':{createProfileDraftController:()=>draft,photoFromPickerAsset:asset=>({id:asset.id||'photo-111111111111',dataUrl:'data:image/jpeg;base64,'+asset.base64}),MAX_NATIVE_PHOTOS:8,MAX_NATIVE_IMAGE_BYTES:12*1024*1024},
+  'profile-draft':{createProfileDraftController:()=>draft,photoFromPickerAsset:asset=>({id:asset.id||'photo-111111111111',dataUrl:'data:image/jpeg;base64,'+asset.base64}),validatePartialNativeProfile(){},MAX_NATIVE_PHOTOS:8,MAX_NATIVE_IMAGE_BYTES:12*1024*1024},
   'ui':{Action:'Action',Field:'Field',Heading:'Heading',Notice:'Notice',colors:{gold:'gold',background:'black'},styles:{}}};
  const cache=new Map();
  function load(file){
   if(cache.has(file))return cache.get(file);let source=fs.readFileSync(path.join(base,file),'utf8');
-  if(file==='App.tsx')source+='\nexport {Login,Create,Profile,Photo,useResource,OwnedRecords,Library,openWeb};';
+  if(file==='App.tsx')source+='\nexport {Browse,Login,Create,Profile,Photo,useResource,OwnedRecords,Library,openWeb};';
   const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.React,esModuleInterop:true}}).outputText;
   const module={exports:{}};cache.set(file,module.exports);
   const scopedRequire=id=>{if(mocks[id])return mocks[id];const key=id.split('/').at(-1);if(mocks[key])return mocks[key];if(id.startsWith('.')){const candidate=path.posix.normalize(path.posix.join(path.posix.dirname(file),id));return load(fs.existsSync(path.join(base,candidate+'.tsx'))?candidate+'.tsx':candidate+'.ts');}return require(id);};
   new Function('require','module','exports',output)(scopedRequire,module,module.exports);cache.set(file,module.exports);return module.exports;
  }
- return {App:load('App.tsx'),Scanner:load('components/Scanner.tsx').Scanner,helpers:load('lib/ui-actions.ts'),calls,alerts,draft,emit,auth,stored,
+ // Core tests exercise real coordinator/native receipts. These component cases
+ // inject event scheduling independently of the native activity implementation.
+ const pickerModule=options.photoCoordinator?null:load('lib/photo-picker.ts');
+ mocks['photo-picker']={getNativePhotoPicker(){
+  const backing=options.photoCoordinator||pickerModule.getNativePhotoPicker();
+  return {pick:(...args)=>backing.pick(...args),discard:async(...args)=>{calls.pickerDiscard.push(args[0]);return backing.discard?.(...args);},
+   recover:async(...args)=>{calls.pickerRecover.push(args[0]);return backing.recover?.(...args)??null;},
+   subscribe(actor,listener){selectionListeners.set(listener,actor);capturedSelectionCallbacks.push(listener);const unsubscribe=options.photoCoordinator?()=>{}:backing.subscribe(actor,listener);return()=>{selectionListeners.delete(listener);unsubscribe();};}};
+ }};
+ return {App:load('App.tsx'),Scanner:load('components/Scanner.tsx').Scanner,helpers:load('lib/ui-actions.ts'),calls,alerts,draft,emit,auth,stored,capturedSelectionCallbacks,
+  notifySelection(actor='owner-111111111111'){for(const [listener,owner] of selectionListeners)if(owner===actor)listener();},
+  deliverNative(result){nativeResults.set(result.selectionId,result);nativeSelectionListeners.forEach(listener=>listener({selectionId:result.selectionId,status:result.status}));},
+  selectionListenerCount:()=>selectionListeners.size,
   async background(value){appState.currentState=value;await invoke(()=>events.forEach(fn=>fn(value)));},
   async changeAccount(next){snapshot=next;await invoke(()=>authListeners.forEach(fn=>fn(snapshot)));},
   async setPermission(next){permission=next;await invoke(()=>permissionListeners.forEach(fn=>fn(next)));},
   createProps:{actorId:'owner-111111111111',displayName:'Owner',onCreated:code=>calls.profiles.push(code),leaveGuardRef:{current:null}}};
 }
 test('renderer uses precisely the mobile React runtime',()=>{assert.equal(React.version,'19.2.3');assert.equal(Renderer.version,React.version);});
+
+test('Browse exposes a failed catalog load and retry recovers to an empty catalog',async()=>{
+ let attempts=0;
+ const f=fixture({api:{listPublic:async()=>{attempts++;if(attempts===1)throw Error('Network is disabled in this offline acceptance build.');return [];}}});
+ const view=await render(f.App.Browse,{onOpen(){},onScan(){},onCreate(){}});
+ assert.equal(attempts,1);assert.match(notices(view),/Network is disabled in this offline acceptance build\./);assert.ok(action(view,'Retry Catalog'));
+ await invoke(action(view,'Retry Catalog').props.onPress);assert.equal(attempts,2);assert.equal(action(view,'Retry Catalog'),undefined);assert.match(text(view),/The Catalog is quiet for now/);
+});
 
 const librarySnapshot=(id='owner-111111111111')=>({status:'signed-in',session:{user:{id,email:id+'@example.invalid'},access_token:'PRIVATE_ACCESS',refresh_token:'PRIVATE_REFRESH'},revision:1,message:''});
 const libraryProps=snapshot=>({snapshot,onSignIn(){},onCreate(){},onOpen(){},onSignOut(){}});
@@ -237,20 +264,20 @@ test('submit and leave guard serialize while an earlier autosave holds the contr
 });
 test('photo picker cancellation keeps existing photos and double taps launch only once',async()=>{
  const pending=deferred(),f=fixture({draft:savedDraft(),picker:()=>pending.promise}),v=await render(f.App.Create,f.createProps);const choose=action(v,'Choose photos').props.onPress;
- await invoke(()=>{choose();choose();});assert.equal(f.calls.picker,1);assert.equal(action(v,'Choose photos').props.loading,true);assert.equal(action(v,'Create Profile').props.disabled,true);
+ await invoke(()=>{choose();choose();});assert.equal(f.calls.nativeStarts.length,1);assert.equal(f.calls.picker,0);assert.equal(action(v,'Choose photos').props.loading,true);assert.equal(action(v,'Create Profile').props.disabled,true);
  pending.resolve({canceled:true});await flush();assert.equal(action(v,'Choose photos').props.loading,false);assert.equal(v.root.findAllByType('Image').length,1);assert.equal(notices(v),'');assert.equal(f.calls.create.length,0);
 });
 test('photo picker results arriving after unmount cannot save or create a draft',async()=>{
  const pending=deferred(),f=fixture({picker:()=>pending.promise}),v=await render(f.App.Create,f.createProps);
  await invoke(action(v,'Choose photos').props.onPress);await unmount(v);assert.equal(f.calls.dispose,1);assert.equal(f.createProps.leaveGuardRef.current,null);
- const before=f.calls.save.length;pending.resolve({canceled:false,assets:[{id:'photo-late-123',base64:'bGF0ZQ=='}]});await flush();assert.ok(before>=1);assert.equal(f.calls.save.length,before);assert.equal(f.calls.create.length,0);assert.equal(f.calls.picker,1);
+ const before=f.calls.save.length;pending.resolve({canceled:false,assets:[{id:'photo-late-123',base64:'bGF0ZQ=='}]});await flush();assert.ok(before>=1);assert.equal(f.calls.save.length,before);assert.equal(f.calls.create.length,0);assert.equal(f.calls.nativeStarts.length,1);assert.equal(f.calls.picker,0);
 });
 
 const pendingSelection=(draft=savedDraft(),extra={})=>({version:1,selectionId:'selection-111111111111',actorId:draft.actorId,uploadId:draft.uploadId,idempotencyKey:draft.idempotencyKey,photoIds:draft.photos.map(photo=>photo.id),...extra});
 const recoveredPhoto=()=>({canceled:false,assets:[{id:'recovered-111111111111',base64:'cGhvdG8='}]});
 test('restored Android Create attaches the pending original selection once without launching or submitting',async()=>{
  const f=fixture({draft:savedDraft(),selectionIntent:pendingSelection(),pendingPicker:async()=>recoveredPhoto()}),v=await render(f.App.Create,f.createProps);
- assert.equal(v.root.findAllByType('Image').length,2);assert.equal(f.calls.pendingPicker,1);assert.equal(f.calls.picker,0);assert.equal(f.calls.create.length,0);assert.equal(f.stored.size,0);
+ assert.equal(v.root.findAllByType('Image').length,2);assert.equal(f.calls.pendingPicker,1);assert.equal(f.calls.picker,0);assert.equal(f.calls.nativeStarts.length,0);assert.equal(f.calls.create.length,0);assert.equal(f.stored.size,0);
  await f.background('active');assert.equal(v.root.findAllByType('Image').length,2);assert.equal(f.calls.pendingPicker,1);
 });
 test('pending picker error preserves saved draft and restore retry works without opening another picker',async()=>{
@@ -290,18 +317,132 @@ test('picker cleanup retry preserves a fresh edit and cannot duplicate already-a
  let fail=true;const f=fixture({draft:savedDraft(),picker:async()=>recoveredPhoto(),removeSelection:async()=>{if(fail){fail=false;throw Error('storage temporarily unavailable');}}}),v=await render(f.App.Create,f.createProps);
  await invoke(action(v,'Choose photos').props.onPress);assert.equal(v.root.findAllByType('Image').length,2);assert.equal(f.stored.size,1);
  await invoke(field(v,'Brand').props.onChangeText,'Edited after receipt');await invoke(action(v,'Choose photos').props.onPress);
- assert.equal(field(v,'Brand').props.value,'Edited after receipt');assert.equal(f.draft.getState().draft.input.brand,'Edited after receipt');assert.equal(v.root.findAllByType('Image').length,2);assert.equal(f.calls.picker,1);assert.equal(f.stored.size,0);assert.equal(f.calls.create.length,0);
+ assert.equal(field(v,'Brand').props.value,'Edited after receipt');assert.equal(f.draft.getState().draft.input.brand,'Edited after receipt');assert.equal(v.root.findAllByType('Image').length,2);assert.equal(f.calls.nativeStarts.length,1);assert.equal(f.calls.picker,0);assert.equal(f.stored.size,0);assert.equal(f.calls.create.length,0);
 });
 
-test('previous-account unresolved selection explains the restriction without offering its private photos',async()=>{
+test('previous-account anonymous selection stays private while the current actor uses only the identified channel',async()=>{
  const intent=pendingSelection(undefined,{actorId:'previous-111111111111'}),f=fixture({draft:savedDraft(),selectionIntent:intent}),v=await render(f.App.Create,f.createProps);
- await invoke(action(v,'Choose photos').props.onPress);assert.match(notices(v),/previous account.*Sign back into that account/);assert.equal(f.calls.pendingPicker,0);assert.equal(f.calls.picker,0);assert.equal(v.root.findAllByType('Image').length,1);
- await invoke(action(v,'Discard pending photo selection').props.onPress);await invoke(f.alerts.at(-1)[2].find(button=>button.text==='Discard selection').onPress);
+ await invoke(action(v,'Choose photos').props.onPress);assert.equal(notices(v),'');assert.equal(f.calls.pendingPicker,0);assert.equal(f.calls.picker,0);assert.equal(f.calls.nativeStarts.length,1);assert.equal(v.root.findAllByType('Image').length,1);
+ assert.equal(action(v,'Discard pending photo selection'),undefined);
  assert.equal(JSON.parse(f.stored.get('qrguitar.android-photo-selection.v1')).actorId,intent.actorId);assert.equal(f.calls.pendingPicker,0);
 });
 test('web keeps the picker launch in the original user gesture and does not inspect Android pending results',async()=>{
  const f=fixture({platform:'web'}),v=await render(f.App.Create,f.createProps);let immediate;
  await invoke(()=>{action(v,'Choose photos').props.onPress();immediate=f.calls.picker;});assert.equal(immediate,1);assert.equal(f.calls.pendingPicker,0);assert.equal(f.calls.save.length,0);
+});
+
+const eventPhoto={id:'event-photo-111111111111',dataUrl:'data:image/jpeg;base64,ZXZlbnQ='};
+const addEventPhoto=controller=>controller.saveDraft(controller.getState().draft.input,[...controller.getState().draft.photos,eventPhoto]);
+
+test('actual Android facade launches an identified request and filters native completion events before applying and acknowledging',async()=>{
+ const f=fixture({draft:savedDraft(),nativeStart:async id=>({selectionId:id,status:'pending'})}),v=await render(f.App.Create,f.createProps);
+ await invoke(action(v,'Choose photos').props.onPress);assert.equal(f.calls.nativeStarts.length,1);assert.equal(f.calls.picker,0);assert.equal(f.calls.pendingPicker,0);
+ const start=f.calls.nativeStarts[0],marker=JSON.parse(f.stored.get('qrguitar.android-photo-selection.v2.'+f.createProps.actorId));
+ assert.equal(marker.selectionId,start.id);assert.equal(start.settings.maxAssets,7);assert.equal(marker.actorId,f.createProps.actorId);
+ await invoke(()=>f.deliverNative({selectionId:'foreign-request-111111111111',status:'ready',resultId:'foreign-result-111111111111',photos:[eventPhoto]}));
+ assert.equal(f.calls.nativeReads.length,0);assert.equal(v.root.findAllByType('Image').length,1);
+ await invoke(()=>{field(v,'Brand').props.onChangeText('Latest native event edit');f.deliverNative({selectionId:start.id,status:'ready',resultId:'matching-result-111111111111',photos:[eventPhoto]});});
+ assert.deepEqual(f.calls.nativeReads,[start.id]);assert.deepEqual(f.calls.nativeAcks,[{id:start.id,resultId:'matching-result-111111111111'}]);
+ assert.equal(v.root.findAllByType('Image').length,2);assert.equal(field(v,'Brand').props.value,'Latest native event edit');assert.equal(f.draft.getState().draft.lastPhotoSelectionId,start.id);assert.equal(f.stored.size,0);assert.equal(f.calls.create.length,0);
+});
+
+test('actual Android facade with missing native module preserves the draft and never launches or drains anonymous Expo',async()=>{
+ const f=fixture({draft:savedDraft(),nativeModuleAvailable:false}),v=await render(f.App.Create,f.createProps);
+ await invoke(action(v,'Choose photos').props.onPress);assert.match(notices(v),/Install the updated QRguitar app/);
+ assert.equal(field(v,'Brand').props.value,'Fender');assert.equal(v.root.findAllByType('Image').length,1);assert.equal(f.calls.nativeStarts.length,0);assert.equal(f.calls.picker,0);assert.equal(f.calls.pendingPicker,0);assert.equal(f.stored.size,0);
+});
+
+test('legacy anonymous intent is recovery-only and explicit retirement never consumes its late result for a new identified selection',async()=>{
+ let late=false;
+ const f=fixture({draft:savedDraft(),selectionIntent:pendingSelection(),pendingPicker:async()=>late?recoveredPhoto():null}),v=await render(f.App.Create,f.createProps);
+ await invoke(action(v,'Choose photos').props.onPress);assert.match(notices(v),/earlier photo selection is still pending/);assert.equal(f.calls.nativeStarts.length,0);
+ const before=f.calls.pendingPicker;late=true;await invoke(action(v,'Discard pending photo selection').props.onPress);await invoke(f.alerts.at(-1)[2].find(button=>button.text==='Discard selection').onPress);
+ assert.equal(f.calls.pendingPicker,before);assert.equal(f.stored.has('qrguitar.android-photo-selection.v1'),false);
+ await invoke(action(v,'Choose photos').props.onPress);assert.equal(f.calls.nativeStarts.length,1);assert.equal(f.calls.pendingPicker,before);assert.equal(f.calls.picker,0);assert.equal(v.root.findAllByType('Image').length,1);assert.equal(f.calls.create.length,0);
+});
+
+test('identified result event after prompt picker return recovers without another foreground transition',async()=>{
+ let available=false;
+ const f=fixture({draft:savedDraft(),photoCoordinator:{pick:async()=>null,recover:async(_actor,controller)=>{if(!available)return null;available=false;return addEventPhoto(controller);}}}),v=await render(f.App.Create,f.createProps);
+ await invoke(action(v,'Choose photos').props.onPress);assert.equal(v.root.findAllByType('Image').length,1);
+ available=true;await invoke(()=>f.notifySelection());
+ assert.equal(v.root.findAllByType('Image').length,2);assert.equal(f.draft.getState().draft.photos.length,2);assert.equal(f.calls.pendingPicker,0);assert.equal(f.calls.create.length,0);
+});
+
+test('identified event during picker work queues recovery instead of dropping the result',async()=>{
+ const pending=deferred();let available=false;
+ const f=fixture({draft:savedDraft(),photoCoordinator:{pick:()=>pending.promise,recover:async(_actor,controller)=>{if(!available)return null;available=false;return addEventPhoto(controller);}}}),v=await render(f.App.Create,f.createProps);
+ const before=f.calls.pickerRecover.length;await invoke(action(v,'Choose photos').props.onPress);available=true;await invoke(()=>f.notifySelection());
+ assert.equal(f.calls.pickerRecover.length,before);assert.equal(action(v,'Create Profile').props.disabled,true);
+ pending.resolve(null);await flush();assert.equal(f.calls.pickerRecover.length,before+1);assert.equal(v.root.findAllByType('Image').length,2);assert.equal(f.calls.create.length,0);
+});
+
+test('event queued during a picker commit cannot flush the previous rendered photo list over the committed result',async()=>{
+ let f;
+ f=fixture({draft:savedDraft(),photoCoordinator:{recover:async()=>null,pick:async(_actor,controller)=>{const result=await addEventPhoto(controller);f.notifySelection();return result;}}});
+ const v=await render(f.App.Create,f.createProps);await invoke(action(v,'Choose photos').props.onPress);
+ assert.equal(v.root.findAllByType('Image').length,2);assert.equal(f.draft.getState().draft.photos.length,2);
+ assert.equal(f.calls.save.at(-1)[1].length,2);assert.equal(f.calls.save.filter(([,photos])=>photos.length===1).length,0);assert.equal(f.calls.create.length,0);
+});
+
+test('native event during queued draft mutation waits and preserves the dirty fields being committed',async()=>{
+ const saving=deferred();let available=false;
+ const f=fixture({draft:savedDraft(),saveDraft:input=>input.brand==='Latest unsaved brand'?saving.promise:undefined,photoCoordinator:{pick:async()=>null,recover:async(_actor,controller)=>{if(!available)return null;available=false;return addEventPhoto(controller);}}}),v=await render(f.App.Create,f.createProps);
+ await invoke(field(v,'Brand').props.onChangeText,'Latest unsaved brand');let leaving;await invoke(()=>{leaving=f.createProps.leaveGuardRef.current();});
+ const before=f.calls.pickerRecover.length;available=true;await invoke(()=>f.notifySelection());assert.equal(f.calls.pickerRecover.length,before);
+ saving.resolve();await act(async()=>{await leaving;await tick();});await flush();
+ assert.equal(field(v,'Brand').props.value,'Latest unsaved brand');assert.equal(f.draft.getState().draft.input.brand,'Latest unsaved brand');assert.equal(v.root.findAllByType('Image').length,2);
+});
+
+test('field edit and identified event in the same turn preserve input before React effects run',async()=>{
+ let available=false;
+ const f=fixture({draft:savedDraft(),photoCoordinator:{pick:async()=>null,recover:async(_actor,controller)=>{if(!available)return null;available=false;return addEventPhoto(controller);}}}),v=await render(f.App.Create,f.createProps);
+ await invoke(()=>{field(v,'Brand').props.onChangeText('Same turn edit');available=true;f.notifySelection();});
+ assert.equal(field(v,'Brand').props.value,'Same turn edit');assert.equal(f.draft.getState().draft.input.brand,'Same turn edit');assert.equal(v.root.findAllByType('Image').length,2);
+});
+
+test('events during recovery coalesce into a subsequent pass without losing just-applied photos',async()=>{
+ let available=false,f;
+ f=fixture({draft:savedDraft(),photoCoordinator:{pick:async()=>null,recover:async(_actor,controller)=>{if(!available)return null;available=false;const result=await addEventPhoto(controller);f.notifySelection();f.notifySelection();return result;}}});
+ const v=await render(f.App.Create,f.createProps),before=f.calls.pickerRecover.length;available=true;await invoke(()=>f.notifySelection());
+ assert.equal(f.calls.pickerRecover.length,before+2);assert.equal(v.root.findAllByType('Image').length,2);assert.equal(f.draft.getState().draft.photos.length,2);assert.equal(f.calls.save.length,1);
+});
+
+test('dirty-draft save failure prevents recovery consumption and a later event retries the latest form',async()=>{
+ let fail=true,available=false;
+ const f=fixture({draft:savedDraft(),saveDraft:input=>{if(input.brand==='Keep this edit'&&fail)throw Error('Draft save unavailable');},photoCoordinator:{pick:async()=>null,recover:async(_actor,controller)=>{if(!available)return null;available=false;return addEventPhoto(controller);}}}),v=await render(f.App.Create,f.createProps);
+ const before=f.calls.pickerRecover.length;await invoke(field(v,'Brand').props.onChangeText,'Keep this edit');available=true;await invoke(()=>f.notifySelection());
+ assert.equal(f.calls.pickerRecover.length,before);assert.equal(available,true);assert.equal(field(v,'Brand').props.value,'Keep this edit');assert.match(notices(v),/Draft save unavailable/);
+ fail=false;await invoke(()=>f.notifySelection());assert.equal(field(v,'Brand').props.value,'Keep this edit');assert.equal(f.draft.getState().draft.input.brand,'Keep this edit');assert.equal(v.root.findAllByType('Image').length,2);assert.equal(notices(v),'');
+});
+
+test('native event during initial restoration is retained until the form becomes ready',async()=>{
+ const pending=deferred();let reads=0;
+ const f=fixture({draft:savedDraft(),photoCoordinator:{pick:async()=>null,recover:async(_actor,controller)=>++reads===1?pending.promise:addEventPhoto(controller)}}),v=await render(f.App.Create,f.createProps);
+ assert.match(text(v),/Restoring your draft/);await invoke(()=>f.notifySelection());assert.equal(reads,1);
+ pending.resolve(null);await flush();await flush();assert.equal(reads,2);assert.equal(v.root.findAllByType('Image').length,2);assert.equal(f.calls.create.length,0);
+});
+
+test('unmount cancels queued native recovery and even an already-captured listener cannot restart it',async()=>{
+ const pending=deferred();
+ const f=fixture({draft:savedDraft(),photoCoordinator:{pick:()=>pending.promise,recover:async()=>null}}),v=await render(f.App.Create,f.createProps);
+ const before=f.calls.pickerRecover.length;await invoke(action(v,'Choose photos').props.onPress);await invoke(()=>f.notifySelection());const late=f.capturedSelectionCallbacks.at(-1);
+ await unmount(v);assert.equal(f.selectionListenerCount(),0);pending.resolve(null);await flush();await invoke(late);
+ assert.equal(f.calls.pickerRecover.length,before);assert.equal(f.calls.create.length,0);assert.equal(f.calls.save.length,0);
+});
+
+test('retired account listener cannot recover into the replacement account UI',async()=>{
+ const old=fixture({draft:savedDraft(),photoCoordinator:{pick:async()=>null,recover:async()=>null}}),first=await render(old.App.Create,old.createProps),late=old.capturedSelectionCallbacks.at(-1);
+ const before=old.calls.pickerRecover.length;await unmount(first);
+ const actor='other-owner-111111111111',next=fixture({snapshot:librarySnapshot(actor),draft:savedDraft({actorId:actor,input:draftInput({brand:'Other account'})}),photoCoordinator:{pick:async()=>null,recover:async()=>null}});
+ const second=await render(next.App.Create,{...next.createProps,actorId:actor});await invoke(late);
+ assert.equal(old.calls.pickerRecover.length,before);assert.equal(field(second,'Brand').props.value,'Other account');assert.equal(next.calls.save.length,0);assert.ok(next.calls.pickerRecover.every(value=>value===actor));
+});
+
+test('missing identified module leaves the editable draft visible and never falls back to the anonymous picker',async()=>{
+ const f=fixture({draft:savedDraft(),photoCoordinator:{recover:async()=>null,pick:async()=>{throw Error('Photo selection requires the updated Android app.');}}}),v=await render(f.App.Create,f.createProps);
+ await invoke(field(v,'Brand').props.onChangeText,'Saved before capability check');await invoke(action(v,'Choose photos').props.onPress);
+ assert.match(notices(v),/updated Android app/);assert.equal(field(v,'Brand').props.value,'Saved before capability check');assert.equal(f.draft.getState().draft.input.brand,'Saved before capability check');assert.equal(v.root.findAllByType('Image').length,1);assert.equal(f.calls.picker,0);assert.equal(f.calls.pendingPicker,0);
 });
 test('backgrounding the root hides private Create content without losing its photos or inputs',async()=>{
  const f=fixture({picker:async()=>({canceled:false,assets:[{id:'selected-111111111',base64:'cGhvdG8='}]})}),v=await render(f.App.default);

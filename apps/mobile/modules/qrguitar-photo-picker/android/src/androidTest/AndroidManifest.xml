@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application android:testOnly="true">
+    <provider
+      android:name="com.qrguitar.picker.PickerFixtureProvider"
+      android:authorities="${applicationId}.qrguitar.fixture"
+      android:exported="false"
+      android:grantUriPermissions="false" />
+  </application>
+</manifest>

@@ -39,7 +39,9 @@ jobs:
         env:
           CI: "1"
           EXPO_NO_TELEMETRY: "1"
-          EXPO_PUBLIC_SUPABASE_URL: https://build-only.supabase.co
-          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CI_fixture_only_not_for_deployment
+          EXPO_PUBLIC_SUPABASE_URL: https://runtime-resolution.supabase.co
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CI_runtime_resolution_only
           EXPO_PUBLIC_API_ORIGIN: https://www.qrguitar.com
       - run: npm run test:runtime-bundles --workspace @qrguitar/mobile
+        env:
+          QRGUITAR_EXPECT_NETWORKED_RUNTIME_FIXTURE: "1"

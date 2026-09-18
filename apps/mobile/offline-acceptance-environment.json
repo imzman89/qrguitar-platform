@@ -1,0 +1,8 @@
+{
+  "supabaseUrl": "https://build-only.supabase.co",
+  "supabaseKey": "sb_publishable_CI_fixture_only_not_for_deployment",
+  "apiOrigin": "https://www.qrguitar.com",
+  "offlineAcceptance": "android-installed-acceptance-v1",
+  "buildGuard": "android-installed-acceptance-build-v1",
+  "bundleEvidence": "android-installed-acceptance-bundle-v1"
+}

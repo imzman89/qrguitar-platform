@@ -1,5 +1,7 @@
 import * as ImagePicker from "expo-image-picker";
 import * as Crypto from "expo-crypto";
+import IdentifiedPickerModule from "../../modules/qrguitar-photo-picker";
+import { makeIdentifiedNativePhotoPicker, type IdentifiedPhotoBridge } from "./identified-photo-picker";
 import { getNativeAuth, getNativeStorage, NativeSessionChangedError, type AuthLease, type NativeAuth, type PersistentStorage } from "./auth";
 import { MAX_NATIVE_PHOTOS, photoFromPickerAsset, type NativePhoto, type NativePhotoSelectionTarget, type NativeProfileDraftController, type NativeProfileInput } from "./profile-draft";
 
@@ -17,6 +19,9 @@ export function makeNativePhotoPicker(deps: {
   auth: NativeAuth; storage: PersistentStorage; randomId(): string;
   launch(options: ImagePicker.ImagePickerOptions): Promise<ImagePicker.ImagePickerResult>;
   pending(): Promise<PickerResult>;
+  /** Only the new ID-aware facade may retire legacy anonymous work. It never
+   * launches another anonymous Android selection that could receive old bytes. */
+  retiredAnonymousChannel?: true;
 }) {
   let busy = false;
   let unsaved: PendingSelection | null = null;
@@ -76,7 +81,11 @@ export function makeNativePhotoPicker(deps: {
     // Checkpoint even if the original screen/session has since retired. The
     // encrypted result remains bound to that actor; application still needs a lease.
     let photos: NativePhoto[];
-    try { photos = result.assets.map(photoFromPickerAsset); }
+    try {
+      if (!Array.isArray(result.assets) || result.assets.length < 1 || result.assets.length > MAX_NATIVE_PHOTOS - value.photoIds.length)
+        throw new Error("Invalid photo count");
+      photos = result.assets.map(photoFromPickerAsset);
+    }
     catch {
       // The native result was consumed even when an asset is unsupported. Keep
       // that terminal receipt so its owner can deliberately discard/reselect.
@@ -108,6 +117,14 @@ export function makeNativePhotoPicker(deps: {
     try { return await work(); } finally { busy = false; }
   }
   return {
+    hasPending: async (actorId: string, signal?: AbortSignal) => {
+      const lease = await deps.auth.acquireSession(actorId); check(lease, signal);
+      const global = await read(); check(lease, signal);
+      if (global?.actorId === actorId) return true;
+      const archived = await read(archiveKey(actorId)); check(lease, signal);
+      if (archived && archived.actorId !== actorId) throw new Error("The saved photo selection account is invalid.");
+      return Boolean(archived);
+    },
     discard: (actorId: string, signal?: AbortSignal) => run(async () => {
       const lease = await deps.auth.acquireSession(actorId); check(lease, signal);
       let key = STORAGE_KEY, value = await read(); check(lease, signal);
@@ -116,7 +133,7 @@ export function makeNativePhotoPicker(deps: {
       if (value.actorId !== actorId) throw new Error("Return to the original account to discard its pending photo selection.");
       if (key === STORAGE_KEY && unsaved?.selectionId === value.selectionId) { value = unsaved; await checkpoint(value); check(lease, signal); }
       // Only an explicit user confirmation may discard a quarantined selection.
-      if (key === STORAGE_KEY && !value.photos && !value.resultReceived) {
+      if (key === STORAGE_KEY && !value.photos && !value.resultReceived && !deps.retiredAnonymousChannel) {
         const result = await deps.pending();
         if (!result) { check(lease, signal); throw new Error(unresolvedMessage); }
         // This read consumed a known result even if the screen/account retired.
@@ -171,8 +188,27 @@ export function makeNativePhotoPicker(deps: {
     })
   };
 }
-let sharedPicker: ReturnType<typeof makeNativePhotoPicker> | undefined;
+const identifiedBridge: IdentifiedPhotoBridge = {
+  isAvailable: () => {
+    const module = IdentifiedPickerModule;
+    if (!module || module.protocolVersion !== 1) return false;
+    return ["startSelectionAsync", "readSelectionAsync", "acknowledgeSelectionAsync", "discardSelectionAsync", "addListener"].every(key => typeof module[key as keyof typeof module] === "function");
+  },
+  startSelectionAsync: (id, options) => IdentifiedPickerModule!.startSelectionAsync(id, options),
+  readSelectionAsync: id => IdentifiedPickerModule!.readSelectionAsync(id),
+  acknowledgeSelectionAsync: (id, resultId) => IdentifiedPickerModule!.acknowledgeSelectionAsync(id, resultId),
+  discardSelectionAsync: id => IdentifiedPickerModule!.discardSelectionAsync(id),
+  subscribe: listener => {
+    const subscription = IdentifiedPickerModule!.addListener("onSelectionChanged", listener);
+    return () => subscription.remove();
+  },
+};
+let sharedPicker: ReturnType<typeof makeIdentifiedNativePhotoPicker> | undefined;
 export function getNativePhotoPicker() {
-  return sharedPicker ??= makeNativePhotoPicker({ auth: getNativeAuth(), storage: getNativeStorage(), randomId: () => Crypto.randomUUID(),
-    launch: options => ImagePicker.launchImageLibraryAsync(options), pending: () => ImagePicker.getPendingResultAsync() });
+  if (sharedPicker) return sharedPicker;
+  const auth = getNativeAuth(), storage = getNativeStorage();
+  const legacy = makeNativePhotoPicker({ auth, storage, randomId: () => Crypto.randomUUID(), retiredAnonymousChannel: true,
+    launch: async () => { throw new Error("Legacy Android selections can only be recovered or discarded."); },
+    pending: () => ImagePicker.getPendingResultAsync() });
+  return sharedPicker = makeIdentifiedNativePhotoPicker({ auth, storage, randomId: () => Crypto.randomUUID(), bridge: identifiedBridge, legacy });
 }
