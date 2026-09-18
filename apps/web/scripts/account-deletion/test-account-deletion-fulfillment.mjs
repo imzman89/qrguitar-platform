@@ -152,6 +152,7 @@ try {
     }
     const helpers = (await db.query("select oid::regprocedure::text signature from pg_proc where pronamespace='public'::regnamespace and proname like '\\_account_deletion\\_%' escape '\\'")).rows;
     assert.ok(helpers.length >= 8);
+    assert.ok(helpers.some(helper => helper.signature === '_account_deletion_scrub_unscoped_personal_content(uuid,uuid,text,uuid)'));
     for (const helper of helpers) for (const role of ["anon", "authenticated", "service_role"]) {
       assert.equal((await db.query("select has_function_privilege($1,$2,'EXECUTE') allowed", [role, helper.signature])).rows[0].allowed, false);
     }
@@ -303,6 +304,8 @@ try {
     assert.equal(evidence.uploaded_by_user_id, null); assert.equal(evidence.uploaded_by_subject_id, upload.actor_subject_id);
     assert.equal(upload.evidence_result.storage_path, upload.storage_path);
     assert.equal((await db.query("select count(*)::int n from storage.objects where bucket_id='service-evidence' and name=$1", [upload.storage_path])).rows[0].n, 1);
+    const scrubbedInstrument=(await db.query("select name,builder,location,safety_note,public_safety_note from guitars where id=$1",[g.id])).rows[0];
+    assert.deepEqual(scrubbedInstrument,{name:'[personal information removed] personal guitar',builder:'[personal information removed]',location:'[personal information removed]',safety_note:'[personal information removed]',public_safety_note:'[personal information removed]'});
   });
 
   await check("a blocked review can be cancelled without orphaning state", async () => {
@@ -375,13 +378,13 @@ try {
     assert.deepEqual(await prepare(id, readyOperation), first);
     assert.deepEqual(Object.keys(first.fulfillment).sort(), ["authDeletedAt", "blockers", "completedAt", "databaseAnonymizedAt", "requestId", "reviewedAt", "revision", "startedAt", "state", "storageQuiesceUntil"]);
     const retained = (await db.query("select owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,builder,location,visibility,summary,safety_note,public_safety_note,admin_archive_reason from guitars where id=$1", [g.id])).rows[0];
-    assert.deepEqual(retained, { owner_id: null, qr_code: "QRG-DELETE", permanent_path: "/i/QRG-DELETE", name: "[personal information removed] personal guitar", brand: "Synthetic", model: "Archive", year: "1962", serial_number: "SERIAL-DELETE", builder: "[personal information removed]", location: "[personal information removed]", visibility: "private", summary: "[personal information removed] lives here", safety_note: "[personal information removed] note", public_safety_note: "Call [personal information removed]", admin_archive_reason: "[personal information removed] [personal information removed]" });
+    assert.deepEqual(retained, { owner_id: null, qr_code: "QRG-DELETE", permanent_path: "/i/QRG-DELETE", name: "[personal information removed] personal guitar", brand: "Synthetic", model: "Archive", year: "1962", serial_number: "SERIAL-DELETE", builder: "[personal information removed]", location: "[personal information removed]", visibility: "private", summary: "[personal information removed] lives here", safety_note: "[personal information removed]", public_safety_note: "[personal information removed]", admin_archive_reason: "[personal information removed] [personal information removed]" });
     assert.equal((await db.query("select count(*)::int n from guitar_specs where guitar_id=$1", [g.id])).rows[0].n, 1);
     assert.deepEqual((await db.query("select label,value from guitar_specs where guitar_id=$1", [g.id])).rows[0], { label: "Owner note", value: "[personal information removed] [personal information removed]" });
     const events = (await db.query("select is_system,is_public,created_by_user_id,provider_user_id,event_type,category,source_key,title,description,private_notes,shop_name,location,provider_display_name,work_order_reference,parts_installed,setup_measurements,who_performed from guitar_timeline_events where guitar_id=$1 order by is_system", [g.id])).rows;
     assert.equal(events.length, 2);
     const custom = events.find(event => !event.is_system); assert.equal(custom.title, "[personal information removed] moved it"); assert.equal(custom.description, "Email [personal information removed]");
-    const system = events.find(event => event.is_system); assert.equal(system.title, "[personal information removed] system event"); assert.equal(system.description, "[personal information removed]"); assert.equal(system.provider_display_name, null);
+    const system = events.find(event => event.is_system); assert.equal(system.title, "[personal information removed] system event"); assert.equal(system.description, "[personal information removed]"); assert.equal(system.provider_display_name, "[personal information removed]");
     assert.equal(custom.is_public, true); assert.equal(custom.event_type, "custom"); assert.equal(custom.category, "Ownership");
     assert.equal(custom.private_notes, "[personal information removed]"); assert.equal(custom.shop_name, "[personal information removed] Shop");
     assert.equal(custom.location, "Home"); assert.equal(custom.work_order_reference, "WO-PII");
@@ -522,12 +525,28 @@ try {
     const id = (await request()).request.requestId;
     let blocked = await prepare(id); await attestReviews(id, blocked); blocked = await prepare(id);
     assert.deepEqual(blocked.fulfillment.blockers, ["retained_personal_content_review_required"]);
+    assert.equal((await db.query("select count(*)::int n from account_deletion_fulfillment_receipts where request_id=$1 and action='unscoped_scrub'",[id])).rows[0].n,1);
+    assert.deepEqual((await db.query("select content_value from site_content where content_key='unrelated-fixture'")).rows[0].content_value,{unexpectedActor:'[personal information removed]'});
+    const revisionAfterScrub=(await db.query("select revision::text value from account_deletion_actor_revisions where actor_id=$1",[ACTOR])).rows[0].value;
+    await fail(()=>db.query("select public.cancel_account_deletion_request($1,$2,$3,$4)",[ACTOR,id,randomUUID(),revisionAfterScrub]),"PD409");
     const unchanged = (await db.query("select owner_id,visibility,name from guitars where id=$1", [g.id])).rows[0];
     assert.deepEqual(unchanged, { owner_id: ACTOR, visibility: "public", name: "Private Person personal guitar" });
     await db.query("delete from site_content where content_key in ('unrelated-fixture','target-authored-unscoped')");
     assert.equal((await prepareReady(id)).fulfillment.state, "ready_for_auth_deletion");
   });
 
+  await check("bounded unscoped identity scrubbing resumes across batches without omission", async () => {
+    await seed(); await guitar();
+    await db.query("insert into site_content(content_key,content_value,updated_by) select 'unscoped-batch-'||n,jsonb_build_object('departingActor',$1::text),$2 from generate_series(1,101) n",[ACTOR,OTHER]);
+    const id=(await request()).request.requestId;
+    const first=await prepare(id); assert.ok(first.fulfillment.blockers.includes("retained_personal_content_review_required"));
+    assert.equal((await db.query("select count(*)::int n from site_content where content_key like 'unscoped-batch-%' and content_value::text like '%'||$1::text||'%'",[ACTOR])).rows[0].n,1);
+    await attestReviews(id,first);
+    const second=await prepare(id); assert.equal(second.fulfillment.state,"quiescing_storage");
+    assert.equal((await db.query("select count(*)::int n from site_content where content_key like 'unscoped-batch-%' and content_value::text like '%'||$1::text||'%'",[ACTOR])).rows[0].n,0);
+    assert.equal((await db.query("select count(*)::int n from account_deletion_fulfillment_receipts where request_id=$1 and action='unscoped_scrub'",[id])).rows[0].n,2);
+    await expireStorageQuiescence(id); assert.equal((await prepare(id)).fulfillment.state,"ready_for_auth_deletion");
+  });
   await check("privacy postcondition rolls back unforeseen content created after inventory", async () => {
     await seed(); const g = await guitar(); const id = (await request()).request.requestId;
     await db.exec(`create function public.fixture_late_personal_content() returns trigger language plpgsql as $$begin

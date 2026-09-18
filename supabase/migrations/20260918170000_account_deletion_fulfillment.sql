@@ -52,7 +52,7 @@ create index account_deletion_fulfillment_queue
 create table public.account_deletion_fulfillment_receipts (
   operation_id uuid primary key,
   request_id uuid not null references public.account_deletion_fulfillments(request_id) on delete restrict,
-  action text not null check(action in ('prepare','complete','profile_redact')),
+  action text not null check(action in ('prepare','complete','profile_redact','unscoped_scrub')),
   result jsonb not null check(jsonb_typeof(result)='object'),
   recorded_at timestamptz not null default clock_timestamp()
 );
@@ -860,23 +860,26 @@ language sql stable set search_path=pg_catalog,public as $$
 $$;
 
 create function public._account_deletion_text_has_identity(p_text text,p_actor_id uuid,p_email text) returns boolean
-language sql immutable set search_path=pg_catalog,public as $$
+language sql stable set search_path=pg_catalog,public as $$
   select strpos(lower(coalesce(p_text,'')),p_actor_id::text)>0
     or (p_email<>'' and strpos(lower(coalesce(p_text,'')),p_email)>0)
+    or (char_length(coalesce(current_setting('qrguitar.account_deletion_target_name',true),''))>=3
+      and strpos(lower(coalesce(p_text,'')),lower(current_setting('qrguitar.account_deletion_target_name',true)))>0)
 $$;
 
 -- Remove only identity strings we can prove belong to the departing account.
 -- This deliberately preserves the surrounding instrument/service fact instead
 -- of replacing whole notes, events, specifications, or Profile descriptions.
 create function public._account_deletion_redact_identity(p_value text,p_actor_id uuid,p_email text) returns text
-language plpgsql immutable set search_path=pg_catalog,public as $$
+language plpgsql stable set search_path=pg_catalog,public as $$
 declare answer text:=p_value; needle text; at_position integer;
 begin
   if answer is null then return null; end if;
-  foreach needle in array array[p_actor_id::text,nullif(lower(btrim(p_email)),'')] loop
-    if needle is null then continue; end if;
+  foreach needle in array array[p_actor_id::text,nullif(lower(btrim(p_email)),''),
+      nullif(btrim(current_setting('qrguitar.account_deletion_target_name',true)),'')] loop
+    if needle is null or (needle<>p_actor_id::text and needle<>lower(btrim(p_email)) and char_length(needle)<3) then continue; end if;
     loop
-      at_position:=strpos(lower(answer),needle);
+      at_position:=strpos(lower(answer),lower(needle));
       exit when at_position=0;
       answer:=overlay(answer placing '[personal information removed]' from at_position for char_length(needle));
     end loop;
@@ -885,7 +888,7 @@ begin
 end $$;
 
 create function public._account_deletion_redact_identity_jsonb(p_value jsonb,p_actor_id uuid,p_email text,p_salt uuid) returns jsonb
-language plpgsql immutable set search_path=pg_catalog,public as $$
+language plpgsql stable set search_path=pg_catalog,public as $$
 declare result jsonb;
 begin
   if p_value is null then return null;end if;
@@ -3031,6 +3034,249 @@ language sql stable security definer set search_path=pg_catalog,public as $$
       concat_ws('|',a.actor_email,a.target_id,a.reason,a.metadata::text),p_actor_id,p_email))
 $$;
 
+-- Remove provable identity strings from rows whose current actor links do not
+-- place them in a normal Profile/retention review. Each table is capped per
+-- prepare call; a remaining match stays as a blocker and the next replay
+-- continues from the current committed state. Facts and rows remain intact.
+create function public._account_deletion_scrub_unscoped_personal_content(
+  p_request_id uuid,p_actor_id uuid,p_email text,p_salt uuid
+) returns integer language plpgsql security definer set search_path=pg_catalog,public as $$
+declare changed integer:=0; affected integer;
+begin
+  update public.profiles p set
+    display_name=public._account_deletion_redact_identity(p.display_name,p_actor_id,p_email),
+    admin_notes=public._account_deletion_redact_identity(p.admin_notes,p_actor_id,p_email),
+    account_lock_reason=public._account_deletion_redact_identity(p.account_lock_reason,p_actor_id,p_email),
+    account_ban_reason=public._account_deletion_redact_identity(p.account_ban_reason,p_actor_id,p_email)
+  where p.id in (select q.id from public.profiles q where q.id<>p_actor_id and
+    public._account_deletion_text_has_identity(concat_ws('|',q.display_name,q.admin_notes,q.account_lock_reason,q.account_ban_reason),p_actor_id,p_email)
+    order by q.id limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+
+  update public.guitars g set
+    name=public._account_deletion_redact_identity(g.name,p_actor_id,p_email),
+    brand=public._account_deletion_redact_identity(g.brand,p_actor_id,p_email),
+    model=public._account_deletion_redact_identity(g.model,p_actor_id,p_email),
+    year=public._account_deletion_redact_identity(g.year,p_actor_id,p_email),
+    serial_number=public._account_deletion_redact_identity(g.serial_number,p_actor_id,p_email),
+    builder=public._account_deletion_redact_identity(g.builder,p_actor_id,p_email),
+    location=public._account_deletion_redact_identity(g.location,p_actor_id,p_email),
+    summary=public._account_deletion_redact_identity(g.summary,p_actor_id,p_email),
+    safety_note=public._account_deletion_redact_identity(g.safety_note,p_actor_id,p_email),
+    public_safety_note=public._account_deletion_redact_identity(g.public_safety_note,p_actor_id,p_email),
+    owner_removed_reason=public._account_deletion_redact_identity(g.owner_removed_reason,p_actor_id,p_email),
+    admin_archive_reason=public._account_deletion_redact_identity(g.admin_archive_reason,p_actor_id,p_email),
+    updated_at=greatest(g.updated_at,clock_timestamp())
+  where g.id in (select q.id from public.guitars q where q.owner_id is distinct from p_actor_id and
+    public._account_deletion_text_has_identity(concat_ws('|',q.name,q.brand,q.model,q.year,q.serial_number,q.builder,q.location,q.summary,
+      q.safety_note,q.public_safety_note,q.owner_removed_reason,q.admin_archive_reason),p_actor_id,p_email) order by q.id limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+
+  update public.guitar_specs s set label=public._account_deletion_redact_identity(s.label,p_actor_id,p_email),
+    value=public._account_deletion_redact_identity(s.value,p_actor_id,p_email)
+  where s.id in (select q.id from public.guitar_specs q join public.guitars g on g.id=q.guitar_id
+    where g.owner_id is distinct from p_actor_id and public._account_deletion_text_has_identity(concat_ws('|',q.label,q.value),p_actor_id,p_email)
+    order by q.id limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+
+  update public.guitar_media m set alt=public._account_deletion_redact_identity(m.alt,p_actor_id,p_email)
+  where m.id in (select q.id from public.guitar_media q join public.guitars g on g.id=q.guitar_id
+    where g.owner_id is distinct from p_actor_id and public._account_deletion_text_has_identity(q.alt,p_actor_id,p_email) order by q.id limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+
+  update public.guitar_documents d set
+    name=public._account_deletion_redact_identity(d.name,p_actor_id,p_email),
+    file_name=public._account_deletion_redact_identity(d.file_name,p_actor_id,p_email),
+    public_description=public._account_deletion_redact_identity(d.public_description,p_actor_id,p_email),
+    private_notes=public._account_deletion_redact_identity(d.private_notes,p_actor_id,p_email),
+    category=public._account_deletion_redact_identity(d.category,p_actor_id,p_email),
+    issuer_source=public._account_deletion_redact_identity(d.issuer_source,p_actor_id,p_email),
+    description=public._account_deletion_redact_identity(d.description,p_actor_id,p_email)
+  where d.id in (select q.id from public.guitar_documents q join public.guitars g on g.id=q.guitar_id
+    where g.owner_id is distinct from p_actor_id and q.uploaded_by_user_id is distinct from p_actor_id
+      and public._account_deletion_text_has_identity(concat_ws('|',q.name,q.file_name,q.public_description,q.private_notes,q.category,q.issuer_source,q.description),p_actor_id,p_email)
+    order by q.id limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+
+  update public.guitar_external_media x set
+    canonical_url=case when public._account_deletion_text_has_identity(x.canonical_url,p_actor_id,p_email) then 'https://privacy.invalid/'||x.id::text else x.canonical_url end,
+    provider_id=public._account_deletion_redact_identity(x.provider_id,p_actor_id,p_email),
+    title=public._account_deletion_redact_identity(x.title,p_actor_id,p_email),
+    caption=public._account_deletion_redact_identity(x.caption,p_actor_id,p_email),
+    thumbnail_url=case when public._account_deletion_text_has_identity(x.thumbnail_url,p_actor_id,p_email) then null else x.thumbnail_url end
+  where x.id in (select q.id from public.guitar_external_media q join public.guitars g on g.id=q.guitar_id
+    where g.owner_id is distinct from p_actor_id and q.created_by is distinct from p_actor_id
+      and public._account_deletion_text_has_identity(concat_ws('|',q.canonical_url,q.provider_id,q.title,q.caption,q.thumbnail_url),p_actor_id,p_email)
+    order by q.id limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+
+  update public.guitar_serial_aliases a set
+    serial_display=public._account_deletion_redact_identity(a.serial_display,p_actor_id,p_email),
+    serial_normalized=case when public._account_deletion_text_has_identity(a.serial_normalized,p_actor_id,p_email)
+      then 'PRIVACY'||upper(substr(replace(a.id::text,'-',''),1,16)) else a.serial_normalized end
+  where a.id in (select q.id from public.guitar_serial_aliases q where
+    public._account_deletion_text_has_identity(concat_ws('|',q.serial_display,q.serial_normalized),p_actor_id,p_email) order by q.id limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+
+  update public.guitar_timeline_events e set
+    title=public._account_deletion_redact_identity(e.title,p_actor_id,p_email),
+    description=public._account_deletion_redact_identity(e.description,p_actor_id,p_email),
+    private_notes=public._account_deletion_redact_identity(e.private_notes,p_actor_id,p_email),
+    shop_name=public._account_deletion_redact_identity(e.shop_name,p_actor_id,p_email),
+    location=public._account_deletion_redact_identity(e.location,p_actor_id,p_email),
+    source_key=public._account_deletion_redact_identity(e.source_key,p_actor_id,p_email),
+    provider_display_name=public._account_deletion_redact_identity(e.provider_display_name,p_actor_id,p_email),
+    work_order_reference=public._account_deletion_redact_identity(e.work_order_reference,p_actor_id,p_email),
+    parts_installed=public._account_deletion_redact_identity(e.parts_installed,p_actor_id,p_email),
+    setup_measurements=public._account_deletion_redact_identity(e.setup_measurements,p_actor_id,p_email)
+  where e.id in (select q.id from public.guitar_timeline_events q join public.guitars g on g.id=q.guitar_id
+    where g.owner_id is distinct from p_actor_id and q.created_by_user_id is distinct from p_actor_id
+      and q.provider_user_id is distinct from p_actor_id and q.evidence_reviewed_by is distinct from p_actor_id
+      and public._account_deletion_text_has_identity(concat_ws('|',q.event_type,q.title,q.description,q.private_notes,q.shop_name,q.location,q.category,
+        q.source_key,q.provider_display_name,q.work_order_reference,q.parts_installed,q.setup_measurements),p_actor_id,p_email)
+    order by q.id limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+
+  update public.ownership_transfers t set
+    to_name=public._account_deletion_redact_identity(t.to_name,p_actor_id,p_email),
+    fee_waived_reason=public._account_deletion_redact_identity(t.fee_waived_reason,p_actor_id,p_email)
+  where t.id in (select q.id from public.ownership_transfers q where q.from_owner_id is distinct from p_actor_id
+    and q.accepted_by is distinct from p_actor_id and (p_email='' or lower(btrim(q.to_email))<>p_email)
+    and public._account_deletion_text_has_identity(concat_ws('|',q.to_name,q.fee_waived_reason),p_actor_id,p_email) order by q.id limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+
+  update public.ownership_claims c set
+    acquisition_details=public._account_deletion_redact_identity(c.acquisition_details,p_actor_id,p_email),
+    ownership_declaration=public._account_deletion_redact_identity(c.ownership_declaration,p_actor_id,p_email),
+    owner_response_note=public._account_deletion_redact_identity(c.owner_response_note,p_actor_id,p_email),
+    admin_review_note=public._account_deletion_redact_identity(c.admin_review_note,p_actor_id,p_email)
+  where c.id in (select q.id from public.ownership_claims q where q.current_owner_id is distinct from p_actor_id
+    and q.claimant_user_id is distinct from p_actor_id and q.decided_by is distinct from p_actor_id
+    and (p_email='' or lower(btrim(q.recipient_email_normalized))<>p_email)
+    and public._account_deletion_text_has_identity(concat_ws('|',q.acquisition_details,q.ownership_declaration,q.owner_response_note,q.admin_review_note),p_actor_id,p_email)
+    order by q.id limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+
+  update public.ownership_claim_evidence e set
+    file_name=public._account_deletion_redact_identity(e.file_name,p_actor_id,p_email),
+    private_note=public._account_deletion_redact_identity(e.private_note,p_actor_id,p_email)
+  where e.id in (select q.id from public.ownership_claim_evidence q join public.ownership_claims c on c.id=q.claim_id
+    where q.uploaded_by is distinct from p_actor_id and c.current_owner_id is distinct from p_actor_id
+      and c.claimant_user_id is distinct from p_actor_id and c.decided_by is distinct from p_actor_id
+      and (p_email='' or lower(btrim(c.recipient_email_normalized))<>p_email)
+      and public._account_deletion_text_has_identity(concat_ws('|',q.evidence_type,q.file_name,q.private_note),p_actor_id,p_email)
+    order by q.id limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+
+  update public.ownership_claim_events e set
+    note=public._account_deletion_redact_identity(e.note,p_actor_id,p_email),
+    metadata=public._account_deletion_redact_identity_jsonb(e.metadata,p_actor_id,p_email,p_salt)
+  where e.id in (select q.id from public.ownership_claim_events q join public.ownership_claims c on c.id=q.claim_id
+    where q.actor_user_id is distinct from p_actor_id and c.current_owner_id is distinct from p_actor_id
+      and c.claimant_user_id is distinct from p_actor_id and c.decided_by is distinct from p_actor_id
+      and (p_email='' or lower(btrim(c.recipient_email_normalized))<>p_email)
+      and public._account_deletion_text_has_identity(concat_ws('|',q.note,q.metadata::text),p_actor_id,p_email)
+    order by q.id limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+
+  update public.service_provider_profiles p set
+    business_name=public._account_deletion_redact_identity(p.business_name,p_actor_id,p_email),
+    public_display_name=public._account_deletion_redact_identity(p.public_display_name,p_actor_id,p_email),
+    website=public._account_deletion_redact_identity(p.website,p_actor_id,p_email),
+    location=public._account_deletion_redact_identity(p.location,p_actor_id,p_email),
+    service_categories=(select coalesce(array_agg(public._account_deletion_redact_identity(v,p_actor_id,p_email) order by n),'{}'::text[])
+      from unnest(p.service_categories) with ordinality t(v,n)),
+    internal_review_note=public._account_deletion_redact_identity(p.internal_review_note,p_actor_id,p_email)
+  where p.user_id in (select q.user_id from public.service_provider_profiles q where q.user_id<>p_actor_id and
+    public._account_deletion_text_has_identity(concat_ws('|',q.business_name,q.public_display_name,q.website,q.location,q.service_categories::text,q.internal_review_note),p_actor_id,p_email)
+    order by q.user_id limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+
+  update public.service_submissions s set
+    title=public._account_deletion_redact_identity(s.title,p_actor_id,p_email),
+    work_performed=public._account_deletion_redact_identity(s.work_performed,p_actor_id,p_email),
+    parts_installed=public._account_deletion_redact_identity(s.parts_installed,p_actor_id,p_email),
+    setup_measurements=public._account_deletion_redact_identity(s.setup_measurements,p_actor_id,p_email),
+    work_order_reference=public._account_deletion_redact_identity(s.work_order_reference,p_actor_id,p_email),
+    recommended_public_description=public._account_deletion_redact_identity(s.recommended_public_description,p_actor_id,p_email),
+    private_provider_note=public._account_deletion_redact_identity(s.private_provider_note,p_actor_id,p_email),
+    owner_review_note=public._account_deletion_redact_identity(s.owner_review_note,p_actor_id,p_email),
+    email_delivery_message=public._account_deletion_redact_identity(s.email_delivery_message,p_actor_id,p_email)
+  where s.id in (select q.id from public.service_submissions q where q.provider_user_id is distinct from p_actor_id
+    and q.owner_user_id is distinct from p_actor_id and public._account_deletion_text_has_identity(concat_ws('|',q.service_type,q.title,
+      q.work_performed,q.parts_installed,q.setup_measurements,q.work_order_reference,q.recommended_public_description,
+      q.private_provider_note,q.owner_review_note,q.email_delivery_message),p_actor_id,p_email) order by q.id limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+
+  update public.service_submission_evidence e set
+    file_name=public._account_deletion_redact_identity(e.file_name,p_actor_id,p_email)
+  where e.id in (select q.id from public.service_submission_evidence q join public.service_submissions s on s.id=q.submission_id
+    where q.uploaded_by_user_id is distinct from p_actor_id and s.provider_user_id is distinct from p_actor_id
+      and s.owner_user_id is distinct from p_actor_id and public._account_deletion_text_has_identity(concat_ws('|',q.evidence_type,q.file_name),p_actor_id,p_email)
+    order by q.id limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+
+  update public.service_submission_activity a set
+    note=public._account_deletion_redact_identity(a.note,p_actor_id,p_email),
+    metadata=public._account_deletion_redact_identity_jsonb(a.metadata,p_actor_id,p_email,p_salt)
+  where a.id in (select q.id from public.service_submission_activity q where q.actor_user_id is distinct from p_actor_id
+    and public._account_deletion_text_has_identity(concat_ws('|',q.note,q.metadata::text),p_actor_id,p_email) order by q.id limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+
+  update public.service_submission_notifications n set message=public._account_deletion_redact_identity(n.message,p_actor_id,p_email)
+  where n.id in (select q.id from public.service_submission_notifications q where q.recipient_user_id is distinct from p_actor_id
+    and public._account_deletion_text_has_identity(q.message,p_actor_id,p_email) order by q.id limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+
+  update public.service_evidence_uploads e set
+    file_name=case when public._account_deletion_text_has_identity(e.file_name,p_actor_id,p_email)
+      then 'privacy-removed-'||e.upload_id::text||'.dat' else e.file_name end,
+    evidence_result=public._account_deletion_redact_identity_jsonb(e.evidence_result,p_actor_id,p_email,p_salt)
+  where e.upload_id in (select q.upload_id from public.service_evidence_uploads q where q.actor_id is distinct from p_actor_id
+    and public._account_deletion_text_has_identity(concat_ws('|',q.file_name,q.evidence_result::text),p_actor_id,p_email) order by q.upload_id limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+
+  delete from public.site_content s where s.content_key in (select q.content_key from public.site_content q
+    where public._account_deletion_text_has_identity(q.content_key,p_actor_id,p_email)
+      and q.content_key<>'public_collection_owner:'||p_actor_id::text
+      and q.content_key not like 'create_submission:'||p_actor_id::text||':%'
+      and coalesce(q.content_value->>'ownerId','')<>p_actor_id::text
+    order by q.content_key limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+  update public.site_content s set
+    content_value=public._account_deletion_redact_identity_jsonb(s.content_value,p_actor_id,p_email,p_salt),
+    updated_by=case when s.updated_by=p_actor_id then null else s.updated_by end
+  where s.content_key in (select q.content_key from public.site_content q where
+    public._account_deletion_text_has_identity(q.content_value::text,p_actor_id,p_email)
+      and q.content_key<>'public_collection_owner:'||p_actor_id::text
+      and q.content_key not like 'create_submission:'||p_actor_id::text||':%'
+      and coalesce(q.content_value->>'ownerId','')<>p_actor_id::text
+    order by q.content_key limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+
+  update public.site_editor_receipts r set
+    request_body=public._account_deletion_redact_identity_jsonb(r.request_body,p_actor_id,p_email,p_salt),
+    result=public._account_deletion_redact_identity_jsonb(r.result,p_actor_id,p_email,p_salt)
+  where (r.actor_user_id,r.request_id) in (select q.actor_user_id,q.request_id from public.site_editor_receipts q
+    where q.actor_user_id<>p_actor_id and public._account_deletion_text_has_identity(concat_ws('|',q.request_body::text,q.result::text),p_actor_id,p_email)
+    order by q.actor_user_id,q.request_id limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+
+  update public.admin_audit_events a set
+    actor_email=public._account_deletion_redact_identity(a.actor_email,p_actor_id,p_email),
+    target_id=public._account_deletion_redact_identity(a.target_id,p_actor_id,p_email),
+    reason=public._account_deletion_redact_identity(a.reason,p_actor_id,p_email),
+    metadata=public._account_deletion_redact_identity_jsonb(a.metadata,p_actor_id,p_email,p_salt)
+  where a.id in (select q.id from public.admin_audit_events q where q.actor_user_id is distinct from p_actor_id
+    and q.target_user_id is distinct from p_actor_id and public._account_deletion_text_has_identity(
+      concat_ws('|',q.actor_email,q.target_id,q.reason,q.metadata::text),p_actor_id,p_email) order by q.id limit 100);
+  get diagnostics affected=row_count;changed:=changed+affected;
+  if changed>0 then
+    insert into public.account_deletion_fulfillment_receipts(operation_id,request_id,action,result)
+      values(gen_random_uuid(),p_request_id,'unscoped_scrub',jsonb_build_object('policyVersion',1,'changedRows',changed));
+  end if;
+  return changed;
+end $$;
 create function public._account_deletion_billing_personal_content(p_actor_id uuid,p_email text) returns boolean
 language sql stable security definer set search_path=pg_catalog,public as $$
   select exists(select 1 from public.billing_orders b where public._account_deletion_text_has_identity(concat_ws('|',b.offer::text,b.last_error),p_actor_id,p_email))
@@ -3053,7 +3299,7 @@ language sql stable security definer set search_path=pg_catalog,public as $$sele
 create function public._account_deletion_promo_retained_pii(p_actor_id uuid,p_email text) returns boolean
 language sql stable security definer set search_path=pg_catalog,public as $$select false$$;
 
-create function public._account_deletion_blockers(p_request_id uuid,p_actor_id uuid,p_email text,p_protected_admin_emails text[]) returns jsonb
+create function public._account_deletion_blockers(p_request_id uuid,p_actor_id uuid,p_email text,p_protected_admin_emails text[],p_unscoped_personal_content boolean) returns jsonb
 language plpgsql stable security definer set search_path=pg_catalog,public as $$
 declare result jsonb;
 begin
@@ -3077,9 +3323,7 @@ begin
     union all select 'active_service_workflow' where exists(select 1 from public.service_submissions where (provider_user_id=p_actor_id or owner_user_id=p_actor_id) and status in ('draft','submitted','changes_requested'))
     union all select 'service_history_privacy_review_required' where not public._account_deletion_retention_review_complete(p_request_id,'service')
     union all select 'profile_history_privacy_review_required' where not public._account_deletion_profile_reviews_complete(p_request_id)
-    union all select 'retained_personal_content_review_required' where
-      public._account_deletion_unscoped_personal_content(p_actor_id,p_email)
-      or false
+    union all select 'retained_personal_content_review_required' where p_unscoped_personal_content
     union all select value from jsonb_array_elements_text(public._account_deletion_promo_blockers(p_actor_id)) hook(value)
   ) blockers;
   return result;
@@ -3144,8 +3388,8 @@ create function public.prepare_account_deletion_fulfillment(
   p_protected_admin_emails text[] default '{}'::text[]
 ) returns jsonb language plpgsql security definer set search_path=pg_catalog,public as $$
 declare request_row public.account_deletion_requests; job public.account_deletion_fulfillments;
-  old_receipt public.account_deletion_fulfillment_receipts; target_email text; blocked jsonb; answer jsonb;
-  new_subject uuid; preliminary_actor uuid; protected_admin_emails text[]; now_at timestamptz:=clock_timestamp();
+  old_receipt public.account_deletion_fulfillment_receipts; target_email text; target_display_name text; blocked jsonb; answer jsonb;
+  new_subject uuid; preliminary_actor uuid; protected_admin_emails text[]; unscoped_remaining boolean; now_at timestamptz:=clock_timestamp();
 begin
   if p_request_id is null or p_operation_id is null then raise exception using errcode='22023',message='Request and operation UUIDs are required.'; end if;
   if cardinality(coalesce(p_protected_admin_emails,'{}'::text[]))>100
@@ -3198,7 +3442,8 @@ begin
     perform 1 from auth.users where id=request_row.actor_id for key share;
     if not found then raise exception using errcode='PD409',message='The requested Auth identity is unavailable.'; end if;
     perform 1 from public.profiles where id=request_row.actor_id for update;
-    select lower(btrim(coalesce(u.email,''))) into target_email from auth.users u where u.id=request_row.actor_id;
+    select lower(btrim(coalesce(u.email,''))),nullif(btrim(p.display_name),'') into target_email,target_display_name
+      from auth.users u left join public.profiles p on p.id=u.id where u.id=request_row.actor_id;
     if target_email<>'' then
       perform pg_advisory_xact_lock(hashtextextended('qrguitar:privacy-email:'||target_email,0));
     end if;
@@ -3210,13 +3455,21 @@ begin
     if job.actor_id is distinct from request_row.actor_id then raise exception using errcode='PD409',message='The fulfillment identity no longer matches this request.'; end if;
     if job.target_email is distinct from target_email then raise exception using errcode='PD409',message='The deletion identity email changed during review.'; end if;
   end if;
+  if target_display_name is null and job.actor_id is not null then
+    select nullif(btrim(display_name),'') into target_display_name from public.profiles where id=job.actor_id;
+  end if;
   perform set_config('qrguitar.account_deletion_request',p_request_id::text,true);
+  perform set_config('qrguitar.account_deletion_target_name',coalesce(target_display_name,''),true);
   now_at:=clock_timestamp();
   if job.state='completed' then
     answer:=public._account_deletion_admin_fulfillment_json(job);
   elsif job.state='ready_for_auth_deletion' then
     answer:=public._account_deletion_admin_fulfillment_json(job);
   else
+    perform set_config('request.jwt.claim.role','service_role',true);
+    perform public._account_deletion_scrub_unscoped_personal_content(p_request_id,job.actor_id,target_email,job.subject_token);
+    unscoped_remaining:=public._account_deletion_unscoped_personal_content(job.actor_id,target_email);
+    perform set_config('qrguitar.account_deletion_target_name','',true);
     perform public._account_deletion_sync_profile_review_scope(p_request_id,job.actor_id,target_email);
     perform public._account_deletion_lock_profile_reviews(p_request_id);
     if job.state='blocked' then
@@ -3227,7 +3480,7 @@ begin
       lock table storage.objects in share mode;
       now_at:=clock_timestamp();
     end if;
-    blocked:=public._account_deletion_blockers(p_request_id,job.actor_id,target_email,protected_admin_emails);
+    blocked:=public._account_deletion_blockers(p_request_id,job.actor_id,target_email,protected_admin_emails,unscoped_remaining);
     if job.state='blocked' and blocked<>'[]'::jsonb then
       update public.account_deletion_fulfillments set state='blocked',blockers=blocked,revision=revision+1,
         last_reviewed_by=p_admin_id,reviewed_at=now_at where request_id=p_request_id returning * into job;
@@ -3267,6 +3520,7 @@ begin
         -- fresh storage inventory is empty. Now anonymize under the same actor
         -- and recipient-email locks before Auth deletion can be attempted.
         perform set_config('request.jwt.claim.role','service_role',true);
+        perform set_config('qrguitar.account_deletion_target_name',coalesce(target_display_name,''),true);
         perform public._account_deletion_migrate_billing_subject(p_request_id,job.actor_id,p_admin_id);
         perform public._account_deletion_migrate_service_subject(p_request_id,job.actor_id,p_admin_id);
         update public.profiles set account_status='removed',hide_public_content=true,display_name=null,
@@ -3290,13 +3544,13 @@ begin
         year=public._account_deletion_redact_identity(g.year,job.actor_id,target_email),
         serial_number=public._account_deletion_redact_identity(g.serial_number,job.actor_id,target_email),
         builder=public._account_deletion_redact_identity(g.builder,job.actor_id,target_email),
-        location=public._account_deletion_redact_identity(g.location,job.actor_id,target_email),
+        location=case when g.location is null then null else '[personal information removed]' end,
         summary=public._account_deletion_redact_identity(g.summary,job.actor_id,target_email),
         hero_image_path=case when public._account_deletion_text_has_identity(g.hero_image_path,job.actor_id,target_email)
           then null else g.hero_image_path end,
         safety_status_updated_by=null,
-        safety_note=public._account_deletion_redact_identity(g.safety_note,job.actor_id,target_email),
-        public_safety_note=public._account_deletion_redact_identity(g.public_safety_note,job.actor_id,target_email),
+        safety_note=case when g.safety_note is null then null else '[personal information removed]' end,
+        public_safety_note=case when g.public_safety_note is null then null else '[personal information removed]' end,
         owner_removed_by=null,
         owner_removed_reason=public._account_deletion_redact_identity(g.owner_removed_reason,job.actor_id,target_email),
         admin_archived_by=case when target_email<>'' and lower(coalesce(g.admin_archived_by,''))=target_email then null else g.admin_archived_by end,
@@ -3458,6 +3712,7 @@ begin
     end if;
   end if;
   perform set_config('qrguitar.account_deletion_request','',true);
+  perform set_config('qrguitar.account_deletion_target_name','',true);
   insert into public.account_deletion_fulfillment_receipts(operation_id,request_id,action,result)
     values(p_operation_id,p_request_id,'prepare',answer);
   return jsonb_build_object('ok',true,'fulfillment',answer,
@@ -3858,7 +4113,7 @@ begin
     and exists(select 1 from public.account_deletion_fulfillments where request_id=old.id) then
     if exists(select 1 from public.account_deletion_fulfillments where request_id=old.id and state='blocked') then
       if exists(select 1 from public.account_deletion_fulfillment_receipts r
-          where r.request_id=old.id and r.action='profile_redact') then
+          where r.request_id=old.id and r.action in ('profile_redact','unscoped_scrub')) then
         raise exception using errcode='PD409',message='Reviewed privacy redaction has already changed retained history; this request can no longer be cancelled.';
       end if;
       if exists(select 1 from public.account_deletion_storage_relocations r where r.request_id=old.id and (
@@ -3944,7 +4199,8 @@ end $$;
 revoke all on function public._account_deletion_fulfillment_guard(),public._account_deletion_custody_fence(),public._account_deletion_write_fence(),
   public._account_deletion_admin(uuid,boolean),public._account_deletion_fulfillment_json(public.account_deletion_fulfillments),
   public._account_deletion_text_has_identity(text,uuid,text),public._account_deletion_unscoped_personal_content(uuid,text),
-  public._account_deletion_billing_personal_content(uuid,text),public._account_deletion_blockers(uuid,uuid,text,text[]),
+  public._account_deletion_scrub_unscoped_personal_content(uuid,uuid,text,uuid),
+  public._account_deletion_billing_personal_content(uuid,text),public._account_deletion_blockers(uuid,uuid,text,text[],boolean),
   public._account_deletion_retained_pii(uuid,uuid,text) from public,anon,authenticated,service_role;
 do $private_account_deletion_helpers$
 declare helper record;
