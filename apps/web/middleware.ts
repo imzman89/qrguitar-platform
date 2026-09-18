@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isCheckoutPath, securityHeaders } from "./lib/security-headers";
+import { isNoindexPathname } from "./lib/search-indexing";
 
 const SITE_PREVIEW_COOKIE = "qrguitar_site_preview";
 
@@ -24,6 +25,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(canonicalUrl, 308);
   }
   const response = NextResponse.next();
+  if (isNoindexPathname(request.nextUrl.pathname)) {
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  }
   if (request.nextUrl.pathname === "/api/site-editor/preview" || request.cookies.has(SITE_PREVIEW_COOKIE)) {
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
     response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");

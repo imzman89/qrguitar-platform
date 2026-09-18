@@ -39,6 +39,7 @@ type GuitarRow = {
   admin_archived_at?: string | null;
   owner_removed_at?: string | null;
   created_at: string | null;
+  updated_at: string | null;
 };
 
 type MediaRow = {
@@ -296,7 +297,8 @@ function mapRecord({
     serviceEvents: [],
     externalMedia: externalMedia || [],
     qrStyle: defaultQrStyle,
-    createdAt: guitar.created_at || new Date().toISOString()
+    createdAt: guitar.created_at || "",
+    updatedAt: guitar.updated_at || undefined
   };
   instrument.serviceEvents = getServiceHistoryEntries({
     timelineEvents: serviceEvents || [],
@@ -439,7 +441,7 @@ async function loadRelated(guitars: GuitarRow[], serviceRole = true) {
 
 export async function getPublicInstruments(ownerId?: string) {
   noStore();
-  const query = new URL("/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,no_serial_used,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&visibility=eq.public&admin_archived_at=is.null&owner_removed_at=is.null&order=created_at.desc,id.asc", "https://supabase.invalid");
+  const query = new URL("/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,no_serial_used,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at,updated_at&visibility=eq.public&admin_archived_at=is.null&owner_removed_at=is.null&order=created_at.desc,id.asc", "https://supabase.invalid");
   if (ownerId) query.searchParams.set("owner_id", "eq." + ownerId);
   const guitars = await supabasePagedRows<GuitarRow>(query.pathname + query.search, { serviceRole: true });
   const [related, trustByCode] = await Promise.all([
@@ -490,12 +492,12 @@ export async function getPublicInstrumentByCode(code: string) {
   if (!normalizedCode || isRetiredPublicProfileCode(normalizedCode)) {
     return null;
   }
-  let rows = await supabaseHttpsJson<GuitarRow[]>(`/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,no_serial_used,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&qr_code=eq.${encodeURIComponent(normalizedCode)}&limit=1`, { serviceRole: true });
+  let rows = await supabaseHttpsJson<GuitarRow[]>(`/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,no_serial_used,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at,updated_at&qr_code=eq.${encodeURIComponent(normalizedCode)}&limit=1`, { serviceRole: true });
   if (!rows.length) {
     const redirects = await supabaseHttpsJson<Array<{ guitar_id: string }>>(`/rest/v1/qr_redirects?select=guitar_id&old_path=eq.${encodeURIComponent(`/i/${normalizedCode}`)}&active=eq.true&limit=1`, { serviceRole: true });
     const guitarId = redirects[0]?.guitar_id;
     if (guitarId) {
-      rows = await supabaseHttpsJson<GuitarRow[]>(`/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,no_serial_used,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at&id=eq.${encodeURIComponent(guitarId)}&limit=1`, { serviceRole: true });
+      rows = await supabaseHttpsJson<GuitarRow[]>(`/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,no_serial_used,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at,updated_at&id=eq.${encodeURIComponent(guitarId)}&limit=1`, { serviceRole: true });
     }
   }
   const data = rows[0] || null;

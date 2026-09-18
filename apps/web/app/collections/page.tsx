@@ -4,6 +4,7 @@ import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import { getPublicInstruments } from "../../lib/public-instruments";
 import { buildCollectionDirectory } from "../../lib/collection-directory";
+import { buildCollectionsDirectoryJsonLd, buildPageMetadata, serializeJsonLd } from "../../lib/seo";
 import { CollectionsDirectoryClient } from "./CollectionsDirectoryClient";
 import styles from "./collections.module.css";
 
@@ -11,16 +12,21 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: "Member Collections | QRguitar",
-  description: "Explore public instrument collections from QRguitar players, collectors, shops, builders, and service professionals.",
-  alternates: { canonical: "https://www.qrguitar.com/collections" }
+  ...buildPageMetadata(
+    "Member Collections",
+    "Explore public instrument collections from QRguitar players, collectors, shops, builders, and service professionals.",
+    "/collections"
+  ),
+  title: "Member Collections | QRguitar"
 };
 
 export default async function CollectionsDirectoryPage() {
   const records = await getPublicInstruments();
   const collections = buildCollectionDirectory(records);
+  const jsonLd = buildCollectionsDirectoryJsonLd(collections);
 
   return <>
+    <script id="qrguitar-collections-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
     <Nav />
     <main className="section collection-directory-page">
       <div className="shell">

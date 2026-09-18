@@ -100,6 +100,7 @@ export type DemoInstrument = {
   galleryImageDataUrls?: string[];
   qrStyle: QrStyle;
   createdAt: string;
+  updatedAt?: string;
 };
 
 export type CustomProfileField = {

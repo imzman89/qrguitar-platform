@@ -11,6 +11,7 @@ import { CollectionsClient } from "./CollectionsClient";
 import { loadPublishedSiteSettings } from "../../../lib/site-settings-server";
 import { CollectionInquiryForm } from "../../../components/CollectionInquiryForm";
 import { SellerWebsiteLink } from "../../../components/SellerWebsiteLink";
+import { buildPageMetadata, buildPrivatePageMetadata, buildPublicCollectionJsonLd, serializeJsonLd } from "../../../lib/seo";
 import styles from "../collections.module.css";
 
 export const dynamic = "force-dynamic";
@@ -26,11 +27,17 @@ async function loadCollection(handleValue: string) {
 export async function generateMetadata({ params }: { params: Promise<{ handle: string }> }): Promise<Metadata> {
   const { handle } = await params;
   const result = await loadCollection(handle);
-  if (!result) return { title: "Collection unavailable | QRguitar", robots: { index: false, follow: false } };
+  if (!result) return buildPrivatePageMetadata(
+    "Collection unavailable",
+    "This QRguitar collection is not available."
+  );
   return {
+    ...buildPageMetadata(
+      `${result.settings.publicName} Collection`,
+      result.settings.bio || `Explore ${result.settings.publicName}'s public QRguitar Profiles.`,
+      `/collections/${encodeURIComponent(result.settings.handle)}`
+    ),
     title: `${result.settings.publicName} Collection | QRguitar`,
-    description: result.settings.bio || `Explore ${result.settings.publicName}'s public QRguitar Profiles.`,
-    alternates: { canonical: `https://www.qrguitar.com/collections/${result.settings.handle}` },
     robots: { index: result.settings.allowIndexing && result.records.length > 0, follow: true }
   };
 }
@@ -42,7 +49,9 @@ export default async function CollectionPage({ params }: { params: Promise<{ han
   const { settings, records } = result;
   const publishedSettings = await loadPublishedSiteSettings();
   const role = collectionRoleLabel(settings.accountType);
+  const jsonLd = buildPublicCollectionJsonLd(settings, records);
   return <>
+    <script id="qrguitar-collection-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
     <Nav />
     <main className="page-shell collection-page">
       <nav className={styles.navigation} aria-label="Collection navigation"><Link href="/collections"><ArrowLeft size={16} aria-hidden="true" /> All member collections</Link><Link href="/catalog">Browse instrument Profiles</Link></nav>

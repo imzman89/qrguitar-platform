@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { buildPageMetadata } from "../../lib/seo";
+import { buildPrivatePageMetadata } from "../../lib/seo";
 
-export const metadata: Metadata = buildPageMetadata(
+export const metadata: Metadata = buildPrivatePageMetadata(
   "QRguitar Dashboard",
-  "Manage your saved QRguitar Profiles.",
-  "/dashboard"
+  "Manage your saved QRguitar Profiles."
 );
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
