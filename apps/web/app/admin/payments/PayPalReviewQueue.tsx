@@ -67,12 +67,20 @@ export default function PayPalReviewQueue() {
   </section>;
 }
 
-function ReviewDelivery({ delivery, busy, retry, acknowledge }: { delivery: PayPalWebhookDelivery; busy: boolean; retry(body: { deliveryId: string; reason: string }): Promise<boolean>; acknowledge(body: { deliveryId: string; reason: string }): Promise<boolean> }) {
+export function ReviewDelivery({ delivery, busy, retry, acknowledge }: { delivery: PayPalWebhookDelivery; busy: boolean; retry(body: { deliveryId: string; reason: string }): Promise<boolean>; acknowledge(body: { deliveryId: string; reason: string }): Promise<boolean> }) {
   const [reason, setReason] = useState(""), [confirmed, setConfirmed] = useState(false);
   const expiredLease = delivery.state === "processing" && Boolean(delivery.lockedUntil) && Date.parse(delivery.lockedUntil!) <= Date.now();
   const retryable = delivery.continuationAvailable === true && (["queued", "verified", "planned", "retry", "quarantined"].includes(delivery.state) || expiredLease);
   const acknowledgeable = delivery.state === "quarantined" && delivery.continuationAvailable === false, canSubmit = (retryable || acknowledgeable) && !busy && confirmed && reason.trim().length >= 10;
-  async function submit(event: React.FormEvent) { event.preventDefault(); if (!canSubmit) return; const body = { deliveryId: delivery.deliveryId, reason: reason.replace(/[\r\n\t]+/g, " ").trim() }; await (retryable ? retry(body) : acknowledge(body)); }
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!canSubmit) return;
+    const body = { deliveryId: delivery.deliveryId, reason: reason.replace(/[\r\n\t]+/g, " ").trim() };
+    if (await (retryable ? retry(body) : acknowledge(body))) {
+      setReason("");
+      setConfirmed(false);
+    }
+  }
   return <><p className={styles.eyebrow}>{delivery.state}</p><h2>{delivery.eventType || "Unverified PayPal event"}</h2><dl className={styles.orderMeta}>
     <dt>Delivery</dt><dd>{delivery.deliveryId}</dd><dt>Provider event</dt><dd>{delivery.eventId || "Not verified yet"}</dd>
     <dt>Progress</dt><dd>{delivery.cursor} of {delivery.totalItems ?? "unknown"} items · {delivery.attemptCount} attempts</dd>
@@ -88,12 +96,15 @@ function ReviewDelivery({ delivery, busy, retry, acknowledge }: { delivery: PayP
   </form> : <p>This delivery has an active processor lease. Refresh after the lease ends; no operator reset is available while another process owns it.</p>}</>;
 }
 
-function ReviewHold({ review, busy, decide }: { review: PayPalAdminReview; busy: boolean; decide(body: { action: PayPalReviewAction; eventId: string; orderId: string; ownerId: string; reason: string }): Promise<boolean> }) {
+export function ReviewHold({ review, busy, decide }: { review: PayPalAdminReview; busy: boolean; decide(body: { action: PayPalReviewAction; eventId: string; orderId: string; ownerId: string; reason: string }): Promise<boolean> }) {
   const [action, setAction] = useState<PayPalReviewAction>("retain_hold"), [reason, setReason] = useState(""), [confirmed, setConfirmed] = useState(false);
   const canSubmit = !busy && confirmed && reason.trim().length >= 10;
   async function submit(event: React.FormEvent) {
     event.preventDefault(); if (!canSubmit) return;
-    await decide({ action, eventId: review.eventId, orderId: review.orderId, ownerId: review.ownerId, reason: reason.replace(/[\r\n\t]+/g, " ").trim() });
+    if (await decide({ action, eventId: review.eventId, orderId: review.orderId, ownerId: review.ownerId, reason: reason.replace(/[\r\n\t]+/g, " ").trim() })) {
+      setReason("");
+      setConfirmed(false);
+    }
   }
   const resource = review.resourceKind && review.resourceId ? `${review.resourceKind} · ${review.resourceId}` : review.refundId ? `refund · ${review.refundId}` : review.disputeId ? `dispute · ${review.disputeId}` : review.caseId ? `case · ${review.caseId}` : "Not supplied";
   return <><p className={styles.eyebrow}>{reasonLabels[review.holdReason] || review.holdReason}</p><h2>{review.reference}</h2>

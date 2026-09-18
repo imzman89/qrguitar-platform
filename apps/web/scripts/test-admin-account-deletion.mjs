@@ -206,6 +206,30 @@ test("unrelated reversible lock action still writes its intended profile and aud
   assert.equal(f.auditCalls.length, 1); assert.equal(f.auditCalls[0].action, "lock"); assert.equal(f.deleted.length, 0);
 });
 
+for (const status of ["banned", "removed"]) test(`${status} accounts cannot be routed through lock and unlock`, async () => {
+  for (const action of ["lock", "unlock"]) {
+    const f = fixture(); f.tables.profiles[0].account_status = status;
+    const response = await f.patch({ action });
+    assert.equal(response.status, 409); assert.equal(f.tables.profiles[0].account_status, status);
+    assert.equal(f.auditCalls.length, 0);
+  }
+});
+
+test("banning a locked account clears incompatible lock metadata atomically", async () => {
+  const f = fixture(); Object.assign(f.tables.profiles[0], { account_status: "locked", account_locked_at: "2026-09-18T12:00:00Z", account_locked_by: "old-admin", account_lock_reason: "Earlier lock" });
+  const response = await f.patch({ action: "ban" });
+  assert.equal(response.status, 200); assert.equal(f.tables.profiles[0].account_status, "banned");
+  assert.equal(f.tables.profiles[0].account_locked_at, null); assert.equal(f.tables.profiles[0].account_locked_by, null); assert.equal(f.tables.profiles[0].account_lock_reason, null);
+  assert.equal(f.tables.profiles[0].hide_public_content, true); assert.equal(f.auditCalls[0].action, "user_banned");
+});
+
+test("admin demotion accepts an explicitly selected specialized role", async () => {
+  const f = fixture(); f.tables.profiles[0].role = "admin"; f.tables.profiles.push({ id: OTHER, role: "admin", account_status: "active" });
+  const response = await f.patch({ action: "change_role", role: "builder" });
+  assert.equal(response.status, 200); assert.equal(f.tables.profiles[0].role, "builder");
+  assert.equal(f.auditCalls.length, 1); assert.equal(f.auditCalls[0].action, "change_role");
+});
+
 test("live-base missing billing tables disable deletion without breaking account listing, locks, or notes", async () => {
   const options = { hooks: { before(query) {
     if (query.table.startsWith("billing_")) return { data: null, error: { code: "42P01", message: "Synthetic billing relation missing" } };
@@ -230,7 +254,7 @@ function renderAdmin(overrides = {}) {
     ts.forEachChild(node, visit);
   }
   visit(parsed);
-  const state = { activeSection: "users", loading: false, adminAuthorized: true, ...overrides };
+  const state = { activeSection: "users", loading: false, adminAccessState: "authorized", adminDataReady: true, ...overrides };
   let index = 0;
   const compilerOptions = { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true };
   const localModules = new Map();
@@ -272,4 +296,29 @@ test("a stale deletion confirmation cannot offer an enabled Confirm button", () 
 test("actual audit view preserves historical deletion event labels", () => {
   const html = renderAdmin({ activeSection: "audit", auditEvents: [{ id: "historic", action: "empty_user_deleted", actor_email: "old-admin@example.invalid", target_type: "profile", target_id: ID, reason: "Historical action", created_at: "2026-01-01T00:00:00Z" }] });
   assert.match(html, /Empty user deleted/); assert.match(html, /Historical action/);
+});
+
+test("admin demotion requires an explicit owner, builder, or shop role", () => {
+  const adminUser = { ...selectedUser, role: "admin" };
+  const html = renderAdmin({ pendingAction: { kind: "user", user: adminUser, action: "change_role", extra: { role: "" }, title: "Remove Admin", target: email, reason: "Move this operator back to their account role" } });
+  assert.match(html, /Role after removing admin access/); assert.match(html, /Choose a role/);
+  assert.match(html, /<option value="builder">Builder<\/option>/); assert.match(html, /<option value="shop">Service Shop<\/option>/);
+  assert.match(html, /<button[^>]*disabled=""[^>]*>Confirm<\/button>/);
+});
+
+for (const [role, label] of [["builder", "Builder"], ["shop", "Service Shop"]]) test(`admin drawer labels the ${role} role accurately`, () => {
+  const html = renderAdmin({ selectedUser: { ...selectedUser, role } });
+  assert.match(html, new RegExp(`admin-chip--${role}[^>]*>${label}<`));
+});
+
+for (const accountStatus of ["banned", "removed"]) test(`${accountStatus} account drawer does not offer lock or unlock`, () => {
+  const html = renderAdmin({ selectedUser: { ...selectedUser, accountStatus } });
+  assert.doesNotMatch(html, />Lock account<|>Unlock account</);
+});
+
+test("Trust and Safety views explain a filtered zero result", () => {
+  for (const activeSection of ["trust", "safety"]) {
+    const html = renderAdmin({ activeSection, recordsPayload: { records: [] } });
+    assert.match(html, new RegExp(`No Profiles match this ${activeSection} view\\.`));
+  }
 });

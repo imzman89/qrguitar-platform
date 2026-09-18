@@ -50,13 +50,15 @@ export default function AdminPaymentsPage() {
     </details>
   </div></main><Footer /></>;
 }
-function ReviewOrder({ order, busy, decide }: { order: DirectOrder; busy: boolean; decide(body: Record<string, unknown>): Promise<boolean> }) {
+export function ReviewOrder({ order, busy, decide }: { order: DirectOrder; busy: boolean; decide(body: Record<string, unknown>): Promise<boolean> }) {
   const [amount, setAmount] = useState(""), [paymentReference, setPaymentReference] = useState(""), [reason, setReason] = useState(""), [confirmed, setConfirmed] = useState(false);
   const [action, setAction] = useState<"verify" | "close" | "review">(order.status === "fulfilled" ? "review" : "verify"), [kind, setKind] = useState<"refund" | "dispute">("refund");
   const validAmount = /^\d{1,8}(?:\.\d{1,2})?$/.test(amount.trim()), cents = validAmount ? Math.round(Number(amount) * 100) : -1;
   const canSubmit = !busy && reason.trim().length >= 10 && confirmed && (action === "close" ? ["awaiting_payment", "pending_review"].includes(order.status) : Boolean(paymentReference.trim().length >= 3 && (action !== "verify" || cents === order.offer.amount)));
   async function submit(event: React.FormEvent) { event.preventDefault(); if (!canSubmit) return;
-    await decide({ action, orderId: order.orderId, reason: reason.replace(/[\r\n\t]+/g, " ").trim(), ...(action === "verify" ? { paymentReference: paymentReference.trim(), amount: cents, currency: "usd" } : action === "review" ? { kind, paymentReference: paymentReference.trim() } : {}) });
+    if (await decide({ action, orderId: order.orderId, reason: reason.replace(/[\r\n\t]+/g, " ").trim(), ...(action === "verify" ? { paymentReference: paymentReference.trim(), amount: cents, currency: "usd" } : action === "review" ? { kind, paymentReference: paymentReference.trim() } : {}) })) {
+      setReason(""); setConfirmed(false); setPaymentReference(""); setAmount("");
+    }
   }
   return <><p className={styles.eyebrow}>{statuses[order.status]}</p><h2>{order.reference}</h2><dl className={styles.orderMeta}><dt>Expected</dt><dd>{money(order.offer.amount)} USD · {order.offer.credits} Profile {order.offer.credits === 1 ? "credit" : "credits"}</dd><dt>Payment method</dt><dd>{label(order.method)}</dd><dt>Receiving account</dt><dd>{order.recipient.displayName} · {order.recipient.accountKey}</dd><dt>Customer account</dt><dd>{order.ownerId}</dd><dt>Customer’s reference</dt><dd>{order.payerReference || "Not supplied"}</dd><dt>Created</dt><dd>{new Date(order.createdAt).toLocaleString()}</dd></dl>
     {order.status === "closed" && <p>This request is closed. A late payment can still be recorded after checking the actual transaction; its credits are held for review.</p>}

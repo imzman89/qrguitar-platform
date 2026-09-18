@@ -331,7 +331,7 @@ function safetyLabel(value?: string) {
 
 function adminChipClass(kind: "role" | "status", value?: string) {
   const clean = normalize(value);
-  if (kind === "role" && (clean === "admin" || clean === "owner" || clean === "env-admin" || clean === "user")) return `admin-chip admin-chip--${clean}`;
+  if (kind === "role" && (clean === "admin" || clean === "owner" || clean === "builder" || clean === "shop" || clean === "env-admin" || clean === "user")) return `admin-chip admin-chip--${clean}`;
   if (kind === "status" && (clean === "active" || clean === "locked" || clean === "banned" || clean === "removed")) return `admin-chip admin-chip--${clean}`;
   return "admin-chip";
 }
@@ -339,12 +339,15 @@ function adminChipClass(kind: "role" | "status", value?: string) {
 function userRoleLabel(user: AdminUser) {
   if (user.envManaged) return "Env Admin";
   if (user.role === "admin") return "Admin";
+  if (user.role === "builder") return "Builder";
+  if (user.role === "shop") return "Service Shop";
+  if (user.role === "owner") return "Owner";
   return "User";
 }
 
 function userRoleChipValue(user: AdminUser) {
   if (user.envManaged) return "env-admin";
-  if (user.role === "admin") return "admin";
+  if (["admin", "owner", "builder", "shop"].includes(user.role)) return user.role;
   return "user";
 }
 
@@ -418,11 +421,13 @@ export default function AdminPage() {
   const sidebarRef = useRef<HTMLElement | null>(null);
   const entityDrawerRef = useRef<HTMLElement | null>(null);
   const modalRef = useRef<HTMLElement | null>(null);
+  const busyRef = useRef(busy);
   const adminActorRef = useRef("");
   const adminLoadRevision = useRef(0);
   const adminMutationRef = useRef("");
   const adminAuthorized = adminAccessState === "authorized";
   const overlayKind = adminAuthorized && adminDataReady ? (pendingAction ? "modal" : selectedUser || selectedRecord ? "entity" : navOpen ? "navigation" : "") : "";
+  busyRef.current = busy;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -432,6 +437,15 @@ export default function AdminPage() {
     if (section === "users") setUserFilter(filter);
     if (section === "records" || section === "trust" || section === "safety") setRecordFilter(filter);
     if (section === "transfers") setTransferFilter(filter);
+  }, []);
+
+  useEffect(() => {
+    const closeDesktopNavigation = () => {
+      if (window.innerWidth >= 1100) setNavOpen(false);
+    };
+    closeDesktopNavigation();
+    window.addEventListener("resize", closeDesktopNavigation);
+    return () => window.removeEventListener("resize", closeDesktopNavigation);
   }, []);
 
   function goToSection(section: SectionId, filter = "", options: { search?: string } = {}) {
@@ -483,7 +497,10 @@ export default function AdminPage() {
     }, 0);
 
     function closeTopOverlay() {
-      if (overlayKind === "modal") setPendingAction(null);
+      if (overlayKind === "modal") {
+        if (busyRef.current) return;
+        setPendingAction(null);
+      }
       else if (overlayKind === "entity") {
         setSelectedUser(null);
         setSelectedRecord(null);
@@ -494,6 +511,7 @@ export default function AdminPage() {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
+        if (overlayKind === "modal" && busyRef.current) return;
         closeTopOverlay();
         return;
       }
@@ -792,6 +810,16 @@ export default function AdminPage() {
     });
   }
 
+  function beginAdminRoleChange(user: AdminUser) {
+    const removingAdmin = user.role === "admin";
+    beginUserAction(
+      user,
+      "change_role",
+      { role: removingAdmin ? "" : "admin" },
+      { confirm: true, title: removingAdmin ? "Remove Admin" : "Add Admin" }
+    );
+  }
+
   async function updateUser(user: AdminUser, action: string, extra: Record<string, unknown> = {}, reason = "") {
     if (action === "delete_empty_user") {
       setMessage(ACCOUNT_DELETION_UNAVAILABLE);
@@ -1028,6 +1056,12 @@ export default function AdminPage() {
 
   async function confirmPendingAction() {
     if (!pendingAction || busy) {
+      return;
+    }
+
+    if (pendingAction.kind === "user" && pendingAction.action === "change_role" && pendingAction.user.role === "admin"
+      && !["owner", "builder", "shop"].includes(String(pendingAction.extra?.role || ""))) {
+      setMessage("Choose the account role that should remain after admin access is removed.");
       return;
     }
 
@@ -1427,7 +1461,7 @@ export default function AdminPage() {
           </div>
           {filterControls("records")}
           <div className="admin-table">
-            {filteredRecords.map((record) => (
+            {filteredRecords.length ? filteredRecords.map((record) => (
               <div className="admin-row" key={record.id}>
                 <div>
                   <strong>{record.qrCode} - {record.title}</strong>
@@ -1456,7 +1490,7 @@ export default function AdminPage() {
                   </button>
                 </div>
               </div>
-            ))}
+            )) : <p className="admin-empty">No Profiles match this trust view.</p>}
           </div>
         </section>
       );
@@ -1473,7 +1507,7 @@ export default function AdminPage() {
           </div>
           {filterControls("records")}
           <div className="admin-table">
-            {filteredRecords.map((record) => (
+            {filteredRecords.length ? filteredRecords.map((record) => (
               <div className="admin-row" key={record.id}>
                 <div>
                   <strong>{record.qrCode} - {record.title}</strong>
@@ -1489,7 +1523,7 @@ export default function AdminPage() {
                   <button type="button" onClick={() => beginRecordAction(record, "set_safety", { safetyStatus: record.safetyStatus || "clear" }, { includeSafetyNotes: true, title: "Edit Safety Notes" })}>Edit Notes</button>
                 </div>
               </div>
-            ))}
+            )) : <p className="admin-empty">No Profiles match this safety view.</p>}
           </div>
         </section>
       );
@@ -1746,7 +1780,7 @@ export default function AdminPage() {
             <button
               type="button"
               disabled={Boolean(busy) || !accessTarget || accessTarget.role !== "admin" || accessTarget.envManaged === true}
-              onClick={() => accessTarget ? beginUserAction(accessTarget, "change_role", { role: "owner" }, { confirm: true, title: "Remove Admin" }) : undefined}
+              onClick={() => accessTarget ? beginAdminRoleChange(accessTarget) : undefined}
             >
               {accessTarget?.envManaged ? "Managed by environment" : "Remove Admin"}
             </button>
@@ -1759,7 +1793,7 @@ export default function AdminPage() {
                   <span>{user.envManaged ? "Managed by environment" : "Database admin"} - {user.accountStatus}</span>
                 </div>
                 <div className="admin-row-actions">
-                  <button type="button" disabled={Boolean(busy) || user.envManaged === true} onClick={() => beginUserAction(user, "change_role", { role: "owner" }, { confirm: true, title: "Remove Admin" })}>
+                  <button type="button" disabled={Boolean(busy) || user.envManaged === true} onClick={() => beginAdminRoleChange(user)}>
                     {user.envManaged ? "Managed by environment" : "Remove Admin"}
                   </button>
                 </div>
@@ -1880,12 +1914,12 @@ export default function AdminPage() {
           <div className="admin-drawer-chips"><span className={adminChipClass("role", userRoleChipValue(selectedUser))}>{userRoleLabel(selectedUser)}</span><span className={adminChipClass("status", selectedUser.accountStatus)}>{selectedUser.accountStatus}</span></div>
           <dl><div><dt>Profiles</dt><dd>{selectedUser.recordCount}</dd></div><div><dt>Public / private</dt><dd>{selectedUser.publicRecordCount} / {selectedUser.privateRecordCount}</dd></div><div><dt>Last sign-in</dt><dd>{formatDate(selectedUser.lastSignInAt)}</dd></div><div><dt>Created</dt><dd>{formatDate(selectedUser.createdAt)}</dd></div></dl>
           <section><span>Account access</span><div className="admin-drawer-actions">
-            {selectedUser.accountStatus === "locked" ? <button type="button" disabled={Boolean(busy)} onClick={() => beginUserAction(selectedUser, "unlock", {}, { confirm: true, title: "Unlock Account" })}>Unlock account</button> : <button type="button" disabled={Boolean(busy) || selectedUser.envManaged} onClick={() => beginUserAction(selectedUser, "lock", {}, { confirm: true, title: "Lock Account" })}>Lock account</button>}
+            {selectedUser.accountStatus === "locked" ? <button type="button" disabled={Boolean(busy)} onClick={() => beginUserAction(selectedUser, "unlock", {}, { confirm: true, title: "Unlock Account" })}>Unlock account</button> : selectedUser.accountStatus === "active" ? <button type="button" disabled={Boolean(busy) || selectedUser.envManaged} onClick={() => beginUserAction(selectedUser, "lock", {}, { confirm: true, title: "Lock Account" })}>Lock account</button> : null}
             {selectedUser.accountStatus === "banned" ? <button type="button" disabled={Boolean(busy)} onClick={() => beginUserAction(selectedUser, "unban", {}, { confirm: true, title: "Unban User" })}>Unban user</button> : <button type="button" disabled={Boolean(busy) || selectedUser.envManaged || selectedUser.accountStatus === "removed"} onClick={() => beginUserAction(selectedUser, "ban", {}, { confirm: true, title: "Ban User" })}>Ban user</button>}
             {selectedUser.accountStatus === "removed" ? <button type="button" disabled={Boolean(busy)} onClick={() => beginUserAction(selectedUser, "restore_user", {}, { confirm: true, title: "Restore User" })}>Restore user</button> : <button type="button" disabled={Boolean(busy) || selectedUser.envManaged} onClick={() => beginUserAction(selectedUser, "remove", {}, { confirm: true, title: "Remove User" })}>Remove user</button>}
           </div></section>
           <section><span>Public presence</span><div className="admin-drawer-actions"><button type="button" disabled={Boolean(busy)} onClick={() => beginUserAction(selectedUser, selectedUser.hidePublicContent ? "restore_public_content" : "hide_public_content", {}, { confirm: true, title: selectedUser.hidePublicContent ? "Restore Public Content" : "Hide Public Content" })}>{selectedUser.hidePublicContent ? "Restore public content" : "Hide public content"}</button></div></section>
-          <section><span>Administration</span><div className="admin-drawer-actions"><button type="button" disabled={Boolean(busy) || selectedUser.envManaged} onClick={() => beginUserAction(selectedUser, "change_role", { role: selectedUser.role === "admin" ? "owner" : "admin" }, { confirm: true, title: selectedUser.role === "admin" ? "Remove Admin" : "Add Admin" })}>{selectedUser.role === "admin" ? "Remove admin" : "Add admin"}</button><button type="button" disabled={Boolean(busy)} onClick={() => beginUserAction(selectedUser, "admin_note", {}, { includeNote: true, title: "Save Admin Note" })}>Internal note</button></div></section>
+          <section><span>Administration</span><div className="admin-drawer-actions"><button type="button" disabled={Boolean(busy) || selectedUser.envManaged} onClick={() => beginAdminRoleChange(selectedUser)}>{selectedUser.role === "admin" ? "Remove admin" : "Add admin"}</button><button type="button" disabled={Boolean(busy)} onClick={() => beginUserAction(selectedUser, "admin_note", {}, { includeNote: true, title: "Save Admin Note" })}>Internal note</button></div></section>
           <section className="admin-danger-zone"><span>Permanent action</span><p id="admin-deletion-unavailable">{ACCOUNT_DELETION_UNAVAILABLE}</p><button type="button" disabled aria-describedby="admin-deletion-unavailable">Permanent account deletion unavailable</button></section>
         </div>
       </aside>
@@ -1959,6 +1993,21 @@ export default function AdminPage() {
                   <span>{pendingAction.kind === "user" && pendingAction.action === "delete_empty_user" ? "Unavailable" : "Reversible where the corresponding restore action is available"}</span>
                 </div>
                 {message ? <div className="admin-message" role="alert">{message}</div> : null}
+                {pendingAction.kind === "user" && pendingAction.action === "change_role" && pendingAction.user.role === "admin" ? (
+                  <label>
+                    Role after removing admin access
+                    <select
+                      value={String(pendingAction.extra?.role || "")}
+                      disabled={Boolean(busy)}
+                      onChange={(event) => setPendingAction({ ...pendingAction, extra: { ...pendingAction.extra, role: event.target.value } })}
+                    >
+                      <option value="">Choose a role</option>
+                      <option value="owner">Owner</option>
+                      <option value="builder">Builder</option>
+                      <option value="shop">Service Shop</option>
+                    </select>
+                  </label>
+                ) : null}
                 <label>
                   Operator reason
                   <textarea value={pendingAction.reason} onChange={(event) => setPendingAction({ ...pendingAction, reason: event.target.value })} rows={2} placeholder="Required for the audit trail" />
@@ -2006,7 +2055,7 @@ export default function AdminPage() {
                   </div>
                 ) : null}
                 <div className="form-actions">
-                  <button className="button" type="button" disabled={Boolean(busy) || !pendingAction.reason.trim() || (pendingAction.kind === "user" && pendingAction.action === "delete_empty_user")} onClick={() => void confirmPendingAction()}>
+                  <button className="button" type="button" disabled={Boolean(busy) || !pendingAction.reason.trim() || (pendingAction.kind === "user" && pendingAction.action === "delete_empty_user") || (pendingAction.kind === "user" && pendingAction.action === "change_role" && pendingAction.user.role === "admin" && !["owner", "builder", "shop"].includes(String(pendingAction.extra?.role || "")))} onClick={() => void confirmPendingAction()}>
                     {busy ? "Saving…" : "Confirm"}
                   </button>
                   <button className="button secondary" type="button" disabled={Boolean(busy)} onClick={() => setPendingAction(null)}>

@@ -43,6 +43,7 @@ type Submission = {
 };
 
 type Payload = { ok?: boolean; message?: string; providers?: Provider[]; submissions?: Submission[] };
+type LoadPhase = "loading" | "signed-out" | "unauthorized" | "error" | "ready";
 
 function label(value: string) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
@@ -59,7 +60,7 @@ export default function AdminServiceWorkflowPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
-  const [loading, setLoading] = useState(true);
+  const [phase, setPhase] = useState<LoadPhase>("loading");
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
   const actorRef = useRef("");
@@ -68,7 +69,7 @@ export default function AdminServiceWorkflowPage() {
 
   const load = useCallback(async (options: { successMessage?: string } = {}) => {
     const revision = ++loadRevision.current;
-    setLoading(true);
+    setPhase("loading");
     if (!options.successMessage) setMessage("");
     try {
       const { data } = await createBrowserSupabaseClient().auth.getSession();
@@ -80,6 +81,7 @@ export default function AdminServiceWorkflowPage() {
         setProviders([]);
         setSubmissions([]);
         setMessage("Sign in with an authorized admin account.");
+        setPhase("signed-out");
         return;
       }
       actorRef.current = actorId;
@@ -93,17 +95,20 @@ export default function AdminServiceWorkflowPage() {
         setMessage(payload?.message || "Service workflow could not be loaded.");
         setProviders([]);
         setSubmissions([]);
+        setPhase(response.status === 401 ? "signed-out" : response.status === 403 ? "unauthorized" : "error");
       } else {
         setMessage(options.successMessage || "");
         setProviders(Array.isArray(payload.providers) ? payload.providers : []);
         setSubmissions(Array.isArray(payload.submissions) ? payload.submissions : []);
+        setPhase("ready");
       }
     } catch (error) {
       if (revision === loadRevision.current) {
         setMessage(error instanceof Error ? `Service workflow could not be loaded: ${error.message}` : "Service workflow could not be loaded. Check your connection and retry.");
+        setProviders([]);
+        setSubmissions([]);
+        setPhase("error");
       }
-    } finally {
-      if (revision === loadRevision.current) setLoading(false);
     }
   }, [search, status]);
 
@@ -120,7 +125,7 @@ export default function AdminServiceWorkflowPage() {
       setBusy("");
       actionRef.current = "";
       setMessage(nextActorId ? "Refreshing service operations for this account." : "Sign in with an authorized admin account.");
-      setLoading(Boolean(nextActorId));
+      setPhase(nextActorId ? "loading" : "signed-out");
       if (nextActorId) void load();
     });
     return () => data.subscription.unsubscribe();
@@ -172,15 +177,18 @@ export default function AdminServiceWorkflowPage() {
         <Link className="text-link service-back" href="/admin"><ArrowLeft size={16} /> Back to Admin</Link>
         <header className="admin-service-hero">
           <div><div className="eyebrow">Admin service operations</div><h1>Providers and submissions.</h1><p>Review provider status, private evidence metadata, notification state, and the audit trail without approving on an owner&apos;s behalf.</p></div>
-          <div className="admin-service-counts"><span><strong>{providers.length}</strong> providers</span><span><strong>{submissions.length}</strong> submissions</span></div>
+          <div className="admin-service-counts"><span><strong>{phase === "ready" ? providers.length : "—"}</strong> providers</span><span><strong>{phase === "ready" ? submissions.length : "—"}</strong> submissions</span></div>
         </header>
-        <div className="admin-service-filters">
+        {phase === "ready" ? <div className="admin-service-filters">
           <label><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search provider, Profile, or work" /></label>
           <select value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All statuses</option><option value="draft">Draft</option><option value="submitted">Submitted</option><option value="changes_requested">Changes requested</option><option value="approved">Approved</option><option value="declined">Declined</option><option value="cancelled">Cancelled</option><option value="expired">Expired</option></select>
-          <button className="button secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => void load()}>{loading ? "Refreshing…" : "Refresh"}</button>
-        </div>
-        {message ? <div className="admin-message" role="status">{message}</div> : null}
-        {loading ? <section className="card admin-panel-card"><h2>Loading service operations.</h2></section> : <>
+          <button className="button secondary" type="button" disabled={Boolean(busy)} onClick={() => void load()}>Refresh</button>
+        </div> : null}
+        {phase === "ready" && message ? <div className="admin-message" role="status">{message}</div> : null}
+        {phase === "loading" ? <section className="card admin-panel-card" role="status"><h2>Loading service operations.</h2></section> : null}
+        {phase === "signed-out" || phase === "unauthorized" ? <section className="card admin-panel-card" role="alert"><h2>{phase === "signed-out" ? "Admin sign-in required." : "Admin access required."}</h2><p>{message || "Use an authorized admin account to open Service Operations."}</p><div className="form-actions"><Link className="button" href="/login?next=%2Fadmin%2Fservice-workflow">Sign in</Link>{phase === "unauthorized" ? <button className="button secondary" type="button" onClick={() => void load()}>Retry access</button> : null}</div></section> : null}
+        {phase === "error" ? <section className="card admin-panel-card" role="alert"><h2>Service Operations is temporarily unavailable.</h2><p>{message || "Service operations could not be loaded."}</p><button className="button secondary" type="button" onClick={() => void load()}>Try again</button></section> : null}
+        {phase === "ready" ? <>
           <section className="admin-service-section">
             <div className="admin-section-head"><div><div className="eyebrow">Service providers</div><h2>Provider accounts</h2><p>Verification applies to the account. It does not verify every service entry.</p></div></div>
             <div className="admin-service-list">
@@ -200,7 +208,7 @@ export default function AdminServiceWorkflowPage() {
             <div className="admin-section-head"><div><div className="eyebrow">Service submissions</div><h2>Private review queue</h2><p>Owner approval remains required before canonical service history is created.</p></div></div>
             <div className="admin-service-list">
               {submissions.length ? submissions.map((submission) => <article className="admin-service-card admin-service-submission" key={submission.id}>
-                <div className="admin-service-submission__heading"><div><span className={`service-status service-status--${submission.status}`}>{label(submission.status)}</span><h3>{submission.title}</h3><p>{submission.profileTitle || submission.qrCode} - {submission.serviceType} - {submission.serviceDate || "Date not provided"}</p></div>{submission.qrCode ? <Link className="text-link" href={`/i/${encodeURIComponent(submission.qrCode)}`}>Open Profile</Link> : null}</div>
+                <div className="admin-service-submission__heading"><div><span className={`service-status service-status--${submission.status}`}>{label(submission.status)}</span><h3>{submission.title}</h3><p>{submission.profileTitle || submission.qrCode} - {submission.serviceType} - {submission.serviceDate || "Date not provided"}</p></div>{submission.qrCode ? <Link className="text-link" href={`/edit/${encodeURIComponent(submission.qrCode)}`}>Open Profile</Link> : null}</div>
                 <div className="admin-service-meta"><span><strong>Provider</strong>{submission.provider?.publicDisplayName || submission.provider?.businessName || "Provider account"}</span><span><strong>Evidence</strong>{submission.evidence.length} private file{submission.evidence.length === 1 ? "" : "s"}</span><span><strong>Email</strong>{label(submission.emailDeliveryStatus || "not_attempted")}</span><span><strong>Updated</strong>{formatDate(submission.updatedAt)}</span></div>
                 <p>{submission.workPerformed}</p>
                 {submission.emailDeliveryMessage ? <small className="admin-service-note">Notification: {submission.emailDeliveryMessage}</small> : null}
@@ -213,7 +221,7 @@ export default function AdminServiceWorkflowPage() {
               </article>) : <p className="admin-empty">No service submissions match this view.</p>}
             </div>
           </section>
-        </>}
+        </> : null}
       </div>
     </main>
     <Footer />

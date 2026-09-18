@@ -78,6 +78,33 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return adminJson({ ok: false, message: "An operator reason is required for the audit trail." }, { status: 400 });
   }
 
+  const guardedActions = ["lock", "unlock", "ban", "unban", "remove", "restore_user", "change_role"];
+  let profileSnapshot: { role?: string | null; account_status?: string | null } | null = null;
+  if (guardedActions.includes(action)) {
+    const currentProfile = await supabase
+      .from("profiles")
+      .select("role,account_status")
+      .eq("id", targetUserId)
+      .maybeSingle<{ role?: string | null; account_status?: string | null }>();
+    if (currentProfile.error) {
+      return adminJson({ ok: false, message: "Account status could not be verified. No account controls were changed." }, { status: 503 });
+    }
+    profileSnapshot = currentProfile.data || null;
+  }
+
+  const currentStatus = profileSnapshot?.account_status || "active";
+  const allowedStatuses: Partial<Record<string, string[]>> = {
+    lock: ["active"],
+    unlock: ["locked"],
+    ban: ["active", "locked"],
+    unban: ["banned"],
+    remove: ["active", "locked", "banned"],
+    restore_user: ["removed"]
+  };
+  if (allowedStatuses[action] && !allowedStatuses[action]!.includes(currentStatus)) {
+    return adminJson({ ok: false, message: `The ${action.replaceAll("_", " ")} action is unavailable while this account is ${currentStatus}. Refresh the user and choose an available action.` }, { status: 409 });
+  }
+
   const update: Record<string, unknown> = {};
   let auditAction = action;
   let auditReason = reason;
@@ -99,6 +126,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   } else if (action === "ban") {
     Object.assign(update, {
       account_status: "banned",
+      account_locked_at: null,
+      account_locked_by: null,
+      account_lock_reason: null,
       account_banned_at: now,
       account_banned_by: admin.email,
       account_ban_reason: reason || null,
@@ -115,8 +145,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     });
     auditAction = "user_unbanned";
   } else if (action === "remove") {
-    const currentProfile = await supabase.from("profiles").select("role").eq("id", targetUserId).maybeSingle<{ role?: string | null }>();
-    if (isAdminRole(currentProfile.data?.role)) {
+    if (isAdminRole(profileSnapshot?.role)) {
       const otherAdmins = await countOtherAdminAccess(supabase, targetUserId);
       if (otherAdmins < 1) {
         return adminJson({ ok: false, message: "At least one admin must remain." }, { status: 400 });
@@ -173,8 +202,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       return adminJson({ ok: false, message: "This admin is managed by server environment settings." }, { status: 400 });
     }
 
-    const currentProfile = await supabase.from("profiles").select("role").eq("id", targetUserId).maybeSingle<{ role?: string | null }>();
-    if (isAdminRole(currentProfile.data?.role) && !isAdminRole(nextRole)) {
+    if (isAdminRole(profileSnapshot?.role) && !isAdminRole(nextRole)) {
       const otherAdmins = await countOtherAdminAccess(supabase, targetUserId);
       if (otherAdmins < 1) {
         return adminJson({ ok: false, message: "At least one owner or admin must remain." }, { status: 400 });

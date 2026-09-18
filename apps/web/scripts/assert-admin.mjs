@@ -65,16 +65,19 @@ for (const marker of [
 }
 if (page.includes("tokenPromise")) throw new Error("Admin still caches one access token for the page lifetime.");
 for (const marker of [
-  'beginUserAction(accessTarget, "change_role", { role: "admin" }, { confirm: true, title: "Add Admin" })',
-  'beginUserAction(accessTarget, "change_role", { role: "owner" }, { confirm: true, title: "Remove Admin" })',
-  'beginUserAction(user, "change_role", { role: "owner" }, { confirm: true, title: "Remove Admin" })'
+  "beginAdminRoleChange(accessTarget)",
+  "beginAdminRoleChange(user)",
+  "beginAdminRoleChange(selectedUser)",
+  "Role after removing admin access",
+  '<option value="builder">Builder</option>',
+  '<option value="shop">Service Shop</option>'
 ]) {
   if (!page.includes(marker)) throw new Error(`Admin access changes can bypass confirmation: ${marker}.`);
 }
 for (const marker of ["unavailableSources", "Counts and lists were not replaced with incomplete results", "Trust states were not replaced with default values"]) {
   if (!recordsListApi.includes(marker)) throw new Error(`Admin record reads can conceal partial failures: ${marker}.`);
 }
-for (const marker of ["onAuthStateChange", "loadRevision.current", "finally", "successMessage", "The signed-in account changed"]) {
+for (const marker of ["onAuthStateChange", "loadRevision.current", "finally", "successMessage", "The signed-in account changed", 'type LoadPhase = "loading" | "signed-out" | "unauthorized" | "error" | "ready"', "Retry access", "Try again", 'href={`/edit/${encodeURIComponent(submission.qrCode)}`}']) {
   if (!serviceOperations.includes(marker)) throw new Error(`Service Operations failure handling is missing ${marker}.`);
 }
 for (const marker of ["Legacy manual-payment archive", "New QRguitar checkout uses automatic PayPal verification", "<details"]) {
@@ -96,7 +99,12 @@ for (const marker of [
   'overlayKind = adminAuthorized && adminDataReady ?',
   "adminAuthorized && adminDataReady && navOpen ?",
   "adminAuthorized && adminDataReady && selectedUser",
-  "adminAuthorized && adminDataReady && pendingAction"
+  "adminAuthorized && adminDataReady && pendingAction",
+  "window.innerWidth >= 1100",
+  'window.addEventListener("resize", closeDesktopNavigation)',
+  'if (overlayKind === "modal" && busyRef.current) return',
+  "No Profiles match this trust view.",
+  "No Profiles match this safety view."
 ]) {
   if (!page.includes(marker)) throw new Error(`Final admin reliability audit is missing ${marker}.`);
 }
