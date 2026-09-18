@@ -2,7 +2,16 @@
 export type DirectMethodKey = "venmo" | "cashapp" | "zelle" | "paypal";
 export type DirectOfferKey = "profile_1" | "profile_10" | "profile_25";
 export type DirectMethod = { key: DirectMethodKey; label: string };
-export type DirectOffer = { key: DirectOfferKey; version: 1; currency: "usd"; amount: number; credits: number; permanent: true; freeAllowance: 5 };
+export type PromotionDiscountType = "fixed_total" | "amount_off" | "percent_off";
+export type AppliedPromotion = {
+  id: string; code: string; name: string; revision: number; discountType: PromotionDiscountType; discountValue: number;
+  classification: "promotion" | "internal_test";
+  originalAmount: number; discountAmount: number; finalAmount: number;
+};
+export type DirectOffer = {
+  key: DirectOfferKey; version: 1; currency: "usd"; amount: number; credits: number; permanent: true; freeAllowance: 5;
+  listAmount?: number; promotion?: AppliedPromotion;
+};
 export type DirectRecipient = { accountKey: string; displayName: string; paymentUrl: string | null; address: string | null };
 export type DirectOrder = {
   orderId: string; ownerId: string; requestId: string; offerKey: DirectOfferKey;

@@ -371,8 +371,10 @@ test("every supported event enforces its bounded non-identifying property schema
     { name: consent.optionalTrackingProductEvents.checkoutStarted, properties: { credits: "10", valueUsd: 50, pricing: "standard" } },
     { name: consent.optionalTrackingProductEvents.checkoutStarted, properties: { credits: 10, valueUsd: 99, pricing: "standard" } },
     { name: consent.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 10, valueUsd: "50", pricing: "standard" } },
+    { name: consent.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 10, valueUsd: 0.3, pricing: "owner_code" } },
     { name: consent.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 10, valueUsd: 50, pricing: "promotion" } },
     { name: consent.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 10, valueUsd: 0.29, pricing: "internal_test" } },
+    { name: consent.optionalTrackingProductEvents.purchaseCompleted, properties: { credits: 10, valueUsd: 0.301, pricing: "promotion" } },
     { name: consent.optionalTrackingProductEvents.profileCreated, properties: { visibility: { toString: () => "public" } } },
     { name: consent.optionalTrackingProductEvents.ownershipTransferCompleted, properties: { method: { toString: () => "review" } } },
     { name: consent.optionalTrackingProductEvents.ownershipTransferCompleted, properties: { method: "token" } }

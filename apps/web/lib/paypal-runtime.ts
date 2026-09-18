@@ -6,6 +6,7 @@ import { readPayPalConfig } from "./paypal-config";
 import { createPayPalGateway } from "./paypal-gateway";
 import { createPayPalService } from "./paypal-service";
 import { createPayPalHandlers } from "./paypal-http";
+import { normalizeEmail, readAdminEmailList } from "./admin-auth";
 
 export function getPayPalService() {
   const settings = getSupabaseEnvStatus();
@@ -20,10 +21,11 @@ export function getPayPalService() {
     authenticate: async request => {
       const auth = await getAuthenticatedUser(request);
       if (!auth.user) return null;
-      const result = await database.from("profiles").select("account_status").eq("id", auth.user.id).maybeSingle<{ account_status: string }>();
+      const result = await database.from("profiles").select("account_status,role").eq("id", auth.user.id).maybeSingle<{ account_status: string; role: string | null }>();
       if (result.error) throw new BillingError(503, "account_unavailable", "Your account could not be verified. Try again.");
       if (!result.data || !["active", "locked", "banned", "removed"].includes(result.data.account_status)) throw new BillingError(403, "account_unavailable", "This account cannot use payments.");
-      return { id: auth.user.id, accountStatus: result.data.account_status };
+      return { id: auth.user.id, accountStatus: result.data.account_status,
+        isAdmin: result.data.role === "admin" || readAdminEmailList().includes(normalizeEmail(auth.user.email)) };
     }
   });
 }

@@ -52,6 +52,10 @@ async function rejectQuery(text, params, code) {
 }
 const providerId = () => randomUUID().replaceAll("-", "").toUpperCase();
 const quote = (actor, pack, code, internal = false) => rpc("billing_promo_quote", [actor, ENVIRONMENT, pack, code, internal]);
+const unavailable = async operation => {
+  const result = await operation();
+  assert.deepEqual(result, { available: false, rateLimited: false });
+};
 const reserve = (actor, requestKey, pack, promoQuote, code = promoQuote.promotion?.code || null, internal = false) => rpc("billing_paypal_reserve_promoted_order", [
   actor, ENVIRONMENT, requestKey, pack, MERCHANT, code,
   promoQuote.promotion?.id || null, promoQuote.promotion?.revision || null,
@@ -91,11 +95,11 @@ const close = order => rpc("billing_paypal_close_order", [ENVIRONMENT, order.ord
 
 try {
   await test("promotion tables, helpers, and public RPCs enforce the server-only boundary", async () => {
-    const tables = ["billing_promo_codes", "billing_order_promotions", "billing_promo_admin_events"];
+    const tables = ["billing_promo_codes", "billing_order_promotions", "billing_promo_admin_events", "billing_promo_quote_limits"];
     for (const table of tables) for (const role of ["anon", "authenticated", "service_role"])
       assert.equal((await db.query("select has_table_privilege($1,$2,'SELECT,INSERT,UPDATE,DELETE') allowed", [role, table])).rows[0].allowed, false);
     const policies = (await db.query("select c.relname table_name,p.polpermissive,p.polcmd,pg_get_expr(p.polqual,p.polrelid) using_expression,pg_get_expr(p.polwithcheck,p.polrelid) check_expression from pg_policy p join pg_class c on c.oid=p.polrelid where c.relname=any($1::text[]) order by c.relname", [tables])).rows;
-    assert.equal(policies.length, 3);
+    assert.equal(policies.length, 4);
     for (const policy of policies) assert.deepEqual([policy.polpermissive, policy.polcmd, policy.using_expression, policy.check_expression], [false, "*", "false", "false"]);
     const functions = (await db.query("select oid::regprocedure::text signature,proname from pg_proc where pronamespace='public'::regnamespace and (proname like 'billing_promo_%' or proname like '_billing_promo_%' or proname='billing_paypal_reserve_promoted_order')")).rows;
     for (const fn of functions) for (const role of ["anon", "authenticated", "service_role"])
@@ -114,8 +118,16 @@ try {
       assert.equal(result.promotion.discountAmount, listAmount - 30); assert.equal(result.promotion.finalAmount, 30);
       assert.equal(result.promotion.classification, "internal_test");
     }
-    await reject(() => quote(owner, "profile_1", "GARYWON"), "PT403");
+    await unavailable(() => quote(owner, "profile_1", "GARYWON"));
     assert.equal((await quote(owner, "profile_1", "GARYWON", true)).offer.amount, 30);
+  });
+
+  await test("GARYAPPLE is protected admin-only Apple Pay acceptance pricing at exactly one dollar", async () => {
+    const seed = (await db.query("select * from billing_promo_codes where environment=$1 and code='GARYAPPLE'", [ENVIRONMENT])).rows[0];
+    assert.equal(seed.status, "active"); assert.equal(seed.audience, "admin"); assert.equal(seed.discount_type, "fixed_total"); assert.equal(seed.discount_value, 100);
+    assert.equal(seed.minimum_amount, 0); assert.deepEqual(seed.eligible_offer_keys, ["profile_1", "profile_10", "profile_25"]);
+    for (const pack of ["profile_1", "profile_10", "profile_25"]) assert.equal((await quote(admin, pack, "GARYAPPLE")).offer.amount, 100);
+    await unavailable(() => quote(owner, "profile_1", "GARYAPPLE"));
   });
 
   await test("the quoted revision and amount are atomic checkout preconditions", async () => {
@@ -123,7 +135,7 @@ try {
     const stale = await quote(owner, "profile_1", "stale30");
     const changed = await updatePromotion(promotion, { discountValue: 40 });
     assert.equal(changed.revision, promotion.revision + 1);
-    await reject(() => reserve(owner, randomUUID(), "profile_1", stale), "PT409");
+    await reject(() => reserve(owner, randomUUID(), "profile_1", stale), "PT410");
     assert.equal((await db.query("select count(*)::int count from billing_orders where owner_id=$1", [owner])).rows[0].count, 0);
     const fresh = await quote(owner, "profile_1", "STALE30"); assert.equal(fresh.offer.amount, 40); assert.equal(fresh.promotion.revision, changed.revision);
     assert.equal((await reserve(owner, randomUUID(), "profile_1", fresh)).offer.amount, 40);
@@ -138,7 +150,7 @@ try {
     await reject(() => rpc("billing_paypal_reserve_promoted_order", [admin, ENVIRONMENT, requestKey, "profile_25", MERCHANT, null, null, null, null, false]), "PT409");
     await reject(() => rpc("billing_paypal_reserve_promoted_order", [admin, ENVIRONMENT, requestKey, "profile_10", MERCHANT, "GARYWON", originalQuote.promotion.id, originalQuote.promotion.revision, 30, false]), "PT409");
     const seed = (await rpc("billing_promo_admin_list", [admin, false, ENVIRONMENT])).promotions.find(value => value.code === "GARYWON");
-    await updatePromotion(seed, { name: "Changed test name", discountValue: 40 });
+    await updatePromotion(seed, { name: "Changed test name" });
     const stored = await rpc("billing_paypal_get_order", [admin, ENVIRONMENT, first.orderId]);
     assert.equal(stored.offer.amount, 30); assert.equal(stored.promotion.name, "Owner payment test"); assert.equal(stored.promotion.revision, originalQuote.promotion.revision);
   });
@@ -157,35 +169,35 @@ try {
     const amount = await createPromotion({ code: "LESS200", discountType: "amount_off", discountValue: 200, eligibleOfferKeys: ["profile_1"] });
     const amountQuote = await quote(owner, "profile_1", amount.code);
     assert.equal(amountQuote.offer.amount, 1000); assert.equal(amountQuote.promotion.classification, "promotion");
-    await reject(() => quote(owner, "profile_10", amount.code), "PT410");
+    await unavailable(() => quote(owner, "profile_10", amount.code));
     const percent = await createPromotion({ code: "QUARTER", discountType: "percent_off", discountValue: 2500, minimumAmount: 1200, eligibleOfferKeys: ["profile_1", "profile_10"] });
     assert.equal((await quote(owner, "profile_1", percent.code)).offer.amount, 900);
     const floor = await createPromotion({ code: "THIRTYFLOOR", discountType: "amount_off", discountValue: 1000000, eligibleOfferKeys: ["profile_1"] });
     assert.equal((await quote(owner, "profile_1", floor.code)).offer.amount, 30);
     const minimum = await createPromotion({ code: "MINIMUM50", discountValue: 30, minimumAmount: 5000, eligibleOfferKeys: ["profile_1", "profile_10"] });
-    await reject(() => quote(owner, "profile_1", minimum.code), "PT410"); assert.equal((await quote(owner, "profile_10", minimum.code)).offer.amount, 30);
+    await unavailable(() => quote(owner, "profile_1", minimum.code)); assert.equal((await quote(owner, "profile_10", minimum.code)).offer.amount, 30);
   });
 
   await test("pause, resume, archive, future start, and expiry govern both quote and reservation", async () => {
     let promotion = await createPromotion({ code: "LIFECYCLE", discountValue: 30 });
     const beforePause = await quote(owner, "profile_1", promotion.code);
-    promotion = await setPromotionStatus(promotion, "paused"); await reject(() => quote(owner, "profile_1", promotion.code), "PT410");
+    promotion = await setPromotionStatus(promotion, "paused"); await unavailable(() => quote(owner, "profile_1", promotion.code));
     await reject(() => reserve(owner, randomUUID(), "profile_1", beforePause), "PT410");
     promotion = await setPromotionStatus(promotion, "active"); assert.equal((await quote(owner, "profile_1", promotion.code)).offer.amount, 30);
-    promotion = await setPromotionStatus(promotion, "archived"); await reject(() => quote(owner, "profile_1", promotion.code), "PT410");
+    promotion = await setPromotionStatus(promotion, "archived"); await unavailable(() => quote(owner, "profile_1", promotion.code));
     await reject(() => updatePromotion(promotion, { name: "Cannot change" }), "PT409");
     await reject(() => setPromotionStatus(promotion, "active"), "22023");
     const future = await createPromotion({ code: "FUTURE30", startsAt: new Date(Date.now() + 86_400_000).toISOString() });
     const ended = await createPromotion({ code: "ENDED30", startsAt: new Date(Date.now() - 172_800_000).toISOString(), endsAt: new Date(Date.now() - 86_400_000).toISOString() });
-    await reject(() => quote(owner, "profile_1", future.code), "PT410"); await reject(() => quote(owner, "profile_1", ended.code), "PT410");
+    await unavailable(() => quote(owner, "profile_1", future.code)); await unavailable(() => quote(owner, "profile_1", ended.code));
   });
 
   await test("per-owner and global limits count reserved and fulfilled orders while expired orders release capacity", async () => {
     const promotion = await createPromotion({ code: "LIMITED", maxRedemptions: 2, maxRedemptionsPerOwner: 1 });
     const first = await reserve(owner, randomUUID(), "profile_1", await quote(owner, "profile_1", promotion.code));
-    await reject(() => quote(owner, "profile_10", promotion.code), "PT410");
+    await unavailable(() => quote(owner, "profile_10", promotion.code));
     const second = await bind(owner2, await reserve(owner2, randomUUID(), "profile_1", await quote(owner2, "profile_1", promotion.code)));
-    await reject(() => quote(owner3, "profile_1", promotion.code), "PT410");
+    await unavailable(() => quote(owner3, "profile_1", promotion.code));
     const expired = await close(second); assert.equal(expired.status, "expired");
     const third = await reserve(owner3, randomUUID(), "profile_1", await quote(owner3, "profile_1", promotion.code)); assert.equal(third.offer.amount, 30);
     assert.equal(first.status, "reserved");
@@ -196,10 +208,10 @@ try {
     const order = await bind(owner, await reserve(owner, randomUUID(), "profile_1", await quote(owner, "profile_1", promotion.code)));
     const incoming = receipt(order); await capture(order, incoming);
     await rpc("billing_paypal_record_review", [ENVIRONMENT, order.orderId, providerId(), "refund", incoming]);
-    await reject(() => quote(owner2, "profile_1", promotion.code), "PT410");
+    await unavailable(() => quote(owner2, "profile_1", promotion.code));
     const list = await rpc("billing_promo_admin_list", [admin, false, ENVIRONMENT]);
     const row = list.promotions.find(value => value.id === promotion.id);
-    assert.equal(row.completedRedemptions, 1); assert.equal(row.releasedRedemptions, 0); assert.equal(row.collectedAmount, 30);
+    assert.equal(row.completedRedemptions, 1); assert.equal(row.releasedRedemptions, 0); assert.equal(row.adjustedRedemptions, 1); assert.equal(row.grossCapturedAmount, 30);
   });
 
   await test("administrator CRUD is revision-safe, audited, and reports redemption history", async () => {
@@ -238,12 +250,36 @@ try {
     await rejectQuery("delete from billing_promo_admin_events where id=$1", [eventId], "42501");
   });
 
-  await test("unknown, malformed, wrong-environment, and no-discount codes fail closed", async () => {
-    await reject(() => quote(owner, "profile_1", "NO_SUCH_CODE"), "PT404");
-    await reject(() => quote(owner, "profile_1", "x"), "PT404");
+  await test("owner acceptance codes keep their purpose but allow descriptive edits and pause or resume", async () => {
+    for (const [code, amount] of [["GARYWON", 30], ["GARYAPPLE", 100]]) {
+      let promotion = (await rpc("billing_promo_admin_list", [admin, false, ENVIRONMENT])).promotions.find(value => value.code === code);
+      promotion = await updatePromotion(promotion, { name: `${code} renamed`, description: "Updated internal acceptance description.", startsAt: new Date(Date.now() - 1000).toISOString(), maxRedemptions: 50, maxRedemptionsPerOwner: 25 });
+      assert.equal(promotion.audience, "admin"); assert.equal(promotion.discountType, "fixed_total"); assert.equal(promotion.discountValue, amount); assert.equal(promotion.minimumAmount, 0);
+      await reject(() => updatePromotion(promotion, { audience: "everyone" }), "PT409");
+      await reject(() => updatePromotion(promotion, { discountValue: amount + 1 }), "PT409");
+      await reject(() => updatePromotion(promotion, { eligibleOfferKeys: ["profile_1"] }), "PT409");
+      await reject(() => setPromotionStatus(promotion, "archived"), "PT409");
+      promotion = await setPromotionStatus(promotion, "paused");
+      promotion = await setPromotionStatus(promotion, "active");
+      assert.equal(promotion.status, "active");
+    }
+  });
+
+  await test("unknown, malformed, private, inactive, and no-discount quote outcomes are indistinguishable", async () => {
+    await unavailable(() => quote(owner, "profile_1", "NO_SUCH_CODE"));
+    await unavailable(() => quote(owner, "profile_1", "x"));
+    await unavailable(() => quote(owner, "profile_1", "GARYWON"));
     await reject(() => rpc("billing_promo_quote", [owner, "test", "profile_1", "GARYWON", true]), "42501");
     const ineffective = await createPromotion({ code: "NOREDUCTION", discountType: "fixed_total", discountValue: 1200, eligibleOfferKeys: ["profile_1"] });
-    await reject(() => quote(owner, "profile_1", ineffective.code), "PT410");
+    await unavailable(() => quote(owner, "profile_1", ineffective.code));
+  });
+
+  await test("promo quote throttling is durable, bounded per account, and resets by window", async () => {
+    for (let attempt = 1; attempt <= 12; attempt++) await unavailable(() => quote(owner, "profile_1", `GUESS_${attempt}`));
+    assert.deepEqual(await quote(owner, "profile_1", "GARYWON"), { available: false, rateLimited: true });
+    assert.equal((await quote(owner2, "profile_1", "NO_SUCH_CODE")).rateLimited, false);
+    await db.query("update billing_promo_quote_limits set window_started_at=clock_timestamp()-interval '6 minutes' where owner_id=$1 and environment=$2", [owner, ENVIRONMENT]);
+    assert.equal((await quote(owner, "profile_1", "NO_SUCH_CODE")).rateLimited, false);
   });
 } finally {
   await db.close();

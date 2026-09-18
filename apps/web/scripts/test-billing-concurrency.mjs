@@ -214,6 +214,29 @@ export async function main(args = process.argv.slice(2), environment = process.e
     });
     const merchant='SYNTHETICMERCHANT',paypalId=()=>randomUUID().replaceAll('-','').toUpperCase();
     const ppReserve=(client,owner,key)=>result(client,'select billing_paypal_reserve_order($1,$2,$3,$4,$5) result',[owner.id,'live',key,'profile_1',merchant]);
+    const promotion=async(maxRedemptions=1)=>{
+      const code='RACE'+randomBytes(8).toString('hex').toUpperCase();
+      return (await observer.query("insert into billing_promo_codes(environment,code,name,description,status,audience,discount_type,discount_value,eligible_offer_keys,max_redemptions,max_redemptions_per_owner) values('live',$1,'Concurrency promotion','Synthetic PostgreSQL lock proof.','active','everyone','fixed_total',30,array['profile_1']::text[],$2,$2) returning id,code,revision",[code,maxRedemptions])).rows[0];
+    };
+    const ppPromoReserve=(client,owner,key,promo)=>result(client,'select billing_paypal_reserve_promoted_order($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) result',[owner.id,'live',key,'profile_1',merchant,promo.code,promo.id,promo.revision,30,false]);
+    for(const commit of[true,false])await test('promotion global limit: A '+(commit?'commit':'rollback'),async()=>{
+      const ownerA=await user(),ownerB=await user(),promo=await promotion(1);
+      const outcome=await race('promo-limit-'+commit,c=>ppPromoReserve(c,ownerA,randomUUID(),promo),c=>ppPromoReserve(c,ownerB,randomUUID(),promo),commit);
+      assert.equal(outcome.first.offer.amount,30);assert.equal(outcome.first.promotion.finalAmount,30);
+      assert.equal(outcome.second.ok,!commit);if(commit)assert.equal(outcome.second.code,'PT410');
+      if(!commit){assert.equal(outcome.second.value.offer.amount,30);assert.equal(outcome.second.value.promotion.id,promo.id);}
+      assert.equal((await observer.query('select count(*)::int n from billing_order_promotions where promotion_id=$1',[promo.id])).rows[0].n,1);
+    });
+    const promoOperator=await user();await observer.query("update profiles set role='admin' where id=$1",[promoOperator.id]);
+    const pausePromo=(client,promo)=>result(client,'select billing_promo_admin_set_status($1,$2,$3,$4,$5,$6,$7,$8) result',[promoOperator.id,promoOperator.email,true,'live',promo.id,promo.revision,'paused','Paused during synthetic checkout race.']);
+    for(const commit of[true,false])await test('promotion pause versus reserve: A '+(commit?'commit':'rollback'),async()=>{
+      const owner=await user(),promo=await promotion(10);
+      const outcome=await race('promo-pause-'+commit,c=>pausePromo(c,promo),c=>ppPromoReserve(c,owner,randomUUID(),promo),commit);
+      assert.equal(outcome.first.status,'paused');assert.equal(outcome.second.ok,!commit);if(commit)assert.equal(outcome.second.code,'PT410');
+      const saved=(await observer.query('select status,revision from billing_promo_codes where id=$1',[promo.id])).rows[0];
+      assert.deepEqual(saved,{status:commit?'paused':'active',revision:commit?2:1});
+      assert.equal((await observer.query('select count(*)::int n from billing_order_promotions where promotion_id=$1',[promo.id])).rows[0].n,commit?0:1);
+    });
     const ppBind=(client,owner,order,provider)=>result(client,'select billing_paypal_bind_order($1,$2,$3,$4,$5) result',[owner.id,'live',order.orderId,provider,merchant]);
     const ppOrder=async owner=>ppBind(observer,owner,await ppReserve(observer,owner,randomUUID()),paypalId());
     const ppReceipt=(order,capture=paypalId())=>({paypalOrderId:order.paypalOrderId,captureId:capture,merchantId:merchant,referenceId:order.orderId,customId:order.orderId,invoiceId:'QRG-'+order.orderId,amount:1200,currency:'USD',status:'COMPLETED'});
@@ -308,7 +331,7 @@ export async function main(args = process.argv.slice(2), environment = process.e
       const saved=await result(observer,'select billing_paypal_get_order($1,$2,$3) result',[owner.id,'live',order.orderId]);
       assert.equal(saved.status,failureFirst||commit?'fulfilled':'expired');
     });
-    assert.equal(report.tests.length, 52); assert.equal(report.barriers.length, 52);
+    assert.equal(report.tests.length, 56); assert.equal(report.barriers.length, 56);
   }
   try {
     observer = await connect('observer');
@@ -336,7 +359,7 @@ export async function main(args = process.argv.slice(2), environment = process.e
     report.passed = report.tests.filter(item => item.ok).length; report.failed = report.tests.filter(item => !item.ok).length;
     report.allConnectionsClosed = clients.size === 0 && report.cleanupErrors.length === 0;
     report.finishedAt = new Date().toISOString();
-    report.accepted = !report.fatal && !report.failed && !report.clientErrors.length && report.allConnectionsClosed && report.passed === 52 && report.barriers.length === 52;
+    report.accepted = !report.fatal && !report.failed && !report.clientErrors.length && report.allConnectionsClosed && report.passed === 56 && report.barriers.length === 56;
     fs.writeFileSync(reportFile, JSON.stringify(report, null, 2));
     log(JSON.stringify({ accepted: report.accepted, passed: report.passed, failed: report.failed, barriers: report.barriers.length, allConnectionsClosed: report.allConnectionsClosed, reportFile }));
   }

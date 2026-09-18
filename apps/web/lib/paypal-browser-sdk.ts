@@ -1,5 +1,6 @@
 import type { createPayPalPaymentsClient } from "./paypal-payments-client";
 import type { PayPalApplePay } from "./paypal-apple-pay";
+import type { DirectOffer } from "./direct-payments";
 
 type Controller = ReturnType<typeof createPayPalPaymentsClient>;
 export type PayPalButtonOptions = {
@@ -38,10 +39,11 @@ export function loadPayPalSdk(clientId: string, deps: { document?: Document; win
   });
   loads.set(document, { source, promise }); return promise;
 }
-export function paypalButtonOptions(controller: Controller, offerKey: string, actorId: string): PayPalButtonOptions {
+export function paypalButtonOptions(controller: Controller, offer: DirectOffer | string, actorId: string): PayPalButtonOptions {
+  const offerKey = typeof offer === "string" ? offer : offer.key;
   return {
     style: { layout: "vertical", color: "gold", shape: "rect", label: "pay", height: 48, tagline: false },
-    createOrder: () => controller.createOrder(offerKey, actorId),
+    createOrder: () => typeof offer === "string" || !offer.promotion ? controller.createOrder(offerKey, actorId) : controller.createOrder(offerKey, actorId, offer),
     async onApprove(data, actions) { const result = await controller.capture(data.orderID, actorId); if (result === "restart" && actions.restart) await actions.restart(); },
     onCancel: () => controller.cancelled(actorId),
     onError: () => controller.sdkError(actorId)

@@ -19,6 +19,7 @@ function loadLibrary(name) {
 }
 
 const { BillingError } = loadLibrary("billing-service");
+const { promoAdminAuthTransition } = loadLibrary("promo-codes");
 const ADMIN = "11111111-1111-4111-8111-111111111111", PROMO = "22222222-2222-4222-8222-222222222222";
 let access;
 const adminJson = (value, init = {}) => Response.json(value, { ...init, headers: { "Cache-Control": "no-store, no-cache, must-revalidate", ...(init.headers || {}) } });
@@ -59,6 +60,15 @@ const promotion = (patch = {}) => ({ code: " save_30 ", name: " Save thirty ", d
   audience: "everyone", discountType: "fixed_total", discountValue: 30, minimumAmount: 0,
   eligibleOfferKeys: ["profile_1", "profile_1", "profile_10"], startsAt: null, endsAt: null,
   maxRedemptions: 20, maxRedemptionsPerOwner: 2, ...patch });
+
+test("same-admin token refresh and repeated sign-in preserve an open promo workspace", () => {
+  assert.deepEqual(promoAdminAuthTransition(undefined, ADMIN, false), { actorId: ADMIN, resetWorkspace: false, reload: true });
+  assert.deepEqual(promoAdminAuthTransition(ADMIN, ADMIN, true), { actorId: ADMIN, resetWorkspace: false, reload: false });
+  assert.deepEqual(promoAdminAuthTransition(ADMIN, null, true), { actorId: null, resetWorkspace: true, reload: true });
+  assert.deepEqual(promoAdminAuthTransition(ADMIN, "22222222-2222-4222-8222-222222222222", true), {
+    actorId: "22222222-2222-4222-8222-222222222222", resetWorkspace: true, reload: true
+  });
+});
 
 test("admin promotion list and detail reads use active server-derived authority and never cache", async t => {
   const fixtureState = fixture(t, {

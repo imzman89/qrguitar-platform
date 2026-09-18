@@ -3,6 +3,7 @@ import { readBillingBody } from "./billing-http";
 
 type Service = {
   status(request: Request, orderId?: string): Promise<unknown>;
+  quote(request: Request, input: unknown): Promise<unknown>;
   create(request: Request, input: unknown): Promise<unknown>;
   capture(request: Request, input: unknown): Promise<unknown>;
   reconcile(request: Request, input: unknown): Promise<unknown>;
@@ -23,7 +24,7 @@ export function createPayPalHandlers(deps: { service(): Service | null; bodyTime
     try { const raw = new TextDecoder("utf-8", { fatal: true }).decode(bytes); return JSON.parse(raw); }
     catch { throw new BillingError(400, "invalid_body", "Invalid payment request."); }
   }
-  const mutation = (method: "create" | "capture" | "reconcile") => async (request: Request) => {
+  const mutation = (method: "quote" | "create" | "capture" | "reconcile") => async (request: Request) => {
     try { return json({ ok: true, ...await service()[method](request, await input(request)) as object }); } catch (error) { return failure(error); }
   };
   return {
@@ -34,6 +35,6 @@ export function createPayPalHandlers(deps: { service(): Service | null; bodyTime
         return json({ ok: true, ...await service().status(request, query.has("orderId") ? query.get("orderId")! : undefined) as object });
       } catch (error) { return failure(error); }
     },
-    create: mutation("create"), capture: mutation("capture"), reconcile: mutation("reconcile")
+    quote: mutation("quote"), create: mutation("create"), capture: mutation("capture"), reconcile: mutation("reconcile")
   };
 }

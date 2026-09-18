@@ -19,6 +19,7 @@ export type ApplePaySessionConstructor = {
   canMakePayments(): boolean; supportsVersion?(version: number): boolean; STATUS_SUCCESS: number; STATUS_FAILURE: number;
 };
 type ApplePayWindow = Window & { ApplePaySession?: ApplePaySessionConstructor; ApplePayWebOptions?: { set(options: { environment: "sandbox" | "prod" }): void } };
+export const PAYPAL_APPLE_PAY_MINIMUM_CENTS = 100;
 const scripts = new WeakMap<Document, Promise<void>>();
 async function bounded<T>(value: Promise<T>, timeoutMs: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -71,7 +72,8 @@ export function createApplePayCheckout(deps: {
   return {
     // This is synchronous so ApplePaySession is created inside the buyer's click gesture.
     start() {
-      if (disposed || active || !deps.controller.beginWalletCheckout(deps.offer.key, deps.actorId)) return false;
+      if (disposed || active || deps.offer.amount < PAYPAL_APPLE_PAY_MINIMUM_CENTS
+        || !deps.controller.beginWalletCheckout(deps.offer.key, deps.actorId)) return false;
       let session: ApplePaySessionInstance;
       try {
         session = new deps.Session(4, { countryCode: deps.config.countryCode, merchantCapabilities: deps.config.merchantCapabilities, supportedNetworks: deps.config.supportedNetworks, currencyCode: "USD", requiredBillingContactFields: ["postalAddress"], total: { label: deps.merchantName, type: "final", amount: (deps.offer.amount / 100).toFixed(2) } });
@@ -84,7 +86,10 @@ export function createApplePayCheckout(deps: {
         session.onpaymentauthorized = event => {
           if (!live(session) || authorized) return; authorized = true;
           void (async () => {
-            const orderId = await deps.controller.createOrder(deps.offer.key, deps.actorId); if (!live(session)) return;
+            const orderId = deps.offer.promotion
+              ? await deps.controller.createOrder(deps.offer.key, deps.actorId, deps.offer)
+              : await deps.controller.createOrder(deps.offer.key, deps.actorId);
+            if (!live(session)) return;
             await bounded(deps.applepay.confirmOrder({ orderId, token: event.payment.token, ...(event.payment.billingContact === undefined ? {} : { billingContact: event.payment.billingContact }) }), deps.timeoutMs ?? 12_000);
             if (!live(session)) return;
             // This closes Apple's authorization sheet. Only the server's ledger read can show Profile credits.

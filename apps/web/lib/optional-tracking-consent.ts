@@ -35,7 +35,7 @@ export type OptionalTrackingCreditPack = Readonly<{ credits: CreditPackSize; val
 type RepeatableProductEventInput =
   Readonly<{ name: typeof optionalTrackingProductEvents.publicProfileViewed; properties: Readonly<{ visibility: Exclude<ProfileVisibility, "private"> }> }>;
 
-type BusinessProductEventInput =
+  type BusinessProductEventInput =
   | Readonly<{ name: typeof optionalTrackingProductEvents.registrationCompleted; properties: Readonly<{ confirmation: RegistrationConfirmation }> }>
   | Readonly<{ name: typeof optionalTrackingProductEvents.profileCreated; properties: Readonly<{ visibility: ProfileVisibility }> }>
   | Readonly<{ name: typeof optionalTrackingProductEvents.checkoutStarted; properties: OptionalTrackingCreditPack }>

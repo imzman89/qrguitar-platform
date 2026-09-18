@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { BillingError } from "./billing-service";
-import { DIRECT_OFFERS } from "./direct-payments";
+import { DIRECT_OFFERS, type AppliedPromotion, type DirectOffer } from "./direct-payments";
 import type { PayPalConfig } from "./paypal-config";
 import type { PayPalGateway } from "./paypal-gateway";
 import type { PayPalOrder, PayPalPaymentsSnapshot } from "./paypal-payments";
@@ -11,7 +11,7 @@ type StoredOrder = PayPalOrder & { merchantId: string; captureId: string | null;
 type Dependencies<Context> = {
   config: PayPalConfig; gateway: PayPalGateway;
   database: { rpc(name: string, args: Json): Promise<{ data: unknown; error: null | { code?: string } }> };
-  authenticate(context: Context): Promise<{ id: string; accountStatus: string } | null>;
+  authenticate(context: Context): Promise<{ id: string; accountStatus: string; isAdmin?: boolean } | null>;
   timeoutMs?: number; now?: () => number;
 };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -60,6 +60,8 @@ export function createPayPalService<Context>(deps: Dependencies<Context>) {
     const result = await bounded(() => deps.database.rpc(name, args));
     if (result.error) {
       if (["PT409", "23505"].includes(result.error.code || "")) throw new BillingError(409, "payment_conflict", "Check your existing payment before starting another purchase.");
+      if (["PT404", "PT403", "PT410"].includes(result.error.code || ""))
+        throw new BillingError(400, "promo_unavailable", "That promo code isn’t available.");
       if (result.error.code === "42501") throw new BillingError(403, "payment_forbidden", "This account cannot make that payment request.");
       if (result.error.code === "P0002") throw new BillingError(404, "payment_not_found", "Payment order not found.");
       if (result.error.code === "22023") throw new BillingError(400, "invalid_payment", "Check the payment details and try again.");
@@ -74,17 +76,37 @@ export function createPayPalService<Context>(deps: Dependencies<Context>) {
     if (writing && value.accountStatus !== "active") throw new BillingError(403, "account_unavailable", "This account cannot make a payment.");
     return value;
   }
+  function pricedOffer(input: unknown, promotionInput: unknown): DirectOffer {
+    const offer = obj(input), approved = DIRECT_OFFERS.find(value => value.key === offer.key), promotion = promotionInput == null ? null : obj(promotionInput);
+    if (!approved || offer.credits !== approved.credits || offer.currency !== "usd" || offer.version !== 1
+      || !Number.isSafeInteger(offer.amount) || Number(offer.amount) < 30 || Number(offer.amount) > approved.amount) return fail("invalid_order");
+    if (!promotion) {
+      if (offer.amount !== approved.amount) return fail("invalid_order");
+      return { ...approved };
+    }
+    if (!uuid(promotion.id) || typeof promotion.code !== "string" || !/^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(promotion.code)
+      || typeof promotion.name !== "string" || promotion.name.length < 1 || promotion.name.length > 80
+      || !Number.isSafeInteger(promotion.revision) || Number(promotion.revision) < 1
+      || !["fixed_total", "amount_off", "percent_off"].includes(String(promotion.discountType))
+      || !Number.isSafeInteger(promotion.discountValue) || Number(promotion.discountValue) < 1
+      || !["promotion", "internal_test"].includes(String(promotion.classification))
+      || promotion.originalAmount !== approved.amount || promotion.finalAmount !== offer.amount
+      || !Number.isSafeInteger(promotion.discountAmount) || Number(promotion.discountAmount) < 1
+      || Number(promotion.originalAmount) - Number(promotion.discountAmount) !== Number(promotion.finalAmount)
+      || Number(promotion.finalAmount) >= approved.amount) return fail("invalid_order");
+    return { ...approved, amount: Number(offer.amount), listAmount: approved.amount, promotion: { ...promotion } as AppliedPromotion };
+  }
   function stored(input: unknown, ownerId?: string): StoredOrder {
     const row = obj(input), offer = obj(row.offer), approved = DIRECT_OFFERS.find(value => value.key === offer.key);
     if (!uuid(row.orderId) || !uuid(row.ownerId) || (ownerId && row.ownerId !== ownerId) || !uuid(row.requestKey)
-      || row.environment !== environment || row.provider !== "paypal" || !approved || offer.amount !== approved.amount
-      || offer.credits !== approved.credits || offer.currency !== "usd" || offer.version !== 1
+      || row.environment !== environment || row.provider !== "paypal" || !approved
       || !["reserved", "open", "fulfilled", "expired"].includes(String(row.status)) || typeof row.merchantId !== "string" || !/^[A-Z0-9]{13}$/.test(row.merchantId)
       || !(row.paypalOrderId === null || providerId(row.paypalOrderId)) || !(row.captureId === null || providerId(row.captureId)) || typeof row.hold !== "boolean"
       || typeof row.createdAt !== "string" || !Number.isFinite(Date.parse(row.createdAt))) return fail("invalid_order");
+    const priced = pricedOffer(offer, row.promotion);
     return { orderId: row.orderId, ownerId: row.ownerId, requestId: row.requestKey, offerKey: approved.key, paypalOrderId: row.paypalOrderId as string | null,
       status: row.hold ? "needs_review" : row.status === "fulfilled" ? "fulfilled" : row.status === "expired" ? "cancelled" : row.paypalOrderId ? "approval_pending" : "reserved",
-      offer: { ...approved }, createdAt: row.createdAt, merchantId: row.merchantId, captureId: row.captureId as string | null, hold: row.hold };
+      offer: priced, createdAt: row.createdAt, merchantId: row.merchantId, captureId: row.captureId as string | null, hold: row.hold };
   }
   function publicOrder(row: StoredOrder): PayPalOrder {
     const { merchantId: _merchant, captureId: _capture, hold: _hold, ...result } = row; return result;
@@ -159,25 +181,54 @@ export function createPayPalService<Context>(deps: Dependencies<Context>) {
       offers: checkoutEnabled ? DIRECT_OFFERS.map(value => ({ ...value })) : [], order: order ? publicOrder(order) : null, pendingOrder: pending ? publicOrder(pending) : null,
       legacyOrderId: other ? other.orderId as string : null, legacyOrderProvider: other ? other.provider as "direct" | "stripe" : null };
   }
+  async function quote(context: Context, input: unknown) {
+    const owner = await actor(context, true), body = obj(input);
+    if (Object.keys(body).some(key => !["offerKey", "promoCode"].includes(key))
+      || !DIRECT_OFFERS.some(value => value.key === body.offerKey) || typeof body.promoCode !== "string")
+      throw new BillingError(400, "promo_unavailable", "That promo code isn’t available.");
+    const promoCode = body.promoCode.trim().toUpperCase();
+    if (!/^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(promoCode)) throw new BillingError(400, "promo_unavailable", "That promo code isn’t available.");
+    const result = obj(await rpc("billing_promo_quote", { ...scope(owner.id), p_offer_key: body.offerKey,
+      p_code: promoCode, p_internal_access: owner.isAdmin === true }));
+    if (result.rateLimited === true) throw new BillingError(429, "promo_rate_limited", "Too many promo attempts. Wait five minutes and try again.");
+    if (result.available !== true) throw new BillingError(400, "promo_unavailable", "That promo code isn’t available.");
+    const offer = pricedOffer(result.offer, result.promotion);
+    if (!offer.promotion || offer.promotion.code !== promoCode || offer.key !== body.offerKey) return fail("invalid_order");
+    return { offer };
+  }
   async function create(context: Context, input: unknown) {
     const owner = await actor(context, true), body = obj(input);
-    if (Object.keys(body).some(key => !["offerKey", "requestId"].includes(key)) || !uuid(body.requestId) || !DIRECT_OFFERS.some(value => value.key === body.offerKey)) throw new BillingError(400, "invalid_payment", "Choose a Profile pack to continue.");
+    if (Object.keys(body).some(key => !["offerKey", "requestId", "promoCode", "promoId", "promoRevision", "expectedAmount"].includes(key))
+      || !uuid(body.requestId) || !DIRECT_OFFERS.some(value => value.key === body.offerKey)) throw new BillingError(400, "invalid_payment", "Choose a Profile pack to continue.");
+    const promoCode = body.promoCode == null ? "" : typeof body.promoCode === "string" ? body.promoCode.trim().toUpperCase() : "!";
+    const promoted = promoCode.length > 0;
+    if ((promoted && (!/^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(promoCode) || !uuid(body.promoId)
+        || !Number.isSafeInteger(body.promoRevision) || Number(body.promoRevision) < 1
+        || !Number.isSafeInteger(body.expectedAmount) || Number(body.expectedAmount) < 30))
+      || (!promoted && [body.promoId, body.promoRevision, body.expectedAmount].some(value => value != null)))
+      throw new BillingError(400, "promo_invalid", "Apply the promo code again before checkout.");
     const existing = obj(await rpc("billing_paypal_find_order", { ...scope(owner.id), p_request_key: body.requestId }));
     let order: StoredOrder;
     if (existing.order) {
       order = stored(existing.order, owner.id);
-      if (order.offerKey !== body.offerKey || order.requestId !== body.requestId) throw new BillingError(409, "payment_conflict", "Continue with the original Profile pack.");
+      if (order.offerKey !== body.offerKey || order.requestId !== body.requestId
+        || (order.offer.promotion?.code || "") !== promoCode
+        || (promoted && (order.offer.promotion?.id !== body.promoId || order.offer.promotion?.revision !== body.promoRevision
+          || order.offer.amount !== body.expectedAmount))) throw new BillingError(409, "payment_conflict", "Continue with the original Profile pack.");
     } else {
       if (!config.enabled||!await schedulerReady()) throw new BillingError(503, "billing_disabled", "Checkout is not available right now.");
       ready();
       const account = balance(await rpc("billing_account_status", scope(owner.id)));
       if (account.commercialExempt) throw new BillingError(409, "profile_access_included", "Your approved plan already includes expanded Profile access.");
       if (account.hold) throw new BillingError(409, "billing_review_required", "Purchases are paused while your billing is reviewed.");
-      order = stored(await rpc("billing_paypal_reserve_order", { ...scope(owner.id), p_request_key: body.requestId, p_offer_key: body.offerKey, p_merchant_id: config.merchantId }), owner.id);
+      order = stored(await rpc("billing_paypal_reserve_promoted_order", { ...scope(owner.id), p_request_key: body.requestId,
+        p_offer_key: body.offerKey, p_merchant_id: config.merchantId, p_promo_code: promoCode || null,
+        p_promotion_id: promoted ? body.promoId : null, p_promotion_revision: promoted ? body.promoRevision : null,
+        p_expected_amount: promoted ? body.expectedAmount : null, p_internal_access: owner.isAdmin === true }), owner.id);
     }
     if (order.requestId !== body.requestId || order.offerKey !== body.offerKey) return fail("invalid_order");
     if (["fulfilled", "cancelled", "needs_review"].includes(order.status)) {
-      return { orderId: order.orderId, paypalOrderId: order.paypalOrderId, status: order.status };
+      return { orderId: order.orderId, paypalOrderId: order.paypalOrderId, status: order.status, offer: order.offer };
     }
     ready(order);
     // Stop remote create retries before PayPal's default six-hour key retention
@@ -185,7 +236,7 @@ export function createPayPalService<Context>(deps: Dependencies<Context>) {
     // a racing successful bind wins and remains the same recoverable purchase.
     if (!order.paypalOrderId && (deps.now?.() ?? Date.now()) - Date.parse(order.createdAt) >= 5 * 60 * 60 * 1000) {
       order = stored(await rpc("billing_paypal_expire_unbound", { ...scope(owner.id), p_order_id: order.orderId }), owner.id);
-      if (["fulfilled", "cancelled", "needs_review"].includes(order.status)) return { orderId: order.orderId, paypalOrderId: order.paypalOrderId, status: order.status };
+      if (["fulfilled", "cancelled", "needs_review"].includes(order.status)) return { orderId: order.orderId, paypalOrderId: order.paypalOrderId, status: order.status, offer: order.offer };
       if (!order.paypalOrderId) return fail("payment_review_required", "This unfinished payment is still being checked. Retry this saved payment.");
     }
     if (!order.paypalOrderId) {
@@ -196,7 +247,7 @@ export function createPayPalService<Context>(deps: Dependencies<Context>) {
       order = stored(await rpc("billing_paypal_bind_order", { ...scope(owner.id), p_order_id: order.orderId, p_paypal_order_id: providerOrderId, p_merchant_id: order.merchantId }), owner.id);
       if (order.paypalOrderId !== providerOrderId || order.requestId !== body.requestId) return fail("invalid_order");
     }
-    return { orderId: order.orderId, paypalOrderId: order.paypalOrderId, status: order.status };
+    return { orderId: order.orderId, paypalOrderId: order.paypalOrderId, status: order.status, offer: order.offer };
   }
   async function review(order: StoredOrder, incoming: Json, eventId: string, kind: "refund" | "dispute" | "reversal" | "refund_pending") {
     return stored(await rpc("billing_paypal_record_review", { p_environment: environment, p_order_id: order.orderId, p_event_id: eventId, p_kind: kind, p_receipt: incoming }), order.ownerId);
@@ -440,6 +491,6 @@ export function createPayPalService<Context>(deps: Dependencies<Context>) {
     }
     return fail("invalid_webhook_plan");
   }
-  return { status, create, capture: (context: Context, input: unknown) => payment(context, input, true), reconcile: (context: Context, input: unknown) => payment(context, input, true),
+  return { status, quote, create, capture: (context: Context, input: unknown) => payment(context, input, true), reconcile: (context: Context, input: unknown) => payment(context, input, true),
     verifyWebhook, prepareWebhook, prepareWebhookItem };
 }

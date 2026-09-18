@@ -19,6 +19,7 @@ const { createPayPalService } = load("paypal-service");
 const OWNER = randomUUID(), OTHER = randomUUID(), REQUEST = randomUUID(), ORDER = randomUUID(), ORDER2 = randomUUID();
 const PAYPAL = "5O190127TN364715T", CAPTURE = "7X12345678901234A", CAPTURE2 = "8Y12345678901234B", MERCHANT = "ABCDEFGHIJKLM";
 const offer = { key: "profile_1", version: 1, currency: "usd", amount: 1200, credits: 1 };
+const publicOffer = { ...offer, permanent: true, freeAllowance: 5 };
 const raw = (overrides = {}) => ({ orderId: ORDER, ownerId: OWNER, environment: "test", requestKey: REQUEST, status: "open", offer,
   provider: "paypal", merchantId: MERCHANT, paypalOrderId: PAYPAL, captureId: null, hold: false, createdAt: new Date().toISOString(), ...overrides });
 const account = (overrides = {}) => ({ environment: "test", createEnvironment: "test", freeLimit: 5, ownedProfiles: 5, freeRemaining: 0,
@@ -61,11 +62,11 @@ function make({ rows = {}, gateway = {}, actor = { id: OWNER, accountStatus: "ac
 await check("create reserves, validates and binds one approved pack", async () => {
   const reserved = raw({ status: "reserved", paypalOrderId: null }), bound = raw(); let creates = 0;
   const { service, calls } = make({ rows: {
-    billing_paypal_find_order: { order: null }, billing_account_status: account(), billing_paypal_reserve_order: reserved,
+    billing_paypal_find_order: { order: null }, billing_account_status: account(), billing_paypal_reserve_promoted_order: reserved,
     billing_paypal_bind_order: args => { assert.equal(args.p_paypal_order_id, PAYPAL); return bound; }
   }, gateway: { createOrder: async value => { creates++; assert.equal(value.orderId, ORDER); return orderView("CREATED", []); } } });
-  assert.deepEqual(await service.create({}, { offerKey: "profile_1", requestId: REQUEST }), { orderId: ORDER, paypalOrderId: PAYPAL, status: "approval_pending" });
-  assert.equal(creates, 1); assert.deepEqual(calls.map(call => call.name), ["billing_paypal_find_order", "billing_paypal_webhook_scheduler_ready", "billing_account_status", "billing_paypal_reserve_order", "billing_paypal_bind_order"]);
+  assert.deepEqual(await service.create({}, { offerKey: "profile_1", requestId: REQUEST }), { orderId: ORDER, paypalOrderId: PAYPAL, status: "approval_pending", offer: publicOffer });
+  assert.equal(creates, 1); assert.deepEqual(calls.map(call => call.name), ["billing_paypal_find_order", "billing_paypal_webhook_scheduler_ready", "billing_account_status", "billing_paypal_reserve_promoted_order", "billing_paypal_bind_order"]);
 });
 
 await check("same request resumes its bound provider order without creating another", async () => {
@@ -76,14 +77,14 @@ await check("same request resumes its bound provider order without creating anot
 await check("lost create response can recover a terminal order without reopening or charging", async () => {
   let providerCalls = 0; const done = raw({ status: "fulfilled", captureId: CAPTURE });
   const { service } = make({ rows: { billing_paypal_find_order: { order: done } }, gateway: { createOrder: async () => { providerCalls++; return {}; } } });
-  assert.deepEqual(await service.create({}, { offerKey: "profile_1", requestId: REQUEST }), { orderId: ORDER, paypalOrderId: PAYPAL, status: "fulfilled" });
+  assert.deepEqual(await service.create({}, { offerKey: "profile_1", requestId: REQUEST }), { orderId: ORDER, paypalOrderId: PAYPAL, status: "fulfilled", offer: publicOffer });
   assert.equal(providerCalls, 0);
 });
 
 await check("old unbound reservation expires safely without another provider create", async () => {
   const old = raw({ status: "reserved", paypalOrderId: null, createdAt: new Date(0).toISOString() }); let creates = 0;
   const { service } = make({ rows: { billing_paypal_find_order: { order: old }, billing_paypal_expire_unbound: { ...old, status: "expired" } }, gateway: { createOrder: async () => { creates++; return {}; } }, now: () => 6 * 60 * 60 * 1000 });
-  assert.deepEqual(await service.create({}, { offerKey: "profile_1", requestId: REQUEST }),{orderId:ORDER,paypalOrderId:null,status:"cancelled"});assert.equal(creates, 0);
+  assert.deepEqual(await service.create({}, { offerKey: "profile_1", requestId: REQUEST }),{orderId:ORDER,paypalOrderId:null,status:"cancelled",offer:publicOffer});assert.equal(creates, 0);
 });
 await check("racing bind wins unbound expiry and resumes the same provider order",async()=>{
   let creates=0;const old=raw({status:"reserved",paypalOrderId:null,createdAt:new Date(0).toISOString()});
@@ -92,7 +93,7 @@ await check("racing bind wins unbound expiry and resumes the same provider order
 });
 await check("terminal unbound replay returns its identity so the client can clear saved intent",async()=>{
   const {service}=make({rows:{billing_paypal_find_order:{order:raw({status:"expired",paypalOrderId:null})}}});
-  assert.deepEqual(await service.create({},{offerKey:"profile_1",requestId:REQUEST}),{orderId:ORDER,paypalOrderId:null,status:"cancelled"});
+  assert.deepEqual(await service.create({},{offerKey:"profile_1",requestId:REQUEST}),{orderId:ORDER,paypalOrderId:null,status:"cancelled",offer:publicOffer});
 });
 for(const provider of["direct","stripe"])await check("status provides correct "+provider+" recovery route metadata",async()=>{
   const {service}=make({rows:{billing_paypal_status:{account:account(),order:null,pendingOrder:null,otherPendingOrder:{orderId:ORDER,provider}}}});
@@ -103,7 +104,7 @@ await check("a recent scheduler heartbeat gates only new checkout while saved pa
     billing_paypal_find_order:{order:null}}});
   const status=await stale.service.status({},ORDER);assert.equal(status.enabled,false);assert.equal(status.offers.length,0);assert.equal(status.order.orderId,ORDER);assert.equal(status.pendingOrder.orderId,ORDER);
   await rejects(stale.service.create({},{offerKey:"profile_1",requestId:REQUEST}),"billing_disabled");
-  assert.equal(stale.calls.some(call=>call.name==="billing_paypal_reserve_order"),false);
+  assert.equal(stale.calls.some(call=>call.name==="billing_paypal_reserve_promoted_order"),false);
   const existing=make({rows:{billing_paypal_find_order:{order:pending},billing_paypal_webhook_scheduler_ready:false}});
   assert.equal((await existing.service.create({},{offerKey:"profile_1",requestId:REQUEST})).paypalOrderId,PAYPAL);
   assert.equal(existing.calls.some(call=>call.name==="billing_paypal_webhook_scheduler_ready"),false);
