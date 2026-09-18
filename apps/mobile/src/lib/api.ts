@@ -5,6 +5,10 @@ import {
   type AuthLease,
   type NativeAuth,
 } from "./auth";
+import {
+  getNativeRuntimeEnvironment,
+  runtimeFetch,
+} from "./runtime-environment";
 
 export type NativeInstrument = {
   qrCode: string;
@@ -668,16 +672,22 @@ export function createNativeApi(deps: {
 }
 let nativeApi: NativeApi | undefined;
 export function getNativeApi(): NativeApi {
-  if (!nativeApi)
+  if (!nativeApi) {
+    const environment = getNativeRuntimeEnvironment();
     nativeApi = createNativeApi({
       auth: getNativeAuth(),
-      fetch: globalThis.fetch.bind(globalThis),
-      storageOrigin: process.env.EXPO_PUBLIC_SUPABASE_URL,
+      fetch: runtimeFetch(
+        environment,
+        globalThis.fetch.bind(globalThis),
+        Platform.OS,
+      ),
+      storageOrigin: environment.supabaseUrl,
       origin: resolveNativeApiOrigin(
-        process.env.EXPO_PUBLIC_API_ORIGIN,
+        environment.apiOrigin,
         typeof __DEV__ !== "undefined" && __DEV__,
         Platform.OS,
       ),
     });
+  }
   return nativeApi;
 }

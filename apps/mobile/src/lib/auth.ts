@@ -8,6 +8,10 @@ import {
 import * as SecureStore from "expo-secure-store";
 import * as Crypto from "expo-crypto";
 import { Directory, File, Paths } from "expo-file-system";
+import {
+  getNativeRuntimeEnvironment,
+  isOfflineAcceptanceEnvironment,
+} from "./runtime-environment";
 
 export interface PersistentStorage {
   getItem(key: string): Promise<string | null>;
@@ -600,41 +604,47 @@ export function createNativeAuth(deps: AuthDependencies): NativeAuth {
 let nativeAuth: NativeAuth | undefined;
 export function getNativeAuth(): NativeAuth {
   if (nativeAuth) return nativeAuth;
-  const url = process.env.EXPO_PUBLIC_SUPABASE_URL || "";
-  const key =
-    process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
-    "";
-  let configurationError = "";
-  try {
-    const parsed = new URL(url);
-    if (
-      parsed.protocol !== "https:" ||
-      parsed.username ||
-      parsed.password ||
-      !key ||
-      key.startsWith("sb_secret_")
-    )
-      throw new Error();
-    // A legacy JWT is allowed only when its declared public role is anon. Never embed a service key.
-    if (!key.startsWith("sb_publishable_")) {
-      const payload = JSON.parse(
-        globalThis.atob(
-          key.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"),
-        ),
-      );
-      if (payload.role !== "anon") throw new Error();
+  const environment = getNativeRuntimeEnvironment();
+  const { supabaseUrl: url, supabaseKey: key } = environment;
+  const offlineAcceptance = isOfflineAcceptanceEnvironment(
+    environment,
+    Platform.OS,
+  );
+  let configurationError = offlineAcceptance
+    ? "Account access is intentionally unavailable in this offline acceptance build."
+    : "";
+  if (!offlineAcceptance) {
+    try {
+      const parsed = new URL(url);
+      if (
+        parsed.protocol !== "https:" ||
+        parsed.username ||
+        parsed.password ||
+        !key ||
+        key.startsWith("sb_secret_")
+      )
+        throw new Error();
+      // A legacy JWT is allowed only when its declared public role is anon. Never embed a service key.
+      if (!key.startsWith("sb_publishable_")) {
+        const payload = JSON.parse(
+          globalThis.atob(
+            key.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"),
+          ),
+        );
+        if (payload.role !== "anon") throw new Error();
+      }
+    } catch {
+      configurationError =
+        "Account access is not configured. Set the public Supabase URL and publishable key for this build.";
     }
-  } catch {
-    configurationError =
-      "Account access is not configured. Set the public Supabase URL and publishable key for this build.";
   }
   nativeAuth = createNativeAuth({
     storage: getNativeStorage(),
     appState: AppState,
     configurationError,
-    clientFactory: (storage) =>
-      createClient(url, key, {
+    clientFactory: (storage) => {
+      if (offlineAcceptance) throw new Error(configurationError);
+      return createClient(url, key, {
         auth: {
           storage,
           storageKey: AUTH_KEY,
@@ -642,7 +652,8 @@ export function getNativeAuth(): NativeAuth {
           persistSession: true,
           detectSessionInUrl: false,
         },
-      }),
+      });
+    },
   });
   return nativeAuth;
 }

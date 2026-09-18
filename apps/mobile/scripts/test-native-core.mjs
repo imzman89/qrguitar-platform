@@ -17,7 +17,7 @@ function load(name) {
     if (id === '../../modules/qrguitar-photo-picker') return { __esModule: true, default: null };
     if (id.startsWith('./')) return load(id.slice(2));
     if (id === 'react-native-url-polyfill/auto') return {};
-    if (id === 'react-native') return { Platform: { OS: 'android' }, AppState: {} };
+    if (id === 'react-native') return { Platform: { OS: 'android' }, AppState: { currentState: 'active', addEventListener() { return { remove() {} }; } } };
     if (id === 'expo-crypto') return { randomUUID };
     if (id === 'expo-secure-store' || id === 'expo-file-system' || id === 'expo-image-picker') return {};
     if (id === '@supabase/supabase-js') return { createClient() { throw new Error('Use an injected auth client in unit tests.'); } };
@@ -28,11 +28,14 @@ function load(name) {
 }
 const authLib = load('auth');
 const apiLib = load('api');
+const runtimeEnvironmentLib = load('runtime-environment');
+const exportEnvironmentLib = await import('./export-environment.mjs');
 const draftLib = load('profile-draft');
 const pickerLib = load('photo-picker');
 const identifiedPickerLib = load('identified-photo-picker');
 const { createEncryptedStorage, createNativeAuth, NativeSessionChangedError } = authLib;
 const { createNativeApi, NativeApiError } = apiLib;
+const { isOfflineAcceptanceEnvironment, runtimeFetch } = runtimeEnvironmentLib;
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
 const actor = '11111111-1111-4111-8111-111111111111';
@@ -42,6 +45,52 @@ function memoryStorage() {
   const values = new Map();
   return { values, getItem: async key => values.get(key) ?? null, setItem: async (key, value) => { values.set(key, value); }, removeItem: async key => { values.delete(key); } };
 }
+test('offline acceptance mode requires its exact fixture and never delegates a network request', async () => {
+  const shared = exportEnvironmentLib.OFFLINE_ACCEPTANCE_RUNTIME_ENVIRONMENT;
+  const fixture = {
+    supabaseUrl: shared.supabaseUrl,
+    supabaseKey: shared.supabaseKey,
+    apiOrigin: shared.apiOrigin,
+    offlineAcceptance: shared.offlineAcceptance,
+    offlineAcceptanceEvidence: shared.bundleEvidence,
+  };
+  assert.equal(isOfflineAcceptanceEnvironment(fixture, 'android'), true);
+  assert.equal(isOfflineAcceptanceEnvironment(fixture, 'ios'), false);
+  assert.equal(isOfflineAcceptanceEnvironment({ ...fixture, offlineAcceptance: '' }, 'android'), false);
+  assert.equal(isOfflineAcceptanceEnvironment({ ...fixture, offlineAcceptance: fixture.offlineAcceptance + '-changed' }, 'android'), false);
+  assert.equal(isOfflineAcceptanceEnvironment({ ...fixture, offlineAcceptanceEvidence: '' }, 'android'), false);
+  let requests = 0;
+  const online = async () => { requests++; return new Response(); };
+  const offline = runtimeFetch(fixture, online, 'android');
+  await assert.rejects(offline('https://www.qrguitar.com/api/instruments'), /disabled in this offline acceptance build/);
+  assert.equal(requests, 0);
+  assert.equal(runtimeFetch({ ...fixture, offlineAcceptance: '' }, online, 'android'), online);
+  assert.equal(runtimeFetch(fixture, online, 'web'), online);
+});
+test('the exact embedded fixture boots the real auth and API singletons without reaching fetch', async () => {
+  const environment = {
+    ...exportEnvironmentLib.OFFLINE_ACCEPTANCE_ENVIRONMENT,
+    [exportEnvironmentLib.OFFLINE_ACCEPTANCE_BUNDLE_EVIDENCE_NAME]:
+      exportEnvironmentLib.OFFLINE_ACCEPTANCE_RUNTIME_ENVIRONMENT.bundleEvidence,
+  };
+  const previous = new Map(Object.keys(environment).map(name => [name, process.env[name]]));
+  const originalFetch = globalThis.fetch;
+  let requests = 0;
+  try {
+    Object.assign(process.env, environment);
+    globalThis.fetch = async () => { requests++; throw new Error('native fetch must stay unreachable'); };
+    const auth = authLib.getNativeAuth();
+    const stop = auth.start(); await tick();
+    assert.equal(auth.getSnapshot().status, 'unconfigured');
+    await assert.rejects(apiLib.getNativeApi().listPublic(), error => error.code === 'network_error');
+    assert.equal(requests, 0); stop();
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const [name, value] of previous) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
+  }
+});
 function encryptedFixture() {
   const pointers = new Map(), files = new Map(), events = [];
   const backend = {
@@ -123,6 +172,23 @@ function authFixture(options = {}) {
   }});
   return { auth, storage, clients, background: value => appListener?.(value) };
 }
+test('an intentionally unconfigured auth runtime never constructs or refreshes a client', async () => {
+  let clients = 0, appListener;
+  const auth = createNativeAuth({
+    storage: memoryStorage(),
+    configurationError: 'Account access is intentionally unavailable in this offline acceptance build.',
+    appState: {
+      currentState: 'active',
+      addEventListener(_event, listener) { appListener = listener; return { remove() { appListener = null; } }; }
+    },
+    clientFactory() { clients++; throw new Error('client must stay unreachable'); }
+  });
+  const stop = auth.start(); await tick();
+  assert.equal(auth.getSnapshot().status, 'unconfigured'); assert.equal(clients, 0);
+  appListener?.('background'); appListener?.('active'); assert.equal(clients, 0);
+  await assert.rejects(auth.signIn('person@example.com', 'password-long'), /intentionally unavailable/);
+  assert.equal(clients, 0); stop();
+});
 test('auth starts refresh only active, stops in background, and subscribes once for two consumers', async () => {
   const f = authFixture({ initialSession: session(actor) }); const stop1 = f.auth.start(); const stop2 = f.auth.start(); await tick();
   assert.equal(f.clients.length, 1); assert.equal(f.auth.getSnapshot().status, 'signed-in');

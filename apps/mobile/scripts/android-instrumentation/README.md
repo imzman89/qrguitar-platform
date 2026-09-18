@@ -1,6 +1,6 @@
 # Installed app acceptance overlay
 
-This is an acceptance-only offline debug APK overlay, not a production/release build. It does not contain working account credentials. Do not distribute the resulting APK to consumers.
+This is an acceptance-only offline debug APK overlay, not a production/release build. It does not contain working account credentials. Do not distribute the resulting APK to consumers. The exact CI fixture environment also selects a JavaScript transport that rejects locally without constructing a Supabase client or calling the platform fetch implementation. The Android-only export wrapper requires `--offline-acceptance` and a separate non-public build guard. Metro validates the same guard during Gradle's direct bundle command, injects bundle evidence only after validation, and partitions its cache by runtime environment. The generated APK remains guarded independently by `testOnly` and removal of `INTERNET`.
 
 After Expo generates `apps/mobile/android`, run from repository root:
 
@@ -11,7 +11,7 @@ node apps/mobile/scripts/prepare-installed-test.mjs
 
 `--check` validates inputs without writing. The script changes only generated `android/app/build.gradle`, `MainApplication.kt`, the debug manifest, and two owned app-target androidTest files. It embeds JavaScript/Hermes in debug, disables developer-server startup, adds the app test runner/dependencies, removes INTERNET permission, marks the APK `android:testOnly=true`, and adds test-only visibility for the OS photo-picker intent. The ordinary app runner selects only `InstalledAcceptanceTest`; the intentional-death helper is invoked separately by its host controller. Existing signing configuration is retained. Unexpected app identity/configuration or unrelated destination tests fail before writing.
 
-Repeat the existing public CI fixture environment during Gradle bundling. Do not load production secrets, sign in, start Metro, or rely on the separate runtime export to supply the APK's bundle. Before installing, verify the actual APK has `assets/index.android.bundle`, lacks INTERNET permission, and is marked test-only. The test-only APK requires installation with test-app support (`-t`), which the connected instrumentation install provides.
+Repeat the exact public fixture and `QRGUITAR_OFFLINE_ACCEPTANCE_BUILD` guard from `offline-acceptance-environment.json` during both the explicit offline Android export and Gradle bundling. Do not load production secrets, sign in, or start a separate Metro server. Before installing, verify the actual APK has `assets/index.android.bundle`, contains the fixture URL/key and Metro-injected bundle evidence, excludes the ordinary network fixture URL/key, lacks INTERNET permission, and is marked test-only. The test-only APK requires installation with test-app support (`-t`), which the connected instrumentation install provides.
 
 From `apps/mobile/android`, expected tasks are:
 

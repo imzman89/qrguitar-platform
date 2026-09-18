@@ -19,7 +19,7 @@ concurrency:
 jobs:
   android-module:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       CI: "1"
       EXPO_NO_TELEMETRY: "1"
@@ -32,13 +32,15 @@ jobs:
       - run: npm run typecheck --workspace @qrguitar/mobile
       - run: npm run lint --workspace @qrguitar/mobile
       - run: npm test --workspace @qrguitar/mobile
-      - name: Export all runtimes with fixture configuration
+      - name: Export ordinary networked runtimes with public fixture configuration
         run: npm run export:all --workspace @qrguitar/mobile -- --source-maps --max-workers 2
         env:
-          EXPO_PUBLIC_SUPABASE_URL: https://build-only.supabase.co
-          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CI_fixture_only_not_for_deployment
+          EXPO_PUBLIC_SUPABASE_URL: https://runtime-resolution.supabase.co
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CI_runtime_resolution_only
           EXPO_PUBLIC_API_ORIGIN: https://www.qrguitar.com
       - run: npm run test:runtime-bundles --workspace @qrguitar/mobile
+        env:
+          QRGUITAR_EXPECT_NETWORKED_RUNTIME_FIXTURE: "1"
       - name: Generate Android project and verify module discovery
         working-directory: apps/mobile
         run: |
@@ -69,6 +71,14 @@ jobs:
           node --test apps/mobile/scripts/android-instrumentation/test-prepare.mjs
           python3 -B apps/mobile/scripts/test-android-ready-process-death.py
           node apps/mobile/scripts/prepare-installed-test.mjs
+      - name: Export guarded offline Android acceptance runtime
+        run: npm run export:android --workspace @qrguitar/mobile -- --offline-acceptance --source-maps --max-workers 2
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: https://build-only.supabase.co
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CI_fixture_only_not_for_deployment
+          EXPO_PUBLIC_API_ORIGIN: https://www.qrguitar.com
+          EXPO_PUBLIC_QRGUITAR_OFFLINE_ACCEPTANCE: android-installed-acceptance-v1
+          QRGUITAR_OFFLINE_ACCEPTANCE_BUILD: android-installed-acceptance-build-v1
       - name: Provision a disposable Android emulator
         run: bash apps/mobile/scripts/android-emulator-ci.sh provision
       - name: Build bundled test app and both instrumentation APKs
@@ -77,20 +87,33 @@ jobs:
           EXPO_PUBLIC_SUPABASE_URL: https://build-only.supabase.co
           EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CI_fixture_only_not_for_deployment
           EXPO_PUBLIC_API_ORIGIN: https://www.qrguitar.com
+          EXPO_PUBLIC_QRGUITAR_OFFLINE_ACCEPTANCE: android-installed-acceptance-v1
+          QRGUITAR_OFFLINE_ACCEPTANCE_BUILD: android-installed-acceptance-build-v1
         run: |
+          node ../scripts/check-offline-acceptance-environment.mjs
+          # The explicit Android export populated the environment-keyed Metro cache that
+          # Expo export:embed reuses in CI. The Metro config independently validates the guard.
           ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :qrguitar-photo-picker:assembleDebugAndroidTest --no-daemon --max-workers=2 -I /tmp/qrguitar-installed-ndk.gradle -Pandroid.builder.sdkDownload=false -PreactNativeArchitectures=x86_64 --stacktrace
           # This is an offline test-only APK with debug signing, never a release artifact.
           python3 - <<'PY'
-          import os, re, subprocess, zipfile
+          import json, os, re, subprocess, zipfile
           apk = 'app/build/outputs/apk/debug/app-debug.apk'
           with zipfile.ZipFile(apk) as archive:
-              assert archive.getinfo('assets/index.android.bundle').file_size > 0, 'Missing embedded JavaScript'
+              bundle = archive.read('assets/index.android.bundle')
+          assert bundle, 'Missing embedded JavaScript'
+          fixture = json.loads(open('../offline-acceptance-environment.json', encoding='utf-8').read())
+          for marker in (fixture['supabaseUrl'].encode(), fixture['supabaseKey'].encode(),
+                         fixture['offlineAcceptance'].encode(), fixture['bundleEvidence'].encode(),
+                         b'Network is disabled in this offline acceptance build.'):
+              assert marker in bundle, f'Missing offline bundle marker: {marker!r}'
+          for marker in (b'https://runtime-resolution.supabase.co', b'sb_publishable_CI_runtime_resolution_only'):
+              assert marker not in bundle, f'Ordinary export environment leaked into offline APK: {marker!r}'
           aapt = os.environ['ANDROID_HOME'] + '/build-tools/36.0.0/aapt'
           permissions = subprocess.check_output([aapt, 'dump', 'permissions', apk], text=True)
           assert 'android.permission.INTERNET' not in permissions, 'Test app must have no network permission'
           manifest = subprocess.check_output([aapt, 'dump', 'xmltree', apk, 'AndroidManifest.xml'], text=True)
           assert re.search(r'android:testOnly[^\n]*0xffffffff', manifest), 'APK must be test-only'
-          print('Bundled JavaScript present; INTERNET permission absent; test-only APK confirmed.')
+          print('Guarded offline JavaScript bundle, absent ordinary fixture, no INTERNET permission and test-only APK confirmed.')
           PY
           sha256sum app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
       - name: Run Android platform storage and installed app acceptance
@@ -98,6 +121,8 @@ jobs:
           EXPO_PUBLIC_SUPABASE_URL: https://build-only.supabase.co
           EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CI_fixture_only_not_for_deployment
           EXPO_PUBLIC_API_ORIGIN: https://www.qrguitar.com
+          EXPO_PUBLIC_QRGUITAR_OFFLINE_ACCEPTANCE: android-installed-acceptance-v1
+          QRGUITAR_OFFLINE_ACCEPTANCE_BUILD: android-installed-acceptance-build-v1
         run: bash apps/mobile/scripts/android-emulator-ci.sh test
       - name: Report native test results
         if: always()
@@ -105,15 +130,41 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import xml.etree.ElementTree as ET
+          expected = {
+              'com.qrguitar.picker.SelectionPolicyTest': {
+                  'onlyLaunchedExistingRequestAcceptsCallback', 'acknowledgeBindsExactReceiptAndCannotPromotePending',
+                  'allActivePhasesRemainPending', 'namesAndOptionsAreBounded', 'imageAndAggregateLimitsApplyBeforeDelivery',
+              },
+              'com.qrguitar.picker.SelectionStoreTest': {
+                  'prepareIsIdempotentAndCannotChangeOptionsOrRelaunch',
+                  'missingDiscardTombstoneFencesDelayedStartAndCallbackAcrossRestart',
+                  'cancelledAndUnknownCallbacksCannotBecomeReady',
+                  'encryptedReadyReadsSurviveRestartAndExactAcknowledgementIsIdempotent',
+                  'terminalCommitRetainsCleanupManifestUntilRestartSuccessfullyDeletesBytes',
+                  'compactionFailureKeepsIdentityAndCleanupCanRepeatWithoutImagesOrGrant',
+                  'sharedGrantRemainsUntilLastReadyRequestIsRetired', 'prefixRelatedRequestCannotDeleteOtherRequestImage',
+                  'discardedProcessingCannotPublishLateReadyOrReacquireItsGrant',
+                  'wrongKeyOrCorruptRecordIsAnExplicitFailureAndNotMissing',
+              },
+          }
           files = list(Path('apps/mobile/modules/qrguitar-photo-picker/android/build/test-results/testDebugUnitTest').glob('TEST-*.xml'))
-          tests = failures = errors = skipped = 0
+          actual, seen = {}, set()
+          failures = errors = skipped = 0
           for file in files:
               suite = ET.parse(file).getroot()
               counts = {key: int(suite.attrib.get(key, '0')) for key in ('tests', 'failures', 'errors', 'skipped')}
-              print(suite.attrib.get('name'), counts)
-              tests += counts['tests']; failures += counts['failures']; errors += counts['errors']; skipped += counts['skipped']
-          print(f'Total native tests: {tests}; failures: {failures}; errors: {errors}; skipped: {skipped}')
-          if tests < 15 or failures or errors or skipped:
+              suite_name = suite.attrib.get('name')
+              cases = suite.findall('testcase')
+              assert counts['tests'] == len(cases), f'inconsistent count: {file}'
+              print(suite_name, counts)
+              for case in cases:
+                  pair = (case.attrib.get('classname'), case.attrib.get('name'))
+                  assert pair not in seen, f'duplicate test: {pair}'
+                  seen.add(pair); actual.setdefault(pair[0], set()).add(pair[1])
+              failures += counts['failures']; errors += counts['errors']; skipped += counts['skipped']
+          print(f'Total native tests: {len(seen)}; failures: {failures}; errors: {errors}; skipped: {skipped}')
+          if actual != expected or failures or errors or skipped:
+              print('Expected:', expected); print('Actual:', actual)
               raise SystemExit(1)
           PY
       - name: Report installed Android acceptance results
@@ -123,23 +174,49 @@ jobs:
           from pathlib import Path
           import xml.etree.ElementTree as ET
           roots = [
-              (Path('apps/mobile/modules/qrguitar-photo-picker/android/build/outputs/androidTest-results/connected'), 10),
-              (Path('apps/mobile/android/app/build/outputs/androidTest-results/connected'), 4),
+              (Path('apps/mobile/modules/qrguitar-photo-picker/android/build/outputs/androidTest-results/connected'), {
+                  'com.qrguitar.picker.SelectionStoreInstrumentedTest': {
+                      'realKeyReadyReceiptSurvivesReopenAndExactAcknowledgement', 'durableDiscardCannotBeRevivedAfterReopen',
+                      'missingDefaultKeyFailsWithoutGeneratingReplacementOrErasingJournal',
+                      'replacedDefaultKeyCannotAuthenticateExistingRecord',
+                      'tamperedImageAndRecordFailAuthenticationWithoutBecomingMissing',
+                      'interruptedAtomicFileOverwriteRetainsPreviousDurableRecord',
+                      'interruptedTerminalCleanupRetriesWithRealKeyOnStoreReopen',
+                      'actualJpegNormalizationAppliesExifOrientationAndRemovesPrivateMetadata',
+                      'actualDecoderSamplesWideImagesBeforeJpegNormalization',
+                      'actualEncodedImageCannotExceedRemainingDraftBudget',
+                  },
+              }),
+              (Path('apps/mobile/android/app/build/outputs/androidTest-results/connected'), {
+                  'com.qrguitar.acceptance.InstalledAcceptanceTest': {
+                      'embeddedBundleLaunchesOfflineAndNavigationWorks',
+                      'realSystemPickerCancellationRetiresOnlyItsRequest',
+                      'realSystemCancellationSurvivesRequestActivityRecreation',
+                      'realSystemPickerSelectionPersistsGrantAndAcknowledgesExactReceipt',
+                  },
+              }),
           ]
           valid = True
-          for root, minimum in roots:
-              tests = failures = errors = skipped = 0
+          for root, expected in roots:
+              actual, seen = {}, set()
+              failures = errors = skipped = 0
               for file in root.rglob('TEST-*.xml'):
                   suite = ET.parse(file).getroot()
                   counts = {key: int(suite.attrib.get(key, '0')) for key in ('tests', 'failures', 'errors', 'skipped')}
                   print(suite.attrib.get('name'), counts)
-                  for case in suite.findall('testcase'):
-                      print('  ' + case.attrib.get('name', '?'))
+                  cases = suite.findall('testcase')
+                  if counts['tests'] != len(cases): valid = False
+                  for case in cases:
+                      pair = (case.attrib.get('classname'), case.attrib.get('name'))
+                      print('  ' + str(pair))
+                      if pair in seen: valid = False
+                      seen.add(pair); actual.setdefault(pair[0], set()).add(pair[1])
                       for failure in list(case.findall('failure')) + list(case.findall('error')):
                           print((failure.text or failure.attrib.get('message', ''))[:6000])
-                  tests += counts['tests']; failures += counts['failures']; errors += counts['errors']; skipped += counts['skipped']
-              print(f'{root}: {tests} tests; {failures} failures; {errors} errors; {skipped} skipped')
-              valid &= tests >= minimum and not (failures or errors or skipped)
+                  failures += counts['failures']; errors += counts['errors']; skipped += counts['skipped']
+              print(f'{root}: {len(seen)} tests; {failures} failures; {errors} errors; {skipped} skipped')
+              if actual != expected: print('Expected:', expected); print('Actual:', actual)
+              valid &= actual == expected and not (failures or errors or skipped)
           if not valid:
               raise SystemExit(1)
           PY

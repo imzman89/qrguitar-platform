@@ -1,5 +1,23 @@
-export function validateExportEnvironment(env, { development = false, platform = 'all' } = {}) {
+import offlineAcceptance from './offline-acceptance-environment.cjs';
+
+export const {
+  OFFLINE_ACCEPTANCE_RUNTIME_ENVIRONMENT,
+  OFFLINE_ACCEPTANCE_ENVIRONMENT,
+  OFFLINE_ACCEPTANCE_BUILD_GUARD_NAME,
+  OFFLINE_ACCEPTANCE_BUNDLE_EVIDENCE_NAME,
+  inspectOfflineAcceptanceEnvironment,
+} = offlineAcceptance;
+
+export function validateExportEnvironment(env, { development = false, platform = 'all', offlineAcceptance = false } = {}) {
   const origin = (env.EXPO_PUBLIC_API_ORIGIN || 'https://www.qrguitar.com').replace(/\/$/, '');
+  const inspected = inspectOfflineAcceptanceEnvironment(env);
+  if (offlineAcceptance) {
+    if (platform !== 'android' || !inspected.exactPublicFixture || !inspected.exactBuildGuard || inspected.bundleEvidence) {
+      throw new Error('Offline acceptance export requires the exact Android CI fixture configuration.');
+    }
+  } else if (inspected.fixtureFieldPresent) {
+    throw new Error('Offline acceptance configuration is test-only and cannot enter a normal export.');
+  }
   if (!['https://qrguitar.com', 'https://www.qrguitar.com'].includes(origin)
       && !(development && platform === 'web' && origin === 'http://127.0.0.1:3014')) {
     throw new Error('The export requires an approved QRguitar API origin.');

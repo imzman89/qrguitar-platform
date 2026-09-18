@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { OFFLINE_ACCEPTANCE_RUNTIME_ENVIRONMENT } from './export-environment.mjs';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = path.resolve(appRoot, '../..');
@@ -28,6 +29,18 @@ for (const platform of ['android', 'ios', 'web']) {
   } else {
     assert.deepEqual(packageRoots(sources, 'react-native'), [expectedRoot('react-native')], platform + ': one SDK-compatible React Native instance required');
     assert.deepEqual(packageRoots(sources, 'react-dom'), [], platform + ': web React DOM must not enter native bundles');
+  }
+  if (process.env.QRGUITAR_EXPECT_NETWORKED_RUNTIME_FIXTURE === '1') {
+    const bundles = fs.readdirSync(dir).filter(file => !file.endsWith('.map'));
+    const fixtureUrl = Buffer.from('https://runtime-resolution.supabase.co');
+    const fixtureKey = Buffer.from('sb_publishable_CI_runtime_resolution_only');
+    const matching = bundles.filter(file => fs.readFileSync(path.join(dir, file)).includes(fixtureUrl));
+    assert.equal(matching.length, 1, platform + ': exactly one app bundle must embed the ordinary networked fixture URL');
+    const bundle = fs.readFileSync(path.join(dir, matching[0]));
+    assert.ok(bundle.includes(fixtureKey), platform + ': networked fixture URL and key must enter the same app bundle');
+    for (const value of [OFFLINE_ACCEPTANCE_RUNTIME_ENVIRONMENT.supabaseUrl, OFFLINE_ACCEPTANCE_RUNTIME_ENVIRONMENT.supabaseKey, OFFLINE_ACCEPTANCE_RUNTIME_ENVIRONMENT.bundleEvidence]) {
+      assert.ok(!bundle.includes(Buffer.from(value)), platform + ': offline-only fixture value must not enter an ordinary bundle');
+    }
   }
   console.log(platform + ': one correct React runtime, ' + (platform === 'web' ? 'React DOM' : 'React Native') + ' resolution verified');
 }
