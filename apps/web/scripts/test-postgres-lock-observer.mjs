@@ -56,8 +56,11 @@ function harness(script, samples, options = {}) {
     pause, sleep: pause, Date: { now: () => clock }, log: () => {}, message: error => error.message
   }, { filename: script });
   async function run(commit = true) {
-    return race('synthetic-lock-observation', async () => { events.push('A:work'); return { first: true }; },
-      async () => { events.push('B:work'); if (options.earlySettled) releaseB(); return pendingB; }, commit, options.expectedLock ?? null);
+    const aWork = async () => { events.push('A:work'); return { first: true }; };
+    const bWork = async () => { events.push('B:work'); if (options.earlySettled) releaseB(); return pendingB; };
+    return script === 'test-evidence-postgres-concurrency.mjs'
+      ? race('synthetic-lock-observation', aWork, bWork, commit, options.expectedLock ?? null)
+      : race('synthetic-lock-observation', aWork, bWork, commit);
   }
   return { run, events, report, get polls() { return pollCount; } };
 }
