@@ -105,9 +105,9 @@ test('renderer uses precisely the mobile React runtime',()=>{assert.equal(React.
 
 test('Browse exposes a failed catalog load and retry recovers to an empty catalog',async()=>{
  let attempts=0;
- const f=fixture({api:{listPublic:async()=>{attempts++;if(attempts===1)throw Error('Network is disabled in this offline acceptance build.');return [];}}});
+ const f=fixture({api:{listPublic:async()=>{attempts++;if(attempts===1)throw Error('QRguitar could not be reached. Check your connection and try again.');return [];}}});
  const view=await render(f.App.Browse,{onOpen(){},onScan(){},onCreate(){}});
- assert.equal(attempts,1);assert.match(notices(view),/Network is disabled in this offline acceptance build\./);assert.ok(action(view,'Retry Catalog'));
+ assert.equal(attempts,1);assert.match(notices(view),/QRguitar could not be reached\. Check your connection and try again\./);assert.ok(action(view,'Retry Catalog'));
  await invoke(action(view,'Retry Catalog').props.onPress);assert.equal(attempts,2);assert.equal(action(view,'Retry Catalog'),undefined);assert.match(text(view),/The Catalog is quiet for now/);
 });
 

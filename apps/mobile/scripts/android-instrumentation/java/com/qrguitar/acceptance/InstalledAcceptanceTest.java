@@ -148,7 +148,7 @@ public final class InstalledAcceptanceTest {
     requireLabel("Explore");
     requireLabel("Scan");
     requireLabel("My instruments");
-    requireLabelAfterScrolling("Network is disabled in this offline acceptance build.");
+    requireLabelAfterScrolling("QRguitar could not be reached. Check your connection and try again.");
     requireLabelAfterScrolling("Retry Catalog");
     clickLabel("My instruments");
     requireLabel("Your instruments, together");

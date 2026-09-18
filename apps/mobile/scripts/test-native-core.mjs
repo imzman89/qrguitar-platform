@@ -82,7 +82,8 @@ test('the exact embedded fixture boots the real auth and API singletons without 
     const auth = authLib.getNativeAuth();
     const stop = auth.start(); await tick();
     assert.equal(auth.getSnapshot().status, 'unconfigured');
-    await assert.rejects(apiLib.getNativeApi().listPublic(), error => error.code === 'network_error');
+    await assert.rejects(apiLib.getNativeApi().listPublic(), error =>
+      error.code === 'network_error' && error.message === 'QRguitar could not be reached. Check your connection and try again.');
     assert.equal(requests, 0); stop();
   } finally {
     globalThis.fetch = originalFetch;
