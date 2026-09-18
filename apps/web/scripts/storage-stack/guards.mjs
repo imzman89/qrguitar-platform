@@ -7,6 +7,22 @@ export const CLI_VERSION = '2.117.0';
 export const PORTS = Object.freeze({ api: 55431, db: 55432, shadow: 55430, tls: 55439, app: 55440 });
 export const ORIGIN = `https://127.0.0.1:${PORTS.tls}`;
 export const APP_ORIGIN = `https://127.0.0.1:${PORTS.app}`;
+export const READINESS_LABELS = Object.freeze(['catalog_readable', 'required_functions', 'function_security', 'blocked_function_grants',
+  'private_tables', 'private_table_grants', 'server_only_policies', 'private_storage_buckets', 'private_storage_policy',
+  'receipt_constraints', 'editor_versioning', 'schema_columns', 'public_schema_create', 'self_security']);
+const READINESS_VERSIONS = new Set(['2026-09-10.1', '2026-09-17.1', '2026-09-17.2', '2026-09-17.3', '2026-09-17.4', '2026-09-17.5', '2026-09-17.6']);
+export function readinessProjection(value, manifest) {
+  // Labels and versions come from this fixed diagnostic vocabulary, never from
+  // an arbitrary RPC field. Malformed/missing/duplicate entries are null, not true.
+  assert.deepEqual([...manifest.checks].sort(), [...READINESS_LABELS].sort());
+  assert.ok(READINESS_VERSIONS.has(manifest.releaseVersion));
+  const rows = Array.isArray(value?.checks) ? value.checks : [];
+  return { expectedReleaseVersion: manifest.releaseVersion,
+    releaseVersion: READINESS_VERSIONS.has(value?.releaseVersion) ? value.releaseVersion : 'unexpected',
+    ready: typeof value?.ready === 'boolean' ? value.ready : null,
+    exactCheckSet: rows.length === READINESS_LABELS.length && READINESS_LABELS.every(name => rows.filter(row => row?.name === name).length === 1),
+    checks: READINESS_LABELS.map(name => { const matches = rows.filter(row => row?.name === name); return { name, ok: matches.length === 1 && typeof matches[0]?.ok === 'boolean' ? matches[0].ok : null }; }) };
+}
 const COMMAND_CLASSES = new Set(['docker', 'supabase-cli', 'openssl', 'acceptance-child']);
 const SIGNALS = new Set(['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGABRT', 'SIGSEGV', 'SIGPIPE']);
 const SPAWN_CODES = new Set(['ENOENT', 'EACCES', 'EPERM', 'ETIMEDOUT', 'ENOBUFS', 'ECONNREFUSED']);

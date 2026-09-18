@@ -4,7 +4,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { createHash, randomUUID, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { context, verifyDirectory, validateStatus, exactApiUrl, ORIGIN, APP_ORIGIN, MARKER, safeReport, createDiagnostics } from './guards.mjs';
+import { context, verifyDirectory, validateStatus, exactApiUrl, ORIGIN, APP_ORIGIN, MARKER, safeReport, createDiagnostics, readinessProjection } from './guards.mjs';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const EXPECTED_CASES = 18;
@@ -163,6 +163,9 @@ async function main() {
     }
     if (!readiness && lastError) throw lastError;
     });
+    report.readiness = readinessProjection(readiness, manifest);
+    safeReport(report.readiness);
+    console.log('READINESS_DIAGNOSTIC ' + JSON.stringify(report.readiness));
     step('readiness-validate', () => {
     assert.equal(readiness?.ready, true, 'Full repository readiness must pass before fixture users');
     assert.equal(readiness.releaseVersion, manifest.releaseVersion);

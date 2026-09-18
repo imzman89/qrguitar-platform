@@ -16,13 +16,14 @@ const embedded=previous.match(/\$manifest\$([\s\S]*?)\$manifest\$/);assert(embed
 const manifest=JSON.parse(embedded[1]);assert.equal(manifest.releaseVersion,'2026-09-17.5');
 const historical=structuredClone(manifest),source=path.resolve(option('--recovery-sql')||path.join(output,'supabase/migrations/20260917220000_service_evidence_recovery.sql'));
 const recovery=normalize(fs.readFileSync(source,'utf8'));
+const helperPermissions=normalize(fs.readFileSync(path.join(output,'supabase/migrations/20260917220500_site_editor_helper_permissions.sql'),'utf8'));
 assert.equal(sha(recovery),'1c3a791f583fee5509a09b972568321e2796a1835d095ff6b61404beef660dae','Recovery SQL changed; review before repinning.');
 const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite');
 const {installRepositorySchema}=await import(pathToFileURL(path.join(repo,'apps/web/scripts/security/postgres-fixture.mjs')));
 const db=new PGlite(),savedFetch=globalThis.fetch;
 globalThis.fetch=async()=>{throw Error('No network permitted in readiness generation');};
 try{
-  await installRepositorySchema(db,repo,'20260917220000');await db.exec(recovery);
+  await installRepositorySchema(db,repo,'20260917220000');await db.exec(recovery);await db.exec(helperPermissions);
   const names=['service_evidence_uploads','service_evidence_upload_scopes','service_evidence_upload_discard_receipts'].sort();
   const functions=(await db.query("select 'public.'||oid::regprocedure::text signature,proname,prosecdef,provolatile,proconfig,pg_get_function_arguments(oid) arguments,pg_get_function_result(oid) result,encode(sha256(convert_to(replace(prosrc,chr(13)||chr(10),chr(10)),'UTF8')),'hex') source_hash from pg_proc where pronamespace='public'::regnamespace and proname like '%service_evidence_upload%' order by proname,pronargs")).rows;
   assert.equal(functions.length,15);

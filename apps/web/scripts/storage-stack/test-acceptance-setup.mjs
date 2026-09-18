@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
 import { applicationLoader } from './acceptance.mjs';
-import { createDiagnostics, safeReport, ORIGIN, APP_ORIGIN } from './guards.mjs';
+import { createDiagnostics, safeReport, ORIGIN, APP_ORIGIN, readinessProjection, READINESS_LABELS } from './guards.mjs';
 
 const repo = path.resolve(process.argv.find(arg => arg.startsWith('--repo='))?.slice(7) || path.resolve(import.meta.dirname, '../../../..'));
 const require = createRequire(path.join(repo, 'package.json'));
@@ -43,6 +43,38 @@ test('fresh full repository schema needs exactly two operator-provisioned privat
     assert.equal((await db.query('select count(*)::int n from storage.objects')).rows[0].n, 0);
   } finally { globalThis.fetch = savedFetch; await db.close(); }
 });
+test('real Supabase default grants require the permanent editor-helper permission migration', async () => {
+  const { PGlite } = require('@electric-sql/pglite');
+  const { installRepositorySchema } = await import(pathToFileURL(path.join(repo, 'apps/web/scripts/security/postgres-fixture.mjs')));
+  const migrationName = '20260917220500_site_editor_helper_permissions.sql';
+  const migrationPath = process.argv.find(arg => arg.startsWith('--permissions-sql='))?.slice(18) || path.join(repo, 'supabase/migrations', migrationName);
+  const migrationSql = fs.readFileSync(migrationPath, 'utf8').replaceAll('\r\n', '\n');
+  const db = new PGlite(), savedFetch = globalThis.fetch;
+  globalThis.fetch = async () => { throw Error('Network forbidden in synthetic grant regression'); };
+  let scaffolded = false;
+  try {
+    await installRepositorySchema({ exec: async sql => {
+      if (sql.replaceAll('\r\n', '\n') === migrationSql) return [];
+      const result = await db.exec(sql);
+      if (!scaffolded) {
+        assert.ok(sql.startsWith('create role anon;')); scaffolded = true;
+        // Match the real local Supabase postgres defaults before application DDL.
+        await db.exec('alter default privileges for role postgres in schema public grant all on functions to anon,authenticated,service_role;alter default privileges for role postgres in schema public grant all on tables to anon,authenticated,service_role;alter default privileges for role postgres in schema public grant all on sequences to anon,authenticated,service_role;');
+      }
+      return result;
+    } }, repo);
+    for (const id of ['instrument-media', 'instrument-documents']) await db.query('insert into storage.buckets(id,name,public)values($1,$1,false)', [id]);
+    const readiness = async () => (await db.query('select public.qrguitar_release_readiness() value')).rows[0].value;
+    const before = await readiness(); assert.equal(before.ready, false);
+    assert.deepEqual(before.checks.filter(item => !item.ok).map(item => item.name), ['blocked_function_grants']);
+    const privileges = async () => (await db.query("select has_function_privilege('service_role','public.site_editor_changed_fields(jsonb,jsonb)','EXECUTE') changed,has_function_privilege('service_role','public.assign_site_editor_version()','EXECUTE') version")).rows[0];
+    assert.deepEqual(await privileges(), { changed: true, version: true });
+    await db.exec(migrationSql);
+    assert.deepEqual(await privileges(), { changed: false, version: false });
+    const after = await readiness(); assert.equal(after.ready, true); assert.ok(after.checks.every(item => item.ok));
+    await db.exec(migrationSql); assert.deepEqual(await readiness(), after, 'Permanent hardening must be idempotent');
+  } finally { globalThis.fetch = savedFetch; await db.close(); }
+});
 test('schema diagnostics expose only whitelisted filename/hash and SQLSTATE', async () => {
   const diagnostics = createDiagnostics(), error = Object.assign(Error('private SQL and actor payload'), { code: '42501', detail: 'private data', status: 403 });
   await assert.rejects(diagnostics.phase('schema-apply', async () => { throw error; }, { source: '20260917220000_service_evidence_recovery.sql', sha256: 'a'.repeat(64) }));
@@ -74,4 +106,26 @@ test('assertions never serialize strings or objects but retain explicit safe ser
   assert.equal(failures[0].actualScalar, undefined); assert.equal(failures[0].expectedScalar, undefined);
   assert.equal(failures[1].httpStatus, 403); assert.equal(failures[1].sqlState, '42501'); assert.equal(failures[1].expectedScalar, null);
   const report = safeReport(diagnostics.report()); assert.ok(!report.includes('private'));
+});
+const readinessManifest = () => ({ releaseVersion: '2026-09-17.6', checks: [...READINESS_LABELS] });
+test('readiness projection identifies exact failed flags without weakening assertions', () => {
+  const value = { ready: false, releaseVersion: '2026-09-17.6', checks: READINESS_LABELS.map(name => ({ name, ok: name !== 'function_security' })) };
+  const projection = readinessProjection(value, readinessManifest());
+  assert.equal(projection.ready, false); assert.equal(projection.exactCheckSet, true);
+  assert.deepEqual(projection.checks.filter(row => !row.ok), [{ name: 'function_security', ok: false }]);
+  assert.equal(projection.releaseVersion, '2026-09-17.6'); safeReport(projection);
+});
+test('readiness projection excludes private RPC fields and arbitrary version/check labels', () => {
+  const value = { ready: 'private', releaseVersion: '?token=private', privateData: 'never print', checks: [
+    { name: 'private_storage_buckets', ok: true, detail: 'never print' }, { name: 'private_storage_buckets', ok: true },
+    { name: 'private-actor-label', ok: true }, { name: 'function_security', ok: '?token=private' }
+  ] };
+  const projection = readinessProjection(value, readinessManifest());
+  assert.equal(projection.ready, null); assert.equal(projection.releaseVersion, 'unexpected'); assert.equal(projection.exactCheckSet, false);
+  assert.ok(projection.checks.every(row => row.ok === null)); assert.equal(projection.checks.length, 14);
+  const printed = safeReport(projection); assert.ok(!printed.includes('never print')); assert.ok(!printed.includes('private-actor-label'));
+});
+test('readiness projection rejects a manifest outside the fixed diagnostic vocabulary', () => {
+  assert.throws(() => readinessProjection({}, { releaseVersion: '2026-09-17.6', checks: ['private-label'] }));
+  assert.throws(() => readinessProjection({}, { ...readinessManifest(), releaseVersion: 'private-version' }));
 });

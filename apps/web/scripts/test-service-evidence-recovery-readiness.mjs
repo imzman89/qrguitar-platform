@@ -11,6 +11,7 @@ const source=path.resolve(arg('--recovery-sql',path.join(overlay,'supabase/migra
 const readinessPath=path.join(overlay,'supabase/migrations/20260917221000_release_readiness.sql'),manifestPath=path.join(overlay,'apps/web/scripts/release-readiness-manifest.json');
 const normalize=s=>s.replaceAll('\r\n','\n'),sha=s=>createHash('sha256').update(normalize(s)).digest('hex');
 const recovery=fs.readFileSync(source,'utf8'),readiness=fs.readFileSync(readinessPath,'utf8'),manifestText=fs.readFileSync(manifestPath,'utf8'),manifest=JSON.parse(manifestText);
+const helperPermissionsPath=path.join(overlay,'supabase/migrations/20260917220500_site_editor_helper_permissions.sql'),helperPermissions=fs.readFileSync(helperPermissionsPath,'utf8');
 assert.equal(manifest.releaseVersion,'2026-09-17.6');assert.equal(sha(recovery),manifest.serviceEvidenceRecoverySourceSha256);
 const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite');
 const {installRepositorySchema}=await import(pathToFileURL(path.join(repo,'apps/web/scripts/security/postgres-fixture.mjs')));
@@ -23,7 +24,7 @@ async function test(name,run){await db.exec('begin');try{await run();passed++;co
 const definition=async signature=>(await db.query('select pg_get_functiondef($1::regprocedure) value',[signature])).rows[0].value;
 const functions=manifest.serviceEvidenceFunctionSignatures,tables=manifest.serviceEvidenceTables;
 try{
-  await installRepositorySchema(db,repo,'20260917220000');await db.exec(recovery);await db.exec(readiness);
+  await installRepositorySchema(db,repo,'20260917220000');await db.exec(recovery);await db.exec(helperPermissions);await db.exec(readiness);
   await db.exec("insert into storage.buckets(id,name,public) values('instrument-media','instrument-media',false),('instrument-documents','instrument-documents',false) on conflict(id) do update set public=false");
   await test('all fourteen contracts pass read-only under service role',async()=>{await db.exec('set transaction read only;set local role service_role');await pristine();});
   for(const principal of ['anon','authenticated'])await test(principal+' cannot execute readiness',async()=>{await db.exec('savepoint denial;set local role '+principal);await assert.rejects(ready,e=>e.code==='42501');await db.exec('rollback to savepoint denial;reset role');});
@@ -79,5 +80,6 @@ try{
   const intakeTrigger=manifest.provenanceTriggers.find(([table])=>table==='account_deletion_request_receipts');
   await test('intake receipt fence still required',async()=>{await db.exec('alter table '+ident(intakeTrigger[0])+' disable trigger '+ident(intakeTrigger[1]));await fails('schema_columns');});
   assert.equal(sha(fs.readFileSync(source,'utf8')),sha(recovery));assert.equal(sha(fs.readFileSync(readinessPath,'utf8')),sha(readiness));assert.equal(sha(fs.readFileSync(manifestPath,'utf8')),sha(manifestText));
+  assert.equal(sha(fs.readFileSync(helperPermissionsPath,'utf8')),sha(helperPermissions));
   console.log(JSON.stringify({passed,failed:0,migrationSha256:sha(recovery),readinessSha256:sha(readiness),manifestSha256:sha(manifestText),runtime:'actual PGlite catalog mutations; rollback and all14 restored after each; no network'}));
 }finally{globalThis.fetch=savedFetch;await db.close();}

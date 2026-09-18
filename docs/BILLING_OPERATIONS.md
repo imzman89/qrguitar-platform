@@ -21,7 +21,8 @@ The billing migrations are `20260917190000_billing_credits.sql` and
 `20260917201000_release_readiness.sql`, followed by
 `20260917210000_service_evidence_uploads.sql` and
 `20260917211000_release_readiness.sql`. This application additionally requires
-`20260917220000_service_evidence_recovery.sql` and
+`20260917220000_service_evidence_recovery.sql`,
+`20260917220500_site_editor_helper_permissions.sql` and
 `20260917221000_release_readiness.sql`, in that order. Its required readiness
 version is **2026-09-17.6**; the historical `.3`, `.4`, and `.5` migrations are intermediate
 contracts. The active contract checks the private ledger, intake and evidence-upload schema,
