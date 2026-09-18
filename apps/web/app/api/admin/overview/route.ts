@@ -1,5 +1,6 @@
 import { requireAdmin, adminJson } from "../_utils";
 import type { ServerSupabaseClient } from "../../../../lib/admin-auth";
+import { resolveBuildIdentity } from "../../../../lib/build-identity.mjs";
 import { mergeRecordTrustSettings } from "../../../../lib/record-trust";
 
 export const dynamic = "force-dynamic";
@@ -78,12 +79,7 @@ export async function GET(request: Request) {
   const bucketNames = new Set((storageCheck.data || []).map((bucket) => bucket.name));
   const requiredBuckets = ["instrument-media", "instrument-documents", "service-evidence"];
   const missingBuckets = requiredBuckets.filter((bucket) => !bucketNames.has(bucket));
-  const gitCommitSha = process.env.QRGUITAR_GIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA || "unknown";
-  const deploymentIdentifier =
-    process.env.QRGUITAR_DEPLOYMENT_ID ||
-    process.env.VERCEL_DEPLOYMENT_ID ||
-    process.env.VERCEL_URL ||
-    "local-review";
+  const buildIdentity = resolveBuildIdentity(process.env, { deploymentIdentifier: "local-review" });
 
   return adminJson({
     ok: true,
@@ -112,13 +108,13 @@ export async function GET(request: Request) {
     },
     systemHealth: {
       build: {
-        gitCommitSha,
-        buildTimestamp: process.env.QRGUITAR_BUILD_TIMESTAMP || null,
-        dirtyWorkingTree: process.env.QRGUITAR_BUILD_DIRTY === "true"
+        gitCommitSha: buildIdentity.gitCommitSha,
+        buildTimestamp: buildIdentity.buildTimestamp,
+        dirtyWorkingTree: buildIdentity.dirtyWorkingTree
       },
       deployment: {
-        environment: process.env.QRGUITAR_BUILD_ENV || "local",
-        identifier: deploymentIdentifier
+        environment: buildIdentity.environment,
+        identifier: buildIdentity.deploymentIdentifier
       },
       supabase: {
         configured: Boolean(

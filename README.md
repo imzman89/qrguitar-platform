@@ -49,6 +49,8 @@ http://127.0.0.1:3003
 
 Read [the release runbook](docs/RELEASE_2026_09.md) before deploying. This release requires coordinated database migrations; a new application build by itself is insufficient.
 
+A source-only Netlify Free adapter is documented in [docs/NETLIFY_FREE_DEPLOYMENT.md](docs/NETLIFY_FREE_DEPLOYMENT.md). It adds no account, deploy, secret, domain, or DNS change and remains fail-closed until the 6 MB request and 60-second function compatibility checks pass.
+
 After management access is current, the release migrations are applied, and the reviewed changes are committed:
 
 ```bash

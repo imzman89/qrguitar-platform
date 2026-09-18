@@ -45,7 +45,7 @@
     "test:atomic-transfers": "node scripts/test-atomic-transfer-db.mjs && node scripts/test-atomic-transfer-api.mjs && node scripts/test-transfer-access-api.mjs",
     "test:auxiliary-security": "node scripts/security/auxiliary-routes.test.mjs && node scripts/security/auxiliary-transactions.test.mjs",
     "test:instrument-controls": "node scripts/test-instrument-controls-db.mjs && node scripts/test-instrument-controls-api.mjs",
-    "test:release-gate": "node --test scripts/test-release-gate.mjs scripts/test-health-route.mjs scripts/test-release-staging.mjs",
+    "test:release-gate": "node --test scripts/test-release-gate.mjs scripts/test-health-route.mjs scripts/test-release-staging.mjs scripts/test-build-identity.mjs scripts/test-netlify-release.mjs scripts/test-netlify-runtime-constraints.mjs",
     "test:beta-entitlements": "node scripts/security/beta-entitlement-behavior.test.mjs ../.. && node scripts/security/beta-entitlement-transaction.test.mjs ../..",
     "test:site-editor-transactions": "node scripts/security/site-editor-transaction.test.mjs && node scripts/security/site-editor-client.test.mjs && node --test scripts/test-site-composition.mjs",
     "test:release-readiness": "node scripts/test-release-readiness-db.mjs && node scripts/generate-service-evidence-readiness.mjs && node scripts/test-service-evidence-readiness.mjs && node scripts/generate-service-evidence-recovery-readiness.mjs && node scripts/test-service-evidence-recovery-readiness.mjs",

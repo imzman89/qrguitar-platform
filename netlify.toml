@@ -1,0 +1,8 @@
+# The repository root remains the build base so npm workspaces and packages/shared are available.
+[build]
+  command = "npm run build --workspace @qrguitar/web"
+  # Netlify's automatic OpenNext adapter owns the generated functions and edge output.
+  publish = "apps/web/.next"
+
+[build.environment]
+  NODE_VERSION = "24"

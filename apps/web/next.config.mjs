@@ -1,3 +1,5 @@
+import { resolveBuildIdentity } from "./lib/build-identity.mjs";
+
 /** @type {import('next').NextConfig} */
 const securityHeaders = [
   {
@@ -26,16 +28,21 @@ const securityHeaders = [
   }
 ];
 
+const buildIdentity = resolveBuildIdentity(process.env, {
+  environment: "local",
+  buildTimestamp: new Date().toISOString(),
+  deploymentIdentifier: ""
+});
+
 const nextConfig = {
   transpilePackages: ["@qrguitar/shared"],
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   env: {
-    QRGUITAR_BUILD_ENV: process.env.QRGUITAR_BUILD_ENV || (process.env.VERCEL ? "production" : "local"),
-    QRGUITAR_GIT_SHA: process.env.QRGUITAR_GIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA || "unknown",
-    QRGUITAR_BUILD_TIMESTAMP: process.env.QRGUITAR_BUILD_TIMESTAMP || new Date().toISOString(),
-    QRGUITAR_BUILD_DIRTY: process.env.QRGUITAR_BUILD_DIRTY || "false",
-    QRGUITAR_DEPLOYMENT_ID:
-      process.env.QRGUITAR_DEPLOYMENT_ID || process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_URL || ""
+    QRGUITAR_BUILD_ENV: buildIdentity.environment,
+    QRGUITAR_GIT_SHA: buildIdentity.gitCommitSha,
+    QRGUITAR_BUILD_TIMESTAMP: buildIdentity.buildTimestamp || "",
+    QRGUITAR_BUILD_DIRTY: String(buildIdentity.dirtyWorkingTree),
+    QRGUITAR_DEPLOYMENT_ID: buildIdentity.deploymentIdentifier || ""
   },
   images: {
     remotePatterns: [

@@ -45,21 +45,47 @@ export async function checkBackendReadiness({ url, serviceKey, fetchImpl = fetch
   return validateReadiness(value);
 }
 
-export async function verifyDeploymentIdentity({ sha, buildTimestamp, origin = "https://qrguitar.com", staged = false, fetchImpl = fetch }) {
+export async function verifyDeploymentIdentity({
+  sha,
+  buildTimestamp,
+  deploymentIdentifier,
+  origin = "https://qrguitar.com",
+  staged = false,
+  productionOrigins = ["https://qrguitar.com", "https://www.qrguitar.com"],
+  fetchImpl = fetch
+}) {
   const response = await fetchImpl(new URL("/api/build-info?release=" + encodeURIComponent(sha), origin), {
     cache: "no-store", signal: AbortSignal.timeout(20000)
   });
   if (!response.ok) throw new Error("Production identity endpoint returned HTTP " + response.status + ".");
   const identity = await response.json();
-  if (identity.gitCommitSha !== sha || (buildTimestamp !== undefined && identity.buildTimestamp !== buildTimestamp) || identity.environment !== "production" || identity.dirtyWorkingTree === true ||
-      !(staged ? [new URL(origin).origin] : ["https://qrguitar.com", "https://www.qrguitar.com"]).includes(identity.origin)) {
-    throw new Error("Production has not confirmed the expected committed release. Inspect the Vercel deployment before announcing completion.");
+  if (identity.gitCommitSha !== sha || (buildTimestamp !== undefined && identity.buildTimestamp !== buildTimestamp) ||
+      (deploymentIdentifier !== undefined && identity.deploymentIdentifier !== deploymentIdentifier) ||
+      identity.environment !== "production" || identity.dirtyWorkingTree === true ||
+      !(staged ? [new URL(origin).origin] : productionOrigins).includes(identity.origin)) {
+    throw new Error("Production has not confirmed the expected committed release. Inspect the deployment before announcing completion.");
   }
   return identity;
 }
 
-export async function verifyProduction({ sha, buildTimestamp, origin = "https://qrguitar.com", staged = false, fetchImpl = fetch }) {
-  const identity = await verifyDeploymentIdentity({ sha, buildTimestamp, origin, staged, fetchImpl });
+export async function verifyProduction({
+  sha,
+  buildTimestamp,
+  deploymentIdentifier,
+  origin = "https://qrguitar.com",
+  staged = false,
+  productionOrigins,
+  fetchImpl = fetch
+}) {
+  const identity = await verifyDeploymentIdentity({
+    sha,
+    buildTimestamp,
+    deploymentIdentifier,
+    origin,
+    staged,
+    productionOrigins,
+    fetchImpl
+  });
   const health = await fetchImpl(new URL("/api/health", identity.origin), { cache: "no-store", signal: AbortSignal.timeout(15000) });
   const healthState = health.ok ? await health.json() : null;
   if (healthState?.status !== "ready" || healthState?.releaseVersion !== RELEASE_VERSION) throw new Error("Production database readiness failed. Inspect the deployed environment and migrations.");

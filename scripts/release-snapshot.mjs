@@ -11,8 +11,10 @@ export function createReleaseSnapshot(repo, sha, projectLink) {
     execFileSync("git", ["archive", "--format=tar", "--output=" + archive, sha], { cwd: repo, stdio: "pipe" });
     execFileSync("tar", ["-xf", archive, "-C", directory], { stdio: "pipe" });
     fs.unlinkSync(archive);
-    fs.mkdirSync(path.join(directory, ".vercel"), {recursive:true});
-    fs.writeFileSync(path.join(directory, ".vercel/project.json"), projectLink);
+    if (projectLink !== undefined) {
+      fs.mkdirSync(path.join(directory, ".vercel"), {recursive:true});
+      fs.writeFileSync(path.join(directory, ".vercel/project.json"), projectLink);
+    }
     return directory;
   } catch (error) { cleanupReleaseSnapshot(directory); throw error; }
 }

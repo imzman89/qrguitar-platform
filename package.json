@@ -4,12 +4,14 @@
   "version": "0.1.0",
   "description": "QRguitar instrument Profiles, ownership history, QR tools, and installable web app.",
   "scripts": {
+    "check:netlify": "node scripts/check-netlify-runtime-constraints.mjs",
     "dev:web": "npm --workspace apps/web run dev",
     "dev:mobile": "npm --workspace apps/mobile run start",
     "lint": "npm --workspaces run lint",
     "typecheck": "npm --workspaces run typecheck",
     "deploy:web": "npm run push:live",
     "push:live": "node scripts/push-live.mjs",
+    "release:netlify": "node scripts/netlify-release.mjs",
     "release:database": "node scripts/check-release-readiness.mjs"
   },
   "workspaces": [
