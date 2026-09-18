@@ -66,8 +66,8 @@
 .memberSummary span { color: var(--gold-2); font-size: 11px; font-weight: 800; }
 .memberPanel > p { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .memberLinks, .threadControls { display: grid; gap: 5px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
-.memberLinks a, .threadControls button { min-height: 40px; display: flex; align-items: center; gap: 8px; border: 0; border-radius: 4px; padding: 8px; color: var(--muted-strong); background: transparent; font: inherit; font-size: 12px; text-align: left; text-decoration: none; cursor: pointer; }
-.memberLinks a:hover, .threadControls button:hover { color: var(--text); background: rgba(255,255,255,.04); }
+.memberLinks a, .threadControls button, .threadControls a { min-height: 40px; display: flex; align-items: center; gap: 8px; border: 0; border-radius: 4px; padding: 8px; color: var(--muted-strong); background: transparent; font: inherit; font-size: 12px; text-align: left; text-decoration: none; cursor: pointer; }
+.memberLinks a:hover, .threadControls button:hover, .threadControls a:hover { color: var(--text); background: rgba(255,255,255,.04); }
 .threadControls button.danger { color: #f0aaa0; }
 .notice, .error { margin: 0; padding: 10px 16px; border-top: 1px solid var(--line); font-size: 12px; }
 .notice { color: #91d5a6; }

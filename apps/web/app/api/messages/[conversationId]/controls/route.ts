@@ -20,21 +20,7 @@ export async function POST(request: Request, context: { params: Promise<{ conver
   if (action === "read") result = await access.supabase.rpc("mark_member_conversation_read", { p_conversation_id: conversationId, p_actor_id: access.user.id });
   else if (action === "archive" || action === "unarchive") result = await access.supabase.rpc("set_member_conversation_archived", { p_conversation_id: conversationId, p_actor_id: access.user.id, p_archived: action === "archive" });
   else if (action === "block" || action === "unblock") result = await access.supabase.rpc("set_member_message_block", { p_actor_id: access.user.id, p_target_id: targetId, p_blocked: action === "block" });
-  else if (action === "report") {
-    const messageId = body?.messageId;
-    const reason = String(body?.reason || "");
-    const details = String(body?.details || "").trim().slice(0, 1000);
-    if (!isMessagingUuid(messageId) || !["spam", "harassment", "fraud", "unsafe_content", "other"].includes(reason)) {
-      return memberMessageJson({ ok: false, message: "Choose a message and report reason." }, 400);
-    }
-    result = await access.supabase.rpc("report_member_message", {
-      p_conversation_id: conversationId,
-      p_actor_id: access.user.id,
-      p_message_id: messageId,
-      p_reason: reason,
-      p_details: details
-    });
-  } else return memberMessageJson({ ok: false, message: "Unsupported conversation action." }, 400);
+  else return memberMessageJson({ ok: false, message: "Unsupported conversation action." }, 400);
   if (result.error) {
     const failure = messagingDatabaseError(result.error);
     return memberMessageJson({ ok: false, message: failure.message }, failure.status);

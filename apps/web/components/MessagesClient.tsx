@@ -26,8 +26,7 @@ import {
   MEMBER_MEDIA_LIMIT,
   MEMBER_MEDIA_TYPES,
   type MemberConversationSummary,
-  type MemberConversationThread,
-  type MemberMessage
+  type MemberConversationThread
 } from "../lib/member-messaging";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../lib/supabase-browser";
 import styles from "./MessagesClient.module.css";
@@ -107,10 +106,7 @@ export function MessagesClient({ conversationId = "", initialArchived = false }:
   const [sending, setSending] = useState(false);
   const [uncertainSend, setUncertainSend] = useState(false);
   const [connection, setConnection] = useState("Connecting");
-  const [reportMessage, setReportMessage] = useState<MemberMessage | null>(null);
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
-  const [reportReason, setReportReason] = useState("spam");
-  const [reportDetails, setReportDetails] = useState("");
   const pendingSend = useRef<PendingSend | null>(null);
   const messageEnd = useRef<HTMLDivElement | null>(null);
   const firstThreadLoad = useRef(true);
@@ -257,20 +253,6 @@ export function MessagesClient({ conversationId = "", initialArchived = false }:
     } catch (reason) { handleRequestError(reason); }
   }
 
-  async function submitReport() {
-    if (!conversationId || !reportMessage) return;
-    setError("");
-    try {
-      await messageFetch(`/api/messages/${conversationId}/controls`, {
-        method: "POST",
-        body: JSON.stringify({ action: "report", messageId: reportMessage.id, reason: reportReason, details: reportDetails })
-      });
-      setReportMessage(null);
-      setReportDetails("");
-      setNotice("Report sent to QRguitar for review.");
-    } catch (reason) { handleRequestError(reason); }
-  }
-
   const signinHref = `/login?next=${encodeURIComponent(conversationId ? `/messages/${conversationId}` : "/messages")}`;
   if (phase === "loading") return <MessageState icon={<LoaderCircle className={styles.spin} />} title="Opening Messages" copy="Loading your private conversations." />;
   if (phase === "signed-out") return <MessageState icon={<MessageCircle />} title="Sign in to Messages" copy="Private conversations are available to signed-in QRguitar members." action={<Link className="button" href={signinHref}>Sign in</Link>} />;
@@ -328,7 +310,7 @@ export function MessagesClient({ conversationId = "", initialArchived = false }:
                 ) : (
                   <video controls preload="metadata" key={attachment.id}><source src={attachment.signedUrl} type={attachment.mimeType} />Your browser cannot play this video.</video>
                 ))}</div> : null}
-                <footer><time dateTime={message.createdAt}>{formatTime(message.createdAt)}</time>{!message.sentByMe ? <button type="button" title="Report this message" onClick={() => setReportMessage(message)}><Flag size={12} /> Report</button> : null}</footer>
+                <footer><time dateTime={message.createdAt}>{formatTime(message.createdAt)}</time></footer>
               </article>
             ))}
             <div ref={messageEnd} />
@@ -359,6 +341,7 @@ export function MessagesClient({ conversationId = "", initialArchived = false }:
           <div className={styles.threadControls}>
             <button type="button" onClick={() => void runControl(thread.archived ? "unarchive" : "archive")}><Archive size={15} /> {thread.archived ? "Restore conversation" : "Archive conversation"}</button>
             <button type="button" className={styles.danger} onClick={() => thread.blockedByMe ? void runControl("unblock") : setBlockConfirmOpen(true)}><Ban size={15} /> {thread.blockedByMe ? "Unblock member" : "Block member"}</button>
+            <a href={`mailto:support@qrguitar.com?subject=${encodeURIComponent("QRguitar message safety concern")}&body=${encodeURIComponent(`Conversation ID: ${conversationId}\n\nPlease describe the message, concern, and approximate time. Do not include passwords, payment-card numbers, or unrelated personal documents.`)}`}><Flag size={15} /> Report a safety concern</a>
           </div>
         </aside>
       </div>
@@ -367,15 +350,6 @@ export function MessagesClient({ conversationId = "", initialArchived = false }:
           <header><div><span className="eyebrow">Conversation control</span><h2 id="block-member-title">Block {thread.member.publicName}?</h2></div><button type="button" title="Close block confirmation" onClick={() => setBlockConfirmOpen(false)}><X /></button></header>
           <p>Neither member will be able to send messages in this conversation until you unblock them. You can reverse this at any time.</p>
           <footer><button className="button secondary" type="button" onClick={() => setBlockConfirmOpen(false)}>Cancel</button><button className="button" type="button" onClick={() => { setBlockConfirmOpen(false); void runControl("block"); }}><Ban size={15} /> Block member</button></footer>
-        </section>
-      </div> : null}
-      {reportMessage ? <div className={styles.modalBackdrop} onMouseDown={(event) => { if (event.target === event.currentTarget) setReportMessage(null); }}>
-        <section className={styles.reportDialog} role="dialog" aria-modal="true" aria-labelledby="report-message-title">
-          <header><div><span className="eyebrow">Safety control</span><h2 id="report-message-title">Report message</h2></div><button type="button" title="Close report" onClick={() => setReportMessage(null)}><X /></button></header>
-          <p>QRguitar will review this message and the conversation context. The other member is not notified that you filed a report.</p>
-          <label><span>Reason</span><select value={reportReason} onChange={(event) => setReportReason(event.target.value)}><option value="spam">Spam</option><option value="harassment">Harassment</option><option value="fraud">Fraud or scam</option><option value="unsafe_content">Unsafe content</option><option value="other">Other</option></select></label>
-          <label><span>Details (optional)</span><textarea rows={4} maxLength={1000} value={reportDetails} onChange={(event) => setReportDetails(event.target.value)} /></label>
-          <footer><button className="button secondary" type="button" onClick={() => setReportMessage(null)}>Cancel</button><button className="button" type="button" onClick={() => void submitReport()}><Flag size={15} /> Send report</button></footer>
         </section>
       </div> : null}
     </section>

@@ -29,7 +29,9 @@ assert.match(messages, /window\.addEventListener\("online"/);
 assert.match(messages, /MEMBER_MEDIA_COUNT_LIMIT/);
 assert.match(messages, /uncertainSend/);
 assert.match(messages, /"archive" \| "unarchive" \| "block" \| "unblock"/);
-assert.match(messages, /submitReport/);
+assert.doesNotMatch(messages, /submitReport|Report sent to QRguitar for review/);
+assert.match(messages, /mailto:support@qrguitar\.com/);
+assert.match(messages, /Report a safety concern/);
 assert.match(messages, /blockConfirmOpen/);
 assert.doesNotMatch(messages, /window\.confirm/);
 
