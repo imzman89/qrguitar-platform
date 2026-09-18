@@ -46,7 +46,8 @@ test("shop link exposes destination and opens safely without promising checkout"
   assert.match(html, /Visit shop website/);
   assert.match(html, /shop.example/);
   assert.match(html, /opens in a new tab/);
-  assert.match(html, /rel="noopener noreferrer"/);
+  const rel = html.match(/\srel="([^"]+)"/)?.[1].split(/\s+/) || [];
+  for (const token of ["ugc", "nofollow", "noopener", "noreferrer"]) assert.ok(rel.includes(token), `missing rel=${token}`);
   assert.doesNotMatch(html, /Buy now|Checkout/);
 });
 test("every supported workspace offers valid local daily actions", () => {
