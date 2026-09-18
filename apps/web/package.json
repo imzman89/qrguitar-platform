@@ -75,7 +75,8 @@
     "test:admin-account-deletion": "node scripts/test-admin-account-deletion.mjs",
     "test:account-deletion-intake": "node scripts/account-deletion/test-account-deletion-intake.mjs && node scripts/account-deletion/test-intake-http.mjs && node scripts/account-deletion/test-deletion-intake-client.mjs && node scripts/account-deletion/test-admin-intake.mjs && node --test scripts/test-intake-postgres-config.mjs && node scripts/generate-intake-readiness.mjs && node scripts/account-deletion/test-intake-readiness.mjs",
     "test:account-deletion-fulfillment": "node scripts/account-deletion/test-account-deletion-fulfillment.mjs && node scripts/account-deletion/test-fulfillment-http.mjs && node scripts/generate-account-deletion-fulfillment-readiness.mjs",
-    "test:native-associations": "node --test scripts/test-native-association.mjs scripts/test-native-association-routes.mjs"
+    "test:native-associations": "node --test scripts/test-native-association.mjs scripts/test-native-association-routes.mjs",
+    "test:member-messaging": "node scripts/test-member-messaging-db.mjs"
   },
   "dependencies": {
     "@qrguitar/shared": "*",
