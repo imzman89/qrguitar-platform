@@ -31,6 +31,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.uiautomator.By;
+import androidx.test.uiautomator.Direction;
 import androidx.test.uiautomator.UiDevice;
 import androidx.test.uiautomator.UiObject2;
 import androidx.test.uiautomator.Until;
@@ -147,7 +148,8 @@ public final class InstalledAcceptanceTest {
     requireLabel("Explore");
     requireLabel("Scan");
     requireLabel("My instruments");
-    requireLabel("Retry Catalog");
+    requireLabelAfterScrolling("Network is disabled in this offline acceptance build.");
+    requireLabelAfterScrolling("Retry Catalog");
     clickLabel("My instruments");
     requireLabel("Your instruments, together");
     clickLabel("Sign in or create an account");
@@ -178,8 +180,7 @@ public final class InstalledAcceptanceTest {
       requireSystemPicker();
       waitFor("request Activity created", () -> trace.createdCount() == 1, PICKER_TIMEOUT);
       assertEquals("pending", store.read(id).get("status"));
-      assertTrue(device.pressBack());
-      requireCancelled(id);
+      cancelSystemPicker(id);
       assertEquals("Other request must remain untouched", "pending", store.read(sentinel).get("status"));
       assertFalse("Same cancelled identity must not launch again", store.prepare(id, 2, 16 * 1024 * 1024));
       assertEquals("cancelled", store.read(id).get("status"));
@@ -203,8 +204,7 @@ public final class InstalledAcceptanceTest {
       assertTrue("Recreation must save the original Activity state", trace.savedCount() >= 1);
       requireSystemPicker();
       assertEquals("pending", store.read(id).get("status"));
-      assertTrue(device.pressBack());
-      requireCancelled(id);
+      cancelSystemPicker(id);
       waitFor("restored request Activity finished", () -> trace.destroyedCount() == 2, PICKER_TIMEOUT);
       assertEquals("Recreation must not create a third caller", 2, trace.createdCount());
       assertFalse(store.prepare(id, 2, 16 * 1024 * 1024));
@@ -215,8 +215,7 @@ public final class InstalledAcceptanceTest {
     String next = prepare();
     launchSelection(next);
     requireSystemPicker();
-    assertTrue(device.pressBack());
-    requireCancelled(next);
+    cancelSystemPicker(next);
   }
 
   @Test(timeout = 120_000) public void realSystemPickerSelectionPersistsGrantAndAcknowledgesExactReceipt() throws Exception {
@@ -498,18 +497,47 @@ public final class InstalledAcceptanceTest {
     Log.i(TAG, "cancelled " + id);
   }
 
+  private void cancelSystemPicker(String id) {
+    // UiDevice's synchronous boolean does not identify whether this exact
+    // request retired. The durable request state and restored app window are
+    // the authoritative cancellation proof; both still fail if Back did not work.
+    boolean observedWindowTransition = device.pressBack();
+    requireCancelled(id);
+    assertTrue("App did not return after cancelling the OS picker",
+        device.wait(Until.hasObject(By.pkg(APP).depth(0)), PICKER_TIMEOUT));
+    Log.i(TAG, "picker Back dispatched; UiDevice observed transition=" + observedWindowTransition);
+  }
+
+  private UiObject2 findLabel(String label) {
+    UiObject2 value = device.findObject(By.text(label).pkg(APP));
+    if (value == null) value = device.findObject(By.desc(label).pkg(APP));
+    if (value == null && (label.equals("Explore") || label.equals("Scan") || label.equals("My instruments"))) {
+      value = device.findObject(By.descContains(label).pkg(APP));
+    }
+    return value;
+  }
+
   private UiObject2 requireLabel(String label) {
     AtomicReference<UiObject2> found = new AtomicReference<>();
     waitFor("UI label: " + label, () -> {
-      UiObject2 value = device.findObject(By.text(label).pkg(APP));
-      if (value == null) value = device.findObject(By.desc(label).pkg(APP));
-      if (value == null && (label.equals("Explore") || label.equals("Scan") || label.equals("My instruments"))) {
-        value = device.findObject(By.descContains(label).pkg(APP));
-      }
+      UiObject2 value = findLabel(label);
       found.set(value);
       return value != null;
     }, UI_TIMEOUT);
     return found.get();
+  }
+
+  private UiObject2 requireLabelAfterScrolling(String label) {
+    long deadline = SystemClock.elapsedRealtime() + UI_TIMEOUT;
+    do {
+      UiObject2 found = findLabel(label);
+      if (found != null) return found;
+      UiObject2 scrollable = device.findObject(By.scrollable(true).pkg(APP));
+      if (scrollable != null) scrollable.scroll(Direction.DOWN, 0.75f);
+      SystemClock.sleep(250);
+    } while (SystemClock.elapsedRealtime() < deadline);
+    fail("Timed out after scrolling: UI label: " + label);
+    return null;
   }
 
   private void clickLabel(String label) { requireLabel(label).click(); }

@@ -77,7 +77,7 @@ function fixture(options={}){
  const cache=new Map();
  function load(file){
   if(cache.has(file))return cache.get(file);let source=fs.readFileSync(path.join(base,file),'utf8');
-  if(file==='App.tsx')source+='\nexport {Login,Create,Profile,Photo,useResource,OwnedRecords,Library,openWeb};';
+  if(file==='App.tsx')source+='\nexport {Browse,Login,Create,Profile,Photo,useResource,OwnedRecords,Library,openWeb};';
   const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.React,esModuleInterop:true}}).outputText;
   const module={exports:{}};cache.set(file,module.exports);
   const scopedRequire=id=>{if(mocks[id])return mocks[id];const key=id.split('/').at(-1);if(mocks[key])return mocks[key];if(id.startsWith('.')){const candidate=path.posix.normalize(path.posix.join(path.posix.dirname(file),id));return load(fs.existsSync(path.join(base,candidate+'.tsx'))?candidate+'.tsx':candidate+'.ts');}return require(id);};
@@ -102,6 +102,14 @@ function fixture(options={}){
   createProps:{actorId:'owner-111111111111',displayName:'Owner',onCreated:code=>calls.profiles.push(code),leaveGuardRef:{current:null}}};
 }
 test('renderer uses precisely the mobile React runtime',()=>{assert.equal(React.version,'19.2.3');assert.equal(Renderer.version,React.version);});
+
+test('Browse exposes a failed catalog load and retry recovers to an empty catalog',async()=>{
+ let attempts=0;
+ const f=fixture({api:{listPublic:async()=>{attempts++;if(attempts===1)throw Error('Network is disabled in this offline acceptance build.');return [];}}});
+ const view=await render(f.App.Browse,{onOpen(){},onScan(){},onCreate(){}});
+ assert.equal(attempts,1);assert.match(notices(view),/Network is disabled in this offline acceptance build\./);assert.ok(action(view,'Retry Catalog'));
+ await invoke(action(view,'Retry Catalog').props.onPress);assert.equal(attempts,2);assert.equal(action(view,'Retry Catalog'),undefined);assert.match(text(view),/The Catalog is quiet for now/);
+});
 
 const librarySnapshot=(id='owner-111111111111')=>({status:'signed-in',session:{user:{id,email:id+'@example.invalid'},access_token:'PRIVATE_ACCESS',refresh_token:'PRIVATE_REFRESH'},revision:1,message:''});
 const libraryProps=snapshot=>({snapshot,onSignIn(){},onCreate(){},onOpen(){},onSignOut(){}});
