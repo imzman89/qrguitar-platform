@@ -25,7 +25,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
-import { defaultSiteSettings, mergeSiteSettings, normalizeBrandLogoKey, type EditableSiteSettings } from "../../lib/site-settings";
+import { defaultSiteSettings, isSafeBrandLogoUrl, mergeSiteSettings, normalizeBrandLogoKey, type EditableSiteSettings } from "../../lib/site-settings";
 import { createBrowserSupabaseClient } from "../../lib/supabase-browser";
 import { ACCOUNT_DELETION_UNAVAILABLE } from "../../lib/admin-account-deletion-status";
 import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "../../lib/optional-tracking-consent";
@@ -162,6 +162,7 @@ type RecordsPayload = {
 };
 
 type AdminSession = { actorId: string; token: string };
+type AdminAccessState = "checking" | "authorized" | "unauthorized" | "unavailable";
 
 async function readAdminSession(): Promise<AdminSession> {
   const { data } = await createBrowserSupabaseClient().auth.getSession();
@@ -400,7 +401,8 @@ export default function AdminPage() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState("");
   const [loading, setLoading] = useState(true);
-  const [adminAuthorized, setAdminAuthorized] = useState(false);
+  const [adminAccessState, setAdminAccessState] = useState<AdminAccessState>("checking");
+  const [adminDataReady, setAdminDataReady] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAdminAction | null>(null);
   const [siteSettings, setSiteSettings] = useState<EditableSiteSettings>(defaultSiteSettings);
   const logoEditor = useRef<ReturnType<typeof createEditorMutationController> | null>(null);
@@ -419,7 +421,8 @@ export default function AdminPage() {
   const adminActorRef = useRef("");
   const adminLoadRevision = useRef(0);
   const adminMutationRef = useRef("");
-  const overlayKind = pendingAction ? "modal" : selectedUser || selectedRecord ? "entity" : navOpen ? "navigation" : "";
+  const adminAuthorized = adminAccessState === "authorized";
+  const overlayKind = adminAuthorized ? (pendingAction ? "modal" : selectedUser || selectedRecord ? "entity" : navOpen ? "navigation" : "") : "";
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -534,7 +537,8 @@ export default function AdminPage() {
       if (requestRevision !== adminLoadRevision.current) return;
       if (!session.token || !session.actorId) {
         adminActorRef.current = "";
-        setAdminAuthorized(false);
+        setAdminAccessState("unauthorized");
+        setAdminDataReady(false);
         setOverview(null);
         setUsers([]);
         setRecordsPayload(null);
@@ -544,6 +548,7 @@ export default function AdminPage() {
         setSelectedUser(null);
         setSelectedRecord(null);
         setPendingAction(null);
+        setNavOpen(false);
         setMessage("Sign in with an authorized admin account.");
         return;
       }
@@ -580,7 +585,8 @@ export default function AdminPage() {
 
       const nextUsers = Array.isArray(usersJson.users) ? usersJson.users as AdminUser[] : [];
       const nextRecords = Array.isArray(recordsJson.records) ? recordsJson.records as AdminRecord[] : [];
-      const coreReady = overviewResponse.ok && overviewJson.ok === true
+      const overviewAuthorized = overviewResponse.ok && overviewJson.ok === true;
+      const coreReady = overviewAuthorized
         && usersResponse.ok && usersJson.ok === true
         && recordsResponse.ok && recordsJson.ok === true
         && auditResponse.ok && auditJson.ok === true;
@@ -593,14 +599,32 @@ export default function AdminPage() {
       setAuditEvents(Array.isArray(auditJson.auditEvents) ? auditJson.auditEvents : []);
       setOwnershipClaims(claimsResponse.ok && Array.isArray(claimsJson.claims) ? claimsJson.claims : []);
       setClaimsError(nextClaimsError);
-      setAdminAuthorized(coreReady);
+      setAdminAccessState(overviewAuthorized
+        ? "authorized"
+        : overviewResponse.status === 401 || overviewResponse.status === 403
+          ? "unauthorized"
+          : "unavailable");
+      setAdminDataReady(coreReady);
+      if (!overviewAuthorized) {
+        setNavOpen(false);
+        setSelectedUser(null);
+        setSelectedRecord(null);
+        setPendingAction(null);
+      }
       setSelectedUser((current) => current ? nextUsers.find((user) => user.id === current.id) || null : null);
       setSelectedRecord((current) => current ? nextRecords.find((record) => record.id === current.id) || null : null);
       const responseMessage = overviewJson.message || usersJson.message || recordsJson.message || auditJson.message || nextClaimsError
-        || overviewJson.migrationNotice || usersJson.migrationNotice || "";
+        || overviewJson.migrationNotice || usersJson.migrationNotice
+        || (!coreReady ? "Admin data could not be loaded completely. Retry before using admin controls." : "");
       setMessage(responseMessage || options.successMessage || "");
     } catch (error) {
       if (requestRevision === adminLoadRevision.current) {
+        setAdminAccessState("unavailable");
+        setAdminDataReady(false);
+        setNavOpen(false);
+        setSelectedUser(null);
+        setSelectedRecord(null);
+        setPendingAction(null);
         setMessage(error instanceof Error ? `Could not refresh admin data: ${error.message}` : "Could not refresh admin data. Check your connection and try again.");
       }
     } finally {
@@ -650,7 +674,8 @@ export default function AdminPage() {
       if (nextActorId === adminActorRef.current) return;
       adminActorRef.current = nextActorId;
       adminLoadRevision.current += 1;
-      setAdminAuthorized(false);
+      setAdminAccessState(nextActorId ? "checking" : "unauthorized");
+      setAdminDataReady(false);
       setOverview(null);
       setUsers([]);
       setRecordsPayload(null);
@@ -660,6 +685,7 @@ export default function AdminPage() {
       setSelectedUser(null);
       setSelectedRecord(null);
       setPendingAction(null);
+      setNavOpen(false);
       setBusy("");
       adminMutationRef.current = "";
       setSiteSettings(defaultSiteSettings);
@@ -702,8 +728,12 @@ export default function AdminPage() {
   function saveCurrentBrandLogo() {
     const key = normalizeBrandLogoKey(brandLogoBrand);
     const url = brandLogoUrl.trim();
-    if (!key || !/^(https?:\/\/|\/)/i.test(url)) {
-      setMessage("Enter a brand name and a valid logo URL.");
+    if (!key) {
+      setMessage("Enter a valid brand name.");
+      return;
+    }
+    if (!isSafeBrandLogoUrl(url)) {
+      setMessage("Use an HTTPS URL or a site-relative path beginning with one slash.");
       return;
     }
 
@@ -747,6 +777,7 @@ export default function AdminPage() {
       return;
     }
 
+    setMessage("");
     setPendingAction({
       kind: "user",
       user,
@@ -764,12 +795,13 @@ export default function AdminPage() {
   async function updateUser(user: AdminUser, action: string, extra: Record<string, unknown> = {}, reason = "") {
     if (action === "delete_empty_user") {
       setMessage(ACCOUNT_DELETION_UNAVAILABLE);
-      return;
+      return false;
     }
     const busyKey = `${action}:${user.id}`;
-    if (adminMutationRef.current) return;
+    if (adminMutationRef.current) return false;
     adminMutationRef.current = busyKey;
     const expectedActorId = adminActorRef.current;
+    setMessage("");
     setBusy(busyKey);
     try {
       const session = await readAdminSession();
@@ -784,16 +816,18 @@ export default function AdminPage() {
         body: JSON.stringify({ action, reason, ...extra })
       });
       const payload = await response.json().catch(() => ({}));
-      if (adminActorRef.current !== session.actorId) return;
+      if (adminActorRef.current !== session.actorId) return false;
       const confirmed = response.ok && payload.ok === true;
       const resultMessage = payload.message || (confirmed ? "Admin action saved." : "Admin action failed. The server response did not confirm a saved change.");
       if (!confirmed) {
         setMessage(resultMessage);
-        return;
+        return false;
       }
       await loadAdmin({ successMessage: resultMessage });
+      return true;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The admin action could not be completed. Try again.");
+      return false;
     } finally {
       if (adminMutationRef.current === busyKey) adminMutationRef.current = "";
       setBusy((current) => current === busyKey ? "" : current);
@@ -806,6 +840,7 @@ export default function AdminPage() {
       return;
     }
 
+    setMessage("");
     setPendingAction({
       kind: "record",
       record,
@@ -827,9 +862,10 @@ export default function AdminPage() {
 
   async function updateRecord(record: AdminRecord, action: string, extra: Record<string, unknown> = {}, reason = "") {
     const busyKey = `${action}:${record.id}`;
-    if (adminMutationRef.current) return;
+    if (adminMutationRef.current) return false;
     adminMutationRef.current = busyKey;
     const expectedActorId = adminActorRef.current;
+    setMessage("");
     setBusy(busyKey);
     try {
       const session = await readAdminSession();
@@ -844,16 +880,18 @@ export default function AdminPage() {
         body: JSON.stringify({ action, reason, ...extra })
       });
       const payload = await response.json().catch(() => ({}));
-      if (adminActorRef.current !== session.actorId) return;
+      if (adminActorRef.current !== session.actorId) return false;
       const confirmed = response.ok && payload.ok === true;
       const resultMessage = payload.message || (confirmed ? "Profile action saved." : "Profile action failed. The server response did not confirm a saved change.");
       if (!confirmed) {
         setMessage(resultMessage);
-        return;
+        return false;
       }
       await loadAdmin({ successMessage: resultMessage });
+      return true;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The Profile action could not be completed. Try again.");
+      return false;
     } finally {
       if (adminMutationRef.current === busyKey) adminMutationRef.current = "";
       setBusy((current) => current === busyKey ? "" : current);
@@ -861,6 +899,7 @@ export default function AdminPage() {
   }
 
   function beginTransferAction(transfer: AdminTransfer, action: "cancel") {
+    setMessage("");
     setPendingAction({
       kind: "transfer",
       transfer,
@@ -873,9 +912,10 @@ export default function AdminPage() {
 
   async function updateTransfer(transfer: AdminTransfer, action: "cancel", reason = "") {
     const busyKey = `${action}:${transfer.id}`;
-    if (adminMutationRef.current) return;
+    if (adminMutationRef.current) return false;
     adminMutationRef.current = busyKey;
     const expectedActorId = adminActorRef.current;
+    setMessage("");
     setBusy(busyKey);
     try {
       const session = await readAdminSession();
@@ -890,16 +930,18 @@ export default function AdminPage() {
         body: JSON.stringify({ id: transfer.id, action, reason })
       });
       const payload = await response.json().catch(() => ({}));
-      if (adminActorRef.current !== session.actorId) return;
+      if (adminActorRef.current !== session.actorId) return false;
       const confirmed = response.ok && payload.ok === true;
       const resultMessage = payload.message || (confirmed ? "Transfer action saved." : "Transfer action failed. The server response did not confirm a saved change.");
       if (!confirmed) {
         setMessage(resultMessage);
-        return;
+        return false;
       }
       await loadAdmin({ successMessage: resultMessage });
+      return true;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The transfer action could not be completed. Try again.");
+      return false;
     } finally {
       if (adminMutationRef.current === busyKey) adminMutationRef.current = "";
       setBusy((current) => current === busyKey ? "" : current);
@@ -913,6 +955,7 @@ export default function AdminPage() {
       request_information: "Request additional evidence",
       expire: "Expire ownership claim"
     } as const;
+    setMessage("");
     setPendingAction({
       kind: "claim",
       claim,
@@ -929,9 +972,10 @@ export default function AdminPage() {
     reason: string
   ) {
     const busyKey = `${action}:${claim.id}`;
-    if (adminMutationRef.current) return;
+    if (adminMutationRef.current) return false;
     adminMutationRef.current = busyKey;
     const expectedActorId = adminActorRef.current;
+    setMessage("");
     setBusy(busyKey);
     try {
       const session = await readAdminSession();
@@ -943,7 +987,7 @@ export default function AdminPage() {
         body: JSON.stringify({ id: claim.id, action, note: reason })
       });
       const payload = await response.json().catch(() => ({})) as { ok?: boolean; message?: string };
-      if (adminActorRef.current !== session.actorId) return;
+      if (adminActorRef.current !== session.actorId) return false;
       const resultMessage = payload.message || (response.ok ? "Ownership request updated." : "Ownership request update failed.");
       if (response.ok && payload.ok === true && action === "approve") {
         void dispatchOptionalTrackingProductEvent({
@@ -953,11 +997,13 @@ export default function AdminPage() {
       }
       if (!response.ok || payload.ok !== true) {
         setMessage(resultMessage);
-        return;
+        return false;
       }
       await loadAdmin({ successMessage: resultMessage });
+      return true;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The ownership request could not be updated. Try again.");
+      return false;
     } finally {
       if (adminMutationRef.current === busyKey) adminMutationRef.current = "";
       setBusy((current) => current === busyKey ? "" : current);
@@ -985,15 +1031,16 @@ export default function AdminPage() {
       return;
     }
 
+    let confirmed = false;
     if (pendingAction.kind === "user") {
-      await updateUser(
+      confirmed = await updateUser(
         pendingAction.user,
         pendingAction.action,
         pendingAction.includeNote ? { ...pendingAction.extra, adminNotes: pendingAction.note || "" } : pendingAction.extra,
         pendingAction.reason
       );
     } else if (pendingAction.kind === "record") {
-      await updateRecord(
+      confirmed = await updateRecord(
         pendingAction.record,
         pendingAction.action,
         {
@@ -1012,12 +1059,12 @@ export default function AdminPage() {
         pendingAction.reason
       );
     } else if (pendingAction.kind === "transfer") {
-      await updateTransfer(pendingAction.transfer, pendingAction.action, pendingAction.reason);
+      confirmed = await updateTransfer(pendingAction.transfer, pendingAction.action, pendingAction.reason);
     } else {
-      await updateOwnershipClaim(pendingAction.claim, pendingAction.action, pendingAction.reason);
+      confirmed = await updateOwnershipClaim(pendingAction.claim, pendingAction.action, pendingAction.reason);
     }
 
-    setPendingAction(null);
+    if (confirmed) setPendingAction(null);
   }
 
   const filteredUsers = useMemo(() => {
@@ -1621,7 +1668,7 @@ export default function AdminPage() {
           <div className="admin-section-head">
             <div>
               <h2>Brand Logos</h2>
-              <p>Manage official brand logo URLs. User uploads never become brand logos.</p>
+              <p>Manage official brand logos with an HTTPS URL or a site-relative path beginning with one slash. User uploads never become brand logos.</p>
             </div>
           </div>
           <div className="admin-brand-form">
@@ -1635,11 +1682,11 @@ export default function AdminPage() {
               />
             </label>
             <label>
-              <span>Transparent logo URL</span>
+              <span>Transparent logo URL or site path</span>
               <input
                 value={brandLogoUrl}
                 onChange={(event) => setBrandLogoUrl(event.target.value)}
-                placeholder="https://example.com/logo.png"
+                placeholder="/logos/brand.svg or https://example.com/logo.png"
               />
             </label>
             <button className="button" type="button" disabled={busy === "brand-logo"} onClick={saveCurrentBrandLogo}>
@@ -1649,7 +1696,7 @@ export default function AdminPage() {
           <datalist id="admin-used-brands">
             {usedBrands.map((brand) => <option value={brand} key={brand} />)}
           </datalist>
-          {brandLogoUrl ? (
+          {isSafeBrandLogoUrl(brandLogoUrl) ? (
             <div className="admin-logo-preview">
               <span>Preview</span>
               <img src={brandLogoUrl} alt="" loading="lazy" fetchPriority="low" decoding="async" width={520} height={120} referrerPolicy="no-referrer" />
@@ -1824,7 +1871,7 @@ export default function AdminPage() {
   const activeSectionMeta = sections.find((section) => section.id === activeSection) || sections[0];
   const ActiveSectionIcon = activeSectionMeta.icon;
 
-  const entityDrawer = selectedUser ? (
+  const entityDrawer = adminAuthorized && selectedUser ? (
     <div className="admin-drawer-layer">
       <button type="button" className="admin-drawer-backdrop" onClick={() => setSelectedUser(null)} aria-label="Close user details" />
       <aside ref={entityDrawerRef} tabIndex={-1} className="admin-entity-drawer" role="dialog" aria-modal="true" aria-label={`User details for ${selectedUser.email}`} aria-busy={Boolean(busy)}>
@@ -1843,7 +1890,7 @@ export default function AdminPage() {
         </div>
       </aside>
     </div>
-  ) : selectedRecord ? (
+  ) : adminAuthorized && selectedRecord ? (
     <div className="admin-drawer-layer">
       <button type="button" className="admin-drawer-backdrop" onClick={() => setSelectedRecord(null)} aria-label="Close Profile details" />
       <aside ref={entityDrawerRef} tabIndex={-1} className="admin-entity-drawer" role="dialog" aria-modal="true" aria-label={`Profile details for ${selectedRecord.title}`} aria-busy={Boolean(busy)}>
@@ -1864,21 +1911,23 @@ export default function AdminPage() {
       <Nav />
       <main className="admin-page">
         <div className="admin-command-bar">
-          <div><button ref={navButtonRef} type="button" className="admin-mobile-nav" onClick={() => setNavOpen(true)} aria-label="Open admin navigation" aria-controls="admin-primary-navigation" aria-expanded={navOpen}><Menu size={18} /></button><div><span>Owner command center</span><strong>{activeSectionMeta.label}</strong></div></div>
-          {adminAuthorized ? <label className="admin-global-search"><Search size={16} /><input value={adminSearch} onChange={(event) => setAdminSearch(event.target.value)} placeholder="Search users, Profiles, or IDs" /></label> : null}
-          <div className="admin-command-meta"><span>Owner access</span><strong>{overview?.admin?.email || "Admin"}</strong></div>
+          <div>{adminAuthorized ? <button ref={navButtonRef} type="button" className="admin-mobile-nav" onClick={() => setNavOpen(true)} aria-label="Open admin navigation" aria-controls="admin-primary-navigation" aria-expanded={navOpen}><Menu size={18} /></button> : null}<div><span>Admin command center</span><strong>{activeSectionMeta.label}</strong></div></div>
+          {adminAuthorized && adminDataReady ? <label className="admin-global-search"><Search size={16} /><input value={adminSearch} onChange={(event) => setAdminSearch(event.target.value)} placeholder="Search users, Profiles, or IDs" /></label> : null}
+          <div className="admin-command-meta"><span>Admin access</span><strong>{adminAuthorized ? overview?.admin?.email || "Authorized admin" : adminAccessState === "unavailable" ? "Temporarily unavailable" : adminAccessState === "checking" ? "Checking" : "Sign in required"}</strong></div>
         </div>
         <div className={adminAuthorized ? "admin-shell" : "admin-shell is-locked"}>
           {adminAuthorized ? <aside ref={sidebarRef} tabIndex={-1} id="admin-primary-navigation" aria-label="Admin navigation" className={navOpen ? "admin-sidebar is-open" : "admin-sidebar"}><header><strong>QRguitar Admin</strong><button type="button" onClick={() => setNavOpen(false)} aria-label="Close admin navigation"><X size={17} /></button></header>{sectionGroups.map((group) => <nav key={group} aria-label={`${group} sections`}><span>{group}</span>{sections.filter((section) => section.group === group).map((section) => { const Icon = section.icon; return <button type="button" className={section.id === activeSection ? "active" : ""} onClick={() => goToSection(section.id)} key={section.id}><Icon size={16} />{section.label}</button>; })}</nav>)}<nav className="admin-sidebar-links" aria-label="Admin workspaces"><span>Workspaces</span><Link href="/admin/site-editor">Site editor</Link><Link href="/admin/service-workflow">Service operations</Link><Link href="/admin/payments">Payments</Link><Link href="/admin/promotions">Promo codes</Link><Link href="/admin/deletion-requests">Deletion requests</Link></nav></aside> : null}
-          {navOpen ? <button type="button" className="admin-sidebar-backdrop" onClick={() => setNavOpen(false)} aria-label="Close admin navigation" /> : null}
+          {adminAuthorized && navOpen ? <button type="button" className="admin-sidebar-backdrop" onClick={() => setNavOpen(false)} aria-label="Close admin navigation" /> : null}
           <div className="admin-main">
           {!adminAuthorized ? (
             <section className="card admin-panel-card admin-login-card">
               <div className="eyebrow">Admin access</div>
-              <h2>{loading ? "Checking admin access." : "Sign in with an authorized admin account."}</h2>
-              <p>{loading ? "Confirming your session before admin tools load." : "Owner tools stay hidden until an authorized admin account is signed in."}</p>
-              {!loading && message ? <p role="alert" className="admin-message">{message}</p> : null}
-              {!loading ? (
+              <h2>{loading || adminAccessState === "checking" ? "Checking admin access." : adminAccessState === "unavailable" ? "Admin is temporarily unavailable." : "Sign in with an authorized admin account."}</h2>
+              <p>{loading || adminAccessState === "checking" ? "Confirming your session before admin tools load." : adminAccessState === "unavailable" ? "Your session exists, but QRguitar could not verify admin access or load the admin service." : "Admin tools stay hidden until an authorized admin account is signed in."}</p>
+              {message ? <p role="alert" className="admin-message">{message}</p> : null}
+              {adminAccessState === "unavailable" ? (
+                <button className="button" type="button" disabled={loading} onClick={() => void loadAdmin()}>{loading ? "Retrying…" : "Retry admin access"}</button>
+              ) : !loading && adminAccessState === "unauthorized" ? (
                 <Link className="button" href={`/login?next=${encodeURIComponent("/admin")}`}>
                   Sign in
                 </Link>
@@ -1887,10 +1936,11 @@ export default function AdminPage() {
           ) : (
             <>
               <div className="admin-main-heading"><ActiveSectionIcon size={22} /><div><span>{activeSectionMeta.group}</span><h1>{activeSectionMeta.label}</h1></div></div>
-              {message ? <div className="admin-message">{message}</div> : null}
+              {adminDataReady && message ? <div className="admin-message">{message}</div> : null}
+              {!adminDataReady ? <section className="card admin-panel-card" role="alert"><h2>Admin data is temporarily unavailable.</h2><p>{message || "QRguitar could not load all required admin data."}</p><button type="button" disabled={loading} onClick={() => void loadAdmin()}>{loading ? "Retrying…" : "Retry admin data"}</button></section> : null}
             </>
           )}
-          {pendingAction ? (
+          {adminAuthorized && pendingAction ? (
             <div className="admin-modal-backdrop" role="presentation">
               <section ref={modalRef} tabIndex={-1} className="card admin-modal" role="dialog" aria-modal="true" aria-label={pendingAction.title}>
                 <div className="admin-section-head">
@@ -1908,6 +1958,7 @@ export default function AdminPage() {
                   <p>{pendingAction.kind === "user" && pendingAction.action === "delete_empty_user" ? ACCOUNT_DELETION_UNAVAILABLE : "This changes operational data immediately. The action is recorded in the audit trail and the affected view is refreshed."}</p>
                   <span>{pendingAction.kind === "user" && pendingAction.action === "delete_empty_user" ? "Unavailable" : "Reversible where the corresponding restore action is available"}</span>
                 </div>
+                {message ? <div className="admin-message" role="alert">{message}</div> : null}
                 <label>
                   Operator reason
                   <textarea value={pendingAction.reason} onChange={(event) => setPendingAction({ ...pendingAction, reason: event.target.value })} rows={2} placeholder="Required for the audit trail" />
@@ -1965,7 +2016,7 @@ export default function AdminPage() {
               </section>
             </div>
           ) : null}
-          {adminAuthorized ? content : null}
+          {adminAuthorized && adminDataReady ? content : null}
           </div>
         </div>
         {entityDrawer}

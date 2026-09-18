@@ -80,4 +80,30 @@ for (const marker of ["onAuthStateChange", "loadRevision.current", "finally", "s
 for (const marker of ["Legacy manual-payment archive", "New QRguitar checkout uses automatic PayPal verification", "<details"]) {
   if (!paymentOperations.includes(marker)) throw new Error(`Legacy payment controls are not clearly separated: ${marker}.`);
 }
+for (const marker of [
+  "isSafeBrandLogoUrl",
+  "if (!isSafeBrandLogoUrl(url))",
+  "Use an HTTPS URL or a site-relative path beginning with one slash.",
+  'type AdminAccessState = "checking" | "authorized" | "unauthorized" | "unavailable"',
+  "setAdminAccessState(overviewAuthorized",
+  "setAdminDataReady(coreReady)",
+  "Retry admin access",
+  "Retry admin data",
+  "Admin is temporarily unavailable.",
+  "let confirmed = false",
+  "if (confirmed) setPendingAction(null)",
+  '{message ? <div className="admin-message" role="alert">{message}</div> : null}',
+  'overlayKind = adminAuthorized ?',
+  "adminAuthorized && navOpen ?"
+]) {
+  if (!page.includes(marker)) throw new Error(`Final admin reliability audit is missing ${marker}.`);
+}
+if (page.includes(String.raw`/^(https?:\/\/|\/)/i`)) throw new Error("Admin brand-logo validation still uses its old URL regex instead of the shared safety rule.");
+if (page.includes("Owner command center") || page.includes("Owner access")) throw new Error("Admin chrome still uses stale owner-only wording.");
+const confirmStart = page.indexOf("async function confirmPendingAction()");
+const confirmEnd = page.indexOf("const filteredUsers", confirmStart);
+const confirmFlow = page.slice(confirmStart, confirmEnd);
+if (!confirmFlow.includes("confirmed = await updateUser") || !confirmFlow.includes("confirmed = await updateRecord") || !confirmFlow.includes("confirmed = await updateTransfer") || !confirmFlow.includes("confirmed = await updateOwnershipClaim")) {
+  throw new Error("Admin confirmation modal does not wait for a confirmed mutation result.");
+}
 console.log("Admin assertions passed.");
