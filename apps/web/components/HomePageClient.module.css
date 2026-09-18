@@ -89,6 +89,12 @@
   .valueStrip > div { gap: 10px; }
   .valueStrip > div + div { padding-left: 16px; }
 }
+@media (max-width: 900px) {
+  .home :global(.hero-grid) { max-width: 720px; grid-template-columns: minmax(0,1fr); gap: 36px; padding-bottom: 38px; }
+  .home :global(.hero-copy) { max-width: 610px; }
+  .home :global(.hero-copy h1) { max-width: 13ch; font-size: clamp(46px, 7vw, 58px); }
+  .heroShowcase { width: 100%; max-width: 720px; }
+}
 @media (max-width: 760px) {
   .home :global(.hero) { padding-top: 40px; }
   .home :global(.hero-grid) { grid-template-columns: minmax(0,1fr); gap: 36px; padding-bottom: 38px; }

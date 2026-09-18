@@ -24,6 +24,7 @@ const fallbackImage = read("components/FallbackImage.tsx");
 const collection = read("app/collections/[handle]/page.tsx");
 const collectionDirectory = read("app/collections/CollectionsDirectoryClient.tsx");
 const dashboard = read("app/dashboard/page.tsx");
+const homeStyles = read("components/HomePageClient.module.css");
 
 function compileImageFallbackHelpers() {
   const module = { exports: {} };
@@ -130,6 +131,12 @@ test("homepage Profile copy uses the saved category instead of a hard-coded inst
   assert.match(showcase, /QRguitar Profile<\/span>/);
   assert.match(showcase, /className=\{styles\.kicker\}>\{card\.typeLabel\}<\/span>/);
   assert.doesNotMatch(showcase, /A real QRguitar Profile|THE INSTRUMENT/);
+});
+
+test("homepage hero stacks before tablet columns become too narrow", () => {
+  assert.match(homeStyles, /@media \(max-width: 900px\)[\s\S]*?\.home :global\(\.hero-grid\) \{[^}]*max-width: 720px;[^}]*grid-template-columns: minmax\(0,1fr\);/);
+  assert.doesNotMatch(homeStyles, /@media \(max-width: 900px\)[\s\S]*?\.home :global\(\.hero-grid\) \{[^}]*width: 100%;/);
+  assert.match(homeStyles, /@media \(max-width: 900px\)[\s\S]*?\.heroShowcase \{[^}]*width: 100%;[^}]*max-width: 720px;/);
 });
 
 test("failed gallery sources are removed without mutating or reordering the remaining photos", () => {
