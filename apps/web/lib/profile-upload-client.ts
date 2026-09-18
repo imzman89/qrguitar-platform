@@ -15,7 +15,7 @@ export async function profileFileId(file: Blob, namespace = "") {
   const hex=Array.from(digest.slice(0,16),byte=>byte.toString(16).padStart(2,"0")).join("");
   return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
 }
-type Options = { file:Blob; uploadId:string; fileId?:string; kind:ProfileUploadKind; expectedOwnerId:string; tokenForOwner:()=>Promise<string> };
+type Options = { file:Blob; uploadId:string; fileId?:string; kind:ProfileUploadKind; expectedOwnerId:string; targetGuitarId?:string; tokenForOwner:()=>Promise<string> };
 type Ports = {fetch:typeof fetch; supabaseUrl:string};
 type Handshake = {ok?:boolean;phase?:string;storagePath?:string;kind?:ProfileUploadKind;signedUrl?:string;code?:string;message?:string;uncertain?:boolean};
 /** File bytes go directly to Storage; QRguitar only receives bounded JSON metadata. */
@@ -24,10 +24,11 @@ export async function uploadProfileFile(options:Options, ports?:Ports):Promise<s
   if (!Number.isSafeInteger(file.size) || file.size<1 || file.size>MAX_PROFILE_UPLOAD_BYTES) throw new ProfileUploadError("Use a nonempty file no larger than 12MB.","file_too_large");
   if (!allowedProfileUpload(kind,file.type)) throw new ProfileUploadError("Use a supported photo or document file.","unsupported_file_type");
   const fileId=options.fileId === undefined ? await profileFileId(file) : cleanProfileFileId(options.fileId);
-  const storagePath=profileUploadPath(expectedOwnerId,uploadId,fileId,kind,file.type),bucket=profileUploadBucket(kind);
+  const targetGuitarId=options.targetGuitarId||"";
+  const storagePath=profileUploadPath(expectedOwnerId,uploadId,fileId,kind,file.type,targetGuitarId),bucket=profileUploadBucket(kind);
   if (!storagePath) throw new ProfileUploadError("The upload identity is invalid.","invalid_upload");
   const fetcher=ports?.fetch||fetch, supabaseUrl=ports?.supabaseUrl||process.env.NEXT_PUBLIC_SUPABASE_URL||"";
-  const metadata={uploadId,fileId,kind,expectedOwnerId,mimeType:file.type,size:file.size};
+  const metadata={uploadId,fileId,kind,expectedOwnerId,mimeType:file.type,size:file.size,...(targetGuitarId?{targetGuitarId}:{})};
   async function handshake(action:"prepare"|"complete") {
     const token=await tokenForOwner();if(!token)throw new ProfileUploadError("Sign in again before uploading.","auth_required");
     let response:Response;

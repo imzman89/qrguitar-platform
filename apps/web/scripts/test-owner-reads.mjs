@@ -87,7 +87,7 @@ test('owner reads return all related rows across 103 guitars, preserving order, 
   const db=database({guitars,guitar_media:media,guitar_documents:docs,guitar_timeline_events:timelines,ownership_transfers:transfers,guitar_specs:specs,profiles:[{id:owner.id,display_name:'DB owner'}],site_content:guitars.map(g=>({content_key:trust.recordTrustContentKey(g.qr_code),content_value:{authenticityStatus:'confirmed',showSerialPublic:false,internalVerificationNote:'Internal'}}))},{cap:31});
   const result=await fixture(db).loadRecordsForUser(db,owner);
   assert.equal(result.records.length,103);
-  const first=result.records[0];assert.equal(first.qrCode,'G000');
+  const first=result.records[0];assert.equal(first.qrCode,'G000');assert.equal(first.recordId,'g000');
   assert.equal(first.galleryImageDataUrls.length,16);assert.match(first.galleryImageDataUrls[1],/photo-14\?/);assert.match(first.galleryImageDataUrls.at(-1),/photo-0\?/);
   assert.equal(first.documentFiles.length,1003);assert.equal(first.timelineEvents.length,1003);assert.equal(first.ownershipTransferCount,1003);
   assert.equal(first.verificationStatus,'verified');assert.equal(first.authenticityStatus,'confirmed');assert.equal(first.saleStatus,'for_sale');assert.equal(first.originalityStatus,'modified');assert.equal(first.instrumentCondition,'new');assert.equal(first.visibility,'private');assert.equal(first.safetyStatus,'stolen');assert.equal(first.safetyNote,'Owner note');assert.equal(first.serial,'serial-g000');assert.equal(first.showSerialPublic,false);

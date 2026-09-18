@@ -34,6 +34,8 @@ export type RecordAuthenticityStatus = "unconfirmed" | "confirmed";
 export type RecordSafetyStatus = "clear" | "lost" | "stolen" | "recovered";
 
 export type DemoInstrument = {
+  /** Internal database identity, exposed only by authenticated owner reads. */
+  recordId?: string;
   qrCode: string;
   permanentPath: string;
   name: string;

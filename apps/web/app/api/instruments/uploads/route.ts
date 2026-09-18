@@ -24,9 +24,12 @@ async function boundedBody(request: Request, limit: number) {
   } catch { return {body:null,bytes}; }
   finally { reader.releaseLock(); }
 }
-async function register(supabase: UploadClient, ownerId: string, uploadId: string, bucket: string, storagePath: string) {
+async function register(supabase: UploadClient, ownerId: string, uploadId: string, bucket: string, storagePath: string, targetGuitarId = "") {
   try {
-    const result = await supabase.rpc("register_staged_instrument_upload",{p_owner_id:ownerId,p_upload_id:uploadId,p_bucket_id:bucket,p_storage_path:storagePath});
+    const result = await supabase.rpc(targetGuitarId ? "register_staged_instrument_edit_upload" : "register_staged_instrument_upload",{
+      p_owner_id:ownerId,p_upload_id:uploadId,p_bucket_id:bucket,p_storage_path:storagePath,
+      ...(targetGuitarId ? {p_guitar_id:targetGuitarId} : {})
+    });
     if (result.error?.code === "QG007" || result.data?.state === "tombstoned") return failure("upload_session_changed","This file was removed from its upload session. Choose it again.",409);
     if (result.data?.state === "consumed") return failure("upload_already_consumed","This file already belongs to a saved Profile. Resume the original save request.",409);
     if (result.error || result.data?.ok !== true || result.data.state !== "staged") return failure("upload_registration_failed","The upload could not be confirmed. Retry this same file.",503,true,true);
@@ -35,14 +38,21 @@ async function register(supabase: UploadClient, ownerId: string, uploadId: strin
 }
 async function signedHandshake(supabase: UploadClient, ownerId: string, body: Record<string,unknown>) {
   const uploadId = cleanProfileUploadId(body.uploadId), fileId = cleanProfileFileId(body.fileId);
+  const targetGuitarId = body.targetGuitarId === undefined ? "" : cleanProfileFileId(body.targetGuitarId);
   const kind = body.kind as ProfileUploadKind, mimeType = typeof body.mimeType === "string" ? body.mimeType : "";
   const size = body.size;
   if (body.expectedOwnerId !== ownerId) return failure("upload_owner_changed","The signed-in account changed. Return to the original account before retrying.",409);
-  if (!uploadId || !fileId || (kind !== "image" && kind !== "document") || (body.action !== "prepare" && body.action !== "complete")) return failure("invalid_upload","This upload identity is invalid. Select the file again.",400);
+  if (!uploadId || !fileId || (body.targetGuitarId !== undefined && !targetGuitarId) || (kind !== "image" && kind !== "document") || (body.action !== "prepare" && body.action !== "complete")) return failure("invalid_upload","This upload identity is invalid. Select the file again.",400);
   if (!Number.isSafeInteger(size) || Number(size) < 1) return failure("invalid_file","Choose a nonempty file.",400);
   if (Number(size) > MAX_PROFILE_UPLOAD_BYTES) return failure("file_too_large","Use a file no larger than 12MB.",413);
   if (!allowedProfileUpload(kind,mimeType)) return failure("unsupported_file_type",kind === "image" ? "Use a JPG, PNG, or WebP photo." : "Use a PDF, JPG, PNG, or WebP document.",415);
-  const bucket = profileUploadBucket(kind), storagePath = profileUploadPath(ownerId,uploadId,fileId,kind,mimeType);
+  if (targetGuitarId) {
+    const target = await supabase.from("guitars").select("id,owner_id,owner_removed_at,admin_archived_at").eq("id",targetGuitarId).maybeSingle();
+    if (target.error) return failure("upload_target_unavailable","The Profile could not be checked before uploading. Try again.",503,true,true);
+    if (!target.data || target.data.owner_id !== ownerId) return failure("upload_target_forbidden","Only the current owner can upload files to this Profile.",403);
+    if (target.data.owner_removed_at || target.data.admin_archived_at) return failure("upload_target_changed","This Profile can no longer accept uploads.",409);
+  }
+  const bucket = profileUploadBucket(kind), storagePath = profileUploadPath(ownerId,uploadId,fileId,kind,mimeType,targetGuitarId);
   if (!storagePath || (body.storagePath !== undefined && body.storagePath !== storagePath)) return failure("invalid_upload","That file does not belong to this account and upload session.",400);
   const registry = await supabase.from("instrument_staged_uploads").select("owner_id,upload_id,state").eq("bucket_id",bucket).eq("storage_path",storagePath).maybeSingle();
   if (registry.error) return failure("upload_registry_unavailable","Uploads cannot be checked safely right now. Retry this same file.",503,true,true);
@@ -53,7 +63,7 @@ async function signedHandshake(supabase: UploadClient, ownerId: string, body: Re
   const storage = supabase.storage.from(bucket), info = await storage.info(storagePath);
   if (!info.error && info.data) {
     if (info.data.size !== size || info.data.contentType !== mimeType || info.data.name !== storagePath || (info.data.bucketId !== undefined && info.data.bucketId !== bucket) || info.data.isDeleteMarker) return failure("upload_metadata_mismatch","The uploaded file does not match the selected file. Keep this attempt and select a new file to replace it.",409);
-    const rejected = await register(supabase,ownerId,uploadId,bucket,storagePath); if (rejected) return rejected;
+    const rejected = await register(supabase,ownerId,uploadId,bucket,storagePath,targetGuitarId); if (rejected) return rejected;
     return json({ok:true,phase:"complete",storagePath,kind});
   }
   const storageError = info.error as {status?:number;statusCode?:string;code?:string} | null;
@@ -105,11 +115,12 @@ export async function DELETE(request: Request) {
   const input = await boundedBody(request,MAX_PROFILE_UPLOAD_CONTROL_BYTES);
   if (input.tooLarge) return failure("invalid_cleanup","Upload cleanup was rejected.",400);
   const body = input.body, uploadId = cleanProfileUploadId(body?.uploadId);
+  const targetGuitarId = body?.targetGuitarId === undefined ? "" : cleanProfileFileId(body.targetGuitarId);
   const paths = Array.isArray(body?.paths) ? body.paths : [];
-  if (!uploadId || !Array.isArray(body?.paths) || paths.length > 30 || paths.some(path=>typeof path !== "string")) return failure("invalid_cleanup","Upload cleanup was rejected.",400);
-  const mediaPaths = (paths as string[]).filter(path=>isOwnedStagedPath(path,auth.user!.id,uploadId,"image"));
-  const documentPaths = (paths as string[]).filter(path=>isOwnedStagedPath(path,auth.user!.id,uploadId,"document"));
+  if (!uploadId || (body?.targetGuitarId !== undefined && !targetGuitarId) || !Array.isArray(body?.paths) || paths.length > 30 || paths.some(path=>typeof path !== "string")) return failure("invalid_cleanup","Upload cleanup was rejected.",400);
+  const mediaPaths = (paths as string[]).filter(path=>isOwnedStagedPath(path,auth.user!.id,uploadId,"image",targetGuitarId));
+  const documentPaths = (paths as string[]).filter(path=>isOwnedStagedPath(path,auth.user!.id,uploadId,"document",targetGuitarId));
   if (mediaPaths.length+documentPaths.length !== paths.length) return failure("invalid_cleanup","Upload cleanup was rejected.",400);
-  const cleaned = await removeUnreferencedStagedUploads(supabase,auth.user.id,uploadId,mediaPaths,documentPaths);
+  const cleaned = await removeUnreferencedStagedUploads(supabase,auth.user.id,uploadId,mediaPaths,documentPaths,targetGuitarId);
   return cleaned ? json({ok:true}) : failure("cleanup_failed","Some staged files could not be removed. Your saved Profiles are unchanged.",502,true,true);
 }

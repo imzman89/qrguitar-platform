@@ -1,14 +1,15 @@
 "use client";
 
 import { ownerProfileHref } from "../../../lib/owner-profile";
+import { dataUrlToProfileFile, uploadProfileFile } from "../../../lib/profile-upload-client";
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Footer } from "../../../components/Footer";
 import { InstrumentPreview } from "../../../components/InstrumentPreview";
 import { Nav } from "../../../components/Nav";
-import { PhotoOrganizer } from "../../../components/PhotoOrganizer";
+import { PhotoOrganizer, type PhotoOrganizerStatus } from "../../../components/PhotoOrganizer";
 import { getContentValue } from "../../../lib/content-registry";
 import { createSubmissionFingerprint, isRepeatedBrowserSubmission, validateInstrumentSubmission } from "../../../lib/security";
 import {
@@ -95,7 +96,17 @@ type DocumentDraft = {
   relatedTimelineEventId: string;
   relatedServiceEventId: string;
   createdAt?: string;
+  storagePath?: string;
+  mimeType?: string;
+  fileSizeBytes?: number;
+  uploadState?: PhotoOrganizerStatus["state"];
+  uploadMessage?: string;
 };
+type StagedPhoto = PhotoOrganizerStatus & { storagePath?: string };
+
+function makeClientKey() {
+  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 const emptyServiceForm = {
   serviceDate: "",
   datePrecision: "day",
@@ -119,6 +130,9 @@ export default function EditInstrumentPage() {
   const params = useParams<{ code: string }>();
   const router = useRouter();
   const code = params.code?.toUpperCase() || "";
+  const uploadFileIds = useRef(new Map<string, string>());
+  const [uploadId] = useState(makeClientKey);
+  const [ownerId, setOwnerId] = useState("");
   const [message, setMessage] = useState("");
   const [honeypot, setHoneypot] = useState("");
   const [ready, setReady] = useState(false);
@@ -129,6 +143,7 @@ export default function EditInstrumentPage() {
   const [customLinks, setCustomLinks] = useState([{ id: "link-1", label: "", url: "" }]);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [documents, setDocuments] = useState<DocumentDraft[]>([]);
+  const [photoUploads, setPhotoUploads] = useState<Record<string, StagedPhoto>>({});
   const [qrStyle, setQrStyle] = useState<QrStyle>(defaultQrStyle);
   const [categoryOptions, setCategoryOptions] = useState(defaultSiteSettings.instrumentCategories);
   const [verificationStatus, setVerificationStatus] = useState<"verified" | "unverified">("unverified");
@@ -187,6 +202,7 @@ export default function EditInstrumentPage() {
           }
           return;
         }
+        if (!cancelled) setOwnerId(sessionResult.data.session.user.id);
 
         const token = await getSupabaseAccessToken();
         const response = await fetch(`/api/instruments?scope=mine&code=${encodeURIComponent(code)}`, {
@@ -228,6 +244,8 @@ export default function EditInstrumentPage() {
             setCustomLinks(normalizeCustomLinks(instrument));
             setGalleryImages(normalizeGalleryImages(instrument));
             setDocuments(normalizeDocumentFiles(instrument));
+            setPhotoUploads({});
+            uploadFileIds.current.clear();
             setQrStyle(normalizeQrStyle(instrument.qrStyle));
             setVerificationStatus(instrument.verificationStatus === "verified" ? "verified" : "unverified");
             setAuthenticityStatus(instrument.authenticityStatus === "confirmed" ? "confirmed" : "unconfirmed");
@@ -538,6 +556,12 @@ export default function EditInstrumentPage() {
 
     const dataUrls = await Promise.all(validation.files.map(fileToCompressedDataUrl));
 
+    setPhotoUploads((current) => {
+      const next = { ...current };
+      dataUrls.forEach((dataUrl) => { next[dataUrl] = { state: "ready" }; });
+      return next;
+    });
+
     setGalleryImages((current) => {
       const next = [...current, ...dataUrls].slice(0, 20);
       setForm((formCurrent) => ({ ...formCurrent, heroImageDataUrl: formCurrent.heroImageDataUrl || next[0] || "" }));
@@ -553,11 +577,19 @@ export default function EditInstrumentPage() {
 
     const remainingSlots = Math.max(0, 10 - documents.length);
     const selectedFiles = Array.from(files).slice(0, remainingSlots);
+    const validation = validateDocumentFiles(selectedFiles);
+    if (!validation.files.length) {
+      setMessage(validation.message);
+      return;
+    }
     const nextDocs = await Promise.all(
-      selectedFiles.map(async (file, index) => ({
+      validation.files.map(async (file, index) => ({
         id: `doc-${Date.now()}-${index}`,
         name: file.name,
         dataUrl: await fileToDataUrl(file),
+        mimeType: file.type,
+        fileSizeBytes: file.size,
+        uploadState: "ready" as const,
         visibility: "hidden" as const,
         documentType: "Receipt",
         issuerSource: "",
@@ -571,7 +603,7 @@ export default function EditInstrumentPage() {
     );
 
     setDocuments((current) => [...current, ...nextDocs].slice(0, 10));
-    setMessage(`${nextDocs.length} document${nextDocs.length === 1 ? "" : "s"} added.`);
+    setMessage(`${nextDocs.length} document${nextDocs.length === 1 ? "" : "s"} added.${validation.message ? ` ${validation.message}` : ""}`);
   }
 
   function selectMainPhoto(imageUrl: string) {
@@ -579,6 +611,8 @@ export default function EditInstrumentPage() {
   }
 
   function removePhoto(imageUrl: string) {
+    uploadFileIds.current.delete(`image:${imageUrl}`);
+    const stagedPath = photoUploads[imageUrl]?.storagePath;
     setGalleryImages((current) => {
       const next = current.filter((item) => item !== imageUrl);
       setForm((formCurrent) => ({
@@ -587,6 +621,12 @@ export default function EditInstrumentPage() {
       }));
       return next;
     });
+    setPhotoUploads((current) => {
+      const next = { ...current };
+      delete next[imageUrl];
+      return next;
+    });
+    if (stagedPath) void cleanupStagedPaths([stagedPath]);
   }
 
   function movePhoto(fromIndex: number, toIndex: number) {
@@ -597,6 +637,90 @@ export default function EditInstrumentPage() {
       next.splice(toIndex, 0, moved);
       return next;
     });
+  }
+
+  async function cleanupStagedPaths(paths: string[]) {
+    if (!paths.length || !original?.recordId) return;
+    const token = await getSupabaseAccessToken();
+    await fetch("/api/instruments/uploads", {
+      method: "DELETE",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: JSON.stringify({ uploadId, targetGuitarId: original.recordId, paths })
+    }).catch(() => null);
+  }
+
+  async function uploadStagedFile(kind: "image" | "document", dataUrl: string) {
+    const targetGuitarId = original?.recordId;
+    if (!ownerId || !targetGuitarId) throw new Error("Reload this Profile before uploading files.");
+    const identity = `${kind}:${dataUrl}`;
+    let fileId = uploadFileIds.current.get(identity);
+    if (!fileId) {
+      fileId = crypto.randomUUID();
+      uploadFileIds.current.set(identity, fileId);
+    }
+    return uploadProfileFile({
+      file: dataUrlToProfileFile(dataUrl), uploadId, fileId, kind, expectedOwnerId: ownerId, targetGuitarId,
+      tokenForOwner: async () => {
+        const { data } = await createBrowserSupabaseClient().auth.getSession();
+        if (data.session?.user.id !== ownerId) throw new Error("The account changed. Return to the original account before retrying.");
+        return data.session.access_token;
+      }
+    });
+  }
+
+  async function uploadWithConcurrency<T>(items: T[], worker: (item: T, index: number) => Promise<void>, concurrency = 3) {
+    let cursor = 0;
+    async function run() {
+      while (cursor < items.length) {
+        const index = cursor++;
+        await worker(items[index], index);
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, run));
+  }
+
+  async function stageSelectedFiles() {
+    const photoPaths = galleryImages.map((imageUrl) => /^data:/i.test(imageUrl) ? photoUploads[imageUrl]?.storagePath || "" : imageUrl);
+    const failedPhotos: string[] = [];
+    await uploadWithConcurrency(galleryImages, async (imageUrl, index) => {
+      if (photoPaths[index]) return;
+      setPhotoUploads((current) => ({ ...current, [imageUrl]: { ...current[imageUrl], state: "uploading", progress: 15 } }));
+      try {
+        const storagePath = await uploadStagedFile("image", imageUrl);
+        photoPaths[index] = storagePath;
+        setPhotoUploads((current) => ({ ...current, [imageUrl]: { state: "uploaded", progress: 100, storagePath } }));
+      } catch (error) {
+        failedPhotos.push(imageUrl);
+        setPhotoUploads((current) => ({ ...current, [imageUrl]: { state: "error", message: error instanceof Error ? error.message : "Upload failed. Retry this photo." } }));
+      }
+    });
+
+    const documentPaths = documents.map((document) => document.storagePath || (/^data:/i.test(document.dataUrl) ? "" : document.dataUrl));
+    const failedDocuments: string[] = [];
+    await uploadWithConcurrency(documents, async (document, index) => {
+      if (documentPaths[index]) return;
+      setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, uploadState: "uploading", uploadMessage: "Uploading" } : item));
+      try {
+        const storagePath = await uploadStagedFile("document", document.dataUrl);
+        documentPaths[index] = storagePath;
+        setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, storagePath, uploadState: "uploaded", uploadMessage: "Uploaded" } : item));
+      } catch (error) {
+        failedDocuments.push(document.id);
+        setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, uploadState: "error", uploadMessage: error instanceof Error ? error.message : "Upload failed. Retry this document." } : item));
+      }
+    });
+    if (failedPhotos.length || failedDocuments.length) {
+      throw new Error("Some files could not be uploaded. Retry the files marked in red; successful uploads are preserved.");
+    }
+    return { photoPaths, documentPaths };
+  }
+
+  function removeDocument(document: DocumentDraft) {
+    uploadFileIds.current.delete(`document:${document.dataUrl}`);
+    setDocuments((current) => current.filter((item) => item.id !== document.id));
+    if (document.storagePath?.startsWith(`${ownerId}/${original?.recordId}/profile-uploads/${uploadId}/`)) {
+      void cleanupStagedPaths([document.storagePath]);
+    }
   }
 
   function buildInstrument(): DemoInstrument | null {
@@ -684,11 +808,14 @@ export default function EditInstrumentPage() {
         return;
       }
 
+      const staged = await stageSelectedFiles();
+      const mainPhotoIndex = Math.max(0, galleryImages.indexOf(form.heroImageDataUrl));
       const token = await getSupabaseAccessToken();
       const response = await fetch("/api/instruments", {
         method: "PATCH",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
         body: JSON.stringify({
+          uploadId,
           qrCode: original?.qrCode || code,
           name: form.name.trim() || [form.brand, form.model].filter(Boolean).join(" "),
           brand: form.brand,
@@ -706,11 +833,11 @@ export default function EditInstrumentPage() {
           location: form.location,
           visibility: form.visibility as "public" | "private" | "unlisted",
           summary: form.summary || "",
-          heroImageDataUrl: form.heroImageDataUrl,
-          photos: galleryImages,
-          documents: documents.map((document) => ({
+          heroImagePath: staged.photoPaths[mainPhotoIndex] || staged.photoPaths[0],
+          photos: staged.photoPaths,
+          documents: documents.map((document, index) => ({
             name: document.name,
-            dataUrl: document.dataUrl,
+            storagePath: staged.documentPaths[index],
             visibility: document.visibility,
             documentType: document.documentType,
             issuerSource: document.issuerSource,
@@ -805,8 +932,8 @@ export default function EditInstrumentPage() {
       if (savedQrCode !== code) {
         router.replace(`/edit/${savedQrCode}`);
       }
-    } catch {
-      setMessage("Profile details failed: check your connection and file sizes, then try again.");
+    } catch (error) {
+      setMessage(`Profile details failed: ${error instanceof Error ? error.message : "Check your connection and file sizes, then try again."}`);
     } finally {
       setRecordSaveAction(null);
     }
@@ -1348,7 +1475,7 @@ export default function EditInstrumentPage() {
                   multiple
                   onChange={(event) => void addProfilePhotos(event.target.files)}
                 />
-                <span>Upload up to 20 photos. Pick one as the main image for dashboard cards, catalog listings, and the public profile hero.</span>
+                <span>Upload up to 20 photos, 12MB each. Pick one as the main image for dashboard cards, catalog listings, and the public profile hero.</span>
               </div>
               <div className="field photo-field" id="documents">
                 <label htmlFor="profileDocuments">Documents</label>
@@ -1360,7 +1487,7 @@ export default function EditInstrumentPage() {
                   multiple
                   onChange={(event) => void addDocuments(event.target.files)}
                 />
-                <span>Store receipts, invoices, build sheets, service slips, appraisal notes, and authenticity evidence with the QRguitar Profile. Up to 10 files.</span>
+                <span>Store receipts, invoices, build sheets, service slips, appraisal notes, and authenticity evidence with the QRguitar Profile. Up to 10 files, 12MB each.</span>
               </div>
               {documents.length ? (
                 <section className="photo-manager proof-vault" aria-label="Proof Vault document manager">
@@ -1374,7 +1501,7 @@ export default function EditInstrumentPage() {
                         <div className="proof-vault-item-header">
                           <strong>{document.name || "Untitled document"}</strong>
                           <span className={document.visibility === "public" ? "status-pill verified-pill" : "status-pill neutral-pill"}>
-                            {document.visibility === "public" ? "Public" : "Private"}
+                            {document.uploadState === "uploading" ? "Uploading" : document.uploadState === "error" ? "Upload failed" : document.visibility === "public" ? "Public" : "Private"}
                           </span>
                         </div>
                         <div className="form-grid compact">
@@ -1477,7 +1604,8 @@ export default function EditInstrumentPage() {
                               Open
                             </a>
                           ) : null}
-                          <button className="button secondary" type="button" onClick={() => setDocuments((current) => current.filter((item) => item.id !== document.id))}>
+                          {document.uploadMessage ? <span className="fine-print">{document.uploadMessage}</span> : null}
+                          <button className="button secondary" type="button" onClick={() => removeDocument(document)}>
                             Remove
                           </button>
                         </div>
@@ -1493,6 +1621,7 @@ export default function EditInstrumentPage() {
                   onSelectMain={selectMainPhoto}
                   onRemove={removePhoto}
                   onMove={movePhoto}
+                  statusByImage={photoUploads}
                 />
               </div>
               <section className="qr-customizer" id="media" aria-label="External media">
@@ -1782,17 +1911,29 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
   );
 }
 
-const MAX_IMAGE_FILE_SIZE = 12 * 1024 * 1024;
+const MAX_PROFILE_FILE_SIZE = 12 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const ACCEPTED_DOCUMENT_TYPES = new Set([...ACCEPTED_IMAGE_TYPES, "application/pdf"]);
 
 function validateImageFiles(files: File[]) {
-  const valid = files.filter((file) => ACCEPTED_IMAGE_TYPES.has(file.type) && file.size <= MAX_IMAGE_FILE_SIZE);
-  const rejected = files.filter((file) => !ACCEPTED_IMAGE_TYPES.has(file.type) || file.size > MAX_IMAGE_FILE_SIZE);
+  const valid = files.filter((file) => ACCEPTED_IMAGE_TYPES.has(file.type) && file.size > 0 && file.size <= MAX_PROFILE_FILE_SIZE);
+  const rejected = files.filter((file) => !ACCEPTED_IMAGE_TYPES.has(file.type) || file.size < 1 || file.size > MAX_PROFILE_FILE_SIZE);
 
   return {
     files: valid,
     message: rejected.length
       ? `${rejected.length} photo${rejected.length === 1 ? "" : "s"} skipped. Use JPG, PNG, or WebP under 12MB each.`
+      : ""
+  };
+}
+
+function validateDocumentFiles(files: File[]) {
+  const valid = files.filter((file) => ACCEPTED_DOCUMENT_TYPES.has(file.type) && file.size > 0 && file.size <= MAX_PROFILE_FILE_SIZE);
+  const rejected = files.filter((file) => !ACCEPTED_DOCUMENT_TYPES.has(file.type) || file.size < 1 || file.size > MAX_PROFILE_FILE_SIZE);
+  return {
+    files: valid,
+    message: rejected.length
+      ? `${rejected.length} document${rejected.length === 1 ? "" : "s"} skipped. Use PDF, JPG, PNG, or WebP files up to 12MB each.`
       : ""
   };
 }
@@ -1895,6 +2036,9 @@ function normalizeDocumentFiles(instrument: DemoInstrument) {
     id: `document-${index}`,
     name: file.name,
     dataUrl: file.url,
+    storagePath: file.url,
+    mimeType: file.mimeType || "",
+    fileSizeBytes: file.fileSizeBytes,
     visibility: file.visibility === "public" ? "public" as const : "hidden" as const,
     documentType: file.documentType || "Other",
     issuerSource: file.issuerSource || "",

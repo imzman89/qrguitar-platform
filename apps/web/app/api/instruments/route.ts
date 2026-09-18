@@ -1,7 +1,10 @@
 import { OwnerReadError, readAllOwnerPages, readOwnerBatches, groupOwnerRows, signOwnerSources } from "../../../lib/owner-record-read";
 import { buildCreateProfilePayload, createProfileFailure, CreateProfileError } from "../../../lib/profile-create";
 import { profileBillingEnvironment } from "../../../lib/billing-environment";
-import { prepareProfileAssets, ProfileSaveError, profileSaveFailure, type SavedMedia, type SavedDocument } from "../../../lib/profile-save-assets";
+import { hasInlineProfileAssets, prepareProfileAssets, ProfileSaveError, profileSaveFailure, type SavedMedia, type SavedDocument } from "../../../lib/profile-save-assets";
+import { verifyProfileEditUploads } from "../../../lib/profile-edit-uploads";
+import { readBoundedJsonBody } from "../../../lib/bounded-json-body";
+import { MAX_PROFILE_EDIT_JSON_BYTES, cleanProfileUploadId } from "../../../lib/profile-upload-protocol";
 import { isOwnedStagedPath, removeUnreferencedStagedUploads } from "../../../lib/staged-upload-cleanup";
 import { NextResponse } from "next/server";
 import { randomInt, randomUUID } from "node:crypto";
@@ -766,6 +769,7 @@ function mapInstrumentRow({
   );
 
   return {
+    ...(exposeInternalTrust ? { recordId: guitar.id } : {}),
     qrCode: guitar.qr_code.toUpperCase(),
     permanentPath: guitar.permanent_path || `/i/${guitar.qr_code.toUpperCase()}`,
     name: guitar.name || [guitar.brand, guitar.model].filter(Boolean).join(" ") || guitar.qr_code,
@@ -1640,6 +1644,17 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   noStore();
+  const parsedBody = await readBoundedJsonBody(request, MAX_PROFILE_EDIT_JSON_BYTES);
+  if (!parsedBody.ok) {
+    return noStoreJson({
+      ok: false,
+      code: parsedBody.reason === "too_large" ? "profile_metadata_too_large" : "invalid_request",
+      message: parsedBody.reason === "too_large"
+        ? "Profile metadata is too large. Upload files directly and try again."
+        : "Invalid request body."
+    }, { status: parsedBody.reason === "too_large" ? 413 : 400 });
+  }
+  const body = parsedBody.body as UpdateInstrumentRequest;
   const supabase = createServerSupabaseClient();
 
   if (!supabase) {
@@ -1654,18 +1669,6 @@ export async function PATCH(request: Request) {
   const writeAccess = await assertAccountCanWrite(supabase, auth.user);
   if (!writeAccess.ok) {
     return NextResponse.json({ ok: false, message: writeAccess.message } satisfies SupabaseCreateResponse, { status: writeAccess.status });
-  }
-
-  let body: UpdateInstrumentRequest;
-
-  try {
-    body = (await request.json()) as UpdateInstrumentRequest;
-  } catch {
-    return NextResponse.json({ ok: false, message: "Invalid request body." } satisfies SupabaseCreateResponse, { status: 400 });
-  }
-
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return noStoreJson({ ok: false, message: "Invalid request body." }, { status: 400 });
   }
 
   if (body.verificationOnly || body.action === "remove_from_collection") {
@@ -1710,6 +1713,14 @@ export async function PATCH(request: Request) {
 
   if (body.action === "restore_to_collection") {
     return noStoreJson({ ok: false, message: "Deleted profiles cannot be restored. Create a new QRguitar Profile instead." }, { status: 410 });
+  }
+
+  if (hasInlineProfileAssets(body)) {
+    return noStoreJson({
+      ok: false,
+      code: "inline_profile_upload_rejected",
+      message: "Upload photos and documents directly before saving Profile metadata."
+    }, { status: 413 });
   }
 
 
@@ -1807,15 +1818,18 @@ export async function PATCH(request: Request) {
         label: profileLinkSpecLabel(link.label), value: link.url, sort_order: customFields.length + index + 6
       }))
     ];
+    const verifiedUploads = await verifyProfileEditUploads({
+      supabase, body: body as unknown as Record<string, unknown>, ownerId: ownerUser.id, guitarId: guitar.id,
+      uploadId: cleanProfileUploadId(body.uploadId),
+      existingMediaPaths: [...(mediaResult.data || []).map((row) => row.storage_path), ...(guitar.hero_image_path ? [guitar.hero_image_path] : [])],
+      existingDocumentPaths: (documentsResult.data || []).map((row) => row.storage_path)
+    });
     const assets = await prepareProfileAssets({
       body, ownerId: ownerUser.id, guitarId: guitar.id, currentHeroPath: guitar.hero_image_path,
       supabaseUrl: getSupabaseEnvStatus().supabaseUrl,
       existingMedia: (mediaResult.data || []) as SavedMedia[],
       existingDocuments: (documentsResult.data || []) as SavedDocument[],
-      upload: async (bucket, storagePath, bytes, mimeType) => {
-        const result = await supabase.storage.from(bucket).upload(storagePath, bytes, { contentType: mimeType, upsert: false });
-        if (result.error) throw new ProfileSaveError("Could not upload all profile files. Your existing Profile has not been changed. Try again.", 502, "profile_upload_failed");
-      }
+      verifiedUploads
     });
     // This is the only database mutation in a full profile edit. All dependent rows,
     // trust settings, redirect, serial aliases, and audit entry commit or roll back together.

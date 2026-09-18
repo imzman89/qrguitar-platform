@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 export type SavedMedia = {
   id: string; storage_path: string; alt: string; sort_order: number;
 };
@@ -15,14 +13,14 @@ export class ProfileSaveError extends Error {
   constructor(message: string, public readonly status = 400, public readonly code = "invalid_profile") { super(message); }
 }
 
-type Upload = { bytes: Buffer; mimeType: string; extension: string };
-type PreparedSource = { path: string; upload?: Upload };
+export type VerifiedProfileUpload = { kind: "image" | "document"; mimeType: string; size: number };
+type PreparedSource = { path: string };
 type PreparedDocument = {
   id: string | null; name: string; storage_path: string; is_public: boolean;
   document_type: string; public_description: string; private_notes: string;
   issuer_source: string; document_date: string; description: string;
   related_timeline_event_id: string; related_service_event_id: string;
-  mime_type: string | null; file_size_bytes: number | null; upload?: Upload;
+  mime_type: string | null; file_size_bytes: number | null;
 };
 
 function text(value: unknown, limit: number, label: string) {
@@ -38,19 +36,18 @@ function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new ProfileSaveError("Invalid document.");
   return value as Record<string, unknown>;
 }
-function decodeUpload(source: string, kind: "image" | "document"): Upload {
-  const limit = (kind === "image" ? 12 : 25) * 1024 * 1024;
-  if (source.length > Math.ceil(limit / 3) * 4 + 100) throw new ProfileSaveError(`This ${kind} file is too large.`);
-  const match = /^data:(image\/jpeg|image\/png|image\/webp|application\/pdf);base64,([A-Za-z0-9+/]+={0,2})$/.exec(source);
-  if (!match || (kind === "image" && match[1] === "application/pdf")) {
-    throw new ProfileSaveError(kind === "image" ? "Only JPG, PNG, and WEBP photos are supported." : "Only PDF, JPG, PNG, and WEBP documents are supported.");
-  }
-  const bytes = Buffer.from(match[2], "base64");
-  if (!bytes.length || bytes.length > limit || bytes.toString("base64").replace(/=+$/, "") !== match[2].replace(/=+$/, "")) {
-    throw new ProfileSaveError(`The ${kind} upload is incomplete or invalid.`);
-  }
-  const extension = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "application/pdf": "pdf" }[match[1]]!;
-  return { bytes, mimeType: match[1], extension };
+function isInlineAsset(value: unknown) {
+  return typeof value === "string" && /^\s*data:/i.test(value);
+}
+
+export function hasInlineProfileAssets(body: { photos?: unknown; heroImageDataUrl?: unknown; heroImagePath?: unknown; documents?: unknown }) {
+  if (isInlineAsset(body.heroImageDataUrl) || isInlineAsset(body.heroImagePath)) return true;
+  if (Array.isArray(body.photos) && body.photos.some(isInlineAsset)) return true;
+  return Array.isArray(body.documents) && body.documents.some((raw) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return false;
+    const document = raw as Record<string, unknown>;
+    return isInlineAsset(document.storagePath) || isInlineAsset(document.dataUrl) || isInlineAsset(document.url);
+  });
 }
 
 // Match complete bucket paths on our own Storage origin, never substrings or query values.
@@ -78,9 +75,13 @@ export async function prepareProfileAssets(options: {
   body: { photos?: unknown; heroImageDataUrl?: unknown; heroImagePath?: unknown; documents?: unknown };
   ownerId: string; guitarId: string; currentHeroPath: string | null; supabaseUrl: string;
   existingMedia: SavedMedia[]; existingDocuments: SavedDocument[];
-  upload: (bucket: string, path: string, bytes: Buffer, mimeType: string) => Promise<void>;
+  verifiedUploads?: ReadonlyMap<string, VerifiedProfileUpload>;
 }) {
-  const { body, ownerId, guitarId, existingMedia, existingDocuments, currentHeroPath, supabaseUrl, upload } = options;
+  const { body, existingMedia, existingDocuments, currentHeroPath, supabaseUrl } = options;
+  const verifiedUploads = options.verifiedUploads || new Map<string, VerifiedProfileUpload>();
+  if (hasInlineProfileAssets(body)) {
+    throw new ProfileSaveError("Upload photos and documents directly before saving Profile metadata.", 413, "inline_profile_upload_rejected");
+  }
   const suppliedPhotos = list(body.photos, 20, "Photos").map((source) => {
     if (typeof source !== "string" || !source.trim()) throw new ProfileSaveError("A photo is missing. Add it again before saving.");
     return source.trim();
@@ -91,13 +92,11 @@ export async function prepareProfileAssets(options: {
   if (!sources.length || sources.length > 20) throw new ProfileSaveError("Every Profile needs between 1 and 20 photos.");
   const mediaPaths = [...existingMedia.map((row) => row.storage_path), ...(currentHeroPath ? [currentHeroPath] : [])];
   const photoPlans: PreparedSource[] = sources.map((source) => {
-    if (source.startsWith("data:")) {
-      const parsed = decodeUpload(source, "image");
-      return { path: `${ownerId}/${guitarId}/media-${randomUUID()}.${parsed.extension}`, upload: parsed };
-    }
     const path = existingAssetPath(source, mediaPaths, "instrument-media", supabaseUrl);
-    if (!path) throw new ProfileSaveError("A photo could not be matched to this Profile. Reload or upload it again.");
-    return { path };
+    if (path) return { path };
+    const staged = verifiedUploads.get(source);
+    if (staged?.kind === "image") return { path: source };
+    throw new ProfileSaveError("A photo could not be matched to this Profile. Reload or upload it again.");
   });
   const documentPlans: PreparedDocument[] = [];
   const documents = body.documents === undefined ? existingDocuments.map((document) => ({
@@ -112,20 +111,19 @@ export async function prepareProfileAssets(options: {
     const source = document.storagePath ?? document.dataUrl ?? document.url ?? "";
     if (typeof source !== "string") throw new ProfileSaveError("Invalid document source.");
     let existing: SavedDocument | undefined;
-    let parsed: Upload | undefined;
+    let staged: VerifiedProfileUpload | undefined;
     let path = "";
-    if (source.startsWith("data:")) {
-      parsed = decodeUpload(source, "document");
-      path = `${ownerId}/${guitarId}/document-${randomUUID()}.${parsed.extension}`;
-    } else {
-      path = existingAssetPath(source, existingDocuments.map((row) => row.storage_path), "instrument-documents", supabaseUrl);
-      existing = path ? existingDocuments.find((row) => row.storage_path === path) : undefined;
-      // Legacy callers can omit a URL, but a name must identify exactly one existing document.
-      if (!source && !existing) {
-        const matches = existingDocuments.filter((row) => row.name === document.name);
-        if (matches.length === 1) { existing = matches[0]; path = existing.storage_path; }
-      }
-      if (!existing) throw new ProfileSaveError("A document could not be matched to this Profile. Reload or upload it again.");
+    path = existingAssetPath(source, existingDocuments.map((row) => row.storage_path), "instrument-documents", supabaseUrl);
+    existing = path ? existingDocuments.find((row) => row.storage_path === path) : undefined;
+    // Legacy callers can omit a URL, but a name must identify exactly one existing document.
+    if (!source && !existing) {
+      const matches = existingDocuments.filter((row) => row.name === document.name);
+      if (matches.length === 1) { existing = matches[0]; path = existing.storage_path; }
+    }
+    if (!existing) {
+      staged = verifiedUploads.get(source);
+      if (staged?.kind !== "document") throw new ProfileSaveError("A document could not be matched to this Profile. Reload or upload it again.");
+      path = source;
     }
     const metadata = (key: string, old: string | null | undefined, max: number) => text(
       document[key] === undefined ? old : document[key], max, key
@@ -153,22 +151,14 @@ export async function prepareProfileAssets(options: {
       issuer_source: metadata("issuerSource", existing?.issuer_source, 200),
       document_date: documentDate, description: metadata("description", existing?.description, 1000),
       related_timeline_event_id: relatedTimelineEventId, related_service_event_id: relatedServiceEventId,
-      mime_type: existing?.mime_type || parsed?.mimeType || null,
-      file_size_bytes: existing?.file_size_bytes ?? parsed?.bytes.length ?? null, upload: parsed
+      mime_type: existing?.mime_type || staged?.mimeType || null,
+      file_size_bytes: existing?.file_size_bytes ?? staged?.size ?? null
     });
   }
   if (new Set(documentPlans.map((document) => document.storage_path)).size !== documentPlans.length) {
     throw new ProfileSaveError("A document was submitted more than once.");
   }
 
-  // Every transform and metadata validation above finishes before any upload or database write.
-  // Upload to new, unique paths. Never delete existing files, including on ambiguous RPC failures.
-  for (const photo of photoPlans) {
-    if (photo.upload) await upload("instrument-media", photo.path, photo.upload.bytes, photo.upload.mimeType);
-  }
-  for (const document of documentPlans) {
-    if (document.upload) await upload("instrument-documents", document.storage_path, document.upload.bytes, document.upload.mimeType);
-  }
   const uniquePhotoPlans = [...new Map(photoPlans.map((photo) => [photo.path, photo])).values()];
   return {
     heroImagePath: photoPlans[0].path,
@@ -176,7 +166,7 @@ export async function prepareProfileAssets(options: {
       const existing = existingMedia.find((row) => row.storage_path === photo.path);
       return { id: existing?.id || null, storage_path: photo.path, alt: existing?.alt || `Instrument media ${index + 1}`, sort_order: index };
     }),
-    documents: documentPlans.map(({ upload: _upload, ...document }) => document),
+    documents: documentPlans,
     expectedMedia: existingMedia.map(({ id, storage_path, sort_order }) => ({ id, storage_path, sort_order })),
     expectedDocuments: existingDocuments.map(({ id, updated_at }) => ({ id, updated_at }))
   };
@@ -187,6 +177,8 @@ export function profileSaveFailure(error: { code?: string; message?: string } | 
     return { status: 503, code: "profile_save_unavailable", message: "Profile saving is temporarily unavailable. Your existing Profile has not been replaced." };
   }
   if (error?.code === "PT409" || error?.code === "40001") return { status: 409, code: "profile_changed", message: "This Profile changed while you were saving. Reload it before trying again." };
+  if (error?.code === "QG007") return { status: 409, code: "profile_upload_changed", message: "A selected upload changed before this Profile was saved. Upload that file again." };
+  if (error?.code === "22023") return { status: 400, code: "invalid_profile", message: error.message || "Review the Profile details and try again." };
   if (error?.code === "42501") return { status: 403, code: "profile_save_forbidden", message: "This Profile can no longer be edited by this account." };
   if (error?.code === "P0002") return { status: 404, code: "profile_not_found", message: "QRguitar Profile was not found." };
   if (error?.code === "23505") return { status: 409, code: "profile_identity_conflict", message: "The Serial Number, QR link, or trust settings conflict with an existing Profile. Admin review is required." };
