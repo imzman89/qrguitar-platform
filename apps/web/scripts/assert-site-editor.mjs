@@ -7,6 +7,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const route = read("app/api/site-editor/route.ts");
 const previewRoute = read("app/api/site-editor/preview/route.ts");
 const page = read("app/site-editor/page.tsx");
+const adminPage = read("app/admin/site-editor/page.tsx");
 const preview = read("lib/site-preview.ts");
 const settingsServer = read("lib/site-settings-server.ts");
 const middleware = read("middleware.ts");
@@ -39,6 +40,19 @@ for (const marker of ["issueDraftPreview", "<iframe", "Desktop preview", "Tablet
 }
 for (const marker of ["if (!authorized || !previewOpen) return", "closePreview", "pagehide", "confirmDialogRef", "sidebarCloseRef", "Autosave will store it as the shared draft."]) {
   if (!page.includes(marker)) throw new Error(`Content Studio preview/accessibility lifecycle is missing ${marker}.`);
+}
+for (const marker of ["mutationLocked", "Resolve the current save issue with the recovery controls", "disabled={mutationLocked", "Retry the same save"]) {
+  if (!page.includes(marker)) throw new Error(`Content Studio mutation recovery guard is missing ${marker}.`);
+}
+if (!page.includes("[previewOpen, closePreview]") || page.includes("[previewOpen, confirmAction, closePreview]")) {
+  throw new Error("Opening a confirmation can incorrectly transfer focus back to the preview panel.");
+}
+for (const marker of ["usePathname", "adminEntry", "editorContinuation", "Back to Admin", "Admin tools"]) {
+  if (!page.includes(marker)) throw new Error(`Content Studio admin entry is missing ${marker}.`);
+}
+if (page.includes("Owner tools")) throw new Error("Content Studio still uses stale Owner tools wording.");
+if (!adminPage.includes('import SiteEditorPage from "../../site-editor/page"') || !adminPage.includes("export default SiteEditorPage")) {
+  throw new Error("The /admin/site-editor continuation no longer resolves to Content Studio.");
 }
 for (const marker of ["Theme", "Brand assets", "Composition", "SEO", "settingsChangeReview"]) {
   if (!review.includes(marker)) throw new Error(`Content Studio change review is missing ${marker}.`);

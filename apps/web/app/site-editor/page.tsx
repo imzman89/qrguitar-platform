@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ArrowLeft,
   Check,
   ChevronDown,
   Clipboard,
@@ -29,6 +30,7 @@ import {
   X
 } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
@@ -251,6 +253,9 @@ function validateEditorSettings(settings: EditableSiteSettings, rawBrandLogos: u
 }
 
 export default function SiteEditorPage() {
+  const pathname = usePathname() || "/site-editor";
+  const adminEntry = pathname === "/admin/site-editor";
+  const editorContinuation = adminEntry ? "/admin/site-editor" : "/site-editor";
   const [selected, setSelected] = useState<SelectedPage>({ area: "Marketing", page: "Homepage" });
   const [settings, setSettingsState] = useState<EditableSiteSettings>(defaultSiteSettings);
   const settingsRef = useRef(settings);
@@ -331,6 +336,7 @@ export default function SiteEditorPage() {
   const previewPath = currentPageEntries.find((entry) => entry.previewPath)?.previewPath || "/";
   const changeReview = useMemo(() => settingsChangeReview(settings, published), [published, settings]);
   const changeCount = changeReview.length;
+  const mutationLocked = Boolean(editorIssue) || writeBusy;
   const hasChanges = JSON.stringify(settings) !== JSON.stringify(published);
   const textContrast = contrastRatio(settings.colors.text, settings.colors.background);
   const actionContrast = contrastRatio(settings.colors.background, settings.colors.cream);
@@ -420,7 +426,17 @@ export default function SiteEditorPage() {
         await writeTask.current;
       }
       const controller = mutationsRef.current;
-      if (!controller || (issueRef.current && !retry)) return;
+      if (!controller) {
+        if (manual) { setStatus("error"); setMessage("Reload Site Editor before making another publishing change."); }
+        return;
+      }
+      if (issueRef.current && !retry) {
+        if (manual) {
+          setStatus("error");
+          setMessage("Resolve the current save issue with the recovery controls before publishing, discarding, or restoring.");
+        }
+        return;
+      }
       const localSnapshot = retry ? controller.pending?.localSnapshot || JSON.stringify(settingsRef.current) : JSON.stringify(settingsRef.current);
       const submitted = settingsRef.current;
       if (!retry && action === "publish") {
@@ -566,14 +582,14 @@ export default function SiteEditorPage() {
     const trigger = previewTriggerRef.current;
     previewPanelRef.current?.focus();
     const close = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !confirmAction) closePreview();
+      if (event.key === "Escape" && !confirmDialogRef.current) closePreview();
     };
     window.addEventListener("keydown", close);
     return () => {
       window.removeEventListener("keydown", close);
       trigger?.focus();
     };
-  }, [previewOpen, confirmAction, closePreview]);
+  }, [previewOpen, closePreview]);
 
   useEffect(() => {
     if (!sidebarOpen) return;
@@ -1011,7 +1027,7 @@ export default function SiteEditorPage() {
         {revisions.map((revision) => (
           <article key={revision.id}>
             <div><strong>{revision.note}</strong><span>{revision.area}</span><small>{formatTime(revision.publishedAt)} · {revision.changedFields.length} changed fields</small></div>
-            <button type="button" className="button secondary" onClick={() => setConfirmAction({ kind: "restore", revision })}><RotateCcw size={15} /> Restore to draft</button>
+            <button type="button" className="button secondary" onClick={() => setConfirmAction({ kind: "restore", revision })} disabled={mutationLocked} title={editorIssue ? "Resolve the current save issue before restoring a revision." : undefined}><RotateCcw size={15} /> Restore to draft</button>
           </article>
         ))}
         {!revisions.length ? <p>No prior published revisions yet.</p> : null}
@@ -1061,7 +1077,7 @@ export default function SiteEditorPage() {
 
   if (!authorized) {
     return (
-      <><Nav /><main className="section cms-access"><div className="shell"><section className="card"><div className="eyebrow">Owner tools</div><h1>{status === "loading" ? "Checking Site Editor access." : "Admin access required."}</h1><p>{message}</p>{status !== "loading" ? <Link className="button" href={`/login?next=${encodeURIComponent("/site-editor")}`}>Sign in</Link> : null}</section></div></main><Footer /></>
+      <><Nav /><main className="section cms-access"><div className="shell"><section className="card"><div className="eyebrow">Admin tools</div><h1>{status === "loading" ? "Checking Site Editor access." : "Admin access required."}</h1><p>{message}</p>{status !== "loading" ? <div className="form-actions"><Link className="button" href={`/login?next=${encodeURIComponent(editorContinuation)}`}>Sign in</Link>{adminEntry ? <Link className="button secondary" href="/admin"><ArrowLeft size={15} /> Back to Admin</Link> : null}</div> : null}</section></div></main><Footer /></>
     );
   }
 
@@ -1072,6 +1088,7 @@ export default function SiteEditorPage() {
         <header className="cms-commandbar">
           <div>
             <button ref={sidebarTriggerRef} type="button" className="cms-mobile-tree" onClick={() => setSidebarOpen(true)} aria-label="Open content tree" aria-expanded={sidebarOpen} aria-controls="cms-content-tree"><Menu size={18} /></button>
+            {adminEntry ? <Link className="cms-admin-back" href="/admin" aria-label="Back to Admin"><ArrowLeft size={15} /> Back to Admin</Link> : null}
             <div><span>Content Studio</span><strong>{selected.page}</strong></div>
           </div>
           <div className={`cms-save-state is-${status}`} aria-live="polite">
@@ -1080,9 +1097,9 @@ export default function SiteEditorPage() {
             {editorIssue ? <div role="alert"><button type="button" onClick={exportLocalChanges}>Export local changes</button>{editorIssue === "uncertain" ? <button type="button" disabled={writeBusy} onClick={() => void executeEditor("", {}, true, true)}>Retry the same save</button> : null}{editorIssue === "error" && !mutationsRef.current?.storageProblem ? <button type="button" disabled={writeBusy} onClick={() => { setEditorIssue(""); setStatus("dirty"); }}>Resume saving</button> : null}<button type="button" disabled={writeBusy} onClick={() => { exportLocalChanges(); window.location.reload(); }}>Export and reload latest</button></div> : null}
           </div>
           <div className="cms-command-actions">
-            <button type="button" className="button secondary" onClick={() => setConfirmAction({ kind: "discard" })} disabled={!draftMeta && !hasChanges}>Discard draft</button>
+            <button type="button" className="button secondary" onClick={() => setConfirmAction({ kind: "discard" })} disabled={mutationLocked || (!draftMeta && !hasChanges)} title={editorIssue ? "Resolve the current save issue before discarding the draft." : undefined}>Discard draft</button>
             <button ref={previewTriggerRef} type="button" className="button secondary" onClick={() => previewOpen ? closePreview() : setPreviewOpen(true)} aria-expanded={previewOpen} aria-controls="cms-site-preview"><Eye size={16} /> {previewOpen ? "Hide preview" : "Preview"}</button>
-            <button type="button" className="button" onClick={() => setConfirmAction({ kind: "publish" })} disabled={status === "saving" || !hasChanges}><Send size={16} /> Publish</button>
+            <button type="button" className="button" onClick={() => setConfirmAction({ kind: "publish" })} disabled={mutationLocked || status === "saving" || !hasChanges} title={editorIssue ? "Resolve the current save issue before publishing." : undefined}><Send size={16} /> Publish</button>
           </div>
         </header>
 
@@ -1156,7 +1173,7 @@ export default function SiteEditorPage() {
               {confirmAction.kind === "publish" ? <label className="cms-release-note">Release note (optional)<input value={note} onChange={(event) => setNote(event.target.value)} placeholder={`What changed on ${selected.page}?`} maxLength={180} /></label> : null}
               <div className="cms-modal-actions">
                 <button type="button" className="button secondary" onClick={() => setConfirmAction(null)}>Cancel</button>
-                <button type="button" className="button" disabled={writeBusy} onClick={() => {
+                <button type="button" className="button" disabled={mutationLocked} onClick={() => {
                   const action = confirmAction;
                   setConfirmAction(null);
                   if (action.kind === "discard") void discardDraft();

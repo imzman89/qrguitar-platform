@@ -84,6 +84,10 @@ function hookRuntime() {
 }
 function browser(options) {
   const writes = [], downloads = [], timers = new Map(), events = new Map(), storage = new Map(); let timer = 0;
+  class BrowserURL extends globalThis.URL {
+    static createObjectURL() { return 'blob:fixture'; }
+    static revokeObjectURL() {}
+  }
   const navigator = {};
   if (!options.noClipboard) navigator.clipboard = { writeText(value) { writes.push(value); return options.clipboard?.(value) ?? Promise.resolve(); } };
   Object.defineProperty(navigator, 'permissions', { get() { throw Error('Clipboard permission queries are forbidden'); } });
@@ -96,27 +100,30 @@ function browser(options) {
   return { writes, downloads, timers, navigator, window, storage,
     emit(name) { for (const callback of [...events.get(name) || []]) callback({}); },
     document: { createElement: () => ({ click() { downloads.push(true); } }) },
-    URL: { createObjectURL: () => 'blob:fixture', revokeObjectURL() {} }
+    URL: BrowserURL
   };
 }
 async function editor(t, options = {}) {
   const f = hookRuntime(), b = browser(options), mutations = [];
   let generation = 0;
-  const payload = { ok: true, editorActorId: 'actor-a', publishedVersion: '0', draftVersion: '0', published: structuredClone(settings.defaultSiteSettings), draft: null };
+  const payload = { ok: true, editorActorId: 'actor-a', publishedVersion: '0', draftVersion: '0', published: structuredClone(settings.defaultSiteSettings), draft: null, revisions: options.revisions || [] };
   const mutate = async body => { mutations.push(body); return options.mutate ? options.mutate(body) : { ...payload, message: 'Saved fixture operation.', draft: body.settings || payload.published }; };
+  const recovered = structuredClone(settings.defaultSiteSettings); recovered.colors.gold = '#abcdef';
+  const pending = options.pendingIssue ? { localSnapshot: JSON.stringify(recovered) } : null;
   class EditorMutationError extends Error {}
   const jsx = (type, props, key) => ({ type, props, key });
   const load = loader({
-    react: f.hooks, 'react/jsx-runtime': { jsx, jsxs: jsx }, 'lucide-react': {}, 'next/link': { default: 'Link' },
+    react: f.hooks, 'react/jsx-runtime': { jsx, jsxs: jsx }, 'lucide-react': {}, 'next/link': { default: 'Link' }, 'next/navigation': { usePathname: () => options.pathname || '/site-editor' },
     '../../components/Nav': { Nav: 'Nav' }, '../../components/Footer': { Footer: 'Footer' }, '../../components/SiteCompositionEditor': { SiteCompositionEditor: 'SiteCompositionEditor' },
     '../../lib/content-registry': registry, '../../lib/site-settings': { ...settings, applyThemeSettings() {} },
     '../../lib/site-editor-client': { EditorMutationError, shouldReplaceEditorContent: (current, submitted) => current === submitted,
-      createEditorMutationController: () => ({ mutate, retry: () => { throw Error('Unexpected retry'); }, pending: null, storageProblem: null }) },
+      createEditorMutationController: () => ({ mutate, retry: () => { throw Error('Unexpected retry'); }, pending, storageProblem: null }) },
     '../../lib/site-preview-client': { clearSitePreviewCookie: async () => {}, openSiteDraftPreview: async () => '/fixture', sitePreviewGeneration: () => generation, sitePreviewInvalidatedEvent: 'fixture-invalidate' },
     '../../lib/supabase-browser': { getSupabaseAccessToken: async () => 'fixture-token', createBrowserSupabaseClient: () => ({ auth: { getSession: async () => ({ data: { session: { user: { id: 'actor-a' }, access_token: 'fixture-token' } } }) } }) }
   }, { window: b.window, document: b.document, navigator: b.navigator, URL: b.URL, crypto: { randomUUID: () => 'fixture-request' },
-    fetch: async (url, init) => { assert.equal(url, '/api/site-editor'); assert.equal(init.method, undefined); return { ok: true, json: async () => payload }; } });
-  f.mount(load('apps/web/app/site-editor/page.tsx').default); await f.flush(); f.click('Advanced'); f.click('Advanced JSON'); await f.flush();
+    fetch: async (url, init) => { assert.equal(url, '/api/site-editor'); assert.equal(init.method, undefined); return options.loadError ? { ok: false, json: async () => ({ message: options.loadError }) } : { ok: true, json: async () => payload }; } });
+  f.mount(load('apps/web/app/site-editor/page.tsx').default); await f.flush();
+  if (!options.loadError) { f.click('Advanced'); f.click('Advanced JSON'); await f.flush(); }
   t.after(() => f.dispose());
   return Object.assign(f, b, { payload, mutations,
     invalidate() { generation++; b.emit('fixture-invalidate'); f.render(); },
@@ -151,6 +158,30 @@ async function importer(t, options = {}) {
     messages: () => f.all().filter(node => node.props?.role === 'status').map(text).join('\n')
   });
 }
+
+test('admin Site Editor entry keeps its admin return path and sign-in continuation', async t => {
+  const authorized = await editor(t, { pathname: '/admin/site-editor' });
+  assert.ok(authorized.all().some(node => node.props?.href === '/admin' && text(node).includes('Back to Admin')));
+  const signedOut = await editor(t, { pathname: '/admin/site-editor', loadError: 'Sign in with an authorized admin account.' });
+  assert.match(signedOut.text(), /Admin tools/); assert.doesNotMatch(signedOut.text(), /Owner tools/);
+  assert.ok(signedOut.all().some(node => node.props?.href === '/login?next=%2Fadmin%2Fsite-editor'));
+});
+
+test('public Site Editor alias preserves its own sign-in continuation', async t => {
+  const signedOut = await editor(t, { pathname: '/site-editor', loadError: 'Sign in with an authorized admin account.' });
+  assert.ok(signedOut.all().some(node => node.props?.href === '/login?next=%2Fsite-editor'));
+  assert.equal(signedOut.all().some(node => node.props?.href === '/admin'), false);
+});
+
+test('pending exact-save recovery disables publish, discard and restore controls', async t => {
+  const revision = { id: 'site-editor:revision:test', updatedAt: '2026-09-18T12:00:00Z', publishedAt: '2026-09-18T12:00:00Z', publishedBy: 'Admin', note: 'Before', area: 'Homepage', changedFields: ['content.title'] };
+  const f = await editor(t, { pendingIssue: true, revisions: [revision] });
+  assert.equal(f.button('Publish').props.disabled, true);
+  assert.equal(f.button('Discard draft').props.disabled, true);
+  assert.equal(f.button('Retry the same save').props.disabled, false);
+  f.click('Revision history');
+  assert.equal(f.button('Restore to draft').props.disabled, true);
+});
 
 test('editor copy confirms the exact settings export without changing save status', async t => {
   const f = await editor(t), before = f.saveStatus(), expected = f.json().props.value;
