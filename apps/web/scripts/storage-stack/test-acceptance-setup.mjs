@@ -5,10 +5,58 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
 import { applicationLoader } from './acceptance.mjs';
-import { createDiagnostics, safeReport, ORIGIN, APP_ORIGIN, readinessProjection, READINESS_LABELS } from './guards.mjs';
+import { createDiagnostics, safeReport, ORIGIN, APP_ORIGIN, readinessProjection, READINESS_LABELS, configToml, assertFixtureAuthSettings } from './guards.mjs';
 
 const repo = path.resolve(process.argv.find(arg => arg.startsWith('--repo='))?.slice(7) || path.resolve(import.meta.dirname, '../../../..'));
 const require = createRequire(path.join(repo, 'package.json'));
+
+test('fixture enables existing email sign-in while global signup and auto-confirmation stay disabled', () => {
+  const sections = {}; let current;
+  for (const line of configToml('qrg-storage-35293824185-1').split(/\r?\n/)) {
+    const section = /^\[([^\]]+)\]$/.exec(line);
+    if (section) { current = section[1]; sections[current] = {}; continue; }
+    const boolean = /^(\w+) = (true|false)$/.exec(line);
+    if (boolean && current) sections[current][boolean[1]] = boolean[2] === 'true';
+  }
+  assert.equal(sections.auth.enable_signup, false);
+  assert.equal(sections['auth.email'].enable_signup, true);
+  assert.equal(sections['auth.email'].enable_confirmations, true);
+});
+
+test('actual Auth settings must permit existing email users without enabling signup or auto-confirmation', () => {
+  const valid = { external: { email: true }, disable_signup: true, mailer_autoconfirm: false };
+  assertFixtureAuthSettings(valid);
+  for (const value of [null, {}, { ...valid, external: { email: false } }, { ...valid, disable_signup: false }, { ...valid, mailer_autoconfirm: true }, { ...valid, external: { email: 'true' } }]) {
+    assert.throws(() => assertFixtureAuthSettings(value));
+  }
+});
+
+test('installed Auth SDK preserves the disabled-provider code while diagnostics hide request and error content', async () => {
+  const { createClient } = require('@supabase/supabase-js');
+  const calls = [], diagnostics = createDiagnostics();
+  const client = createClient(ORIGIN, 'synthetic-not-a-credential', { auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: async (input, init) => {
+      calls.push({ url: String(input), method: init.method, body: JSON.parse(init.body) });
+      return new Response(JSON.stringify({ code: 'email_provider_disabled', msg: 'private fixture details ?token=never-output' }), { status: 422, headers: { 'content-type': 'application/json', 'x-supabase-api-version': '2024-01-01' } });
+    } } });
+  const result = await client.auth.signInWithPassword({ email: 'fixture@example.invalid', password: 'synthetic-only-no-network' });
+  assert.equal(calls.length, 1); assert.equal(calls[0].url, ORIGIN + '/auth/v1/token?grant_type=password'); assert.equal(calls[0].method, 'POST');
+  assert.equal(calls[0].body.email, 'fixture@example.invalid'); assert.equal(calls[0].body.password, 'synthetic-only-no-network');
+  assert.equal(result.data.session, null); assert.equal(result.error.status, 422); assert.equal(result.error.code, 'email_provider_disabled');
+  assert.throws(() => diagnostics.phase('auth-user-signin', () => { throw result.error; }, { actorKind: 'provider' }));
+  assert.deepEqual(diagnostics.report().events.at(-1).failure, { classifier: 'operation-failed', authCode: 'email_provider_disabled', httpStatus: 422 });
+  const report = safeReport(diagnostics.report());
+  for (const forbidden of ['private fixture details', '?token=', 'fixture@example.invalid', 'synthetic-only-no-network']) assert.ok(!report.includes(forbidden));
+});
+
+test('Auth diagnostics accept only exact known codes, never arbitrary or credential-like strings', () => {
+  for (const code of ['email_provider_disabled?token=private', 'private-custom-code', 'password', 'EMAIL_PROVIDER_DISABLED']) {
+    const diagnostics = createDiagnostics();
+    assert.throws(() => diagnostics.phase('auth-user-signin', () => { throw Object.assign(Error('private content'), { status: 422, code }); }, { actorKind: 'provider' }));
+    assert.deepEqual(diagnostics.report().events.at(-1).failure, { classifier: 'operation-failed', httpStatus: 422 });
+    assert.ok(!safeReport(diagnostics.report()).includes(code));
+  }
+});
 test('actual route and protocol load with synthetic environment and forbidden network', () => {
   const savedEnv = process.env, savedFetch = globalThis.fetch;
   let networkCalls = 0;

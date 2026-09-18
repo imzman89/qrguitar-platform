@@ -4,7 +4,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { createHash, randomUUID, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { context, verifyDirectory, validateStatus, exactApiUrl, ORIGIN, APP_ORIGIN, MARKER, safeReport, createDiagnostics, readinessProjection } from './guards.mjs';
+import { context, verifyDirectory, validateStatus, exactApiUrl, ORIGIN, APP_ORIGIN, MARKER, safeReport, createDiagnostics, readinessProjection, assertFixtureAuthSettings } from './guards.mjs';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const EXPECTED_CASES = 18;
@@ -174,6 +174,11 @@ async function main() {
     assert.deepEqual(readiness.checks.map(item => item.name).sort(), [...manifest.checks].sort());
     });
     report.releaseVersion = readiness.releaseVersion; report.readinessChecks = readiness.checks.length;
+    await step('auth-settings', async () => {
+      const response = await fetch(ORIGIN + '/auth/v1/settings', { headers: { apikey: status.ANON_KEY } });
+      assert.equal(response.status, 200);
+      assertFixtureAuthSettings(await response.json());
+    });
     provider = await user('provider'); owner = await user('owner'); stranger = await user('stranger');
     const guitar = randomUUID(); submission = randomUUID(); const qr = 'QRG-' + randomBytes(8).toString('hex').toUpperCase();
     await step('fixture-instrument-create', () => db.query("insert into public.guitars(id,owner_id,qr_code,permanent_path,name,brand,visibility) values($1,$2,$3,$4,'Synthetic','Synthetic','private')", [guitar, owner.id, qr, '/i/' + qr]));

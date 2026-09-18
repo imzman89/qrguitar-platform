@@ -26,6 +26,12 @@ export function readinessProjection(value, manifest) {
 const COMMAND_CLASSES = new Set(['docker', 'supabase-cli', 'openssl', 'acceptance-child']);
 const SIGNALS = new Set(['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGABRT', 'SIGSEGV', 'SIGPIPE']);
 const SPAWN_CODES = new Set(['ENOENT', 'EACCES', 'EPERM', 'ETIMEDOUT', 'ENOBUFS', 'ECONNREFUSED']);
+const AUTH_CODES = new Set(['email_provider_disabled', 'signup_disabled', 'invalid_credentials', 'email_not_confirmed', 'user_banned', 'validation_failed', 'unexpected_failure', 'over_request_rate_limit']);
+export function assertFixtureAuthSettings(settings) {
+  assert.equal(settings?.external?.email, true);
+  assert.equal(settings?.disable_signup, true);
+  assert.equal(settings?.mailer_autoconfirm, false);
+}
 export const DIAGNOSTIC_PHASES = Object.freeze([
   'context', 'mode', 'fixture-absent', 'repository-path', 'fresh-containers', 'fresh-network', 'fixture-create',
   'cli-version', 'cli-init', 'config-write', 'fixture-validate', 'network-create', 'network-validate-empty',
@@ -36,7 +42,7 @@ export const DIAGNOSTIC_PHASES = Object.freeze([
   'child-context', 'child-fixture', 'child-status', 'child-dependencies', 'child-sources', 'child-package-versions',
   'child-module-load', 'database-connect', 'database-preconditions', 'schema-apply', 'schema-notify',
   'fixture-bucket-create', 'fixture-bucket-verify', 'readiness-rpc', 'readiness-validate',
-  'auth-user-create', 'auth-user-signin', 'auth-profile-create', 'fixture-instrument-create',
+  'auth-settings', 'auth-user-create', 'auth-user-signin', 'auth-profile-create', 'fixture-instrument-create',
   'fixture-submission-create', 'acceptance-case', 'acceptance-final-validation', 'database-close'
 ]);
 export function commandFailure(command, result) {
@@ -76,6 +82,7 @@ export function createDiagnostics(write = () => {}) {
     const source = assertion && error.actual && typeof error.actual === 'object' ? error.actual : error;
     return { classifier: assertion ? 'guard-rejected' : error instanceof SyntaxError ? 'invalid-json' : 'operation-failed',
       ...(/^[0-9A-Z]{5}$/.test(source?.code || '') ? { sqlState: source.code } : {}),
+      ...(AUTH_CODES.has(source?.code) ? { authCode: source.code } : {}),
       ...(Number.isInteger(source?.status) && source.status >= 100 && source.status <= 599 ? { httpStatus: source.status } : {}),
       ...(assertion ? { actualType: kind(error.actual), expectedType: kind(error.expected),
         ...(scalar(error.actual) ? { actualScalar: error.actual } : {}), ...(scalar(error.expected) ? { expectedScalar: error.expected } : {}) } : {}) };
@@ -208,7 +215,9 @@ site_url = "${APP_ORIGIN}"
 additional_redirect_urls = []
 enable_signup = false
 [auth.email]
-enable_signup = false
+# CLI maps this flag to GOTRUE_EXTERNAL_EMAIL_ENABLED, including existing-user login.
+# The independent global auth.enable_signup=false above still forbids public signup.
+enable_signup = true
 enable_confirmations = true
 [analytics]
 enabled = false
