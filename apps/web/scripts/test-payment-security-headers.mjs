@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import nextConfig from "../next.config.mjs";
 import * as policy from "../lib/security-headers.ts";
+import * as indexing from "../lib/search-indexing.ts";
 
 const web = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url), ts = require("typescript");
@@ -93,6 +94,7 @@ function middleware(pathname, preview) {
   new Function("require", "module", "exports", "process", middlewareCode)(name => {
     if (name === "next/server") return { NextResponse: { next: () => new Response(null), redirect: (url, status) => new Response(null, { status, headers: { location: String(url) } }) } };
     if (name === "./lib/security-headers") return policy;
+    if (name === "./lib/search-indexing") return indexing;
     throw Error(`Unexpected middleware import: ${name}`);
   }, module, module.exports, { env: { NODE_ENV: "production" } });
   return module.exports.middleware({ headers: new Headers({ host: "www.qrguitar.com" }), nextUrl: new URL(pathname, "https://www.qrguitar.com"), cookies: { has: name => preview && name === "qrguitar_site_preview" } });

@@ -70,7 +70,8 @@ test("middleware emits X-Robots-Tag for protected families and leaves public pag
   };
   const middleware = loadTypeScript("middleware.ts", {
     "next/server": { NextResponse: nextResponse },
-    "./lib/search-indexing": indexing
+    "./lib/search-indexing": indexing,
+    "./lib/security-headers": { isCheckoutPath: () => false, securityHeaders: () => [] }
   }, { NODE_ENV: "production" });
   const request = pathname => ({
     headers: new Headers({ host: "www.qrguitar.com" }),
