@@ -76,7 +76,7 @@ test("middleware emits X-Robots-Tag for protected families and leaves public pag
   }, { NODE_ENV: "production" });
   const request = pathname => ({
     headers: new Headers({ host: "www.qrguitar.com" }),
-    nextUrl: { pathname, clone: () => ({ pathname, hostname: "www.qrguitar.com", toString: () => `https://www.qrguitar.com${pathname}` }) },
+    nextUrl: { pathname, searchParams: new URLSearchParams(), clone: () => ({ pathname, hostname: "www.qrguitar.com", toString: () => `https://www.qrguitar.com${pathname}` }) },
     cookies: { has: () => false }
   });
   for (const pathname of ["/dashboard", "/edit/QRG-A", "/service-review/private-id", "/api/account"])
