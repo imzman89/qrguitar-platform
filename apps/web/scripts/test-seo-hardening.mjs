@@ -135,6 +135,122 @@ test("Profile social metadata never publishes browser-local image schemes", () =
   }), "https://www.qrguitar.com/api/public-file/QRG-A/media/token");
 });
 
+test("unlisted Profile metadata is noindex while social sharing metadata remains available", () => {
+  const profile = {
+    qrCode: "QRG-UNLISTED",
+    permanentPath: "/i/QRG-UNLISTED",
+    name: "Unlisted Test Guitar",
+    brand: "Test",
+    model: "Guitar",
+    summary: "Shared only with people who receive the direct link.",
+    heroImageDataUrl: "/api/public-file/QRG-UNLISTED/media/token"
+  };
+  const unlisted = seo.buildRecordMetadata({ ...profile, visibility: "unlisted" });
+  assert.deepEqual(unlisted.robots, { index: false, follow: true });
+  assert.equal(unlisted.alternates.canonical, "https://www.qrguitar.com/i/QRG-UNLISTED");
+  assert.equal(unlisted.openGraph.url, "https://www.qrguitar.com/i/QRG-UNLISTED");
+  assert.deepEqual(unlisted.twitter.images, ["https://www.qrguitar.com/api/public-file/QRG-UNLISTED/media/token"]);
+
+  assert.deepEqual(seo.buildRecordMetadata({ ...profile, visibility: "public" }).robots, { index: true, follow: true });
+  assert.deepEqual(seo.buildRecordMetadata({ ...profile, visibility: "private" }).robots, { index: false, follow: true });
+});
+
+test("metadata excerpts normalize whitespace and remain word and Unicode safe", () => {
+  assert.equal(seo.metadataExcerpt("  alpha\n beta   gamma  ", 12), "alpha beta…");
+  const emojiExcerpt = seo.metadataExcerpt("😀😀😀😀😀😀", 5);
+  assert.equal(Array.from(emojiExcerpt).length, 5);
+  assert.doesNotMatch(emojiExcerpt, /�/);
+
+  const summary = `A detailed instrument history with original paperwork and documented service. ${"Additional provenance remains visible in structured data. ".repeat(8)}`;
+  const instrument = {
+    qrCode: "QRG-LONG",
+    permanentPath: "/i/QRG-LONG",
+    name: "A remarkably long custom instrument name with provenance from a respected independent builder and studio",
+    brand: "Independent Builder",
+    model: "Studio Custom",
+    year: "1998",
+    summary,
+    visibility: "public"
+  };
+  const metadata = seo.buildRecordMetadata(instrument);
+  assert.ok(Array.from(metadata.title).length <= seo.SEARCH_TITLE_MAX_LENGTH);
+  assert.ok(Array.from(metadata.description).length <= seo.SEARCH_DESCRIPTION_MAX_LENGTH);
+  assert.ok(Array.from(metadata.openGraph.title).length <= seo.SOCIAL_TITLE_MAX_LENGTH);
+  assert.ok(Array.from(metadata.openGraph.description).length <= seo.SOCIAL_DESCRIPTION_MAX_LENGTH);
+  assert.doesNotMatch(metadata.description, /\s{2,}/);
+
+  const graph = seo.buildRecordJsonLd(instrument)["@graph"];
+  const product = graph.find(item => item["@type"] === "Product");
+  const breadcrumb = graph.find(item => item["@type"] === "BreadcrumbList");
+  assert.match(product.description, /Additional provenance remains visible in structured data\.(?: Additional provenance remains visible in structured data\.){7}/);
+  assert.ok(product.description.length > metadata.openGraph.description.length);
+  assert.deepEqual(breadcrumb.itemListElement.map(item => item.name), ["Home", "Catalog", instrument.name]);
+  assert.deepEqual(breadcrumb.itemListElement.map(item => item.item), [
+    "https://www.qrguitar.com",
+    "https://www.qrguitar.com/catalog",
+    "https://www.qrguitar.com/i/QRG-LONG"
+  ]);
+});
+
+test("managed public metadata honors allowlisted indexing values and locks protected page ids", async () => {
+  const content = {
+    "seo.catalog.title": "Browse Profiles",
+    "seo.catalog.description": "Explore public QRguitar Profiles.",
+    "seo.catalog.ogTitle": "Browse Profiles",
+    "seo.catalog.ogDescription": "Explore public QRguitar Profiles.",
+    "seo.catalog.image": "/seo/qrguitar-og-v2.png",
+    "seo.catalog.indexing": "noindex, follow",
+    "seo.dashboard.title": "Dashboard",
+    "seo.dashboard.description": "Private workspace",
+    "seo.dashboard.ogTitle": "Dashboard",
+    "seo.dashboard.ogDescription": "Private workspace",
+    "seo.dashboard.image": "/seo/qrguitar-og-v2.png",
+    "seo.dashboard.indexing": "index, follow",
+    "seo.global.image": "/seo/qrguitar-og-v2.png"
+  };
+  const siteMetadata = loadTypeScript("lib/site-metadata.ts", {
+    "./content-registry": { getContentValue: (values, key) => values[key] || "" },
+    "./seo": seo,
+    "./site-settings-server": {
+      loadPublishedSiteSettings: async () => ({ content, brandName: "QRguitar", seo: { twitterHandle: "@qrguitar", keywords: [] } })
+    }
+  });
+
+  assert.deepEqual((await siteMetadata.buildManagedPageMetadata("catalog", "/catalog")).robots, { index: false, follow: true });
+  assert.deepEqual((await siteMetadata.buildManagedPageMetadata("dashboard", "/dashboard")).robots, { index: false, follow: false });
+  content["seo.catalog.indexing"] = "index, nofollow";
+  assert.deepEqual((await siteMetadata.buildManagedPageMetadata("catalog", "/catalog")).robots, { index: true, follow: false });
+  content["seo.catalog.indexing"] = "unsupported directive";
+  assert.deepEqual((await siteMetadata.buildManagedPageMetadata("catalog", "/catalog")).robots, { index: true, follow: true });
+  assert.deepEqual(siteMetadata.resolveManagedPageRobots("catalog", "index, follow", false), { index: false, follow: false });
+
+  const homeSource = fs.readFileSync(path.join(webRoot, "app/page.tsx"), "utf8");
+  assert.match(homeSource, /resolveManagedPageRobots\("home", getContentValue\(publishedSettings\.content, "seo\.home\.indexing"\)\)/);
+});
+
+test("public user-controlled outbound links are qualified without changing trusted document links", () => {
+  const seller = fs.readFileSync(path.join(webRoot, "components/SellerWebsiteLink.tsx"), "utf8");
+  const profile = fs.readFileSync(path.join(webRoot, "app/i/[code]/ProfileClient.tsx"), "utf8");
+  assert.match(seller, /href=\{href\} target="_blank" rel="ugc nofollow noopener noreferrer"/);
+  assert.match(profile, /href=\{item\.canonicalUrl\} target="_blank" rel="ugc nofollow noopener noreferrer"/);
+  assert.match(profile, /href=\{link\.href\} target="_blank" rel="ugc nofollow noopener noreferrer"/);
+  assert.match(profile, /href=\{href\} target="_blank" rel="noreferrer" className="button secondary"/);
+});
+
+test("installer snippets and Profile breadcrumbs describe the rendered experience", () => {
+  const registry = fs.readFileSync(path.join(webRoot, "lib/content-registry.ts"), "utf8");
+  assert.match(registry, /Instrument Service Provider Network \| QRguitar/);
+  assert.match(registry, /document instrument service with owner approval, update permanent Profiles, and print scannable handouts/);
+  assert.doesNotMatch(registry, /QR Installation and Hardware \| QRguitar/);
+
+  const breadcrumbs = fs.readFileSync(path.join(webRoot, "app/i/[code]/ProfileBreadcrumbs.tsx"), "utf8");
+  const profile = fs.readFileSync(path.join(webRoot, "app/i/[code]/ProfileClient.tsx"), "utf8");
+  assert.match(breadcrumbs, /<Link href="\/">Home<\/Link>/);
+  assert.match(breadcrumbs, /<Link href="\/catalog">Catalog<\/Link>/);
+  assert.match(breadcrumbs, /aria-current="page"/);
+  assert.match(profile, /<ProfileBreadcrumbs current=\{instrumentDisplayName\(instrument\)\} \/>/);
+});
+
 test("collection structured data contains public discovery fields only and is script safe", () => {
   const directory = seo.buildCollectionsDirectoryJsonLd([
     { handle: "safe-owner", name: "Safe Owner", accountType: "collector", count: 1, image: "private-image-value" }

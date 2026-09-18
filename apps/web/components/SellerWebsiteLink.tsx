@@ -9,7 +9,7 @@ export function SellerWebsiteLink({ websiteUrl, publicName, accountType }: { web
   const label = accountType === "shop" ? "Visit shop website"
     : accountType === "builder" ? "Visit builder website"
     : accountType === "luthier" ? "Visit service website" : "Visit owner website";
-  return <a className={styles.link} href={href} target="_blank" rel="noopener noreferrer" aria-label={`${label}: ${publicName} (${host}, opens in a new tab)`}>
+  return <a className={styles.link} href={href} target="_blank" rel="ugc nofollow noopener noreferrer" aria-label={`${label}: ${publicName} (${host}, opens in a new tab)`}>
     <span><strong>{label}</strong><small>{host}</small></span><ArrowUpRight size={19} aria-hidden="true" />
   </a>;
 }

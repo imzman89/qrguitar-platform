@@ -1,12 +1,48 @@
 import type { Metadata } from "next";
 import { getContentValue } from "./content-registry";
-import { absoluteSiteUrl } from "./seo";
+import {
+  absoluteSiteUrl,
+  metadataExcerpt,
+  SEARCH_DESCRIPTION_MAX_LENGTH,
+  SEARCH_TITLE_MAX_LENGTH,
+  SOCIAL_DESCRIPTION_MAX_LENGTH,
+  SOCIAL_TITLE_MAX_LENGTH
+} from "./seo";
 import { loadPublishedSiteSettings } from "./site-settings-server";
+
+const PUBLIC_MANAGED_PAGE_IDS = new Set([
+  "home",
+  "howItWorks",
+  "catalog",
+  "installers",
+  "contact",
+  "privacy",
+  "terms",
+  "collections"
+]);
+
+const ALLOWED_ROBOTS_VALUES = new Map([
+  ["index, follow", { index: true, follow: true }],
+  ["index, nofollow", { index: true, follow: false }],
+  ["noindex, follow", { index: false, follow: true }],
+  ["noindex, nofollow", { index: false, follow: false }]
+]);
+
+export function resolveManagedPageRobots(pageId: string, configuredValue: unknown, routeIndexable = true) {
+  if (!routeIndexable || !PUBLIC_MANAGED_PAGE_IDS.has(pageId)) {
+    return { index: false, follow: false };
+  }
+
+  const normalized = String(configuredValue || "").trim().toLowerCase().replace(/\s*,\s*/g, ", ");
+  return ALLOWED_ROBOTS_VALUES.get(normalized) || { index: true, follow: true };
+}
 
 export async function buildManagedSiteMetadata(): Promise<Metadata> {
   const settings = await loadPublishedSiteSettings();
-  const title = getContentValue(settings.content, "seo.global.title");
-  const description = getContentValue(settings.content, "seo.global.description");
+  const title = metadataExcerpt(getContentValue(settings.content, "seo.global.title"), SEARCH_TITLE_MAX_LENGTH);
+  const description = metadataExcerpt(getContentValue(settings.content, "seo.global.description"), SEARCH_DESCRIPTION_MAX_LENGTH);
+  const socialTitle = metadataExcerpt(getContentValue(settings.content, "seo.global.title"), SOCIAL_TITLE_MAX_LENGTH);
+  const socialDescription = metadataExcerpt(getContentValue(settings.content, "seo.global.description"), SOCIAL_DESCRIPTION_MAX_LENGTH);
   const image = absoluteSiteUrl(getContentValue(settings.content, "seo.global.image") || settings.seo.image);
   const canonical = absoluteSiteUrl("/");
 
@@ -22,8 +58,8 @@ export async function buildManagedSiteMetadata(): Promise<Metadata> {
     },
     robots: { index: true, follow: true },
     openGraph: {
-      title,
-      description,
+      title: socialTitle,
+      description: socialDescription,
       url: canonical,
       siteName: settings.brandName || "QRguitar",
       type: "website",
@@ -32,8 +68,8 @@ export async function buildManagedSiteMetadata(): Promise<Metadata> {
     twitter: {
       card: "summary_large_image",
       site: settings.seo.twitterHandle || "@qrguitar",
-      title,
-      description,
+      title: socialTitle,
+      description: socialDescription,
       images: [image]
     }
   };
@@ -42,18 +78,21 @@ export async function buildManagedSiteMetadata(): Promise<Metadata> {
 export async function buildManagedPageMetadata(pageId: string, canonicalPath: string, indexable = true): Promise<Metadata> {
   const settings = await loadPublishedSiteSettings();
   const content = settings.content;
-  const title = getContentValue(content, `seo.${pageId}.title`);
-  const description = getContentValue(content, `seo.${pageId}.description`);
-  const ogTitle = getContentValue(content, `seo.${pageId}.ogTitle`) || title;
-  const ogDescription = getContentValue(content, `seo.${pageId}.ogDescription`) || description;
+  const rawTitle = getContentValue(content, `seo.${pageId}.title`);
+  const rawDescription = getContentValue(content, `seo.${pageId}.description`);
+  const title = metadataExcerpt(rawTitle, SEARCH_TITLE_MAX_LENGTH);
+  const description = metadataExcerpt(rawDescription, SEARCH_DESCRIPTION_MAX_LENGTH);
+  const ogTitle = metadataExcerpt(getContentValue(content, `seo.${pageId}.ogTitle`) || rawTitle, SOCIAL_TITLE_MAX_LENGTH);
+  const ogDescription = metadataExcerpt(getContentValue(content, `seo.${pageId}.ogDescription`) || rawDescription, SOCIAL_DESCRIPTION_MAX_LENGTH);
   const image = absoluteSiteUrl(getContentValue(content, `seo.${pageId}.image`) || getContentValue(content, "seo.global.image"));
   const canonical = absoluteSiteUrl(canonicalPath);
+  const robots = resolveManagedPageRobots(pageId, getContentValue(content, `seo.${pageId}.indexing`), indexable);
 
   return {
     title,
     description,
     alternates: { canonical },
-    robots: indexable ? { index: true, follow: true } : { index: false, follow: false },
+    robots,
     openGraph: {
       title: ogTitle,
       description: ogDescription,

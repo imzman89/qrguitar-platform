@@ -12,7 +12,7 @@ import { CollectionsClient } from "./CollectionsClient";
 import { loadPublishedSiteSettings } from "../../../lib/site-settings-server";
 import { CollectionInquiryForm } from "../../../components/CollectionInquiryForm";
 import { SellerWebsiteLink } from "../../../components/SellerWebsiteLink";
-import { buildPageMetadata, buildPrivatePageMetadata, buildPublicCollectionJsonLd, serializeJsonLd } from "../../../lib/seo";
+import { buildPageMetadata, buildPrivatePageMetadata, buildPublicCollectionJsonLd, metadataExcerpt, SEARCH_TITLE_MAX_LENGTH, serializeJsonLd } from "../../../lib/seo";
 import styles from "../collections.module.css";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +38,7 @@ export async function generateMetadata({ params }: { params: Promise<{ handle: s
       result.settings.bio || `Explore ${result.settings.publicName}'s public QRguitar Profiles.`,
       `/collections/${encodeURIComponent(result.settings.handle)}`
     ),
-    title: `${result.settings.publicName} Collection | QRguitar`,
+    title: metadataExcerpt(`${result.settings.publicName} Collection | QRguitar`, SEARCH_TITLE_MAX_LENGTH),
     robots: { index: result.settings.allowIndexing && result.records.length > 0, follow: true }
   };
 }

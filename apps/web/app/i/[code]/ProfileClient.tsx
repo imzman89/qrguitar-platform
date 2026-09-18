@@ -45,6 +45,7 @@ import { getContentValue } from "../../../lib/content-registry";
 import { publicProfileUrl } from "../../../lib/profile-url";
 import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "../../../lib/optional-tracking-consent";
 import { appendFailedImageSource, filterAvailableImageSources } from "../../../lib/image-fallback";
+import { ProfileBreadcrumbs } from "./ProfileBreadcrumbs";
 
 type ProfileTab = "overview" | "specs" | "timeline" | "service" | "ownership" | "media" | "repairs" | "documents";
 const PROFILE_FETCH_TIMEOUT_MS = 28000;
@@ -694,6 +695,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
             <button type="button" className="button secondary" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button>
           </div>
         ) : null}
+        <ProfileBreadcrumbs current={instrumentDisplayName(instrument)} />
         <div className="scan-topbar">
           <button type="button" aria-label="Back to homepage" onClick={() => router.push("/")}>
             <ArrowLeft size={24} />
@@ -1312,7 +1314,7 @@ function ProfilePanel({
                 <div>
                   <strong>{item.title}</strong>
                   {item.caption ? <p>{item.caption}</p> : null}
-                  {!embedUrl ? <a href={item.canonicalUrl} target="_blank" rel="noreferrer">Open media</a> : null}
+                  {!embedUrl ? <a href={item.canonicalUrl} target="_blank" rel="ugc nofollow noopener noreferrer">Open media</a> : null}
                 </div>
               </article>
             );
@@ -1400,7 +1402,7 @@ function ProfilePanel({
         {profileLinks.length ? (
           <div className="public-link-list">
             {profileLinks.map((link) => (
-              <a href={link.href} target="_blank" rel="noreferrer" key={link.label}>{link.label}</a>
+              <a href={link.href} target="_blank" rel="ugc nofollow noopener noreferrer" key={link.label}>{link.label}</a>
             ))}
           </div>
         ) : null}

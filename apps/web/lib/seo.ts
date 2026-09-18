@@ -7,6 +7,31 @@ export const SITE_URL = "https://www.qrguitar.com";
 export const DEFAULT_OG_IMAGE = "/seo/qrguitar-og-v2.png";
 export const DEFAULT_DESCRIPTION =
   "Permanent QRguitar Profiles for guitars, amps, pedals, builders, shops, and collectors.";
+export const SEARCH_TITLE_MAX_LENGTH = 70;
+export const SEARCH_DESCRIPTION_MAX_LENGTH = 180;
+export const SOCIAL_TITLE_MAX_LENGTH = 90;
+export const SOCIAL_DESCRIPTION_MAX_LENGTH = 220;
+
+export function normalizeMetadataText(value: unknown) {
+  return String(value ?? "").replace(/\s+/gu, " ").trim();
+}
+
+/** Keep metadata concise without splitting a Unicode code point or, when possible, a word. */
+export function metadataExcerpt(value: unknown, maxLength: number) {
+  const normalized = normalizeMetadataText(value);
+  const limit = Math.max(1, Math.floor(maxLength));
+  const characters = Array.from(normalized);
+  if (characters.length <= limit) return normalized;
+  if (limit === 1) return "…";
+
+  const prefix = characters.slice(0, limit - 1).join("");
+  const lastSpace = prefix.lastIndexOf(" ");
+  const wordSafePrefix = lastSpace >= Math.floor((limit - 1) * 0.55)
+    ? prefix.slice(0, lastSpace)
+    : prefix;
+  const cleanPrefix = wordSafePrefix.replace(/[\s,.;:!?–—-]+$/u, "") || prefix;
+  return `${cleanPrefix}…`;
+}
 
 export function absoluteSiteUrl(pathOrUrl: string) {
   if (!pathOrUrl) {
@@ -82,16 +107,20 @@ export function buildPageMetadata(
 ): Metadata {
   const url = absoluteSiteUrl(canonicalPath);
   const image = absoluteSiteUrl(overrides?.ogImage || DEFAULT_OG_IMAGE);
+  const searchTitle = metadataExcerpt(title, SEARCH_TITLE_MAX_LENGTH);
+  const searchDescription = metadataExcerpt(description, SEARCH_DESCRIPTION_MAX_LENGTH);
+  const socialTitle = metadataExcerpt(`${normalizeMetadataText(title)} | QRguitar`, SOCIAL_TITLE_MAX_LENGTH);
+  const socialDescription = metadataExcerpt(description, SOCIAL_DESCRIPTION_MAX_LENGTH);
 
   return {
-    title,
-    description,
+    title: searchTitle,
+    description: searchDescription,
     alternates: {
       canonical: url
     },
     openGraph: {
-      title: `${title} | QRguitar`,
-      description,
+      title: socialTitle,
+      description: socialDescription,
       url,
       siteName: "QRguitar",
       type: "website",
@@ -107,8 +136,8 @@ export function buildPageMetadata(
     twitter: {
       card: "summary_large_image",
       site: "@qrguitar",
-      title: `${title} | QRguitar`,
-      description,
+      title: socialTitle,
+      description: socialDescription,
       images: [image]
     }
   };
@@ -222,14 +251,18 @@ export function getRecordMetadataImage(instrument: DemoInstrument) {
 }
 
 export function getRecordMetadataDescription(instrument: DemoInstrument) {
+  return metadataExcerpt(getRecordStructuredDescription(instrument), SEARCH_DESCRIPTION_MAX_LENGTH);
+}
+
+export function getRecordStructuredDescription(instrument: DemoInstrument) {
   const lead = [
-    String(instrument.brand || "").trim(),
-    String(instrument.model || "").trim(),
-    String(instrument.year || "").trim(),
-    String(instrument.qrCode || "").trim()
+    normalizeMetadataText(instrument.brand),
+    normalizeMetadataText(instrument.model),
+    normalizeMetadataText(instrument.year),
+    normalizeMetadataText(instrument.qrCode)
   ].filter(Boolean);
 
-  const summary = String(instrument.summary || "").trim();
+  const summary = normalizeMetadataText(instrument.summary);
   const base = lead.join(" - ");
 
   if (summary) {
@@ -240,20 +273,27 @@ export function getRecordMetadataDescription(instrument: DemoInstrument) {
 }
 
 export function buildRecordMetadata(instrument: DemoInstrument): Metadata {
-  const title = instrumentDisplayName(instrument);
+  const fullTitle = normalizeMetadataText(instrumentDisplayName(instrument));
+  const title = metadataExcerpt(fullTitle, SEARCH_TITLE_MAX_LENGTH);
   const description = getRecordMetadataDescription(instrument);
+  const socialTitle = metadataExcerpt(fullTitle, SOCIAL_TITLE_MAX_LENGTH);
+  const socialDescription = metadataExcerpt(getRecordStructuredDescription(instrument), SOCIAL_DESCRIPTION_MAX_LENGTH);
   const url = absoluteSiteUrl(instrument.permanentPath || `/i/${instrument.qrCode}`);
   const image = getRecordMetadataImage(instrument);
 
   return {
     title,
     description,
+    robots: {
+      index: instrument.visibility !== "unlisted" && instrument.visibility !== "private",
+      follow: true
+    },
     alternates: {
       canonical: url
     },
     openGraph: {
-      title,
-      description,
+      title: socialTitle,
+      description: socialDescription,
       url,
       siteName: "QRguitar",
       type: "article",
@@ -266,8 +306,8 @@ export function buildRecordMetadata(instrument: DemoInstrument): Metadata {
     },
     twitter: {
       card: "summary_large_image",
-      title,
-      description,
+      title: socialTitle,
+      description: socialDescription,
       images: [image]
     }
   };
@@ -303,10 +343,12 @@ export function buildOrganizationJsonLd() {
 }
 
 export function buildRecordJsonLd(instrument: DemoInstrument) {
-  const title = instrumentDisplayName(instrument);
+  const title = normalizeMetadataText(instrumentDisplayName(instrument));
   const url = absoluteSiteUrl(instrument.permanentPath || `/i/${instrument.qrCode}`);
   const image = getRecordMetadataImage(instrument);
-  const description = getRecordMetadataDescription(instrument);
+  const description = getRecordStructuredDescription(instrument);
+  const profileId = `${url}#profile`;
+  const breadcrumbId = `${url}#breadcrumb`;
   const additionalProperty = (instrument.customFields || [])
     .filter((field) => String(field.label || "").trim() && String(field.value || "").trim())
     .map((field) => ({
@@ -317,27 +359,49 @@ export function buildRecordJsonLd(instrument: DemoInstrument) {
 
   return {
     "@context": "https://schema.org",
-    "@type": "Product",
-    name: title,
-    description,
-    image: [image],
-    url,
-    sku: instrument.qrCode,
-    serialNumber: instrument.serial || undefined,
-    category: instrument.instrumentType || "Instrument",
-    brand: instrument.brand
-      ? {
-          "@type": "Brand",
-          name: instrument.brand
-        }
-      : undefined,
-    manufacturer: instrument.builder
-      ? {
-          "@type": "Organization",
-          name: instrument.builder
-        }
-      : undefined,
-    additionalProperty,
-    productionDate: instrument.year || undefined
+    "@graph": [
+      {
+        "@type": "WebPage",
+        "@id": `${url}#page`,
+        url,
+        name: title,
+        description,
+        breadcrumb: { "@id": breadcrumbId },
+        mainEntity: { "@id": profileId }
+      },
+      {
+        "@type": "Product",
+        "@id": profileId,
+        name: title,
+        description,
+        image: [image],
+        url,
+        sku: instrument.qrCode,
+        serialNumber: instrument.serial || undefined,
+        category: instrument.instrumentType || "Instrument",
+        brand: instrument.brand
+          ? {
+              "@type": "Brand",
+              name: instrument.brand
+            }
+          : undefined,
+        manufacturer: instrument.builder
+          ? {
+              "@type": "Organization",
+              name: instrument.builder
+            }
+          : undefined,
+        additionalProperty,
+        productionDate: instrument.year || undefined
+      },
+      {
+        ...breadcrumbList([
+          { name: "Home", url: SITE_URL },
+          { name: "Catalog", url: absoluteSiteUrl("/catalog") },
+          { name: title, url }
+        ]),
+        "@id": breadcrumbId
+      }
+    ]
   };
 }

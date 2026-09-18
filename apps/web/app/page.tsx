@@ -2,10 +2,18 @@ import { HomePageClient } from "../components/HomePageClient";
 import type { DemoInstrument } from "../lib/local-demo";
 import { getPublicInstruments } from "../lib/public-instruments";
 import { loadPublishedSiteSettings } from "../lib/site-settings-server";
-import { absoluteSiteUrl } from "../lib/seo";
+import {
+  absoluteSiteUrl,
+  metadataExcerpt,
+  SEARCH_DESCRIPTION_MAX_LENGTH,
+  SEARCH_TITLE_MAX_LENGTH,
+  SOCIAL_DESCRIPTION_MAX_LENGTH,
+  SOCIAL_TITLE_MAX_LENGTH
+} from "../lib/seo";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
 import { getContentValue } from "../lib/content-registry";
+import { resolveManagedPageRobots } from "../lib/site-metadata";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -27,10 +35,12 @@ function sanitizePresentationRecord(record: DemoInstrument) {
 
 export async function generateMetadata(): Promise<Metadata> {
   const publishedSettings = await loadPublishedSiteSettings();
-  const title = getContentValue(publishedSettings.content, "seo.home.title");
-  const description = getContentValue(publishedSettings.content, "seo.home.description");
-  const ogTitle = getContentValue(publishedSettings.content, "seo.home.ogTitle") || title;
-  const ogDescription = getContentValue(publishedSettings.content, "seo.home.ogDescription") || description;
+  const rawTitle = getContentValue(publishedSettings.content, "seo.home.title");
+  const rawDescription = getContentValue(publishedSettings.content, "seo.home.description");
+  const title = metadataExcerpt(rawTitle, SEARCH_TITLE_MAX_LENGTH);
+  const description = metadataExcerpt(rawDescription, SEARCH_DESCRIPTION_MAX_LENGTH);
+  const ogTitle = metadataExcerpt(getContentValue(publishedSettings.content, "seo.home.ogTitle") || rawTitle, SOCIAL_TITLE_MAX_LENGTH);
+  const ogDescription = metadataExcerpt(getContentValue(publishedSettings.content, "seo.home.ogDescription") || rawDescription, SOCIAL_DESCRIPTION_MAX_LENGTH);
   const canonical = "https://www.qrguitar.com";
   const image = absoluteSiteUrl(getContentValue(publishedSettings.content, "seo.home.image") || publishedSettings.seo.image || "/seo/qrguitar-og-v2.png");
   const favicon = absoluteSiteUrl(publishedSettings.seo.favicon || "/qrguitar-logo-white-orange.svg");
@@ -46,7 +56,7 @@ export async function generateMetadata(): Promise<Metadata> {
       icon: favicon,
       apple: favicon
     },
-    robots: publishedSettings.seo.robots || "index, follow",
+    robots: resolveManagedPageRobots("home", getContentValue(publishedSettings.content, "seo.home.indexing")),
     openGraph: {
       title: ogTitle,
       description: ogDescription,
