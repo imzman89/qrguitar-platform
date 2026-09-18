@@ -13,6 +13,9 @@ export function isIsolatedBillingTestDatabase(environment: Record<string, string
 
 /** Server configuration only. Never accept environment selection from a Profile request. */
 export function profileBillingEnvironment(environment: Record<string, string | undefined>, supabaseUrl: string): "live" | "test" | null {
-  if (!environment.STRIPE_ENVIRONMENT || environment.STRIPE_ENVIRONMENT === "live") return "live";
-  return environment.STRIPE_ENVIRONMENT === "test" && isIsolatedBillingTestDatabase(environment, supabaseUrl) ? "test" : null;
+  const neutral = environment.QRGUITAR_BILLING_ENVIRONMENT, legacy = environment.STRIPE_ENVIRONMENT;
+  if (neutral && legacy && neutral !== legacy) return null;
+  const mode = neutral || legacy;
+  if (!mode || mode === "live") return "live";
+  return mode === "test" && isIsolatedBillingTestDatabase(environment, supabaseUrl) ? "test" : null;
 }

@@ -8,9 +8,9 @@ const here=path.dirname(fileURLToPath(import.meta.url));
 const arg=(key,fallback)=>process.argv.includes(key)?process.argv[process.argv.indexOf(key)+1]:fallback;
 const repo=path.resolve(arg('--repo',path.resolve(here,'../../..'))),overlay=path.resolve(arg('--migration-root',repo));
 const source=path.resolve(arg('--recovery-sql',path.join(overlay,'supabase/migrations/20260917220000_service_evidence_recovery.sql')));
-const readinessPath=path.join(overlay,'supabase/migrations/20260917221000_release_readiness.sql'),manifestPath=path.join(overlay,'apps/web/scripts/release-readiness-manifest.json');
+const readinessPath=path.join(overlay,'supabase/migrations/20260917221000_release_readiness.sql');
 const normalize=s=>s.replaceAll('\r\n','\n'),sha=s=>createHash('sha256').update(normalize(s)).digest('hex');
-const recovery=fs.readFileSync(source,'utf8'),readiness=fs.readFileSync(readinessPath,'utf8'),manifestText=fs.readFileSync(manifestPath,'utf8'),manifest=JSON.parse(manifestText);
+const recovery=fs.readFileSync(source,'utf8'),readiness=fs.readFileSync(readinessPath,'utf8'),manifestText=readiness.match(/\$manifest\$([\s\S]*?)\$manifest\$/)[1],manifest=JSON.parse(manifestText);
 const helperPermissionsPath=path.join(overlay,'supabase/migrations/20260917220500_site_editor_helper_permissions.sql'),helperPermissions=fs.readFileSync(helperPermissionsPath,'utf8');
 assert.equal(manifest.releaseVersion,'2026-09-17.6');assert.equal(sha(recovery),manifest.serviceEvidenceRecoverySourceSha256);
 const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite');
@@ -79,7 +79,7 @@ try{
   await test('billing ledger still private',async()=>{await db.exec('grant select on billing_credit_grants to authenticated');await fails('private_table_grants');});
   const intakeTrigger=manifest.provenanceTriggers.find(([table])=>table==='account_deletion_request_receipts');
   await test('intake receipt fence still required',async()=>{await db.exec('alter table '+ident(intakeTrigger[0])+' disable trigger '+ident(intakeTrigger[1]));await fails('schema_columns');});
-  assert.equal(sha(fs.readFileSync(source,'utf8')),sha(recovery));assert.equal(sha(fs.readFileSync(readinessPath,'utf8')),sha(readiness));assert.equal(sha(fs.readFileSync(manifestPath,'utf8')),sha(manifestText));
+  assert.equal(sha(fs.readFileSync(source,'utf8')),sha(recovery));assert.equal(sha(fs.readFileSync(readinessPath,'utf8')),sha(readiness));
   assert.equal(sha(fs.readFileSync(helperPermissionsPath,'utf8')),sha(helperPermissions));
   console.log(JSON.stringify({passed,failed:0,migrationSha256:sha(recovery),readinessSha256:sha(readiness),manifestSha256:sha(manifestText),runtime:'actual PGlite catalog mutations; rollback and all14 restored after each; no network'}));
 }finally{globalThis.fetch=savedFetch;await db.close();}

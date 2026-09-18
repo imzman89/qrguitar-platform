@@ -1,2 +1,2 @@
-import BillingPage from "./BillingPage";
-export default function Page() { return <BillingPage />; }
+import DirectBillingPage from "./DirectBillingPage";
+export default function Page() { return <DirectBillingPage />; }

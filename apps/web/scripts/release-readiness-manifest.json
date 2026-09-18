@@ -1,5 +1,5 @@
 {
-  "releaseVersion": "2026-09-17.6",
+  "releaseVersion": "2026-09-17.7",
   "checks": [
     "catalog_readable",
     "required_functions",
@@ -33,7 +33,6 @@
     "public.legacy_create_matches_profile(uuid,uuid,jsonb)",
     "public.read_site_editor_state()",
     "public.mutate_site_editor(uuid,text,boolean,jsonb,jsonb,jsonb,jsonb)",
-    "public.billing_account_status(uuid,text)",
     "public.billing_catalog(text)",
     "public.billing_fulfill_order(uuid,text,uuid,jsonb)",
     "public.billing_get_customer(uuid,text)",
@@ -56,7 +55,17 @@
     "public.discard_service_evidence_upload(uuid,uuid,boolean,uuid,bigint)",
     "public.prepare_service_evidence_upload(uuid,uuid,boolean,uuid,jsonb)",
     "public.prepare_service_evidence_upload(uuid,uuid,boolean,uuid,jsonb,bigint)",
-    "public.read_service_evidence_uploads(uuid,uuid,boolean,uuid)"
+    "public.read_service_evidence_uploads(uuid,uuid,boolean,uuid)",
+    "public.billing_account_status(uuid,text)",
+    "public.billing_direct_claim_order(uuid,text,uuid,uuid,text)",
+    "public.billing_direct_close_order(text,uuid,uuid,uuid,text)",
+    "public.billing_direct_find_order(uuid,text,uuid)",
+    "public.billing_direct_get_order(uuid,text,uuid)",
+    "public.billing_direct_list_orders(uuid,text,uuid)",
+    "public.billing_direct_record_review(text,uuid,uuid,uuid,text,text,text)",
+    "public.billing_direct_reserve_order(uuid,text,uuid,text,text,jsonb)",
+    "public.billing_direct_status(uuid,text,uuid)",
+    "public.billing_direct_verify_order(text,uuid,uuid,uuid,text,integer,text,text)"
   ],
   "blockedFunctions": [
     "public.create_instrument_profile_unregistered(uuid,text,text,jsonb,boolean,text)",
@@ -79,7 +88,6 @@
     "public._billing_order_json(billing_orders)",
     "public._billing_payment_identity(billing_orders,jsonb)",
     "public._billing_receipt(billing_orders,text,jsonb)",
-    "public.create_instrument_profile_credited(uuid,text,text,jsonb,boolean,text,text)",
     "public._account_deletion_intake_guard()",
     "public._account_deletion_lock_actor(uuid)",
     "public._account_deletion_receipt_json(account_deletion_request_receipts)",
@@ -92,7 +100,11 @@
     "public._service_evidence_upload_json(service_evidence_uploads)",
     "public._service_evidence_upload_recovery_authority(service_submissions,uuid,boolean)",
     "public._service_evidence_upload_recovery_guard()",
-    "public._service_evidence_upload_recovery_json(uuid,uuid,uuid,boolean,boolean)"
+    "public._service_evidence_upload_recovery_json(uuid,uuid,uuid,boolean,boolean)",
+    "public._billing_direct_admin(uuid)",
+    "public._billing_direct_bind_payment(billing_orders,uuid,text)",
+    "public._billing_direct_order_json(billing_orders)",
+    "public.create_instrument_profile_credited(uuid,text,text,jsonb,boolean,text,text)"
   ],
   "fingerprints": [
     {
@@ -554,17 +566,6 @@
       ]
     },
     {
-      "signature": "public.billing_account_status(uuid,text)",
-      "source_hash": "1e5d79d6ca804285a7a1c3d2b7920608948c3c75ecbea4277fd815e480f87c36",
-      "arguments": "p_owner_id uuid, p_environment text",
-      "result": "jsonb",
-      "definer": true,
-      "volatility": "s",
-      "settings": [
-        "search_path=pg_catalog, public"
-      ]
-    },
-    {
       "signature": "public.billing_catalog(text)",
       "source_hash": "4647d87b75ef3fce1687ee7d79ec92bbc9dc1f1dec8b70957bc992f85ffcd2a6",
       "arguments": "p_environment text",
@@ -699,17 +700,6 @@
     {
       "signature": "public.create_instrument_profile(uuid,text,text,jsonb,boolean,text,text)",
       "source_hash": "4c1a08dea4f32d5912abd3dc276cfcfe3a1be2367c6b80f946bb2c5f8a238c4a",
-      "arguments": "p_owner_id uuid, p_idempotency_key text, p_upload_id text, p_payload jsonb, p_launch_testing_access boolean, p_owner_display_name text, p_billing_environment text",
-      "result": "jsonb",
-      "definer": true,
-      "volatility": "v",
-      "settings": [
-        "search_path=pg_catalog, public"
-      ]
-    },
-    {
-      "signature": "public.create_instrument_profile_credited(uuid,text,text,jsonb,boolean,text,text)",
-      "source_hash": "26cf85566613051178cb58d5676cb5b254d21acd81ff6ace549bef40bb86c211",
       "arguments": "p_owner_id uuid, p_idempotency_key text, p_upload_id text, p_payload jsonb, p_launch_testing_access boolean, p_owner_display_name text, p_billing_environment text",
       "result": "jsonb",
       "definer": true,
@@ -967,6 +957,160 @@
       "result": "jsonb",
       "definer": true,
       "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._billing_direct_admin(uuid)",
+      "source_hash": "88e8227326b97648849d700b5f0109cef2a8e2481ae95f4e33945e23b435d1b2",
+      "arguments": "p_operator_id uuid",
+      "result": "void",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._billing_direct_bind_payment(billing_orders,uuid,text)",
+      "source_hash": "61b12719c0c81b70e00c9c8c9acf8bec9854257464a2e6d166a954b9166418fd",
+      "arguments": "p_order billing_orders, p_operator_id uuid, p_reference text",
+      "result": "text",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._billing_direct_order_json(billing_orders)",
+      "source_hash": "5ba5ddf5ac96ce25aba9fd4f90ee3dd577793f3d95605f24bff822ff8b4e0e09",
+      "arguments": "p_order billing_orders",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_account_status(uuid,text)",
+      "source_hash": "9cc53626d454e307dc42652bb27c947099273c32165773fdef4d2572f3c5fe69",
+      "arguments": "p_owner_id uuid, p_environment text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_direct_claim_order(uuid,text,uuid,uuid,text)",
+      "source_hash": "9a59c096c050756a19afc559ba59d95fa78d1089df145f96aa4934821d392c27",
+      "arguments": "p_owner_id uuid, p_environment text, p_order_id uuid, p_claim_id uuid, p_reference text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_direct_close_order(text,uuid,uuid,uuid,text)",
+      "source_hash": "b8834e541f44a8261c7e102b0213843141e7e6dd76f9bc9c3798db31ee0ef645",
+      "arguments": "p_environment text, p_order_id uuid, p_operator_id uuid, p_decision_id uuid, p_reason text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_direct_find_order(uuid,text,uuid)",
+      "source_hash": "6138e4aa7490ce76407364190e871986c60d2c768204fe1c77478f01e03fd28c",
+      "arguments": "p_owner_id uuid, p_environment text, p_request_key uuid",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_direct_get_order(uuid,text,uuid)",
+      "source_hash": "529af5c3addd96feaaf4866bdd32496853b96fcc031e427d6ccfe2a7ff30d71d",
+      "arguments": "p_owner_id uuid, p_environment text, p_order_id uuid",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_direct_list_orders(uuid,text,uuid)",
+      "source_hash": "0f6e772d7d5b9c269d61a80984a96cd7e6d4d72331b2d0a5cfc73ae6788db4b7",
+      "arguments": "p_operator_id uuid, p_environment text, p_order_id uuid DEFAULT NULL::uuid",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_direct_record_review(text,uuid,uuid,uuid,text,text,text)",
+      "source_hash": "02db276a6b84e04d264e6403d8cc471b15e27ec0b40c92e0eb4903e0704aeedc",
+      "arguments": "p_environment text, p_order_id uuid, p_operator_id uuid, p_decision_id uuid, p_kind text, p_reference text, p_reason text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_direct_reserve_order(uuid,text,uuid,text,text,jsonb)",
+      "source_hash": "b09d9564db60ddaabfddea8b1c8e9de452107bfd0ee9e990f9dc165530d6c38e",
+      "arguments": "p_owner_id uuid, p_environment text, p_request_key uuid, p_offer_key text, p_provider text, p_recipient jsonb",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_direct_status(uuid,text,uuid)",
+      "source_hash": "96bb0d62e1b74db70a3b6e28881d7efd0c02cd9a171e8a655ce9e2592ba790b4",
+      "arguments": "p_owner_id uuid, p_environment text, p_order_id uuid DEFAULT NULL::uuid",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.billing_direct_verify_order(text,uuid,uuid,uuid,text,integer,text,text)",
+      "source_hash": "ab12d7d6948538f0e8dcc2d64388ec7b1c9335914e210090ef5a09b77e8be37c",
+      "arguments": "p_environment text, p_order_id uuid, p_operator_id uuid, p_verification_id uuid, p_payment_reference text, p_amount integer, p_currency text, p_reason text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.create_instrument_profile_credited(uuid,text,text,jsonb,boolean,text,text)",
+      "source_hash": "6db8d676342d537aa2232554892d7920f05338df6a8220106eba2e684afde790",
+      "arguments": "p_owner_id uuid, p_idempotency_key text, p_upload_id text, p_payload jsonb, p_launch_testing_access boolean, p_owner_display_name text, p_billing_environment text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
       "settings": [
         "search_path=pg_catalog, public"
       ]
@@ -1936,6 +2080,120 @@
       "name": "discarded_at",
       "type": "timestamp with time zone",
       "not_null": false
+    },
+    {
+      "table": "billing_direct_claims",
+      "name": "id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_direct_claims",
+      "name": "order_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_direct_claims",
+      "name": "reference",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_direct_claims",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "billing_direct_orders",
+      "name": "order_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_direct_orders",
+      "name": "owner_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_direct_orders",
+      "name": "environment",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_direct_orders",
+      "name": "provider",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_direct_orders",
+      "name": "recipient",
+      "type": "jsonb",
+      "not_null": true
+    },
+    {
+      "table": "billing_direct_orders",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "order_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "environment",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "provider",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "account_key",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "reference",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "normalized_reference",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "payment_id",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "operator_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true
     }
   ],
   "provenanceTriggers": [
@@ -2038,6 +2296,21 @@
       "service_submission_evidence",
       "service_evidence_upload_tombstone",
       "CREATE TRIGGER service_evidence_upload_tombstone AFTER DELETE ON public.service_submission_evidence FOR EACH ROW EXECUTE FUNCTION _service_evidence_upload_deleted()"
+    ],
+    [
+      "billing_direct_claims",
+      "billing_history_immutable",
+      "CREATE TRIGGER billing_history_immutable BEFORE DELETE OR UPDATE ON public.billing_direct_claims FOR EACH ROW EXECUTE FUNCTION _billing_immutable()"
+    ],
+    [
+      "billing_direct_orders",
+      "billing_history_immutable",
+      "CREATE TRIGGER billing_history_immutable BEFORE DELETE OR UPDATE ON public.billing_direct_orders FOR EACH ROW EXECUTE FUNCTION _billing_immutable()"
+    ],
+    [
+      "billing_direct_payments",
+      "billing_history_immutable",
+      "CREATE TRIGGER billing_history_immutable BEFORE DELETE OR UPDATE ON public.billing_direct_payments FOR EACH ROW EXECUTE FUNCTION _billing_immutable()"
     ]
   ],
   "rpcOnlyTables": [
@@ -2049,7 +2322,10 @@
     "billing_credit_grants",
     "billing_credit_consumptions",
     "billing_credit_holds",
-    "billing_review_decisions"
+    "billing_review_decisions",
+    "billing_direct_claims",
+    "billing_direct_orders",
+    "billing_direct_payments"
   ],
   "billingDefaults": [
     {
@@ -2351,6 +2627,101 @@
       "table": "billing_review_decisions",
       "name": "created_at",
       "expression": "clock_timestamp()"
+    },
+    {
+      "table": "billing_direct_claims",
+      "name": "id",
+      "expression": null
+    },
+    {
+      "table": "billing_direct_claims",
+      "name": "order_id",
+      "expression": null
+    },
+    {
+      "table": "billing_direct_claims",
+      "name": "reference",
+      "expression": null
+    },
+    {
+      "table": "billing_direct_claims",
+      "name": "created_at",
+      "expression": "clock_timestamp()"
+    },
+    {
+      "table": "billing_direct_orders",
+      "name": "order_id",
+      "expression": null
+    },
+    {
+      "table": "billing_direct_orders",
+      "name": "owner_id",
+      "expression": null
+    },
+    {
+      "table": "billing_direct_orders",
+      "name": "environment",
+      "expression": null
+    },
+    {
+      "table": "billing_direct_orders",
+      "name": "provider",
+      "expression": null
+    },
+    {
+      "table": "billing_direct_orders",
+      "name": "recipient",
+      "expression": null
+    },
+    {
+      "table": "billing_direct_orders",
+      "name": "created_at",
+      "expression": "clock_timestamp()"
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "order_id",
+      "expression": null
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "environment",
+      "expression": null
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "provider",
+      "expression": null
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "account_key",
+      "expression": null
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "reference",
+      "expression": null
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "normalized_reference",
+      "expression": null
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "payment_id",
+      "expression": null
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "operator_id",
+      "expression": null
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "created_at",
+      "expression": "clock_timestamp()"
     }
   ],
   "billingConstraints": [
@@ -2569,6 +2940,72 @@
       "name": "billing_review_decisions_pkey",
       "definition": "PRIMARY KEY (id)",
       "type": "p"
+    },
+    {
+      "table": "billing_direct_claims",
+      "name": "billing_direct_claims_order_id_fkey",
+      "definition": "FOREIGN KEY (order_id) REFERENCES billing_direct_orders(order_id)",
+      "type": "f"
+    },
+    {
+      "table": "billing_direct_claims",
+      "name": "billing_direct_claims_order_id_key",
+      "definition": "UNIQUE (order_id)",
+      "type": "u"
+    },
+    {
+      "table": "billing_direct_claims",
+      "name": "billing_direct_claims_pkey",
+      "definition": "PRIMARY KEY (id)",
+      "type": "p"
+    },
+    {
+      "table": "billing_direct_orders",
+      "name": "billing_direct_orders_order_id_owner_id_environment_fkey",
+      "definition": "FOREIGN KEY (order_id, owner_id, environment) REFERENCES billing_orders(id, owner_id, environment)",
+      "type": "f"
+    },
+    {
+      "table": "billing_direct_orders",
+      "name": "billing_direct_orders_pkey",
+      "definition": "PRIMARY KEY (order_id)",
+      "type": "p"
+    },
+    {
+      "table": "billing_direct_orders",
+      "name": "billing_direct_orders_provider_check",
+      "definition": "CHECK ((provider = ANY (ARRAY['venmo'::text, 'cashapp'::text, 'zelle'::text, 'paypal'::text])))",
+      "type": "c"
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "billing_direct_payments_environment_payment_id_key",
+      "definition": "UNIQUE (environment, payment_id)",
+      "type": "u"
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "billing_direct_payments_environment_provider_account_key_no_key",
+      "definition": "UNIQUE (environment, provider, account_key, normalized_reference)",
+      "type": "u"
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "billing_direct_payments_environment_provider_normalized_ref_key",
+      "definition": "UNIQUE (environment, provider, normalized_reference)",
+      "type": "u"
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "billing_direct_payments_order_id_fkey",
+      "definition": "FOREIGN KEY (order_id) REFERENCES billing_direct_orders(order_id)",
+      "type": "f"
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "billing_direct_payments_pkey",
+      "definition": "PRIMARY KEY (order_id)",
+      "type": "p"
     }
   ],
   "billingIndexes": [
@@ -2576,6 +3013,41 @@
       "table": "billing_orders",
       "name": "billing_one_unresolved_checkout",
       "definition": "CREATE UNIQUE INDEX billing_one_unresolved_checkout ON public.billing_orders USING btree (owner_id, environment) WHERE (status = ANY (ARRAY['reserved'::text, 'open'::text]))"
+    },
+    {
+      "table": "billing_direct_claims",
+      "name": "billing_direct_claims_order_id_key",
+      "definition": "CREATE UNIQUE INDEX billing_direct_claims_order_id_key ON public.billing_direct_claims USING btree (order_id)"
+    },
+    {
+      "table": "billing_direct_claims",
+      "name": "billing_direct_claims_pkey",
+      "definition": "CREATE UNIQUE INDEX billing_direct_claims_pkey ON public.billing_direct_claims USING btree (id)"
+    },
+    {
+      "table": "billing_direct_orders",
+      "name": "billing_direct_orders_pkey",
+      "definition": "CREATE UNIQUE INDEX billing_direct_orders_pkey ON public.billing_direct_orders USING btree (order_id)"
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "billing_direct_payments_environment_payment_id_key",
+      "definition": "CREATE UNIQUE INDEX billing_direct_payments_environment_payment_id_key ON public.billing_direct_payments USING btree (environment, payment_id)"
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "billing_direct_payments_environment_provider_account_key_no_key",
+      "definition": "CREATE UNIQUE INDEX billing_direct_payments_environment_provider_account_key_no_key ON public.billing_direct_payments USING btree (environment, provider, account_key, normalized_reference)"
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "billing_direct_payments_environment_provider_normalized_ref_key",
+      "definition": "CREATE UNIQUE INDEX billing_direct_payments_environment_provider_normalized_ref_key ON public.billing_direct_payments USING btree (environment, provider, normalized_reference)"
+    },
+    {
+      "table": "billing_direct_payments",
+      "name": "billing_direct_payments_pkey",
+      "definition": "CREATE UNIQUE INDEX billing_direct_payments_pkey ON public.billing_direct_payments USING btree (order_id)"
     }
   ],
   "billingInstance": {
@@ -3150,5 +3622,20 @@
       "name": "service_evidence_uploads_no_direct_access"
     }
   ],
-  "serviceEvidenceRecoverySourceSha256": "1c3a791f583fee5509a09b972568321e2796a1835d095ff6b61404beef660dae"
+  "serviceEvidenceRecoverySourceSha256": "1c3a791f583fee5509a09b972568321e2796a1835d095ff6b61404beef660dae",
+  "directBillingFunctionSignatures": [
+    "public._billing_direct_admin(uuid)",
+    "public._billing_direct_bind_payment(billing_orders,uuid,text)",
+    "public._billing_direct_order_json(billing_orders)",
+    "public.billing_direct_claim_order(uuid,text,uuid,uuid,text)",
+    "public.billing_direct_close_order(text,uuid,uuid,uuid,text)",
+    "public.billing_direct_find_order(uuid,text,uuid)",
+    "public.billing_direct_get_order(uuid,text,uuid)",
+    "public.billing_direct_list_orders(uuid,text,uuid)",
+    "public.billing_direct_record_review(text,uuid,uuid,uuid,text,text,text)",
+    "public.billing_direct_reserve_order(uuid,text,uuid,text,text,jsonb)",
+    "public.billing_direct_status(uuid,text,uuid)",
+    "public.billing_direct_verify_order(text,uuid,uuid,uuid,text,integer,text,text)"
+  ],
+  "directBillingSourceSha256": "bae793d6373ef992fe1a0839e03ebc6e21a3179813e761796e29fe93f0f64d3e"
 }

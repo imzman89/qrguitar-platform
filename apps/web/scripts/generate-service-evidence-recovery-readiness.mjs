@@ -54,7 +54,8 @@ try{
   await db.exec("insert into storage.buckets(id,name,public) values('instrument-media','instrument-media',false),('instrument-documents','instrument-documents',false) on conflict(id) do update set public=false;begin read only;set local role service_role");
   const ready=(await db.query('select qrguitar_release_readiness() value')).rows[0].value;
   await db.exec('rollback');assert.equal(ready.releaseVersion,'2026-09-17.6');assert.equal(ready.ready,true,JSON.stringify(ready));assert.equal(ready.checks.length,14);assert(ready.checks.every(c=>c.ok));
-  const files=[['supabase/migrations/20260917221000_release_readiness.sql',generated],['apps/web/scripts/release-readiness-manifest.json',JSON.stringify(manifest,null,2)+'\n']];
+  // The active release manifest belongs to the newest generator; .6 is historical.
+  const files=[['supabase/migrations/20260917221000_release_readiness.sql',generated]];
   for(const [relative,content] of files){const target=path.join(output,relative);if(process.argv.includes('--write')){fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,content);}else assert.equal(normalize(fs.readFileSync(target,'utf8')),content,relative+' differs from reviewed generation');console.log(sha(content)+'  '+relative);}
   console.log('Readiness .6 reproduces all14 checks, 24 private protocol columns, 15 exact functions and4 triggers.');
 }finally{globalThis.fetch=savedFetch;await db.close();}

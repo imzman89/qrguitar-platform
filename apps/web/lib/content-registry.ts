@@ -219,7 +219,7 @@ const completionRegistry: ContentRegistryEntry[] = [
   field("home.lifecycle.step3.body", "Marketing", "Homepage", "How it works", "Step three body", "Transfer the same Profile when the instrument changes hands.", { maxLength: 180, previewPath: "/" }),
   field("pricing.beta.title", "Marketing", "Pricing", "Public beta", "Plan title", "For owners and collectors", { maxLength: 70, previewPath: "/" }),
   field("pricing.beta.price", "Marketing", "Pricing", "Public beta", "Price", "$0 during public beta", { maxLength: 30, previewPath: "/" }),
-  field("pricing.beta.body", "Marketing", "Pricing", "Public beta", "Description", "Create up to 25 Profiles with photos, specifications, privacy controls, history, and downloadable QR codes.", { maxLength: 220, previewPath: "/" }),
+  field("pricing.beta.body", "Marketing", "Pricing", "Public beta", "Description", "Create up to 5 Profiles with photos, specifications, privacy controls, history, and downloadable QR codes.", { maxLength: 220, previewPath: "/" }),
   field("pricing.commercial.title", "Marketing", "Pricing", "Commercial", "Plan title", "For shops, builders & brands", { maxLength: 80, previewPath: "/" }),
   field("pricing.commercial.price", "Marketing", "Pricing", "Commercial", "Price", "From $99", { maxLength: 30, previewPath: "/" }),
   field("pricing.commercial.body", "Marketing", "Pricing", "Commercial", "Description", "Need help with bulk setup, QR hardware, verification, or a commercial rollout? We'll help you get started.", { maxLength: 240, previewPath: "/" }),

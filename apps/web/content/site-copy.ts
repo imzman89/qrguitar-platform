@@ -189,9 +189,9 @@ export const siteCopy = {
       {
         name: "For owners and collectors",
         price: "$0 during public beta",
-        copy: "Create up to 25 Profiles with photos, specifications, privacy controls, history, and downloadable QR codes.",
+        copy: "Create up to 5 Profiles with photos, specifications, privacy controls, history, and downloadable QR codes.",
         features: [
-          "Up to 25 Profiles",
+          "5 free Profiles",
           "Public, Unlisted, or Private",
           "Downloadable QR codes",
           "Service and ownership history"

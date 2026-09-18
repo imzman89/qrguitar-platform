@@ -20,7 +20,7 @@ export async function installRepositorySchema(db, repo, beforeMigration = "99999
   files.push(...fs.readdirSync(path.join(repo, "supabase/migrations")).filter((name) => name.endsWith(".sql") && name < beforeMigration).sort().map((name) => "migrations/" + name));
   for (const file of files) {
     // gen_random_uuid is built into this PostgreSQL runtime; the external pgcrypto bundle is not required.
-    const sql = fs.readFileSync(path.join(repo, "supabase", file), "utf8").replace(/create extension if not exists "?pgcrypto"?;/gi, "");
+    const sql = fs.readFileSync(path.join(repo, "supabase", file), "utf8").replaceAll("\r\n", "\n").replace(/create extension if not exists "?pgcrypto"?;/gi, "");
     try { await db.exec(sql); }
     catch (error) { console.error("Failed repository schema fixture: " + file); throw error; }
   }

@@ -2,6 +2,11 @@
 
 QRguitar public beta: permanent digital records for guitars, amps, pedals, builders, shops, collectors, and future owners.
 
+Standard accounts include 5 free owned Profiles. Additional nonexpiring Profile
+credits are US$12/1, US$50/10, or US$99/25 when purchases are enabled. Transfers
+are free. Existing Profiles stay available and never consume credits retroactively
+when the allowance changes. Separately approved business exceptions remain intact.
+
 ## What This Includes
 
 - Next.js web app
@@ -16,9 +21,14 @@ QRguitar public beta: permanent digital records for guitars, amps, pedals, build
 
 - Web hosting: Vercel free tier
 - Database/auth/storage: Supabase free tier
-- Payments later: Stripe, no monthly fee
+- Payments: business payment links with owner confirmation; no added monthly payment platform fee
 
-Payments are not active in this MVP. When payments are added, QRguitar must use Stripe Checkout or Stripe Customer Portal only. Do not build credit-card fields into the app.
+Payment collection stays disabled until the receiving accounts and confirmation
+workflow are configured and tested. Direct payments must be confirmed against an
+actual business-account receipt before credits are granted. Do not build
+credit-card fields into the app or treat a buyer's payment claim as proof.
+See [Direct payment operations](docs/DIRECT_PAYMENTS_OPERATIONS.md) for private
+configuration, the three fixed packs, manual receipt review, and isolated tests.
 
 ## Quick Start
 
@@ -373,4 +383,5 @@ https://www.qrguitar.com/dashboard
 
 When an owner starts a transfer from the dashboard, QRguitar creates a pending claim link and asks Supabase Auth to email the recipient a sign-in link that opens `/transfer/[id]`. The recipient must sign in with that same email address before accepting ownership. The permanent QRguitar URL stays unchanged.
 
-During beta, transfer emails depend on the existing Supabase Auth SMTP configuration. Keep Stripe/payment handling separate until paid/free transfer rules are finalized.
+During beta, transfer emails depend on the existing Supabase Auth SMTP configuration.
+Ownership transfers are free and remain separate from Profile credit purchases.

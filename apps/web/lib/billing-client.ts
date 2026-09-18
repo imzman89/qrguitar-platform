@@ -3,11 +3,11 @@ export type BillingAuth = {
   getSession(): Promise<{ data: { session: BillingSession }; error?: unknown }>;
   onAuthStateChange(callback: (event: string, session: BillingSession) => void): { data: { subscription: { unsubscribe(): void } } };
 };
-export type BillingOffer = { key: string; version: 1; currency: "usd"; amount: number; credits: number; permanent: true; freeAllowance: 25 };
+export type BillingOffer = { key: string; version: 1; currency: "usd"; amount: number; credits: number; permanent: true; freeAllowance: 5 };
 export type BillingIntent = { requestId: string; offerKey: string; orderId: string };
 export type BillingOrder = { orderId: string; status: "reserved" | "open" | "fulfilled" | "expired"; offer: Pick<BillingOffer, "key" | "amount" | "currency" | "credits"> };
 export type BillingSnapshot = {
-  environment: "test" | "live"; freeLimit: 25; freeRemaining: number; paidGranted: number; paidConsumed: number;
+  environment: "test" | "live"; freeLimit: 5; freeRemaining: number; paidGranted: number; paidConsumed: number;
   paidRemaining: number; paidAvailable: number; hold: boolean; commercialExempt: boolean; ownedProfiles: number;
   unresolvedOrder: (BillingIntent & { status: "reserved" | "open" }) | null; order: BillingOrder | null;
 };
@@ -35,8 +35,8 @@ export function billingCheckoutUrl(value: unknown): string {
 function readOffer(value: unknown, full = true): BillingOffer {
   const row = record(value), tuple = typeof row.key === "string" && Object.hasOwn(tuples, row.key) ? tuples[row.key] : undefined;
   if (!tuple || row.currency !== "usd" || row.amount !== tuple[0] || row.credits !== tuple[1]
-    || (full && (row.version !== 1 || row.permanent !== true || row.freeAllowance !== 25))) throw new Error("The available credit packs could not be verified. Refresh to try again.");
-  return { key: row.key as string, currency: "usd", amount: tuple[0], credits: tuple[1], version: 1, permanent: true, freeAllowance: 25 };
+    || (full && (row.version !== 1 || row.permanent !== true || row.freeAllowance !== 5))) throw new Error("The available credit packs could not be verified. Refresh to try again.");
+  return { key: row.key as string, currency: "usd", amount: tuple[0], credits: tuple[1], version: 1, permanent: true, freeAllowance: 5 };
 }
 function readIntent(value: unknown): BillingIntent | null {
   const row = record(value);
@@ -45,10 +45,10 @@ function readIntent(value: unknown): BillingIntent | null {
 }
 function readSnapshot(value: unknown, requestedOrder: string): BillingSnapshot {
   const row = record(value);
-  if (!["test", "live"].includes(String(row.environment)) || row.freeLimit !== 25
+  if (!["test", "live"].includes(String(row.environment)) || row.freeLimit !== 5
     || ["freeRemaining", "paidGranted", "paidConsumed", "paidRemaining", "paidAvailable", "ownedProfiles"].some(key => !Number.isSafeInteger(row[key]) || Number(row[key]) < 0)
     || typeof row.hold !== "boolean" || typeof row.commercialExempt !== "boolean"
-    || Number(row.freeRemaining) > 25 || row.paidRemaining !== Number(row.paidGranted) - Number(row.paidConsumed)
+    || Number(row.freeRemaining) > 5 || row.paidRemaining !== Number(row.paidGranted) - Number(row.paidConsumed)
     || row.paidAvailable !== (row.hold ? 0 : row.paidRemaining)) throw new Error("Your credit balance could not be verified. Refresh before continuing.");
   let unresolvedOrder: BillingSnapshot["unresolvedOrder"] = null, order: BillingOrder | null = null;
   if (requestedOrder && row.order === null) throw new Error("The requested order could not be verified. Refresh to try again.");

@@ -26,7 +26,7 @@ const db=new PGlite();
 try {
   await installRepositorySchema(db,repo,'20260917190000');
   // The billing migration itself checks both reviewed create bodies before changing any implementation.
-  const migration=fs.readFileSync(path.join(output,'supabase/migrations/20260917190000_billing_credits.sql'),'utf8');
+  const migration=normalized(fs.readFileSync(path.join(output,'supabase/migrations/20260917190000_billing_credits.sql'),'utf8'));
   await db.exec(migration);
   const functions=(await db.query("select 'public.'||oid::regprocedure::text signature,proname,prosecdef,provolatile,proconfig,pg_get_function_arguments(oid) arguments,pg_get_function_result(oid) result,encode(sha256(convert_to(replace(prosrc,chr(13)||chr(10),chr(10)),'UTF8')),'hex') source_hash from pg_proc where pronamespace='public'::regnamespace and (proname like 'billing_%' or proname like '_billing_%' or proname like 'create_instrument_profile%') order by proname,pronargs")).rows;
   assert.equal(functions.length,29);

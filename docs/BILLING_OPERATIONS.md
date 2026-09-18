@@ -1,5 +1,11 @@
 # Profile credit billing
 
+The default customer billing page now uses the direct business payment candidate.
+Its setup, manual verification, and recovery workflow are documented in
+[DIRECT_PAYMENTS_OPERATIONS.md](DIRECT_PAYMENTS_OPERATIONS.md). The Stripe-specific
+configuration and webhook instructions below apply to the retained legacy
+integration. Both flows share the protected Profile credit ledger.
+
 Billing is disabled by default. Adding this code or applying its schema does not
 activate purchases, create a Stripe account, or charge a customer.
 
@@ -7,11 +13,13 @@ activate purchases, create a Stripe account, or charge a customer.
 
 The approved packs are one-time USD purchases: 1 credit for $12, 10 for $50, and
 25 for $99. Unused purchased credits do not expire. Each successful new Profile
-uses one credit when the owner's 25 free owned-Profile allowance is full.
+uses one credit when the owner's 5 free owned-Profile allowance is full.
 Transfers are free and do not restore a previously consumed credit. Failed or
 replayed creates consume no extra credits. The existing protected business and
 enterprise plan exceptions remain; choosing a workspace type does not grant an
 exception. The authoritative owned count includes retained owner-linked records.
+The five-Profile allowance applies to future creation only: existing Profiles are
+preserved, and adopting the limit does not consume purchased credits retroactively.
 
 ## Deployment and configuration
 
@@ -23,8 +31,10 @@ The billing migrations are `20260917190000_billing_credits.sql` and
 `20260917211000_release_readiness.sql`. This application additionally requires
 `20260917220000_service_evidence_recovery.sql`,
 `20260917220500_site_editor_helper_permissions.sql` and
-`20260917221000_release_readiness.sql`, in that order. Its required readiness
-version is **2026-09-17.6**; the historical `.3`, `.4`, and `.5` migrations are intermediate
+`20260917221000_release_readiness.sql`, followed by
+`20260918120000_direct_business_payments.sql` and
+`20260918121000_release_readiness.sql`, in that order. This candidate's required readiness
+version is **2026-09-17.7**; the historical `.3`, `.4`, `.5`, and `.6` migrations are intermediate
 contracts. The active contract checks the private ledger, intake and evidence-upload schema,
 exact function implementations, grants, constraints, and LIVE database boundary.
 Do not edit old migrations or bypass fingerprint checks. Coordinate schema and
@@ -97,7 +107,7 @@ tests use the official SDK and real PostgreSQL semantics but cannot certify Stri
 account capabilities, hosted Checkout, tax behavior, webhook delivery, or payouts.
 Verify successful, declined, authentication-required, cancelled, and expired
 checkouts; interrupted responses and retry; repeated/out-of-order webhook delivery;
-one successful 26th Profile consuming one credit; failed/replayed creates; refunds
+one successful sixth Profile consuming one credit; failed/replayed creates; refunds
 and disputes placing remaining paid capacity on hold. Verify both browser return
 pages against server ledger state. Never substitute test payment records into the
 production ledger.
@@ -152,10 +162,12 @@ The main behavior suite includes this command. Offline tests contact no Stripe
 account and do not mutate production.
 
 The separate `Billing concurrency` GitHub Actions workflow uses a fresh PostgreSQL
-17 service container and three independent connections. Ten cases must each
+17 service container and three independent connections. Twenty cases must each
 observe a real database lock barrier before commit/rollback. It checks final-credit
-spending, duplicate grants, and competing checkout reservations; captures source
+spending, duplicate grants, competing checkout reservations, direct-payment
+verification/replay, reused transaction references across accounts, and
+close-versus-verification races under commit/rollback; captures source
 hashes and outcomes; and makes no deployment. The runner refuses existing or
 nonlocal databases and never starts or drops a server/database. An accepted CI
-report is required before claiming these ten cases passed. A syntax or connection-
+report is required before claiming these twenty cases passed. A syntax or connection-
 guard pass is insufficient. The prior Windows startup failure executed zero cases.

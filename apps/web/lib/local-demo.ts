@@ -1,4 +1,5 @@
 import { formatRecordLocation } from "./record-location";
+import { FREE_PROFILE_ALLOWANCE } from "@qrguitar/shared";
 
 export type DemoUser = {
   name: string;
@@ -1171,7 +1172,7 @@ export function isFreeInstrumentLimitReached(user: DemoUser | null, instruments:
   }
 
   const ownedRecords = instruments.filter((instrument) => !isDemoInstrumentRecord(instrument)).length;
-  return ownedRecords >= 25;
+  return ownedRecords >= FREE_PROFILE_ALLOWANCE;
 }
 
 export function getInstrumentCondition(instrument: Pick<DemoInstrument, "instrumentCondition">): InstrumentCondition {
