@@ -44,6 +44,7 @@ includes(resolver, 'typeLabel: String(record.instrumentType || "").trim() || "Pr
 includes(card, '<span className="collectible-card-type">{card.typeLabel}</span>', "Every shared Profile card must show its saved category.");
 includes(homepageShowcase, '<span className={styles.kicker}>{card.typeLabel}</span>', "The homepage showcase must show the saved Profile category.");
 excludes(homepageShowcase, "THE INSTRUMENT", "The homepage showcase must not replace a specific saved category with a generic label.");
+excludes(homepageShowcase, "styles.publicLabel", "A publicly displayed Profile card must not repeat its visibility as a photo badge.");
 includes(instrumentApi, 'instrumentType: specValue(specs, "Type")', "Profile cards must receive the saved Type selection from the API.");
 excludes(instrumentApi, 'instrumentType: specValue(specs, "Type") || guitar.model', "A model name must never be substituted for the user-selected Profile type.");
 includes(instrumentApi, '!input.instrumentType', "Profile edits must preserve a user-selected Type instead of allowing cards to lose their category.");

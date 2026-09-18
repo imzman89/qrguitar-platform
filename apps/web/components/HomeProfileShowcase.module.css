@@ -5,7 +5,6 @@
 .liveDot { width: 6px; height: 6px; border-radius: 50%; background: var(--positive); flex-shrink: 0; }
 .photoStage { position: relative; height: clamp(290px, 28vw, 390px); background: #101615; border-bottom: 1px solid var(--line); }
 .mainPhoto { width: 100%; height: 100%; display: block; object-fit: contain; }
-.publicLabel { position: absolute; top: 17px; left: 17px; padding: 6px 10px; color: #fffaf0; background: #172018e8; border: 1px solid #ffffff35; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
 .noPhoto { display: grid; place-content: center; justify-items: center; gap: 16px; height: 100%; padding: 24px; color: #e8e1d2; text-align: center; }
 .photoSelector { position: absolute; inset: auto 14px 14px; display: flex; justify-content: center; gap: 7px; flex-wrap: wrap; }
 .photoSelector button { height: 46px; width: 46px; flex: 0 0 46px; border: 2px solid #f5f1e86b; border-radius: 2px; padding: 2px; background: #111c; cursor: pointer; }
