@@ -422,7 +422,7 @@ export default function AdminPage() {
   const adminLoadRevision = useRef(0);
   const adminMutationRef = useRef("");
   const adminAuthorized = adminAccessState === "authorized";
-  const overlayKind = adminAuthorized ? (pendingAction ? "modal" : selectedUser || selectedRecord ? "entity" : navOpen ? "navigation" : "") : "";
+  const overlayKind = adminAuthorized && adminDataReady ? (pendingAction ? "modal" : selectedUser || selectedRecord ? "entity" : navOpen ? "navigation" : "") : "";
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -605,7 +605,7 @@ export default function AdminPage() {
           ? "unauthorized"
           : "unavailable");
       setAdminDataReady(coreReady);
-      if (!overviewAuthorized) {
+      if (!coreReady) {
         setNavOpen(false);
         setSelectedUser(null);
         setSelectedRecord(null);
@@ -1871,7 +1871,7 @@ export default function AdminPage() {
   const activeSectionMeta = sections.find((section) => section.id === activeSection) || sections[0];
   const ActiveSectionIcon = activeSectionMeta.icon;
 
-  const entityDrawer = adminAuthorized && selectedUser ? (
+  const entityDrawer = adminAuthorized && adminDataReady && selectedUser ? (
     <div className="admin-drawer-layer">
       <button type="button" className="admin-drawer-backdrop" onClick={() => setSelectedUser(null)} aria-label="Close user details" />
       <aside ref={entityDrawerRef} tabIndex={-1} className="admin-entity-drawer" role="dialog" aria-modal="true" aria-label={`User details for ${selectedUser.email}`} aria-busy={Boolean(busy)}>
@@ -1890,7 +1890,7 @@ export default function AdminPage() {
         </div>
       </aside>
     </div>
-  ) : adminAuthorized && selectedRecord ? (
+  ) : adminAuthorized && adminDataReady && selectedRecord ? (
     <div className="admin-drawer-layer">
       <button type="button" className="admin-drawer-backdrop" onClick={() => setSelectedRecord(null)} aria-label="Close Profile details" />
       <aside ref={entityDrawerRef} tabIndex={-1} className="admin-entity-drawer" role="dialog" aria-modal="true" aria-label={`Profile details for ${selectedRecord.title}`} aria-busy={Boolean(busy)}>
@@ -1911,13 +1911,13 @@ export default function AdminPage() {
       <Nav />
       <main className="admin-page">
         <div className="admin-command-bar">
-          <div>{adminAuthorized ? <button ref={navButtonRef} type="button" className="admin-mobile-nav" onClick={() => setNavOpen(true)} aria-label="Open admin navigation" aria-controls="admin-primary-navigation" aria-expanded={navOpen}><Menu size={18} /></button> : null}<div><span>Admin command center</span><strong>{activeSectionMeta.label}</strong></div></div>
+          <div>{adminAuthorized && adminDataReady ? <button ref={navButtonRef} type="button" className="admin-mobile-nav" onClick={() => setNavOpen(true)} aria-label="Open admin navigation" aria-controls="admin-primary-navigation" aria-expanded={navOpen}><Menu size={18} /></button> : null}<div><span>Admin command center</span><strong>{activeSectionMeta.label}</strong></div></div>
           {adminAuthorized && adminDataReady ? <label className="admin-global-search"><Search size={16} /><input value={adminSearch} onChange={(event) => setAdminSearch(event.target.value)} placeholder="Search users, Profiles, or IDs" /></label> : null}
           <div className="admin-command-meta"><span>Admin access</span><strong>{adminAuthorized ? overview?.admin?.email || "Authorized admin" : adminAccessState === "unavailable" ? "Temporarily unavailable" : adminAccessState === "checking" ? "Checking" : "Sign in required"}</strong></div>
         </div>
-        <div className={adminAuthorized ? "admin-shell" : "admin-shell is-locked"}>
-          {adminAuthorized ? <aside ref={sidebarRef} tabIndex={-1} id="admin-primary-navigation" aria-label="Admin navigation" className={navOpen ? "admin-sidebar is-open" : "admin-sidebar"}><header><strong>QRguitar Admin</strong><button type="button" onClick={() => setNavOpen(false)} aria-label="Close admin navigation"><X size={17} /></button></header>{sectionGroups.map((group) => <nav key={group} aria-label={`${group} sections`}><span>{group}</span>{sections.filter((section) => section.group === group).map((section) => { const Icon = section.icon; return <button type="button" className={section.id === activeSection ? "active" : ""} onClick={() => goToSection(section.id)} key={section.id}><Icon size={16} />{section.label}</button>; })}</nav>)}<nav className="admin-sidebar-links" aria-label="Admin workspaces"><span>Workspaces</span><Link href="/admin/site-editor">Site editor</Link><Link href="/admin/service-workflow">Service operations</Link><Link href="/admin/payments">Payments</Link><Link href="/admin/promotions">Promo codes</Link><Link href="/admin/deletion-requests">Deletion requests</Link></nav></aside> : null}
-          {adminAuthorized && navOpen ? <button type="button" className="admin-sidebar-backdrop" onClick={() => setNavOpen(false)} aria-label="Close admin navigation" /> : null}
+        <div className={adminAuthorized && adminDataReady ? "admin-shell" : "admin-shell is-locked"}>
+          {adminAuthorized && adminDataReady ? <aside ref={sidebarRef} tabIndex={-1} id="admin-primary-navigation" aria-label="Admin navigation" className={navOpen ? "admin-sidebar is-open" : "admin-sidebar"}><header><strong>QRguitar Admin</strong><button type="button" onClick={() => setNavOpen(false)} aria-label="Close admin navigation"><X size={17} /></button></header>{sectionGroups.map((group) => <nav key={group} aria-label={`${group} sections`}><span>{group}</span>{sections.filter((section) => section.group === group).map((section) => { const Icon = section.icon; return <button type="button" className={section.id === activeSection ? "active" : ""} onClick={() => goToSection(section.id)} key={section.id}><Icon size={16} />{section.label}</button>; })}</nav>)}<nav className="admin-sidebar-links" aria-label="Admin workspaces"><span>Workspaces</span><Link href="/admin/site-editor">Site editor</Link><Link href="/admin/service-workflow">Service operations</Link><Link href="/admin/payments">Payments</Link><Link href="/admin/promotions">Promo codes</Link><Link href="/admin/deletion-requests">Deletion requests</Link></nav></aside> : null}
+          {adminAuthorized && adminDataReady && navOpen ? <button type="button" className="admin-sidebar-backdrop" onClick={() => setNavOpen(false)} aria-label="Close admin navigation" /> : null}
           <div className="admin-main">
           {!adminAuthorized ? (
             <section className="card admin-panel-card admin-login-card">
@@ -1940,7 +1940,7 @@ export default function AdminPage() {
               {!adminDataReady ? <section className="card admin-panel-card" role="alert"><h2>Admin data is temporarily unavailable.</h2><p>{message || "QRguitar could not load all required admin data."}</p><button type="button" disabled={loading} onClick={() => void loadAdmin()}>{loading ? "Retrying…" : "Retry admin data"}</button></section> : null}
             </>
           )}
-          {adminAuthorized && pendingAction ? (
+          {adminAuthorized && adminDataReady && pendingAction ? (
             <div className="admin-modal-backdrop" role="presentation">
               <section ref={modalRef} tabIndex={-1} className="card admin-modal" role="dialog" aria-modal="true" aria-label={pendingAction.title}>
                 <div className="admin-section-head">

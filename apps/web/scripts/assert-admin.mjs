@@ -93,8 +93,10 @@ for (const marker of [
   "let confirmed = false",
   "if (confirmed) setPendingAction(null)",
   '{message ? <div className="admin-message" role="alert">{message}</div> : null}',
-  'overlayKind = adminAuthorized ?',
-  "adminAuthorized && navOpen ?"
+  'overlayKind = adminAuthorized && adminDataReady ?',
+  "adminAuthorized && adminDataReady && navOpen ?",
+  "adminAuthorized && adminDataReady && selectedUser",
+  "adminAuthorized && adminDataReady && pendingAction"
 ]) {
   if (!page.includes(marker)) throw new Error(`Final admin reliability audit is missing ${marker}.`);
 }
@@ -105,5 +107,11 @@ const confirmEnd = page.indexOf("const filteredUsers", confirmStart);
 const confirmFlow = page.slice(confirmStart, confirmEnd);
 if (!confirmFlow.includes("confirmed = await updateUser") || !confirmFlow.includes("confirmed = await updateRecord") || !confirmFlow.includes("confirmed = await updateTransfer") || !confirmFlow.includes("confirmed = await updateOwnershipClaim")) {
   throw new Error("Admin confirmation modal does not wait for a confirmed mutation result.");
+}
+const coreFailureStart = page.indexOf("if (!coreReady) {");
+const coreFailureEnd = page.indexOf("const responseMessage", coreFailureStart);
+const coreFailureFlow = page.slice(coreFailureStart, coreFailureEnd);
+for (const marker of ["setNavOpen(false)", "setSelectedUser(null)", "setSelectedRecord(null)", "setPendingAction(null)"]) {
+  if (!coreFailureFlow.includes(marker)) throw new Error(`Incomplete admin data does not clear ${marker}.`);
 }
 console.log("Admin assertions passed.");
