@@ -39,6 +39,7 @@ const real = loader({ 'lucide-react': {} });
 const settings = real('apps/web/lib/site-settings.ts');
 const registry = real('apps/web/lib/content-registry.ts');
 const bulk = real('apps/web/lib/bulk-import.ts');
+const editorClient = real('apps/web/lib/site-editor-client.ts');
 
 function hookRuntime() {
   let cursor = 0, dirty = true, mounted = true, tree, Component, props = {}, lateWrites = 0;
@@ -110,18 +111,24 @@ async function editor(t, options = {}) {
   const mutate = async body => { mutations.push(body); return options.mutate ? options.mutate(body) : { ...payload, message: 'Saved fixture operation.', draft: body.settings || payload.published }; };
   const recovered = structuredClone(settings.defaultSiteSettings); recovered.colors.gold = '#abcdef';
   const pending = options.pendingIssue ? { localSnapshot: JSON.stringify(recovered) } : null;
-  class EditorMutationError extends Error {}
+  const EditorMutationError = editorClient.EditorMutationError;
   const jsx = (type, props, key) => ({ type, props, key });
+  const fetchEditor = async (url, init) => {
+    assert.equal(url, '/api/site-editor'); assert.equal(init.method, undefined);
+    return options.loadError
+      ? { ok: false, status: 401, json: async () => ({ message: options.loadError }) }
+      : { ok: true, status: 200, json: async () => payload };
+  };
   const load = loader({
     react: f.hooks, 'react/jsx-runtime': { jsx, jsxs: jsx }, 'lucide-react': {}, 'next/link': { default: 'Link' }, 'next/navigation': { usePathname: () => options.pathname || '/site-editor' },
     '../../components/Nav': { Nav: 'Nav' }, '../../components/Footer': { Footer: 'Footer' }, '../../components/SiteCompositionEditor': { SiteCompositionEditor: 'SiteCompositionEditor' },
     '../../lib/content-registry': registry, '../../lib/site-settings': { ...settings, applyThemeSettings() {} },
-    '../../lib/site-editor-client': { EditorMutationError, shouldReplaceEditorContent: (current, submitted) => current === submitted,
+    '../../lib/site-editor-client': { ...editorClient, EditorMutationError,
+      loadSiteEditorState: getAccessToken => editorClient.loadSiteEditorState(getAccessToken, fetchEditor),
       createEditorMutationController: () => ({ mutate, retry: () => { throw Error('Unexpected retry'); }, pending, storageProblem: null }) },
     '../../lib/site-preview-client': { clearSitePreviewCookie: async () => {}, openSiteDraftPreview: async () => '/fixture', sitePreviewGeneration: () => generation, sitePreviewInvalidatedEvent: 'fixture-invalidate' },
     '../../lib/supabase-browser': { getSupabaseAccessToken: async () => 'fixture-token', createBrowserSupabaseClient: () => ({ auth: { getSession: async () => ({ data: { session: { user: { id: 'actor-a' }, access_token: 'fixture-token' } } }) } }) }
-  }, { window: b.window, document: b.document, navigator: b.navigator, URL: b.URL, crypto: { randomUUID: () => 'fixture-request' },
-    fetch: async (url, init) => { assert.equal(url, '/api/site-editor'); assert.equal(init.method, undefined); return options.loadError ? { ok: false, json: async () => ({ message: options.loadError }) } : { ok: true, json: async () => payload }; } });
+  }, { window: b.window, document: b.document, navigator: b.navigator, URL: b.URL, crypto: { randomUUID: () => 'fixture-request' }, fetch: fetchEditor });
   f.mount(load('apps/web/app/site-editor/page.tsx').default); await f.flush();
   if (!options.loadError) { f.click('Advanced'); f.click('Advanced JSON'); await f.flush(); }
   t.after(() => f.dispose());
