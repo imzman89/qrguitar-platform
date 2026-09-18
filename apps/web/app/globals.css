@@ -137,6 +137,24 @@ select {
   width: clamp(120px, 16vw, 172px);
 }
 
+.brand-logo-fallback {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.brand-logo-fallback b {
+  color: var(--gold);
+}
+
+.brand-logo-fallback span {
+  color: inherit;
+}
+
 .nav-links {
   display: flex;
   gap: 22px;

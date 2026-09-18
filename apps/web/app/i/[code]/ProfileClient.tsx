@@ -23,6 +23,7 @@ import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BrandLogo } from "../../../components/BrandLogo";
 import { CompactQr } from "../../../components/CompactQr";
+import { FallbackImage } from "../../../components/FallbackImage";
 import { buildProfileIdentityFields, ProfileIdentity } from "../../../components/ProfileIdentity";
 import { ProfileStatusBadges } from "../../../components/ProfileStatusBadges";
 import { RecordShareButton } from "../../../components/RecordShareButton";
@@ -43,6 +44,7 @@ import { resolveInstrumentPresentation } from "../../../lib/instrument-profile-c
 import { getContentValue } from "../../../lib/content-registry";
 import { publicProfileUrl } from "../../../lib/profile-url";
 import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "../../../lib/optional-tracking-consent";
+import { appendFailedImageSource, filterAvailableImageSources } from "../../../lib/image-fallback";
 
 type ProfileTab = "overview" | "specs" | "timeline" | "service" | "ownership" | "media" | "repairs" | "documents";
 const PROFILE_FETCH_TIMEOUT_MS = 28000;
@@ -62,7 +64,8 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
   const copyActiveRef = useRef(false);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [actionNotice, setActionNotice] = useState<"transfer" | "documents" | "owner" | null>(null);
-  const [mediaIndex, setMediaIndex] = useState(0);
+  const [requestedMediaIndex, setMediaIndex] = useState(0);
+  const [failedGalleryImages, setFailedGalleryImages] = useState<string[]>([]);
   const [activeMedia, setActiveMedia] = useState<string | null>(null);
   const galleryDialogRef = useRef<HTMLElement | null>(null);
   const galleryTriggerRef = useRef<HTMLElement | null>(null);
@@ -317,7 +320,13 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
     () => instrument ? resolveInstrumentPresentation(instrument, ownerPreview || ownerRecord ? "owner" : "public") : null,
     [instrument, ownerPreview, ownerRecord]
   );
-  const galleryImages = useMemo(() => presentation?.photos || [], [presentation?.photos]);
+  const allGalleryImages = useMemo(() => presentation?.photos || [], [presentation?.photos]);
+  const gallerySourceKey = allGalleryImages.join("\u001f");
+  const galleryImages = useMemo(
+    () => filterAvailableImageSources(allGalleryImages, failedGalleryImages),
+    [allGalleryImages, failedGalleryImages]
+  );
+  const mediaIndex = Math.min(requestedMediaIndex, Math.max(0, galleryImages.length - 1));
   const documentFiles = presentation?.documents || [];
   const externalMedia = presentation?.supplementalMedia || [];
   const timelineEvents = presentation?.timelineEvents || [];
@@ -407,7 +416,15 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
     }
 
     setMediaIndex(0);
-  }, [instrumentQrCode, galleryImages.length]);
+    setFailedGalleryImages((current) => current.length ? [] : current);
+    setActiveMedia(null);
+  }, [instrumentQrCode, gallerySourceKey]);
+
+  useEffect(() => {
+    if (activeMedia && !galleryImages.includes(activeMedia)) {
+      setActiveMedia(galleryImages[mediaIndex] || null);
+    }
+  }, [activeMedia, galleryImages, mediaIndex]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -455,6 +472,9 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
 
     [galleryImages[mediaIndex - 1], galleryImages[mediaIndex + 1]].filter(Boolean).forEach((source) => {
       const image = new window.Image();
+      image.decoding = "async";
+      image.fetchPriority = "low";
+      image.referrerPolicy = "no-referrer";
       image.src = source;
     });
   }, [galleryImages, mediaIndex]);
@@ -471,6 +491,9 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
     const currentIndex = Math.max(0, galleryImages.indexOf(activeMedia));
     [galleryImages[currentIndex - 1], galleryImages[currentIndex + 1]].filter(Boolean).forEach((source) => {
       const image = new window.Image();
+      image.decoding = "async";
+      image.fetchPriority = "low";
+      image.referrerPolicy = "no-referrer";
       image.src = source;
     });
 
@@ -529,9 +552,16 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
     setActiveMedia(imageUrl);
   }
 
+  function markGalleryImageFailed(imageUrl: string) {
+    setFailedGalleryImages((current) => appendFailedImageSource(current, imageUrl));
+  }
+
   function moveHeroPhoto(direction: -1 | 1) {
     if (galleryImages.length < 2) return;
-    setMediaIndex((current) => (current + direction + galleryImages.length) % galleryImages.length);
+    setMediaIndex((current) => {
+      const safeCurrent = Math.min(current, galleryImages.length - 1);
+      return (safeCurrent + direction + galleryImages.length) % galleryImages.length;
+    });
   }
 
   if (!resolved) {
@@ -705,9 +735,20 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                 aria-label={galleryImages.length ? `Open ${instrumentDisplayName(instrument)} photo ${mediaIndex + 1} in fullscreen` : undefined}
               >
                 {galleryImages[mediaIndex] ? (
-                  <img src={galleryImages[mediaIndex]} alt={`${instrumentDisplayName(instrument)} photo ${mediaIndex + 1} of ${galleryImages.length}`} />
+                  <img
+                    key={galleryImages[mediaIndex]}
+                    src={galleryImages[mediaIndex]}
+                    alt={`${instrumentDisplayName(instrument)} photo ${mediaIndex + 1} of ${galleryImages.length}`}
+                    loading="eager"
+                    fetchPriority="high"
+                    decoding="async"
+                    width={1200}
+                    height={900}
+                    referrerPolicy="no-referrer"
+                    onError={() => markGalleryImageFailed(galleryImages[mediaIndex])}
+                  />
                 ) : (
-                  <div className="scan-hero-empty">No main photo yet</div>
+                  <div className="scan-hero-empty">{allGalleryImages.length ? "Photos are currently unavailable" : "No main photo yet"}</div>
                 )}
                 {galleryImages.length ? (
                   <span className="scan-hero-photo-count">
@@ -787,7 +828,17 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                     aria-current={index === mediaIndex ? "true" : undefined}
                     key={`${imageUrl}-${index}`}
                   >
-                    <img src={imageUrl} alt="" loading="lazy" />
+                    <img
+                      src={imageUrl}
+                      alt=""
+                      loading="lazy"
+                      fetchPriority="low"
+                      decoding="async"
+                      width={168}
+                      height={126}
+                      referrerPolicy="no-referrer"
+                      onError={() => markGalleryImageFailed(imageUrl)}
+                    />
                   </button>
                 ))}
               </div>
@@ -1027,7 +1078,18 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                     Previous
                   </button>
                 ) : null}
-                <img src={activeMedia} alt={`${instrumentDisplayName(instrument)} preview`} />
+                <img
+                  key={activeMedia}
+                  src={activeMedia}
+                  alt={`${instrumentDisplayName(instrument)} preview`}
+                  loading="eager"
+                  fetchPriority="high"
+                  decoding="async"
+                  width={1600}
+                  height={1200}
+                  referrerPolicy="no-referrer"
+                  onError={() => markGalleryImageFailed(activeMedia)}
+                />
                 {galleryImages.length > 1 ? (
                   <button
                     className="media-gallery-nav media-gallery-nav--next"
@@ -1057,7 +1119,17 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                       aria-label={`Open photo ${index + 1}`}
                       key={`${imageUrl}-lightbox-${index}`}
                     >
-                      <img src={imageUrl} alt="" />
+                      <img
+                        src={imageUrl}
+                        alt=""
+                        loading="lazy"
+                        fetchPriority="low"
+                        decoding="async"
+                        width={148}
+                        height={112}
+                        referrerPolicy="no-referrer"
+                        onError={() => markGalleryImageFailed(imageUrl)}
+                      />
                     </button>
                   ))}
                 </div>
@@ -1335,7 +1407,17 @@ function ProfilePanel({
       </div>
       {instrument.brand ? (
         <div className={`maker-signature ${officialBrandLogoUrl ? "maker-signature--logo" : "maker-signature--text"}`}>
-          {officialBrandLogoUrl ? <img src={officialBrandLogoUrl} alt={`${instrument.brand} official logo`} /> : <span>Brand</span>}
+          <FallbackImage
+            src={officialBrandLogoUrl}
+            alt={`${instrument.brand} official logo`}
+            loading="lazy"
+            fetchPriority="low"
+            decoding="async"
+            width={520}
+            height={120}
+            referrerPolicy="no-referrer"
+            fallback={<span>Brand</span>}
+          />
           <strong>{instrument.brand}</strong>
           <em>{isVerifiedRecord ? "Verified by QRguitar" : "Unverified"}</em>
         </div>

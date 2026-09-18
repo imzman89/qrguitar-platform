@@ -1482,7 +1482,7 @@ export default function AdminPage() {
           {brandLogoUrl ? (
             <div className="admin-logo-preview">
               <span>Preview</span>
-              <img src={brandLogoUrl} alt="" />
+              <img src={brandLogoUrl} alt="" loading="lazy" fetchPriority="low" decoding="async" width={520} height={120} referrerPolicy="no-referrer" />
             </div>
           ) : null}
           <div className="admin-table">

@@ -174,6 +174,7 @@ export function CollectibleRecordCard({
                         decoding="async"
                         width={1200}
                         height={900}
+                        referrerPolicy="no-referrer"
                         draggable={false}
                         onLoad={(event) => markImageReady(index, event.currentTarget)}
                         onError={() => setFailedImages((current) => current.includes(index) ? current : [...current, index])}

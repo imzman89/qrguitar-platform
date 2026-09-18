@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { Footer } from "../../../components/Footer";
+import { FallbackImage } from "../../../components/FallbackImage";
 import { Nav } from "../../../components/Nav";
 import { collectionRoleLabel } from "../../../lib/collection-directory";
 import { loadPublicCollectionSettings } from "../../../lib/public-collection-page";
@@ -56,7 +57,17 @@ export default async function CollectionPage({ params }: { params: Promise<{ han
     <main className="page-shell collection-page">
       <nav className={styles.navigation} aria-label="Collection navigation"><Link href="/collections"><ArrowLeft size={16} aria-hidden="true" /> All member collections</Link><Link href="/catalog">Browse instrument Profiles</Link></nav>
       <header className="collection-header">
-        {settings.avatarUrl ? <img src={settings.avatarUrl} alt="" /> : <div className="collection-avatar" aria-hidden="true">{settings.publicName.slice(0, 1).toUpperCase()}</div>}
+        <FallbackImage
+          src={settings.avatarUrl}
+          alt=""
+          width={112}
+          height={112}
+          loading="eager"
+          fetchPriority="low"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          fallback={<div className="collection-avatar" aria-hidden="true">{settings.publicName.slice(0, 1).toUpperCase()}</div>}
+        />
         <div><span className="eyebrow">Public Collection</span><h1>{settings.publicName}</h1><p className="collection-role">{role}{settings.location ? ` / ${settings.location}` : ""}</p>{settings.bio ? <p>{settings.bio}</p> : null}<SellerWebsiteLink {...settings} /></div>
         <strong className="collection-count">{records.length}<small>Public {records.length === 1 ? "Profile" : "Profiles"}</small></strong>
       </header>

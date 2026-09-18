@@ -16,6 +16,39 @@ const card = read("components/CollectibleRecordCard.tsx");
 const catalog = read("app/catalog/CatalogClient.tsx");
 const homepage = read("components/HomePageClient.tsx");
 const showcase = read("components/HomeProfileShowcase.tsx");
+const profile = read("app/i/[code]/ProfileClient.tsx");
+const photoOrganizer = read("components/PhotoOrganizer.tsx");
+const compactQr = read("components/CompactQr.tsx");
+const brandLogo = read("components/BrandLogo.tsx");
+const fallbackImage = read("components/FallbackImage.tsx");
+const collection = read("app/collections/[handle]/page.tsx");
+const collectionDirectory = read("app/collections/CollectionsDirectoryClient.tsx");
+const dashboard = read("app/dashboard/page.tsx");
+
+function compileImageFallbackHelpers() {
+  const module = { exports: {} };
+  const source = read("lib/image-fallback.ts");
+  const code = ts.transpileModule(source, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS }
+  }).outputText;
+  new Function("require", "module", "exports", code)(require, module, module.exports);
+  return module.exports;
+}
+
+function compileFallbackImageComponent(useState) {
+  const module = { exports: {} };
+  const code = ts.transpileModule(fallbackImage, {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.CommonJS,
+      jsx: ts.JsxEmit.ReactJSX
+    }
+  }).outputText;
+  new Function("require", "module", "exports", code)(
+    (name) => name === "react" ? { useState } : require(name), module, module.exports
+  );
+  return module.exports.FallbackImage;
+}
 
 function compileCard() {
   const module = { exports: {} };
@@ -85,4 +118,59 @@ test("Homepage keeps only its above-the-fold showcase eager and defers supportin
   assert.equal((showcase.match(/fetchPriority="high"/g) || []).length, 1);
   assert.match(homepage, /loading="lazy" fetchPriority="low" decoding="async" width=\{1200\} height=\{900\}/);
   assert.doesNotMatch(homepage, /prioritizeLeadImage/);
+});
+
+test("failed gallery sources are removed without mutating or reordering the remaining photos", () => {
+  const { appendFailedImageSource, filterAvailableImageSources } = compileImageFallbackHelpers();
+  const sources = ["/lead.jpg", "/detail.jpg", "/back.jpg"];
+  const failed = appendFailedImageSource([], sources[0]);
+  assert.deepEqual(failed, ["/lead.jpg"]);
+  assert.deepEqual(filterAvailableImageSources(sources, failed), ["/detail.jpg", "/back.jpg"]);
+  assert.strictEqual(appendFailedImageSource(failed, sources[0]), failed, "repeated load errors must be idempotent");
+  assert.deepEqual(filterAvailableImageSources(sources, [...failed, "/detail.jpg", "/back.jpg"]), []);
+  assert.deepEqual(sources, ["/lead.jpg", "/detail.jpg", "/back.jpg"], "the source list must remain immutable");
+});
+
+test("public Profile reserves LCP priority for visible full-size photos and defers every thumbnail", () => {
+  assert.match(profile, /filterAvailableImageSources\(allGalleryImages, failedGalleryImages\)/);
+  assert.match(profile, /key=\{galleryImages\[mediaIndex\]\}[\s\S]{0,500}loading="eager"[\s\S]{0,120}fetchPriority="high"[\s\S]{0,160}width=\{1200\}[\s\S]{0,80}height=\{900\}[\s\S]{0,120}referrerPolicy="no-referrer"[\s\S]{0,150}markGalleryImageFailed/);
+  assert.match(profile, /width=\{168\}[\s\S]{0,80}height=\{126\}[\s\S]{0,120}referrerPolicy="no-referrer"[\s\S]{0,140}markGalleryImageFailed\(imageUrl\)/);
+  assert.match(profile, /key=\{activeMedia\}[\s\S]{0,500}loading="eager"[\s\S]{0,120}fetchPriority="high"[\s\S]{0,160}width=\{1600\}[\s\S]{0,80}height=\{1200\}/);
+  assert.match(profile, /width=\{148\}[\s\S]{0,80}height=\{112\}[\s\S]{0,120}referrerPolicy="no-referrer"[\s\S]{0,140}markGalleryImageFailed\(imageUrl\)/);
+  assert.ok((profile.match(/loading="lazy"[\s\S]{0,100}fetchPriority="low"/g) || []).length >= 3);
+  assert.match(profile, /image\.fetchPriority = "low";[\s\S]{0,80}image\.referrerPolicy = "no-referrer";/);
+});
+
+test("editor and supporting UI images declare stable geometry and low-priority decoding", () => {
+  assert.match(photoOrganizer, /loading="lazy"[\s\S]{0,100}fetchPriority="low"[\s\S]{0,100}decoding="async"[\s\S]{0,100}width=\{1200\}[\s\S]{0,80}height=\{900\}[\s\S]{0,100}referrerPolicy="no-referrer"/);
+  assert.match(dashboard, /loading="lazy"[\s\S]{0,100}fetchPriority="low"[\s\S]{0,100}decoding="async"[\s\S]{0,100}width=\{1200\}[\s\S]{0,80}height=\{900\}/);
+  assert.match(showcase, /referrerPolicy="no-referrer"/);
+  assert.match(card, /referrerPolicy="no-referrer"/);
+  assert.match(homepage, /referrerPolicy="no-referrer"/);
+});
+
+test("avatars, compact QR previews, and brand marks replace failed sources with usable fallbacks", () => {
+  assert.match(fallbackImage, /failedSource === source/);
+  assert.match(fallbackImage, /setFailedSource\(source\)/);
+  assert.match(collection, /<FallbackImage[\s\S]{0,500}width=\{112\}[\s\S]{0,200}fallback=\{<div className="collection-avatar"/);
+  assert.match(collectionDirectory, /<FallbackImage[\s\S]{0,500}loading="lazy"[\s\S]{0,300}width=\{640\}[\s\S]{0,200}fallback=\{<div className=\{styles\.placeholder\}/);
+  assert.match(compactQr, /<FallbackImage[\s\S]{0,500}width=\{240\}[\s\S]{0,80}height=\{240\}[\s\S]{0,300}QR preview unavailable/);
+  assert.match(brandLogo, /<FallbackImage[\s\S]{0,400}width=\{520\}[\s\S]{0,80}height=\{120\}[\s\S]{0,250}brand-logo-fallback/);
+});
+
+test("fallback image swaps only the failed source and still calls the caller error handler", () => {
+  let failedSource = "";
+  let callerErrors = 0;
+  const FallbackImage = compileFallbackImageComponent((initial) => [failedSource || initial, (next) => { failedSource = next; }]);
+  const fallback = React.createElement("span", null, "Image unavailable");
+  const props = { src: " /broken.jpg ", alt: "Instrument", width: 640, height: 480, fallback, onError: () => { callerErrors += 1; } };
+  const image = FallbackImage(props);
+  assert.equal(image.type, "img");
+  assert.equal(image.props.src, "/broken.jpg");
+  assert.equal(image.props.alt, "Instrument");
+  image.props.onError({});
+  assert.equal(failedSource, "/broken.jpg");
+  assert.equal(callerErrors, 1);
+  assert.equal(renderToStaticMarkup(FallbackImage(props)), "<span>Image unavailable</span>");
+  assert.equal(FallbackImage({ ...props, src: "/recovered.jpg" }).props.src, "/recovered.jpg", "a changed source must get a fresh load attempt");
 });

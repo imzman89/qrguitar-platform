@@ -91,7 +91,16 @@ export function PhotoOrganizer({
               onDragEnd={() => { dragIndex.current = null; setDropIndex(null); }}
               onDrop={(event) => { event.preventDefault(); dragIndex.current = null; setDropIndex(null); }}
             >
-              <img src={imageUrl} alt={`Instrument photo ${index + 1}`} />
+              <img
+                src={imageUrl}
+                alt={`Instrument photo ${index + 1}`}
+                loading="lazy"
+                fetchPriority="low"
+                decoding="async"
+                width={1200}
+                height={900}
+                referrerPolicy="no-referrer"
+              />
               <span className="photo-organizer-number">{String(index + 1).padStart(2, "0")}</span>
               {isMain ? <span className="photo-organizer-main">Main</span> : null}
               <div className="photo-organizer-controls">

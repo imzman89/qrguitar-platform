@@ -881,7 +881,7 @@ export default function SiteEditorPage() {
         <header><div><span>Registry</span><h2>Official logos</h2></div><span>{Object.keys(settings.brandLogos).length}</span></header>
         <div className="cms-asset-list">
           {Object.entries(settings.brandLogos).map(([key, url]) => (
-            <div key={key}><img src={url} alt="" /><div><strong>{key}</strong><small>{url}</small></div><button type="button" onClick={() => setSettings((current) => { const next = { ...current.brandLogos }; delete next[key]; return { ...current, brandLogos: next }; })}>Remove</button></div>
+            <div key={key}><img src={url} alt="" loading="lazy" fetchPriority="low" decoding="async" width={520} height={120} referrerPolicy="no-referrer" /><div><strong>{key}</strong><small>{url}</small></div><button type="button" onClick={() => setSettings((current) => { const next = { ...current.brandLogos }; delete next[key]; return { ...current, brandLogos: next }; })}>Remove</button></div>
           ))}
           {!Object.keys(settings.brandLogos).length ? <p>No official logos have been added. Brand names continue to render as text.</p> : null}
         </div>

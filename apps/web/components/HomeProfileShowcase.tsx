@@ -21,11 +21,11 @@ export function HomeProfileShowcase({ record }: { record: DemoInstrument }) {
         <Link href={card.profileUrl} aria-label={"Open " + card.title + " Profile"}><ArrowUpRight size={19} aria-hidden="true" /></Link>
       </div>
       <div className={styles.photoStage}>
-        {photos.length ? <img className={styles.mainPhoto} src={photos[activePhoto]} alt={card.title + ", photo " + (activePhoto + 1) + " of " + photos.length} loading="eager" fetchPriority="high" decoding="async" width={1200} height={900} onError={() => setFailedPhotos((current) => [...current, photos[activePhoto]])} />
+        {photos.length ? <img className={styles.mainPhoto} src={photos[activePhoto]} alt={card.title + ", photo " + (activePhoto + 1) + " of " + photos.length} loading="eager" fetchPriority="high" decoding="async" width={1200} height={900} referrerPolicy="no-referrer" onError={() => setFailedPhotos((current) => current.includes(photos[activePhoto]) ? current : [...current, photos[activePhoto]])} />
           : <div className={styles.noPhoto}><Camera size={36} aria-hidden="true" /><span>Photos are currently unavailable</span></div>}
         <span className={styles.publicLabel}>Public Profile</span>
         {photos.length > 1 ? <div className={styles.photoSelector} aria-label={"Choose a photo of " + card.title}>
-          {photos.slice(0, 8).map((photo, index) => <button key={photo} type="button" className={index === activePhoto ? styles.selectedPhoto : undefined} aria-label={"Show photo " + (index + 1) + " of " + card.title} aria-pressed={index === activePhoto} onClick={() => setSelectedPhoto(index)}><img src={photo} alt="" loading="lazy" fetchPriority="low" decoding="async" width={92} height={92} /></button>)}
+          {photos.slice(0, 8).map((photo, index) => <button key={photo} type="button" className={index === activePhoto ? styles.selectedPhoto : undefined} aria-label={"Show photo " + (index + 1) + " of " + card.title} aria-pressed={index === activePhoto} onClick={() => setSelectedPhoto(index)}><img src={photo} alt="" loading="lazy" fetchPriority="low" decoding="async" width={92} height={92} referrerPolicy="no-referrer" onError={() => setFailedPhotos((current) => current.includes(photo) ? current : [...current, photo])} /></button>)}
         </div> : null}
       </div>
       <div className={styles.details}>

@@ -72,6 +72,10 @@ function DashboardInstrumentThumb({ sources, title }: { sources: string[]; title
           src={imageUrl}
           alt=""
           loading="lazy"
+          fetchPriority="low"
+          decoding="async"
+          width={1200}
+          height={900}
           referrerPolicy="no-referrer"
           onError={() => {
             setImageIndex((current) => {

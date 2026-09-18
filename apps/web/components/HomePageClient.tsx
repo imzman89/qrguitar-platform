@@ -252,7 +252,7 @@ export function HomePageClient({
           <div className="record-holds-visual" aria-label="A QRguitar Profile keeps the instrument and its history together">
             <div className="record-holds-photo">
               {recordPhoto
-                ? <img src={recordPhoto} alt={`Documented ${supportingRecord?.brand || "instrument"} in QRguitar`} loading="lazy" fetchPriority="low" decoding="async" width={1200} height={900} onError={() => setFailedRecordPhotos((current) => current.includes(recordPhoto) ? current : [...current, recordPhoto])} />
+                ? <img src={recordPhoto} alt={`Documented ${supportingRecord?.brand || "instrument"} in QRguitar`} loading="lazy" fetchPriority="low" decoding="async" width={1200} height={900} referrerPolicy="no-referrer" onError={() => setFailedRecordPhotos((current) => current.includes(recordPhoto) ? current : [...current, recordPhoto])} />
                 : <div className="record-holds-photo-empty"><span>{settings?.content["home.anatomy.fallback"] || "A permanent identity for every instrument"}</span></div>}
               <span>One Profile</span>
             </div>
