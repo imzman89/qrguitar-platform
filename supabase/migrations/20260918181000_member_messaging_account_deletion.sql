@@ -27,6 +27,19 @@ begin
   end loop;
 end $fences$;
 
+create or replace function public._account_deletion_external_storage_delete_allowed(p_bucket text,p_path text) returns boolean
+language sql stable security definer set search_path=pg_catalog,public as $$
+  select p_bucket='member-message-media' and exists(
+    select 1 from public.account_deletion_fulfillments f
+    where f.actor_id is not null and f.state='ready_for_auth_deletion' and (
+      split_part(p_path,'/',2)=f.actor_id::text
+      or exists(select 1 from public.member_conversations c
+        where c.id::text=split_part(p_path,'/',1) and f.actor_id in (c.user_a,c.user_b)))
+  )
+$$;
+revoke all on function public._account_deletion_external_storage_delete_allowed(text,text)
+  from public,anon,authenticated,service_role;
+
 create function public.prepare_member_messaging_account_deletion(p_actor_id uuid) returns jsonb
 language plpgsql security definer set search_path=pg_catalog,public,storage as $$
 declare paths jsonb;

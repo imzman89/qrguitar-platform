@@ -129,8 +129,9 @@ for(const lifecycle of ['locked','banned','removed','auth_removed'])for(const al
  if(alreadyLinked)await rpc('billing_link_checkout',[actor,'live',original.orderId,sessionId,customerId]);
  if(lifecycle==='auth_removed')await db.query('delete from auth.users where id=$1',[actor]);
  else await db.query('update profiles set account_status=$2 where id=$1',[actor,lifecycle]);
- await reject(()=>reserve(),'42501');
- await reject(()=>rpc('billing_link_customer',[actor,'live',customerId]),'42501');
+ const blockedCode=lifecycle==='removed'?'PD423':'42501';
+ await reject(()=>reserve(),blockedCode);
+ await reject(()=>rpc('billing_link_customer',[actor,'live',customerId]),blockedCode);
  const before=await snapshot();
  await reject(()=>rpc('billing_link_checkout',[actor,'live',original.orderId,sessionId,'cus_foreign']),'22023');
  await reject(()=>rpc('billing_link_checkout',[other,'live',original.orderId,sessionId,customerId]),'P0002');
@@ -143,7 +144,7 @@ for(const lifecycle of ['locked','banned','removed','auth_removed'])for(const al
  assert.equal((await status()).paidGranted,0);assert.equal((await status()).unresolvedOrder,null);
  assert.equal((await db.query('select count(*)::integer n from billing_receipts where order_id=$1',[original.orderId])).rows[0].n,1);
  assert.equal((await rpc('billing_get_customer',[actor,'live'])).customerId,customerId);
- await reject(()=>reserve(),'42501');
+ await reject(()=>reserve(),blockedCode);
  if(lifecycle==='auth_removed')assert.equal((await db.query('select count(*)::integer n from profiles where id=$1',[actor])).rows[0].n,0);
 });
 const inventory=(await db.query("select oid::regprocedure::text signature,proname,prosecdef,provolatile,proconfig,pg_get_function_arguments(oid) arguments,pg_get_function_result(oid) result,encode(sha256(convert_to(replace(prosrc,chr(13)||chr(10),chr(10)),'UTF8')),'hex') source_hash from pg_proc where pronamespace='public'::regnamespace and (proname like 'billing_%' or proname like '_billing_%' or proname like 'create_instrument_profile%') order by proname,pronargs")).rows;

@@ -37,5 +37,35 @@
 .blockers strong { color: #f4dfad; }
 .blockers ul { margin: 9px 0 0; padding-left: 20px; }
 .blockers li + li { margin-top: 6px; }
+.reviews { margin: 18px 0; padding: 16px; border: 1px solid #405149; border-radius: 10px; background: #111a15; }
+.reviewHeading, .reviewCard > div { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.reviewHeading h3 { margin: 0; color: #eef5f0; font-size: .95rem; }
+.reviewHeading span, .reviews > p, .reviewCard p { color: #a9b9b0; font-size: .78rem; line-height: 1.5; }
+.reviews > p { margin: 8px 0 14px; }
+.reviews ol { list-style: none; display: grid; gap: 10px; margin: 0; padding: 0; }
+.reviewCard { display: grid; gap: 9px; padding: 14px; border: 1px solid #344139; border-radius: 9px; background: #17201a; }
+.reviewCard a { color: #b8e3cf; text-underline-offset: 3px; }
+.reviewCard p { margin: 0; text-transform: capitalize; }
+.reviewCard code { display: block; color: #b8c7be; overflow-wrap: anywhere; user-select: all; }
+.confirmed, .pending { border-radius: 99px; padding: 4px 8px; font-size: .7rem; white-space: nowrap; }
+.confirmed { color: #bfe5cf; background: #1a3325; }
+.pending { color: #efd79f; background: #342d1c; }
+.reviewCard .button { justify-self: start; }
+.snapshot { display: grid; gap: 12px; margin-top: 4px; padding-top: 14px; border-top: 1px solid #344139; }
+.snapshot .reviewHeading h4 { margin: 0; color: #eef5f0; font-size: .88rem; }
+.snapshot > p { margin: 0; color: #b7c6bd; font-size: .8rem; line-height: 1.55; text-transform: none; }
+.storagePreview { display: block; width: 100%; max-height: 560px; min-height: 240px; border: 1px solid #46564c; border-radius: 8px; background: #0b100d; object-fit: contain; }
+.storageActions { display: flex; align-items: center; justify-content: flex-start !important; flex-wrap: wrap; gap: 10px; }
+.snapshotSections { display: grid; gap: 8px; }
+.snapshotSection { border: 1px solid #3b493f; border-radius: 8px; background: #101713; overflow: hidden; }
+.snapshotSection summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; color: #dce9e1; cursor: pointer; }
+.snapshotSection summary small { color: #9eb0a5; }
+.snapshotSection > p, .snapshotSection > code { display: block; margin: 0; padding: 10px 12px; color: #9eb0a5; font-size: .72rem; overflow-wrap: anywhere; }
+.snapshotRecords { display: grid; gap: 8px; padding: 0 10px 10px; }
+.snapshotRecords pre { max-height: 320px; margin: 0; padding: 10px; overflow: auto; border: 1px solid #2d3831; border-radius: 6px; background: #0b100d; color: #c9d7ce; font: .72rem/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.redaction { display: grid; gap: 9px; padding: 12px; border: 1px solid #5b4d31; border-radius: 8px; background: #211d14; }
+.redaction label { display: grid; gap: 7px; color: #ead8ae; font-size: .78rem; font-weight: 600; }
+.redaction textarea { width: 100%; resize: vertical; border: 1px solid #64583e; border-radius: 7px; padding: 9px 10px; background: #111612; color: #f1f4f2; font: inherit; font-size: .8rem; line-height: 1.5; }
+.redaction p { margin: 0; color: #c8b990; font-size: .72rem; line-height: 1.5; text-transform: none; }
 .pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; padding-top: 22px; line-height: 1.5; }
 @media (max-width: 650px) { .heading { flex-direction: column; gap: 16px; } .toolbar { align-items: flex-start; flex-direction: column; } .card { padding: 18px; } .card dl { grid-template-columns: 1fr; } .pagination { align-items: stretch; flex-direction: column; } .pagination .button { width: 100%; } }

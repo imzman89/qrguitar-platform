@@ -44,6 +44,17 @@ async function request() {
 async function prepare(requestId) {
   return (await db.query("select public.prepare_account_deletion_fulfillment($1,false,$2,$3,'{}'::text[]) result", [ADMIN, requestId, randomUUID()])).rows[0].result;
 }
+async function attestReviews(requestId, snapshot) {
+  for (const review of snapshot.profileReviews || []) if (!review.attested) {
+    await db.query("select public.attest_account_deletion_profile_review($1,false,$2,$3,$4,$5,true)",
+      [ADMIN, requestId, randomUUID(), review.guitarId, review.contentFingerprint]);
+  }
+  for (const review of snapshot.retentionReviews || []) if (review.required && !review.attested) {
+    const decision = review.domain === "billing" ? "lawful_financial_retention_reviewed" : "service_history_privacy_reviewed";
+    await db.query("select public.attest_account_deletion_retention_review($1,false,$2,$3,$4,$5,$6,true)",
+      [ADMIN, requestId, randomUUID(), review.domain, review.contentFingerprint, decision]);
+  }
+}
 async function expireStorageQuiescence(requestId) {
   await db.query("select set_config('qrguitar.account_deletion_request',$1,true)", [requestId]);
   await db.query("update account_deletion_fulfillments set storage_quiesce_until=clock_timestamp()-interval '1 second' where request_id=$1 and state='quiescing_storage'", [requestId]);
@@ -105,12 +116,13 @@ try {
 
     const helpers = (await db.query(`select oid::regprocedure::text signature from pg_proc
       where pronamespace='public'::regnamespace and proname=any($1::text[]) order by proname`, [[
+        "_account_deletion_promo_billing_graph", "_account_deletion_promo_migrate_billing_subject",
         "_account_deletion_promo_blockers", "_account_deletion_promo_redact_json",
         "_account_deletion_promo_retained_pii", "_account_deletion_promo_scrub_profile",
         "_account_deletion_promo_text_has_identity", "_account_deletion_promo_write_fence",
         "_billing_promo_admin_event_guard"
       ]])).rows;
-    assert.equal(helpers.length, 7);
+    assert.equal(helpers.length, 9);
     for (const helper of helpers) for (const role of ["anon", "authenticated", "service_role"])
       assert.equal((await db.query("select has_function_privilege($1,$2,'EXECUTE') allowed", [role, helper.signature])).rows[0].allowed, false);
   });
@@ -177,11 +189,11 @@ try {
     assert.equal(operated.operator_id, null); assert.equal(operated.operator_email, null);
     assert.equal(operated.reason, "Personal information removed after an account deletion request.");
     assert.equal(operated.after_value.revision, 1); assert.equal(operated.after_value.discountValue, 30);
-    assert.equal(operated.after_value.status, "active"); assert.equal(operated.after_value.nested.actor, "[redacted]");
-    assert.equal(operated.after_value.nested.email, "[redacted]"); assert.equal(operated.after_value.nested.factual, "preserve me");
+    assert.equal(operated.after_value.status, "active"); assert.equal(operated.after_value.nested.actor, "[personal information removed]");
+    assert.equal(operated.after_value.nested.email, "[personal information removed]"); assert.equal(operated.after_value.nested.factual, "preserve me");
     assert.equal(referenced.operator_id, OTHER); assert.equal(referenced.operator_email, "other@example.test");
     assert.equal(referenced.reason, "Personal information removed after an account deletion request.");
-    assert.equal(referenced.before_value.discountValue, 30); assert.equal(referenced.after_value.note, "[redacted]");
+    assert.equal(referenced.before_value.discountValue, 30); assert.equal(referenced.after_value.note, "[personal information removed]");
     assert.equal((await db.query("select count(*)::int n from billing_promo_quote_limits where owner_id=$1", [ACTOR])).rows[0].n, 0);
     assert.deepEqual((await db.query("select public._account_deletion_promo_blockers($1) value", [ACTOR])).rows[0].value, []);
     assert.equal((await db.query("select public._account_deletion_promo_retained_pii($1,$2) value", [ACTOR, ACTOR_EMAIL])).rows[0].value, false);
@@ -210,7 +222,7 @@ try {
     assert.equal((await db.query("select count(*)::int n from billing_promo_admin_events where promotion_id=$1", [promotion.id])).rows[0].n, 2);
   });
 
-  await check("promoted payment history remains a billing blocker and retained-PII failure", async () => {
+  await check("a promoted settled order migrates to the reviewed billing subject and can complete deletion", async () => {
     await seed();
     const promotion = await insertPromotion({ creator: ADMIN, code: "PAIDHISTORY", identifying: false });
     const orderId = randomUUID();
@@ -221,15 +233,23 @@ try {
       values($1,$2,$3,'test',$4,$5,1,'fixed_total',30,'promotion',1200,1170,30)`,
       [orderId, promotion.id, ACTOR, promotion.code, promotion.name]);
 
-    assert.deepEqual((await db.query("select public._account_deletion_promo_blockers($1) value", [ACTOR])).rows[0].value,
-      ["billing_retention_migration_required"]);
-    assert.equal((await db.query("select public._account_deletion_promo_retained_pii($1,$2) value", [ACTOR, ACTOR_EMAIL])).rows[0].value, true);
+    assert.deepEqual((await db.query("select public._account_deletion_promo_blockers($1) value", [ACTOR])).rows[0].value, []);
     const requestId = (await request()).request.requestId;
     const blocked = await prepare(requestId);
     assert.equal(blocked.fulfillment.state, "blocked");
-    assert.ok(blocked.fulfillment.blockers.includes("billing_retention_migration_required"));
+    assert.deepEqual(blocked.fulfillment.blockers, ["billing_retention_review_required"]);
     assert.equal((await db.query("select account_status from profiles where id=$1", [ACTOR])).rows[0].account_status, "active");
     assert.equal((await db.query("select owner_id from billing_order_promotions where order_id=$1", [orderId])).rows[0].owner_id, ACTOR);
+    await attestReviews(requestId, blocked);
+    const frozen = await prepare(requestId); assert.equal(frozen.fulfillment.state, "quiescing_storage");
+    await expireStorageQuiescence(requestId);
+    const ready = await prepare(requestId); assert.equal(ready.fulfillment.state, "ready_for_auth_deletion");
+    const promotionRow = (await db.query("select owner_id,subject_id from billing_order_promotions where order_id=$1", [orderId])).rows[0];
+    assert.equal(promotionRow.owner_id, promotionRow.subject_id); assert.notEqual(promotionRow.owner_id, ACTOR);
+    assert.equal((await db.query("select public._account_deletion_promo_retained_pii($1,$2) value", [ACTOR, ACTOR_EMAIL])).rows[0].value, false);
+    await db.query("delete from auth.users where id=$1", [ACTOR]);
+    const completed = (await db.query("select public.complete_account_deletion_fulfillment($1,false,$2,$3) result", [ADMIN, requestId, randomUUID()])).rows[0].result;
+    assert.equal(completed.fulfillment.state, "completed");
   });
   }
 } finally {

@@ -9,6 +9,10 @@ assert.equal(manifest.paypalWebhookSourceSha256,migrationSha('supabase/migration
 assert.equal(manifest.paypalAdminReviewSourceSha256,migrationSha('supabase/migrations/20260918133000_paypal_admin_reviews.sql'));
 assert.equal(manifest.profileEditUploadSourceSha256,migrationSha('supabase/migrations/20260918150000_profile_edit_staged_uploads.sql'));
 assert.equal(manifest.accountDeletionFulfillmentSourceSha256,migrationSha('supabase/migrations/20260918170000_account_deletion_fulfillment.sql'));
+assert.equal(manifest.accountDeletionPromotionSourceSha256,migrationSha('supabase/migrations/20260918172000_billing_promo_codes.sql'));
+assert.equal(manifest.accountDeletionPromotionCompatibilitySourceSha256,migrationSha('supabase/migrations/20260918172500_account_deletion_promo_compatibility.sql'));
+assert.equal(manifest.memberMessagingSourceSha256,migrationSha('supabase/migrations/20260918180000_member_messaging.sql'));
+assert.equal(manifest.memberMessagingAccountDeletionSourceSha256,migrationSha('supabase/migrations/20260918181000_member_messaging_account_deletion.sql'));
 assert.deepEqual(manifest.profileEditUploadFunctionSignatures,[
   'public.cleanup_staged_instrument_edit_uploads(uuid,text,uuid,text[],text[])',
   'public.consume_staged_instrument_edit_upload()',
@@ -82,7 +86,7 @@ await test('PG17 relation nullability uses attnotnull without requiring PG18-onl
  const expected=manifest.columns.filter(c=>manifest.rpcOnlyTables.includes(c.table)).map(({table,name,not_null})=>({table,name,not_null})).sort((a,b)=>(a.table+'.'+a.name).localeCompare(b.table+'.'+b.name));
  assert.deepEqual(actual,expected,'Every billing column retains exact pg_attribute nullability coverage');
  assert.equal((await ready()).ready,true);
- const fields=[['billing_instance_config','create_environment'],['billing_offers','amount'],['billing_customers','created_at'],['billing_orders','offer'],['billing_receipts','receipt'],['billing_credit_grants','credits'],['billing_credit_consumptions','credits'],['billing_credit_holds','owner_id'],['billing_review_decisions','reason']];
+ const fields=[['billing_instance_config','create_environment'],['billing_offers','amount'],['billing_customers','created_at'],['billing_orders','offer'],['billing_receipts','receipt'],['billing_credit_grants','credits'],['billing_credit_consumptions','credits'],['billing_credit_holds','reason'],['billing_review_decisions','reason']];
  for(const [table,column]of fields){
   assert.equal(expected.find(c=>c.table===table&&c.name===column)?.not_null,true);
   await db.exec('savepoint nullability');
@@ -192,10 +196,14 @@ for(const [table,name]of manifest.provenanceTriggers.filter(([,name])=>name.star
   await db.exec('drop trigger '+name+' on '+table+';create trigger '+name+' before insert on '+table+' for each row execute function public.create_profile_timeline_event()');await expectFalse('schema_columns');
 });
 assert.deepEqual([...manifest.intakeTables].sort(),[
-  'account_deletion_actor_revisions','account_deletion_fulfillment_receipts','account_deletion_fulfillments',
-  'account_deletion_profile_custody','account_deletion_request_receipts','account_deletion_requests'
+  'account_deletion_actor_revisions','account_deletion_billing_subjects','account_deletion_custody_evidence_reviews',
+  'account_deletion_custody_release_receipts','account_deletion_fulfillment_receipts','account_deletion_fulfillments',
+  'account_deletion_identity_inventory','account_deletion_profile_custody','account_deletion_profile_review_attestations',
+  'account_deletion_profile_review_scopes','account_deletion_request_receipts','account_deletion_requests',
+  'account_deletion_retention_attestations','account_deletion_service_subjects','account_deletion_storage_content_reviews',
+  'account_deletion_storage_relocations'
 ]);
-assert.equal(manifest.intakeFunctionSignatures.length,21);
+assert.equal(manifest.intakeFunctionSignatures.length,89);
 await test('missing deletion fulfillment RPC blocks release',async()=>{
   await db.exec('drop function public.prepare_account_deletion_fulfillment(uuid,boolean,uuid,uuid,text[])');await expectFalse('required_functions');
 });

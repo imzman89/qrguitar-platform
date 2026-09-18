@@ -26,7 +26,7 @@ function readRequest(value: unknown): DeletionRequest {
     || (row.status === "requested" ? row.cancelledAt !== null : !timestamp(row.cancelledAt) || Date.parse(row.cancelledAt) < Date.parse(row.requestedAt))) throw new Error("The request status could not be verified. Refresh to try again.");
   return { requestId: id, status: row.status as DeletionRequest["status"], requestedAt: row.requestedAt, cancelledAt: row.cancelledAt as string | null };
 }
-const fulfillmentBlockers = new Set(["administrator_account", "unused_paid_credits", "unresolved_payment_order", "payment_hold_or_dispute", "billing_retention_migration_required", "unused_profile_credits", "storage_cleanup_required", "storage_quiescence_required", "active_ownership_transfer", "active_ownership_claim", "active_service_workflow", "service_record_migration_required", "retained_personal_content_review_required"]);
+const fulfillmentBlockers = new Set(["administrator_account", "unused_paid_credits", "unresolved_payment_order", "payment_hold_or_dispute", "billing_retention_review_required", "unused_profile_credits", "storage_cleanup_required", "storage_quiescence_required", "active_ownership_transfer", "active_ownership_claim", "active_service_workflow", "service_history_privacy_review_required", "profile_history_privacy_review_required", "retained_personal_content_review_required"]);
 function readFulfillment(value: unknown): IntakeFulfillment | null {
   if (value === null) return null;
   const row = record(value), state = row.state;

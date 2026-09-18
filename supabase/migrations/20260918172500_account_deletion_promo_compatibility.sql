@@ -3,6 +3,25 @@
 -- only account links and text that contains the departing UUID/email change.
 begin;
 
+alter table public.billing_order_promotions
+  add column subject_id uuid references public.account_deletion_billing_subjects(subject_id) on delete restrict,
+  drop constraint billing_order_promotions_order_id_owner_id_environment_fkey,
+  add constraint billing_order_promotions_order_history_fkey
+    foreign key(order_id,owner_id,environment) references public.billing_orders(id,owner_id,environment)
+    deferrable initially deferred,
+  add constraint billing_order_promotions_identity_mode check(
+    subject_id is null or owner_id=subject_id);
+
+insert into public.account_deletion_identity_inventory(domain,table_name,actor_column,subject_column)
+values('billing','billing_order_promotions','owner_id','subject_id');
+
+create trigger account_deletion_billing_subject_billing_order_promotions
+  before insert or update on public.billing_order_promotions for each row
+  execute function public._account_deletion_billing_identity_normalize('owner_id','subject_id');
+create trigger account_deletion_billing_graph_billing_order_promotions
+  before insert or update or delete on public.billing_order_promotions for each row
+  execute function public._account_deletion_billing_graph_fence();
+
 alter table public.billing_promo_admin_events
   alter column operator_id drop not null,
   alter column operator_email drop not null,
@@ -28,31 +47,12 @@ $$;
 create function public._account_deletion_promo_redact_json(
   p_value jsonb,p_actor_id uuid,p_email text
 ) returns jsonb
-language plpgsql immutable set search_path=pg_catalog,public as $$
-declare scrubbed jsonb; scalar_text text;
-begin
-  if p_value is null then return null; end if;
-  case jsonb_typeof(p_value)
-    when 'object' then
-      select coalesce(jsonb_object_agg(item.key,
-        public._account_deletion_promo_redact_json(item.value,p_actor_id,p_email)),'{}'::jsonb)
-        into scrubbed from jsonb_each(p_value) item;
-      return scrubbed;
-    when 'array' then
-      select coalesce(jsonb_agg(
-        public._account_deletion_promo_redact_json(item.value,p_actor_id,p_email)
-        order by item.ordinality),'[]'::jsonb)
-        into scrubbed from jsonb_array_elements(p_value) with ordinality item(value,ordinality);
-      return scrubbed;
-    when 'string' then
-      scalar_text:=p_value#>>'{}';
-      if public._account_deletion_promo_text_has_identity(scalar_text,p_actor_id,p_email) then
-        return to_jsonb('[redacted]'::text);
-      end if;
-      return p_value;
-    else return p_value;
-  end case;
-end $$;
+language sql stable security definer set search_path=pg_catalog,public as $$
+  select public._account_deletion_redact_identity_jsonb(p_value,p_actor_id,p_email,f.subject_token)
+  from public.account_deletion_fulfillments f
+  where f.actor_id=p_actor_id and f.state in ('blocked','quiescing_storage')
+  order by f.started_at desc limit 1
+$$;
 
 -- The normal promotion guard remains unchanged outside a live, reviewed
 -- deletion. Inside that context it permits one exact identity scrub while
@@ -273,24 +273,44 @@ begin
   end loop;
 end $fences$;
 
--- The revised fulfillment scanner should merge this array with its own stable
--- blocker set. A promoted order remains billing history; it is never scrubbed.
-create function public._account_deletion_promo_blockers(p_actor_id uuid) returns jsonb
+create or replace function public._account_deletion_promo_billing_graph(
+  p_actor_id uuid,p_subject_id uuid
+) returns jsonb language sql stable security definer set search_path=pg_catalog,public set timezone='UTC' as $$
+  select jsonb_build_object('promotions',coalesce(jsonb_agg(to_jsonb(x) order by x.order_id),'[]'::jsonb))
+  from public.billing_order_promotions x
+  where x.owner_id in (p_actor_id,p_subject_id) or x.subject_id=p_subject_id
+$$;
+
+create or replace function public._account_deletion_promo_migrate_billing_subject(
+  p_request_id uuid,p_actor_id uuid,p_subject_id uuid
+) returns void language plpgsql security definer set search_path=pg_catalog,public as $$
+begin
+  if nullif(current_setting('qrguitar.account_deletion_identity_migration',true),'') is distinct from p_request_id::text
+    or not exists(select 1 from public.account_deletion_fulfillments f
+      where f.request_id=p_request_id and f.actor_id=p_actor_id and f.state='quiescing_storage')
+    or not exists(select 1 from public.account_deletion_billing_subjects b
+      where b.request_id=p_request_id and b.subject_id=p_subject_id) then
+    raise exception using errcode='42501',message='Promotion billing identity migration requires the reviewed deletion transaction.';
+  end if;
+  update public.billing_order_promotions set owner_id=p_subject_id,subject_id=p_subject_id where owner_id=p_actor_id;
+end $$;
+
+-- Promoted orders participate in the same reviewed billing graph and subject
+-- migration as every other settled order; they need no separate permanent
+-- blocker and never forfeit the discount or financial history.
+create or replace function public._account_deletion_promo_blockers(p_actor_id uuid) returns jsonb
 language sql stable security definer set search_path=pg_catalog,public as $$
-  select case when exists(
-    select 1 from public.billing_order_promotions where owner_id=p_actor_id
-  ) then '["billing_retention_migration_required"]'::jsonb else '[]'::jsonb end
+  select '[]'::jsonb
 $$;
 
 -- This is both a standalone integration postcondition and the assertion used
 -- by the scrub hook. Order history, actor links, quote throttles, or a literal
 -- UUID/email anywhere in retained promo configuration/audit data all fail it.
-create function public._account_deletion_promo_retained_pii(
+create or replace function public._account_deletion_promo_retained_pii(
   p_actor_id uuid,p_email text
 ) returns boolean
 language sql stable security definer set search_path=pg_catalog,public as $$
-  select exists(select 1 from public.billing_order_promotions where owner_id=p_actor_id)
-    or exists(select 1 from public.billing_promo_codes p where p.created_by=p_actor_id or p.updated_by=p_actor_id
+  select exists(select 1 from public.billing_promo_codes p where p.created_by=p_actor_id or p.updated_by=p_actor_id
       or public._account_deletion_promo_text_has_identity(to_jsonb(p)::text,p_actor_id,p_email))
     or exists(select 1 from public.billing_promo_admin_events e where e.operator_id=p_actor_id
       or (nullif(lower(btrim(coalesce(p_email,''))),'') is not null
@@ -366,6 +386,8 @@ revoke all on function public._account_deletion_promo_text_has_identity(text,uui
   public._account_deletion_promo_redact_json(jsonb,uuid,text),
   public._account_deletion_promo_write_fence(),
   public._billing_promo_admin_event_guard(),
+  public._account_deletion_promo_billing_graph(uuid,uuid),
+  public._account_deletion_promo_migrate_billing_subject(uuid,uuid,uuid),
   public._account_deletion_promo_blockers(uuid),
   public._account_deletion_promo_retained_pii(uuid,text),
   public._account_deletion_promo_scrub_profile()

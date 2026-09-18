@@ -16,6 +16,12 @@ export type IntakeDependencies = {
 export type RequestDto = { requestId: string; status: "requested" | "cancelled"; requestedAt: string; cancelledAt: string | null };
 export type ReceiptDto = { operationId: string; expectedRevision: string; action: "submit" | "cancel"; requestId: string; recordedAt: string };
 export type QueueFulfillmentDto = { state: "blocked" | "quiescing_storage" | "ready_for_auth_deletion" | "completed"; blockers: string[]; revision: string; reviewedAt: string; storageQuiesceUntil: string | null };
+export type QueueProfileReviewDto = { guitarId: string; qrCode: string; permanentPath: string; relationshipCodes: string[]; policyVersion: 1; contentFingerprint: string; attested: boolean; attestedAt: string | null };
+export type QueueRetentionReviewDto = { domain: "billing" | "service"; policyVersion: 1; contentFingerprint: string; required: boolean; decisionCode: "lawful_financial_retention_reviewed" | "service_history_privacy_reviewed" | null; attested: boolean; attestedAt: string | null };
+export type QueueStorageReviewDto = { relocationId:string; bucket:"instrument-media"|"instrument-documents"|"service-evidence";
+  disposition:"retain"|"delete"; sourceSize:number|null; sourceMimeType:string|null; sourceFingerprint:string;
+  reviewRequired:boolean; decision:"retain"|"delete"|null; byteSha256:string|null; reviewedAt:string|null;
+  state:"planned"|"copy_authorized"|"deletion_authorized"|"references_updated" };
 export class IntakeError extends Error {
   constructor(readonly status: number, readonly code: string, message: string, readonly uncertain = false, readonly operationId?: string, readonly retryable = false, readonly expectedRevision?: string) { super(message); }
 }
@@ -40,9 +46,12 @@ function timestampMicros(value: string) {
   return BigInt(Date.parse(value.replace(/\.\d+/, ""))) * 1000n + BigInt(fraction.padEnd(6, "0"));
 }
 const queueBlockers = new Set(["administrator_account", "unused_paid_credits", "unresolved_payment_order", "payment_hold_or_dispute",
-  "billing_retention_migration_required", "unused_profile_credits", "storage_cleanup_required", "active_ownership_transfer",
-  "storage_quiescence_required", "active_ownership_claim", "active_service_workflow", "service_record_migration_required",
+  "billing_retention_review_required", "unused_profile_credits", "storage_cleanup_required", "active_ownership_transfer",
+  "storage_quiescence_required", "active_ownership_claim", "active_service_workflow", "service_history_privacy_review_required",
+  "profile_history_privacy_review_required",
   "retained_personal_content_review_required"]);
+const reviewRelationshipCodes = new Set(["current_owner", "safety_author", "owner_removal_author", "archive_author", "transfer_from_owner", "transfer_recipient", "claim_participant", "claim_evidence_author", "claim_event_author", "document_author", "external_media_author", "serial_author", "timeline_author", "service_access", "service_participant", "service_evidence_author", "service_activity_author", "service_notification_recipient", "service_upload_author", "service_upload_scope", "service_discard_receipt", "create_receipt", "staged_upload", "site_content"]);
+const reviewFingerprint = (value: unknown): value is string => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
 function queueFulfillment(value: unknown): QueueFulfillmentDto | null {
   if (value === null) return null;
   if (!object(value) || !["blocked", "quiescing_storage", "ready_for_auth_deletion", "completed"].includes(String(value.state)) || !Array.isArray(value.blockers)
@@ -54,6 +63,46 @@ function queueFulfillment(value: unknown): QueueFulfillmentDto | null {
     || (value.state !== "blocked" && value.storageQuiesceUntil === null)) throw unavailable();
   return { state: value.state as QueueFulfillmentDto["state"], blockers: [...value.blockers], revision: value.revision,
     reviewedAt: value.reviewedAt, storageQuiesceUntil: value.storageQuiesceUntil as string | null };
+}
+function queueProfileReview(value: unknown): QueueProfileReviewDto {
+  if (!exactObject(value,["guitarId","qrCode","permanentPath","relationshipCodes","policyVersion","contentFingerprint","attested","attestedAt"])
+    || !uuid(value.guitarId) || typeof value.qrCode!=="string" || !value.qrCode || value.qrCode.length>200
+    || typeof value.permanentPath!=="string" || !value.permanentPath.startsWith("/i/") || value.permanentPath.length>500
+    || !Array.isArray(value.relationshipCodes) || value.relationshipCodes.length<1 || value.relationshipCodes.length>32
+    || value.relationshipCodes.some(code=>typeof code!=="string"||!reviewRelationshipCodes.has(code)) || new Set(value.relationshipCodes).size!==value.relationshipCodes.length
+    || value.policyVersion!==1 || !reviewFingerprint(value.contentFingerprint) || typeof value.attested!=="boolean"
+    || (value.attestedAt!==null&&!validTimestamp(value.attestedAt)) || value.attested!==(value.attestedAt!==null)) throw unavailable();
+  return { guitarId:value.guitarId.toLowerCase(),qrCode:value.qrCode,permanentPath:value.permanentPath,relationshipCodes:[...value.relationshipCodes],policyVersion:1,
+    contentFingerprint:value.contentFingerprint,attested:value.attested,attestedAt:value.attestedAt as string|null };
+}
+function queueRetentionReview(value: unknown): QueueRetentionReviewDto {
+  if (!exactObject(value,["domain","policyVersion","contentFingerprint","required","decisionCode","attested","attestedAt"])
+    || !["billing","service"].includes(String(value.domain)) || value.policyVersion!==1 || !reviewFingerprint(value.contentFingerprint)
+    || typeof value.required!=="boolean" || typeof value.attested!=="boolean" || (value.attestedAt!==null&&!validTimestamp(value.attestedAt))) throw unavailable();
+  const domain=value.domain as "billing"|"service",decision=domain==="billing"?"lawful_financial_retention_reviewed":"service_history_privacy_reviewed";
+  if((!value.required&&value.attested)||value.attested!==(value.attestedAt!==null)||(value.attested?value.decisionCode!==decision:value.decisionCode!==null))throw unavailable();
+  return { domain,policyVersion:1,contentFingerprint:value.contentFingerprint,required:value.required,decisionCode:value.decisionCode as QueueRetentionReviewDto["decisionCode"],attested:value.attested,attestedAt:value.attestedAt as string|null };
+}
+const storageMimes={"instrument-media":new Set(["image/jpeg","image/png","image/webp"]),
+  "instrument-documents":new Set(["image/jpeg","image/png","image/webp","application/pdf"]),
+  "service-evidence":new Set(["image/jpeg","image/png","image/webp","application/pdf"])} as const;
+function queueStorageReview(value:unknown):QueueStorageReviewDto{
+  if(!exactObject(value,["relocationId","bucket","disposition","sourceSize","sourceMimeType","sourceFingerprint","reviewRequired","decision","byteSha256","reviewedAt","state"])
+    ||!uuid(value.relocationId)||!Object.hasOwn(storageMimes,String(value.bucket))||!["retain","delete"].includes(String(value.disposition))
+    ||(value.sourceSize!==null&&(!Number.isSafeInteger(value.sourceSize)||Number(value.sourceSize)<0||Number(value.sourceSize)>16*1024*1024))
+    ||(value.sourceMimeType!==null&&(typeof value.sourceMimeType!=="string"||!storageMimes[value.bucket as keyof typeof storageMimes].has(value.sourceMimeType as never)))
+    ||!reviewFingerprint(value.sourceFingerprint)||typeof value.reviewRequired!=="boolean"||![null,"retain","delete"].includes(value.decision as null|string)
+    ||(value.byteSha256!==null&&!reviewFingerprint(value.byteSha256))||(value.reviewedAt!==null&&!validTimestamp(value.reviewedAt))
+    ||!["planned","copy_authorized","deletion_authorized","references_updated"].includes(String(value.state)))throw unavailable();
+  const decision=value.decision as "retain"|"delete"|null;
+  if((decision===null)!==(value.byteSha256===null)||(decision===null)!==(value.reviewedAt===null)
+    ||value.reviewRequired!==(value.disposition==="retain")||(decision!==null&&decision!==value.disposition)
+    ||(value.state==="copy_authorized"&&(value.disposition!=="retain"||decision!=="retain"))
+    ||(value.state==="deletion_authorized"&&value.disposition!=="delete")
+    ||(value.state==="references_updated"&&(value.disposition!=="retain"||decision!=="retain")))throw unavailable();
+  return{relocationId:value.relocationId.toLowerCase(),bucket:value.bucket as QueueStorageReviewDto["bucket"],disposition:value.disposition as "retain"|"delete",
+    sourceSize:value.sourceSize as number|null,sourceMimeType:value.sourceMimeType as string|null,sourceFingerprint:value.sourceFingerprint,
+    reviewRequired:value.reviewRequired,decision,byteSha256:value.byteSha256 as string|null,reviewedAt:value.reviewedAt as string|null,state:value.state as QueueStorageReviewDto["state"]};
 }
 function unavailable(operationId?: string) {
   return new IntakeError(503, operationId ? "intake_unconfirmed" : "intake_unavailable",
@@ -179,9 +228,14 @@ export function createIntakeService(deps: IntakeDependencies) {
       const ids = new Set<string>();
       const requests = data.requests.map(value => {
         const item = requestDto(value);
-        if (!object(value) || (value.actorId !== null && !uuid(value.actorId)) || item.status !== "requested" || ids.has(item.requestId)) throw unavailable();
+        if (!object(value) || (value.actorId !== null && !uuid(value.actorId)) || item.status !== "requested" || ids.has(item.requestId)
+          || !Array.isArray(value.profileReviews) || !Array.isArray(value.retentionReviews) || value.retentionReviews.length>2
+          || !Array.isArray(value.storageReviews) || value.storageReviews.length>10_000) throw unavailable();
+        const profileReviews=value.profileReviews.map(queueProfileReview),retentionReviews=value.retentionReviews.map(queueRetentionReview),storageReviews=value.storageReviews.map(queueStorageReview);
+        if(new Set(profileReviews.map(row=>row.guitarId)).size!==profileReviews.length||new Set(retentionReviews.map(row=>row.domain)).size!==retentionReviews.length
+          ||new Set(storageReviews.map(row=>row.relocationId)).size!==storageReviews.length)throw unavailable();
         ids.add(item.requestId);
-        return { ...item, actorId: value.actorId === null ? null : value.actorId.toLowerCase(), fulfillment: queueFulfillment(value.fulfillment) };
+        return { ...item, actorId: value.actorId === null ? null : value.actorId.toLowerCase(), fulfillment: queueFulfillment(value.fulfillment), profileReviews, retentionReviews, storageReviews };
       });
       return { ok: true as const, requests };
     }
