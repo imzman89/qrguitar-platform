@@ -197,3 +197,66 @@ for (const reject of [false, true]) test(`failed resume session check does not e
   f.readSession = () => reject ? Promise.reject(new Error("offline")) : Promise.resolve({ data: { session: f.session }, error: new Error("offline") });
   await f.focus(); assert.equal(f.storage.get(activityKey), before); assert.equal(f.signouts, 0); f.dispose();
 });
+
+function componentStatements(relative, componentName) {
+  const sourcePath = path.join(web, relative), source = fs.readFileSync(sourcePath, "utf8");
+  const file = ts.createSourceFile(sourcePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const component = file.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === componentName);
+  assert.ok(component?.body, `${componentName} component source is required`);
+  return { file, statements: component.body.statements };
+}
+
+function compileLifecycleHarness(source) {
+  const exports = {};
+  const code = ts.transpileModule(source, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS }
+  }).outputText;
+  new Function("exports", code)(exports);
+  return exports;
+}
+
+test("owner service review aborts a stale route load before private data can commit", async () => {
+  const { file, statements } = componentStatements("app/service-review/[id]/page.tsx", "ServiceReviewPage");
+  const load = statements.find((node) => ts.isVariableStatement(node) && node.declarationList.declarations.some((declaration) => declaration.name.getText(file) === "load"));
+  const effect = statements.find((node) => ts.isExpressionStatement(node) && node.getText(file).includes("getSupabaseAccessToken()"));
+  assert.ok(load && effect, "service review load lifecycle source is required");
+  const harness = compileLifecycleHarness(`export function run(d:any){const {id,useCallback,useEffect,getSupabaseAccessToken,setToken,setMessage,setSubmission,setVisibility,setEvidence,fetch}=d;${load.getText(file)}${effect.getText(file)}}`);
+  let cleanup, resolveResponse, requestSignal;
+  const writes = [];
+  const response = new Promise((resolve) => { resolveResponse = resolve; });
+  harness.run({
+    id: "submission-old",
+    useCallback: (callback) => callback,
+    useEffect: (callback) => { cleanup = callback(); },
+    getSupabaseAccessToken: async () => "owner-token",
+    setToken: (value) => writes.push(["token", value]),
+    setMessage: (value) => writes.push(["message", value]),
+    setSubmission: (value) => writes.push(["submission", value]),
+    setVisibility: (value) => writes.push(["visibility", value]),
+    setEvidence: (value) => writes.push(["evidence", value]),
+    fetch: async (_url, init) => { requestSignal = init.signal; return response; }
+  });
+  await tick();
+  assert.ok(requestSignal); const writesBeforeCleanup = writes.length; cleanup(); assert.equal(requestSignal.aborted, true);
+  resolveResponse(Response.json({ ok: true, submission: { id: "submission-old", requestedVisibility: "private" } }));
+  await tick(); await tick();
+  assert.deepEqual(writes.slice(writesBeforeCleanup), []);
+});
+
+test("bot welcome state follows route changes even when the Profile identity is unchanged", () => {
+  const { file, statements } = componentStatements("components/QRGuitarBotPopup.tsx", "QRGuitarBotPopup");
+  const name = statements.find((node) => ts.isVariableStatement(node) && node.declarationList.declarations.some((declaration) => declaration.name.getText(file) === "profileInstrumentName"));
+  const effect = statements.find((node) => ts.isExpressionStatement(node) && node.getText(file).includes("setMessages(["));
+  assert.ok(name && effect, "bot route-aware welcome lifecycle source is required");
+  const harness = compileLifecycleHarness(`export function run(d:any){const {pathname,instrument,useEffect,setMessages}=d;${name.getText(file)}${effect.getText(file)}}`);
+  const instrument = { qrCode: "QRG-SAME", name: "Route test guitar", brand: "Test" };
+  const render = (pathname) => {
+    let message, dependencies;
+    harness.run({ pathname, instrument, setMessages: (value) => { message = value[0].copy; }, useEffect: (callback, deps) => { dependencies = deps; callback(); } });
+    return { message, dependencies };
+  };
+  const profile = render("/i/QRG-SAME"), editor = render("/edit/QRG-SAME");
+  assert.match(profile.message, /Route test guitar/);
+  assert.doesNotMatch(editor.message, /Route test guitar/);
+  assert.notDeepEqual(profile.dependencies, editor.dependencies);
+});

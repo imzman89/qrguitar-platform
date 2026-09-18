@@ -29,7 +29,7 @@ import {
   X
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import { SiteCompositionEditor } from "../../components/SiteCompositionEditor";
@@ -214,10 +214,10 @@ export default function SiteEditorPage() {
   const [selected, setSelected] = useState<SelectedPage>({ area: "Marketing", page: "Homepage" });
   const [settings, setSettingsState] = useState<EditableSiteSettings>(defaultSiteSettings);
   const settingsRef = useRef(settings);
-  function setSettings(next: EditableSiteSettings | ((current: EditableSiteSettings) => EditableSiteSettings)) {
+  const setSettings = useCallback((next: EditableSiteSettings | ((current: EditableSiteSettings) => EditableSiteSettings)) => {
     const value = typeof next === "function" ? next(settingsRef.current) : next;
     settingsRef.current = value; setSettingsState(value);
-  }
+  }, []);
   const versionsRef = useRef({ publishedVersion: "", draftVersion: "" });
   const actorRef = useRef("");
   const mutationsRef = useRef<ReturnType<typeof createEditorMutationController> | null>(null);
@@ -226,7 +226,7 @@ export default function SiteEditorPage() {
   const [writeBusy, setWriteBusy] = useState(false);
   const [editorIssue, setEditorIssueState] = useState<"" | "conflict" | "uncertain" | "error">("");
   const issueRef = useRef(editorIssue);
-  function setEditorIssue(value: typeof editorIssue) { issueRef.current = value; setEditorIssueState(value); }
+  const setEditorIssue = useCallback((value: typeof editorIssue) => { issueRef.current = value; setEditorIssueState(value); }, []);
   const [published, setPublished] = useState<EditableSiteSettings>(defaultSiteSettings);
   const [publishedAt, setPublishedAt] = useState("");
   const [draftMeta, setDraftMeta] = useState<SiteEditorPayload["draftMeta"]>(null);
@@ -309,7 +309,7 @@ export default function SiteEditorPage() {
     return () => window.removeEventListener("resize", updatePreviewLayout);
   }, []);
 
-  function applyPayload(payload: SiteEditorPayload, preferDraft = true, submittedSnapshot?: string) {
+  const applyPayload = useCallback((payload: SiteEditorPayload, preferDraft = true, submittedSnapshot?: string) => {
     if (typeof payload.publishedVersion !== "string" || typeof payload.draftVersion !== "string" || !payload.published) throw new Error("Incomplete editor snapshot.");
     versionsRef.current = { publishedVersion: payload.publishedVersion, draftVersion: payload.draftVersion };
     const nextPublished = hydrateLegacyContent(mergeSiteSettings(payload.published));
@@ -322,7 +322,7 @@ export default function SiteEditorPage() {
       setSettings(next); setAdvancedJson(JSON.stringify(next, null, 2)); applyThemeSettings(next);
     }
     setDraftMeta(payload.draftMeta || null); setRevisions(payload.revisions || []);
-  }
+  }, [setSettings]);
 
   async function api() {
     const token = await getSupabaseAccessToken();
@@ -333,7 +333,7 @@ export default function SiteEditorPage() {
     return payload;
   }
 
-  function initializeMutations(actorId: string) {
+  const initializeMutations = useCallback((actorId: string) => {
     actorRef.current = actorId;
     const controller = createEditorMutationController({ actorId, storage: window.sessionStorage, uuid: () => crypto.randomUUID(),
       send: async (body) => {
@@ -355,9 +355,9 @@ export default function SiteEditorPage() {
     } else if (controller.storageProblem) {
       setEditorIssue("error"); setStatus("error"); setMessage("Recovery storage is unavailable. Export your local changes before reloading.");
     }
-  }
+  }, [setEditorIssue, setSettings]);
 
-  async function executeEditor(action: string, body: Record<string, unknown> = {}, manual = false, retry = false) {
+  const executeEditor = useCallback(async (action: string, body: Record<string, unknown> = {}, manual = false, retry = false) => {
     if (manual && manualPending.current) return;
     if (manual) manualPending.current = true;
     try {
@@ -406,7 +406,7 @@ export default function SiteEditorPage() {
       await operation;
       if (writeTask.current === operation) writeTask.current = null;
     } finally { if (manual) manualPending.current = false; }
-  }
+  }, [applyPayload, setEditorIssue]);
 
   function exportLocalChanges() {
     const url = URL.createObjectURL(new Blob([JSON.stringify(settingsRef.current, null, 2)], { type: "application/json" }));
@@ -432,7 +432,7 @@ export default function SiteEditorPage() {
     };
     window.addEventListener(sitePreviewInvalidatedEvent, invalidate);
     return () => window.removeEventListener(sitePreviewInvalidatedEvent, invalidate);
-  }, []);
+  }, [setSettings]);
 
   useEffect(() => {
     let cancelled = false;
@@ -456,7 +456,7 @@ export default function SiteEditorPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [applyPayload, initializeMutations]);
 
   useEffect(() => {
     let cancelled = false;
@@ -503,7 +503,7 @@ export default function SiteEditorPage() {
       }
     }, 1800);
     return () => window.clearTimeout(timer);
-  }, [authorized, draftMeta, hasChanges, selected.area, selected.page, settings, writeBusy, editorIssue]);
+  }, [authorized, draftMeta, executeEditor, hasChanges, selected.area, selected.page, settings, writeBusy, editorIssue]);
 
   useEffect(() => {
     if (!confirmAction) return;

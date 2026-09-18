@@ -130,6 +130,7 @@ export default function DashboardPage() {
   useEffect(() => {
     let cancelled = false;
     let authResolved = false;
+    const accountRevisionRef = accountRevision;
     let supabase: ReturnType<typeof createBrowserSupabaseClient>;
     try { supabase = createBrowserSupabaseClient(); } catch {
       setAuthChecked(true);
@@ -149,7 +150,7 @@ export default function DashboardPage() {
       const email = session?.user.email || "";
       if (sessionEmail.current !== email) {
         sessionEmail.current = email;
-        accountRevision.current++;
+        accountRevisionRef.current++;
         visibilityRequests.current.clear(); removalRequests.current.clear(); setVisibilityPendingCodes([]);
         setInstruments([]); setTransfers([]); setServiceRequests([]);
         setQuickEditRecord(null); setActionRecord(null);
@@ -165,7 +166,7 @@ export default function DashboardPage() {
       if (!cancelled && !authResolved) { setAuthChecked(true); setDashboardMessage("Could not check your session. Please reload."); }
     });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => applySession(session));
-    return () => { cancelled = true; accountRevision.current++; window.clearTimeout(timeout); listener.subscription.unsubscribe(); };
+    return () => { cancelled = true; accountRevisionRef.current++; window.clearTimeout(timeout); listener.subscription.unsubscribe(); };
   }, []);
 
   useEffect(() => {

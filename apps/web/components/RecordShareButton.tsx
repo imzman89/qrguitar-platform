@@ -24,12 +24,15 @@ export function RecordShareButton({ code, title, className = "", showLabel = fal
   const label = title || code;
 
   useEffect(() => {
-    active.current = true;
+    const activeRef = active;
+    const revisionRef = revision;
+    const timerRef = timer;
+    activeRef.current = true;
     setStatus("idle");
     return () => {
-      active.current = false;
-      revision.current++;
-      if (timer.current !== undefined) window.clearTimeout(timer.current);
+      activeRef.current = false;
+      revisionRef.current++;
+      if (timerRef.current !== undefined) window.clearTimeout(timerRef.current);
     };
   }, [url]);
 

@@ -54,6 +54,7 @@ function hookRuntime() {
     },
     useRef(initial) { const index = cursor++; slots[index] ??= { current: initial }; return slots[index]; },
     useMemo(make, deps) { const index = cursor++; if (!same(slots[index]?.deps, deps)) slots[index] = { value: make(), deps }; return slots[index].value; },
+    useCallback(callback, deps) { const index = cursor++; if (!same(slots[index]?.deps, deps)) slots[index] = { value: callback, deps }; return slots[index].value; },
     useEffect(run, deps) {
       const index = cursor++; slots[index] ??= {};
       if (!same(slots[index].deps, deps)) pending.push(() => { slots[index].cleanup?.(); slots[index].deps = deps; slots[index].cleanup = run(); });

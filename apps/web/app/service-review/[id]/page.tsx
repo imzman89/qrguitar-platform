@@ -3,7 +3,7 @@
 import { ArrowLeft, CheckCircle2, FileLock2, ShieldCheck, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Footer } from "../../../components/Footer";
 import { Nav } from "../../../components/Nav";
 import { getContentValue } from "../../../lib/content-registry";
@@ -27,17 +27,35 @@ export default function ServiceReviewPage() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState("");
 
-  async function load(accessToken: string) {
-    const response = await fetch(`/api/service-submissions?id=${encodeURIComponent(id)}`, { headers: { authorization: `Bearer ${accessToken}` }, cache: "no-store" });
+  const load = useCallback(async (accessToken: string, signal: AbortSignal) => {
+    const response = await fetch(`/api/service-submissions?id=${encodeURIComponent(id)}`, { headers: { authorization: `Bearer ${accessToken}` }, cache: "no-store", signal });
     const payload = await response.json().catch(() => ({}));
+    if (signal.aborted) return;
     if (!response.ok) { setMessage(payload.message || "Could not load this owner review."); return; }
     setSubmission(payload.submission); setVisibility(payload.submission?.requestedVisibility || "private");
-    const files = await fetch(`/api/service-evidence?submissionId=${encodeURIComponent(id)}`, { headers: { authorization: `Bearer ${accessToken}` }, cache: "no-store" });
-    const filesPayload = await files.json().catch(() => ({})); if (files.ok) setEvidence(filesPayload.evidence || []);
-    await fetch("/api/service-submissions", { method: "PATCH", headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" }, body: JSON.stringify({ id, action: "mark_read" }) });
-  }
+    const files = await fetch(`/api/service-evidence?submissionId=${encodeURIComponent(id)}`, { headers: { authorization: `Bearer ${accessToken}` }, cache: "no-store", signal });
+    const filesPayload = await files.json().catch(() => ({}));
+    if (signal.aborted) return;
+    if (files.ok) setEvidence(filesPayload.evidence || []);
+    await fetch("/api/service-submissions", { method: "PATCH", headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" }, body: JSON.stringify({ id, action: "mark_read" }), signal });
+  }, [id]);
 
-  useEffect(() => { void getSupabaseAccessToken().then((value) => { setToken(value); if (value) void load(value); }); }, [id]);
+  useEffect(() => {
+    const controller = new AbortController();
+    setSubmission(null);
+    setEvidence([]);
+    setMessage("");
+    void getSupabaseAccessToken()
+      .then(async (value) => {
+        if (controller.signal.aborted) return;
+        setToken(value);
+        if (value) await load(value, controller.signal);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : "Could not load this owner review.");
+      });
+    return () => controller.abort();
+  }, [load]);
 
   async function act(action: "approve" | "request_changes" | "decline") {
     setBusy(action);

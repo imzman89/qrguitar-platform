@@ -424,7 +424,7 @@ export default function EditInstrumentPage() {
     return "No Alert";
   }
 
-  async function refreshServiceEvents(qrCode = original?.qrCode || code) {
+  async function refreshServiceEvents(qrCode: string) {
     if (!qrCode) {
       return;
     }

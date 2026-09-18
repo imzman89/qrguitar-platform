@@ -376,14 +376,17 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
   const shareUrl = instrumentQrCode ? publicProfileUrl(instrumentQrCode) : "";
 
   useEffect(() => {
-    copyActiveRef.current = true;
+    const activeRef = copyActiveRef;
+    const revisionRef = copyRevisionRef;
+    const timerRef = copyTimerRef;
+    activeRef.current = true;
     setCopyStatus("idle");
     setShareNotice("idle");
     return () => {
-      copyActiveRef.current = false;
-      copyRevisionRef.current++;
-      if (copyTimerRef.current !== undefined) clearTimeout(copyTimerRef.current);
-      copyTimerRef.current = undefined;
+      activeRef.current = false;
+      revisionRef.current++;
+      if (timerRef.current !== undefined) clearTimeout(timerRef.current);
+      timerRef.current = undefined;
     };
   }, [shareUrl]);
 

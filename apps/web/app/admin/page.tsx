@@ -554,7 +554,7 @@ export default function AdminPage() {
     loadAdmin();
   }, [loadAdmin]);
 
-  async function loadSiteSettings() {
+  const loadSiteSettings = useCallback(async () => {
     try {
       const token = await tokenPromise;
       if (!token) return;
@@ -574,9 +574,9 @@ export default function AdminPage() {
       } });
       if (logoEditor.current.pending) setMessage("A previous brand logo save needs confirmation. Use Save again to retry that exact change before making another.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not load brand logo settings."); }
-  }
+  }, [tokenPromise]);
 
-  useEffect(() => { void loadSiteSettings(); }, []);
+  useEffect(() => { void loadSiteSettings(); }, [loadSiteSettings]);
 
   async function saveBrandLogoMapping(nextLogos: Record<string, string>) {
     if (logoSaving.current) return;

@@ -45,6 +45,9 @@ export function QRGuitarBotPopup() {
   );
 
   const instrument = useMemo(() => scopedInstrument, [scopedInstrument]);
+  const profileInstrumentName = pathname?.startsWith("/i/") && instrument
+    ? instrument.name || instrument.brand || "this instrument"
+    : "";
   const quickPromptFor = (label: string, defaultPrompt: string) => {
     if (instrument) {
       return defaultPrompt;
@@ -78,16 +81,15 @@ export function QRGuitarBotPopup() {
   }, [pathname]);
 
   useEffect(() => {
-    const shouldClearScope = pathname?.startsWith("/i/") ? instrument : null;
     setMessages([
       {
         role: "assistant",
-        copy: shouldClearScope
-          ? `Ask about ${shouldClearScope.name || shouldClearScope.brand || "this instrument"}: proof, pricing, repairs, transfers, or listing prep.`
+        copy: profileInstrumentName
+          ? `Ask about ${profileInstrumentName}: proof, pricing, repairs, transfers, or listing prep.`
           : "The Guitar Expert and Assistant. Ask about a guitar, amp, pedal, price, serial, repair, listing, QRguitar Profile, or account issue."
       }
     ]);
-  }, [instrument?.qrCode, instrument?.name]);
+  }, [instrument?.qrCode, profileInstrumentName]);
 
   useEffect(() => {
     const handleBotContext = (event: Event) => {
