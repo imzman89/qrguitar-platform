@@ -359,6 +359,18 @@ test("paused sales still render official checkout for the saved pending pack", (
   const html = renderBilling(ready({ snapshot: snapshot({ enabled: false, offers: [], order: next, pendingOrder: next }), intent }), { controller: {} }); assert.match(html, /Loading secure payment options/); assert.match(html, /10 Profile credits/); assert.doesNotMatch(html, /Checkout is being connected/);
   const unconfigured = renderBilling(ready({ snapshot: snapshot({ enabled: false, clientId: null, offers: [], order: next, pendingOrder: next }), intent }), { controller: {} }); assert.doesNotMatch(unconfigured, /Loading secure payment options/); assert.match(unconfigured, /Check saved payment/);
 });
+test("a restored promoted intent cannot render a standard-price SDK before authoritative recovery", () => {
+  const promotion = { id: ID2, code: "GARYWON", name: "Owner payment test", revision: 1, discountType: "fixed_total", discountValue: 30,
+    classification: "internal_test", originalAmount: 5000, discountAmount: 4970, finalAmount: 30 };
+  const promotedOffer = { ...offers[1], amount: 30, listAmount: 5000, promotion };
+  const intent = { requestId: ID, offerKey: "profile_10", orderId: "", paypalOrderId: "", approvalObserved: false,
+    promoCode: promotion.code, promoId: promotion.id, promoRevision: promotion.revision, expectedAmount: 30 };
+  const unresolved = renderBilling(ready({ intent, uncertain: true }), { controller: {} });
+  assert.match(unresolved, /Check saved payment/); assert.doesNotMatch(unresolved, /Loading secure payment options|id="automatic-checkout-title"|<apple-pay-button/);
+  const pending = order({ offer: promotedOffer });
+  const recovered = renderBilling(ready({ snapshot: snapshot({ applePayEnabled: true, order: pending, pendingOrder: pending }), intent: { ...intent, orderId: ORDER, paypalOrderId: PAYPAL } }), { controller: {} });
+  assert.match(recovered, /\$0\.30/); assert.match(recovered, /Loading secure payment options/); assert.doesNotMatch(recovered, />\$50<span>one time/);
+});
 test("automatic-payment errors offer retry and support without sending PayPal IDs to manual checkout", () => {
   const html = renderBilling({ ...client.initialPayPalPaymentsState(), phase: "error", actorId: A, message: "Could not check payment" }, { mode: "return", query: `orderId=${ORDER}` }); assert.match(html, /Try again/); assert.match(html, /href="\/contact"/); assert.doesNotMatch(html, /\/billing\/manual/);
 });

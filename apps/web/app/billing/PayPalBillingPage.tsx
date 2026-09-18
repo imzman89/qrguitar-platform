@@ -36,7 +36,15 @@ function PayPalBillingContent({ mode }: { mode: Mode }) {
   const selectedKey = state.intent?.offerKey || (choice.actorId === state.actorId ? choice.offerKey : "");
   const catalogOffer = snapshot?.offers.find(offer => offer.key === selectedKey) || null;
   const appliedOffer = promo.actorId === state.actorId && promo.offerKey === selectedKey ? promo.offer : null;
-  const selected = state.intent && order?.offerKey === selectedKey ? order.offer : appliedOffer || catalogOffer || (order?.offerKey === selectedKey ? order.offer : null);
+  const intentOrder = state.intent?.orderId && order?.orderId === state.intent.orderId ? order : null;
+  const intentPromoOffer = state.intent?.promoCode && appliedOffer?.promotion?.code === state.intent.promoCode
+    && appliedOffer.promotion.id === state.intent.promoId && appliedOffer.promotion.revision === state.intent.promoRevision
+    && appliedOffer.amount === state.intent.expectedAmount ? appliedOffer : null;
+  // A restored promoted intent has no trustworthy display/wallet total until its
+  // original quote is still in memory or the ledger returns the frozen order.
+  const selected = state.intent
+    ? intentOrder?.offer || (state.intent.promoCode ? intentPromoOffer : catalogOffer || (order?.offerKey === selectedKey ? order.offer : null))
+    : appliedOffer || catalogOffer || (order?.offerKey === selectedKey ? order.offer : null);
   const receiptComplete = order?.status === "fulfilled", nextPurchase = Boolean(!orderId && receiptComplete && choice.actorId === state.actorId && choice.afterOrderId === order?.orderId);
   const completed = receiptComplete && !nextPurchase, review = order?.status === "needs_review", processing = order?.status === "processing" || state.intent?.approvalObserved;
   const disabled = Boolean(state.busy || state.refreshing || state.checkoutOpen || promo.busy || !snapshot?.enabled || snapshot.hold || snapshot.commercialExempt || snapshot.legacyOrderId || state.intent);

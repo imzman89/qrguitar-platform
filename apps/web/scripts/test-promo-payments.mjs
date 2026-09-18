@@ -229,6 +229,28 @@ test("definitive stale, paused, or limited promo rejection clears the local inte
   }
 });
 
+test("reloaded promoted intent recovers authoritative pending-order pricing before SDK use", async t => {
+  const storage = new Map([[`qrguitar:paypal-checkout:${OWNER}`, JSON.stringify({ requestId: REQUEST, offerKey: "profile_10",
+    orderId: "", paypalOrderId: "", approvalObserved: false, promoCode: "GARYWON", promoId: PROMO, promoRevision: 1, expectedAmount: 30 })]]);
+  let pending = null;
+  const fixture = clientFixture(t, { storage, responder: async (url) => {
+    if (url.includes("/status")) return json(snapshot(pending ? { order: pending, pendingOrder: pending } : {}));
+    if (url.endsWith("/create")) {
+      pending = { orderId: ORDER, ownerId: OWNER, requestId: REQUEST, offerKey: "profile_10", paypalOrderId: PAYPAL,
+        status: "approval_pending", offer: promotedOffer, createdAt: new Date().toISOString() };
+      return json({ orderId: ORDER, paypalOrderId: PAYPAL, status: "approval_pending", offer: promotedOffer });
+    }
+    if (url.endsWith("/reconcile")) return json({ order: pending });
+    throw new Error(`Unexpected request ${url}`);
+  } });
+  await fixture.ready(); assert.equal(fixture.client.getState().uncertain, true); assert.equal(fixture.client.getState().snapshot.pendingOrder, null);
+  assert.equal(fixture.posts().length, 0); await fixture.client.reconcile();
+  assert.deepEqual(fixture.posts().map(call => new URL(call.url, "https://qrguitar.test").pathname), ["/api/billing/paypal/create", "/api/billing/paypal/reconcile"]);
+  assert.equal(fixture.client.getState().snapshot.pendingOrder.offer.amount, 30);
+  assert.equal(fixture.client.getState().snapshot.pendingOrder.offer.promotion.code, "GARYWON");
+  assert.equal(fixture.client.getState().intent.orderId, ORDER);
+});
+
 test("browser client rejects tampered promo quotes and changed create responses", async t => {
   const tamperedQuote = { ...promotedOffer, amount: 31 };
   const quoteFixture = clientFixture(t, { responder: async url => url.includes("/status") ? json(snapshot()) : json({ offer: tamperedQuote }) });
