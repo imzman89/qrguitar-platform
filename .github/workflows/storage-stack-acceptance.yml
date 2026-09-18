@@ -46,7 +46,7 @@ jobs:
       - name: Install lockfile dependencies
         run: npm ci
       - name: Exercise fixture guards without network or Docker
-        run: node --test apps/web/scripts/storage-stack/test-guards.mjs
+        run: node --test apps/web/scripts/storage-stack/test-guards.mjs apps/web/scripts/storage-stack/test-acceptance-setup.mjs
       - name: Run real local Auth Storage PostgREST and PostgreSQL acceptance
         timeout-minutes: 20
         run: node apps/web/scripts/storage-stack/stack.mjs run

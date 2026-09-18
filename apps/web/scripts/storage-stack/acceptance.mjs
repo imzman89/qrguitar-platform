@@ -4,46 +4,13 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { createHash, randomUUID, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { context, verifyDirectory, validateStatus, exactApiUrl, ORIGIN, APP_ORIGIN, MARKER, safeReport } from './guards.mjs';
+import { context, verifyDirectory, validateStatus, exactApiUrl, ORIGIN, APP_ORIGIN, MARKER, safeReport, createDiagnostics } from './guards.mjs';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const EXPECTED_CASES = 18;
-async function main() {
-  const outer = { ...process.env }; delete outer.NODE_EXTRA_CA_CERTS;
-  const ctx = context(outer);
-  assert.equal(process.argv.length, 4); assert.equal(path.resolve(process.argv[2]), ctx.root);
-  assert.equal(fs.realpathSync(process.argv[3]), fs.realpathSync(ctx.repo));
-  verifyDirectory(ctx);
-  assert.equal(process.env.NODE_EXTRA_CA_CERTS, path.join(ctx.root, 'tls/ca.crt'));
-  assert.equal(process.env.NODE_ENV, 'production');
-  const status = JSON.parse(fs.readFileSync(path.join(ctx.root, 'status.json'), 'utf8'));
-  const connection = validateStatus(status);
-  const repo = fs.realpathSync(ctx.repo), require = createRequire(path.join(repo, 'apps/web/package.json'));
-  const { Client } = require('pg'), { createClient } = require('@supabase/supabase-js'), ts = require('typescript');
-  const files = ['schema.sql', 'security-rls.sql', 'admin-panel-foundation.sql', 'record-archive-controls.sql', 'service-history-timeline.sql', 'lost-stolen-safety-status.sql',
-    ...fs.readdirSync(path.join(repo, 'supabase/migrations')).filter(name => /^\d{14}_[a-z0-9_]+\.sql$/.test(name)).sort().map(name => 'migrations/' + name)];
-  const fingerprints = () => Object.fromEntries(files.map(name => ['supabase/' + name, hash(fs.readFileSync(path.join(repo, 'supabase', name)))]));
-  const harnessRoot = path.dirname(fileURLToPath(import.meta.url));
-  const harnessFingerprints = () => Object.fromEntries(['acceptance.mjs', 'guards.mjs', 'stack.mjs'].map(name => [name, hash(fs.readFileSync(path.join(harnessRoot, name)))]));
-  const report = { fixture: MARKER, startedAt: new Date().toISOString(), infrastructure: JSON.parse(fs.readFileSync(path.join(ctx.root, 'infrastructure.json'), 'utf8')),
-    sourceHashes: fingerprints(), harnessHashes: harnessFingerprints(), loadedModules: {}, packages: {}, tests: [], complete: false,
-    scope: 'Actual Next handler functions and real local Auth/Storage/PostgREST/PG17; no browser, hosted-provider, SMTP, deployment, or lock-barrier claim' };
-  for (const pkg of ['@supabase/supabase-js', '@supabase/storage-js', 'next', 'typescript', 'pg']) report.packages[pkg] = require(pkg + '/package.json').version;
-  const output = path.join(repo, 'test-results/storage-stack'); fs.mkdirSync(output, { recursive: true });
-  const db = new Client({ ...connection, application_name: 'qrguitar-isolated-storage-acceptance' });
-  const nativeFetch = globalThis.fetch;
-  globalThis.fetch = (input, init = {}) => {
-    const url = exactApiUrl(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
-    assert.ok(['/auth/v1/', '/rest/v1/', '/storage/v1/'].some(prefix => url.pathname.startsWith(prefix)), 'Unexpected network path');
-    return nativeFetch(input, { ...init, redirect: 'error', signal: init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(120000)]) : AbortSignal.timeout(120000) });
-  };
-  // Only freshly generated local CLI credentials enter the actual application modules.
-  process.env.NEXT_PUBLIC_SUPABASE_URL = ORIGIN;
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = status.ANON_KEY;
-  process.env.SUPABASE_SERVICE_ROLE_KEY = status.SERVICE_ROLE_KEY;
-  process.env.NEXT_PUBLIC_SITE_URL = APP_ORIGIN;
+export function applicationLoader(repo, ts, report) {
   const cache = new Map();
-  function load(relative) {
+  return function load(relative) {
     const full = path.resolve(repo, relative);
     assert.ok(full.startsWith(path.join(repo, 'apps/web') + path.sep));
     if (cache.has(full)) return cache.get(full).exports;
@@ -54,13 +21,57 @@ async function main() {
     new Function('module', 'exports', 'require', '__filename', '__dirname', compiled)(module, module.exports,
       name => name.startsWith('.') ? load(path.relative(repo, path.resolve(path.dirname(full), name + '.ts'))) : actualRequire(name), full, path.dirname(full));
     return module.exports;
-  }
-  const route = load('apps/web/app/api/service-evidence/route.ts');
-  const protocol = load('apps/web/lib/service-evidence-upload.ts');
+  };
+}
+async function main() {
+  const diagnostics = createDiagnostics(row => console.log('ACCEPTANCE_DIAGNOSTIC ' + JSON.stringify(row)));
+  const step = (name, work, info) => diagnostics.phase(name, work, info);
+  let db, report, output;
+  const nativeFetch = globalThis.fetch;
+  try {
+  const outer = { ...process.env }; delete outer.NODE_EXTRA_CA_CERTS;
+  const ctx = step('child-context', () => context(outer));
+  const repo = fs.realpathSync(ctx.repo); output = path.join(repo, 'test-results/storage-stack');
+  fs.mkdirSync(output, { recursive: true });
+  step('child-fixture', () => {
+  assert.equal(process.argv.length, 4); assert.equal(path.resolve(process.argv[2]), ctx.root);
+  assert.equal(fs.realpathSync(process.argv[3]), fs.realpathSync(ctx.repo));
+  verifyDirectory(ctx);
+  assert.equal(process.env.NODE_EXTRA_CA_CERTS, path.join(ctx.root, 'tls/ca.crt'));
+  assert.equal(process.env.NODE_ENV, 'production');
+  });
+  const { status, connection } = step('child-status', () => { const status = JSON.parse(fs.readFileSync(path.join(ctx.root, 'status.json'), 'utf8')); return { status, connection: validateStatus(status) }; });
+  const require = createRequire(path.join(repo, 'apps/web/package.json'));
+  const { Client, createClient, ts } = step('child-dependencies', () => ({ Client: require('pg').Client, createClient: require('@supabase/supabase-js').createClient, ts: require('typescript') }));
+  const files = step('child-sources', () => {
+    const names = fs.readdirSync(path.join(repo, 'supabase/migrations')).filter(name => name.endsWith('.sql'));
+    assert.ok(names.every(name => /^\d{14}_[a-z0-9_]+\.sql$/.test(name)), 'Unexpected migration filename');
+    return ['schema.sql', 'security-rls.sql', 'admin-panel-foundation.sql', 'record-archive-controls.sql', 'service-history-timeline.sql', 'lost-stolen-safety-status.sql', ...names.sort().map(name => 'migrations/' + name)];
+  });
+  const fingerprints = () => Object.fromEntries(files.map(name => ['supabase/' + name, hash(fs.readFileSync(path.join(repo, 'supabase', name)))]));
+  const harnessRoot = path.dirname(fileURLToPath(import.meta.url));
+  const harnessFingerprints = () => Object.fromEntries(['acceptance.mjs', 'guards.mjs', 'stack.mjs'].map(name => [name, hash(fs.readFileSync(path.join(harnessRoot, name)))]));
+  report = { fixture: MARKER, startedAt: new Date().toISOString(), infrastructure: JSON.parse(fs.readFileSync(path.join(ctx.root, 'infrastructure.json'), 'utf8')),
+    sourceHashes: fingerprints(), harnessHashes: harnessFingerprints(), loadedModules: {}, packages: {}, tests: [], complete: false,
+    scope: 'Actual Next handler functions and real local Auth/Storage/PostgREST/PG17; no browser, hosted-provider, SMTP, deployment, or lock-barrier claim' };
+  step('child-package-versions', () => { for (const pkg of ['@supabase/supabase-js', '@supabase/storage-js', 'next', 'typescript', 'pg']) report.packages[pkg] = require(pkg + '/package.json').version; });
+  db = new Client({ ...connection, application_name: 'qrguitar-isolated-storage-acceptance' });
+  globalThis.fetch = (input, init = {}) => {
+    const url = exactApiUrl(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+    assert.ok(['/auth/v1/', '/rest/v1/', '/storage/v1/'].some(prefix => url.pathname.startsWith(prefix)), 'Unexpected network path');
+    return nativeFetch(input, { ...init, redirect: 'error', signal: init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(120000)]) : AbortSignal.timeout(120000) });
+  };
+  // Only freshly generated local CLI credentials enter the actual application modules.
+  process.env.NEXT_PUBLIC_SUPABASE_URL = ORIGIN;
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = status.ANON_KEY;
+  process.env.SUPABASE_SERVICE_ROLE_KEY = status.SERVICE_ROLE_KEY;
+  process.env.NEXT_PUBLIC_SITE_URL = APP_ORIGIN;
+  const load = applicationLoader(repo, ts, report);
+  const { route, protocol } = step('child-module-load', () => ({ route: load('apps/web/app/api/service-evidence/route.ts'), protocol: load('apps/web/lib/service-evidence-upload.ts') }));
   const service = createClient(ORIGIN, status.SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
   const scalar = async (sql, values = []) => (await db.query(sql, values)).rows[0].value;
   async function test(name, work) {
-    try { await work(); report.tests.push({ name, ok: true }); console.log('PASS ' + name); }
+    try { await step('acceptance-case', work, { caseIndex: report.tests.length + 1 }); report.tests.push({ name, ok: true }); console.log('PASS ' + name); }
     catch (error) { report.tests.push({ name, ok: false, failureType: error instanceof assert.AssertionError ? 'assertion' : 'operation' }); console.error('FAIL ' + name); throw new Error('Acceptance case failed'); }
   }
   async function control(method, actor, body, search = '') {
@@ -73,14 +84,12 @@ async function main() {
   }
   async function user(label) {
     const email = `fixture-${label}-${randomUUID()}@example.invalid`, password = randomBytes(30).toString('base64url');
-    const created = await service.auth.admin.createUser({ email, password, email_confirm: true });
-    assert.equal(created.error, null, 'Synthetic Auth user creation failed'); assert.ok(created.data.user?.id);
+    const created = await step('auth-user-create', async () => { const result = await service.auth.admin.createUser({ email, password, email_confirm: true }); if (result.error) throw result.error; assert.ok(result.data.user?.id); return result; }, { actorKind: label });
     const client = createClient(ORIGIN, status.ANON_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
-    const login = await client.auth.signInWithPassword({ email, password });
-    assert.equal(login.error, null, 'Synthetic password sign-in failed'); assert.ok(login.data.session?.access_token);
+    const login = await step('auth-user-signin', async () => { const result = await client.auth.signInWithPassword({ email, password }); if (result.error) throw result.error; assert.ok(result.data.session?.access_token); return result; }, { actorKind: label });
     const id = created.data.user.id;
     assert.equal(login.data.user.id, id);
-    await db.query("insert into public.profiles(id,display_name) values($1,'Synthetic acceptance actor') on conflict(id) do nothing", [id]);
+    await step('auth-profile-create', () => db.query("insert into public.profiles(id,display_name) values($1,'Synthetic acceptance actor') on conflict(id) do nothing", [id]), { actorKind: label });
     return { id, token: login.data.session.access_token, client };
   }
   const bytes = size => { const value = Buffer.alloc(size, 0x71); Buffer.from('%PDF-1.4\n% synthetic fixture\n').copy(value); Buffer.from('\n%%EOF\n').copy(value, Math.max(0, size - 7)); return value; };
@@ -125,32 +134,47 @@ async function main() {
     const actual = Buffer.from(await response.arrayBuffer()); assert.equal(actual.length, expected.length); assert.equal(hash(actual), hash(expected));
     return row.previewUrl;
   }
-  try {
-    await db.connect();
+    await step('database-connect', () => db.connect());
+    await step('database-preconditions', async () => {
     assert.equal(await scalar('select current_database() value'), 'postgres');
     assert.match(await scalar("select current_setting('server_version') value"), /^17\./);
     assert.equal(await scalar('select count(*)::int value from auth.users'), 0, 'Refusing nonempty Auth');
     assert.equal(await scalar('select count(*)::int value from storage.objects'), 0, 'Refusing nonempty Storage');
     assert.equal(await scalar("select count(*)::int value from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p')"), 0, 'Refusing an existing application schema');
-    for (const file of files) await db.query(fs.readFileSync(path.join(repo, 'supabase', file), 'utf8'));
-    await db.query("notify pgrst,'reload schema'");
+    assert.equal(await scalar('select count(*)::int value from storage.buckets'), 0, 'Refusing nonempty buckets');
+    });
+    for (const file of files) await step('schema-apply', () => db.query(fs.readFileSync(path.join(repo, 'supabase', file), 'utf8')), { source: path.basename(file), sha256: report.sourceHashes['supabase/' + file] });
+    await step('schema-notify', () => db.query("notify pgrst,'reload schema'"));
+    // The base DDL documents these two operator-provisioned private buckets but
+    // does not create them. Create only in this previously empty disposable stack.
+    for (const bucket of ['instrument-media', 'instrument-documents']) {
+      await step('fixture-bucket-create', async () => { const result = await service.storage.createBucket(bucket, { public: false }); if (result.error) throw result.error; assert.equal(result.data?.name, bucket); }, { bucket });
+      await step('fixture-bucket-verify', async () => { const result = await service.storage.getBucket(bucket); if (result.error) throw result.error; assert.equal(result.data?.id, bucket); assert.equal(result.data?.public, false); }, { bucket });
+    }
     const manifest = JSON.parse(fs.readFileSync(path.join(repo, 'apps/web/scripts/release-readiness-manifest.json'), 'utf8'));
     let readiness;
+    await step('readiness-rpc', async () => {
+    let lastError;
     for (let i = 0; i < 40; i++) {
       const result = await service.rpc('qrguitar_release_readiness');
       if (!result.error) { readiness = result.data; break; }
+      lastError = result.error;
       await new Promise(resolve => setTimeout(resolve, 250));
     }
+    if (!readiness && lastError) throw lastError;
+    });
+    step('readiness-validate', () => {
     assert.equal(readiness?.ready, true, 'Full repository readiness must pass before fixture users');
     assert.equal(readiness.releaseVersion, manifest.releaseVersion);
     assert.equal(readiness.checks.length, manifest.checks.length);
     assert.ok(readiness.checks.every(item => item.ok === true));
     assert.deepEqual(readiness.checks.map(item => item.name).sort(), [...manifest.checks].sort());
+    });
     report.releaseVersion = readiness.releaseVersion; report.readinessChecks = readiness.checks.length;
     provider = await user('provider'); owner = await user('owner'); stranger = await user('stranger');
     const guitar = randomUUID(); submission = randomUUID(); const qr = 'QRG-' + randomBytes(8).toString('hex').toUpperCase();
-    await db.query("insert into public.guitars(id,owner_id,qr_code,permanent_path,name,brand,visibility) values($1,$2,$3,$4,'Synthetic','Synthetic','private')", [guitar, owner.id, qr, '/i/' + qr]);
-    await db.query('insert into public.service_submissions(id,guitar_id,provider_user_id,owner_user_id) values($1,$2,$3,$4)', [submission, guitar, provider.id, owner.id]);
+    await step('fixture-instrument-create', () => db.query("insert into public.guitars(id,owner_id,qr_code,permanent_path,name,brand,visibility) values($1,$2,$3,$4,'Synthetic','Synthetic','private')", [guitar, owner.id, qr, '/i/' + qr]));
+    await step('fixture-submission-create', () => db.query('insert into public.service_submissions(id,guitar_id,provider_user_id,owner_user_id) values($1,$2,$3,$4)', [submission, guitar, provider.id, owner.id]));
     let small, large, smallEvidence, largeEvidence, oldPreview;
     await test('fresh discovery and exact absent UUID lookup are read-only and create no scope or receipt', async () => {
       const before = await protocolCounts(), unknown = randomUUID();
@@ -284,15 +308,21 @@ async function main() {
       assert.equal((await control('DELETE', provider, { evidenceId: largeEvidence })).status, 403);
       assert.equal(await scalar('select count(*)::int value from service_submission_evidence where id=$1', [largeEvidence]), 1);
     });
+    step('acceptance-final-validation', () => {
     assert.equal(report.tests.length, EXPECTED_CASES); assert.ok(report.tests.every(item => item.ok));
     assert.deepEqual(fingerprints(), report.sourceHashes, 'Schema sources changed during acceptance');
     assert.deepEqual(harnessFingerprints(), report.harnessHashes, 'Harness sources changed during acceptance');
     for (const [relative, digest] of Object.entries(report.loadedModules)) assert.equal(hash(fs.readFileSync(path.join(repo, relative))), digest);
     report.complete = true;
+    });
   } finally {
-    await db.end().catch(() => undefined); globalThis.fetch = nativeFetch;
-    report.finishedAt = new Date().toISOString(); fs.writeFileSync(path.join(output, 'acceptance.json'), safeReport(report));
+    if (db) await step('database-close', () => db.end()).catch(() => undefined);
+    globalThis.fetch = nativeFetch;
+    if (output) {
+      fs.writeFileSync(path.join(output, 'acceptance-setup.json'), safeReport(diagnostics.report()));
+      if (report) { report.finishedAt = new Date().toISOString(); fs.writeFileSync(path.join(output, 'acceptance.json'), safeReport(report)); }
+    }
   }
   console.log(`Actual isolated Auth/Storage acceptance: ${report.tests.length}/${EXPECTED_CASES} passed.`);
 }
-main().catch(() => { console.error('Isolated Auth/Storage acceptance failed; see credential-free acceptance.json.'); process.exitCode = 1; });
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch(() => { console.error('Isolated Auth/Storage acceptance failed; see fixed setup diagnostics and credential-free reports.'); process.exitCode = 1; });

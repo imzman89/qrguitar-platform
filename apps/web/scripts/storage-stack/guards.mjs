@@ -16,7 +16,12 @@ export const DIAGNOSTIC_PHASES = Object.freeze([
   'cli-start', 'network-validate-running', 'containers-inspect', 'containers-validate', 'cli-status', 'status-parse',
   'status-validate', 'status-save', 'tls-certificate', 'proxy-listen', 'infrastructure-save', 'acceptance-child',
   'proxy-close', 'cleanup-validate', 'cleanup-config', 'cleanup-cli-stop', 'cleanup-network-list',
-  'cleanup-network-validate', 'cleanup-network-remove', 'cleanup-directory-remove'
+  'cleanup-network-validate', 'cleanup-network-remove', 'cleanup-directory-remove',
+  'child-context', 'child-fixture', 'child-status', 'child-dependencies', 'child-sources', 'child-package-versions',
+  'child-module-load', 'database-connect', 'database-preconditions', 'schema-apply', 'schema-notify',
+  'fixture-bucket-create', 'fixture-bucket-verify', 'readiness-rpc', 'readiness-validate',
+  'auth-user-create', 'auth-user-signin', 'auth-profile-create', 'fixture-instrument-create',
+  'fixture-submission-create', 'acceptance-case', 'acceptance-final-validation', 'database-close'
 ]);
 export function commandFailure(command, result) {
   assert.ok(COMMAND_CLASSES.has(command), 'Unexpected diagnostic command family');
@@ -47,14 +52,35 @@ export function commandFailure(command, result) {
 export function createDiagnostics(write = () => {}) {
   const records = [], allowed = new Set(DIAGNOSTIC_PHASES), diagnostics = new WeakMap();
   const record = value => { safeReport(value); records.push(value); write(value); };
-  const failure = error => diagnostics.get(error) || { classifier: error instanceof assert.AssertionError ? 'guard-rejected' : error instanceof SyntaxError ? 'invalid-json' : 'operation-failed' };
+  const failure = error => {
+    if (diagnostics.has(error)) return diagnostics.get(error);
+    const assertion = error instanceof assert.AssertionError;
+    const scalar = value => value === null || typeof value === 'boolean' || (Number.isSafeInteger(value) && Math.abs(value) <= Number.MAX_SAFE_INTEGER);
+    const kind = value => value === null ? 'null' : Array.isArray(value) ? 'array' : ['undefined', 'boolean', 'number', 'string', 'object'].includes(typeof value) ? typeof value : 'other';
+    const source = assertion && error.actual && typeof error.actual === 'object' ? error.actual : error;
+    return { classifier: assertion ? 'guard-rejected' : error instanceof SyntaxError ? 'invalid-json' : 'operation-failed',
+      ...(/^[0-9A-Z]{5}$/.test(source?.code || '') ? { sqlState: source.code } : {}),
+      ...(Number.isInteger(source?.status) && source.status >= 100 && source.status <= 599 ? { httpStatus: source.status } : {}),
+      ...(assertion ? { actualType: kind(error.actual), expectedType: kind(error.expected),
+        ...(scalar(error.actual) ? { actualScalar: error.actual } : {}), ...(scalar(error.expected) ? { expectedScalar: error.expected } : {}) } : {}) };
+  };
+  const details = input => {
+    assert.ok(input && typeof input === 'object' && !Array.isArray(input));
+    assert.ok(Object.keys(input).every(key => ['source', 'sha256', 'actorKind', 'bucket', 'caseIndex'].includes(key)));
+    if (Object.hasOwn(input, 'source')) assert.match(input.source, /^(?:schema|security-rls|admin-panel-foundation|record-archive-controls|service-history-timeline|lost-stolen-safety-status|[0-9]{14}_[a-z0-9_]+)\.sql$/);
+    if (Object.hasOwn(input, 'sha256')) assert.match(input.sha256, /^[0-9a-f]{64}$/);
+    if (Object.hasOwn(input, 'actorKind')) assert.ok(['provider', 'owner', 'stranger'].includes(input.actorKind));
+    if (Object.hasOwn(input, 'bucket')) assert.ok(['instrument-media', 'instrument-documents'].includes(input.bucket));
+    if (Object.hasOwn(input, 'caseIndex')) assert.ok(Number.isInteger(input.caseIndex) && input.caseIndex >= 1 && input.caseIndex <= 18);
+    return { ...input };
+  };
   return {
     commandError(command, result) { const error = new Error('Fixture command failed'); diagnostics.set(error, commandFailure(command, result)); return error; },
-    phase(name, run) {
+    phase(name, run, input = {}) {
       assert.ok(allowed.has(name), 'Unknown diagnostic phase');
-      const started = Date.now(); record({ phase: name, event: 'start' });
-      const pass = value => { record({ phase: name, event: 'pass', elapsedMs: Date.now() - started }); return value; };
-      const fail = error => { record({ phase: name, event: 'fail', elapsedMs: Date.now() - started, failure: failure(error) }); throw error; };
+      const extra = details(input), started = Date.now(); record({ phase: name, event: 'start', ...extra });
+      const pass = value => { record({ phase: name, event: 'pass', elapsedMs: Date.now() - started, ...extra }); return value; };
+      const fail = error => { record({ phase: name, event: 'fail', elapsedMs: Date.now() - started, ...extra, failure: failure(error) }); throw error; };
       try { const result = run(); return result && typeof result.then === 'function' ? result.then(pass, fail) : pass(result); } catch (error) { return fail(error); }
     },
     report() { return { schemaVersion: 1, scope: 'isolated-stack-infrastructure-diagnostics', events: structuredClone(records) }; }
