@@ -121,7 +121,18 @@ test("sitemap is deterministic and uses Profile and collection update timestamps
   assert.match(first, /<loc>https:\/\/www\.qrguitar\.com\/i\/QRG-UPDATED<\/loc>[\s\S]*?<lastmod>2026-09-17T15:30:00\.000Z<\/lastmod>/);
   assert.match(first, /<loc>https:\/\/www\.qrguitar\.com\/i\/QRG-CREATED<\/loc>[\s\S]*?<lastmod>2026-02-03T00:00:00\.000Z<\/lastmod>/);
   assert.match(first, /<loc>https:\/\/www\.qrguitar\.com\/collections\/owner-one<\/loc>[\s\S]*?<lastmod>2026-09-16T10:00:00\.000Z<\/lastmod>/);
+  assert.match(first, /<loc>https:\/\/www\.qrguitar\.com\/installers<\/loc>/);
   assert.match(first, /<loc>https:\/\/www\.qrguitar\.com\/<\/loc>\s*<lastmod>2026-09-18<\/lastmod>/);
+});
+
+test("Profile social metadata never publishes browser-local image schemes", () => {
+  const fallback = "https://www.qrguitar.com/seo/qrguitar-og-v2.png";
+  assert.equal(seo.getRecordMetadataImage({ heroImageDataUrl: "data:image/png;base64,private" }), fallback);
+  assert.equal(seo.getRecordMetadataImage({ heroImageDataUrl: "blob:https://www.qrguitar.com/private" }), fallback);
+  assert.equal(seo.getRecordMetadataImage({
+    heroImageDataUrl: "data:image/png;base64,private",
+    galleryImageDataUrls: ["blob:https://www.qrguitar.com/private", "/api/public-file/QRG-A/media/token"]
+  }), "https://www.qrguitar.com/api/public-file/QRG-A/media/token");
 });
 
 test("collection structured data contains public discovery fields only and is script safe", () => {

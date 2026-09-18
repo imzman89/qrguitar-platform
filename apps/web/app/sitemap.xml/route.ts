@@ -55,6 +55,7 @@ export async function GET() {
       urlEntry("/collections", STATIC_LAST_MODIFIED, "weekly", "0.7"),
       urlEntry("/create", STATIC_LAST_MODIFIED, "monthly", "0.65"),
       urlEntry("/how-it-works", STATIC_LAST_MODIFIED, "monthly", "0.7"),
+      urlEntry("/installers", STATIC_LAST_MODIFIED, "monthly", "0.6"),
       urlEntry("/privacy", STATIC_LAST_MODIFIED, "yearly", "0.4"),
       urlEntry("/terms", STATIC_LAST_MODIFIED, "yearly", "0.4"),
       urlEntry("/contact", STATIC_LAST_MODIFIED, "yearly", "0.4"),

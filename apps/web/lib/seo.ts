@@ -207,11 +207,13 @@ export function serializeJsonLd(value: unknown) {
 
 export function getRecordMetadataImage(instrument: DemoInstrument) {
   const hero = String(instrument.heroImageDataUrl || "").trim();
-  if (hero) {
+  if (/^(https?:\/\/|\/(?!\/))/i.test(hero)) {
     return absoluteSiteUrl(hero);
   }
 
-  const firstGallery = instrument.galleryImageDataUrls?.find((source) => String(source || "").trim());
+  const firstGallery = instrument.galleryImageDataUrls?.find((source) =>
+    /^(https?:\/\/|\/(?!\/))/i.test(String(source || "").trim())
+  );
   if (firstGallery) {
     return absoluteSiteUrl(firstGallery);
   }

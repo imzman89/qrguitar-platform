@@ -3,7 +3,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { ProfileClient } from "./ProfileClient";
 import { getPublicInstrumentByCode } from "../../../lib/public-instruments";
 import { isRetiredPublicProfileCode, normalizePublicProfileCode } from "../../../lib/public-profile-eligibility";
-import { buildRecordJsonLd, buildRecordMetadata } from "../../../lib/seo";
+import { buildPrivatePageMetadata, buildRecordJsonLd, buildRecordMetadata } from "../../../lib/seo";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -15,10 +15,7 @@ function normalizeCode(codeParam: string) {
 export async function generateMetadata({ params }: { params: Promise<{ code: string }> }): Promise<Metadata> {
   const code = normalizeCode((await params).code);
   if (!code || isRetiredPublicProfileCode(code)) {
-    return {
-      title: "QRguitar Profile Not Found",
-      robots: { index: false, follow: false }
-    };
+    return buildPrivatePageMetadata("QRguitar Profile Not Found", "This QRguitar Profile is not available.");
   }
 
   const instrument = await getPublicInstrumentByCode(code);
@@ -26,10 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ code: str
     return buildRecordMetadata(instrument);
   }
 
-  return {
-    title: "QRguitar Profile Not Found",
-    robots: { index: false, follow: false }
-  };
+  return buildPrivatePageMetadata("QRguitar Profile Not Found", "This QRguitar Profile is not available.");
 }
 
 export default async function PublicProfilePage({ params }: { params: Promise<{ code: string }> }) {
