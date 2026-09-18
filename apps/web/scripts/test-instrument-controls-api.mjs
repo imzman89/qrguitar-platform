@@ -4,6 +4,8 @@ const runtime=fs.mkdtempSync(path.join(os.tmpdir(),'qrguitar-controls-tests-')),
 const prelude=`
 let current,options={};export function setBackend(db,value={}){current=db;options=value;}
 const noStore=()=>{};const noStoreJson=(body,init={})=>({body,status:init.status||200});const NextResponse={json:noStoreJson};
+const MAX_PROFILE_EDIT_JSON_BYTES=4*1024*1024;
+const readBoundedJsonBody=async request=>{try{const body=await request.json();return body&&typeof body==='object'&&!Array.isArray(body)?{ok:true,body}:{ok:false,reason:'invalid'};}catch{return{ok:false,reason:'invalid'};}};
 const createServerSupabaseClient=()=>current;const supabaseWriteUnavailableResponse=()=>noStoreJson({ok:false},{status:503});
 const getAuthenticatedUser=async()=>({user:options.signedOut?null:{id:'10000000-0000-4000-8000-000000000001',email:'owner@example.test'}});
 const assertAccountCanWrite=async()=>({ok:true});const readAdminEmailList=()=>options.envAdmin?['owner@example.test']:[];
