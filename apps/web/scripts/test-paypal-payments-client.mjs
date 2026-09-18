@@ -45,6 +45,13 @@ function trackingFixture(decision = "accepted") {
 }
 test("signed-out payer cannot create orders", async t => { const f = fixture(t, { session: null }); await f.ready(); await assert.rejects(f.client.createOrder("profile_10", A)); assert.equal(f.calls.length, 0); });
 test("status loads five-free account without creating an order", async t => { const f = fixture(t); await f.ready(); assert.equal(f.client.getState().snapshot.freeLimit, 5); assert.equal(f.posts().length, 0); assert.equal(f.calls[0].init.cache, "no-store"); });
+test("analytics uses the verified charged total and bounded promotion classification", () => {
+  assert.deepEqual(client.paypalTrackingProperties(offers[1]), { credits: 10, valueUsd: 50, pricing: "standard" });
+  const promotion = { id: ID, code: "GARYWON", name: "Owner payment test", revision: 1, discountType: "fixed_total", discountValue: 30,
+    classification: "internal_test", originalAmount: 5000, discountAmount: 4970, finalAmount: 30 };
+  assert.deepEqual(client.paypalTrackingProperties({ ...offers[1], amount: 30, listAmount: 5000, promotion }), { credits: 10, valueUsd: .3, pricing: "internal_test" });
+  assert.equal(client.paypalTrackingProperties({ ...offers[1], amount: 30 }), null);
+});
 test("provider order IDs match the database and service boundaries", () => { for (const size of [5, 17, 64]) { const value = "A".repeat(size); assert.equal(client.paypalProviderOrderId(value), value); } for (const value of ["A".repeat(4), "A".repeat(65), "lowercase", "ORDER_123", "ORDER-123", null]) assert.equal(client.paypalProviderOrderId(value), ""); });
 test("unconfigured checkout still displays the usable five-free account", async t => { const f = fixture(t, { status: snapshot({ enabled: false, clientId: null, offers: [], freeRemaining: 5, ownedProfiles: 0 }) }); await f.ready(); assert.equal(f.client.getState().phase, "ready"); assert.equal(f.client.getState().snapshot.freeRemaining, 5); assert.equal(f.client.getState().snapshot.clientId, null); });
 test("pausing new sales preserves the exact pending purchase with a public client ID", async t => {
@@ -231,6 +238,19 @@ test("SDK script loads once per document and errors can retry", async () => {
   f.scripts[0].onerror(); await assert.rejects(load); assert.equal(f.scripts[0].removed, true);
   const retry = sdkModule.loadPayPalSdk("public-test-client-id", { document: f.document, window: f.target }); f.target.qrguitarPayPal = { Buttons() {} }; f.scripts[1].onload(); assert.equal(await retry, f.target.qrguitarPayPal); await assert.rejects(sdkModule.loadPayPalSdk("different-client-id", { document: f.document, window: f.target }));
 });
+test("normal and GARYWON totals reuse the configured SDK superset without a reload", async () => {
+  const billingSource = fs.readFileSync(path.join(web, "app/billing/PayPalBillingPage.tsx"), "utf8");
+  assert.match(billingSource, /loadPayPalSdk\(clientId, \{ applePayEnabled \}\)/);
+  assert.doesNotMatch(billingSource, /loadPayPalSdk\(clientId, \{ applePayEnabled: applePayEnabled && applePayAmountEligible \}\)/);
+  assert.match(billingSource, /applePayEnabled && applePayAmountEligible[\s\S]*eligibleApplePay/);
+  const f = sdkFixture();
+  const normal = sdkModule.loadPayPalSdk("public-test-client-id", { document: f.document, window: f.target, applePayEnabled: true });
+  const garywon = sdkModule.loadPayPalSdk("public-test-client-id", { document: f.document, window: f.target, applePayEnabled: true });
+  const normalAgain = sdkModule.loadPayPalSdk("public-test-client-id", { document: f.document, window: f.target, applePayEnabled: true });
+  assert.equal(normal, garywon); assert.equal(garywon, normalAgain); assert.equal(f.scripts.length, 1);
+  assert.equal(new URL(f.scripts[0].src).searchParams.get("components"), "buttons,applepay");
+  f.target.qrguitarPayPal = { Buttons() {} }; f.scripts[0].onload(); await normal;
+});
 test("SDK load timeout removes the broken script and permits retry", async () => { const f = sdkFixture(); await assert.rejects(sdkModule.loadPayPalSdk("public-test-client-id", { document: f.document, window: f.target, timeoutMs: 5 })); assert.equal(f.scripts[0].removed, true); });
 
 const appleConfig = { isEligible: true, countryCode: "US", merchantCapabilities: ["supports3DS"], supportedNetworks: ["visa", "masterCard", "amex"] };
@@ -294,7 +314,7 @@ function renderBilling(state, { mode = "overview", query = "", choice = { actorI
   const React = require("react"), { renderToStaticMarkup } = require("react-dom/server"), component = { exports: {} }; let states = 0, refs = 0;
   const compiled = ts.transpileModule(fs.readFileSync(path.join(web, "app/billing/PayPalBillingPage.tsx"), "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   new Function("require", "module", "exports", compiled)(specifier => {
-    if (specifier === "react") return { ...React, useEffect() {}, useRef: () => ({ current: refs++ === 0 ? controller : null }), useState(initial) { const index = states++; return [index === 0 ? state : index === 1 ? choice : index === 5 ? appleOption : typeof initial === "function" ? initial() : initial, () => {}]; } };
+    if (specifier === "react") return { ...React, useEffect() {}, useRef: () => ({ current: refs++ === 0 ? controller : null }), useState(initial) { const index = states++; return [index === 0 ? state : index === 1 ? choice : index === 6 ? appleOption : typeof initial === "function" ? initial() : initial, () => {}]; } };
     if (specifier === "next/link") return ({ children, ...props }) => React.createElement("a", props, children);
     if (specifier === "next/navigation") return { useSearchParams: () => new URLSearchParams(query) };
     if (specifier.endsWith("/Nav")) return { Nav: () => null };
