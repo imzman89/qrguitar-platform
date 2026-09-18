@@ -7,6 +7,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { ThemeRuntime } from "../components/ThemeRuntime";
 import { SessionLifecycle } from "../components/SessionLifecycle";
 import { OptionalTrackingConsent } from "../components/OptionalTrackingConsent";
+import { GoogleAnalyticsRuntime } from "../components/GoogleAnalyticsRuntime";
 import { buildOrganizationJsonLd } from "../lib/seo";
 import { buildManagedSiteMetadata } from "../lib/site-metadata";
 import { loadPublishedSiteSettings } from "../lib/site-settings-server";
@@ -43,6 +44,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <body data-product-theme="paper">
         <ThemeRuntime />
         <SessionLifecycle />
+        <GoogleAnalyticsRuntime />
         <script
           id="qrguitar-organization-jsonld"
           type="application/ld+json"

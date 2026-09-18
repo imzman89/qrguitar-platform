@@ -359,7 +359,7 @@ test("the UI contract stays compact, accessible, balanced, and hidden without ex
   const css = fs.readFileSync(path.join(webRoot, "components/OptionalTrackingConsent.module.css"), "utf8");
   const layout = fs.readFileSync(path.join(webRoot, "app/layout.tsx"), "utf8");
   const privacy = fs.readFileSync(path.join(webRoot, "app/privacy/page.tsx"), "utf8");
-  assert.match(component, /!configuredOptionalTracking\.enabled \|\| !consent/);
+  assert.match(component, /!hasConfiguredOptionalTrackingProvider\(\) \|\| !consent/);
   assert.match(component, /role="dialog"/);
   assert.match(component, /aria-label="Optional tracking choices"/);
   assert.match(component, />Accept<\/button>/);
@@ -411,3 +411,5 @@ test("documented default remains blank, provider-neutral, and banner-free", () =
     assert.match(sample, /^NEXT_PUBLIC_OPTIONAL_TRACKING_PURPOSES=$/m);
   }
 });
+
+await import("./test-google-analytics.mjs");

@@ -11,6 +11,7 @@ import {
   type OptionalTrackingConsentState,
   type OptionalTrackingDecision
 } from "../lib/optional-tracking-consent";
+import { hasConfiguredOptionalTrackingProvider } from "../lib/google-analytics-config";
 
 function consentQuestion() {
   const { purposes } = configuredOptionalTracking;
@@ -29,13 +30,13 @@ export function OptionalTrackingConsent() {
   const [managing, setManaging] = useState(false);
 
   useEffect(() => {
-    if (!configuredOptionalTracking.enabled) return;
+    if (!hasConfiguredOptionalTrackingProvider()) return;
     const update = () => setConsent(readOptionalTrackingConsent());
     update();
     return subscribeToOptionalTrackingConsent(update);
   }, []);
 
-  if (!configuredOptionalTracking.enabled || !consent) return null;
+  if (!hasConfiguredOptionalTrackingProvider() || !consent) return null;
 
   const choose = (decision: OptionalTrackingDecision) => {
     setStorageError(false);
