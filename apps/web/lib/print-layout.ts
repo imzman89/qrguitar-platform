@@ -5,8 +5,8 @@ export type PrintOrientation = "portrait" | "landscape";
 export type FormatConfig = { sizes: PrintSize[]; defaultSize: PrintSize; orientations: PrintOrientation[]; photo: boolean; availability: boolean; attribution: boolean; specifications: boolean; timeline: boolean };
 
 export const printFormats: Record<PrintMode, FormatConfig> = {
-  label: { sizes: ["letter", "a4", "compact"], defaultSize: "letter", orientations: ["portrait"], photo: false, availability: false, attribution: false, specifications: false, timeline: false },
-  hangtag: { sizes: ["letter", "a4", "4x6"], defaultSize: "letter", orientations: ["portrait", "landscape"], photo: true, availability: true, attribution: true, specifications: false, timeline: false },
+  label: { sizes: ["compact"], defaultSize: "compact", orientations: ["portrait"], photo: false, availability: false, attribution: false, specifications: false, timeline: false },
+  hangtag: { sizes: ["4x6"], defaultSize: "4x6", orientations: ["portrait", "landscape"], photo: true, availability: true, attribution: true, specifications: false, timeline: false },
   handout: { sizes: ["letter", "a4"], defaultSize: "letter", orientations: ["portrait"], photo: true, availability: true, attribution: true, specifications: true, timeline: true },
   service: { sizes: ["letter", "a4"], defaultSize: "letter", orientations: ["portrait"], photo: true, availability: false, attribution: false, specifications: false, timeline: false }
 };
