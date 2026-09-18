@@ -132,7 +132,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === thisFile) {
   assert.ok(process.argv.slice(2).every(argument => argument === '--check'), 'Only --check is supported');
   const check = process.argv.includes('--check');
   const outputs = prepareInstalledTest(path.resolve(path.dirname(thisFile), '..'), { check });
-  console.log(JSON.stringify({ mode: check ? 'validated-no-writes' : 'prepared', outputs, tests: 3,
+  console.log(JSON.stringify({ mode: check ? 'validated-no-writes' : 'prepared', outputs, tests: 4,
     offlineInternetPermissionRemoved: true,
     note: 'Acceptance-only offline debug APK. Not a production or release artifact.' }, null, 2));
 }

@@ -6,13 +6,24 @@ import static org.junit.Assert.*;
 import android.Manifest;
 import android.app.Activity;
 import android.app.Application;
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.content.UriPermission;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.SystemClock;
 import android.provider.MediaStore;
+import android.util.Base64;
 import android.util.Log;
 
 import androidx.activity.result.PickVisualMediaRequest;
@@ -28,11 +39,18 @@ import com.qrguitar.picker.PhotoSelectionActivity;
 import com.qrguitar.picker.SelectionStore;
 
 import java.io.File;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.security.MessageDigest;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
@@ -71,6 +89,7 @@ public final class InstalledAcceptanceTest {
     try {
       if (store != null) for (String id : ownedIds) store.discard(id);
       if (device != null) {
+        dumpBoundedHierarchy();
         File evidence = new File(context.getExternalFilesDir(null), "installed-acceptance");
         assertTrue(evidence.isDirectory() || evidence.mkdirs());
         String name = "state-" + System.currentTimeMillis();
@@ -84,6 +103,36 @@ public final class InstalledAcceptanceTest {
             : "settings put global always_finish_activities " + previousAlwaysFinish);
         assertEquals(previousAlwaysFinish, device.executeShellCommand("settings get global always_finish_activities").trim());
       }
+    }
+  }
+
+  private void dumpBoundedHierarchy() {
+    if ((context.getApplicationInfo().flags & ApplicationInfo.FLAG_TEST_ONLY) == 0
+        || context.checkSelfPermission(Manifest.permission.INTERNET) != PackageManager.PERMISSION_DENIED) {
+      Log.i(TAG, "UI_HIERARCHY omitted: target is not the offline test-only fixture");
+      return;
+    }
+    try {
+      final int maximumBytes = 23_000;
+      ByteArrayOutputStream captured = new ByteArrayOutputStream(maximumBytes);
+      OutputStream bounded = new OutputStream() {
+        @Override public void write(int value) {
+          if (captured.size() < maximumBytes) captured.write(value);
+        }
+        @Override public void write(byte[] bytes, int offset, int length) {
+          int remaining = maximumBytes - captured.size();
+          if (remaining > 0) captured.write(bytes, offset, Math.min(length, remaining));
+        }
+      };
+      device.dumpWindowHierarchy(bounded);
+      String hierarchy = new String(captured.toByteArray(), StandardCharsets.UTF_8);
+      Log.i(TAG, "UI_HIERARCHY fixture-only bytes=" + captured.size() + " cap=" + maximumBytes);
+      for (int offset = 0, part = 1; offset < hierarchy.length(); offset += 2_900, part++) {
+        Log.i(TAG, "UI_HIERARCHY[" + part + "] " + hierarchy.substring(offset, Math.min(offset + 2_900, hierarchy.length())));
+      }
+    } catch (Exception error) {
+      // Diagnostics must not replace the assertion that caused a test failure.
+      Log.i(TAG, "UI_HIERARCHY unavailable: " + error.getClass().getSimpleName());
     }
   }
 
@@ -170,6 +219,237 @@ public final class InstalledAcceptanceTest {
     requireCancelled(next);
   }
 
+  @Test(timeout = 120_000) public void realSystemPickerSelectionPersistsGrantAndAcknowledgesExactReceipt() throws Exception {
+    assertTrue("This fixture APK must be test-only", (context.getApplicationInfo().flags & ApplicationInfo.FLAG_TEST_ONLY) != 0);
+    for (String permission : new String[] {
+        Manifest.permission.INTERNET, Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO,
+        Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED, Manifest.permission.READ_EXTERNAL_STORAGE,
+        Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.ACCESS_MEDIA_LOCATION,
+        Manifest.permission.MANAGE_EXTERNAL_STORAGE }) {
+      assertEquals("No broad or network permission may bypass picker access: " + permission,
+          PackageManager.PERMISSION_DENIED, context.checkSelfPermission(permission));
+    }
+    assertFalse("No all-files access may bypass picker access", Environment.isExternalStorageManager());
+    ContentResolver resolver = context.getContentResolver();
+    Map<Uri, Integer> baselineGrants = persistedGrants();
+    String fixtureName = "qrguitar-acceptance-" + UUID.randomUUID() + ".jpg";
+    byte[] source = syntheticJpeg();
+    String sourceHash = sha256(source);
+    Uri fixture = null;
+    try {
+      ContentValues values = new ContentValues();
+      values.put(MediaStore.MediaColumns.DISPLAY_NAME, fixtureName);
+      values.put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg");
+      values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/QRguitarAcceptance/");
+      values.put(MediaStore.MediaColumns.IS_PENDING, 1);
+      fixture = resolver.insert(MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values);
+      assertNotNull("App-owned synthetic MediaStore insertion failed", fixture);
+      try (OutputStream output = resolver.openOutputStream(fixture, "w")) {
+        assertNotNull("Cannot write owned synthetic fixture", output);
+        output.write(source);
+      }
+      ContentValues published = new ContentValues();
+      published.put(MediaStore.MediaColumns.IS_PENDING, 0);
+      assertEquals("Publish only the inserted fixture", 1, resolver.update(fixture, published, null, null));
+      final Uri insertedFixture = fixture;
+      waitFor("synthetic MediaStore fixture published and indexed", () -> {
+        try (Cursor row = resolver.query(insertedFixture, new String[] {
+            MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.IS_PENDING, MediaStore.MediaColumns.SIZE }, null, null, null)) {
+          if (row == null || !row.moveToFirst()) return false;
+          assertEquals(fixtureName, row.getString(0));
+          return row.getInt(1) == 0 && row.getLong(2) > 0;
+        }
+      }, PICKER_TIMEOUT);
+      launchApp();
+      requireLabel("Every instrument has a story.");
+      String sentinel = prepare();
+      String id = prepare();
+      try (SelectionTrace trace = new SelectionTrace(id)) {
+        launchSelection(id);
+        String handler = requireSystemPicker();
+        clickOnlySyntheticPickerItem(handler);
+        waitFor("actual selected result ready", () -> {
+          Map<?, ?> snapshot = store.read(id);
+          assertEquals(id, snapshot.get("selectionId"));
+          String status = String.valueOf(snapshot.get("status"));
+          assertTrue("Actual picker result must stay pending or become ready, got " + status + ": " + snapshot.get("code"),
+              status.equals("pending") || status.equals("ready"));
+          return status.equals("ready");
+        }, PICKER_TIMEOUT);
+        waitFor("successful picker caller finished", () -> trace.destroyedCount() == 1, PICKER_TIMEOUT);
+        assertEquals("One actual caller, no synthetic replacement", 1, trace.createdCount());
+        Map<?, ?> ready = store.read(id);
+        Map<?, ?> firstPhoto = onlyPhoto(ready);
+        String receipt = String.valueOf(ready.get("resultId"));
+        String photoId = String.valueOf(firstPhoto.get("id"));
+        assertTrue(receipt.matches("[A-Za-z0-9-]{12,80}"));
+        assertTrue(photoId.matches("[A-Za-z0-9-]{12,80}"));
+        byte[] normalized = jpegBytes(firstPhoto);
+        assertSyntheticPixels(normalized);
+        Map<?, ?> replay = store.read(id);
+        assertEquals(id, replay.get("selectionId"));
+        assertEquals(receipt, replay.get("resultId"));
+        assertEquals(photoId, onlyPhoto(replay).get("id"));
+        assertEquals(sha256(normalized), sha256(jpegBytes(onlyPhoto(replay))));
+        assertEquals("Other request stays pending", "pending", store.read(sentinel).get("status"));
+
+        Map<Uri, Integer> retained = persistedGrants();
+        for (Map.Entry<Uri, Integer> entry : baselineGrants.entrySet()) assertEquals(entry.getValue(), retained.get(entry.getKey()));
+        Set<Uri> added = new HashSet<>(retained.keySet());
+        added.removeAll(baselineGrants.keySet());
+        assertEquals("Production selection must obtain exactly one real persisted grant", 1, added.size());
+        Uri selectedGrant = added.iterator().next();
+        assertEquals("content", selectedGrant.getScheme());
+        assertNotEquals("Verify the returned picker URI, not app-owned insertion access", fixture, selectedGrant);
+        assertEquals("Picker grant must grant read only", Integer.valueOf(Intent.FLAG_GRANT_READ_URI_PERMISSION), retained.get(selectedGrant));
+        try (InputStream selected = resolver.openInputStream(selectedGrant)) {
+          assertNotNull("Real retained picker URI cannot be opened", selected);
+          assertEquals("Retained picker grant must identify the synthetic source", sourceHash, sha256(readFixtureBytes(selected)));
+        }
+        File journal = new File(context.getNoBackupFilesDir(), "qrguitar-photo-picker-v1");
+        File record = new File(journal, id + ".record");
+        File encryptedImage = new File(journal, id + "-" + photoId + ".image");
+        assertTrue("Actual native encrypted image must exist before ack", encryptedImage.isFile() && encryptedImage.length() > 0);
+        long readyRecordBytes = record.length();
+        assertTrue("Native ready journal missing", readyRecordBytes > 0);
+        try {
+          store.acknowledge(id, "incorrect-" + UUID.randomUUID());
+          fail("Incorrect receipt must not acknowledge native bytes");
+        } catch (IllegalStateException expected) {
+          assertEquals("receipt_changed", expected.getMessage());
+        }
+        assertEquals(receipt, store.read(id).get("resultId"));
+        assertEquals(sha256(normalized), sha256(jpegBytes(onlyPhoto(store.read(id)))));
+        assertEquals(retained, persistedGrants());
+        assertEquals("acknowledged", store.acknowledge(id, receipt).get("status"));
+        assertEquals("acknowledged", store.acknowledge(id, receipt).get("status"));
+        Map<?, ?> retired = store.read(id);
+        assertEquals(id, retired.get("selectionId"));
+        assertEquals("acknowledged", retired.get("status"));
+        assertFalse(retired.containsKey("photos"));
+        assertEquals("Only the newly retained grant is released", baselineGrants, persistedGrants());
+        for (String suffix : new String[] { "", ".new", ".bak" }) {
+          assertFalse("Acknowledged image cleanup incomplete", new File(encryptedImage.getPath() + suffix).exists());
+        }
+        assertTrue("Keep a compact durable identity after exact ack", record.isFile() && record.length() > 0 && record.length() < readyRecordBytes);
+        assertFalse("Acknowledged identity cannot start again", store.prepare(id, 2, 16 * 1024 * 1024));
+        assertEquals("pending", store.read(sentinel).get("status"));
+        trace.log("actual selection and exact acknowledgement");
+        Log.i(TAG, "PASS sourceSha256=" + sourceHash + " normalizedSha256=" + sha256(normalized)
+            + " addedPersistedGrants=1 remainingAddedGrants=0 selection=" + id);
+      }
+    } finally {
+      try {
+        for (String id : ownedIds) store.discard(id);
+      } finally {
+        if (fixture != null) {
+          // Exact insertion URI plus UUID name: never enumerate/delete another media row.
+          int deleted = resolver.delete(fixture, MediaStore.MediaColumns.DISPLAY_NAME + " = ?", new String[] { fixtureName });
+          assertEquals("Owned synthetic fixture cleanup failed", 1, deleted);
+        }
+      }
+    }
+  }
+
+  private Map<Uri, Integer> persistedGrants() {
+    Map<Uri, Integer> result = new HashMap<>();
+    for (UriPermission permission : context.getContentResolver().getPersistedUriPermissions()) {
+      int flags = (permission.isReadPermission() ? Intent.FLAG_GRANT_READ_URI_PERMISSION : 0)
+          | (permission.isWritePermission() ? Intent.FLAG_GRANT_WRITE_URI_PERMISSION : 0);
+      assertNull("Duplicate persisted URI entry", result.put(permission.getUri(), flags));
+    }
+    return result;
+  }
+
+  private void clickOnlySyntheticPickerItem(String handler) {
+    String gridId = pickerResource("qrguitarPickerGridId", "picker_tab_recyclerview");
+    String thumbnailId = pickerResource("qrguitarPickerThumbnailId", "icon_thumbnail");
+    String addId = pickerResource("qrguitarPickerAddId", "button_add");
+    AtomicReference<UiObject2> thumbnail = new AtomicReference<>();
+    waitFor("one OS picker thumbnail; verify actual hierarchy/selector " + handler + ":id/" + gridId + "/" + thumbnailId, () -> {
+      UiObject2 grid = device.findObject(By.res(handler, gridId));
+      if (grid == null) return false;
+      List<UiObject2> items = grid.findObjects(By.res(handler, thumbnailId));
+      assertTrue("Fresh acceptance AVD unexpectedly has multiple visible media items", items.size() <= 1);
+      if (items.size() != 1) return false;
+      thumbnail.set(items.get(0));
+      return true;
+    }, PICKER_TIMEOUT);
+    thumbnail.get().click();
+    AtomicReference<UiObject2> add = new AtomicReference<>();
+    waitFor("enabled actual OS picker confirmation " + handler + ":id/" + addId, () -> {
+      UiObject2 value = device.findObject(By.res(handler, addId).enabled(true));
+      add.set(value);
+      return value != null;
+    }, PICKER_TIMEOUT);
+    Log.i(TAG, "actual picker selectors " + handler + ": " + gridId + "," + thumbnailId + "," + addId);
+    add.get().click();
+  }
+
+  private static String pickerResource(String argument, String fallback) {
+    String value = InstrumentationRegistry.getArguments().getString(argument, fallback);
+    assertTrue("Picker selector must be one explicit resource entry: " + argument, value.matches("[A-Za-z][A-Za-z0-9_]*"));
+    return value;
+  }
+
+  private static Map<?, ?> onlyPhoto(Map<?, ?> snapshot) {
+    assertEquals("ready", snapshot.get("status"));
+    assertTrue(snapshot.get("photos") instanceof List);
+    List<?> photos = (List<?>) snapshot.get("photos");
+    assertEquals(1, photos.size());
+    assertTrue(photos.get(0) instanceof Map);
+    return (Map<?, ?>) photos.get(0);
+  }
+
+  private static byte[] jpegBytes(Map<?, ?> photo) {
+    Object value = photo.get("dataUrl");
+    assertTrue("Native photo bytes missing", value instanceof String);
+    String data = (String) value;
+    String prefix = "data:image/jpeg;base64,";
+    assertTrue("Native normalization must produce JPEG", data.startsWith(prefix));
+    assertTrue("Synthetic fixture unexpectedly large", data.length() < 1024 * 1024);
+    return Base64.decode(data.substring(prefix.length()), Base64.NO_WRAP);
+  }
+
+  private static byte[] syntheticJpeg() {
+    int[] pixels = new int[96 * 64];
+    for (int y = 0; y < 64; y++) for (int x = 0; x < 96; x++) pixels[y * 96 + x] = x < 48 ? Color.RED : Color.BLUE;
+    Bitmap image = Bitmap.createBitmap(pixels, 96, 64, Bitmap.Config.ARGB_8888);
+    try {
+      ByteArrayOutputStream output = new ByteArrayOutputStream();
+      assertTrue(image.compress(Bitmap.CompressFormat.JPEG, 95, output));
+      return output.toByteArray();
+    } finally { image.recycle(); }
+  }
+
+  private static void assertSyntheticPixels(byte[] bytes) {
+    Bitmap image = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+    assertNotNull("Normalized photo is not decodable", image);
+    try {
+      assertEquals(96, image.getWidth()); assertEquals(64, image.getHeight());
+      int left = image.getPixel(24, 32), right = image.getPixel(72, 32);
+      assertTrue("Synthetic left red region changed", Color.red(left) > 200 && Color.green(left) < 70 && Color.blue(left) < 70);
+      assertTrue("Synthetic right blue region changed", Color.blue(right) > 200 && Color.green(right) < 70 && Color.red(right) < 70);
+    } finally { image.recycle(); }
+  }
+
+  private static byte[] readFixtureBytes(InputStream input) throws Exception {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    byte[] buffer = new byte[8192];
+    int count;
+    while ((count = input.read(buffer)) != -1) {
+      assertTrue("Synthetic picker source unexpectedly large", output.size() + count <= 1024 * 1024);
+      output.write(buffer, 0, count);
+    }
+    return output.toByteArray();
+  }
+
+  private static String sha256(byte[] bytes) throws Exception {
+    StringBuilder result = new StringBuilder();
+    for (byte value : MessageDigest.getInstance("SHA-256").digest(bytes)) result.append(String.format(java.util.Locale.ROOT, "%02x", value & 255));
+    return result.toString();
+  }
+
   private String prepare() {
     String id = "installed-" + UUID.randomUUID();
     ownedIds.add(id);
@@ -191,7 +471,7 @@ public final class InstalledAcceptanceTest {
     InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> context.startActivity(intent));
   }
 
-  private void requireSystemPicker() {
+  private String requireSystemPicker() {
     PickVisualMediaRequest request = new PickVisualMediaRequest.Builder()
         .setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly.INSTANCE).build();
     Intent picker = new ActivityResultContracts.PickMultipleVisualMedia(2).createIntent(context, request);
@@ -204,6 +484,7 @@ public final class InstalledAcceptanceTest {
     assertTrue("Resolved OS photo picker not visible: " + handler,
         device.wait(Until.hasObject(By.pkg(handler).depth(0)), PICKER_TIMEOUT));
     Log.i(TAG, "observed OS picker " + handler + "/" + resolved.activityInfo.name);
+    return handler;
   }
 
   private void requireCancelled(String id) {

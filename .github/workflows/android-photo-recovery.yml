@@ -123,7 +123,7 @@ jobs:
           import xml.etree.ElementTree as ET
           roots = [
               (Path('apps/mobile/modules/qrguitar-photo-picker/android/build/outputs/androidTest-results/connected'), 10),
-              (Path('apps/mobile/android/app/build/outputs/androidTest-results/connected'), 3),
+              (Path('apps/mobile/android/app/build/outputs/androidTest-results/connected'), 4),
           ]
           valid = True
           for root, minimum in roots:
