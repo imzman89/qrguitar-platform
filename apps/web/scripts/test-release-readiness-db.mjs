@@ -7,13 +7,19 @@ const manifest=JSON.parse(fs.readFileSync(path.join(source,'apps/web/scripts/rel
 const migrationSha=relative=>createHash('sha256').update(fs.readFileSync(path.join(source,relative),'utf8').replaceAll('\r\n','\n')).digest('hex');
 assert.equal(manifest.paypalWebhookSourceSha256,migrationSha('supabase/migrations/20260918132000_paypal_webhook_inbox.sql'));
 assert.equal(manifest.paypalAdminReviewSourceSha256,migrationSha('supabase/migrations/20260918133000_paypal_admin_reviews.sql'));
+assert.equal(manifest.profileEditUploadSourceSha256,migrationSha('supabase/migrations/20260918150000_profile_edit_staged_uploads.sql'));
+assert.deepEqual(manifest.profileEditUploadFunctionSignatures,[
+  'public.cleanup_staged_instrument_edit_uploads(uuid,text,uuid,text[],text[])',
+  'public.consume_staged_instrument_edit_upload()',
+  'public.register_staged_instrument_edit_upload(uuid,text,uuid,text,text)'
+]);
 const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite');
 const {installRepositorySchema}=await import(pathToFileURL(path.join(repo,'apps/web/scripts/security/postgres-fixture.mjs')));
 const db=new PGlite();await installRepositorySchema(db,repo,overlay?'20260917190000':undefined);
 if(overlay)for(const file of fs.readdirSync(path.join(source,'supabase/migrations')).filter(file=>file.endsWith('.sql')&&file>='20260917190000').sort())await db.exec(fs.readFileSync(path.join(source,'supabase/migrations',file),'utf8').replaceAll('\r\n','\n'));await db.exec("insert into storage.buckets(id,name,public)values('instrument-media','instrument-media',false),('instrument-documents','instrument-documents',false),('service-evidence','service-evidence',false) on conflict(id)do update set public=false;");
 const ready=async()=> (await db.query('select public.qrguitar_release_readiness() result')).rows[0].result;
 let passed=0;async function test(name,fn){await db.exec('begin');try{await fn();console.log('PASS '+name);passed++;}finally{await db.exec('rollback');}}
-function assertShape(result){assert.deepEqual(Object.keys(result).sort(),['checks','ready','releaseVersion']);assert.equal(result.releaseVersion,'2026-09-17.9');assert.equal(typeof result.ready,'boolean');assert.deepEqual(result.checks.map(c=>c.name),manifest.checks);assert.equal(new Set(result.checks.map(c=>c.name)).size,manifest.checks.length);for(const check of result.checks){assert.deepEqual(Object.keys(check).sort(),['name','ok']);assert.equal(typeof check.ok,'boolean');}}
+function assertShape(result){assert.deepEqual(Object.keys(result).sort(),['checks','ready','releaseVersion']);assert.equal(result.releaseVersion,'2026-09-17.10');assert.equal(typeof result.ready,'boolean');assert.deepEqual(result.checks.map(c=>c.name),manifest.checks);assert.equal(new Set(result.checks.map(c=>c.name)).size,manifest.checks.length);for(const check of result.checks){assert.deepEqual(Object.keys(check).sort(),['name','ok']);assert.equal(typeof check.ok,'boolean');}}
 async function expectFalse(name){const result=await ready();assertShape(result);assert.equal(result.ready,false);assert.equal(result.checks.find(c=>c.name===name)?.ok,false);}
 await test('complete schema returns exact version and all14 checks true',async()=>{const result=await ready();assertShape(result);assert.equal(result.ready,true,JSON.stringify(result));assert.equal(result.checks.length,14);assert.ok(result.checks.every(c=>c.ok));});
 await test('anonymous and authenticated callers cannot execute the readiness routine',async()=>{for(const role of['anon','authenticated']){await db.exec('savepoint deny');try{await db.exec('set role '+role);await assert.rejects(ready,e=>e.code==='42501');}finally{await db.exec('rollback to savepoint deny');}}});
@@ -131,5 +137,57 @@ await test('webhook delivery state constraint remains exact',async()=>{
   const constraint=manifest.billingConstraints.find(item=>item.table==='billing_paypal_webhook_deliveries'&&item.name.endsWith('_state_check'));assert.ok(constraint);
   await db.exec('alter table billing_paypal_webhook_deliveries drop constraint '+constraint.name);
   await expectFalse('receipt_constraints');
+});
+const profileEditServiceFunctions=manifest.profileEditUploadFunctionSignatures.filter(signature=>manifest.serviceFunctions.includes(signature));
+const profileEditBlockedFunctions=manifest.profileEditUploadFunctionSignatures.filter(signature=>manifest.blockedFunctions.includes(signature));
+assert.equal(profileEditServiceFunctions.length,2);
+assert.deepEqual(profileEditBlockedFunctions,['public.consume_staged_instrument_edit_upload()']);
+for(const signature of profileEditServiceFunctions)await test('missing Profile edit service RPC fails readiness: '+signature,async()=>{
+  await db.exec('drop function '+signature);await expectFalse('required_functions');
+});
+await test('missing trigger-only Profile edit consumer fails readiness',async()=>{
+  await db.exec('drop function public.consume_staged_instrument_edit_upload() cascade');await expectFalse('required_functions');
+});
+for(const signature of profileEditServiceFunctions)for(const role of['public','anon','authenticated'])await test(role+' cannot execute Profile edit RPC: '+signature,async()=>{
+  await db.exec('grant execute on function '+signature+' to '+role);await expectFalse('function_security');
+});
+for(const signature of profileEditServiceFunctions)await test('missing service grant fails Profile edit readiness: '+signature,async()=>{
+  await db.exec('revoke execute on function '+signature+' from service_role');await expectFalse('function_security');
+});
+for(const role of['public','anon','authenticated','service_role'])await test(role+' cannot directly execute trigger-only Profile edit consumer',async()=>{
+  await db.exec('grant execute on function public.consume_staged_instrument_edit_upload() to '+role);await expectFalse('blocked_function_grants');
+});
+for(const name of['register_staged_instrument_edit_upload','cleanup_staged_instrument_edit_uploads','consume_staged_instrument_edit_upload'])await test('unreviewed Profile edit upload overload cannot bypass '+name,async()=>{
+  await db.exec("create function public."+name+"(uuid) returns jsonb language sql as $$select '{}'::jsonb$$;");await expectFalse('function_security');
+});
+for(const signature of manifest.profileEditUploadFunctionSignatures)await test('unreviewed role cannot execute Profile edit function: '+signature,async()=>{
+  await db.exec('create role unexpected_profile_editor;grant execute on function '+signature+' to unexpected_profile_editor');await expectFalse('function_security');
+});
+await test('Profile edit upload functions cannot be owned by an API role',async()=>{
+  await db.exec('alter function public.register_staged_instrument_edit_upload(uuid,text,uuid,text,text) owner to service_role');await expectFalse('function_security');
+});
+for(const signature of manifest.profileEditUploadFunctionSignatures)await test('Profile edit upload implementation drift fails its fixed fingerprint: '+signature,async()=>{
+  const source=(await db.query('select pg_get_functiondef($1::regprocedure) definition',[signature])).rows[0].definition;
+  assert.ok(source.includes('AS $function$'));
+  await db.exec(source.replace('AS $function$','AS $function$\n-- unexpected Profile edit implementation drift'));
+  await expectFalse('function_security');
+});
+for(const signature of manifest.profileEditUploadFunctionSignatures)await test('Profile edit upload search-path drift fails: '+signature,async()=>{
+  await db.exec('alter function '+signature+' set search_path=public');await expectFalse('function_security');
+});
+for(const signature of manifest.profileEditUploadFunctionSignatures)await test('Profile edit upload SECURITY INVOKER drift fails: '+signature,async()=>{
+  await db.exec('alter function '+signature+' security invoker');await expectFalse('function_security');
+});
+for(const signature of manifest.profileEditUploadFunctionSignatures)await test('Profile edit upload volatility drift fails: '+signature,async()=>{
+  await db.exec('alter function '+signature+' stable');await expectFalse('function_security');
+});
+for(const [table,name]of manifest.provenanceTriggers.filter(([,name])=>name.startsWith('consume_staged_instrument_edit_')))await test('disabled '+table+' Profile edit consumption trigger fails readiness',async()=>{
+  await db.exec('alter table '+table+' disable trigger '+name);await expectFalse('schema_columns');
+});
+for(const [table,name]of manifest.provenanceTriggers.filter(([,name])=>name.startsWith('consume_staged_instrument_edit_')))await test('missing '+table+' Profile edit consumption trigger fails readiness',async()=>{
+  await db.exec('drop trigger '+name+' on '+table);await expectFalse('schema_columns');
+});
+for(const [table,name]of manifest.provenanceTriggers.filter(([,name])=>name.startsWith('consume_staged_instrument_edit_')))await test('wrong '+table+' Profile edit consumption trigger fails readiness',async()=>{
+  await db.exec('drop trigger '+name+' on '+table+';create trigger '+name+' before insert on '+table+' for each row execute function public.create_profile_timeline_event()');await expectFalse('schema_columns');
 });
 console.log('Completed '+passed+' actual PostgreSQL readiness tests.');await db.close();

@@ -171,10 +171,9 @@ try{
   assert.equal(ready.ready,true,JSON.stringify(ready));
   assert.equal(ready.releaseVersion,'2026-09-17.9');
 
-  const files=[
-    [outputPath,generated],
-    ['apps/web/scripts/release-readiness-manifest.json',JSON.stringify(manifest,null,2)+'\n']
-  ];
+  // The active release manifest belongs to the newest additive generator;
+  // .9 remains a reproducible historical migration.
+  const files=[[outputPath,generated]];
   for(const [relative,content] of files){
     const target=path.join(repo,relative);
     if(process.argv.includes('--write')) fs.writeFileSync(target,content);

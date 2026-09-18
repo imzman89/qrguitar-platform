@@ -1,5 +1,5 @@
 {
-  "releaseVersion": "2026-09-17.9",
+  "releaseVersion": "2026-09-17.10",
   "checks": [
     "catalog_readable",
     "required_functions",
@@ -95,7 +95,9 @@
     "public.billing_paypal_webhook_retry(text,uuid,uuid,text,integer)",
     "public.billing_paypal_webhook_reverse_approval(text,uuid,text,text,text,text,integer,jsonb)",
     "public.billing_paypal_webhook_save_plan(text,uuid,uuid,jsonb)",
-    "public.billing_paypal_webhook_scheduler_ready(text)"
+    "public.billing_paypal_webhook_scheduler_ready(text)",
+    "public.cleanup_staged_instrument_edit_uploads(uuid,text,uuid,text[],text[])",
+    "public.register_staged_instrument_edit_upload(uuid,text,uuid,text,text)"
   ],
   "blockedFunctions": [
     "public.create_instrument_profile_unregistered(uuid,text,text,jsonb,boolean,text)",
@@ -145,7 +147,8 @@
     "public._billing_paypal_webhook_evidence(text,text,integer,jsonb,jsonb)",
     "public._billing_paypal_webhook_headers(jsonb)",
     "public._billing_paypal_webhook_json(billing_paypal_webhook_deliveries,boolean,boolean)",
-    "public._billing_paypal_webhook_receipt_id(text,integer)"
+    "public._billing_paypal_webhook_receipt_id(text,integer)",
+    "public.consume_staged_instrument_edit_upload()"
   ],
   "fingerprints": [
     {
@@ -1603,6 +1606,39 @@
       "result": "boolean",
       "definer": true,
       "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.cleanup_staged_instrument_edit_uploads(uuid,text,uuid,text[],text[])",
+      "source_hash": "9b53254a74cd8edb4acd7d4d37fc268da73a3611f7fad2885f05343ad7709abc",
+      "arguments": "p_owner_id uuid, p_upload_id text, p_guitar_id uuid, p_media_paths text[], p_document_paths text[]",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.consume_staged_instrument_edit_upload()",
+      "source_hash": "ddc4b17d874dffece31274ef453169f664e3c3f1a580d6affa7d39cdf83dddc2",
+      "arguments": "",
+      "result": "trigger",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.register_staged_instrument_edit_upload(uuid,text,uuid,text,text)",
+      "source_hash": "a8f39edf26fc80e2a0567ac4982f8641aedc10b9632779ed0749e5f8c55c4239",
+      "arguments": "p_owner_id uuid, p_upload_id text, p_guitar_id uuid, p_bucket_id text, p_storage_path text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
       "settings": [
         "search_path=pg_catalog, public"
       ]
@@ -3247,6 +3283,16 @@
       "billing_paypal_webhook_outcomes",
       "billing_paypal_webhook_outcomes_immutable",
       "CREATE TRIGGER billing_paypal_webhook_outcomes_immutable BEFORE DELETE OR UPDATE ON public.billing_paypal_webhook_outcomes FOR EACH ROW EXECUTE FUNCTION _billing_immutable()"
+    ],
+    [
+      "guitar_documents",
+      "consume_staged_instrument_edit_document",
+      "CREATE TRIGGER consume_staged_instrument_edit_document BEFORE INSERT ON public.guitar_documents FOR EACH ROW EXECUTE FUNCTION consume_staged_instrument_edit_upload()"
+    ],
+    [
+      "guitar_media",
+      "consume_staged_instrument_edit_media",
+      "CREATE TRIGGER consume_staged_instrument_edit_media BEFORE INSERT ON public.guitar_media FOR EACH ROW EXECUTE FUNCTION consume_staged_instrument_edit_upload()"
     ]
   ],
   "rpcOnlyTables": [
@@ -5472,5 +5518,11 @@
   ],
   "paypalBillingSourceSha256": "4cc218cd7e9385c642236a6212d9652fa82dcf7992ce9b33b3e9dc3c7ba88f65",
   "paypalWebhookSourceSha256": "e11f697d1fe279fa8584d09d2bf02b543583b6581893a0f8074e9180411df568",
-  "paypalAdminReviewSourceSha256": "411bca008f45d1d930b0205024833cd2caa60141538d349b2895dc189eb01727"
+  "paypalAdminReviewSourceSha256": "411bca008f45d1d930b0205024833cd2caa60141538d349b2895dc189eb01727",
+  "profileEditUploadFunctionSignatures": [
+    "public.cleanup_staged_instrument_edit_uploads(uuid,text,uuid,text[],text[])",
+    "public.consume_staged_instrument_edit_upload()",
+    "public.register_staged_instrument_edit_upload(uuid,text,uuid,text,text)"
+  ],
+  "profileEditUploadSourceSha256": "f1d0ba57a3d19ceaef9f6ec216d31158267792cec19b85f48beee965b44dcee1"
 }
