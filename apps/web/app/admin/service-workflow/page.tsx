@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { ArrowLeft, FileLock2, Search, ShieldCheck } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Footer } from "../../../components/Footer";
 import { Nav } from "../../../components/Nav";
-import { getSupabaseAccessToken } from "../../../lib/supabase-browser";
+import { createBrowserSupabaseClient } from "../../../lib/supabase-browser";
 
 type Provider = {
   userId: string;
@@ -62,48 +62,102 @@ export default function AdminServiceWorkflowPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
+  const actorRef = useRef("");
+  const loadRevision = useRef(0);
+  const actionRef = useRef("");
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options: { successMessage?: string } = {}) => {
+    const revision = ++loadRevision.current;
     setLoading(true);
-    const token = await getSupabaseAccessToken().catch(() => "");
-    if (!token) {
-      setMessage("Sign in with an authorized admin account.");
-      setLoading(false);
-      return;
+    if (!options.successMessage) setMessage("");
+    try {
+      const { data } = await createBrowserSupabaseClient().auth.getSession();
+      const actorId = data.session?.user.id || "";
+      const token = data.session?.access_token || "";
+      if (revision !== loadRevision.current) return;
+      if (!token || !actorId) {
+        actorRef.current = "";
+        setProviders([]);
+        setSubmissions([]);
+        setMessage("Sign in with an authorized admin account.");
+        return;
+      }
+      actorRef.current = actorId;
+      const query = new URLSearchParams();
+      if (search.trim()) query.set("search", search.trim());
+      if (status !== "all") query.set("status", status);
+      const response = await fetch(`/api/admin/service-workflow?${query.toString()}`, { cache: "no-store", headers: { authorization: `Bearer ${token}` } });
+      const payload = await response.json().catch(() => null) as Payload | null;
+      if (revision !== loadRevision.current || actorRef.current !== actorId) return;
+      if (!response.ok || !payload?.ok) {
+        setMessage(payload?.message || "Service workflow could not be loaded.");
+        setProviders([]);
+        setSubmissions([]);
+      } else {
+        setMessage(options.successMessage || "");
+        setProviders(Array.isArray(payload.providers) ? payload.providers : []);
+        setSubmissions(Array.isArray(payload.submissions) ? payload.submissions : []);
+      }
+    } catch (error) {
+      if (revision === loadRevision.current) {
+        setMessage(error instanceof Error ? `Service workflow could not be loaded: ${error.message}` : "Service workflow could not be loaded. Check your connection and retry.");
+      }
+    } finally {
+      if (revision === loadRevision.current) setLoading(false);
     }
-    const query = new URLSearchParams();
-    if (search.trim()) query.set("search", search.trim());
-    if (status !== "all") query.set("status", status);
-    const response = await fetch(`/api/admin/service-workflow?${query.toString()}`, { cache: "no-store", headers: { authorization: `Bearer ${token}` } });
-    const payload = await response.json().catch(() => null) as Payload | null;
-    if (!response.ok || !payload?.ok) {
-      setMessage(payload?.message || "Service workflow could not be loaded.");
-      setProviders([]);
-      setSubmissions([]);
-    } else {
-      setMessage("");
-      setProviders(payload.providers || []);
-      setSubmissions(payload.submissions || []);
-    }
-    setLoading(false);
   }, [search, status]);
 
   useEffect(() => { void load(); }, [load]);
 
-  async function act(body: Record<string, unknown>, successMessage: string) {
-    const token = await getSupabaseAccessToken().catch(() => "");
-    if (!token) return setMessage("Admin session expired. Sign in again.");
-    const key = String(body.action || "action") + String(body.providerUserId || body.submissionId || "");
-    setBusy(key);
-    const response = await fetch("/api/admin/service-workflow", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", authorization: `Bearer ${token}` },
-      body: JSON.stringify(body)
+  useEffect(() => {
+    const { data } = createBrowserSupabaseClient().auth.onAuthStateChange((_event, session) => {
+      const nextActorId = session?.user.id || "";
+      if (nextActorId === actorRef.current) return;
+      actorRef.current = nextActorId;
+      loadRevision.current += 1;
+      setProviders([]);
+      setSubmissions([]);
+      setBusy("");
+      actionRef.current = "";
+      setMessage(nextActorId ? "Refreshing service operations for this account." : "Sign in with an authorized admin account.");
+      setLoading(Boolean(nextActorId));
+      if (nextActorId) void load();
     });
-    const payload = await response.json().catch(() => null) as Payload | null;
-    setMessage(payload?.message || (response.ok ? successMessage : "Admin action failed."));
-    setBusy("");
-    if (response.ok) await load();
+    return () => data.subscription.unsubscribe();
+  }, [load]);
+
+  async function act(body: Record<string, unknown>, successMessage: string) {
+    const key = String(body.action || "action") + String(body.providerUserId || body.submissionId || "");
+    if (actionRef.current) return;
+    actionRef.current = key;
+    const expectedActorId = actorRef.current;
+    setBusy(key);
+    try {
+      const { data } = await createBrowserSupabaseClient().auth.getSession();
+      const actorId = data.session?.user.id || "";
+      const token = data.session?.access_token || "";
+      if (!token || !actorId) throw new Error("Admin session expired. Sign in again.");
+      if (!expectedActorId || actorId !== expectedActorId) throw new Error("The signed-in account changed. Refresh service operations before trying again.");
+      const response = await fetch("/api/admin/service-workflow", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify(body)
+      });
+      const payload = await response.json().catch(() => null) as Payload | null;
+      if (actorRef.current !== actorId) return;
+      const confirmed = response.ok && payload?.ok === true;
+      const resultMessage = payload?.message || (confirmed ? successMessage : "Admin action failed. The server response did not confirm a saved change.");
+      if (!confirmed) {
+        setMessage(resultMessage);
+        return;
+      }
+      await load({ successMessage: resultMessage });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "The admin action could not be completed. Try again.");
+    } finally {
+      if (actionRef.current === key) actionRef.current = "";
+      setBusy((current) => current === key ? "" : current);
+    }
   }
 
   const filteredProviders = useMemo(() => {
@@ -123,7 +177,7 @@ export default function AdminServiceWorkflowPage() {
         <div className="admin-service-filters">
           <label><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search provider, Profile, or work" /></label>
           <select value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All statuses</option><option value="draft">Draft</option><option value="submitted">Submitted</option><option value="changes_requested">Changes requested</option><option value="approved">Approved</option><option value="declined">Declined</option><option value="cancelled">Cancelled</option><option value="expired">Expired</option></select>
-          <button className="button secondary" type="button" onClick={() => void load()}>Refresh</button>
+          <button className="button secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => void load()}>{loading ? "Refreshing…" : "Refresh"}</button>
         </div>
         {message ? <div className="admin-message" role="status">{message}</div> : null}
         {loading ? <section className="card admin-panel-card"><h2>Loading service operations.</h2></section> : <>
@@ -137,7 +191,7 @@ export default function AdminServiceWorkflowPage() {
                   <div className="admin-service-card__main"><ShieldCheck /><div><strong>{provider.publicDisplayName || provider.businessName || "Unnamed provider"}</strong><span>{provider.businessName || "No business name"}{provider.location ? ` - ${provider.location}` : ""}</span><small>{provider.serviceCategories?.join(" - ") || "No service categories"}</small></div></div>
                   <span className={`service-provider-state ${provider.verificationStatus}`}>{provider.verificationStatus === "verified" ? "Verified Service Provider" : "Unverified provider"}</span>
                   {provider.internalReviewNote ? <p className="admin-service-note">Internal note: {provider.internalReviewNote}</p> : null}
-                  <button className="button secondary" type="button" disabled={busy === key} onClick={() => void act({ action, providerUserId: provider.userId }, action === "verify_provider" ? "Provider verified." : "Provider verification revoked.")}>{action === "verify_provider" ? "Verify provider" : "Revoke verification"}</button>
+                  <button className="button secondary" type="button" disabled={Boolean(busy)} onClick={() => void act({ action, providerUserId: provider.userId }, action === "verify_provider" ? "Provider verified." : "Provider verification revoked.")}>{busy === key ? "Saving…" : action === "verify_provider" ? "Verify provider" : "Revoke verification"}</button>
                 </article>;
               }) : <p className="admin-empty">No provider accounts match this view.</p>}
             </div>
@@ -153,8 +207,8 @@ export default function AdminServiceWorkflowPage() {
                 {submission.evidence.length ? <details><summary><FileLock2 size={14} /> Private evidence</summary><ul>{submission.evidence.map((item) => <li key={item.id}>{item.previewUrl ? <a href={item.previewUrl} target="_blank" rel="noreferrer">{item.file_name}</a> : item.file_name} - {label(item.evidence_type)} - {Math.ceil(item.file_size_bytes / 1024)} KB</li>)}</ul></details> : null}
                 {submission.activity.length ? <details><summary>Audit trail</summary><ul>{submission.activity.map((item) => <li key={item.id}><strong>{label(item.action)}</strong> - {formatDate(item.created_at)}{item.note ? ` - ${item.note}` : ""}</li>)}</ul></details> : null}
                 <div className="admin-service-actions">
-                  {(["draft", "submitted", "changes_requested"].includes(submission.status)) ? <><button className="button secondary" type="button" disabled={busy === `cancel_submission${submission.id}`} onClick={() => void act({ action: "cancel_submission", submissionId: submission.id }, "Submission cancelled.")}>Cancel submission</button><button className="button secondary" type="button" disabled={busy === `expire_submission${submission.id}`} onClick={() => void act({ action: "expire_submission", submissionId: submission.id }, "Submission expired.")}>Expire submission</button></> : null}
-                  {submission.status === "approved" && submission.resultingServiceEventId ? <button className="button secondary" type="button" disabled={busy === `mark_evidence_reviewed${submission.id}`} onClick={() => void act({ action: "mark_evidence_reviewed", submissionId: submission.id }, "Evidence marked reviewed.")}>Mark evidence reviewed</button> : null}
+                  {(["draft", "submitted", "changes_requested"].includes(submission.status)) ? <><button className="button secondary" type="button" disabled={Boolean(busy)} onClick={() => void act({ action: "cancel_submission", submissionId: submission.id }, "Submission cancelled.")}>{busy === `cancel_submission${submission.id}` ? "Saving…" : "Cancel submission"}</button><button className="button secondary" type="button" disabled={Boolean(busy)} onClick={() => void act({ action: "expire_submission", submissionId: submission.id }, "Submission expired.")}>{busy === `expire_submission${submission.id}` ? "Saving…" : "Expire submission"}</button></> : null}
+                  {submission.status === "approved" && submission.resultingServiceEventId ? <button className="button secondary" type="button" disabled={Boolean(busy)} onClick={() => void act({ action: "mark_evidence_reviewed", submissionId: submission.id }, "Evidence marked reviewed.")}>{busy === `mark_evidence_reviewed${submission.id}` ? "Saving…" : "Mark evidence reviewed"}</button> : null}
                 </div>
               </article>) : <p className="admin-empty">No service submissions match this view.</p>}
             </div>

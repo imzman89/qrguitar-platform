@@ -26,7 +26,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import { defaultSiteSettings, mergeSiteSettings, normalizeBrandLogoKey, type EditableSiteSettings } from "../../lib/site-settings";
-import { getSupabaseAccessToken } from "../../lib/supabase-browser";
+import { createBrowserSupabaseClient } from "../../lib/supabase-browser";
 import { ACCOUNT_DELETION_UNAVAILABLE } from "../../lib/admin-account-deletion-status";
 import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "../../lib/optional-tracking-consent";
 
@@ -160,6 +160,16 @@ type RecordsPayload = {
   serviceEvents?: AdminServiceEvent[];
   transfers?: AdminTransfer[];
 };
+
+type AdminSession = { actorId: string; token: string };
+
+async function readAdminSession(): Promise<AdminSession> {
+  const { data } = await createBrowserSupabaseClient().auth.getSession();
+  return {
+    actorId: data.session?.user.id || "",
+    token: data.session?.access_token || ""
+  };
+}
 
 type AdminOwnershipClaim = {
   id: string;
@@ -381,6 +391,7 @@ export default function AdminPage() {
   const [recordsPayload, setRecordsPayload] = useState<RecordsPayload | null>(null);
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [ownershipClaims, setOwnershipClaims] = useState<AdminOwnershipClaim[]>([]);
+  const [claimsError, setClaimsError] = useState("");
   const [userFilter, setUserFilter] = useState("");
   const [recordFilter, setRecordFilter] = useState("");
   const [transferFilter, setTransferFilter] = useState("");
@@ -405,9 +416,10 @@ export default function AdminPage() {
   const sidebarRef = useRef<HTMLElement | null>(null);
   const entityDrawerRef = useRef<HTMLElement | null>(null);
   const modalRef = useRef<HTMLElement | null>(null);
+  const adminActorRef = useRef("");
+  const adminLoadRevision = useRef(0);
+  const adminMutationRef = useRef("");
   const overlayKind = pendingAction ? "modal" : selectedUser || selectedRecord ? "entity" : navOpen ? "navigation" : "";
-
-  const tokenPromise = useMemo(() => getSupabaseAccessToken(), []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -419,9 +431,9 @@ export default function AdminPage() {
     if (section === "transfers") setTransferFilter(filter);
   }, []);
 
-  function goToSection(section: SectionId, filter = "") {
+  function goToSection(section: SectionId, filter = "", options: { search?: string } = {}) {
     setActiveSection(section);
-    setAdminSearch("");
+    setAdminSearch(options.search || "");
     setSortKey("created-desc");
     setUserFilter("");
     setRecordFilter("");
@@ -513,71 +525,159 @@ export default function AdminPage() {
     };
   }, [overlayKind]);
 
-  const loadAdmin = useCallback(async () => {
+  const loadAdmin = useCallback(async (options: { successMessage?: string } = {}) => {
+    const requestRevision = ++adminLoadRevision.current;
     setLoading(true);
-    setMessage("");
-    const token = await tokenPromise;
-    if (!token) {
-      setAdminAuthorized(false);
-      setMessage("Sign in with an authorized admin account.");
-      setLoading(false);
-      return;
+    if (!options.successMessage) setMessage("");
+    try {
+      const session = await readAdminSession();
+      if (requestRevision !== adminLoadRevision.current) return;
+      if (!session.token || !session.actorId) {
+        adminActorRef.current = "";
+        setAdminAuthorized(false);
+        setOverview(null);
+        setUsers([]);
+        setRecordsPayload(null);
+        setAuditEvents([]);
+        setOwnershipClaims([]);
+        setClaimsError("");
+        setSelectedUser(null);
+        setSelectedRecord(null);
+        setPendingAction(null);
+        setMessage("Sign in with an authorized admin account.");
+        return;
+      }
+      if (adminActorRef.current && adminActorRef.current !== session.actorId) {
+        setOverview(null);
+        setUsers([]);
+        setRecordsPayload(null);
+        setAuditEvents([]);
+        setOwnershipClaims([]);
+        setClaimsError("");
+        setSelectedUser(null);
+        setSelectedRecord(null);
+        setPendingAction(null);
+      }
+      adminActorRef.current = session.actorId;
+
+      const headers = { Authorization: `Bearer ${session.token}` };
+      const [overviewResponse, usersResponse, recordsResponse, auditResponse, claimsResponse] = await Promise.all([
+        fetch("/api/admin/overview", { headers, cache: "no-store" }),
+        fetch("/api/admin/users", { headers, cache: "no-store" }),
+        fetch("/api/admin/records", { headers, cache: "no-store" }),
+        fetch("/api/admin/audit", { headers, cache: "no-store" }),
+        fetch("/api/ownership-claims", { headers, cache: "no-store" })
+      ]);
+
+      const [overviewJson, usersJson, recordsJson, auditJson, claimsJson] = await Promise.all([
+        overviewResponse.json().catch(() => ({})),
+        usersResponse.json().catch(() => ({})),
+        recordsResponse.json().catch(() => ({})),
+        auditResponse.json().catch(() => ({})),
+        claimsResponse.json().catch(() => ({}))
+      ]);
+      if (requestRevision !== adminLoadRevision.current || adminActorRef.current !== session.actorId) return;
+
+      const nextUsers = Array.isArray(usersJson.users) ? usersJson.users as AdminUser[] : [];
+      const nextRecords = Array.isArray(recordsJson.records) ? recordsJson.records as AdminRecord[] : [];
+      const coreReady = overviewResponse.ok && overviewJson.ok === true
+        && usersResponse.ok && usersJson.ok === true
+        && recordsResponse.ok && recordsJson.ok === true
+        && auditResponse.ok && auditJson.ok === true;
+      const nextClaimsError = claimsResponse.ok && claimsJson.ok === true
+        ? ""
+        : String(claimsJson.message || "Ownership claims could not be loaded. Retry the admin refresh.");
+      setOverview(overviewJson);
+      setUsers(nextUsers);
+      setRecordsPayload(recordsJson);
+      setAuditEvents(Array.isArray(auditJson.auditEvents) ? auditJson.auditEvents : []);
+      setOwnershipClaims(claimsResponse.ok && Array.isArray(claimsJson.claims) ? claimsJson.claims : []);
+      setClaimsError(nextClaimsError);
+      setAdminAuthorized(coreReady);
+      setSelectedUser((current) => current ? nextUsers.find((user) => user.id === current.id) || null : null);
+      setSelectedRecord((current) => current ? nextRecords.find((record) => record.id === current.id) || null : null);
+      const responseMessage = overviewJson.message || usersJson.message || recordsJson.message || auditJson.message || nextClaimsError
+        || overviewJson.migrationNotice || usersJson.migrationNotice || "";
+      setMessage(responseMessage || options.successMessage || "");
+    } catch (error) {
+      if (requestRevision === adminLoadRevision.current) {
+        setMessage(error instanceof Error ? `Could not refresh admin data: ${error.message}` : "Could not refresh admin data. Check your connection and try again.");
+      }
+    } finally {
+      if (requestRevision === adminLoadRevision.current) setLoading(false);
     }
-
-    const headers = { Authorization: `Bearer ${token}` };
-    const [overviewResponse, usersResponse, recordsResponse, auditResponse, claimsResponse] = await Promise.all([
-      fetch("/api/admin/overview", { headers, cache: "no-store" }),
-      fetch("/api/admin/users", { headers, cache: "no-store" }),
-      fetch("/api/admin/records", { headers, cache: "no-store" }),
-      fetch("/api/admin/audit", { headers, cache: "no-store" }),
-      fetch("/api/ownership-claims", { headers, cache: "no-store" })
-    ]);
-
-    const [overviewJson, usersJson, recordsJson, auditJson, claimsJson] = await Promise.all([
-      overviewResponse.json().catch(() => ({})),
-      usersResponse.json().catch(() => ({})),
-      recordsResponse.json().catch(() => ({})),
-      auditResponse.json().catch(() => ({})),
-      claimsResponse.json().catch(() => ({}))
-    ]);
-
-    setOverview(overviewJson);
-    setUsers(usersJson.users || []);
-    setRecordsPayload(recordsJson);
-    setAuditEvents(auditJson.auditEvents || []);
-    setOwnershipClaims(claimsJson.claims || []);
-    setAdminAuthorized(overviewResponse.ok && usersResponse.ok && recordsResponse.ok && auditResponse.ok);
-    setMessage(overviewJson.message || usersJson.message || recordsJson.message || auditJson.message || overviewJson.migrationNotice || usersJson.migrationNotice || "");
-    setLoading(false);
-  }, [tokenPromise]);
+  }, []);
 
   useEffect(() => {
-    loadAdmin();
+    void loadAdmin();
   }, [loadAdmin]);
 
   const loadSiteSettings = useCallback(async () => {
+    let requestedActorId = "";
     try {
-      const token = await tokenPromise;
-      if (!token) return;
-      const response = await fetch("/api/site-editor", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+      const session = await readAdminSession();
+      if (!session.token || !session.actorId) return;
+      requestedActorId = session.actorId;
+      const response = await fetch("/api/site-editor", { headers: { Authorization: `Bearer ${session.token}` }, cache: "no-store" });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload.ok !== true || !payload.editorActorId || typeof payload.publishedVersion !== "string" || typeof payload.draftVersion !== "string") throw new Error(payload.message || "Could not load brand logo settings.");
+      if (adminActorRef.current && adminActorRef.current !== session.actorId) return;
       setSiteSettings(mergeSiteSettings(payload.published));
       logoVersions.current = { publishedVersion: payload.publishedVersion, draftVersion: payload.draftVersion };
       logoEditor.current = createEditorMutationController({ actorId: payload.editorActorId, storageScope: "brand-logos", storage: window.sessionStorage, uuid: () => crypto.randomUUID(), send: async (body) => {
-        const accessToken = await tokenPromise;
-        if (!accessToken) return { status: 401, payload: { ok: false, uncertain: false, message: "Sign in required." } };
+        const currentSession = await readAdminSession().catch(() => ({ actorId: "", token: "" }));
+        if (!currentSession.token) return { status: 401, payload: { ok: false, uncertain: false, message: "Sign in required." } };
+        if (currentSession.actorId !== payload.editorActorId) return { status: 409, payload: { ok: false, uncertain: false, message: "The signed-in account changed. Reload brand logos before saving." } };
         const abort = new AbortController(); const timer = window.setTimeout(() => abort.abort(), 20000);
         try {
-          const result = await fetch("/api/site-editor", { method: "PUT", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body, cache: "no-store", signal: abort.signal });
+          const result = await fetch("/api/site-editor", { method: "PUT", headers: { Authorization: `Bearer ${currentSession.token}`, "Content-Type": "application/json" }, body, cache: "no-store", signal: abort.signal });
           return { status: result.status, payload: await result.json().catch(() => ({})) as EditorMutationPayload };
         } finally { window.clearTimeout(timer); }
       } });
       if (logoEditor.current.pending) setMessage("A previous brand logo save needs confirmation. Use Save again to retry that exact change before making another.");
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not load brand logo settings."); }
-  }, [tokenPromise]);
+    } catch (error) {
+      if (!requestedActorId || !adminActorRef.current || adminActorRef.current === requestedActorId) {
+        setMessage(error instanceof Error ? error.message : "Could not load brand logo settings.");
+      }
+    }
+  }, []);
 
   useEffect(() => { void loadSiteSettings(); }, [loadSiteSettings]);
+
+  useEffect(() => {
+    const { data } = createBrowserSupabaseClient().auth.onAuthStateChange((_event, session) => {
+      const nextActorId = session?.user.id || "";
+      if (nextActorId === adminActorRef.current) return;
+      adminActorRef.current = nextActorId;
+      adminLoadRevision.current += 1;
+      setAdminAuthorized(false);
+      setOverview(null);
+      setUsers([]);
+      setRecordsPayload(null);
+      setAuditEvents([]);
+      setOwnershipClaims([]);
+      setClaimsError("");
+      setSelectedUser(null);
+      setSelectedRecord(null);
+      setPendingAction(null);
+      setBusy("");
+      adminMutationRef.current = "";
+      setSiteSettings(defaultSiteSettings);
+      setBrandLogoBrand("");
+      setBrandLogoUrl("");
+      logoEditor.current = null;
+      logoVersions.current = { publishedVersion: "", draftVersion: "" };
+      logoSaving.current = false;
+      logoNeedsReload.current = false;
+      setMessage(nextActorId ? "Refreshing admin access for this account." : "Sign in with an authorized admin account.");
+      setLoading(Boolean(nextActorId));
+      if (nextActorId) {
+        void loadAdmin();
+        void loadSiteSettings();
+      }
+    });
+    return () => data.subscription.unsubscribe();
+  }, [loadAdmin, loadSiteSettings]);
 
   async function saveBrandLogoMapping(nextLogos: Record<string, string>) {
     if (logoSaving.current) return;
@@ -666,26 +766,37 @@ export default function AdminPage() {
       setMessage(ACCOUNT_DELETION_UNAVAILABLE);
       return;
     }
-    const token = await tokenPromise;
-    if (!token) {
-      setMessage("Sign in required.");
-      return;
-    }
-
-    setBusy(`${action}:${user.id}`);
-    const response = await fetch(`/api/admin/users/${encodeURIComponent(user.id)}`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ action, reason, ...extra })
-    });
-    const payload = await response.json().catch(() => ({}));
-    setMessage(payload.message || (response.ok ? "Admin action saved." : "Admin action failed."));
-    setBusy("");
-    if (response.ok) {
-      await loadAdmin();
+    const busyKey = `${action}:${user.id}`;
+    if (adminMutationRef.current) return;
+    adminMutationRef.current = busyKey;
+    const expectedActorId = adminActorRef.current;
+    setBusy(busyKey);
+    try {
+      const session = await readAdminSession();
+      if (!session.token || !session.actorId) throw new Error("Sign in required.");
+      if (!expectedActorId || expectedActorId !== session.actorId) throw new Error("The signed-in account changed. Refresh admin before trying again.");
+      const response = await fetch(`/api/admin/users/${encodeURIComponent(user.id)}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ action, reason, ...extra })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (adminActorRef.current !== session.actorId) return;
+      const confirmed = response.ok && payload.ok === true;
+      const resultMessage = payload.message || (confirmed ? "Admin action saved." : "Admin action failed. The server response did not confirm a saved change.");
+      if (!confirmed) {
+        setMessage(resultMessage);
+        return;
+      }
+      await loadAdmin({ successMessage: resultMessage });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "The admin action could not be completed. Try again.");
+    } finally {
+      if (adminMutationRef.current === busyKey) adminMutationRef.current = "";
+      setBusy((current) => current === busyKey ? "" : current);
     }
   }
 
@@ -715,26 +826,37 @@ export default function AdminPage() {
   }
 
   async function updateRecord(record: AdminRecord, action: string, extra: Record<string, unknown> = {}, reason = "") {
-    const token = await tokenPromise;
-    if (!token) {
-      setMessage("Sign in required.");
-      return;
-    }
-
-    setBusy(`${action}:${record.id}`);
-    const response = await fetch(`/api/admin/records/${encodeURIComponent(record.id)}`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ action, reason, ...extra })
-    });
-    const payload = await response.json().catch(() => ({}));
-    setMessage(payload.message || (response.ok ? "Profile action saved." : "Profile action failed."));
-    setBusy("");
-    if (response.ok) {
-      await loadAdmin();
+    const busyKey = `${action}:${record.id}`;
+    if (adminMutationRef.current) return;
+    adminMutationRef.current = busyKey;
+    const expectedActorId = adminActorRef.current;
+    setBusy(busyKey);
+    try {
+      const session = await readAdminSession();
+      if (!session.token || !session.actorId) throw new Error("Sign in required.");
+      if (!expectedActorId || expectedActorId !== session.actorId) throw new Error("The signed-in account changed. Refresh admin before trying again.");
+      const response = await fetch(`/api/admin/records/${encodeURIComponent(record.id)}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ action, reason, ...extra })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (adminActorRef.current !== session.actorId) return;
+      const confirmed = response.ok && payload.ok === true;
+      const resultMessage = payload.message || (confirmed ? "Profile action saved." : "Profile action failed. The server response did not confirm a saved change.");
+      if (!confirmed) {
+        setMessage(resultMessage);
+        return;
+      }
+      await loadAdmin({ successMessage: resultMessage });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "The Profile action could not be completed. Try again.");
+    } finally {
+      if (adminMutationRef.current === busyKey) adminMutationRef.current = "";
+      setBusy((current) => current === busyKey ? "" : current);
     }
   }
 
@@ -750,26 +872,37 @@ export default function AdminPage() {
   }
 
   async function updateTransfer(transfer: AdminTransfer, action: "cancel", reason = "") {
-    const token = await tokenPromise;
-    if (!token) {
-      setMessage("Sign in required.");
-      return;
-    }
-
-    setBusy(`${action}:${transfer.id}`);
-    const response = await fetch("/api/transfers", {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ id: transfer.id, action, reason })
-    });
-    const payload = await response.json().catch(() => ({}));
-    setMessage(payload.message || (response.ok ? "Transfer action saved." : "Transfer action failed."));
-    setBusy("");
-    if (response.ok) {
-      await loadAdmin();
+    const busyKey = `${action}:${transfer.id}`;
+    if (adminMutationRef.current) return;
+    adminMutationRef.current = busyKey;
+    const expectedActorId = adminActorRef.current;
+    setBusy(busyKey);
+    try {
+      const session = await readAdminSession();
+      if (!session.token || !session.actorId) throw new Error("Sign in required.");
+      if (!expectedActorId || expectedActorId !== session.actorId) throw new Error("The signed-in account changed. Refresh admin before trying again.");
+      const response = await fetch("/api/transfers", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ id: transfer.id, action, reason })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (adminActorRef.current !== session.actorId) return;
+      const confirmed = response.ok && payload.ok === true;
+      const resultMessage = payload.message || (confirmed ? "Transfer action saved." : "Transfer action failed. The server response did not confirm a saved change.");
+      if (!confirmed) {
+        setMessage(resultMessage);
+        return;
+      }
+      await loadAdmin({ successMessage: resultMessage });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "The transfer action could not be completed. Try again.");
+    } finally {
+      if (adminMutationRef.current === busyKey) adminMutationRef.current = "";
+      setBusy((current) => current === busyKey ? "" : current);
     }
   }
 
@@ -795,27 +928,40 @@ export default function AdminPage() {
     action: "approve" | "deny" | "request_information" | "expire",
     reason: string
   ) {
-    const token = await tokenPromise;
-    if (!token) {
-      setMessage("Sign in required.");
-      return;
+    const busyKey = `${action}:${claim.id}`;
+    if (adminMutationRef.current) return;
+    adminMutationRef.current = busyKey;
+    const expectedActorId = adminActorRef.current;
+    setBusy(busyKey);
+    try {
+      const session = await readAdminSession();
+      if (!session.token || !session.actorId) throw new Error("Sign in required.");
+      if (!expectedActorId || expectedActorId !== session.actorId) throw new Error("The signed-in account changed. Refresh admin before trying again.");
+      const response = await fetch("/api/ownership-claims", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${session.token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ id: claim.id, action, note: reason })
+      });
+      const payload = await response.json().catch(() => ({})) as { ok?: boolean; message?: string };
+      if (adminActorRef.current !== session.actorId) return;
+      const resultMessage = payload.message || (response.ok ? "Ownership request updated." : "Ownership request update failed.");
+      if (response.ok && payload.ok === true && action === "approve") {
+        void dispatchOptionalTrackingProductEvent({
+          name: optionalTrackingProductEvents.ownershipTransferCompleted,
+          properties: { method: "review" }
+        }, { dedupeKey: claim.id });
+      }
+      if (!response.ok || payload.ok !== true) {
+        setMessage(resultMessage);
+        return;
+      }
+      await loadAdmin({ successMessage: resultMessage });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "The ownership request could not be updated. Try again.");
+    } finally {
+      if (adminMutationRef.current === busyKey) adminMutationRef.current = "";
+      setBusy((current) => current === busyKey ? "" : current);
     }
-    setBusy(`${action}:${claim.id}`);
-    const response = await fetch("/api/ownership-claims", {
-      method: "PATCH",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ id: claim.id, action, note: reason })
-    });
-    const payload = await response.json().catch(() => ({})) as { ok?: boolean; message?: string };
-    setBusy("");
-    setMessage(payload.message || (response.ok ? "Ownership request updated." : "Ownership request update failed."));
-    if (response.ok && payload.ok === true && action === "approve") {
-      void dispatchOptionalTrackingProductEvent({
-        name: optionalTrackingProductEvents.ownershipTransferCompleted,
-        properties: { method: "review" }
-      }, { dedupeKey: claim.id });
-    }
-    if (response.ok) await loadAdmin();
   }
 
   async function copyTransferClaimLink(transfer: AdminTransfer) {
@@ -825,12 +971,17 @@ export default function AdminPage() {
     }
 
     const url = `${window.location.origin}${transfer.claimPath}`;
-    await window.navigator.clipboard?.writeText(url);
-    setMessage("Transfer claim link copied.");
+    try {
+      if (!window.navigator.clipboard?.writeText) throw new Error("Clipboard access is unavailable in this browser.");
+      await window.navigator.clipboard.writeText(url);
+      setMessage("Transfer claim link copied.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not copy the transfer claim link.");
+    }
   }
 
   async function confirmPendingAction() {
-    if (!pendingAction) {
+    if (!pendingAction || busy) {
       return;
     }
 
@@ -955,13 +1106,28 @@ export default function AdminPage() {
 
   const filteredProof = useMemo(() => {
     const search = normalize(adminSearch);
-    return (recordsPayload?.proofDocuments || []).filter((document) => !search || normalize(`${document.name} ${document.recordCode} ${document.recordTitle} ${document.ownerEmail} ${document.document_type}`).includes(search));
-  }, [adminSearch, recordsPayload?.proofDocuments]);
+    return [...(recordsPayload?.proofDocuments || [])]
+      .filter((document) => !search || normalize(`${document.name} ${document.recordCode} ${document.recordTitle} ${document.ownerEmail} ${document.document_type}`).includes(search))
+      .sort((a, b) => {
+        if (sortKey === "title") return String(a.name || "").localeCompare(String(b.name || ""));
+        if (sortKey === "owner") return String(a.ownerEmail || "").localeCompare(String(b.ownerEmail || ""));
+        if (sortKey === "created-asc") return String(a.created_at || "").localeCompare(String(b.created_at || ""));
+        return String(b.created_at || "").localeCompare(String(a.created_at || ""));
+      });
+  }, [adminSearch, recordsPayload?.proofDocuments, sortKey]);
 
   const filteredService = useMemo(() => {
     const search = normalize(adminSearch);
-    return (recordsPayload?.serviceEvents || []).filter((event) => !search || normalize(`${event.title} ${event.recordCode} ${event.recordTitle} ${event.ownerEmail} ${event.event_type} ${event.shop_name} ${event.location}`).includes(search));
-  }, [adminSearch, recordsPayload?.serviceEvents]);
+    return [...(recordsPayload?.serviceEvents || [])]
+      .filter((event) => !search || normalize(`${event.title} ${event.recordCode} ${event.recordTitle} ${event.ownerEmail} ${event.event_type} ${event.shop_name} ${event.location}`).includes(search))
+      .sort((a, b) => {
+        if (sortKey === "title") return String(a.title || "").localeCompare(String(b.title || ""));
+        if (sortKey === "owner") return String(a.ownerEmail || "").localeCompare(String(b.ownerEmail || ""));
+        if (sortKey === "service-date") return String(b.service_date || "").localeCompare(String(a.service_date || ""));
+        if (sortKey === "created-asc") return String(a.created_at || "").localeCompare(String(b.created_at || ""));
+        return String(b.created_at || "").localeCompare(String(a.created_at || ""));
+      });
+  }, [adminSearch, recordsPayload?.serviceEvents, sortKey]);
 
   const filteredAudit = useMemo(() => {
     const search = normalize(adminSearch);
@@ -975,7 +1141,7 @@ export default function AdminPage() {
       });
   }, [adminSearch, auditEvents, sortKey]);
 
-  function filterControls(kind: "users" | "records" | "transfers" | "audit") {
+  function filterControls(kind: "users" | "records" | "transfers" | "proof" | "service" | "audit") {
     return (
       <div className="admin-filter-row">
         <input
@@ -1024,14 +1190,14 @@ export default function AdminPage() {
             <option value="has-proof">Has evidence documents</option>
             <option value="has-service">Has service history</option>
           </select>
-        ) : (
+        ) : kind === "audit" ? (
           <select value={sortKey} onChange={(event) => setSortKey(event.target.value)} aria-label="Sort audit events">
             <option value="created-desc">Newest</option>
             <option value="created-asc">Oldest</option>
             <option value="email">Actor</option>
             <option value="status">Action</option>
           </select>
-        )}
+        ) : null}
         {kind !== "audit" ? (
           <select value={sortKey} onChange={(event) => setSortKey(event.target.value)} aria-label={`Sort ${kind}`}>
             <option value="created-desc">Newest</option>
@@ -1055,6 +1221,10 @@ export default function AdminPage() {
                 <option value="service">Service count</option>
                 <option value="proof">Evidence count</option>
               </>
+            ) : kind === "proof" ? (
+              <><option value="title">Document name</option><option value="owner">Owner</option></>
+            ) : kind === "service" ? (
+              <><option value="service-date">Service date</option><option value="title">Entry title</option><option value="owner">Owner</option></>
             ) : null}
           </select>
         ) : null}
@@ -1312,10 +1482,10 @@ export default function AdminPage() {
                       <button type="button" disabled title="Private, archived, or removed transfer records do not have an active public page.">No public page</button>
                     )}
                     {transfer.fromOwnerEmail ? (
-                      <button type="button" onClick={() => { setAdminSearch(transfer.fromOwnerEmail || ""); goToSection("users"); }}>View From User</button>
+                      <button type="button" onClick={() => goToSection("users", "", { search: transfer.fromOwnerEmail || "" })}>View From User</button>
                     ) : null}
                     {transfer.acceptedByEmail ? (
-                      <button type="button" onClick={() => { setAdminSearch(transfer.acceptedByEmail || ""); goToSection("users"); }}>View Recipient</button>
+                      <button type="button" onClick={() => goToSection("users", "", { search: transfer.acceptedByEmail || "" })}>View Recipient</button>
                     ) : null}
                     {transfer.status === "sent" && transfer.claimPath ? (
                       <button type="button" onClick={() => void copyTransferClaimLink(transfer)}>
@@ -1346,7 +1516,7 @@ export default function AdminPage() {
             </div>
           </div>
           <div className="admin-table">
-            {ownershipClaims.length ? ownershipClaims.map((claim) => (
+            {claimsError ? <p className="admin-empty" role="alert">{claimsError}</p> : ownershipClaims.length ? ownershipClaims.map((claim) => (
               <div className="admin-row" key={claim.id}>
                 <div>
                   <strong>{claim.profileTitle}</strong>
@@ -1395,7 +1565,7 @@ export default function AdminPage() {
               <p>Document metadata only. Raw private storage paths are never shown.</p>
             </div>
           </div>
-          {filterControls("audit")}
+          {filterControls("proof")}
           <div className="admin-table">
             {filteredProof.length ? filteredProof.map((document) => (
               <div className="admin-row" key={document.id}>
@@ -1424,7 +1594,7 @@ export default function AdminPage() {
               <p>Service-entry metadata. Private notes are not shown in this admin list.</p>
             </div>
           </div>
-          {filterControls("audit")}
+          {filterControls("service")}
           <div className="admin-table">
             {filteredService.length ? filteredService.map((event) => (
               <div className="admin-row" key={event.id}>
@@ -1521,15 +1691,15 @@ export default function AdminPage() {
             <input value={adminSearch} onChange={(event) => setAdminSearch(event.target.value)} placeholder="User email for admin access" />
             <button
               type="button"
-              disabled={!accessTarget || accessTarget.role === "admin"}
-              onClick={() => accessTarget ? beginUserAction(accessTarget, "change_role", { role: "admin" }, { title: "Add Admin" }) : undefined}
+              disabled={Boolean(busy) || !accessTarget || accessTarget.role === "admin"}
+              onClick={() => accessTarget ? beginUserAction(accessTarget, "change_role", { role: "admin" }, { confirm: true, title: "Add Admin" }) : undefined}
             >
               Add Admin
             </button>
             <button
               type="button"
-              disabled={!accessTarget || accessTarget.role !== "admin" || accessTarget.envManaged === true}
-              onClick={() => accessTarget ? beginUserAction(accessTarget, "change_role", { role: "owner" }, { title: "Remove Admin" }) : undefined}
+              disabled={Boolean(busy) || !accessTarget || accessTarget.role !== "admin" || accessTarget.envManaged === true}
+              onClick={() => accessTarget ? beginUserAction(accessTarget, "change_role", { role: "owner" }, { confirm: true, title: "Remove Admin" }) : undefined}
             >
               {accessTarget?.envManaged ? "Managed by environment" : "Remove Admin"}
             </button>
@@ -1542,7 +1712,7 @@ export default function AdminPage() {
                   <span>{user.envManaged ? "Managed by environment" : "Database admin"} - {user.accountStatus}</span>
                 </div>
                 <div className="admin-row-actions">
-                  <button type="button" disabled={user.envManaged === true} onClick={() => beginUserAction(user, "change_role", { role: "owner" }, { title: "Remove Admin" })}>
+                  <button type="button" disabled={Boolean(busy) || user.envManaged === true} onClick={() => beginUserAction(user, "change_role", { role: "owner" }, { confirm: true, title: "Remove Admin" })}>
                     {user.envManaged ? "Managed by environment" : "Remove Admin"}
                   </button>
                 </div>
@@ -1657,18 +1827,18 @@ export default function AdminPage() {
   const entityDrawer = selectedUser ? (
     <div className="admin-drawer-layer">
       <button type="button" className="admin-drawer-backdrop" onClick={() => setSelectedUser(null)} aria-label="Close user details" />
-      <aside ref={entityDrawerRef} tabIndex={-1} className="admin-entity-drawer" role="dialog" aria-modal="true" aria-label={`User details for ${selectedUser.email}`}>
-        <header><div><span>User account</span><h2>{selectedUser.email}</h2></div><button type="button" onClick={() => setSelectedUser(null)} aria-label="Close"><X size={18} /></button></header>
+      <aside ref={entityDrawerRef} tabIndex={-1} className="admin-entity-drawer" role="dialog" aria-modal="true" aria-label={`User details for ${selectedUser.email}`} aria-busy={Boolean(busy)}>
+        <header><div><span>User account</span><h2>{selectedUser.email}</h2></div><button type="button" disabled={Boolean(busy)} onClick={() => setSelectedUser(null)} aria-label="Close"><X size={18} /></button></header>
         <div className="admin-drawer-body">
           <div className="admin-drawer-chips"><span className={adminChipClass("role", userRoleChipValue(selectedUser))}>{userRoleLabel(selectedUser)}</span><span className={adminChipClass("status", selectedUser.accountStatus)}>{selectedUser.accountStatus}</span></div>
           <dl><div><dt>Profiles</dt><dd>{selectedUser.recordCount}</dd></div><div><dt>Public / private</dt><dd>{selectedUser.publicRecordCount} / {selectedUser.privateRecordCount}</dd></div><div><dt>Last sign-in</dt><dd>{formatDate(selectedUser.lastSignInAt)}</dd></div><div><dt>Created</dt><dd>{formatDate(selectedUser.createdAt)}</dd></div></dl>
           <section><span>Account access</span><div className="admin-drawer-actions">
-            {selectedUser.accountStatus === "locked" ? <button type="button" onClick={() => beginUserAction(selectedUser, "unlock", {}, { confirm: true, title: "Unlock Account" })}>Unlock account</button> : <button type="button" disabled={selectedUser.envManaged} onClick={() => beginUserAction(selectedUser, "lock", {}, { confirm: true, title: "Lock Account" })}>Lock account</button>}
-            {selectedUser.accountStatus === "banned" ? <button type="button" onClick={() => beginUserAction(selectedUser, "unban", {}, { confirm: true, title: "Unban User" })}>Unban user</button> : <button type="button" disabled={selectedUser.envManaged || selectedUser.accountStatus === "removed"} onClick={() => beginUserAction(selectedUser, "ban", {}, { confirm: true, title: "Ban User" })}>Ban user</button>}
-            {selectedUser.accountStatus === "removed" ? <button type="button" onClick={() => beginUserAction(selectedUser, "restore_user", {}, { confirm: true, title: "Restore User" })}>Restore user</button> : <button type="button" disabled={selectedUser.envManaged} onClick={() => beginUserAction(selectedUser, "remove", {}, { confirm: true, title: "Remove User" })}>Remove user</button>}
+            {selectedUser.accountStatus === "locked" ? <button type="button" disabled={Boolean(busy)} onClick={() => beginUserAction(selectedUser, "unlock", {}, { confirm: true, title: "Unlock Account" })}>Unlock account</button> : <button type="button" disabled={Boolean(busy) || selectedUser.envManaged} onClick={() => beginUserAction(selectedUser, "lock", {}, { confirm: true, title: "Lock Account" })}>Lock account</button>}
+            {selectedUser.accountStatus === "banned" ? <button type="button" disabled={Boolean(busy)} onClick={() => beginUserAction(selectedUser, "unban", {}, { confirm: true, title: "Unban User" })}>Unban user</button> : <button type="button" disabled={Boolean(busy) || selectedUser.envManaged || selectedUser.accountStatus === "removed"} onClick={() => beginUserAction(selectedUser, "ban", {}, { confirm: true, title: "Ban User" })}>Ban user</button>}
+            {selectedUser.accountStatus === "removed" ? <button type="button" disabled={Boolean(busy)} onClick={() => beginUserAction(selectedUser, "restore_user", {}, { confirm: true, title: "Restore User" })}>Restore user</button> : <button type="button" disabled={Boolean(busy) || selectedUser.envManaged} onClick={() => beginUserAction(selectedUser, "remove", {}, { confirm: true, title: "Remove User" })}>Remove user</button>}
           </div></section>
-          <section><span>Public presence</span><div className="admin-drawer-actions"><button type="button" onClick={() => beginUserAction(selectedUser, selectedUser.hidePublicContent ? "restore_public_content" : "hide_public_content", {}, { confirm: true, title: selectedUser.hidePublicContent ? "Restore Public Content" : "Hide Public Content" })}>{selectedUser.hidePublicContent ? "Restore public content" : "Hide public content"}</button></div></section>
-          <section><span>Administration</span><div className="admin-drawer-actions"><button type="button" disabled={selectedUser.envManaged} onClick={() => beginUserAction(selectedUser, "change_role", { role: selectedUser.role === "admin" ? "owner" : "admin" }, { confirm: true, title: selectedUser.role === "admin" ? "Remove Admin" : "Add Admin" })}>{selectedUser.role === "admin" ? "Remove admin" : "Add admin"}</button><button type="button" onClick={() => beginUserAction(selectedUser, "admin_note", {}, { includeNote: true, title: "Save Admin Note" })}>Internal note</button></div></section>
+          <section><span>Public presence</span><div className="admin-drawer-actions"><button type="button" disabled={Boolean(busy)} onClick={() => beginUserAction(selectedUser, selectedUser.hidePublicContent ? "restore_public_content" : "hide_public_content", {}, { confirm: true, title: selectedUser.hidePublicContent ? "Restore Public Content" : "Hide Public Content" })}>{selectedUser.hidePublicContent ? "Restore public content" : "Hide public content"}</button></div></section>
+          <section><span>Administration</span><div className="admin-drawer-actions"><button type="button" disabled={Boolean(busy) || selectedUser.envManaged} onClick={() => beginUserAction(selectedUser, "change_role", { role: selectedUser.role === "admin" ? "owner" : "admin" }, { confirm: true, title: selectedUser.role === "admin" ? "Remove Admin" : "Add Admin" })}>{selectedUser.role === "admin" ? "Remove admin" : "Add admin"}</button><button type="button" disabled={Boolean(busy)} onClick={() => beginUserAction(selectedUser, "admin_note", {}, { includeNote: true, title: "Save Admin Note" })}>Internal note</button></div></section>
           <section className="admin-danger-zone"><span>Permanent action</span><p id="admin-deletion-unavailable">{ACCOUNT_DELETION_UNAVAILABLE}</p><button type="button" disabled aria-describedby="admin-deletion-unavailable">Permanent account deletion unavailable</button></section>
         </div>
       </aside>
@@ -1676,14 +1846,14 @@ export default function AdminPage() {
   ) : selectedRecord ? (
     <div className="admin-drawer-layer">
       <button type="button" className="admin-drawer-backdrop" onClick={() => setSelectedRecord(null)} aria-label="Close Profile details" />
-      <aside ref={entityDrawerRef} tabIndex={-1} className="admin-entity-drawer" role="dialog" aria-modal="true" aria-label={`Profile details for ${selectedRecord.title}`}>
-        <header><div><span>QRguitar Profile</span><h2>{selectedRecord.title}</h2><small>{selectedRecord.qrCode}</small></div><button type="button" onClick={() => setSelectedRecord(null)} aria-label="Close"><X size={18} /></button></header>
+      <aside ref={entityDrawerRef} tabIndex={-1} className="admin-entity-drawer" role="dialog" aria-modal="true" aria-label={`Profile details for ${selectedRecord.title}`} aria-busy={Boolean(busy)}>
+        <header><div><span>QRguitar Profile</span><h2>{selectedRecord.title}</h2><small>{selectedRecord.qrCode}</small></div><button type="button" disabled={Boolean(busy)} onClick={() => setSelectedRecord(null)} aria-label="Close"><X size={18} /></button></header>
         <div className="admin-drawer-body">
           <dl><div><dt>Owner</dt><dd>{selectedRecord.ownerEmail || "No owner"}</dd></div><div><dt>Visibility</dt><dd>{selectedRecord.visibility}</dd></div><div><dt>Service / evidence</dt><dd>{selectedRecord.serviceEventCount} / {selectedRecord.proofDocumentCount}</dd></div><div><dt>Created</dt><dd>{formatDate(selectedRecord.createdAt)}</dd></div></dl>
           <section><span>Open</span><div className="admin-drawer-actions"><Link href={`/edit/${selectedRecord.qrCode}`}>Full editor</Link>{selectedRecord.visibility === "public" && !selectedRecord.isArchived && !selectedRecord.isOwnerRemoved ? <Link href={selectedRecord.permanentPath}>Public Profile</Link> : null}</div></section>
-          <section><span>Visibility</span><div className="admin-drawer-actions"><button type="button" disabled={selectedRecord.visibility === "public" || selectedRecord.isArchived} onClick={() => beginRecordAction(selectedRecord, "set_visibility", { visibility: "public" }, { confirm: true, title: "Make Public" })}>Make public</button><button type="button" disabled={selectedRecord.visibility === "private" || selectedRecord.isArchived} onClick={() => beginRecordAction(selectedRecord, "set_visibility", { visibility: "private" }, { confirm: true, title: "Make Private" })}>Make private</button></div></section>
-          <section><span>Trust and safety</span><div className="admin-drawer-actions"><button type="button" onClick={() => beginRecordAction(selectedRecord, "set_verification", { verificationStatus: selectedRecord.verificationStatus === "Verified" ? "unverified" : "verified" }, { includeTrustNotes: true, title: "Update Verification" })}>{selectedRecord.verificationStatus === "Verified" ? "Set unverified" : "Set verified"}</button><button type="button" onClick={() => beginRecordAction(selectedRecord, "set_authenticity", { authenticityStatus: selectedRecord.authenticityStatus === "Authenticity Confirmed" ? "unconfirmed" : "confirmed" }, { includeTrustNotes: true, title: "Update Authenticity" })}>{selectedRecord.authenticityStatus === "Authenticity Confirmed" ? "Set unconfirmed" : "Confirm authenticity"}</button><button type="button" onClick={() => beginRecordAction(selectedRecord, "set_safety", { safetyStatus: selectedRecord.safetyStatus || "clear" }, { includeSafetyNotes: true, title: "Update Safety Status" })}>Safety details</button></div></section>
-          <section className="admin-danger-zone"><span>Archive</span><p>Archiving removes the Profile from active public surfaces without changing its permanent QRguitar ID.</p><button type="button" onClick={() => beginRecordAction(selectedRecord, selectedRecord.isArchived ? "restore_archive" : "archive", {}, { confirm: true, title: selectedRecord.isArchived ? "Restore from Archive" : "Archive Profile" })}>{selectedRecord.isArchived ? "Restore Profile" : "Archive Profile"}</button></section>
+          <section><span>Visibility</span><div className="admin-drawer-actions"><button type="button" disabled={Boolean(busy) || selectedRecord.visibility === "public" || selectedRecord.isArchived} onClick={() => beginRecordAction(selectedRecord, "set_visibility", { visibility: "public" }, { confirm: true, title: "Make Public" })}>Make public</button><button type="button" disabled={Boolean(busy) || selectedRecord.visibility === "private" || selectedRecord.isArchived} onClick={() => beginRecordAction(selectedRecord, "set_visibility", { visibility: "private" }, { confirm: true, title: "Make Private" })}>Make private</button></div></section>
+          <section><span>Trust and safety</span><div className="admin-drawer-actions"><button type="button" disabled={Boolean(busy)} onClick={() => beginRecordAction(selectedRecord, "set_verification", { verificationStatus: selectedRecord.verificationStatus === "Verified" ? "unverified" : "verified" }, { includeTrustNotes: true, title: "Update Verification" })}>{selectedRecord.verificationStatus === "Verified" ? "Set unverified" : "Set verified"}</button><button type="button" disabled={Boolean(busy)} onClick={() => beginRecordAction(selectedRecord, "set_authenticity", { authenticityStatus: selectedRecord.authenticityStatus === "Authenticity Confirmed" ? "unconfirmed" : "confirmed" }, { includeTrustNotes: true, title: "Update Authenticity" })}>{selectedRecord.authenticityStatus === "Authenticity Confirmed" ? "Set unconfirmed" : "Confirm authenticity"}</button><button type="button" disabled={Boolean(busy)} onClick={() => beginRecordAction(selectedRecord, "set_safety", { safetyStatus: selectedRecord.safetyStatus || "clear" }, { includeSafetyNotes: true, title: "Update Safety Status" })}>Safety details</button></div></section>
+          <section className="admin-danger-zone"><span>Archive</span><p>Archiving removes the Profile from active public surfaces without changing its permanent QRguitar ID.</p><button type="button" disabled={Boolean(busy)} onClick={() => beginRecordAction(selectedRecord, selectedRecord.isArchived ? "restore_archive" : "archive", {}, { confirm: true, title: selectedRecord.isArchived ? "Restore from Archive" : "Archive Profile" })}>{selectedRecord.isArchived ? "Restore Profile" : "Archive Profile"}</button></section>
         </div>
       </aside>
     </div>
@@ -1699,7 +1869,7 @@ export default function AdminPage() {
           <div className="admin-command-meta"><span>Owner access</span><strong>{overview?.admin?.email || "Admin"}</strong></div>
         </div>
         <div className={adminAuthorized ? "admin-shell" : "admin-shell is-locked"}>
-          {adminAuthorized ? <aside ref={sidebarRef} tabIndex={-1} id="admin-primary-navigation" aria-label="Admin navigation" className={navOpen ? "admin-sidebar is-open" : "admin-sidebar"}><header><strong>QRguitar Admin</strong><button type="button" onClick={() => setNavOpen(false)} aria-label="Close admin navigation"><X size={17} /></button></header>{sectionGroups.map((group) => <nav key={group} aria-label={`${group} sections`}><span>{group}</span>{sections.filter((section) => section.group === group).map((section) => { const Icon = section.icon; return <button type="button" className={section.id === activeSection ? "active" : ""} onClick={() => goToSection(section.id)} key={section.id}><Icon size={16} />{section.label}</button>; })}</nav>)}<div className="admin-sidebar-links"><Link href="/admin/service-workflow">Service Operations</Link><Link href="/admin/site-editor">Content Studio</Link><Link href="/admin/deletion-requests">Deletion requests</Link><Link href="/admin/payments">Payment review</Link></div></aside> : null}
+          {adminAuthorized ? <aside ref={sidebarRef} tabIndex={-1} id="admin-primary-navigation" aria-label="Admin navigation" className={navOpen ? "admin-sidebar is-open" : "admin-sidebar"}><header><strong>QRguitar Admin</strong><button type="button" onClick={() => setNavOpen(false)} aria-label="Close admin navigation"><X size={17} /></button></header>{sectionGroups.map((group) => <nav key={group} aria-label={`${group} sections`}><span>{group}</span>{sections.filter((section) => section.group === group).map((section) => { const Icon = section.icon; return <button type="button" className={section.id === activeSection ? "active" : ""} onClick={() => goToSection(section.id)} key={section.id}><Icon size={16} />{section.label}</button>; })}</nav>)}<nav className="admin-sidebar-links" aria-label="Admin workspaces"><span>Workspaces</span><Link href="/admin/site-editor">Site editor</Link><Link href="/admin/service-workflow">Service operations</Link><Link href="/admin/payments">Payments</Link><Link href="/admin/promotions">Promo codes</Link><Link href="/admin/deletion-requests">Deletion requests</Link></nav></aside> : null}
           {navOpen ? <button type="button" className="admin-sidebar-backdrop" onClick={() => setNavOpen(false)} aria-label="Close admin navigation" /> : null}
           <div className="admin-main">
           {!adminAuthorized ? (
@@ -1707,6 +1877,7 @@ export default function AdminPage() {
               <div className="eyebrow">Admin access</div>
               <h2>{loading ? "Checking admin access." : "Sign in with an authorized admin account."}</h2>
               <p>{loading ? "Confirming your session before admin tools load." : "Owner tools stay hidden until an authorized admin account is signed in."}</p>
+              {!loading && message ? <p role="alert" className="admin-message">{message}</p> : null}
               {!loading ? (
                 <Link className="button" href={`/login?next=${encodeURIComponent("/admin")}`}>
                   Sign in
@@ -1728,7 +1899,7 @@ export default function AdminPage() {
                     <h2>{pendingAction.title}</h2>
                     <p>{pendingAction.target}</p>
                   </div>
-                  <button type="button" className="button secondary" onClick={() => setPendingAction(null)}>
+                  <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={() => setPendingAction(null)}>
                     Cancel
                   </button>
                 </div>
@@ -1784,10 +1955,10 @@ export default function AdminPage() {
                   </div>
                 ) : null}
                 <div className="form-actions">
-                  <button className="button" type="button" disabled={!pendingAction.reason.trim() || (pendingAction.kind === "user" && pendingAction.action === "delete_empty_user")} onClick={() => void confirmPendingAction()}>
-                    Confirm
+                  <button className="button" type="button" disabled={Boolean(busy) || !pendingAction.reason.trim() || (pendingAction.kind === "user" && pendingAction.action === "delete_empty_user")} onClick={() => void confirmPendingAction()}>
+                    {busy ? "Saving…" : "Confirm"}
                   </button>
-                  <button className="button secondary" type="button" onClick={() => setPendingAction(null)}>
+                  <button className="button secondary" type="button" disabled={Boolean(busy)} onClick={() => setPendingAction(null)}>
                     Cancel
                   </button>
                 </div>

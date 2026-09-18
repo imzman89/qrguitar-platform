@@ -10,6 +10,8 @@ const recordsApi = read("app/api/admin/records/[id]/route.ts");
 const claimsApi = read("app/api/ownership-claims/route.ts");
 const overviewApi = read("app/api/admin/overview/route.ts");
 const recordsListApi = read("app/api/admin/records/route.ts");
+const serviceOperations = read("app/admin/service-workflow/page.tsx");
+const paymentOperations = read("app/admin/payments/AdminPaymentsPage.tsx");
 
 if (page.includes("window.prompt")) throw new Error("Admin still uses browser prompts.");
 for (const marker of ["admin-command-bar", "admin-sidebar", "admin-entity-drawer", 'kind: "claim"', 'kind: "transfer"', "Operator reason", "System Health"]) {
@@ -43,5 +45,39 @@ for (const endpoint of ["/api/admin/overview", "/api/admin/users", "/api/admin/r
 }
 for (const marker of ["Permanent account deletion unavailable", "ACCOUNT_DELETION_UNAVAILABLE", 'aria-describedby="admin-deletion-unavailable"']) {
   if (!page.includes(marker)) throw new Error(`Admin permanent deletion safeguards are missing ${marker}.`);
+}
+for (const marker of [
+  "readAdminSession()",
+  "onAuthStateChange",
+  "adminLoadRevision.current",
+  "setSelectedUser((current)",
+  "setSelectedRecord((current)",
+  "nextClaimsError",
+  'role="alert">{claimsError}',
+  'loadAdmin({ successMessage: resultMessage })',
+  'disabled={Boolean(busy) || !pendingAction.reason.trim()',
+  'goToSection("users", "", { search: transfer.fromOwnerEmail',
+  'goToSection("users", "", { search: transfer.acceptedByEmail',
+  'filterControls("proof")',
+  'filterControls("service")'
+]) {
+  if (!page.includes(marker)) throw new Error(`Admin state and failure handling is missing ${marker}.`);
+}
+if (page.includes("tokenPromise")) throw new Error("Admin still caches one access token for the page lifetime.");
+for (const marker of [
+  'beginUserAction(accessTarget, "change_role", { role: "admin" }, { confirm: true, title: "Add Admin" })',
+  'beginUserAction(accessTarget, "change_role", { role: "owner" }, { confirm: true, title: "Remove Admin" })',
+  'beginUserAction(user, "change_role", { role: "owner" }, { confirm: true, title: "Remove Admin" })'
+]) {
+  if (!page.includes(marker)) throw new Error(`Admin access changes can bypass confirmation: ${marker}.`);
+}
+for (const marker of ["unavailableSources", "Counts and lists were not replaced with incomplete results", "Trust states were not replaced with default values"]) {
+  if (!recordsListApi.includes(marker)) throw new Error(`Admin record reads can conceal partial failures: ${marker}.`);
+}
+for (const marker of ["onAuthStateChange", "loadRevision.current", "finally", "successMessage", "The signed-in account changed"]) {
+  if (!serviceOperations.includes(marker)) throw new Error(`Service Operations failure handling is missing ${marker}.`);
+}
+for (const marker of ["Legacy manual-payment archive", "New QRguitar checkout uses automatic PayPal verification", "<details"]) {
+  if (!paymentOperations.includes(marker)) throw new Error(`Legacy payment controls are not clearly separated: ${marker}.`);
 }
 console.log("Admin assertions passed.");

@@ -63,8 +63,19 @@ export async function GET(request: Request) {
     supabase.auth.admin.listUsers({ page: 1, perPage: 1000 })
   ]);
 
-  if (guitarsResult.error) {
-    return adminJson({ ok: false, message: guitarsResult.error.message || "Could not load records." }, { status: 500 });
+  const unavailableSources = [
+    guitarsResult.error || !Array.isArray(guitarsResult.data) ? "Profiles" : "",
+    documentsResult.error || !Array.isArray(documentsResult.data) ? "evidence documents" : "",
+    serviceResult.error || !Array.isArray(serviceResult.data) ? "service history" : "",
+    transfersResult.error || !Array.isArray(transfersResult.data) ? "ownership transfers" : "",
+    authUsers.error || !Array.isArray(authUsers.data?.users) ? "owner accounts" : ""
+  ].filter(Boolean);
+  if (unavailableSources.length) {
+    return adminJson({
+      ok: false,
+      unavailableSources,
+      message: `Could not load complete Profile administration data (${unavailableSources.join(", ")}). Counts and lists were not replaced with incomplete results.`
+    }, { status: 503 });
   }
 
   const guitars = (guitarsResult.data || []) as GuitarRow[];
@@ -78,6 +89,13 @@ export async function GET(request: Request) {
   const trustResult = trustKeys.length
     ? await supabase.from("site_content").select("content_key,content_value").in("content_key", trustKeys)
     : { data: [], error: null };
+  if (trustResult.error || !Array.isArray(trustResult.data)) {
+    return adminJson({
+      ok: false,
+      unavailableSources: ["trust settings"],
+      message: "Could not load complete Profile administration data (trust settings). Trust states were not replaced with default values."
+    }, { status: 503 });
+  }
   const trustByCode = new Map<string, ReturnType<typeof mergeRecordTrustSettings>>();
   for (const row of (trustResult.data || []) as SiteContentRow[]) {
     const code = row.content_key.replace(/^record_trust:/, "").toUpperCase();

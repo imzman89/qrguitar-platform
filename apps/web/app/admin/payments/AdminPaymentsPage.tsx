@@ -25,11 +25,14 @@ export default function AdminPaymentsPage() {
   }, []);
   const selected = selection.actorId === state.actorId ? state.orders.find(order => order.orderId === selection.orderId) : undefined;
   return <><Nav /><main className={styles.page}><div className={styles.shell}>
-    <Link href="/admin" className={styles.back}>Admin / Payment review</Link>
-    <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>Payment operations</p><h1>Review payments and holds.</h1></div>{state.phase === "ready" && <button className={styles.secondary} disabled={state.busy || state.refreshing} onClick={() => void controller.current?.reload()}><RefreshCw size={16} aria-hidden="true" />{state.refreshing ? "Checking…" : "Refresh manual queue"}</button>}</div>
-    <p className={styles.intro}>Automatic PayPal exceptions use provider-verified evidence. Manual orders still require matching the actual transaction in QRguitar’s receiving account; customer reports and screenshots do not confirm payment.</p>
+    <Link href="/admin" className={styles.back}>Admin / Commerce / Payment review</Link>
+    <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>Payment operations</p><h1>Review payments and holds.</h1></div></div>
+    <p className={styles.intro}>Automatic PayPal exceptions use provider-verified evidence. Manage checkout offers in <Link href="/admin/promotions">Promo codes</Link>. Older manual-payment tools remain available in the collapsed archive below.</p>
     <PayPalReviewQueue />
-    <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>Legacy manual payments</p><h2>Verify received funds</h2></div></div>
+    <details className={styles.notice} open={state.phase !== "ready" || state.orders.length > 0 || Boolean(state.filterOrderId) || Boolean(state.pendingDecision)}>
+    <summary><strong>Legacy manual-payment archive</strong>{state.phase === "ready" ? ` · ${state.orders.length} visible order${state.orders.length === 1 ? "" : "s"}` : ""}</summary>
+    <p className={styles.muted}>Use this queue only for a manual order that already exists. New QRguitar checkout uses automatic PayPal verification.</p>
+    <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>Legacy manual payments</p><h2>Verify received funds</h2></div>{state.phase === "ready" && <button className={styles.secondary} disabled={state.busy || state.refreshing} onClick={() => void controller.current?.reload()}><RefreshCw size={16} aria-hidden="true" />{state.refreshing ? "Checking…" : "Refresh archive"}</button>}</div>
     {state.phase === "loading" && <p role="status">Checking admin access and loading payments…</p>}
     {state.phase === "signed-out" && <section className={styles.notice}><h2>Sign in with an admin account.</h2><Link className={styles.primary} href={`/login?next=${encodeURIComponent("/admin/payments")}`}>Sign in</Link></section>}
     {state.phase === "error" && <section className={`${styles.notice} ${styles.error}`} role="alert"><h2>Payment review is unavailable.</h2><p>{state.message}</p><button className={styles.secondary} disabled={state.refreshing} onClick={() => void controller.current?.reload()}>Try again</button></section>}
@@ -44,6 +47,7 @@ export default function AdminPaymentsPage() {
         {state.hasMore && <p className={styles.muted}>This queue shows a limited set of orders. Use the full order reference above to find an older payment.</p>}
       </section><section aria-label="Selected payment"><div className={styles.notice}>{selected ? <ReviewOrder key={`${state.actorId}:${selected.orderId}:${selected.status}`} order={selected} busy={state.busy || state.refreshing || Boolean(state.pendingDecision)} decide={body => controller.current?.decide(body) || Promise.resolve(false)} /> : <><h2>Choose an order to review.</h2><p>Confirm the recipient, amount, currency and order reference in the payment provider’s own transaction record.</p></>}</div></section></div>
     </>}
+    </details>
   </div></main><Footer /></>;
 }
 function ReviewOrder({ order, busy, decide }: { order: DirectOrder; busy: boolean; decide(body: Record<string, unknown>): Promise<boolean> }) {
