@@ -64,6 +64,40 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew :qrguitar-photo-picker:testDebugUnitTest :qrguitar-photo-picker:assembleDebug --no-daemon --max-workers=2 -I /tmp/qrguitar-installed-ndk.gradle -Pandroid.builder.sdkDownload=false --stacktrace
+      - name: Prepare test-only installed app
+        run: |
+          node --test apps/mobile/scripts/android-instrumentation/test-prepare.mjs
+          node apps/mobile/scripts/prepare-installed-test.mjs
+      - name: Provision a disposable Android emulator
+        run: bash apps/mobile/scripts/android-emulator-ci.sh provision
+      - name: Build bundled test app and both instrumentation APKs
+        working-directory: apps/mobile/android
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: https://build-only.supabase.co
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CI_fixture_only_not_for_deployment
+          EXPO_PUBLIC_API_ORIGIN: https://www.qrguitar.com
+        run: |
+          ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :qrguitar-photo-picker:assembleDebugAndroidTest --no-daemon --max-workers=2 -I /tmp/qrguitar-installed-ndk.gradle -Pandroid.builder.sdkDownload=false -PreactNativeArchitectures=x86_64 --stacktrace
+          # This is an offline test-only APK with debug signing, never a release artifact.
+          python3 - <<'PY'
+          import os, re, subprocess, zipfile
+          apk = 'app/build/outputs/apk/debug/app-debug.apk'
+          with zipfile.ZipFile(apk) as archive:
+              assert archive.getinfo('assets/index.android.bundle').file_size > 0, 'Missing embedded JavaScript'
+          aapt = os.environ['ANDROID_HOME'] + '/build-tools/36.0.0/aapt'
+          permissions = subprocess.check_output([aapt, 'dump', 'permissions', apk], text=True)
+          assert 'android.permission.INTERNET' not in permissions, 'Test app must have no network permission'
+          manifest = subprocess.check_output([aapt, 'dump', 'xmltree', apk, 'AndroidManifest.xml'], text=True)
+          assert re.search(r'android:testOnly[^\n]*0xffffffff', manifest), 'APK must be test-only'
+          print('Bundled JavaScript present; INTERNET permission absent; test-only APK confirmed.')
+          PY
+          sha256sum app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+      - name: Run Android platform storage and installed app acceptance
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: https://build-only.supabase.co
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CI_fixture_only_not_for_deployment
+          EXPO_PUBLIC_API_ORIGIN: https://www.qrguitar.com
+        run: bash apps/mobile/scripts/android-emulator-ci.sh test
       - name: Report native test results
         if: always()
         run: |
@@ -79,5 +113,32 @@ jobs:
               tests += counts['tests']; failures += counts['failures']; errors += counts['errors']; skipped += counts['skipped']
           print(f'Total native tests: {tests}; failures: {failures}; errors: {errors}; skipped: {skipped}')
           if tests < 15 or failures or errors or skipped:
+              raise SystemExit(1)
+          PY
+      - name: Report installed Android acceptance results
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          roots = [
+              (Path('apps/mobile/modules/qrguitar-photo-picker/android/build/outputs/androidTest-results/connected'), 10),
+              (Path('apps/mobile/android/app/build/outputs/androidTest-results/connected'), 3),
+          ]
+          valid = True
+          for root, minimum in roots:
+              tests = failures = errors = skipped = 0
+              for file in root.rglob('TEST-*.xml'):
+                  suite = ET.parse(file).getroot()
+                  counts = {key: int(suite.attrib.get(key, '0')) for key in ('tests', 'failures', 'errors', 'skipped')}
+                  print(suite.attrib.get('name'), counts)
+                  for case in suite.findall('testcase'):
+                      print('  ' + case.attrib.get('name', '?'))
+                      for failure in list(case.findall('failure')) + list(case.findall('error')):
+                          print((failure.text or failure.attrib.get('message', ''))[:6000])
+                  tests += counts['tests']; failures += counts['failures']; errors += counts['errors']; skipped += counts['skipped']
+              print(f'{root}: {tests} tests; {failures} failures; {errors} errors; {skipped} skipped')
+              valid &= tests >= minimum and not (failures or errors or skipped)
+          if not valid:
               raise SystemExit(1)
           PY
