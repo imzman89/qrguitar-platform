@@ -13,6 +13,7 @@ const ts = require("typescript");
 const read = (relativePath) => fs.readFileSync(path.join(root, "apps/web", relativePath), "utf8");
 
 const card = read("components/CollectibleRecordCard.tsx");
+const cardResolver = read("lib/collectible-card.ts");
 const catalog = read("app/catalog/CatalogClient.tsx");
 const homepage = read("components/HomePageClient.tsx");
 const showcase = read("components/HomeProfileShowcase.tsx");
@@ -82,6 +83,37 @@ function compileCard() {
   return module.exports.CollectibleRecordCard;
 }
 
+function compileCollectibleResolver() {
+  const module = { exports: {} };
+  const code = ts.transpileModule(cardResolver, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS }
+  }).outputText;
+  const overrides = {
+    "./instrument-profile-contract": {
+      resolveInstrumentPresentation: () => ({ photos: [], serialNumber: "", counts: { photos: 0, documents: 0 } })
+    },
+    "./local-demo": {
+      instrumentDisplayName: () => "Test Profile",
+      instrumentToProfileUrl: () => "/i/TEST"
+    },
+    "./record-location": { formatRecordLocation: () => "" }
+  };
+  new Function("require", "module", "exports", code)(
+    (name) => overrides[name] || require(name), module, module.exports
+  );
+  return module.exports.resolveCollectibleCard;
+}
+
+function compileInstrumentCategories() {
+  const module = { exports: {} };
+  const source = read("lib/instrument-categories.ts");
+  const code = ts.transpileModule(source, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS }
+  }).outputText;
+  new Function("require", "module", "exports", code)(require, module, module.exports);
+  return module.exports.defaultInstrumentCategories;
+}
+
 test("shared Profile cards are lazy by default and prioritize only an explicitly selected lead photo", () => {
   assert.match(card, /prioritizeLeadImage\?: boolean/);
   assert.match(card, /prioritizeLeadImage = false/);
@@ -125,6 +157,15 @@ test("shared Profile cards show the category selected for that Profile", () => {
   const CollectibleRecordCard = compileCard();
   const html = renderToStaticMarkup(React.createElement(CollectibleRecordCard, { record: { qrCode: "TEST" } }));
   assert.match(html, /<span class="collectible-card-type">Amplifier<\/span>/);
+});
+
+test("every upload category reaches Profile cards unchanged", () => {
+  const resolveCollectibleCard = compileCollectibleResolver();
+  const categories = compileInstrumentCategories();
+  for (const instrumentType of categories) {
+    const cardData = resolveCollectibleCard({ qrCode: "TEST", instrumentType });
+    assert.equal(cardData.typeLabel, instrumentType);
+  }
 });
 
 test("homepage Profile copy uses the saved category instead of a hard-coded instrument label", () => {
