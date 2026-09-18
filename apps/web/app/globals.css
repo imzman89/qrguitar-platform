@@ -8605,6 +8605,17 @@ button.button {
   text-decoration: none;
 }
 
+.collectible-card-type {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1.2;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
 /* The public Profile hero is the photograph gallery; Media is supplemental only. */
 .scan-hero-gallery {
   min-width: 0;

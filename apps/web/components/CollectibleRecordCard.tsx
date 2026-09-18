@@ -211,6 +211,7 @@ export function CollectibleRecordCard({
 
         <div className="collectible-card-content" onClick={handleContentClick}>
           <Link className="collectible-card-profile-link" href={card.profileUrl} aria-label={`Open ${card.title} Profile`}>
+            <span className="collectible-card-type">{card.typeLabel}</span>
             <h3>{card.title}</h3>
             <p className="collectible-card-subtitle">{card.factLine}</p>
             {summary ? <p className="collectible-card-summary">{summary}</p> : null}

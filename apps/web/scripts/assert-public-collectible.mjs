@@ -29,6 +29,8 @@ const catalog = read("app/catalog/CatalogClient.tsx");
 const collection = read("app/collections/[handle]/CollectionsClient.tsx");
 const profile = read("app/i/[code]/ProfileClient.tsx");
 const homepage = read("components/HomePageClient.tsx");
+const homepageShowcase = read("components/HomeProfileShowcase.tsx");
+const instrumentApi = read("app/api/instruments/route.ts");
 const contentRegistry = read("lib/content-registry.ts");
 
 includes(card, "resolveCollectibleCard(record)", "Public cards must use the shared collectible-card DTO.");
@@ -38,6 +40,12 @@ includes(collection, "<CollectibleRecordCard", "Public collection Profiles must 
 includes(resolver, "presentation.serialNumber", "Public cards must use the shared serial presentation contract.");
 includes(presentation, "instrument.showSerialPublic === true", "Public serial visibility must respect the explicit privacy setting.");
 includes(resolver, "publicSerial:", "The shared DTO must keep public Serial Number separate from QRguitar ID.");
+includes(resolver, 'typeLabel: String(record.instrumentType || "").trim() || "Profile"', "Cards must derive their category from the Profile type selected by the user.");
+includes(card, '<span className="collectible-card-type">{card.typeLabel}</span>', "Every shared Profile card must show its saved category.");
+includes(homepageShowcase, '<span className={styles.kicker}>{card.typeLabel}</span>', "The homepage showcase must show the saved Profile category.");
+excludes(homepageShowcase, "THE INSTRUMENT", "The homepage showcase must not replace a specific saved category with a generic label.");
+includes(instrumentApi, 'instrumentType: specValue(specs, "Type")', "Profile cards must receive the saved Type selection from the API.");
+excludes(instrumentApi, 'instrumentType: specValue(specs, "Type") || guitar.model', "A model name must never be substituted for the user-selected Profile type.");
 includes(card, "maxBadges={3}", "Collectible cards must cap compact status badges.");
 includes(card, "galleryImages.length > 1", "One-photo Profiles must not render gallery controls.");
 includes(card, "onPointerMove={handlePointerMove}", "Card galleries must support pointer dragging.");
@@ -81,7 +89,7 @@ async function get(route) {
 
 const homepageResponse = await get("/");
 assert(homepageResponse.response.ok, `Homepage returned ${homepageResponse.response.status}.`);
-includes(homepageResponse.text, "Latest QRguitar Profile", "Homepage must render the latest Profile server-side.");
+includes(homepageResponse.text, "Explore the public Profile for", "Homepage must render the latest Profile showcase server-side.");
 
 const catalogResponse = await get("/catalog");
 assert(catalogResponse.response.ok, `Catalog returned ${catalogResponse.response.status}.`);

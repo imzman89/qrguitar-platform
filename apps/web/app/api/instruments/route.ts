@@ -798,7 +798,7 @@ function mapInstrumentRow({
     safetyStatusUpdatedAt: guitar.safety_status_updated_at || "",
     ...(exposeInternalTrust ? { safetyNote: guitar.safety_note || "" } : {}),
     ...(guitar.owner_removed_at ? { collectionRemovedAt: guitar.owner_removed_at, collectionRemovedReason: guitar.owner_removed_reason || "" } : {}),
-    instrumentType: specValue(specs, "Type") || guitar.model || "",
+    instrumentType: specValue(specs, "Type"),
     builder: guitar.builder || specValue(specs, "Builder"),
     owner: ownerName || ownerEmail || "Unclaimed",
     ownerUserEmail: ownerEmail,

@@ -1191,6 +1191,8 @@ function ProfilePanel({
   timelineEvents: ServiceHistoryEntry[];
   serviceEntries: ServiceHistoryEntry[];
 }) {
+  const profileTypeLabel = String(instrument.instrumentType || "").trim() || "Profile";
+
   if (activeTab === "specs") {
     const visibleSpecs = [...specs, ...optionalSpecs].filter((spec) => hasMeaningfulPublicValue(spec.value));
 
@@ -1388,7 +1390,7 @@ function ProfilePanel({
       <div>
         {meaningfulProfileSummary(instrument.summary) ? (
           <>
-            <h2>About this instrument</h2>
+            <h2>About this {profileTypeLabel.toLowerCase()}</h2>
             <p>{meaningfulProfileSummary(instrument.summary)}</p>
           </>
         ) : null}

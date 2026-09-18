@@ -68,7 +68,7 @@ function compileCard() {
     "../lib/collectible-card": {
       resolveCollectibleCard: () => ({
         images: ["/lead.jpg", "/detail.jpg"], title: "Test Profile", profileUrl: "/i/TEST",
-        code: "TEST", summary: "", factLine: "", publicSerial: "", photoCount: 2,
+        code: "TEST", typeLabel: "Amplifier", summary: "", factLine: "", publicSerial: "", photoCount: 2,
         publicDocumentCount: 0, collection: null
       })
     },
@@ -118,6 +118,18 @@ test("Homepage keeps only its above-the-fold showcase eager and defers supportin
   assert.equal((showcase.match(/fetchPriority="high"/g) || []).length, 1);
   assert.match(homepage, /loading="lazy" fetchPriority="low" decoding="async" width=\{1200\} height=\{900\}/);
   assert.doesNotMatch(homepage, /prioritizeLeadImage/);
+});
+
+test("shared Profile cards show the category selected for that Profile", () => {
+  const CollectibleRecordCard = compileCard();
+  const html = renderToStaticMarkup(React.createElement(CollectibleRecordCard, { record: { qrCode: "TEST" } }));
+  assert.match(html, /<span class="collectible-card-type">Amplifier<\/span>/);
+});
+
+test("homepage Profile copy uses the saved category instead of a hard-coded instrument label", () => {
+  assert.match(showcase, /QRguitar Profile<\/span>/);
+  assert.match(showcase, /className=\{styles\.kicker\}>\{card\.typeLabel\}<\/span>/);
+  assert.doesNotMatch(showcase, /A real QRguitar Profile|THE INSTRUMENT/);
 });
 
 test("failed gallery sources are removed without mutating or reordering the remaining photos", () => {

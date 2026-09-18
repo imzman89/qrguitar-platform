@@ -17,7 +17,7 @@ export function HomeProfileShowcase({ record }: { record: DemoInstrument }) {
   return (
     <article className={styles.showcase} aria-label={"Explore the public Profile for " + card.title}>
       <div className={styles.topline}>
-        <span><span className={styles.liveDot} /> A real QRguitar Profile</span>
+        <span><span className={styles.liveDot} /> QRguitar Profile</span>
         <Link href={card.profileUrl} aria-label={"Open " + card.title + " Profile"}><ArrowUpRight size={19} aria-hidden="true" /></Link>
       </div>
       <div className={styles.photoStage}>
@@ -30,7 +30,7 @@ export function HomeProfileShowcase({ record }: { record: DemoInstrument }) {
       </div>
       <div className={styles.details}>
         <div className={styles.identity}>
-          <span className={styles.kicker}>THE INSTRUMENT</span>
+          <span className={styles.kicker}>{card.typeLabel}</span>
           <h2><Link href={card.profileUrl}>{card.title}</Link></h2>
           {card.factLine ? <p>{card.factLine}</p> : null}
         </div>

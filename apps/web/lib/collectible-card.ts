@@ -9,6 +9,7 @@ import { formatRecordLocation } from "./record-location";
 export type CollectibleCardData = {
   code: string;
   profileUrl: string;
+  typeLabel: string;
   title: string;
   factLine: string;
   summary: string;
@@ -31,6 +32,7 @@ export function resolveCollectibleCard(record: DemoInstrument): CollectibleCardD
   return {
     code: record.qrCode,
     profileUrl: instrumentToProfileUrl(record),
+    typeLabel: String(record.instrumentType || "").trim() || "Profile",
     title: instrumentDisplayName(record),
     factLine,
     summary: cleanCardSummary(record.summary),
