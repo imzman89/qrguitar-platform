@@ -123,28 +123,57 @@ function pngStructure(bytes: Uint8Array, findings: Set<string>) {
 
 function webpStructure(bytes: Uint8Array, findings: Set<string>) {
   if (bytes.length < 20 || ascii(bytes, 0, 4) !== "RIFF" || ascii(bytes, 8, 12) !== "WEBP" || uint32le(bytes, 4) + 8 !== bytes.length) return false;
-  let at = 12, imageChunks = 0, extended = false;
+  const chunks: { type: string; dataStart: number; length: number }[] = [];
+  let at = 12;
   while (at + 8 <= bytes.length) {
     const type = ascii(bytes, at, at + 4), length = uint32le(bytes, at + 4), dataStart = at + 8;
     const paddedEnd = dataStart + length + (length % 2);
     if (!/^[\x20-\x7e]{4}$/.test(type) || paddedEnd > bytes.length) return false;
     if (type === "VP8 ") {
       if (length < 10 || (bytes[dataStart] & 1) !== 0 || bytes[dataStart + 3] !== 0x9d || bytes[dataStart + 4] !== 0x01 || bytes[dataStart + 5] !== 0x2a) return false;
-      imageChunks += 1;
+      const width = (bytes[dataStart + 6] | (bytes[dataStart + 7] << 8)) & 0x3fff;
+      const height = (bytes[dataStart + 8] | (bytes[dataStart + 9] << 8)) & 0x3fff;
+      if (width === 0 || height === 0) return false;
     } else if (type === "VP8L") {
-      if (length < 5 || bytes[dataStart] !== 0x2f) return false;
-      imageChunks += 1;
+      if (length < 5 || bytes[dataStart] !== 0x2f || ((uint32le(bytes, dataStart + 1) >>> 29) & 7) !== 0) return false;
     } else if (type === "VP8X") {
-      if (at !== 12 || length !== 10 || (bytes[dataStart] & 0xc1) !== 0) return false;
-      extended = true;
-    }
+      if (length !== 10 || (bytes[dataStart] & 0xc1) !== 0 || bytes[dataStart + 1] !== 0 || bytes[dataStart + 2] !== 0 || bytes[dataStart + 3] !== 0) return false;
+    } else if (type === "ALPH" && length < 1) return false;
     if (["EXIF", "XMP ", "ICCP"].includes(type)) findings.add(type === "ICCP" ? "icc" : type.trim().toLowerCase());
     else if (!["VP8 ", "VP8L", "VP8X", "ALPH"].includes(type)) findings.add("application-metadata");
+    chunks.push({ type, dataStart, length });
     at = paddedEnd;
   }
-  return at === bytes.length && imageChunks === 1 && (!extended || bytes.length > 30);
+  if (at !== bytes.length) return false;
+  const indexes = (type: string) => chunks.map((chunk, index) => chunk.type === type ? index : -1).filter(index => index >= 0);
+  const vp8x = indexes("VP8X"), vp8 = indexes("VP8 "), vp8l = indexes("VP8L"), alpha = indexes("ALPH");
+  const images = [...vp8, ...vp8l].sort((left, right) => left - right);
+  if (vp8x.length === 0) return chunks.length === 1 && images.length === 1;
+  if (vp8x.length !== 1 || vp8x[0] !== 0 || images.length !== 1 || alpha.length > 1) return false;
+  const extended = chunks[0], flags = bytes[extended.dataStart];
+  const canvasWidth = 1 + bytes[extended.dataStart + 4] + (bytes[extended.dataStart + 5] << 8) + (bytes[extended.dataStart + 6] << 16);
+  const canvasHeight = 1 + bytes[extended.dataStart + 7] + (bytes[extended.dataStart + 8] << 8) + (bytes[extended.dataStart + 9] << 16);
+  const imageIndex = images[0], image = chunks[imageIndex];
+  let imageWidth: number, imageHeight: number, embeddedAlpha = false;
+  if (image.type === "VP8 ") {
+    imageWidth = (bytes[image.dataStart + 6] | (bytes[image.dataStart + 7] << 8)) & 0x3fff;
+    imageHeight = (bytes[image.dataStart + 8] | (bytes[image.dataStart + 9] << 8)) & 0x3fff;
+  } else {
+    const bits = uint32le(bytes, image.dataStart + 1);
+    imageWidth = 1 + (bits & 0x3fff); imageHeight = 1 + ((bits >>> 14) & 0x3fff); embeddedAlpha = Boolean(bits & 0x10000000);
+  }
+  if (canvasWidth !== imageWidth || canvasHeight !== imageHeight || Boolean(flags & 0x02)) return false;
+  const alphaFlag = Boolean(flags & 0x10);
+  if (image.type === "VP8 " ? alphaFlag !== (alpha.length === 1) || (alpha.length === 1 && alpha[0] + 1 !== imageIndex)
+    : alpha.length !== 0 || alphaFlag !== embeddedAlpha) return false;
+  const featureChunks: [number, string][] = [[0x20, "ICCP"], [0x08, "EXIF"], [0x04, "XMP "]];
+  for (const [flag, type] of featureChunks) {
+    const present = indexes(type);
+    if (present.length > 1 || Boolean(flags & flag) !== (present.length === 1)) return false;
+    if (present.length === 1 && (type === "ICCP" ? present[0] >= imageIndex : present[0] <= imageIndex)) return false;
+  }
+  return true;
 }
-
 function dictionaryEnd(text: string, start: number) {
   let depth = 0, stringDepth = 0, escaped = false, hex = false;
   for (let at = start; at < text.length; at += 1) {
@@ -255,6 +284,8 @@ export async function analyzeDeletionContainer(bytes: Uint8Array, mimeType: stri
       valid = false;
     }
   }
+  if (mimeType === "image/png") findings.add("lossless-image-container");
+  if (mimeType === "image/webp") findings.add("webp-container");
   if (mimeType === "application/pdf") {
     const text = new TextDecoder("latin1").decode(bytes);
     findings.add("document-container");

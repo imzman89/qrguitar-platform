@@ -82,12 +82,36 @@ await check("a private PNG ancillary chunk is metadata and delete-only", async (
   const result = await analyzeDeletionContainer(withPrivateChunk, "image/png");
   assert.equal(result.structureValid, true); assert.equal(result.safeToRetain, false); assert.ok(result.metadataFindings.includes("application-metadata"));
 });
+await check("a valid extended WebP alpha image is decoded but original bytes remain delete-only", async () => {
+  const webp = await sharp({ create: { width: 8, height: 8, channels: 4, background: { r: 3, g: 4, b: 5, alpha: 0.5 } } }).webp().toBuffer();
+  const result = await analyzeDeletionContainer(webp, "image/webp");
+  assert.equal(result.structureValid, true); assert.equal(result.safeToRetain, false); assert.ok(result.metadataFindings.includes("webp-container"));
+});
+await check("an ALPH chunk appended to a simple WebP cannot hide private data", async () => {
+  const webp = await sharp({ create: { width: 8, height: 8, channels: 3, background: { r: 3, g: 4, b: 5 } } }).webp().toBuffer();
+  const withAlpha = Buffer.concat([webp, webpChunk("ALPH", Buffer.from("SECRET=departing@example.test GPS=private"))]);
+  withAlpha.writeUInt32LE(withAlpha.length - 8, 4);
+  const result = await analyzeDeletionContainer(withAlpha, "image/webp");
+  assert.equal(result.structureValid, false); assert.equal(result.safeToRetain, false); assert.ok(result.metadataFindings.includes("malformed-container"));
+});
+await check("nonzero VP8X reserved bytes make the WebP malformed and delete-only", async () => {
+  const webp = Buffer.from(await sharp({ create: { width: 8, height: 8, channels: 4, background: { r: 3, g: 4, b: 5, alpha: 0.5 } } }).webp().toBuffer());
+  assert.equal(webp.toString("latin1", 12, 16), "VP8X");
+  webp.set(Buffer.from("PII", "latin1"), 21);
+  const result = await analyzeDeletionContainer(webp, "image/webp");
+  assert.equal(result.structureValid, false); assert.equal(result.safeToRetain, false); assert.ok(result.metadataFindings.includes("malformed-container"));
+});
 await check("an unknown WebP RIFF chunk is metadata and delete-only", async () => {
   const webp = await sharp({ create: { width: 8, height: 8, channels: 3, background: { r: 3, g: 4, b: 5 } } }).webp().toBuffer();
   const withPrivateChunk = Buffer.concat([webp, webpChunk("PIII", Buffer.from("SECRET=departing@example.test GPS=private"))]);
   withPrivateChunk.writeUInt32LE(withPrivateChunk.length - 8, 4);
   const result = await analyzeDeletionContainer(withPrivateChunk, "image/webp");
-  assert.equal(result.structureValid, true); assert.equal(result.safeToRetain, false); assert.ok(result.metadataFindings.includes("application-metadata"));
+  assert.equal(result.structureValid, false); assert.equal(result.safeToRetain, false); assert.ok(result.metadataFindings.includes("application-metadata"));
+});
+await check("a simple WebP is decoded but original container bytes remain delete-only", async () => {
+  const webp = await sharp({ create: { width: 8, height: 8, channels: 3, background: { r: 3, g: 4, b: 5 } } }).webp().toBuffer();
+  const result = await analyzeDeletionContainer(webp, "image/webp");
+  assert.equal(result.structureValid, true); assert.equal(result.safeToRetain, false); assert.ok(result.metadataFindings.includes("webp-container"));
 });
 await check("a forged PDF with a fake xref footer is malformed and delete-only", async () => {
   const bytes = Buffer.from("%PDF-1.7\nSECRET=departing@example.test\nstartxref\n0\n%%EOF\n", "latin1");
