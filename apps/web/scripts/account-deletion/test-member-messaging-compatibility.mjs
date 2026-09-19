@@ -42,6 +42,7 @@ try {
   await db.query("insert into public.member_message_uploads(upload_id,conversation_id,actor_id,operation_id,file_name,mime_type,file_size_bytes,storage_path,state,message_id,committed_at) values($1,$2,$3,$4,'actor.jpg','image/jpeg',10,$5,'committed',$6,clock_timestamp())", [upload, conversation, actor, operation, actorPath, sent]);
   await db.query("insert into public.member_message_attachments(message_id,uploader_id,file_name,mime_type,file_size_bytes,storage_path) values($1,$2,'actor.jpg','image/jpeg',10,$3),($1,$4,'peer.png','image/png',20,$5),($6,$7,'other.jpg','image/jpeg',30,$8)", [sent, actor, actorPath, peer, peerPath, unrelatedMessage, otherA, unrelatedPath]);
   await db.query("insert into public.member_message_blocks(blocker_id,blocked_id) values($1,$2)", [peer, actor]);
+  await db.exec(fs.readFileSync(path.join(repo, "supabase/migrations/20260918182000_durable_member_message_history.sql"), "utf8"));
   await db.query("insert into storage.objects(bucket_id,name,metadata) values('member-message-media',$1,'{}'),('member-message-media',$2,'{}'),('member-message-media',$3,'{}')", [actorPath, peerPath, unrelatedPath]);
   await db.query("update public.profiles set account_status='removed' where id=$1", [actor]);
   await db.query("insert into public.account_deletion_requests(id,actor_id,status) values($1,$2,'requested')", [requestId, actor]);

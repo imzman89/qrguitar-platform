@@ -6,6 +6,7 @@ import { installRepositorySchema } from "./security/postgres-fixture.mjs";
 
 const repo = path.resolve(process.cwd(), "../..");
 const migrationPath = path.join(repo, "supabase/migrations/20260918180000_member_messaging.sql");
+const durableMigrationPath = path.join(repo, "supabase/migrations/20260918182000_durable_member_message_history.sql");
 const db = new PGlite();
 const users = {
   sender: "10000000-0000-4000-8000-000000000001",
@@ -124,13 +125,20 @@ try {
     );
   });
 
-  await test("blocking is global and prevents either member from sending", async () => {
+  await test("durable-history migration clears legacy controls and makes archive, block, and delete unavailable", async () => {
     await service("select public.set_member_message_block($1,$2,true)", [users.owner, users.sender]);
-    await assert.rejects(
-      service("select public.send_member_message($1,$2,$3,'blocked')", [conversationId, users.sender, "70000000-0000-4000-8000-000000000007"]),
-      /messaging is unavailable/i
-    );
-    await service("select public.set_member_message_block($1,$2,false)", [users.owner, users.sender]);
+    await role("postgres");
+    await db.query("update public.member_conversations set user_a_archived_at=clock_timestamp() where id=$1", [conversationId]);
+    await db.exec(fs.readFileSync(durableMigrationPath, "utf8"));
+    const state = (await db.query("select user_a_archived_at,user_b_archived_at from public.member_conversations where id=$1", [conversationId])).rows[0];
+    assert.deepEqual(state, { user_a_archived_at: null, user_b_archived_at: null });
+    assert.equal((await db.query("select count(*)::integer n from public.member_message_blocks")).rows[0].n, 0);
+    assert.equal((await db.query("select to_regprocedure('public.set_member_conversation_archived(uuid,uuid,boolean)') archived,to_regprocedure('public.set_member_message_block(uuid,uuid,boolean)') blocked")).rows[0].archived, null);
+    assert.equal((await db.query("select to_regprocedure('public.set_member_message_block(uuid,uuid,boolean)') blocked")).rows[0].blocked, null);
+    await assert.rejects(db.query("insert into public.member_message_blocks(blocker_id,blocked_id) values($1,$2)", [users.owner, users.sender]), /member_message_blocks_disabled|check constraint/i);
+    await assert.rejects(db.query("update public.member_conversations set user_a_archived_at=clock_timestamp() where id=$1", [conversationId]), /durable_history_no_archive|check constraint/i);
+    const sent = await service("select public.send_member_message($1,$2,$3,'Durable history remains writable') value", [conversationId, users.sender, "70000000-0000-4000-8000-000000000007"]);
+    assert.equal(sent.rows[0].value.replayed, false);
   });
 
   await test("anonymous clients receive no messaging metadata", async () => {
