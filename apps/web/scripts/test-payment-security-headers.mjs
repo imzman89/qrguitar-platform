@@ -136,6 +136,10 @@ test("Next configuration does not globally force public routes no-store while pr
     assert.match(configuredHeaders(rules, pathname).get("cache-control") || "", /no-store/, `${pathname} must stay no-store`);
   }
 
+  for (const pathname of ["/api/health", "/account", "/billing/return"]) {
+    assert.match(configuredHeaders(rules, pathname).get("cache-control") || "", /^private, no-store/, pathname + " must prohibit shared caching");
+  }
+
   const general = configuredHeaders(rules, "/contact");
   const checkout = configuredHeaders(rules, "/billing/return");
   assert.equal(permits(general, "frame-src", "https://www.paypal.com/"), false);

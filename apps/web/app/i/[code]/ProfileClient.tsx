@@ -46,6 +46,7 @@ import { getContentValue } from "../../../lib/content-registry";
 import { publicProfileUrl } from "../../../lib/profile-url";
 import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "../../../lib/optional-tracking-consent";
 import { appendFailedImageSource, filterAvailableImageSources } from "../../../lib/image-fallback";
+import { publicMediaVariantUrl } from "../../../lib/public-media-variant";
 import { ProfileBreadcrumbs } from "./ProfileBreadcrumbs";
 
 type ProfileTab = "overview" | "specs" | "timeline" | "service" | "ownership" | "media" | "repairs" | "documents";
@@ -477,7 +478,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
       image.decoding = "async";
       image.fetchPriority = "low";
       image.referrerPolicy = "no-referrer";
-      image.src = source;
+      image.src = publicMediaVariantUrl(source, 1200);
     });
   }, [galleryImages, mediaIndex]);
 
@@ -496,7 +497,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
       image.decoding = "async";
       image.fetchPriority = "low";
       image.referrerPolicy = "no-referrer";
-      image.src = source;
+      image.src = publicMediaVariantUrl(source, 1200);
     });
 
     function movePhoto(direction: 1 | -1) {
@@ -740,7 +741,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                 {galleryImages[mediaIndex] ? (
                   <img
                     key={galleryImages[mediaIndex]}
-                    src={galleryImages[mediaIndex]}
+                    src={publicMediaVariantUrl(galleryImages[mediaIndex], 1200)}
                     alt={`${instrumentDisplayName(instrument)} photo ${mediaIndex + 1} of ${galleryImages.length}`}
                     loading="eager"
                     fetchPriority="high"
@@ -832,7 +833,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                     key={`${imageUrl}-${index}`}
                   >
                     <img
-                      src={imageUrl}
+                      src={publicMediaVariantUrl(imageUrl, 160)}
                       alt=""
                       loading="lazy"
                       fetchPriority="low"
@@ -1079,7 +1080,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                 ) : null}
                 <img
                   key={activeMedia}
-                  src={activeMedia}
+                  src={publicMediaVariantUrl(activeMedia, 1200)}
                   alt={`${instrumentDisplayName(instrument)} preview`}
                   loading="eager"
                   fetchPriority="high"
@@ -1119,7 +1120,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                       key={`${imageUrl}-lightbox-${index}`}
                     >
                       <img
-                        src={imageUrl}
+                        src={publicMediaVariantUrl(imageUrl, 160)}
                         alt=""
                         loading="lazy"
                         fetchPriority="low"

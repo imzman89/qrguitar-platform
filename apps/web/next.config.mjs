@@ -9,7 +9,7 @@ const buildIdentity = resolveBuildIdentity(process.env, {
 });
 
 const noStoreHeaders = [
-  { key: "Cache-Control", value: "no-store, max-age=0, must-revalidate" }
+  { key: "Cache-Control", value: "private, no-store, max-age=0, must-revalidate" }
 ];
 
 // These browser routes can render account-specific tools or accept private tokens.

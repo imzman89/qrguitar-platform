@@ -16,6 +16,7 @@ import {
 } from "react";
 import { resolveCollectibleCard } from "../lib/collectible-card";
 import type { DemoInstrument } from "../lib/local-demo";
+import { publicMediaVariantUrl } from "../lib/public-media-variant";
 import { ProfileStatusBadges } from "./ProfileStatusBadges";
 import { RecordShareButton } from "./RecordShareButton";
 
@@ -165,7 +166,7 @@ export function CollectibleRecordCard({
                       <img
                         ref={(node) => markImageReady(index, node)}
                         className={`collectible-card-image ${loadedImages.includes(index) ? "is-loaded" : ""}`}
-                        src={imageUrl}
+                        src={publicMediaVariantUrl(imageUrl, 640)}
                         alt={`${card.title} photo ${index + 1} of ${galleryImages.length}`}
                         loading={prioritizeLeadImage && index === 0 ? "eager" : "lazy"}
                         fetchPriority={prioritizeLeadImage && index === 0 ? "high" : "low"}
@@ -208,7 +209,7 @@ export function CollectibleRecordCard({
         </div>
 
         <div className="collectible-card-content" onClick={handleContentClick}>
-          <Link className="collectible-card-profile-link" href={card.profileUrl} aria-label={`Open ${card.title} Profile`}>
+          <Link className="collectible-card-profile-link" href={card.profileUrl}>
             <span className="collectible-card-type">{card.typeLabel}</span>
             <h3>{card.title}</h3>
             <p className="collectible-card-subtitle">{card.factLine}</p>

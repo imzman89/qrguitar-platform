@@ -22,6 +22,7 @@ const photoOrganizer = read("components/PhotoOrganizer.tsx");
 const compactQr = read("components/CompactQr.tsx");
 const brandLogo = read("components/BrandLogo.tsx");
 const fallbackImage = read("components/FallbackImage.tsx");
+const publicMediaVariant = read("lib/public-media-variant.ts");
 const collection = read("app/collections/[handle]/page.tsx");
 const collectionDirectory = read("app/collections/CollectionsDirectoryClient.tsx");
 const dashboard = read("app/dashboard/page.tsx");
@@ -35,6 +36,15 @@ function compileImageFallbackHelpers() {
   }).outputText;
   new Function("require", "module", "exports", code)(require, module, module.exports);
   return module.exports;
+}
+
+function compilePublicMediaVariant() {
+  const module = { exports: {} };
+  const code = ts.transpileModule(publicMediaVariant, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS }
+  }).outputText;
+  new Function("require", "module", "exports", code)(require, module, module.exports);
+  return module.exports.publicMediaVariantUrl;
 }
 
 function compileFallbackImageComponent(useState) {
@@ -67,6 +77,9 @@ function compileCard() {
     "lucide-react": { ArrowRight: Icon, Camera: Icon, ChevronLeft: Icon, ChevronRight: Icon, FileText: Icon, Globe2: Icon, Hash: Icon },
     "next/link": { __esModule: true, default: Link },
     "next/navigation": { useRouter: () => ({ push() {} }) },
+    "../lib/public-media-variant": {
+      publicMediaVariantUrl: (source, width) => source + "?w=" + width + "&format=webp"
+    },
     "../lib/collectible-card": {
       resolveCollectibleCard: () => ({
         images: ["/lead.jpg", "/detail.jpg"], title: "Test Profile", profileUrl: "/i/TEST",
@@ -113,6 +126,43 @@ function compileInstrumentCategories() {
   new Function("require", "module", "exports", code)(require, module, module.exports);
   return module.exports.defaultInstrumentCategories;
 }
+
+test("public media variants are added only to checked public media proxy URLs", () => {
+  const variant = compilePublicMediaVariant();
+  const source = "/api/public-file/QRG-TEST/media/0123456789abcdef01234567";
+  assert.equal(variant(source, 160), source + "?w=160&format=webp");
+  assert.equal(variant(source, 640), source + "?w=640&format=webp");
+  assert.equal(variant(source, 1200), source + "?w=1200&format=webp");
+  for (const untrusted of [
+    "https://images.example/large.jpg",
+    "//images.example/large.jpg",
+    "data:image/png;base64,AAAA",
+    "/api/public-file/QRG-TEST/document/0123456789abcdef01234567",
+    "/api/public-file/QRG-TEST/media/not-a-token",
+    source + "?download=1",
+    " " + source + " "
+  ]) assert.equal(variant(untrusted, 640), untrusted);
+  assert.equal(variant(source, 999), source);
+});
+
+test("public image surfaces request bounded variants while keeping original URLs as identity", () => {
+  assert.match(showcase, /publicMediaVariantUrl\(photos\[activePhoto\], 1200\)/);
+  assert.match(showcase, /publicMediaVariantUrl\(photo, 160\)/);
+  assert.match(card, /publicMediaVariantUrl\(imageUrl, 640\)/);
+  assert.match(profile, /publicMediaVariantUrl\(galleryImages\[mediaIndex\], 1200\)/);
+  assert.match(profile, /publicMediaVariantUrl\(activeMedia, 1200\)/);
+  assert.ok((profile.match(/publicMediaVariantUrl\(imageUrl, 160\)/g) || []).length >= 2);
+  assert.ok((profile.match(/image\.src = publicMediaVariantUrl\(source, 1200\);/g) || []).length >= 2);
+});
+
+test("shared Profile card link derives its accessible name from visible content", () => {
+  assert.doesNotMatch(card, /collectible-card-profile-link[^>]*aria-label/);
+  const CollectibleRecordCard = compileCard();
+  const html = renderToStaticMarkup(React.createElement(CollectibleRecordCard, { record: { qrCode: "TEST" } }));
+  const link = html.match(/<a class="collectible-card-profile-link"[^>]*>/)?.[0] || "";
+  assert.ok(link);
+  assert.doesNotMatch(link, /aria-label=/);
+});
 
 test("shared Profile cards are lazy by default and prioritize only an explicitly selected lead photo", () => {
   assert.match(card, /prioritizeLeadImage\?: boolean/);
