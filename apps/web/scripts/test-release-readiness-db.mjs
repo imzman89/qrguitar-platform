@@ -203,7 +203,7 @@ assert.deepEqual([...manifest.intakeTables].sort(),[
   'account_deletion_retention_attestations','account_deletion_service_subjects','account_deletion_storage_content_reviews',
   'account_deletion_storage_relocations'
 ]);
-assert.equal(manifest.intakeFunctionSignatures.length,89);
+assert.equal(manifest.intakeFunctionSignatures.length,90);
 await test('missing deletion fulfillment RPC blocks release',async()=>{
   await db.exec('drop function public.prepare_account_deletion_fulfillment(uuid,boolean,uuid,uuid,text[])');await expectFalse('required_functions');
 });

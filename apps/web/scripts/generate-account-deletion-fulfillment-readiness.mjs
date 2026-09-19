@@ -23,7 +23,7 @@ const manifest = JSON.parse(embedded[1]);
 assert.equal(manifest.releaseVersion, "2026-09-17.10");
 const historical = structuredClone(manifest);
 const fulfillmentSource = read(fulfillmentPath);
-assert.equal(sha(fulfillmentSource), "37d09e6bcfd4887dfe36e0cc73f1ab71879e20051576dd98353121f0e2223fa6", "Fulfillment migration changed; review before repinning.");
+assert.equal(sha(fulfillmentSource), "1cfc789fb6e5b09de94de7271215fb6539aea356361c4f5478049015ceabcc5e", "Fulfillment migration changed; review before repinning.");
 const promotionSource = read("supabase/migrations/20260918172000_billing_promo_codes.sql");
 const promotionDeletionSource = read("supabase/migrations/20260918172500_account_deletion_promo_compatibility.sql");
 const messagingSource = read("supabase/migrations/20260918180000_member_messaging.sql");
@@ -107,7 +107,7 @@ try {
   const functions = allFunctions.filter(item => item.proname.includes("account_deletion"));
   const fingerprintFunctions = allFunctions.filter(item => historicalFingerprintSignatures.has(item.signature) || item.proname.includes("account_deletion") || item.proname === "billing_paypal_reserve_promoted_order");
   const fingerprintSignatures = new Set(fingerprintFunctions.map(item => item.signature));
-  assert.equal(functions.length, 89, "Expected the complete reviewed account-deletion function surface.");
+  assert.equal(functions.length, 90, "Expected the complete reviewed account-deletion function surface.");
   for (const item of functions) {
     assert.ok(!["anon", "authenticated", "service_role"].includes(item.owner), item.signature + " has an API-role owner.");
     assert.equal(item.anon_execute, false, item.signature + " cannot be executable by anon.");
@@ -121,7 +121,7 @@ try {
   const allowed = functions.filter(item => serviceNames.has(item.proname)).map(item => item.signature);
   const blocked = functions.filter(item => !serviceNames.has(item.proname)).map(item => item.signature);
   assert.equal(allowed.length, 23);
-  assert.equal(blocked.length, 66);
+  assert.equal(blocked.length, 67);
   const promotedCheckoutFunctions = allFunctions.filter(item => item.proname === "billing_paypal_reserve_promoted_order");
   assert.equal(promotedCheckoutFunctions.length, 1, "Expected the reviewed promoted PayPal reservation RPC.");
   for (const item of promotedCheckoutFunctions) {

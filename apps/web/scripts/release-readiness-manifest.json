@@ -107,7 +107,7 @@
     "public.inspect_account_deletion_review_page(uuid,boolean,uuid,uuid,text,uuid,text,text,integer)",
     "public.prepare_account_deletion_fulfillment(uuid,boolean,uuid,uuid,text[])",
     "public.prepare_member_messaging_account_deletion(uuid)",
-    "public.read_account_deletion_custody_evidence_inventory(uuid,boolean,uuid,uuid,text)",
+    "public.read_account_deletion_custody_evidence_inventory(uuid,boolean,uuid,uuid,text,integer)",
     "public.read_account_deletion_custody_evidence_source(uuid,boolean,uuid,uuid,uuid,text)",
     "public.read_account_deletion_fulfillment(uuid,boolean,uuid)",
     "public.read_account_deletion_queue(uuid,boolean,timestamp with time zone,uuid,integer)",
@@ -175,7 +175,7 @@
     "public._account_deletion_billing_order_json(billing_orders,uuid)",
     "public._account_deletion_billing_order_owner(uuid,text,uuid)",
     "public._account_deletion_billing_personal_content(uuid,text)",
-    "public._account_deletion_blockers(uuid,uuid,text,text[])",
+    "public._account_deletion_blockers(uuid,uuid,text,text[],boolean)",
     "public._account_deletion_custody_evidence_reviews_json(uuid,uuid)",
     "public._account_deletion_custody_fence()",
     "public._account_deletion_external_storage_delete_allowed(text,text)",
@@ -218,6 +218,7 @@
     "public._account_deletion_retention_reviews_json(uuid)",
     "public._account_deletion_review_graph_within_bounds(jsonb)",
     "public._account_deletion_review_safe_jsonb(jsonb)",
+    "public._account_deletion_scrub_unscoped_personal_content(uuid,uuid,text,uuid)",
     "public._account_deletion_service_graph(uuid,uuid)",
     "public._account_deletion_storage_cleanup_required(uuid,uuid,text)",
     "public._account_deletion_storage_disposition(text,text)",
@@ -356,9 +357,9 @@
       ]
     },
     {
-      "signature": "public._account_deletion_blockers(uuid,uuid,text,text[])",
-      "source_hash": "ae6953fd4f521136ffc562bbc5da08b2482c7a2951bae76edc61c720babb4249",
-      "arguments": "p_request_id uuid, p_actor_id uuid, p_email text, p_protected_admin_emails text[]",
+      "signature": "public._account_deletion_blockers(uuid,uuid,text,text[],boolean)",
+      "source_hash": "9fda2920c5675f4039c1ec1da5cd3ed68ae474507134309404e1320d130ee0cb",
+      "arguments": "p_request_id uuid, p_actor_id uuid, p_email text, p_protected_admin_emails text[], p_unscoped_personal_content boolean",
       "result": "jsonb",
       "definer": true,
       "volatility": "s",
@@ -467,7 +468,7 @@
     },
     {
       "signature": "public._account_deletion_intake_guard()",
-      "source_hash": "4f36b18ef00376f371d6e08f1cc5573da75b76d3a21bbc634b2301b790a8731d",
+      "source_hash": "8354a6707885de304253f5773d37c14495be29970ab3c043918664317936cc7e",
       "arguments": "",
       "result": "trigger",
       "definer": true,
@@ -700,11 +701,11 @@
     },
     {
       "signature": "public._account_deletion_redact_identity(text,uuid,text)",
-      "source_hash": "989d6ed18bdea32053b083f9c43643cc5a33b8b59baf9d432f0609bfcfd5f63c",
+      "source_hash": "9951a43dbd7e991e4cb36f03a10b9edada71b05e8f622acf101320b2cc909751",
       "arguments": "p_value text, p_actor_id uuid, p_email text",
       "result": "text",
       "definer": false,
-      "volatility": "i",
+      "volatility": "s",
       "settings": [
         "search_path=pg_catalog, public"
       ]
@@ -715,7 +716,7 @@
       "arguments": "p_value jsonb, p_actor_id uuid, p_email text, p_salt uuid",
       "result": "jsonb",
       "definer": false,
-      "volatility": "i",
+      "volatility": "s",
       "settings": [
         "search_path=pg_catalog, public"
       ]
@@ -826,6 +827,17 @@
       "result": "jsonb",
       "definer": false,
       "volatility": "i",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._account_deletion_scrub_unscoped_personal_content(uuid,uuid,text,uuid)",
+      "source_hash": "774704725178ccc1a245639a35416df92cea63c5486ec723bb3bb5a3c5a7c805",
+      "arguments": "p_request_id uuid, p_actor_id uuid, p_email text, p_salt uuid",
+      "result": "integer",
+      "definer": true,
+      "volatility": "v",
       "settings": [
         "search_path=pg_catalog, public"
       ]
@@ -943,11 +955,11 @@
     },
     {
       "signature": "public._account_deletion_text_has_identity(text,uuid,text)",
-      "source_hash": "00da7908765672f3ad0c3030a87b1e6e480fe5b72a5edf972b301748ba0f63c7",
+      "source_hash": "532389fca598780862a4437a9dca884004ac520d1fa87973e084ea345dd7157c",
       "arguments": "p_text text, p_actor_id uuid, p_email text",
       "result": "boolean",
       "definer": false,
-      "volatility": "i",
+      "volatility": "s",
       "settings": [
         "search_path=pg_catalog, public"
       ]
@@ -1416,7 +1428,7 @@
     },
     {
       "signature": "public.attest_account_deletion_profile_review(uuid,boolean,uuid,uuid,uuid,text,boolean)",
-      "source_hash": "31d73679a3fe8884648a45a2a25083954e29c8fa46aad8fa72ff02e682d5e82d",
+      "source_hash": "b2a253b57b1cc14555e9642d1a02f72c6efb19693030b79d3fd96117562b7a31",
       "arguments": "p_admin_id uuid, p_environment_admin boolean, p_request_id uuid, p_operation_id uuid, p_guitar_id uuid, p_expected_fingerprint text, p_confirm_personal_information_removed boolean",
       "result": "jsonb",
       "definer": true,
@@ -1427,7 +1439,7 @@
     },
     {
       "signature": "public.attest_account_deletion_retention_review(uuid,boolean,uuid,uuid,text,text,text,boolean)",
-      "source_hash": "f2cb6d7e46dab23083134930fa25174f34161470c3b1753abffb9fdd17d5f297",
+      "source_hash": "2824bad4fe0878a11f268b55f304e2fe840434603ecf5f86774177f3326f5eaa",
       "arguments": "p_admin_id uuid, p_environment_admin boolean, p_request_id uuid, p_operation_id uuid, p_domain text, p_expected_fingerprint text, p_decision_code text, p_confirm_reviewed boolean",
       "result": "jsonb",
       "definer": true,
@@ -2252,7 +2264,7 @@
     },
     {
       "signature": "public.inspect_account_deletion_review_page(uuid,boolean,uuid,uuid,text,uuid,text,text,integer)",
-      "source_hash": "2b7665b1bc6fea032c52341f841190b407a8a563b5b7b1792f6611f8a02426d6",
+      "source_hash": "e827f22a0df60be38a251977bba7729a430ae81cb182fc9004a8016c64cd4365",
       "arguments": "p_admin_id uuid, p_environment_admin boolean, p_request_id uuid, p_operation_id uuid, p_kind text, p_guitar_id uuid, p_domain text, p_expected_fingerprint text, p_page_index integer",
       "result": "jsonb",
       "definer": true,
@@ -2327,7 +2339,7 @@
     },
     {
       "signature": "public.prepare_account_deletion_fulfillment(uuid,boolean,uuid,uuid,text[])",
-      "source_hash": "6a238d1025755fc3cccab2d573f2bb5960d9229c1a88fdbaafb003a280ba7dc8",
+      "source_hash": "deed6f77be86bc3edfdeb7f659d9ee22a22023f824e51efba428d349dcceeafd",
       "arguments": "p_admin_id uuid, p_environment_admin boolean, p_request_id uuid, p_operation_id uuid, p_protected_admin_emails text[] DEFAULT '{}'::text[]",
       "result": "jsonb",
       "definer": true,
@@ -2403,9 +2415,9 @@
       ]
     },
     {
-      "signature": "public.read_account_deletion_custody_evidence_inventory(uuid,boolean,uuid,uuid,text)",
-      "source_hash": "1fe3272edd8630562c75c43600cafe05b05d82feb462e47d2fbc26f190f095c8",
-      "arguments": "p_admin_id uuid, p_environment_admin boolean, p_request_id uuid, p_claim_id uuid, p_expected_profile_fingerprint text",
+      "signature": "public.read_account_deletion_custody_evidence_inventory(uuid,boolean,uuid,uuid,text,integer)",
+      "source_hash": "5023424f1c39b6f7f6ea7350444d47157e456cf97105ddc40c77bc88d4de54de",
+      "arguments": "p_admin_id uuid, p_environment_admin boolean, p_request_id uuid, p_claim_id uuid, p_expected_profile_fingerprint text, p_page_index integer",
       "result": "jsonb",
       "definer": true,
       "volatility": "v",
@@ -2536,7 +2548,7 @@
     },
     {
       "signature": "public.release_account_deletion_profile_custody(uuid,boolean,uuid,uuid,uuid,text,boolean)",
-      "source_hash": "7f72b8e44fe9bc3a27317fd863b9a3867fa1f2e14a88e5afa2fbe0762d4ee261",
+      "source_hash": "af895f629ae788a391cef277741cc2c36c5400b0585d9a48c39433458dd78bb7",
       "arguments": "p_admin_id uuid, p_environment_admin boolean, p_request_id uuid, p_operation_id uuid, p_claim_id uuid, p_expected_fingerprint text, p_confirm_reviewed boolean",
       "result": "jsonb",
       "definer": true,
@@ -7958,7 +7970,7 @@
     "public._account_deletion_billing_order_json(billing_orders,uuid)",
     "public._account_deletion_billing_order_owner(uuid,text,uuid)",
     "public._account_deletion_billing_personal_content(uuid,text)",
-    "public._account_deletion_blockers(uuid,uuid,text,text[])",
+    "public._account_deletion_blockers(uuid,uuid,text,text[],boolean)",
     "public._account_deletion_custody_evidence_reviews_json(uuid,uuid)",
     "public._account_deletion_custody_fence()",
     "public._account_deletion_external_storage_delete_allowed(text,text)",
@@ -8001,6 +8013,7 @@
     "public._account_deletion_retention_reviews_json(uuid)",
     "public._account_deletion_review_graph_within_bounds(jsonb)",
     "public._account_deletion_review_safe_jsonb(jsonb)",
+    "public._account_deletion_scrub_unscoped_personal_content(uuid,uuid,text,uuid)",
     "public._account_deletion_service_graph(uuid,uuid)",
     "public._account_deletion_storage_cleanup_required(uuid,uuid,text)",
     "public._account_deletion_storage_disposition(text,text)",
@@ -8027,7 +8040,7 @@
     "public.inspect_account_deletion_review_page(uuid,boolean,uuid,uuid,text,uuid,text,text,integer)",
     "public.prepare_account_deletion_fulfillment(uuid,boolean,uuid,uuid,text[])",
     "public.prepare_member_messaging_account_deletion(uuid)",
-    "public.read_account_deletion_custody_evidence_inventory(uuid,boolean,uuid,uuid,text)",
+    "public.read_account_deletion_custody_evidence_inventory(uuid,boolean,uuid,uuid,text,integer)",
     "public.read_account_deletion_custody_evidence_source(uuid,boolean,uuid,uuid,uuid,text)",
     "public.read_account_deletion_fulfillment(uuid,boolean,uuid)",
     "public.read_account_deletion_queue(uuid,boolean,timestamp with time zone,uuid,integer)",
@@ -8956,7 +8969,7 @@
     {
       "table": "account_deletion_fulfillment_receipts",
       "name": "account_deletion_fulfillment_receipts_action_check",
-      "definition": "CHECK ((action = ANY (ARRAY['prepare'::text, 'complete'::text, 'profile_redact'::text])))",
+      "definition": "CHECK ((action = ANY (ARRAY['prepare'::text, 'complete'::text, 'profile_redact'::text, 'unscoped_scrub'::text])))",
       "type": "c"
     },
     {
@@ -10253,7 +10266,7 @@
     "public.register_staged_instrument_edit_upload(uuid,text,uuid,text,text)"
   ],
   "profileEditUploadSourceSha256": "f1d0ba57a3d19ceaef9f6ec216d31158267792cec19b85f48beee965b44dcee1",
-  "accountDeletionFulfillmentSourceSha256": "37d09e6bcfd4887dfe36e0cc73f1ab71879e20051576dd98353121f0e2223fa6",
+  "accountDeletionFulfillmentSourceSha256": "1cfc789fb6e5b09de94de7271215fb6539aea356361c4f5478049015ceabcc5e",
   "accountDeletionPromotionSourceSha256": "a7cf0c00615feeeb76d3533250c127f16eb8f1cd19349e639276d98433ea98a5",
   "accountDeletionPromotionCompatibilitySourceSha256": "e8504d19dfd6484f0b5cdf59fdfb057471b0f58c527ee80d60a324d0757d26f2",
   "memberMessagingSourceSha256": "fc2cd013dd29f632c48a05f2fc62afc86c1f513ebe787405f95b66b1b34b1816",
