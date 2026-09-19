@@ -31,3 +31,15 @@ export function publicMediaVariantUrl(source: string, width: PublicMediaVariantW
 
   return url.pathname + "?w=" + width + "&format=webp";
 }
+const defaultResponsiveWidths: readonly PublicMediaVariantWidth[] = [640, 1200];
+
+export function publicMediaVariantSrcSet(
+  source: string,
+  widths: readonly PublicMediaVariantWidth[] = defaultResponsiveWidths
+) {
+  const candidates = Array.from(new Set(widths)).sort((first, second) => first - second);
+  if (!candidates.length) return undefined;
+  const variants = candidates.map((width) => ({ width, url: publicMediaVariantUrl(source, width) }));
+  if (variants.some((variant) => variant.url === source)) return undefined;
+  return variants.map((variant) => variant.url + " " + variant.width + "w").join(", ");
+}

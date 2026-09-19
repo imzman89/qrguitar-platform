@@ -46,7 +46,7 @@ import { getContentValue } from "../../../lib/content-registry";
 import { publicProfileUrl } from "../../../lib/profile-url";
 import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "../../../lib/optional-tracking-consent";
 import { appendFailedImageSource, filterAvailableImageSources } from "../../../lib/image-fallback";
-import { publicMediaVariantUrl } from "../../../lib/public-media-variant";
+import { publicMediaVariantSrcSet, publicMediaVariantUrl } from "../../../lib/public-media-variant";
 import { ProfileBreadcrumbs } from "./ProfileBreadcrumbs";
 
 type ProfileTab = "overview" | "specs" | "timeline" | "service" | "ownership" | "media" | "repairs" | "documents";
@@ -478,6 +478,11 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
       image.decoding = "async";
       image.fetchPriority = "low";
       image.referrerPolicy = "no-referrer";
+      const srcSet = publicMediaVariantSrcSet(source);
+      if (srcSet) {
+        image.srcset = srcSet;
+        image.sizes = "(max-width: 900px) 360px, 720px";
+      }
       image.src = publicMediaVariantUrl(source, 1200);
     });
   }, [galleryImages, mediaIndex]);
@@ -497,6 +502,11 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
       image.decoding = "async";
       image.fetchPriority = "low";
       image.referrerPolicy = "no-referrer";
+      const srcSet = publicMediaVariantSrcSet(source);
+      if (srcSet) {
+        image.srcset = srcSet;
+        image.sizes = "(max-width: 900px) 360px, 720px";
+      }
       image.src = publicMediaVariantUrl(source, 1200);
     });
 
@@ -742,6 +752,8 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                   <img
                     key={galleryImages[mediaIndex]}
                     src={publicMediaVariantUrl(galleryImages[mediaIndex], 1200)}
+                    srcSet={publicMediaVariantSrcSet(galleryImages[mediaIndex])}
+                    sizes="(max-width: 900px) 360px, 720px"
                     alt={`${instrumentDisplayName(instrument)} photo ${mediaIndex + 1} of ${galleryImages.length}`}
                     loading="eager"
                     fetchPriority="high"
@@ -1081,6 +1093,8 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                 <img
                   key={activeMedia}
                   src={publicMediaVariantUrl(activeMedia, 1200)}
+                  srcSet={publicMediaVariantSrcSet(activeMedia)}
+                  sizes="(max-width: 900px) 360px, 1080px"
                   alt={`${instrumentDisplayName(instrument)} preview`}
                   loading="eager"
                   fetchPriority="high"

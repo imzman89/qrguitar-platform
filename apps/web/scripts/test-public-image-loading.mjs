@@ -44,7 +44,7 @@ function compilePublicMediaVariant() {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS }
   }).outputText;
   new Function("require", "module", "exports", code)(require, module, module.exports);
-  return module.exports.publicMediaVariantUrl;
+  return module.exports;
 }
 
 function compileFallbackImageComponent(useState) {
@@ -128,7 +128,7 @@ function compileInstrumentCategories() {
 }
 
 test("public media variants are added only to checked public media proxy URLs", () => {
-  const variant = compilePublicMediaVariant();
+  const { publicMediaVariantSrcSet: responsive, publicMediaVariantUrl: variant } = compilePublicMediaVariant();
   const source = "/api/public-file/QRG-TEST/media/0123456789abcdef01234567";
   assert.equal(variant(source, 160), source + "?w=160&format=webp");
   assert.equal(variant(source, 640), source + "?w=640&format=webp");
@@ -143,15 +143,26 @@ test("public media variants are added only to checked public media proxy URLs", 
     " " + source + " "
   ]) assert.equal(variant(untrusted, 640), untrusted);
   assert.equal(variant(source, 999), source);
+  assert.equal(responsive(source), source + "?w=640&format=webp 640w, " + source + "?w=1200&format=webp 1200w");
+  assert.equal(responsive(source, [160, 640]), source + "?w=160&format=webp 160w, " + source + "?w=640&format=webp 640w");
+  assert.equal(responsive(source, [1200, 640, 640]), source + "?w=640&format=webp 640w, " + source + "?w=1200&format=webp 1200w");
+  assert.equal(responsive(source, []), undefined);
+  assert.equal(responsive("https://images.example/large.jpg"), undefined);
 });
 
 test("public image surfaces request bounded variants while keeping original URLs as identity", () => {
   assert.match(showcase, /publicMediaVariantUrl\(photos\[activePhoto\], 1200\)/);
+  assert.match(showcase, /srcSet=\{publicMediaVariantSrcSet\(photos\[activePhoto\]\)\} sizes="\(max-width: 900px\) 360px, 560px"/);
   assert.match(showcase, /publicMediaVariantUrl\(photo, 160\)/);
+  assert.match(homepage, /src=\{publicMediaVariantUrl\(recordPhoto, 640\)\} srcSet=\{publicMediaVariantSrcSet\(recordPhoto, \[160, 640\]\)\} sizes="\(max-width: 700px\) 360px, 320px"/);
+  assert.doesNotMatch(homepage, /<img src=\{recordPhoto\}/);
   assert.match(card, /publicMediaVariantUrl\(imageUrl, 640\)/);
   assert.match(profile, /publicMediaVariantUrl\(galleryImages\[mediaIndex\], 1200\)/);
+  assert.match(profile, /srcSet=\{publicMediaVariantSrcSet\(galleryImages\[mediaIndex\]\)\}[^>]*sizes="\(max-width: 900px\) 360px, 720px"/);
   assert.match(profile, /publicMediaVariantUrl\(activeMedia, 1200\)/);
+  assert.match(profile, /srcSet=\{publicMediaVariantSrcSet\(activeMedia\)\}[^>]*sizes="\(max-width: 900px\) 360px, 1080px"/);
   assert.ok((profile.match(/publicMediaVariantUrl\(imageUrl, 160\)/g) || []).length >= 2);
+  assert.ok((profile.match(/image\.srcset = srcSet;/g) || []).length >= 2);
   assert.ok((profile.match(/image\.src = publicMediaVariantUrl\(source, 1200\);/g) || []).length >= 2);
 });
 
