@@ -284,8 +284,7 @@ export async function analyzeDeletionContainer(bytes: Uint8Array, mimeType: stri
       valid = false;
     }
   }
-  if (mimeType === "image/png") findings.add("lossless-image-container");
-  if (mimeType === "image/webp") findings.add("webp-container");
+  if (mimeType.startsWith("image/")) findings.add("original-image-container");
   if (mimeType === "application/pdf") {
     const text = new TextDecoder("latin1").decode(bytes);
     findings.add("document-container");

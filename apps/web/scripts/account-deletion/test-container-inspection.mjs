@@ -51,9 +51,9 @@ function classicPdf() {
 }
 
 const jpeg = await sharp({ create: { width: 16, height: 16, channels: 3, background: { r: 20, g: 80, b: 120 } } }).jpeg().toBuffer();
-await check("a fully decoded JPEG with no hidden metadata is retainable", async () => {
+await check("a fully decoded JPEG original remains delete-only until canonical re-encoding exists", async () => {
   const result = await analyzeDeletionContainer(jpeg, "image/jpeg");
-  assert.equal(result.structureValid, true); assert.equal(result.safeToRetain, true); assert.deepEqual(result.metadataFindings, []);
+  assert.equal(result.structureValid, true); assert.equal(result.safeToRetain, false); assert.ok(result.metadataFindings.includes("original-image-container"));
 });
 await check("JPEG bytes appended after EOI are malformed and delete-only", async () => {
   const result = await analyzeDeletionContainer(Buffer.concat([jpeg, Buffer.from("SECRET=departing@example.test GPS=private")]), "image/jpeg");
@@ -62,6 +62,19 @@ await check("JPEG bytes appended after EOI are malformed and delete-only", async
 await check("a truncated JPEG entropy scan is malformed and delete-only", async () => {
   const result = await analyzeDeletionContainer(jpeg.subarray(0, jpeg.length - 2), "image/jpeg");
   assert.equal(result.structureValid, false); assert.equal(result.safeToRetain, false);
+});
+await check("valid repeated Adobe APP14 segments cannot carry retained private bytes", async () => {
+  const secret = Buffer.from("SECRET=departing@example.test GPS=private", "latin1");
+  const segments = [];
+  for (let at = 0; at < secret.length; at += 7) segments.push(jpegSegment(0xee, Buffer.concat([Buffer.from("Adobe", "latin1"), Buffer.concat([secret.subarray(at, at + 7), Buffer.alloc(7)]).subarray(0, 7)])));
+  const result = await analyzeDeletionContainer(insertAfterSoi(jpeg, Buffer.concat(segments)), "image/jpeg");
+  assert.equal(result.structureValid, true); assert.equal(result.safeToRetain, false); assert.ok(result.metadataFindings.includes("original-image-container"));
+});
+await check("a valid unused JPEG quantization table cannot carry retained private bytes", async () => {
+  const secret = Buffer.from("SECRET=departing@example.test GPS=private", "latin1"), values = Buffer.alloc(64, 1); secret.copy(values, 0, 0, Math.min(secret.length, values.length));
+  const dqt = jpegSegment(0xdb, Buffer.concat([Buffer.from([3]), values]));
+  const result = await analyzeDeletionContainer(insertAfterSoi(jpeg, dqt), "image/jpeg");
+  assert.equal(result.structureValid, true); assert.equal(result.safeToRetain, false); assert.ok(result.metadataFindings.includes("original-image-container"));
 });
 await check("JPEG ICC and application metadata are visible to the privacy gate", async () => {
   const withIcc = insertAfterSoi(jpeg, jpegSegment(0xe2, Buffer.concat([Buffer.from("ICC_PROFILE\0", "latin1"), Buffer.from([1, 1, 0, 1, 2, 3])])));
@@ -85,7 +98,7 @@ await check("a private PNG ancillary chunk is metadata and delete-only", async (
 await check("a valid extended WebP alpha image is decoded but original bytes remain delete-only", async () => {
   const webp = await sharp({ create: { width: 8, height: 8, channels: 4, background: { r: 3, g: 4, b: 5, alpha: 0.5 } } }).webp().toBuffer();
   const result = await analyzeDeletionContainer(webp, "image/webp");
-  assert.equal(result.structureValid, true); assert.equal(result.safeToRetain, false); assert.ok(result.metadataFindings.includes("webp-container"));
+  assert.equal(result.structureValid, true); assert.equal(result.safeToRetain, false); assert.ok(result.metadataFindings.includes("original-image-container"));
 });
 await check("an ALPH chunk appended to a simple WebP cannot hide private data", async () => {
   const webp = await sharp({ create: { width: 8, height: 8, channels: 3, background: { r: 3, g: 4, b: 5 } } }).webp().toBuffer();
@@ -111,7 +124,7 @@ await check("an unknown WebP RIFF chunk is metadata and delete-only", async () =
 await check("a simple WebP is decoded but original container bytes remain delete-only", async () => {
   const webp = await sharp({ create: { width: 8, height: 8, channels: 3, background: { r: 3, g: 4, b: 5 } } }).webp().toBuffer();
   const result = await analyzeDeletionContainer(webp, "image/webp");
-  assert.equal(result.structureValid, true); assert.equal(result.safeToRetain, false); assert.ok(result.metadataFindings.includes("webp-container"));
+  assert.equal(result.structureValid, true); assert.equal(result.safeToRetain, false); assert.ok(result.metadataFindings.includes("original-image-container"));
 });
 await check("a forged PDF with a fake xref footer is malformed and delete-only", async () => {
   const bytes = Buffer.from("%PDF-1.7\nSECRET=departing@example.test\nstartxref\n0\n%%EOF\n", "latin1");
@@ -129,3 +142,4 @@ await check("a structurally valid PDF remains delete-only because hidden documen
   assert.equal(result.structureValid, true); assert.equal(result.safeToRetain, false); assert.ok(result.metadataFindings.includes("document-container"));
 });
 console.log(`Container privacy checks passed: ${passed}`);
+
