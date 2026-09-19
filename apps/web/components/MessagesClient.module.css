@@ -6,6 +6,7 @@
 .segmented button { min-height: 38px; display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 4px; padding: 7px 13px; color: var(--muted); background: transparent; font: inherit; font-size: 13px; font-weight: 750; cursor: pointer; }
 .segmented button.active { color: var(--ink); background: var(--gold); }
 .inboxList { overflow: hidden; border-top: 1px solid var(--line); }
+.paginationRow { display: flex; justify-content: center; padding: 22px 0; }
 .conversationCard { position: relative; min-width: 0; display: grid; grid-template-columns: 56px minmax(0,1fr) 10px; gap: 16px; align-items: center; padding: 20px 12px; border-bottom: 1px solid var(--line); color: var(--text); text-decoration: none; transition: background .18s ease; }
 .conversationCard:hover, .conversationCard:focus-visible { background: rgba(255,255,255,.035); }
 .conversationCard.unread { background: rgba(240,161,43,.055); }
@@ -31,6 +32,8 @@
 .threadPanel { overflow: hidden; }
 .messageList { min-height: 440px; max-height: min(62vh,720px); overflow-y: auto; display: flex; flex-direction: column; gap: 11px; padding: 22px; scroll-behavior: smooth; }
 .historyNote { margin: 0; padding: 9px 18px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 11px; text-align: center; }
+.historyNote button { border: 0; padding: 4px 8px; color: var(--gold-2); background: transparent; font: inherit; font-weight: 800; cursor: pointer; }
+.historyNote button:disabled { color: var(--muted); cursor: wait; }
 .message { width: fit-content; max-width: min(76%,620px); border: 1px solid var(--line); border-radius: 8px 8px 8px 2px; padding: 11px 13px 8px; background: var(--panel-2); }
 .message.mine { align-self: flex-end; border-color: rgba(240,161,43,.28); border-radius: 8px 8px 2px 8px; background: rgba(240,161,43,.085); }
 .message p { margin: 0; color: var(--text); font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; white-space: pre-wrap; }

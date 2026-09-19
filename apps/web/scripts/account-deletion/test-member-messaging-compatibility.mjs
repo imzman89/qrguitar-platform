@@ -32,6 +32,25 @@ try {
   await db.query("insert into public.member_conversations(id,user_a,user_b,created_by) values($1,$2,$3,$2),($4,$5,$6,$5)", [conversation, actor, peer, unrelated, otherA, otherB]);
   const sent = (await db.query("insert into public.member_messages(conversation_id,sender_id,client_operation_id,body) values($1,$2,$3,'Private message') returning id", [conversation, actor, operation])).rows[0].id;
   const unrelatedMessage = (await db.query("insert into public.member_messages(conversation_id,sender_id,client_operation_id,body) values($1,$2,$3,'Unrelated') returning id", [unrelated, otherA, "81000000-0000-4000-8000-000000000008"])).rows[0].id;
+  await db.query(`insert into auth.users(id,email)
+    select ('b0000000-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,'deletion-scale-'||i||'@example.invalid'
+    from generate_series(1,100) i`);
+  await db.query(`insert into public.profiles(id,display_name,account_status)
+    select ('b0000000-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,'Deletion peer '||i,'active'
+    from generate_series(1,100) i`);
+  await db.query(`insert into public.member_conversations(id,user_a,user_b,created_by,created_at,updated_at)
+    select ('c0000000-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,$1,
+      ('b0000000-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,$1,
+      timestamptz '2026-09-18 12:00:00+00'-i*interval '1 second',
+      timestamptz '2026-09-18 12:00:00+00'-i*interval '1 second'
+    from generate_series(1,100) i`, [actor]);
+  await db.query(`insert into public.member_messages(id,conversation_id,sender_id,client_operation_id,body,created_at)
+    select ('d0000000-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,$1,$2,
+      ('e0000000-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,'Deletion scale message '||i,
+      timestamptz '2026-09-17 12:00:00+00'-i*interval '1 second'
+    from generate_series(1,200) i`, [conversation, actor]);
+  assert.equal((await db.query("select count(*)::integer n from public.member_conversations where $1 in (user_a,user_b)", [actor])).rows[0].n, 101);
+  assert.equal((await db.query("select count(*)::integer n from public.member_messages where conversation_id=$1", [conversation])).rows[0].n, 201);
   await db.query(`insert into public.member_message_reports(
     id,conversation_id,message_id,reported_by,target_user_id,reason,details,status,reviewed_at,reviewed_by
   ) values($1,$2,$3,$4,$5,'other','Reviewed unrelated safety report','reviewed',clock_timestamp(),$6)`,
@@ -64,7 +83,7 @@ try {
   await db.query("delete from storage.objects where bucket_id='member-message-media' and name=any($1::text[])", [plan.paths]);
   const completed = (await service("select public.complete_member_messaging_account_deletion($1) value", [actor])).rows[0].value;
   assert.equal(completed.ok, true);
-  assert.equal(completed.removedConversations, 1);
+  assert.equal(completed.removedConversations, 101);
   await db.exec("reset role;");
   assert.equal((await db.query("select count(*)::integer n from public.member_conversations where id=$1", [conversation])).rows[0].n, 0);
   assert.equal((await db.query("select count(*)::integer n from public.member_conversations where id=$1", [unrelated])).rows[0].n, 1);

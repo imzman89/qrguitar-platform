@@ -22,6 +22,9 @@ import {
   MEMBER_MEDIA_COUNT_LIMIT,
   MEMBER_MEDIA_LIMIT,
   MEMBER_MEDIA_TYPES,
+  mergeMemberConversationPages,
+  mergeMemberMessagePages,
+  type MemberConversationPage,
   type MemberConversationSummary,
   type MemberConversationThread
 } from "../lib/member-messaging";
@@ -93,7 +96,10 @@ function MemberAvatar({ name, src }: { name: string; src: string }) {
 export function MessagesClient({ conversationId = "" }: { conversationId?: string }) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [conversations, setConversations] = useState<MemberConversationSummary[]>([]);
+  const [conversationCursor, setConversationCursor] = useState<string | null>(null);
+  const [loadingMoreConversations, setLoadingMoreConversations] = useState(false);
   const [thread, setThread] = useState<MemberConversationThread | null>(null);
+  const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [draft, setDraft] = useState("");
@@ -103,6 +109,8 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
   const [connection, setConnection] = useState("Connecting");
   const pendingSend = useRef<PendingSend | null>(null);
   const messageEnd = useRef<HTMLDivElement | null>(null);
+  const messageList = useRef<HTMLDivElement | null>(null);
+  const loadingHistory = useRef(false);
   const firstThreadLoad = useRef(true);
 
   const handleRequestError = useCallback((reason: unknown) => {
@@ -119,11 +127,24 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
     if (showLoading) setPhase("loading");
     setError("");
     try {
-      const payload = await messageFetch<{ ok: boolean; conversations: MemberConversationSummary[] }>("/api/messages");
+      const payload = await messageFetch<{ ok: boolean } & MemberConversationPage>("/api/messages");
       setConversations(payload.conversations || []);
+      setConversationCursor(payload.nextCursor || null);
       setPhase("ready");
     } catch (reason) { handleRequestError(reason); }
   }, [handleRequestError]);
+
+  const loadMoreConversations = useCallback(async () => {
+    if (!conversationCursor || loadingMoreConversations) return;
+    setLoadingMoreConversations(true);
+    setError("");
+    try {
+      const payload = await messageFetch<{ ok: boolean } & MemberConversationPage>(`/api/messages?cursor=${encodeURIComponent(conversationCursor)}`);
+      setConversations((current) => mergeMemberConversationPages(current, payload.conversations || []));
+      setConversationCursor(payload.nextCursor || null);
+    } catch (reason) { handleRequestError(reason); }
+    finally { setLoadingMoreConversations(false); }
+  }, [conversationCursor, handleRequestError, loadingMoreConversations]);
 
   const loadThread = useCallback(async (showLoading = true) => {
     if (!conversationId) return;
@@ -131,7 +152,18 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
     setError("");
     try {
       const payload = await messageFetch<{ ok: boolean; conversation: MemberConversationThread }>(`/api/messages/${conversationId}`);
-      setThread(payload.conversation);
+      setThread((current) => {
+        if (showLoading || !current || current.id !== payload.conversation.id) return payload.conversation;
+        const currentIds = new Set(current.messages.map((message) => message.id));
+        const overlapsLoadedHistory = payload.conversation.messages.some((message) => currentIds.has(message.id));
+        if (!overlapsLoadedHistory && current.messages.length) return payload.conversation;
+        return {
+          ...payload.conversation,
+          messages: mergeMemberMessagePages(current.messages, payload.conversation.messages),
+          hasOlderMessages: current.hasOlderMessages,
+          nextMessageCursor: current.nextMessageCursor
+        };
+      });
       setPhase("ready");
       void messageFetch(`/api/messages/${conversationId}/controls`, { method: "POST", body: JSON.stringify({ action: "read" }) }).catch(() => undefined);
     } catch (reason) { handleRequestError(reason); }
@@ -165,9 +197,34 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
   useEffect(() => {
     const latest = thread?.messages.at(-1)?.id;
     if (!latest) return;
+    if (loadingHistory.current) { loadingHistory.current = false; return; }
     messageEnd.current?.scrollIntoView({ behavior: firstThreadLoad.current ? "auto" : "smooth", block: "end" });
     firstThreadLoad.current = false;
   }, [thread?.messages]);
+
+  async function loadOlderMessages() {
+    if (!thread?.nextMessageCursor || loadingOlderMessages || !conversationId) return;
+    const beforeHeight = messageList.current?.scrollHeight || 0;
+    const beforeTop = messageList.current?.scrollTop || 0;
+    setLoadingOlderMessages(true);
+    setError("");
+    try {
+      const payload = await messageFetch<{ ok: boolean; conversation: MemberConversationThread }>(
+        `/api/messages/${conversationId}?cursor=${encodeURIComponent(thread.nextMessageCursor)}`
+      );
+      loadingHistory.current = true;
+      setThread((current) => current ? {
+        ...current,
+        messages: mergeMemberMessagePages(current.messages, payload.conversation.messages),
+        hasOlderMessages: payload.conversation.hasOlderMessages,
+        nextMessageCursor: payload.conversation.nextMessageCursor
+      } : payload.conversation);
+      window.requestAnimationFrame(() => {
+        if (messageList.current) messageList.current.scrollTop = messageList.current.scrollHeight - beforeHeight + beforeTop;
+      });
+    } catch (reason) { handleRequestError(reason); }
+    finally { setLoadingOlderMessages(false); }
+  }
 
   function chooseFiles(selected: FileList | null) {
     setNotice("");
@@ -263,6 +320,7 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
             </Link>
           )) : <MessageState compact icon={<Inbox />} title="Your inbox is ready" copy="Open a member page or public QRguitar Profile to start a private conversation." action={<Link className="button" href="/collections">Browse member collections</Link>} />}
         </div>
+        {conversationCursor ? <div className={styles.paginationRow}><button className="button secondary" type="button" disabled={loadingMoreConversations} onClick={() => void loadMoreConversations()}>{loadingMoreConversations ? "Loading…" : "Load older conversations"}</button></div> : null}
       </section>
     );
   }
@@ -278,8 +336,8 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
       </header>
       <div className={styles.threadGrid}>
         <div className={styles.threadPanel}>
-          {thread.hasOlderMessages ? <p className={styles.historyNote}>This view shows the latest 200 messages.</p> : null}
-          <div className={styles.messageList} aria-live="polite">
+          {thread.hasOlderMessages ? <div className={styles.historyNote}><button type="button" disabled={loadingOlderMessages} onClick={() => void loadOlderMessages()}>{loadingOlderMessages ? "Loading earlier messages…" : "Load earlier messages"}</button></div> : null}
+          <div ref={messageList} className={styles.messageList} aria-live="polite">
             {!thread.messages.length ? <div className={styles.threadEmpty}><MessageCircle /><strong>Start the conversation</strong><p>Ask a focused question about the Profile, availability, service, or a potential transfer.</p></div> : null}
             {thread.messages.map((message) => (
               <article className={`${styles.message} ${message.sentByMe ? styles.mine : styles.theirs}`} key={message.id}>

@@ -48,7 +48,31 @@ export type MemberConversationSummary = {
 export type MemberConversationThread = MemberConversationSummary & {
   messages: MemberMessage[];
   hasOlderMessages: boolean;
+  nextMessageCursor: string | null;
 };
+
+export type MemberConversationPage = {
+  conversations: MemberConversationSummary[];
+  nextCursor: string | null;
+};
+
+export function mergeMemberConversationPages(current: MemberConversationSummary[], incoming: MemberConversationSummary[]) {
+  const seen = new Set<string>();
+  return [...current, ...incoming].filter((conversation) => {
+    if (seen.has(conversation.id)) return false;
+    seen.add(conversation.id);
+    return true;
+  });
+}
+
+export function mergeMemberMessagePages(current: MemberMessage[], incoming: MemberMessage[]) {
+  const byId = new Map(current.map((message) => [message.id, message]));
+  for (const message of incoming) byId.set(message.id, message);
+  return [...byId.values()].sort((left, right) => {
+    const time = new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
+    return time || left.id.localeCompare(right.id);
+  });
+}
 
 export function isMessagingUuid(value: unknown): value is string {
   return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);

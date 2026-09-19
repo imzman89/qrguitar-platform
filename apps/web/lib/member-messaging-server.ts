@@ -4,6 +4,7 @@ import type { User } from "@supabase/supabase-js";
 import { assertAccountCanWrite, type ServerSupabaseClient } from "./admin-auth";
 import {
   MEMBER_MEDIA_BUCKET,
+  type MemberConversationPage,
   type MemberConversationSummary,
   type MemberConversationThread,
   type MemberIdentity,
@@ -51,6 +52,56 @@ const genericMember: MemberIdentity = {
   websiteUrl: "",
   avatarUrl: ""
 };
+
+export const MEMBER_CONVERSATION_PAGE_SIZE = 25;
+export const MEMBER_MESSAGE_PAGE_SIZE = 200;
+
+type ConversationCursor = { updatedAt: string; id: string };
+type MessageCursor = { createdAt: string; id: string };
+
+function canonicalTimestamp(value: unknown) {
+  if (typeof value !== "string" || value.length < 20 || value.length > 40) return null;
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : null;
+}
+
+function canonicalUuid(value: unknown) {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+    ? value.toLowerCase()
+    : null;
+}
+
+function encodeCursor(prefix: "mc1" | "mm1", timestamp: string, id: string) {
+  const normalizedTime = canonicalTimestamp(timestamp);
+  const normalizedId = canonicalUuid(id);
+  if (!normalizedTime || !normalizedId) throw new Error("invalid_message_cursor_source");
+  return `${prefix}.${Buffer.from(JSON.stringify([normalizedTime, normalizedId]), "utf8").toString("base64url")}`;
+}
+
+function decodeCursor(value: string, prefix: "mc1" | "mm1") {
+  if (value.length > 256 || !value.startsWith(`${prefix}.`) || !/^[A-Za-z0-9._-]+$/.test(value)) return null;
+  try {
+    const payload = value.slice(prefix.length + 1);
+    const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as unknown;
+    if (!Array.isArray(decoded) || decoded.length !== 2) return null;
+    const timestamp = canonicalTimestamp(decoded[0]);
+    const id = canonicalUuid(decoded[1]);
+    if (!timestamp || !id || decoded[0] !== timestamp || decoded[1] !== id) return null;
+    return encodeCursor(prefix, timestamp, id) === value ? { timestamp, id } : null;
+  } catch {
+    return null;
+  }
+}
+
+export function decodeMemberConversationCursor(value: string): ConversationCursor | null {
+  const decoded = decodeCursor(value, "mc1");
+  return decoded ? { updatedAt: decoded.timestamp, id: decoded.id } : null;
+}
+
+export function decodeMemberMessageCursor(value: string): MessageCursor | null {
+  const decoded = decodeCursor(value, "mm1");
+  return decoded ? { createdAt: decoded.timestamp, id: decoded.id } : null;
+}
 
 export type MessagingAccess =
   | { ok: true; user: User; supabase: ServerSupabaseClient }
@@ -143,27 +194,39 @@ function summarizeConversation(
   };
 }
 
-export async function listMemberConversations(supabase: ServerSupabaseClient, actorId: string) {
-  const result = await supabase.from("member_conversations")
+export async function listMemberConversations(
+  supabase: ServerSupabaseClient,
+  actorId: string,
+  cursor: ConversationCursor | null = null
+): Promise<MemberConversationPage> {
+  let query = supabase.from("member_conversations")
     .select("id,user_a,user_b,context_guitar_id,created_at,updated_at,last_message_at,user_a_read_at,user_b_read_at")
-    .or(`user_a.eq.${actorId},user_b.eq.${actorId}`)
-    .order("last_message_at", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false })
-    .limit(100);
+    .or(`user_a.eq.${actorId},user_b.eq.${actorId}`);
+  if (cursor) query = query.or(`updated_at.lt.${cursor.updatedAt},and(updated_at.eq.${cursor.updatedAt},id.lt.${cursor.id})`);
+  const result = await query
+    .order("updated_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(MEMBER_CONVERSATION_PAGE_SIZE + 1);
   if (result.error) throw new Error("messages_unavailable");
-  const conversations = (result.data || []) as ConversationRow[];
-  if (!conversations.length) return [];
+  const fetched = (result.data || []) as ConversationRow[];
+  const conversations = fetched.slice(0, MEMBER_CONVERSATION_PAGE_SIZE);
+  if (!conversations.length) return { conversations: [], nextCursor: null };
   const ids = conversations.map((row) => row.id);
+  const latestTerms = conversations
+    .filter((row) => row.last_message_at)
+    .map((row) => `and(conversation_id.eq.${row.id},created_at.eq.${canonicalTimestamp(row.last_message_at)})`);
   const [identities, contexts, messages] = await Promise.all([
     loadMemberIdentities(supabase, conversations.map((row) => otherMember(row, actorId))),
     loadProfileContexts(supabase, conversations.map((row) => row.context_guitar_id || "")),
-    supabase.from("member_messages").select("id,conversation_id,sender_id,body,created_at").in("conversation_id", ids)
-      .order("created_at", { ascending: false }).limit(500)
+    latestTerms.length
+      ? supabase.from("member_messages").select("id,conversation_id,sender_id,body,created_at")
+        .in("conversation_id", ids).or(latestTerms.join(",")).order("id", { ascending: false })
+      : Promise.resolve({ data: [], error: null })
   ]);
   if (messages.error) throw new Error("messages_unavailable");
   const latest = new Map<string, MessageRow>();
   for (const row of (messages.data || []) as MessageRow[]) if (!latest.has(row.conversation_id)) latest.set(row.conversation_id, row);
-  return conversations.map((conversation) => {
+  const page = conversations.map((conversation) => {
     const targetId = otherMember(conversation, actorId);
     return summarizeConversation(
       conversation,
@@ -173,8 +236,14 @@ export async function listMemberConversations(supabase: ServerSupabaseClient, ac
       latest.get(conversation.id) || null
     );
   });
+  const boundary = conversations.at(-1);
+  return {
+    conversations: page,
+    nextCursor: fetched.length > MEMBER_CONVERSATION_PAGE_SIZE && boundary
+      ? encodeCursor("mc1", boundary.updated_at, boundary.id)
+      : null
+  };
 }
-
 export async function requireParticipantConversation(supabase: ServerSupabaseClient, actorId: string, conversationId: string) {
   const result = await supabase.from("member_conversations")
     .select("id,user_a,user_b,context_guitar_id,created_at,updated_at,last_message_at,user_a_read_at,user_b_read_at")
@@ -183,20 +252,27 @@ export async function requireParticipantConversation(supabase: ServerSupabaseCli
   return result.data;
 }
 
-export async function loadMemberConversation(supabase: ServerSupabaseClient, actorId: string, conversationId: string): Promise<MemberConversationThread | null> {
+export async function loadMemberConversation(
+  supabase: ServerSupabaseClient,
+  actorId: string,
+  conversationId: string,
+  cursor: MessageCursor | null = null
+): Promise<MemberConversationThread | null> {
   const conversation = await requireParticipantConversation(supabase, actorId, conversationId);
   if (!conversation) return null;
   const targetId = otherMember(conversation, actorId);
-  const messagesResult = await supabase.from("member_messages")
+  let query = supabase.from("member_messages")
     .select("id,conversation_id,sender_id,body,created_at")
-    .eq("conversation_id", conversationId)
+    .eq("conversation_id", conversationId);
+  if (cursor) query = query.or(`created_at.lt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id})`);
+  const messagesResult = await query
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
-    .limit(201);
+    .limit(MEMBER_MESSAGE_PAGE_SIZE + 1);
   if (messagesResult.error) throw new Error("messages_unavailable");
-  const newest = (messagesResult.data || []) as MessageRow[];
-  const hasOlderMessages = newest.length > 200;
-  const messages = newest.slice(0, 200).reverse();
+  const fetched = (messagesResult.data || []) as MessageRow[];
+  const pageDescending = fetched.slice(0, MEMBER_MESSAGE_PAGE_SIZE);
+  const messages = [...pageDescending].reverse();
   const messageIds = messages.map((row) => row.id);
   const [identities, contexts, attachmentResult] = await Promise.all([
     loadMemberIdentities(supabase, [targetId]),
@@ -228,8 +304,12 @@ export async function loadMemberConversation(supabase: ServerSupabaseClient, act
     actorId,
     identities.get(targetId) || genericMember,
     contexts.get(conversation.context_guitar_id || "") || null,
-    messages.at(-1) || null
+    cursor ? null : messages.at(-1) || null
   );
+  const boundary = pageDescending.at(-1);
+  const nextMessageCursor = fetched.length > MEMBER_MESSAGE_PAGE_SIZE && boundary
+    ? encodeCursor("mm1", boundary.created_at, boundary.id)
+    : null;
   return {
     ...summary,
     messages: messages.map((row) => ({
@@ -239,10 +319,10 @@ export async function loadMemberConversation(supabase: ServerSupabaseClient, act
       sentByMe: row.sender_id === actorId,
       attachments: attachmentsByMessage.get(row.id) || []
     })),
-    hasOlderMessages
+    hasOlderMessages: Boolean(nextMessageCursor),
+    nextMessageCursor
   };
 }
-
 export function messagingDatabaseError(error: unknown) {
   const value = error as { code?: string; message?: string } | null;
   const code = value?.code || "";

@@ -7,6 +7,7 @@ import { installRepositorySchema } from "./security/postgres-fixture.mjs";
 const repo = path.resolve(process.cwd(), "../..");
 const migrationPath = path.join(repo, "supabase/migrations/20260918180000_member_messaging.sql");
 const durableMigrationPath = path.join(repo, "supabase/migrations/20260918182000_durable_member_message_history.sql");
+const paginationMigrationPath = path.join(repo, "supabase/migrations/20260919101000_member_messaging_pagination.sql");
 const db = new PGlite();
 const users = {
   sender: "10000000-0000-4000-8000-000000000001",
@@ -130,6 +131,7 @@ try {
     await role("postgres");
     await db.query("update public.member_conversations set user_a_archived_at=clock_timestamp() where id=$1", [conversationId]);
     await db.exec(fs.readFileSync(durableMigrationPath, "utf8"));
+    await db.exec(fs.readFileSync(paginationMigrationPath, "utf8"));
     const state = (await db.query("select user_a_archived_at,user_b_archived_at from public.member_conversations where id=$1", [conversationId])).rows[0];
     assert.deepEqual(state, { user_a_archived_at: null, user_b_archived_at: null });
     assert.equal((await db.query("select count(*)::integer n from public.member_message_blocks")).rows[0].n, 0);
@@ -139,6 +141,74 @@ try {
     await assert.rejects(db.query("update public.member_conversations set user_a_archived_at=clock_timestamp() where id=$1", [conversationId]), /durable_history_no_archive|check constraint/i);
     const sent = await service("select public.send_member_message($1,$2,$3,'Durable history remains writable') value", [conversationId, users.sender, "70000000-0000-4000-8000-000000000007"]);
     assert.equal(sent.rows[0].value.replayed, false);
+    await role("postgres");
+    const activityBeforeRead = (await db.query("select updated_at from public.member_conversations where id=$1", [conversationId])).rows[0].updated_at;
+    await service("select public.mark_member_conversation_read($1,$2)", [conversationId, users.owner]);
+    await role("postgres");
+    assert.equal(new Date((await db.query("select updated_at from public.member_conversations where id=$1", [conversationId])).rows[0].updated_at).getTime(), new Date(activityBeforeRead).getTime());
+    await role("authenticated", users.sender);
+    await assert.rejects(db.query("delete from public.member_messages where conversation_id=$1", [conversationId]), /permission denied|row-level security/i);
+    await assert.rejects(db.query("update public.member_messages set body='hidden' where conversation_id=$1", [conversationId]), /permission denied|row-level security/i);
+    await role("service_role");
+    await assert.rejects(db.query("delete from public.member_conversations where id=$1", [conversationId]), /permission denied|row-level security/i);
+  });
+
+  await test("stable database keys page beyond 100 conversations and 200 durable messages without omission", async () => {
+    await role("postgres");
+    await db.query(`insert into auth.users(id,email)
+      select ('90000000-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,'scale-'||i||'@example.invalid'
+      from generate_series(1,100) i`);
+    await db.query(`insert into public.profiles(id,display_name,account_status)
+      select ('90000000-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,'Scale peer '||i,'active'
+      from generate_series(1,100) i`);
+    await db.query(`insert into public.member_conversations(id,user_a,user_b,created_by,created_at,updated_at,last_message_at)
+      select ('91000000-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,$1,
+        ('90000000-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,$1,
+        timestamptz '2026-09-18 12:00:00+00'-i*interval '1 second',
+        timestamptz '2026-09-18 12:00:00+00'-i*interval '1 second',null
+      from generate_series(1,100) i`, [users.sender]);
+    await db.query(`insert into public.member_messages(id,conversation_id,sender_id,client_operation_id,body,created_at)
+      select ('92000000-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,$1,$2,
+        ('93000000-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,'Scale message '||i,
+        timestamptz '2026-09-17 12:00:00+00'-i*interval '1 second'
+      from generate_series(1,203) i`, [conversationId, users.sender]);
+
+    const conversationIds = [];
+    let conversationCursor = null;
+    do {
+      const params = [users.sender];
+      let filter = "";
+      if (conversationCursor) {
+        params.push(conversationCursor.updated_at, conversationCursor.id);
+        filter = "and (updated_at<$2 or (updated_at=$2 and id<$3))";
+      }
+      const page = (await db.query(`select id,updated_at from public.member_conversations
+        where $1 in (user_a,user_b) ${filter} order by updated_at desc,id desc limit 26`, params)).rows;
+      const visible = page.slice(0,25);
+      conversationIds.push(...visible.map(row => row.id));
+      conversationCursor = page.length > 25 ? visible.at(-1) : null;
+    } while (conversationCursor);
+    assert.equal(conversationIds.length, 101);
+    assert.equal(new Set(conversationIds).size, 101);
+    assert.equal((await db.query("select count(*)::integer n from pg_indexes where schemaname='public' and indexname in ('member_conversations_user_a_updated_page','member_conversations_user_b_updated_page')")).rows[0].n, 2);
+
+    const messageIds = [];
+    let messageCursor = null;
+    do {
+      const params = [conversationId];
+      let filter = "";
+      if (messageCursor) {
+        params.push(messageCursor.created_at, messageCursor.id);
+        filter = "and (created_at<$2 or (created_at=$2 and id<$3))";
+      }
+      const page = (await db.query(`select id,created_at from public.member_messages where conversation_id=$1 ${filter}
+        order by created_at desc,id desc limit 201`, params)).rows;
+      const visible = page.slice(0,200);
+      messageIds.push(...visible.map(row => row.id));
+      messageCursor = page.length > 200 ? visible.at(-1) : null;
+    } while (messageCursor);
+    assert.equal(messageIds.length, 205);
+    assert.equal(new Set(messageIds).size, 205);
   });
 
   await test("anonymous clients receive no messaging metadata", async () => {

@@ -14,6 +14,9 @@ const server = read("lib/member-messaging-server.ts");
 const controls = read("app/api/messages/[conversationId]/controls/route.ts");
 const migration = read("../../supabase/migrations/20260918180000_member_messaging.sql");
 const deletionMigration = read("../../supabase/migrations/20260918181000_member_messaging_account_deletion.sql");
+const paginationMigration = read("../../supabase/migrations/20260919101000_member_messaging_pagination.sql");
+const inboxRoute = read("app/api/messages/route.ts");
+const threadRoute = read("app/api/messages/[conversationId]/route.ts");
 
 assert.match(status, /Owned by <strong>/);
 assert.match(status, /href={`\/collections\/\$\{ownerCollection\.handle\}`}/);
@@ -38,6 +41,19 @@ assert.doesNotMatch(messages, /blockConfirmOpen|thread\.blocked|thread\.archived
 assert.match(controls, /action !== "read"/);
 assert.doesNotMatch(controls, /set_member_conversation_archived|set_member_message_block/);
 assert.doesNotMatch(messages, /window\.confirm/);
+assert.match(messages, /Load older conversations/);
+assert.match(messages, /Load earlier messages/);
+assert.match(messages, /mergeMemberConversationPages/);
+assert.match(messages, /mergeMemberMessagePages/);
+assert.match(messages, /overlapsLoadedHistory/);
+assert.match(server, /updated_at\.lt/);
+assert.match(server, /created_at\.lt/);
+assert.match(server, /created_at\.eq/);
+assert.doesNotMatch(server, /limit\(500\)/);
+assert.match(inboxRoute, /decodeMemberConversationCursor/);
+assert.match(threadRoute, /decodeMemberMessageCursor/);
+assert.match(paginationMigration, /member_conversations_user_a_updated_page/);
+assert.match(paginationMigration, /member_conversations_user_b_updated_page/);
 
 assert.doesNotMatch(dto, /peerId|senderId|storagePath/);
 assert.match(server, /code === "PD423"/);
