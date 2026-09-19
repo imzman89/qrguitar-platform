@@ -405,19 +405,26 @@ export function buildRecordJsonLd(instrument: DemoInstrument) {
   const description = getRecordStructuredDescription(instrument);
   const profileId = `${url}#profile`;
   const breadcrumbId = `${url}#breadcrumb`;
-  const additionalProperty = (instrument.customFields || [])
-    .filter((field) => String(field.label || "").trim() && String(field.value || "").trim())
-    .map((field) => ({
+  const identifiers = [
+    {
       "@type": "PropertyValue",
-      name: String(field.label).trim(),
-      value: String(field.value).trim()
-    }));
+      propertyID: "QRguitar Profile",
+      value: instrument.qrCode
+    },
+    instrument.serial
+      ? {
+          "@type": "PropertyValue",
+          propertyID: "Serial number",
+          value: instrument.serial
+        }
+      : null
+  ].filter(Boolean);
 
   return {
     "@context": "https://schema.org",
     "@graph": [
       {
-        "@type": "WebPage",
+        "@type": "ItemPage",
         "@id": `${url}#page`,
         url,
         name: title,
@@ -426,29 +433,13 @@ export function buildRecordJsonLd(instrument: DemoInstrument) {
         mainEntity: { "@id": profileId }
       },
       {
-        "@type": "Product",
+        "@type": "Thing",
         "@id": profileId,
         name: title,
         description,
         image: [image],
         url,
-        sku: instrument.qrCode,
-        serialNumber: instrument.serial || undefined,
-        category: instrument.instrumentType || "Instrument",
-        brand: instrument.brand
-          ? {
-              "@type": "Brand",
-              name: instrument.brand
-            }
-          : undefined,
-        manufacturer: instrument.builder
-          ? {
-              "@type": "Organization",
-              name: instrument.builder
-            }
-          : undefined,
-        additionalProperty,
-        productionDate: instrument.year || undefined
+        identifier: identifiers
       },
       {
         ...breadcrumbList([

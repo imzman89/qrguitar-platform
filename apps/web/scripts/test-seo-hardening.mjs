@@ -185,16 +185,46 @@ test("metadata excerpts normalize whitespace and remain word and Unicode safe", 
   assert.doesNotMatch(metadata.description, /\s{2,}/);
 
   const graph = seo.buildRecordJsonLd(instrument)["@graph"];
-  const product = graph.find(item => item["@type"] === "Product");
+  const page = graph.find(item => item["@type"] === "ItemPage");
+  const profile = graph.find(item => item["@type"] === "Thing");
   const breadcrumb = graph.find(item => item["@type"] === "BreadcrumbList");
-  assert.match(product.description, /Additional provenance remains visible in structured data\.(?: Additional provenance remains visible in structured data\.){7}/);
-  assert.ok(product.description.length > metadata.openGraph.description.length);
+  assert.equal(graph.some(item => item["@type"] === "Product"), false);
+  assert.equal(graph.some(item => Object.hasOwn(item, "offers")), false);
+  assert.deepEqual(page.mainEntity, { "@id": "https://www.qrguitar.com/i/QRG-LONG#profile" });
+  assert.match(profile.description, /Additional provenance remains visible in structured data\.(?: Additional provenance remains visible in structured data\.){7}/);
+  assert.ok(profile.description.length > metadata.openGraph.description.length);
+  assert.deepEqual(profile.identifier, [{
+    "@type": "PropertyValue",
+    propertyID: "QRguitar Profile",
+    value: "QRG-LONG"
+  }]);
   assert.deepEqual(breadcrumb.itemListElement.map(item => item.name), ["Home", "Catalog", instrument.name]);
   assert.deepEqual(breadcrumb.itemListElement.map(item => item.item), [
     "https://www.qrguitar.com",
     "https://www.qrguitar.com/catalog",
     "https://www.qrguitar.com/i/QRG-LONG"
   ]);
+});
+
+test("Profile structured data never invents a Product offer from availability alone", () => {
+  for (const saleStatus of ["not_for_sale", "for_sale"]) {
+    const code = "QRG-" + saleStatus;
+    const graph = seo.buildRecordJsonLd({
+      qrCode: code,
+      permanentPath: "/i/" + code,
+      name: "Documented amplifier",
+      brand: "Example",
+      model: "Amp",
+      serial: "SERIAL-1",
+      instrumentType: "Amplifier",
+      summary: "A permanent identity and history Profile.",
+      saleStatus
+    })["@graph"];
+    assert.equal(graph.some(item => item["@type"] === "Product"), false, saleStatus);
+    assert.equal(graph.some(item => Object.hasOwn(item, "offers")), false, saleStatus);
+    assert.equal(graph.find(item => item["@type"] === "ItemPage").mainEntity["@id"], "https://www.qrguitar.com/i/" + code + "#profile");
+    assert.equal(graph.find(item => item["@type"] === "Thing").identifier[1].value, "SERIAL-1");
+  }
 });
 
 test("managed public metadata honors allowlisted indexing values and locks protected page ids", async () => {
