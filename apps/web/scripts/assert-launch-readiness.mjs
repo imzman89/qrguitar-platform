@@ -138,7 +138,7 @@ if (baseUrl) {
 
   const robotsResponse = await fetch(baseUrl + "/robots.txt", { cache: "no-store" });
   const robotsText = await robotsResponse.text();
-  ok(robotsResponse.ok && /text\/plain/i.test(robotsResponse.headers.get("content-type") || "") && robotsText.split("\n").length >= 10, "robots invalid");
+  ok(robotsResponse.ok && /text\/plain/i.test(robotsResponse.headers.get("content-type") || "") && /^User-agent: \*/m.test(robotsText) && /^Allow: \/$/m.test(robotsText) && /^Sitemap: https:\/\/www\.qrguitar\.com\/sitemap\.xml$/m.test(robotsText), "robots invalid");
   const sitemapResponse = await fetch(baseUrl + "/sitemap.xml", { cache: "no-store" });
   const sitemapText = await sitemapResponse.text();
   ok(sitemapResponse.ok && /(application|text)\/xml/i.test(sitemapResponse.headers.get("content-type") || "") && sitemapText.includes("<urlset") && sitemapText.includes("</urlset>") && !sitemapText.toUpperCase().includes(retiredCode), "sitemap invalid");
