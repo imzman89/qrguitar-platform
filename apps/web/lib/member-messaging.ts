@@ -43,9 +43,6 @@ export type MemberConversationSummary = {
   contextProfile: MemberMessageProfileContext | null;
   lastMessage: { body: string; createdAt: string; sentByMe: boolean } | null;
   unread: boolean;
-  archived: boolean;
-  blockedByMe: boolean;
-  blocked: boolean;
 };
 
 export type MemberConversationThread = MemberConversationSummary & {

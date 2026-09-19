@@ -9,10 +9,9 @@ export async function GET(request: Request) {
   const access = await requireMessagingAccess(request);
   if (!access.ok) return memberMessageJson({ ok: false, message: access.message }, access.status);
   const url = new URL(request.url);
-  if ([...url.searchParams.keys()].some((key) => key !== "archived")) return memberMessageJson({ ok: false, message: "Unsupported message filter." }, 400);
-  const archived = url.searchParams.get("archived") === "true";
+  if ([...url.searchParams.keys()].length) return memberMessageJson({ ok: false, message: "Unsupported message filter." }, 400);
   try {
-    const conversations = await listMemberConversations(access.supabase, access.user.id, archived);
+    const conversations = await listMemberConversations(access.supabase, access.user.id);
     return memberMessageJson({ ok: true, conversations });
   } catch {
     return memberMessageJson({ ok: false, message: "Messages are temporarily unavailable. Try again." }, 503);

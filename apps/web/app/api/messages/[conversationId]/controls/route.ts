@@ -15,12 +15,8 @@ export async function POST(request: Request, context: { params: Promise<{ conver
   if (!isMessagingUuid(conversationId)) return memberMessageJson({ ok: false, message: "Conversation not found." }, 404);
   const conversation = await requireParticipantConversation(access.supabase, access.user.id, conversationId);
   if (!conversation) return memberMessageJson({ ok: false, message: "Conversation not found." }, 404);
-  const targetId = conversation.user_a === access.user.id ? conversation.user_b : conversation.user_a;
-  let result;
-  if (action === "read") result = await access.supabase.rpc("mark_member_conversation_read", { p_conversation_id: conversationId, p_actor_id: access.user.id });
-  else if (action === "archive" || action === "unarchive") result = await access.supabase.rpc("set_member_conversation_archived", { p_conversation_id: conversationId, p_actor_id: access.user.id, p_archived: action === "archive" });
-  else if (action === "block" || action === "unblock") result = await access.supabase.rpc("set_member_message_block", { p_actor_id: access.user.id, p_target_id: targetId, p_blocked: action === "block" });
-  else return memberMessageJson({ ok: false, message: "Unsupported conversation action." }, 400);
+  if (action !== "read") return memberMessageJson({ ok: false, message: "Conversation history cannot be archived, blocked, or deleted." }, 400);
+  const result = await access.supabase.rpc("mark_member_conversation_read", { p_conversation_id: conversationId, p_actor_id: access.user.id });
   if (result.error) {
     const failure = messagingDatabaseError(result.error);
     return memberMessageJson({ ok: false, message: failure.message }, failure.status);

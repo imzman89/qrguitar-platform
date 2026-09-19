@@ -1,9 +1,7 @@
 "use client";
 
 import {
-  Archive,
   ArrowLeft,
-  Ban,
   ExternalLink,
   FileImage,
   Flag,
@@ -18,7 +16,6 @@ import {
   X
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   MEMBER_MEDIA_BUCKET,
@@ -93,10 +90,8 @@ function MemberAvatar({ name, src }: { name: string; src: string }) {
     : <span className={styles.avatarFallback} aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>;
 }
 
-export function MessagesClient({ conversationId = "", initialArchived = false }: { conversationId?: string; initialArchived?: boolean }) {
-  const router = useRouter();
+export function MessagesClient({ conversationId = "" }: { conversationId?: string }) {
   const [phase, setPhase] = useState<Phase>("loading");
-  const [archived, setArchived] = useState(initialArchived);
   const [conversations, setConversations] = useState<MemberConversationSummary[]>([]);
   const [thread, setThread] = useState<MemberConversationThread | null>(null);
   const [error, setError] = useState("");
@@ -106,7 +101,6 @@ export function MessagesClient({ conversationId = "", initialArchived = false }:
   const [sending, setSending] = useState(false);
   const [uncertainSend, setUncertainSend] = useState(false);
   const [connection, setConnection] = useState("Connecting");
-  const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
   const pendingSend = useRef<PendingSend | null>(null);
   const messageEnd = useRef<HTMLDivElement | null>(null);
   const firstThreadLoad = useRef(true);
@@ -125,11 +119,11 @@ export function MessagesClient({ conversationId = "", initialArchived = false }:
     if (showLoading) setPhase("loading");
     setError("");
     try {
-      const payload = await messageFetch<{ ok: boolean; conversations: MemberConversationSummary[] }>(`/api/messages?archived=${archived}`);
+      const payload = await messageFetch<{ ok: boolean; conversations: MemberConversationSummary[] }>("/api/messages");
       setConversations(payload.conversations || []);
       setPhase("ready");
     } catch (reason) { handleRequestError(reason); }
-  }, [archived, handleRequestError]);
+  }, [handleRequestError]);
 
   const loadThread = useCallback(async (showLoading = true) => {
     if (!conversationId) return;
@@ -242,17 +236,6 @@ export function MessagesClient({ conversationId = "", initialArchived = false }:
     } finally { setSending(false); }
   }
 
-  async function runControl(action: "archive" | "unarchive" | "block" | "unblock") {
-    if (!conversationId || !thread) return;
-    setNotice("");
-    setError("");
-    try {
-      await messageFetch(`/api/messages/${conversationId}/controls`, { method: "POST", body: JSON.stringify({ action }) });
-      if (action === "archive" || action === "unarchive") router.push(`/messages${action === "archive" ? "?archived=true" : ""}`);
-      else await loadThread(false);
-    } catch (reason) { handleRequestError(reason); }
-  }
-
   const signinHref = `/login?next=${encodeURIComponent(conversationId ? `/messages/${conversationId}` : "/messages")}`;
   if (phase === "loading") return <MessageState icon={<LoaderCircle className={styles.spin} />} title="Opening Messages" copy="Loading your private conversations." />;
   if (phase === "signed-out") return <MessageState icon={<MessageCircle />} title="Sign in to Messages" copy="Private conversations are available to signed-in QRguitar members." action={<Link className="button" href={signinHref}>Sign in</Link>} />;
@@ -262,13 +245,9 @@ export function MessagesClient({ conversationId = "", initialArchived = false }:
     return (
       <section className={styles.workspace} aria-labelledby="messages-title">
         <header className={styles.inboxHeader}>
-          <div><span className="eyebrow">Private member conversations</span><h1 id="messages-title">Messages</h1><p>{"Connect with owners, stores, brands, builders, and repair professionals without exposing either member's email address."}</p></div>
+          <div><span className="eyebrow">Private member conversations</span><h1 id="messages-title">Messages</h1><p>{"Connect with owners, stores, brands, builders, and repair professionals without exposing either member's email address. Conversation history stays available to both members."}</p></div>
           <Link className="button secondary" href="/collections"><UserRound size={16} /> Find members</Link>
         </header>
-        <div className={styles.segmented} aria-label="Message folders">
-          <button type="button" className={!archived ? styles.active : ""} onClick={() => setArchived(false)}><Inbox size={15} /> Inbox</button>
-          <button type="button" className={archived ? styles.active : ""} onClick={() => setArchived(true)}><Archive size={15} /> Archived</button>
-        </div>
         {error ? <p className={styles.error} role="alert">{error}</p> : null}
         <div className={styles.inboxList}>
           {conversations.length ? conversations.map((conversation) => (
@@ -282,7 +261,7 @@ export function MessagesClient({ conversationId = "", initialArchived = false }:
               </div>
               {conversation.unread ? <i aria-label="Unread message" /> : null}
             </Link>
-          )) : <MessageState compact icon={archived ? <Archive /> : <Inbox />} title={archived ? "No archived conversations" : "Your inbox is ready"} copy={archived ? "Archived conversations will stay here until you restore them." : "Open a member page or public QRguitar Profile to start a private conversation."} action={!archived ? <Link className="button" href="/collections">Browse member collections</Link> : undefined} />}
+          )) : <MessageState compact icon={<Inbox />} title="Your inbox is ready" copy="Open a member page or public QRguitar Profile to start a private conversation." action={<Link className="button" href="/collections">Browse member collections</Link>} />}
         </div>
       </section>
     );
@@ -315,8 +294,7 @@ export function MessagesClient({ conversationId = "", initialArchived = false }:
             ))}
             <div ref={messageEnd} />
           </div>
-          {thread.blocked ? <div className={styles.blockNotice}><Ban size={18} /><div><strong>Messaging is paused</strong><p>{thread.blockedByMe ? "You blocked this member. Unblock them to continue the conversation." : "Messages cannot be sent in this conversation."}</p></div></div> : (
-            <div className={styles.composer}>
+          <div className={styles.composer}>
               <label htmlFor="member-message-draft">Message</label>
               <textarea id="member-message-draft" rows={3} maxLength={4000} value={draft} disabled={lockComposer} onChange={(event) => setDraft(event.target.value)} placeholder={`Message ${thread.member.publicName}`} />
               {files.length ? <ul className={styles.fileList}>{files.map((file, index) => <li key={`${file.name}-${file.lastModified}-${index}`}><FileImage size={15} /><span><strong>{file.name}</strong><small>{fileSize(file.size)}</small></span><button type="button" disabled={lockComposer} title={`Remove ${file.name}`} onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={15} /></button></li>)}</ul> : null}
@@ -325,8 +303,7 @@ export function MessagesClient({ conversationId = "", initialArchived = false }:
                 <span>{draft.length}/4000</span>
                 <button className="button" type="button" disabled={sending} onClick={() => void sendMessage()}>{sending ? <LoaderCircle className={styles.spin} size={16} /> : <Send size={16} />}{sending ? "Sending..." : uncertainSend ? "Retry send" : "Send"}</button>
               </div>
-            </div>
-          )}
+          </div>
           {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
           {error ? <p className={styles.error} role="alert">{error}</p> : null}
         </div>
@@ -339,19 +316,10 @@ export function MessagesClient({ conversationId = "", initialArchived = false }:
             {thread.contextProfile ? <Link href={thread.contextProfile.href}><ShieldCheck size={15} /> {thread.contextProfile.title}</Link> : null}
           </div>
           <div className={styles.threadControls}>
-            <button type="button" onClick={() => void runControl(thread.archived ? "unarchive" : "archive")}><Archive size={15} /> {thread.archived ? "Restore conversation" : "Archive conversation"}</button>
-            <button type="button" className={styles.danger} onClick={() => thread.blockedByMe ? void runControl("unblock") : setBlockConfirmOpen(true)}><Ban size={15} /> {thread.blockedByMe ? "Unblock member" : "Block member"}</button>
             <a href={`mailto:support@qrguitar.com?subject=${encodeURIComponent("QRguitar message safety concern")}&body=${encodeURIComponent(`Conversation ID: ${conversationId}\n\nPlease describe the message, concern, and approximate time. Do not include passwords, payment-card numbers, or unrelated personal documents.`)}`}><Flag size={15} /> Report a safety concern</a>
           </div>
         </aside>
       </div>
-      {blockConfirmOpen ? <div className={styles.modalBackdrop} onMouseDown={(event) => { if (event.target === event.currentTarget) setBlockConfirmOpen(false); }}>
-        <section className={styles.reportDialog} role="dialog" aria-modal="true" aria-labelledby="block-member-title">
-          <header><div><span className="eyebrow">Conversation control</span><h2 id="block-member-title">Block {thread.member.publicName}?</h2></div><button type="button" title="Close block confirmation" onClick={() => setBlockConfirmOpen(false)}><X /></button></header>
-          <p>Neither member will be able to send messages in this conversation until you unblock them. You can reverse this at any time.</p>
-          <footer><button className="button secondary" type="button" onClick={() => setBlockConfirmOpen(false)}>Cancel</button><button className="button" type="button" onClick={() => { setBlockConfirmOpen(false); void runControl("block"); }}><Ban size={15} /> Block member</button></footer>
-        </section>
-      </div> : null}
     </section>
   );
 }

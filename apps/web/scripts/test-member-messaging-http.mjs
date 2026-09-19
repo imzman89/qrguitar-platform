@@ -26,9 +26,9 @@ assert.equal(memberMessageOriginAllowed(new Request("https://www.qrguitar.com/ap
 const valid = new Request("https://www.qrguitar.com/api/messages", {
   method: "POST",
   headers: { "content-type": "application/json; charset=utf-8" },
-  body: JSON.stringify({ action: "archive" })
+  body: JSON.stringify({ action: "read" })
 });
-assert.deepEqual(await readMemberMessageJson(valid, 128), { action: "archive" });
+assert.deepEqual(await readMemberMessageJson(valid, 128), { action: "read" });
 
 let cancelled = false;
 const oversized = new Request("https://www.qrguitar.com/api/messages", {

@@ -23,8 +23,6 @@ type ConversationRow = {
   last_message_at?: string | null;
   user_a_read_at?: string | null;
   user_b_read_at?: string | null;
-  user_a_archived_at?: string | null;
-  user_b_archived_at?: string | null;
 };
 
 type MessageRow = {
@@ -43,8 +41,6 @@ type AttachmentRow = {
   file_size_bytes: number;
   storage_path: string;
 };
-
-type BlockRow = { blocker_id: string; blocked_id: string };
 
 const genericMember: MemberIdentity = {
   publicName: "QRguitar member",
@@ -126,32 +122,14 @@ async function loadProfileContexts(supabase: ServerSupabaseClient, guitarIds: st
   return profiles;
 }
 
-async function loadBlocks(supabase: ServerSupabaseClient, actorId: string) {
-  const result = await supabase.from("member_message_blocks").select("blocker_id,blocked_id")
-    .or(`blocker_id.eq.${actorId},blocked_id.eq.${actorId}`);
-  if (result.error) throw new Error("message_controls_unavailable");
-  return (result.data || []) as BlockRow[];
-}
-
-function blockState(blocks: BlockRow[], actorId: string, targetId: string) {
-  return {
-    blockedByMe: blocks.some((row) => row.blocker_id === actorId && row.blocked_id === targetId),
-    blocked: blocks.some((row) => (row.blocker_id === actorId && row.blocked_id === targetId) || (row.blocker_id === targetId && row.blocked_id === actorId))
-  };
-}
-
 function summarizeConversation(
   conversation: ConversationRow,
   actorId: string,
   identity: MemberIdentity,
   context: MemberMessageProfileContext | null,
-  lastMessage: MessageRow | null,
-  blocks: BlockRow[]
+  lastMessage: MessageRow | null
 ): MemberConversationSummary {
-  const targetId = otherMember(conversation, actorId);
   const readAt = actorValue(conversation, actorId, conversation.user_a_read_at, conversation.user_b_read_at);
-  const archivedAt = actorValue(conversation, actorId, conversation.user_a_archived_at, conversation.user_b_archived_at);
-  const status = blockState(blocks, actorId, targetId);
   return {
     id: conversation.id,
     member: identity,
@@ -161,50 +139,45 @@ function summarizeConversation(
       createdAt: lastMessage.created_at,
       sentByMe: lastMessage.sender_id === actorId
     } : null,
-    unread: Boolean(conversation.last_message_at && (!readAt || new Date(conversation.last_message_at).getTime() > new Date(readAt).getTime())),
-    archived: Boolean(archivedAt),
-    ...status
+    unread: Boolean(conversation.last_message_at && (!readAt || new Date(conversation.last_message_at).getTime() > new Date(readAt).getTime()))
   };
 }
 
-export async function listMemberConversations(supabase: ServerSupabaseClient, actorId: string, archived: boolean) {
+export async function listMemberConversations(supabase: ServerSupabaseClient, actorId: string) {
   const result = await supabase.from("member_conversations")
-    .select("id,user_a,user_b,context_guitar_id,created_at,updated_at,last_message_at,user_a_read_at,user_b_read_at,user_a_archived_at,user_b_archived_at")
+    .select("id,user_a,user_b,context_guitar_id,created_at,updated_at,last_message_at,user_a_read_at,user_b_read_at")
     .or(`user_a.eq.${actorId},user_b.eq.${actorId}`)
     .order("last_message_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
     .limit(100);
   if (result.error) throw new Error("messages_unavailable");
   const conversations = (result.data || []) as ConversationRow[];
-  const visibleConversations = conversations.filter((row) => Boolean(actorValue(row, actorId, row.user_a_archived_at, row.user_b_archived_at)) === archived);
-  if (!visibleConversations.length) return [];
-  const ids = visibleConversations.map((row) => row.id);
-  const [identities, contexts, messages, blocks] = await Promise.all([
-    loadMemberIdentities(supabase, visibleConversations.map((row) => otherMember(row, actorId))),
-    loadProfileContexts(supabase, visibleConversations.map((row) => row.context_guitar_id || "")),
+  if (!conversations.length) return [];
+  const ids = conversations.map((row) => row.id);
+  const [identities, contexts, messages] = await Promise.all([
+    loadMemberIdentities(supabase, conversations.map((row) => otherMember(row, actorId))),
+    loadProfileContexts(supabase, conversations.map((row) => row.context_guitar_id || "")),
     supabase.from("member_messages").select("id,conversation_id,sender_id,body,created_at").in("conversation_id", ids)
-      .order("created_at", { ascending: false }).limit(500),
-    loadBlocks(supabase, actorId)
+      .order("created_at", { ascending: false }).limit(500)
   ]);
   if (messages.error) throw new Error("messages_unavailable");
   const latest = new Map<string, MessageRow>();
   for (const row of (messages.data || []) as MessageRow[]) if (!latest.has(row.conversation_id)) latest.set(row.conversation_id, row);
-  return visibleConversations.map((conversation) => {
+  return conversations.map((conversation) => {
     const targetId = otherMember(conversation, actorId);
     return summarizeConversation(
       conversation,
       actorId,
       identities.get(targetId) || genericMember,
       contexts.get(conversation.context_guitar_id || "") || null,
-      latest.get(conversation.id) || null,
-      blocks
+      latest.get(conversation.id) || null
     );
   });
 }
 
 export async function requireParticipantConversation(supabase: ServerSupabaseClient, actorId: string, conversationId: string) {
   const result = await supabase.from("member_conversations")
-    .select("id,user_a,user_b,context_guitar_id,created_at,updated_at,last_message_at,user_a_read_at,user_b_read_at,user_a_archived_at,user_b_archived_at")
+    .select("id,user_a,user_b,context_guitar_id,created_at,updated_at,last_message_at,user_a_read_at,user_b_read_at")
     .eq("id", conversationId).maybeSingle<ConversationRow>();
   if (result.error || !result.data || !otherMember(result.data, actorId)) return null;
   return result.data;
@@ -225,10 +198,9 @@ export async function loadMemberConversation(supabase: ServerSupabaseClient, act
   const hasOlderMessages = newest.length > 200;
   const messages = newest.slice(0, 200).reverse();
   const messageIds = messages.map((row) => row.id);
-  const [identities, contexts, blocks, attachmentResult] = await Promise.all([
+  const [identities, contexts, attachmentResult] = await Promise.all([
     loadMemberIdentities(supabase, [targetId]),
     loadProfileContexts(supabase, [conversation.context_guitar_id || ""]),
-    loadBlocks(supabase, actorId),
     messageIds.length
       ? supabase.from("member_message_attachments").select("id,message_id,file_name,mime_type,file_size_bytes,storage_path").in("message_id", messageIds)
       : Promise.resolve({ data: [], error: null })
@@ -256,8 +228,7 @@ export async function loadMemberConversation(supabase: ServerSupabaseClient, act
     actorId,
     identities.get(targetId) || genericMember,
     contexts.get(conversation.context_guitar_id || "") || null,
-    messages.at(-1) || null,
-    blocks
+    messages.at(-1) || null
   );
   return {
     ...summary,

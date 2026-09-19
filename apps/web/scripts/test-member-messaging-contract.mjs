@@ -11,6 +11,7 @@ const member = read("app/collections/[handle]/page.tsx");
 const messages = read("components/MessagesClient.tsx");
 const dto = read("lib/member-messaging.ts");
 const server = read("lib/member-messaging-server.ts");
+const controls = read("app/api/messages/[conversationId]/controls/route.ts");
 const migration = read("../../supabase/migrations/20260918180000_member_messaging.sql");
 const deletionMigration = read("../../supabase/migrations/20260918181000_member_messaging_account_deletion.sql");
 
@@ -28,11 +29,14 @@ assert.match(messages, /setInterval\(refresh, 12000\)/);
 assert.match(messages, /window\.addEventListener\("online"/);
 assert.match(messages, /MEMBER_MEDIA_COUNT_LIMIT/);
 assert.match(messages, /uncertainSend/);
-assert.match(messages, /"archive" \| "unarchive" \| "block" \| "unblock"/);
+assert.doesNotMatch(messages, /Archive conversation|Restore conversation|Block member|Unblock member|No archived conversations/);
+assert.match(messages, /Conversation history stays available to both members/);
 assert.doesNotMatch(messages, /submitReport|Report sent to QRguitar for review/);
 assert.match(messages, /mailto:support@qrguitar\.com/);
 assert.match(messages, /Report a safety concern/);
-assert.match(messages, /blockConfirmOpen/);
+assert.doesNotMatch(messages, /blockConfirmOpen|thread\.blocked|thread\.archived/);
+assert.match(controls, /action !== "read"/);
+assert.doesNotMatch(controls, /set_member_conversation_archived|set_member_message_block/);
 assert.doesNotMatch(messages, /window\.confirm/);
 
 assert.doesNotMatch(dto, /peerId|senderId|storagePath/);
