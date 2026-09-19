@@ -92,6 +92,9 @@ includes(profile, "meaningfulTimelineEvents.length", "Timeline tabs must be cont
 includes(profile, "externalMedia.length", "Media tabs must be content-aware.");
 includes(profile, "documentFiles.length", "Document tabs must be content-aware.");
 excludes(catalog, "topBrands", "Catalog must not render arbitrary brand summaries.");
+includes(catalog, 'setShowOwnershipClaim(payload.match === "none")', "Every serial with no public match must offer the same ownership-claim path.");
+includes(catalog, 'href="/ownership-claim">Start ownership claim', "The generic no-public-match result must lead to signed-in ownership claims.");
+excludes(catalog, '"protected"', "Catalog serial results must not distinguish private Profile existence.");
 includes(siteSettings, "Public Profiles", "Published settings normalization must use Public Profile terminology.");
 excludes(siteEditor, "Confirming your QRguitar session", "Site Editor must not render duplicate access-loading messages.");
 excludes(installers.toLowerCase(), "find installers near you", "Installer copy must not promise an unavailable finder.");

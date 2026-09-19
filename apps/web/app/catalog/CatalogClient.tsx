@@ -31,7 +31,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
   const [query, setQuery] = useState("");
   const [exactMatchCode, setExactMatchCode] = useState("");
   const [serialLookupMessage, setSerialLookupMessage] = useState("");
-  const [protectedSerialMatch, setProtectedSerialMatch] = useState(false);
+  const [showOwnershipClaim, setShowOwnershipClaim] = useState(false);
   const [serialLookupBusy, setSerialLookupBusy] = useState(false);
   const [sortMode, setSortMode] = useState<"Newest" | "Oldest" | "Title" | "Year">("Newest");
 
@@ -154,7 +154,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
 
     setSerialLookupBusy(true);
     setSerialLookupMessage("");
-    setProtectedSerialMatch(false);
+    setShowOwnershipClaim(false);
     setExactMatchCode("");
     try {
       const response = await fetch("/api/instruments/serial-lookup", {
@@ -164,7 +164,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
       });
       const payload = await response.json().catch(() => null) as {
         ok?: boolean;
-        match?: "public" | "protected" | "none";
+        match?: "public" | "none";
         message?: string;
         instrument?: DemoInstrument;
       } | null;
@@ -179,8 +179,8 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
         setSerialLookupMessage("Exact serial match found. The serial remains hidden when the owner has chosen privacy.");
         return;
       }
-      setProtectedSerialMatch(payload.match === "protected");
-      setSerialLookupMessage(payload.message || "No QRguitar Profile matches that exact serial.");
+      setShowOwnershipClaim(payload.match === "none");
+      setSerialLookupMessage(payload.message || "No public QRguitar Profile matches that exact serial.");
     } catch {
       setSerialLookupMessage("Exact serial lookup is temporarily unavailable.");
     } finally {
@@ -216,7 +216,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
                     setQuery(event.target.value);
                     setExactMatchCode("");
                     setSerialLookupMessage("");
-                    setProtectedSerialMatch(false);
+                    setShowOwnershipClaim(false);
                   }}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
@@ -273,7 +273,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
           {serialLookupMessage ? (
             <div className={exactMatchCode ? "catalog-lookup-result is-match" : "catalog-lookup-result"} role="status">
               <span>{serialLookupMessage}</span>
-              {protectedSerialMatch ? <Link className="button secondary" href="/ownership-claim">Request ownership</Link> : null}
+              {showOwnershipClaim ? <Link className="button secondary" href="/ownership-claim">Start ownership claim</Link> : null}
             </div>
           ) : null}
 
@@ -299,7 +299,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
                     setQuery("");
                     setExactMatchCode("");
                     setSerialLookupMessage("");
-                    setProtectedSerialMatch(false);
+                    setShowOwnershipClaim(false);
                   }}
                 >
                   <SlidersHorizontal size={14} />

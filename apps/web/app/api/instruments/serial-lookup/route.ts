@@ -24,6 +24,10 @@ function response(body: Record<string, unknown>, status = 200) {
   return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
 }
 
+function noPublicMatch() {
+  return response({ ok: true, match: "none", message: "No public QRguitar Profile matches that exact serial." });
+}
+
 function requestKey(request: Request) {
   return (request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown")
     .split(",")[0]
@@ -91,7 +95,7 @@ export async function POST(request: Request) {
   }
 
   if (!guitarId) {
-    return response({ ok: true, match: "none", message: "No QRguitar Profile matches that exact serial." });
+    return noPublicMatch();
   }
 
   const guitarResult = await supabase
@@ -101,7 +105,7 @@ export async function POST(request: Request) {
     .maybeSingle<GuitarMatchRow>();
   const guitar = guitarResult.data;
   if (guitarResult.error || !guitar || guitar.admin_archived_at || guitar.owner_removed_at) {
-    return response({ ok: true, match: "none", message: "No QRguitar Profile matches that exact serial." });
+    return noPublicMatch();
   }
 
   if (guitar.visibility === "public") {
@@ -111,9 +115,5 @@ export async function POST(request: Request) {
     }
   }
 
-  return response({
-    ok: true,
-    match: "protected",
-    message: "An existing QRguitar Profile matches this serial. Sign in to request ownership without exposing its private details."
-  });
+  return noPublicMatch();
 }

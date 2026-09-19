@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createMemoryDatabase, loadRoutes } from "./mock-routes.mjs";
@@ -117,15 +118,33 @@ await test("private evidence read requires a participant and omits raw storage p
   const denied=fixture({actor:stranger});assert.equal((await denied.route("apps/web/app/api/service-evidence/route.ts").GET(request("service-evidence?submissionId="+submission))).status,403);assert.equal(denied.storageCalls.length,0);
   const allowed=fixture({actor:owner});const payload=await(await allowed.route("apps/web/app/api/service-evidence/route.ts").GET(request("service-evidence?submissionId="+submission))).json();assert.equal(payload.ok,true);assert.equal(payload.evidence[0].previewUrl,"https://signed.invalid/private-token");assert.equal(JSON.stringify(payload).includes("storage_path"),false);
 });
-for(const [name,patch] of [["hidden",{hide_public_content:true}],["banned",{account_status:"banned"}],["removed",{account_status:"removed"}]])await test("inquiry does not contact a "+name+" collection owner",async()=>{
-  const f=fixture({actor:provider});Object.assign(f.tables.profiles[0],patch);
-  assert.equal((await f.route("apps/web/app/api/collection-inquiries/route.ts").POST(request("collection-inquiries","POST",{handle:"audited",message:"This is a sufficiently detailed synthetic inquiry."}))).status,404);assert.equal(f.emails.length,0);
+await test("legacy collection inquiry endpoint is retired without reading private data or sending email",async()=>{
+  const f=fixture({actor:provider});const response=await f.route("apps/web/app/api/collection-inquiries/route.ts").POST(request("collection-inquiries","POST",{handle:"audited",message:"This must not be emailed."}));
+  assert.equal(response.status,410);assert.equal(response.headers.get("cache-control"),"no-store, no-cache, must-revalidate");
+  assert.deepEqual(await response.json(),{ok:false,code:"durable_messages_required",message:"Email inquiries have been retired. Use QRguitar Messages to contact another member."});
+  assert.equal(f.db.calls.length,0);assert.equal(f.emails.length,0);
 });
-await test("inquiry owner moderation failure prevents delivery",async()=>{
-  const f=fixture({actor:provider,hooks:{before:q=>q.table==="profiles"?{data:null,error:{message:"outage"}}:null}});
-  assert.equal((await f.route("apps/web/app/api/collection-inquiries/route.ts").POST(request("collection-inquiries","POST",{handle:"audited",message:"This is a sufficiently detailed synthetic inquiry."}))).status,503);assert.equal(f.emails.length,0);
+await test("private and absent serials return the same non-enumerable result",async()=>{
+  const modules={"apps/web/lib/public-instruments.ts":{getPublicInstrumentByCode:async()=>{throw new Error("Private records must not load public details.");}}};
+  const hidden=fixture({modules});hidden.tables.guitar_serial_aliases=[{serial_normalized:"PRIVATE123",guitar_id:guitar}];hidden.tables.guitars[0].visibility="private";
+  const absent=fixture({modules});absent.tables.guitar_serial_aliases=[];
+  const hiddenResponse=await hidden.route("apps/web/app/api/instruments/serial-lookup/route.ts").POST(request("instruments/serial-lookup","POST",{serial:"private-123"}));
+  const absentResponse=await absent.route("apps/web/app/api/instruments/serial-lookup/route.ts").POST(request("instruments/serial-lookup","POST",{serial:"private-123"}));
+  assert.equal(hiddenResponse.status,200);assert.equal(absentResponse.status,200);
+  const hiddenPayload=await hiddenResponse.json(),absentPayload=await absentResponse.json();
+  assert.deepEqual(hiddenPayload,absentPayload);assert.deepEqual(hiddenPayload,{ok:true,match:"none",message:"No public QRguitar Profile matches that exact serial."});
 });
-await test("enabled eligible collection inquiry preserves normal mocked delivery",async()=>{
-  const f=fixture({actor:provider});assert.equal((await f.route("apps/web/app/api/collection-inquiries/route.ts").POST(request("collection-inquiries","POST",{handle:"audited",message:"This is a sufficiently detailed synthetic inquiry."}))).status,200);assert.equal(f.emails.length,1);
+await test("public exact serial match remains discoverable",async()=>{
+  const instrument={qrCode:"QRG-AUDIT",name:"Public fixture"};
+  const f=fixture({modules:{"apps/web/lib/public-instruments.ts":{getPublicInstrumentByCode:async(code)=>code==="QRG-AUDIT"?instrument:null}}});
+  f.tables.guitar_serial_aliases=[{serial_normalized:"PUBLIC123",guitar_id:guitar}];
+  const response=await f.route("apps/web/app/api/instruments/serial-lookup/route.ts").POST(request("instruments/serial-lookup","POST",{serial:"public-123"}));
+  assert.equal(response.status,200);assert.deepEqual(await response.json(),{ok:true,match:"public",instrument,exactSerialMatch:true});
+});
+await test("catalog offers the same ownership-claim path for every no-public-match result",async()=>{
+  const source=fs.readFileSync(path.join(repo,"apps/web/app/catalog/CatalogClient.tsx"),"utf8");
+  assert.match(source,/setShowOwnershipClaim\(payload\.match === "none"\)/);
+  assert.match(source,/showOwnershipClaim \? <Link className="button secondary" href="\/ownership-claim">Start ownership claim<\/Link>/);
+  assert.doesNotMatch(source,/protectedSerialMatch|match\?: "public" \| "protected"/);
 });
 console.log(passes+" mocked auxiliary API tests passed.");
