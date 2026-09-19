@@ -1,5 +1,5 @@
 {
-  "releaseVersion": "2026-09-17.11",
+  "releaseVersion": "2026-09-17.12",
   "checks": [
     "catalog_readable",
     "required_functions",
@@ -10270,5 +10270,6 @@
   "accountDeletionPromotionSourceSha256": "a7cf0c00615feeeb76d3533250c127f16eb8f1cd19349e639276d98433ea98a5",
   "accountDeletionPromotionCompatibilitySourceSha256": "e8504d19dfd6484f0b5cdf59fdfb057471b0f58c527ee80d60a324d0757d26f2",
   "memberMessagingSourceSha256": "fc2cd013dd29f632c48a05f2fc62afc86c1f513ebe787405f95b66b1b34b1816",
-  "memberMessagingAccountDeletionSourceSha256": "7d4f6a8acbbe1a65ebbd9ee64999b1171027d682c0ca7c5ff4ba263301e1d400"
+  "memberMessagingAccountDeletionSourceSha256": "7d4f6a8acbbe1a65ebbd9ee64999b1171027d682c0ca7c5ff4ba263301e1d400",
+  "memberMessagingDurableHistorySourceSha256": "a4c3d97445e160759fef2b7072184fbb2a8ca9b93d0433beee7a3840460a37c5"
 }
