@@ -91,13 +91,55 @@ test("checkout permissions allow only same-origin and the two PayPal frame origi
   assert.ok(!sources(headers, "script-src").includes("*"));
 });
 
-test("Next configuration applies the checkout override only to the billing tree", async () => {
+function ruleMatches(source, pathname) {
+  if (source === "/:path*") return true;
+  if (source === "/api/:path*") return pathname === "/api" || pathname.startsWith("/api/");
+  if (source === "/billing/:path*") return pathname === "/billing" || pathname.startsWith("/billing/");
+  const privateTree = source.match(/^\/:privatePath\(([^)]+)\)\/:path\*$/);
+  if (!privateTree) return false;
+  const firstSegment = pathname.split("/").filter(Boolean)[0] || "";
+  return privateTree[1].split("|").includes(firstSegment);
+}
+
+function configuredHeaders(rules, pathname) {
+  const values = new Map();
+  for (const rule of rules) {
+    if (!ruleMatches(rule.source, pathname)) continue;
+    for (const header of rule.headers) values.set(header.key.toLowerCase(), header.value);
+  }
+  return new Headers(values);
+}
+
+test("Next configuration does not globally force public routes no-store while private and API trees stay no-store", async () => {
   assert.equal(nextConfig.poweredByHeader, false);
   const rules = await nextConfig.headers();
-  assert.deepEqual(rules.map(rule => rule.source), ["/:path*", "/billing/:path*"]);
-  const general = headerMap(rules[0].headers), checkout = headerMap(rules[1].headers);
-  assert.match(general.get("cache-control"), /no-store/);
+  assert.deepEqual(rules.map(rule => rule.source), [
+    "/:path*",
+    "/api/:path*",
+    "/:privatePath(account|admin|create|dashboard|edit|handout|login|messages|ownership-claim|reset-password|service-review|service-work|site-editor|transfer)/:path*",
+    "/billing/:path*"
+  ]);
+
+  for (const pathname of ["/", "/contact", "/privacy", "/terms", "/installers", "/collections/example", "/i/QRG-EXAMPLE", "/_next/static/chunk.js", "/favicon.ico"]) {
+    const headers = configuredHeaders(rules, pathname);
+    assert.equal(headers.get("cache-control"), null, `${pathname} must not be forced no-store by route configuration`);
+    assert.ok(headers.get("content-security-policy"), `${pathname} keeps global security headers`);
+    assert.equal(permits(headers, "frame-src", "https://www.paypal.com/"), false);
+  }
+
+  for (const pathname of [
+    "/api", "/api/health", "/account", "/account/security", "/admin", "/admin/payments",
+    "/create", "/dashboard", "/dashboard/profile/QRG-EXAMPLE", "/edit/QRG-EXAMPLE",
+    "/handout/QRG-EXAMPLE", "/login", "/messages", "/messages/example", "/ownership-claim",
+    "/reset-password", "/service-review/example", "/service-work/QRG-EXAMPLE", "/site-editor", "/transfer/example"
+  ]) {
+    assert.match(configuredHeaders(rules, pathname).get("cache-control") || "", /no-store/, `${pathname} must stay no-store`);
+  }
+
+  const general = configuredHeaders(rules, "/contact");
+  const checkout = configuredHeaders(rules, "/billing/return");
   assert.equal(permits(general, "frame-src", "https://www.paypal.com/"), false);
+  assert.match(checkout.get("cache-control") || "", /no-store/);
   assert.ok(permits(checkout, "frame-src", "https://www.paypal.com/"));
   for (const pathname of ["/billing", "/billing/return", "/billing/cancel"]) assert.equal(policy.isCheckoutPath(pathname), true);
   for (const pathname of ["/", "/login", "/billing-other", "/api/billing/checkout", "/admin/payments"]) assert.equal(policy.isCheckoutPath(pathname), false);

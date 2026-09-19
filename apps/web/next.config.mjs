@@ -8,6 +8,14 @@ const buildIdentity = resolveBuildIdentity(process.env, {
   deploymentIdentifier: ""
 });
 
+const noStoreHeaders = [
+  { key: "Cache-Control", value: "no-store, max-age=0, must-revalidate" }
+];
+
+// These browser routes can render account-specific tools or accept private tokens.
+// Keep this list intentionally narrower than the public marketing and Profile trees.
+const privatePageCacheSource = "/:privatePath(account|admin|create|dashboard|edit|handout|login|messages|ownership-claim|reset-password|service-review|service-work|site-editor|transfer)/:path*";
+
 const nextConfig = {
   transpilePackages: ["@qrguitar/shared"],
   poweredByHeader: false,
@@ -31,14 +39,19 @@ const nextConfig = {
     return [
       {
         source: "/:path*",
-        headers: [
-          { key: "Cache-Control", value: "no-store, max-age=0, must-revalidate" },
-          ...securityHeaders()
-        ]
+        headers: securityHeaders()
+      },
+      {
+        source: "/api/:path*",
+        headers: noStoreHeaders
+      },
+      {
+        source: privatePageCacheSource,
+        headers: noStoreHeaders
       },
       {
         source: "/billing/:path*",
-        headers: securityHeaders({ checkout: true })
+        headers: [...noStoreHeaders, ...securityHeaders({ checkout: true })]
       }
     ];
   }
