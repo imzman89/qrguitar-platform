@@ -1,22 +1,22 @@
-.showcase { width: 100%; min-width: 0; overflow: hidden; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 24px 70px #0004; }
+.showcase { width: 100%; min-width: 0; overflow: hidden; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 20px 60px #0005; }
 .topline { min-height: 47px; padding: 8px 19px; display: flex; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); font-size: 11px; letter-spacing: 0; text-transform: uppercase; font-weight: 650; }
 .topline > span { display: flex; align-items: center; gap: 8px; }
 .topline a { display: grid; place-items: center; width: 34px; min-height: 34px; border: 1px solid var(--line); border-radius: 50%; }
 .liveDot { width: 6px; height: 6px; border-radius: 50%; background: var(--positive); flex-shrink: 0; }
-.photoStage { position: relative; height: clamp(290px, 28vw, 390px); background: #101615; border-bottom: 1px solid var(--line); }
+.photoStage { position: relative; height: clamp(260px, 24vw, 320px); background: #101113; border-bottom: 1px solid var(--line); }
 .mainPhoto { width: 100%; height: 100%; display: block; object-fit: contain; }
 .noPhoto { display: grid; place-content: center; justify-items: center; gap: 16px; height: 100%; padding: 24px; color: #e8e1d2; text-align: center; }
 .photoSelector { position: absolute; inset: auto 14px 14px; display: flex; justify-content: center; gap: 7px; flex-wrap: wrap; }
-.photoSelector button { height: 46px; width: 46px; flex: 0 0 46px; border: 2px solid #f5f1e86b; border-radius: 2px; padding: 2px; background: #111c; cursor: pointer; }
+.photoSelector button { height: 46px; width: 46px; flex: 0 0 46px; border: 2px solid #f5f1e86b; border-radius: 7px; padding: 2px; background: #111c; cursor: pointer; }
 .photoSelector button.selectedPhoto { border-color: #f0a12b; box-shadow: 0 0 0 1px #172018; }
 .photoSelector img { width: 100%; height: 100%; display: block; object-fit: cover; }
-.details { padding: 23px 24px 20px; }
+.details { padding: 20px 22px; }
 .kicker { font-size: 10px; letter-spacing: 0; font-weight: 600; color: var(--muted); }
-.identity h2 { font-size: 28px; font-weight: 500; letter-spacing: 0; line-height: 1.2; margin: 8px 0 10px; font-family: Georgia, "Times New Roman", serif; text-wrap: balance; }
+.identity h2 { font-size: 24px; font-weight: 600; letter-spacing: -.03em; line-height: 1.2; margin: 8px 0 10px; font-family: inherit; text-wrap: balance; }
 .identity p { font-size: 13px; line-height: 1.6; margin: 0; color: var(--muted); }
-.contents { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 17px; }
+.contents { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 12px; }
 .contents span { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted-strong); }
-.passportLink { min-height: 78px; display: flex; align-items: center; gap: 14px; padding: 16px 24px; border-top: 1px solid var(--line); background: var(--surface-subtle); }
+.passportLink { min-height: 68px; display: flex; align-items: center; gap: 14px; padding: 16px 24px; border-top: 1px solid var(--line); background: var(--surface-subtle); }
 .passportLink > svg { flex-shrink: 0; }
 .passportLink small { display: block; color: var(--muted); letter-spacing: 0; font-size: 10px; margin-bottom: 5px; }
 .passportLink strong { display: block; font-size: 12px; letter-spacing: 0; overflow-wrap: anywhere; }
@@ -24,10 +24,18 @@
 .showcase a:hover { color: var(--gold); }
 .showcase a:focus-visible, .showcase button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 @media (max-width: 760px) {
-  .photoStage { height: clamp(270px, 75vw, 440px); }
+  .photoStage { height: clamp(240px, 70vw, 360px); }
   .details { padding: 20px; }
   .identity h2 { font-size: 24px; }
   .passportLink { padding: 16px 20px; gap: 10px; }
   .openLabel { font-size: 10px; }
 }
 @media (max-width: 360px) { .openLabel { max-width: 65px; } .topline { padding-inline: 14px; font-size: 10px; } }
+
+@media (min-width: 761px) and (max-width: 900px) {
+  .showcase { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+  .topline { grid-column: 1 / -1; }
+  .photoStage { grid-row: 2 / span 2; height: 300px; border-bottom: 0; border-right: 1px solid var(--line); }
+  .details { align-self: end; }
+  .passportLink { padding: 16px 20px; flex-wrap: wrap; }
+}

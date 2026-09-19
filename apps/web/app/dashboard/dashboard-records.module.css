@@ -796,7 +796,7 @@
 .instrumentRow:last-child { border-color: var(--line); }
 .instrumentThumb { background: var(--surface-soft); border-color: var(--line); }
 .instrumentThumb span { background: var(--panel); color: var(--text); border-color: var(--line); }
-.instrumentInfo strong { font-family: Georgia, "Times New Roman", serif; font-weight: 400; font-size: 1.5rem; }
+.instrumentInfo strong { font-family: inherit; font-weight: 600; font-size: 1.25rem; line-height: 1.3; letter-spacing: -.025em; }
 .dashboardIdentity { color: var(--muted); font-size: .8rem; }
 .instrumentMeta, .instrumentMeta span + span, .qrActionColumn, .compactQr { border-color: var(--line); }
 .qrActionColumn { background: var(--surface-soft); }
@@ -809,6 +809,6 @@
   font-weight: 600;
 }
 .moreButton, .primaryActions :global(.button) { min-height: 44px; font-size: .8125rem; }
-.profileNumber { color: #f8f2e5; background: #172a20; border-color: #405343; }
+.profileNumber { color: var(--text); background: var(--canvas); border-color: var(--line); }
 .dangerAction { color: var(--negative) !important; border-color: #885750 !important; }
 .drawerSections > section > p { grid-column: 1 / -1; margin: 0; font-size: .8rem; line-height: 1.5; }
