@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { exactObject, uuid, validRevision, validTimestamp } from "./intake-service";
+import { analyzeDeletionContainer } from "./container-inspection";
 
 export const fulfillmentBlockers = [
   "administrator_account", "unused_paid_credits", "unresolved_payment_order", "payment_hold_or_dispute",
@@ -578,41 +579,7 @@ export function createFulfillmentService(deps: FulfillmentDependencies) {
     if (bytes.length >= 5 && String.fromCharCode(...bytes.slice(0,5)) === "%PDF-") return "application/pdf";
     return "";
   };
-  /* A visual preview cannot reveal container metadata. Malformed containers and
-     EXIF/XMP/PDF properties are therefore deletion-only during privacy review. */
-  const analyzeContainer = (bytes: Uint8Array, mimeType: string) => {
-    const findings = new Set<string>(); let valid = true;
-    const ascii = (from:number,to:number) => String.fromCharCode(...bytes.slice(from,to));
-    if (mimeType === "image/jpeg") {
-      let at=2, ended=false;
-      while(at<bytes.length){if(bytes[at]!==0xff){valid=false;break;}while(bytes[at]===0xff)at++;const marker=bytes[at++];
-        if(marker===0xd9){ended=true;break;}if(marker===0xda){const tail=bytes.lastIndexOf(0xff);ended=tail>=at&&bytes[tail+1]===0xd9;break;}
-        if(marker===0x01||(marker>=0xd0&&marker<=0xd7))continue;if(at+2>bytes.length){valid=false;break;}
-        const length=(bytes[at]<<8)|bytes[at+1];if(length<2||at+length>bytes.length){valid=false;break;}
-        if(marker===0xe1)findings.add(ascii(at+2,Math.min(at+32,at+length)).includes("Exif")?"exif":"xmp");
-        if(marker===0xed)findings.add("iptc");if(marker===0xfe)findings.add("comment");at+=length;
-      } valid=valid&&ended;
-    } else if (mimeType === "image/png") {
-      let at=8, ended=false;
-      while(at+12<=bytes.length){const length=((bytes[at]<<24)>>>0)+(bytes[at+1]<<16)+(bytes[at+2]<<8)+bytes[at+3],type=ascii(at+4,at+8);
-        if(length>bytes.length-at-12){valid=false;break;}if(["eXIf","iTXt","tEXt","zTXt"].includes(type))findings.add(type==="eXIf"?"exif":"text-metadata");
-        at+=12+length;if(type==="IEND"){ended=true;break;}}
-      valid=valid&&ended&&at===bytes.length;
-    } else if (mimeType === "image/webp") {
-      const declared=bytes.length>=12?(bytes[4]|bytes[5]<<8|bytes[6]<<16|bytes[7]<<24)>>>0:0;let at=12;
-      valid=declared+8===bytes.length;
-      while(valid&&at+8<=bytes.length){const type=ascii(at,at+4),length=(bytes[at+4]|bytes[at+5]<<8|bytes[at+6]<<16|bytes[at+7]<<24)>>>0;
-        if(length>bytes.length-at-8){valid=false;break;}if(["EXIF","XMP ","ICCP"].includes(type))findings.add(type.trim().toLowerCase());at+=8+length+(length%2);}
-      valid=valid&&at===bytes.length;
-    } else if (mimeType === "application/pdf") {
-      const text=new TextDecoder("latin1").decode(bytes),tail=text.slice(Math.max(0,text.length-4096));
-      valid=/^%PDF-\d\.\d/.test(text)&&/%%EOF\s*$/.test(tail)&&/startxref\s+\d+\s+%%EOF\s*$/.test(tail);
-      const tokens:[RegExp,string][]=[[/\/(Author|Creator|Producer|Title|Subject|Keywords)\b/,"document-properties"],[/\/(Metadata|PieceInfo)\b|<x:xmpmeta\b/i,"xmp"],[/\/(JavaScript|JS|OpenAction|AA)\b/,"active-content"],[/\/(EmbeddedFiles|Filespec)\b/,"embedded-files"]];
-      for(const [pattern,label] of tokens)if(pattern.test(text))findings.add(label);
-    }
-    if(!valid)findings.add("malformed-container");
-    return {structureValid:valid,metadataFindings:[...findings].sort(),safeToRetain:valid&&findings.size===0};
-  };
+  const analyzeContainer = analyzeDeletionContainer;
   async function downloadBytes(bucket: StorageBucket, path: string, mimeType: string, expectedSize: number | null, missingAllowed = false) {
     let result: { data: StorageDownload | null; error: StorageError };
     try { result = await bounded(() => bucket.download(path)); } catch { throw storagePending(); }
@@ -663,7 +630,7 @@ export function createFulfillmentService(deps: FulfillmentDependencies) {
     const bytes = await downloadBytes(bucket, descriptor.sourcePath, descriptor.sourceMimeType, descriptor.sourceSize);
     if (!bytes) throw storagePending();
     return { bytes, mimeType: descriptor.sourceMimeType, byteSize: bytes.byteLength, byteSha256: byteHash(bytes),
-      sourceFingerprint: descriptor.sourceFingerprint, ...analyzeContainer(bytes,descriptor.sourceMimeType) };
+      sourceFingerprint: descriptor.sourceFingerprint, ...await analyzeContainer(bytes,descriptor.sourceMimeType) };
   }
   async function inspectCustodySource(current:VerifiedAccess,requestId:string,claimId:string,evidenceId:string,expectedObjectFingerprint:string):Promise<CustodyInspection>{
     if(current.accountStatus!=="active")throw new FulfillmentError(403,"admin_required","An active administrator account is required.");
@@ -674,7 +641,7 @@ export function createFulfillmentService(deps: FulfillmentDependencies) {
     if(!bucket||typeof bucket.download!=="function")throw storagePending();
     const bytes=await downloadBytes(bucket,descriptor.sourcePath,descriptor.sourceMimeType,descriptor.sourceSize);
     if(!bytes)throw storagePending();
-    const analyzed=analyzeContainer(bytes,descriptor.sourceMimeType);if(!analyzed.structureValid)throw storagePending();
+    const analyzed=await analyzeContainer(bytes,descriptor.sourceMimeType);if(!analyzed.structureValid)throw storagePending();
     return{bytes,mimeType:descriptor.sourceMimeType,byteSize:bytes.byteLength,byteSha256:byteHash(bytes),sourceFingerprint:expectedObjectFingerprint,...analyzed,
       claimId,evidenceId,objectFingerprint:expectedObjectFingerprint};
   }

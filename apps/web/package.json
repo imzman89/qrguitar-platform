@@ -74,7 +74,7 @@
     "test:paypal-payments": "node scripts/test-paypal-config.mjs && node scripts/test-paypal-gateway.mjs && node scripts/test-paypal-service.mjs && node scripts/test-paypal-http.mjs && node scripts/test-paypal-webhook-inbox.mjs && node scripts/test-paypal-webhook-http.mjs && node scripts/test-paypal-webhook-sweep-http.mjs && node --test scripts/test-paypal-payments-client.mjs && node scripts/test-paypal-billing-ledger.mjs && node scripts/test-paypal-webhook-ledger.mjs && node --test scripts/test-payment-security-headers.mjs scripts/test-apple-pay-association.mjs && npm run test:paypal-admin-reviews && npm run test:promotions && node scripts/generate-paypal-billing-readiness.mjs",
     "test:admin-account-deletion": "node scripts/test-admin-account-deletion.mjs",
     "test:account-deletion-intake": "node scripts/account-deletion/test-account-deletion-intake.mjs && node scripts/account-deletion/test-intake-http.mjs && node scripts/account-deletion/test-deletion-intake-client.mjs && node scripts/account-deletion/test-admin-intake.mjs && node --test scripts/test-intake-postgres-config.mjs && node scripts/generate-intake-readiness.mjs && node scripts/account-deletion/test-intake-readiness.mjs",
-    "test:account-deletion-fulfillment": "node scripts/account-deletion/test-account-deletion-fulfillment.mjs && node scripts/account-deletion/test-fulfillment-http.mjs && node scripts/generate-account-deletion-fulfillment-readiness.mjs",
+    "test:account-deletion-fulfillment": "node scripts/account-deletion/test-account-deletion-fulfillment.mjs && node scripts/account-deletion/test-fulfillment-http.mjs && node scripts/account-deletion/test-container-inspection.mjs && node scripts/generate-account-deletion-fulfillment-readiness.mjs",
     "test:native-associations": "node --test scripts/test-native-association.mjs scripts/test-native-association-routes.mjs",
     "test:member-messaging": "node scripts/test-member-messaging-db.mjs && node scripts/account-deletion/test-member-messaging-compatibility.mjs && node scripts/test-member-messaging-http.mjs && node scripts/test-member-messaging-contract.mjs"
   },
@@ -86,6 +86,7 @@
     "qrcode": "^1.5.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "sharp": "^0.35.4",
     "stripe": "22.6.2"
   },
   "devDependencies": {
