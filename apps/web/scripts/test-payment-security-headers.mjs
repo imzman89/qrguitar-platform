@@ -66,6 +66,20 @@ test("ordinary pages retain payment isolation and existing media access", () => 
   assert.equal(headers.get("x-frame-options"), "DENY");
 });
 
+test("production forbids eval while development keeps framework debugging support", () => {
+  const original = process.env.NODE_ENV;
+  try {
+    process.env.NODE_ENV = "production";
+    assert.equal(sources(headerMap(policy.securityHeaders()), "script-src").includes("'unsafe-eval'"), false);
+    assert.equal(sources(headerMap(policy.securityHeaders({ checkout: true })), "script-src").includes("'unsafe-eval'"), false);
+    process.env.NODE_ENV = "development";
+    assert.equal(sources(headerMap(policy.securityHeaders()), "script-src").includes("'unsafe-eval'"), true);
+  } finally {
+    if (original === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = original;
+  }
+});
+
 test("checkout permissions allow only same-origin and the two PayPal frame origins", () => {
   const headers = headerMap(policy.securityHeaders({ checkout: true }));
   assert.equal(headers.get("permissions-policy"), 'camera=(), microphone=(), geolocation=(), payment=(self "https://www.paypal.com" "https://www.sandbox.paypal.com"), usb=(), bluetooth=(), interest-cohort=()');
@@ -78,6 +92,7 @@ test("checkout permissions allow only same-origin and the two PayPal frame origi
 });
 
 test("Next configuration applies the checkout override only to the billing tree", async () => {
+  assert.equal(nextConfig.poweredByHeader, false);
   const rules = await nextConfig.headers();
   assert.deepEqual(rules.map(rule => rule.source), ["/:path*", "/billing/:path*"]);
   const general = headerMap(rules[0].headers), checkout = headerMap(rules[1].headers);

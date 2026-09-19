@@ -34,6 +34,7 @@ export function isCheckoutPath(pathname: string) {
 
 export function contentSecurityPolicy(options: SecurityHeaderOptions = {}) {
   const { preview = false, checkout = false } = options;
+  const developmentEval = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
   const paymentSources = checkout ? ` ${paypalSources}` : "";
   const appleSource = checkout ? ` ${applePaySdkSource}` : "";
   const analytics = googleAnalyticsEnabled(options);
@@ -42,7 +43,7 @@ export function contentSecurityPolicy(options: SecurityHeaderOptions = {}) {
   const analyticsImage = analytics ? ` ${googleAnalyticsCollectionSources} ${googleAnalyticsScriptSource}` : "";
   return [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-eval' 'unsafe-inline'${paymentSources}${appleSource}${analyticsScript}`,
+    `script-src 'self' 'unsafe-inline'${developmentEval}${paymentSources}${appleSource}${analyticsScript}`,
     `style-src 'self' 'unsafe-inline'${paymentSources}${appleSource}`,
     `img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co${paymentSources}${appleSource}${analyticsImage}`,
     "font-src 'self' data:",

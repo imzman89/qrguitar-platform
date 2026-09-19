@@ -10,6 +10,7 @@ const buildIdentity = resolveBuildIdentity(process.env, {
 
 const nextConfig = {
   transpilePackages: ["@qrguitar/shared"],
+  poweredByHeader: false,
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   env: {
     QRGUITAR_BUILD_ENV: buildIdentity.environment,
