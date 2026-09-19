@@ -58,9 +58,9 @@ function PayPalBillingContent({ mode }: { mode: Mode }) {
   const returnPath = `/billing${mode === "overview" ? "" : `/paypal/${mode}`}${orderId ? `?orderId=${encodeURIComponent(orderId)}` : ""}`;
   return <><Nav /><main className={styles.page}><div className={`${styles.shell} ${styles.automaticShell}`}>
     <Link href="/account" className={styles.back}>Account / Profile credits</Link>
-    <header className={styles.automaticHeader}><p className={styles.eyebrow}>Your instruments. Their stories.</p><h1>Room for your next instrument.</h1><p>5 free Profiles. More when you need them.</p><span>No subscription · Credits never expire · Free transfers</span></header>
+    <header className={styles.automaticHeader}><p className={styles.eyebrow}>Your instruments. Their stories.</p><h1>Room for your next instrument.</h1><p>25 free Profiles. More when you need them.</p><span>No subscription · Credits never expire · Free transfers</span></header>
     {(state.phase === "loading" || (state.phase === "ready" && !snapshot)) && <section className={styles.notice} role="status">Loading your Profile balance…</section>}
-    {state.phase === "signed-out" && <section className={styles.notice}><h2>Your first 5 Profiles are free.</h2><p>Sign in to see your balance and add more when you need them.</p><Link href={`/login?next=${encodeURIComponent(returnPath)}`} className={styles.primary}>Sign in <ArrowRight size={16} aria-hidden="true" /></Link></section>}
+    {state.phase === "signed-out" && <section className={styles.notice}><h2>Your first 25 Profiles are free.</h2><p>Sign in to see your balance and add more when you need them.</p><Link href={`/login?next=${encodeURIComponent(returnPath)}`} className={styles.primary}>Sign in <ArrowRight size={16} aria-hidden="true" /></Link></section>}
     {state.phase === "error" && <section className={`${styles.notice} ${styles.error}`} role="alert"><h2>We couldn’t check your account.</h2><p>{state.message}</p><button className={styles.secondary} disabled={state.refreshing} onClick={() => void controller.current?.reload()}>Try again</button><p className={styles.muted}><Link href="/contact">Contact QRguitar</Link></p></section>}
     {state.phase === "ready" && snapshot && <>
       {snapshot.environment === "test" && <p className={styles.testLabel} role="status">Sandbox checkout · Test payments only</p>}
@@ -88,7 +88,7 @@ function PayPalBillingContent({ mode }: { mode: Mode }) {
           <p className={styles.paymentPrivacy}>Payment information is processed by PayPal under its <a href="https://www.paypal.com/us/legalhub/paypal/privacy-full" target="_blank" rel="noreferrer">Privacy Statement</a>.</p>
         </section>}
       </details>}
-      <p className={styles.billingFootnote}>Each credit creates one additional Profile after your 5 free Profiles. Unused paid credits never expire.</p>
+      <p className={styles.billingFootnote}>Each credit creates one additional Profile after your 25 free Profiles. Unused paid credits never expire.</p>
     </>}
   </div></main><Footer /></>;
 }

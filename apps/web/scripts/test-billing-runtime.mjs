@@ -11,7 +11,7 @@ const OWNER = "11111111-1111-4111-8111-111111111111", OTHER = "22222222-2222-422
 const live = "https://qvoruycxxrbarlafvhbi.supabase.co", sandbox = "https://isolated-example.supabase.co";
 const version = "2026-08-26.dahlia";
 const fullConfig = { STRIPE_ENVIRONMENT: "live", QRGUITAR_BILLING_ENABLED: "true", STRIPE_SECRET_KEY: "sk_live_synthetic_fixture", STRIPE_WEBHOOK_SECRET: "whsec_synthetic_fixture", STRIPE_WEBHOOK_API_VERSION: version, STRIPE_PRICE_PROFILE_1: "price_fixture" };
-const balance = patch => ({ environment: "live", createEnvironment: "live", freeLimit: 5, freeRemaining: 0, ownedProfiles: 8, paidGranted: 12, paidConsumed: 3, paidRemaining: 9, paidAvailable: 9, hold: false, commercialExempt: false, unresolvedOrder: null, ...patch });
+const balance = patch => ({ environment: "live", createEnvironment: "live", freeLimit: 25, freeRemaining: 0, ownedProfiles: 25, paidGranted: 12, paidConsumed: 3, paidRemaining: 9, paidAvailable: 9, hold: false, commercialExempt: false, unresolvedOrder: null, ...patch });
 const order = patch => ({ orderId: ORDER, ownerId: OWNER, environment: "live", requestKey: REQUEST, status: "open", offer: { key: "profile_1", version: 1, currency: "usd", amount: 1200, credits: 1, priceId: "price_fixture" }, customerId: "cus_fixture", sessionId: "cs_fixture", paymentId: null, createdAt: "2026-09-18T12:00:00.000Z", updatedAt: "2026-09-18T12:00:00.000Z", ...patch });
 const request = orderId => new Request(`https://www.qrguitar.com/api/billing/status${orderId ? `?orderId=${orderId}` : ""}`, { headers: { Authorization: "Bearer synthetic-token" } });
 const post = (kind, body = { offerKey: "profile_1", requestId: REQUEST }) => new Request(`https://www.qrguitar.com/api/billing/${kind}`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": "fixture-signature", authorization: "Bearer synthetic-token" }, body: JSON.stringify(body) });
@@ -72,7 +72,7 @@ async function expectPurchasesDisabled(f) {
 }
 test("unconfigured payment provider still returns real authenticated LIVE ledger values", async () => {
   const f = fixture(), result = await expectStatus(f);
-  assert.equal(result.environment, "live"); assert.equal(result.freeLimit, 5); assert.equal(result.freeRemaining, 0); assert.equal(result.paidAvailable, 9); assert.equal(result.ownedProfiles, 8);
+  assert.equal(result.environment, "live"); assert.equal(result.freeLimit, 25); assert.equal(result.freeRemaining, 0); assert.equal(result.paidAvailable, 9); assert.equal(result.ownedProfiles, 25);
   assert.deepEqual(f.calls.filter(call => call.kind === "rpc").map(call => call.args), [{ p_owner_id: OWNER, p_environment: "live" }]);
   await expectPurchasesDisabled(f);
 });

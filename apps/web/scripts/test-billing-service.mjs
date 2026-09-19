@@ -52,7 +52,7 @@ function fixture(options = {}) {
       else if (name === "billing_catalog") data = { environment: args.p_environment, createEnvironment: f.createEnvironment || "test", offers: f.registeredOffers || Object.entries(APPROVED_OFFERS).map(([key, spec]) => ({ key, version: 1, currency: "usd", ...spec, priceId: f.config.prices[key] })).filter(value => value.priceId) };
       else if (name === "billing_account_status") {
         const granted = [...f.grants.values()].filter(item => item.ownerId === args.p_owner_id && item.environment === args.p_environment).reduce((sum, item) => sum + item.credits, 0);
-        data = { environment: args.p_environment, createEnvironment: f.createEnvironment || "test", freeLimit: 5, ownedProfiles: 0, commercialExempt: false, freeRemaining: 5, paidGranted: granted, paidConsumed: 0, paidRemaining: granted, paidAvailable: f.holds.has(scope) ? 0 : granted, hold: f.holds.has(scope),
+        data = { environment: args.p_environment, createEnvironment: f.createEnvironment || "test", freeLimit: 25, ownedProfiles: 0, commercialExempt: false, freeRemaining: 25, paidGranted: granted, paidConsumed: 0, paidRemaining: granted, paidAvailable: f.holds.has(scope) ? 0 : granted, hold: f.holds.has(scope),
           unresolvedOrder: [...f.orders.values()].find(item => item.ownerId === args.p_owner_id && item.environment === args.p_environment && ["reserved", "open"].includes(item.status)) || null };
       } else if (name === "billing_link_checkout") { const order = current(args); bind(order, { sessionId: args.p_session_id, customerId: args.p_customer_id }); if (order.status === "reserved") order.status = "open"; data = order; }
       else if (name === "billing_mark_order_error") { const order = current(args); receipt(order, { eventId: args.p_receipt_id, code: args.p_code }); order.lastError = args.p_code; data = order; }
@@ -114,7 +114,7 @@ function fixture(options = {}) {
 test("configuration is disabled by default and secrets are never public offer fields", async () => {
   assert.equal(readBillingConfig({}).enabled, false); assert.equal(readBillingConfig({ QRGUITAR_BILLING_ENABLED: "TRUE" }).enabled, false);
   const f = fixture(); const offers = await f.service.offers(); assert.deepEqual(offers.map(item => [item.key, item.amount, item.credits]), [["profile_1", 1200, 1], ["profile_10", 5000, 10], ["profile_25", 9900, 25]]);
-  assert.ok(offers.every(item => item.permanent && item.freeAllowance === 5)); assert.doesNotMatch(JSON.stringify(offers), /price_|sk_|whsec_|customer/);
+  assert.ok(offers.every(item => item.permanent && item.freeAllowance === 25)); assert.doesNotMatch(JSON.stringify(offers), /price_|sk_|whsec_|customer/);
 });
 for (const patch of [{ enabled: false }, { secretKey: undefined }, { webhookSecret: undefined }, { webhookApiVersion: undefined }, { environment: undefined }, { secretKey: "sk_live_wrong_environment" }]) test("incomplete/disabled config never offers or creates payment: " + JSON.stringify(patch), async () => {
   const f = fixture({ config: patch }); assert.deepEqual(await f.service.offers(), []); await rejectsCode(f.start(), "billing_disabled"); assert.equal(f.trace.length, 0);
@@ -255,7 +255,7 @@ for (const kind of ["refund", "dispute"]) test("fresh " + kind + " during paymen
   const event = f.event(); assert.equal((await f.send(event)).status, "review"); await f.send(event);
   const calls = f.trace.map(call => call.name); assert.ok(calls.indexOf("billing_record_review") < calls.indexOf("billing_fulfill_order"));
   assert.equal(f.calls("billing_record_review")[0].args.p_receipt.eventId, event.id + ":review:" + kind);
-  assert.equal(f.grants.size, 1); const status = await f.service.status("request"); assert.equal(status.hold, true); assert.equal(status.paidGranted, 1); assert.equal(status.paidAvailable, 0); assert.equal(status.freeRemaining, 5);
+  assert.equal(f.grants.size, 1); const status = await f.service.status("request"); assert.equal(status.hold, true); assert.equal(status.paidGranted, 1); assert.equal(status.paidAvailable, 0); assert.equal(status.freeRemaining, 25);
 });
 test("hold remains durable if grant fails after refund detection; later retry cannot expose credits", async () => {
   const f = fixture(); await f.start(); f.paid(); f.charges.get("ch_paid").amount_refunded = 1200;
@@ -339,7 +339,7 @@ test("unassociated refund and legacy charge cannot affect this account", async (
 for (const testAppUrl of [undefined, "", "http://sandbox.example", "https://qrguitar.com", "https://www.qrguitar.com/", "https://user:pass@sandbox.example", "https://sandbox.example/path", "https://sandbox.example/?owner=other", "https://sandbox.example/#return", "https://sandbox.example:443", "https://sandbox.example:3003", "//sandbox.example"]) test("test checkout rejects unsafe/unconfigured return origin " + String(testAppUrl), async () => {
   const f = fixture({ config: { testAppUrl } });
   assert.deepEqual(await f.service.offers(), []); await rejectsCode(f.start(), "billing_disabled"); assert.equal(f.trace.length, 0);
-  assert.equal((await f.service.status("authenticated-owner")).freeRemaining, 5);
+  assert.equal((await f.service.status("authenticated-owner")).freeRemaining, 25);
 });
 test("test checkout normalizes only a trailing slash and preserves retry parameters", async () => {
   const f = fixture({ config: { testAppUrl: "https://isolated-checkout.example/" } }); await f.start(); await f.start();

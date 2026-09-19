@@ -33,7 +33,7 @@ const PROMO = "44444444-4444-4444-8444-444444444444";
 const PAYPAL = "5O190127TN364715T", CAPTURE = "7X12345678901234A", MERCHANT = "ABCDEFGHIJKLM";
 const config = { configured: true, enabled: true, environment: "test", clientId: "public-test-client-id", secret: "fixture-secret",
   merchantId: MERCHANT, webhookId: "fixture-webhook", merchantName: "QRguitar", origin: "https://fixture.invalid", applePayEnabled: true };
-const baseOffer = { key: "profile_10", version: 1, currency: "usd", amount: 5000, credits: 10, permanent: true, freeAllowance: 5 };
+const baseOffer = { key: "profile_10", version: 1, currency: "usd", amount: 5000, credits: 10, permanent: true, freeAllowance: 25 };
 const promotion = { id: PROMO, code: "GARYWON", name: "Owner payment test", revision: 1, discountType: "fixed_total", discountValue: 30,
   classification: "internal_test", originalAmount: 5000, discountAmount: 4970, finalAmount: 30 };
 const promotedOffer = { ...baseOffer, amount: 30, listAmount: 5000, promotion };
@@ -43,7 +43,7 @@ const databaseOffer = { key: "profile_10", version: 1, currency: "usd", amount: 
 const rawOrder = (patch = {}) => ({ orderId: ORDER, ownerId: OWNER, environment: "test", requestKey: REQUEST, status: "open",
   offer: databaseOffer, provider: "paypal", merchantId: MERCHANT, paypalOrderId: PAYPAL, captureId: null, hold: false,
   promotion, createdAt: new Date().toISOString(), ...patch });
-const account = { environment: "test", createEnvironment: "test", freeLimit: 5, ownedProfiles: 5, freeRemaining: 0,
+const account = { environment: "test", createEnvironment: "test", freeLimit: 25, ownedProfiles: 25, freeRemaining: 0,
   paidGranted: 0, paidConsumed: 0, paidRemaining: 0, paidAvailable: 0, commercialExempt: false, hold: false, unresolvedOrder: null };
 const unit = (amount = "0.30", captures) => ({ reference_id: ORDER, custom_id: ORDER, invoice_id: `QRG-${ORDER}`,
   payee: { merchant_id: MERCHANT }, amount: { currency_code: "USD", value: amount },
@@ -159,9 +159,9 @@ test("PayPal gateway serializes the promoted order as exactly 0.30 USD without e
 
 const allOffers = [
   { key: "profile_1", amount: 1200, credits: 1 }, baseOffer, { key: "profile_25", amount: 9900, credits: 25 }
-].map(value => ({ ...value, version: 1, currency: "usd", permanent: true, freeAllowance: 5 }));
-const snapshot = (patch = {}) => ({ environment: "test", freeLimit: 5, freeRemaining: 0, paidGranted: 0, paidConsumed: 0,
-  paidRemaining: 0, paidAvailable: 0, ownedProfiles: 5, hold: false, commercialExempt: false, enabled: true, applePayEnabled: true,
+].map(value => ({ ...value, version: 1, currency: "usd", permanent: true, freeAllowance: 25 }));
+const snapshot = (patch = {}) => ({ environment: "test", freeLimit: 25, freeRemaining: 0, paidGranted: 0, paidConsumed: 0,
+  paidRemaining: 0, paidAvailable: 0, ownedProfiles: 25, hold: false, commercialExempt: false, enabled: true, applePayEnabled: true,
   clientId: "public-test-client-id", currency: "USD", merchantName: "QRguitar", offers: allOffers, order: null, pendingOrder: null,
   legacyOrderId: null, legacyOrderProvider: null, ...patch });
 const json = value => Response.json({ ok: true, ...value });

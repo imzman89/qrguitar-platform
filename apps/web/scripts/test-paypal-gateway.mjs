@@ -15,7 +15,7 @@ function load(name) {
 }
 const { createPayPalGateway } = load("paypal-gateway");
 const ORDER = "11111111-1111-4111-8111-111111111111", PAYPAL = "5O190127TN364715T", MERCHANT = "ABCDEFGHIJKLM";
-const offer = { key: "profile_1", version: 1, currency: "usd", amount: 1200, credits: 1, permanent: true, freeAllowance: 5 };
+const offer = { key: "profile_1", version: 1, currency: "usd", amount: 1200, credits: 1, permanent: true, freeAllowance: 25 };
 const config = { enabled: true, environment: "test", clientId: "CLIENT_ID_123456", secret: "fixture-secret", merchantId: MERCHANT,
   webhookId: "WH-FIXTURE", merchantName: "QRguitar", origin: "https://fixture.invalid", applePayEnabled: false };
 const response = (value, status = 200) => new Response(typeof value === "string" ? value : JSON.stringify(value), { status, headers: { "content-type": "application/json" } });

@@ -1,5 +1,5 @@
 {
-  "releaseVersion": "2026-09-17.12",
+  "releaseVersion": "2026-09-17.13",
   "checks": [
     "catalog_readable",
     "required_functions",
@@ -1472,7 +1472,7 @@
     },
     {
       "signature": "public.billing_account_status(uuid,text)",
-      "source_hash": "ca9f60157646772574877f75e9df0e0ce3574737d6ca346a502a1516f2586bdf",
+      "source_hash": "8fe3ffd119cc37557a0330adbb04361d639b83408eabe79bb62e8d3241ac13fe",
       "arguments": "p_owner_id uuid, p_environment text",
       "result": "jsonb",
       "definer": true,
@@ -2209,7 +2209,7 @@
     },
     {
       "signature": "public.create_instrument_profile_credited(uuid,text,text,jsonb,boolean,text,text)",
-      "source_hash": "6db8d676342d537aa2232554892d7920f05338df6a8220106eba2e684afde790",
+      "source_hash": "26cf85566613051178cb58d5676cb5b254d21acd81ff6ace549bef40bb86c211",
       "arguments": "p_owner_id uuid, p_idempotency_key text, p_upload_id text, p_payload jsonb, p_launch_testing_access boolean, p_owner_display_name text, p_billing_environment text",
       "result": "jsonb",
       "definer": true,
@@ -10271,5 +10271,21 @@
   "accountDeletionPromotionCompatibilitySourceSha256": "e8504d19dfd6484f0b5cdf59fdfb057471b0f58c527ee80d60a324d0757d26f2",
   "memberMessagingSourceSha256": "fc2cd013dd29f632c48a05f2fc62afc86c1f513ebe787405f95b66b1b34b1816",
   "memberMessagingAccountDeletionSourceSha256": "7d4f6a8acbbe1a65ebbd9ee64999b1171027d682c0ca7c5ff4ba263301e1d400",
-  "memberMessagingDurableHistorySourceSha256": "a4c3d97445e160759fef2b7072184fbb2a8ca9b93d0433beee7a3840460a37c5"
+  "memberMessagingDurableHistorySourceSha256": "a4c3d97445e160759fef2b7072184fbb2a8ca9b93d0433beee7a3840460a37c5",
+  "twentyFiveFreeProfilesSourceSha256": "d121f64709aee3a018c5bcbfc4d138fb337aad4d2a066d241876d405fcfd3c90",
+  "memberMessagingPaginationSourceSha256": "045a145bc33b092be1a8335f9ecea6b06e48a6f57650cbae2a8ca095e449681f",
+  "memberMessagingPaginationIndexes": [
+    {
+      "table": "member_conversations",
+      "name": "member_conversations_user_a_updated_page",
+      "definition": "CREATE INDEX member_conversations_user_a_updated_page ON public.member_conversations USING btree (user_a, updated_at DESC, id DESC)",
+      "unique": false
+    },
+    {
+      "table": "member_conversations",
+      "name": "member_conversations_user_b_updated_page",
+      "definition": "CREATE INDEX member_conversations_user_b_updated_page ON public.member_conversations USING btree (user_b, updated_at DESC, id DESC)",
+      "unique": false
+    }
+  ]
 }

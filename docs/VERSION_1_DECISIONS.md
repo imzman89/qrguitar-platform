@@ -39,7 +39,7 @@ The same profile should support:
 
 ## Pricing
 
-- Each owner has 5 free owned Profiles.
+- Each owner has 25 free owned Profiles.
 - Existing Profiles remain available; the new allowance never consumes credits retroactively.
 - One-time permanent Profile credits: US$12 for 1, US$50 for 10, US$99 for 25.
 - Unused purchased credits do not expire. A new Profile consumes one credit when the free owned-Profile allowance is full; replayed or failed creation must not consume another.

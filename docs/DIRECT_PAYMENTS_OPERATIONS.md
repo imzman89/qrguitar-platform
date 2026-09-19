@@ -18,7 +18,7 @@ Adding code, configuring links, or applying migrations does not charge anyone.
 
 ## Product contract
 
-Every ordinary account has room for 5 free owned Profiles. The fixed USD packs
+Every ordinary account has room for 25 free owned Profiles. The fixed USD packs
 are `profile_1`: $12 for 1 credit; `profile_10`: $50 for 10; and `profile_25`:
 $99 for 25. Unused purchased credits never expire. A new Profile uses one credit
 when the free allowance is full. Ownership transfers are free and do not restore
@@ -178,7 +178,7 @@ availability, mobile app handoff, settlement, or payouts.
 
 Before activating real sales, verify all three fixed pack totals and receiving
 identities through the intended provider flow, the review process, a confirmed
-balance, one successful sixth Profile consuming one credit, and interrupted
+balance, one successful 26th Profile consuming one credit, and interrupted
 request recovery. Verify the actual mobile/browser checkout and advertised wallet
 choices. Keep payment fees and any tax/refund terms clear in the provider setup;
 the QRguitar ledger currently expects the exact fixed USD gross amount.

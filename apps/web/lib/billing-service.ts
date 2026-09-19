@@ -262,7 +262,7 @@ export function createBillingService<Context>(deps: BillingDependencies<Context>
       try { const value = approvedOffer({ key, version: 1, currency: "usd", ...APPROVED_OFFERS[key], priceId: config.prices?.[key] });
         assert(registered.some(item => JSON.stringify(item) === JSON.stringify(value)), "offer_unavailable");
         validatePrice(await bounded(() => deps.stripe.retrievePrice(value.priceId)), value, env, true);
-        return { key, version: 1, currency: "usd", amount: value.amount, credits: value.credits, permanent: true, freeAllowance: 5 };
+        return { key, version: 1, currency: "usd", amount: value.amount, credits: value.credits, permanent: true, freeAllowance: 25 };
       } catch { return null; }
     }));
     return values.filter(value => value !== null);
@@ -272,12 +272,12 @@ export function createBillingService<Context>(deps: BillingDependencies<Context>
       const env = ledgerEnvironment(), owner = await actor(context);
       if (orderId !== undefined && !UUID.test(orderId)) throw new BillingError(400, "invalid_purchase", "Purchase not found.");
       const account = await accountStatus(owner.id, env);
-      assert(account.freeLimit === 5 && typeof account.commercialExempt === "boolean", "status_unavailable");
+      assert(account.freeLimit === 25 && typeof account.commercialExempt === "boolean", "status_unavailable");
       for (const key of ["ownedProfiles", "freeRemaining", "paidGranted", "paidConsumed", "paidRemaining", "paidAvailable"]) assert(Number.isSafeInteger(account[key]) && Number(account[key]) >= 0, "status_unavailable");
       const pending = account.unresolvedOrder === null ? null : order(account.unresolvedOrder, owner.id, env);
       assert(!pending || ["reserved", "open"].includes(pending.status), "status_unavailable");
       const value = orderId ? await getOrder(owner.id, env, orderId) : null;
-      return { environment: env, freeLimit: 5, ownedProfiles: account.ownedProfiles as number, commercialExempt: account.commercialExempt as boolean,
+      return { environment: env, freeLimit: 25, ownedProfiles: account.ownedProfiles as number, commercialExempt: account.commercialExempt as boolean,
         freeRemaining: account.freeRemaining as number, paidGranted: account.paidGranted as number, paidConsumed: account.paidConsumed as number,
         paidRemaining: account.paidRemaining as number, paidAvailable: account.paidAvailable as number, hold: account.hold as boolean,
         unresolvedOrder: pending ? { orderId: pending.orderId, requestId: pending.requestKey, offerKey: pending.offer.key, status: pending.status } : null,

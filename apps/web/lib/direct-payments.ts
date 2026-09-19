@@ -9,7 +9,7 @@ export type AppliedPromotion = {
   originalAmount: number; discountAmount: number; finalAmount: number;
 };
 export type DirectOffer = {
-  key: DirectOfferKey; version: 1; currency: "usd"; amount: number; credits: number; permanent: true; freeAllowance: 5;
+  key: DirectOfferKey; version: 1; currency: "usd"; amount: number; credits: number; permanent: true; freeAllowance: 25;
   listAmount?: number; promotion?: AppliedPromotion;
 };
 export type DirectRecipient = { accountKey: string; displayName: string; paymentUrl: string | null; address: string | null };
@@ -20,9 +20,9 @@ export type DirectOrder = {
 };
 export const DIRECT_METHOD_LABELS: Record<DirectMethodKey, string> = { paypal: "Card or PayPal", venmo: "Venmo", cashapp: "Cash App", zelle: "Zelle" };
 export const DIRECT_OFFERS: readonly DirectOffer[] = Object.freeze([
-  Object.freeze({ key: "profile_1", version: 1, currency: "usd", amount: 1200, credits: 1, permanent: true, freeAllowance: 5 }),
-  Object.freeze({ key: "profile_10", version: 1, currency: "usd", amount: 5000, credits: 10, permanent: true, freeAllowance: 5 }),
-  Object.freeze({ key: "profile_25", version: 1, currency: "usd", amount: 9900, credits: 25, permanent: true, freeAllowance: 5 })
+  Object.freeze({ key: "profile_1", version: 1, currency: "usd", amount: 1200, credits: 1, permanent: true, freeAllowance: 25 }),
+  Object.freeze({ key: "profile_10", version: 1, currency: "usd", amount: 5000, credits: 10, permanent: true, freeAllowance: 25 }),
+  Object.freeze({ key: "profile_25", version: 1, currency: "usd", amount: 9900, credits: 25, permanent: true, freeAllowance: 25 })
 ]);
 export function isDirectMethod(value: unknown): value is DirectMethodKey {
   return typeof value === "string" && Object.hasOwn(DIRECT_METHOD_LABELS, value);

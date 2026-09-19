@@ -20,7 +20,7 @@ function post(body,headers={},path='/api/billing/checkout'){
 }
 function fixture(overrides={},options={}){
   const calls=[];
-  const service={offers:async()=>[],status:async(...args)=>{calls.push(['status',...args]);return{freeLimit:5};},checkout:async(...args)=>{calls.push(['checkout',...args]);return{orderId:'order',status:'processing'};},webhook:async(...args)=>{calls.push(['webhook',...args]);return{received:true};},...overrides};
+  const service={offers:async()=>[],status:async(...args)=>{calls.push(['status',...args]);return{freeLimit:25};},checkout:async(...args)=>{calls.push(['checkout',...args]);return{orderId:'order',status:'processing'};},webhook:async(...args)=>{calls.push(['webhook',...args]);return{received:true};},...overrides};
   return{calls,handlers:createBillingHandlers({service:()=>service,...options})};
 }
 test('unconfigured billing has empty offers and cannot initiate checkout',async()=>{

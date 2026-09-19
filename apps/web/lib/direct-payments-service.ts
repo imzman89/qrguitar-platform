@@ -66,10 +66,10 @@ export function createDirectPaymentsService<Context>(deps: Dependencies<Context>
   }
   function account(input: unknown) {
     const row = obj(input);
-    if (row.environment !== environment || row.createEnvironment !== environment || row.freeLimit !== 5
+    if (row.environment !== environment || row.createEnvironment !== environment || row.freeLimit !== 25
       || typeof row.commercialExempt !== "boolean" || typeof row.hold !== "boolean"
       || ["ownedProfiles", "freeRemaining", "paidGranted", "paidConsumed", "paidRemaining", "paidAvailable"].some(key => !Number.isSafeInteger(row[key]) || Number(row[key]) < 0)
-      || Number(row.freeRemaining) > 5 || row.paidRemaining !== Number(row.paidGranted) - Number(row.paidConsumed)
+      || Number(row.freeRemaining) > 25 || row.paidRemaining !== Number(row.paidGranted) - Number(row.paidConsumed)
       || row.paidAvailable !== (row.hold ? 0 : row.paidRemaining)) return fail("balance_unavailable", "Your credit balance could not be verified. Refresh before continuing.");
     let unresolvedOrder = null;
     if (row.unresolvedOrder !== null) {
@@ -78,7 +78,7 @@ export function createDirectPaymentsService<Context>(deps: Dependencies<Context>
         || !["reserved", "open"].includes(String(pending.status))) return fail("balance_unavailable");
       unresolvedOrder = { orderId: pending.orderId, requestId: pending.requestKey, offerKey: offer.key, status: pending.status };
     }
-    return { environment, freeLimit: 5 as const, ownedProfiles: row.ownedProfiles as number, freeRemaining: row.freeRemaining as number,
+    return { environment, freeLimit: 25 as const, ownedProfiles: row.ownedProfiles as number, freeRemaining: row.freeRemaining as number,
       paidGranted: row.paidGranted as number, paidConsumed: row.paidConsumed as number, paidRemaining: row.paidRemaining as number,
       paidAvailable: row.paidAvailable as number, commercialExempt: row.commercialExempt, hold: row.hold, unresolvedOrder, order: null };
   }

@@ -1,7 +1,7 @@
 # Automatic PayPal checkout setup
 
 QRguitar's automatic checkout sells one-time Profile credit packs: $12 for 1,
-$50 for 10, or $99 for 25. Ordinary accounts have 5 free owned Profiles;
+$50 for 10, or $99 for 25. Ordinary accounts have 25 free owned Profiles;
 unused purchased credits never expire and transfers remain free. PayPal collects
 the payment and applies its merchant fees. QRguitar adds credits only after
 server verification. This is an implementation and activation checklist, not

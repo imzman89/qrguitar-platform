@@ -113,13 +113,13 @@ export function createPayPalService<Context>(deps: Dependencies<Context>) {
   }
   function balance(input: unknown) {
     const row = obj(input);
-    if (row.environment !== environment || row.createEnvironment !== environment || row.freeLimit !== 5 || typeof row.commercialExempt !== "boolean" || typeof row.hold !== "boolean"
+    if (row.environment !== environment || row.createEnvironment !== environment || row.freeLimit !== 25 || typeof row.commercialExempt !== "boolean" || typeof row.hold !== "boolean"
       || ["ownedProfiles", "freeRemaining", "paidGranted", "paidConsumed", "paidRemaining", "paidAvailable"].some(key => !Number.isSafeInteger(row[key]) || Number(row[key]) < 0)
-      || Number(row.freeRemaining) > 5 || row.paidRemaining !== Number(row.paidGranted) - Number(row.paidConsumed)
+      || Number(row.freeRemaining) > 25 || row.paidRemaining !== Number(row.paidGranted) - Number(row.paidConsumed)
       || row.paidAvailable !== (row.hold ? 0 : row.paidRemaining)) return fail("balance_unavailable", "Your balance could not be verified. Refresh before continuing.");
     const unresolved = row.unresolvedOrder == null ? null : obj(row.unresolvedOrder);
     if (unresolved && !uuid(unresolved.orderId)) return fail("balance_unavailable");
-    return { freeLimit: 5 as const, ownedProfiles: row.ownedProfiles as number, freeRemaining: row.freeRemaining as number,
+    return { freeLimit: 25 as const, ownedProfiles: row.ownedProfiles as number, freeRemaining: row.freeRemaining as number,
       paidGranted: row.paidGranted as number, paidConsumed: row.paidConsumed as number, paidRemaining: row.paidRemaining as number,
       paidAvailable: row.paidAvailable as number, commercialExempt: row.commercialExempt, hold: row.hold, legacyOrderId: unresolved ? unresolved.orderId as string : null };
   }

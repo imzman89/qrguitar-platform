@@ -34,12 +34,12 @@ function BillingContent({ mode }: { mode: Mode }) {
   const blocked = state.busy || state.refreshing || state.phase !== "ready" || !snapshot || Boolean(snapshot.hold || snapshot.commercialExempt || state.intent);
   return <><Nav /><main className={styles.page}><div className={styles.shell}>
     <header className={styles.header}>
-      <div><Link href="/account" className={styles.back}>Account / Profile credits</Link><p className={styles.eyebrow}>Yours to keep</p><h1>Room for what<br className={styles.desktopBreak} /> comes next.</h1><p className={styles.intro}>Your first 5 Profiles are free. Add permanent Profile credits when your collection grows. Ownership transfers stay free.</p></div>
+      <div><Link href="/account" className={styles.back}>Account / Profile credits</Link><p className={styles.eyebrow}>Yours to keep</p><h1>Room for what<br className={styles.desktopBreak} /> comes next.</h1><p className={styles.intro}>Your first 25 Profiles are free. Add permanent Profile credits when your collection grows. Ownership transfers stay free.</p></div>
       <div className={styles.promise}><ShieldCheck size={27} aria-hidden="true" /><strong>One purchase. Permanent credits.</strong><span>No subscription. No expiry.</span><span>Each credit creates one additional Profile when your free allowance is full.</span></div>
     </header>
 
     {(state.phase === "loading" || (state.phase === "ready" && !snapshot)) && <section className={styles.notice} role="status">Loading your credit balance…</section>}
-    {state.phase === "signed-out" && <section className={styles.notice}><h2>Your collection starts with 5 free Profiles.</h2><p>Sign in to see your balance and available credit packs.</p><Link className={styles.primary} href={`/login?next=${encodeURIComponent(returnPath)}`}>Sign in <ArrowRight size={16} aria-hidden="true" /></Link></section>}
+    {state.phase === "signed-out" && <section className={styles.notice}><h2>Your collection starts with 25 free Profiles.</h2><p>Sign in to see your balance and available credit packs.</p><Link className={styles.primary} href={`/login?next=${encodeURIComponent(returnPath)}`}>Sign in <ArrowRight size={16} aria-hidden="true" /></Link></section>}
     {state.phase === "error" && <section className={`${styles.notice} ${styles.error}`} role="alert"><h2>Billing could not be loaded.</h2><p>{state.message}</p><button className={styles.secondary} type="button" onClick={() => void controller.current?.reload()} disabled={state.refreshing}>{state.refreshing ? "Checking…" : "Try again"}</button></section>}
 
     {snapshot && state.phase === "ready" && <>

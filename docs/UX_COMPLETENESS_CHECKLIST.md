@@ -23,7 +23,7 @@ These are acceptance requirements, not checked-off results. Product rules reflec
 
 ## Brand / Builder / Shop Flow
 
-- Every workspace has the approved 5 free owned-Profile allowance unless a protected entitlement explicitly applies.
+- Every workspace has the approved 25 free owned-Profile allowance unless a protected entitlement explicitly applies.
 - After payment activation, customers can buy permanent Profile credits: US$12/1, US$50/10 or US$99/25.
 - Workspace selection never grants paid, verified-provider or administrator permissions.
 - Brand can pre-register each guitar.

@@ -1,6 +1,6 @@
 # QRguitar Product Plan
 
-Product rules updated September 18, 2026. The approved launch offer is permanent Profile credits above 5 free owned Profiles, with free ownership transfers. Pricing experiments below the current contract must not be treated as active products. This plan is a requirements document, not evidence that all launch gates are complete.
+Product rules updated September 18, 2026. The approved launch offer is permanent Profile credits above 25 free owned Profiles, with free ownership transfers. Pricing experiments below the current contract must not be treated as active products. This plan is a requirements document, not evidence that all launch gates are complete.
 
 ## MVP
 
@@ -51,7 +51,7 @@ Each guitar profile should support:
 
 ## Approved Profile credits
 
-- 5 free owned Profiles per owner, with protected existing entitlement exceptions documented in `BILLING_OPERATIONS.md`.
+- 25 free owned Profiles per owner, with protected existing entitlement exceptions documented in `BILLING_OPERATIONS.md`.
 - Existing Profiles remain available. Applying this allowance does not consume credits for previously created Profiles.
 - One-time permanent credits: US$12 for 1, US$50 for 10, US$99 for 25.
 - Unused purchased credits do not expire. One is consumed for a successful new Profile when the free allowance is full. Failure and exact retry cannot charge twice.

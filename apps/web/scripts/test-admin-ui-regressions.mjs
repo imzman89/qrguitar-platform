@@ -126,7 +126,7 @@ for (const outcome of [false, true]) test(`PayPal continuation form ${outcome ? 
 
 for (const outcome of [false, true]) test(`manual payment review ${outcome ? "clears" : "retains"} evidence only after a confirmed result`, async () => {
   const order = { orderId: "order-1", ownerId: "owner-1", requestId: "request-1", offerKey: "profile_1", method: "paypal", status: "fulfilled",
-    reference: "QRG-PAY", offer: { key: "profile_1", version: 1, currency: "usd", amount: 1200, credits: 1, permanent: true, freeAllowance: 5 },
+    reference: "QRG-PAY", offer: { key: "profile_1", version: 1, currency: "usd", amount: 1200, credits: 1, permanent: true, freeAllowance: 25 },
     recipient: { accountKey: "merchant", displayName: "QRguitar", paymentUrl: null, address: null }, createdAt: "2026-09-18T12:00:00Z", payerReference: "customer" };
   const runtime = paymentComponent("app/admin/payments/AdminPaymentsPage.tsx", "ReviewOrder", { order, busy: false, decide: async () => outcome });
   runtime.find(node => node.type === "input" && node.props.type !== "checkbox").props.onChange({ target: { value: "provider-payment-1" } });

@@ -54,7 +54,7 @@ await test('all PayPal tables/helpers deny browser and direct service access',as
 for(const [pack,amount,credits]of[['profile_1',1200,1],['profile_10',5000,10],['profile_25',9900,25]])await test(pack+' pricing comes only from approved database pack',async()=>{
   const o=await reserve(owner,randomUUID(),pack);assert.deepEqual(o.offer,{key:pack,version:1,currency:'usd',amount,credits});
   assert.equal(o.status,'reserved');assert.equal(o.paypalOrderId,null);assert.equal(o.captureId,null);assert.equal(o.merchantId,merchant);
-  assert.equal((await status()).account.freeLimit,5);assert.equal((await status()).account.paidGranted,0);
+  assert.equal((await status()).account.freeLimit,25);assert.equal((await status()).account.paidGranted,0);
 });
 await test('reserve rejects invalid IDs, packs, wrong environment, inactive and exempt accounts',async()=>{
   await reject(()=>reserve(owner,randomUUID(),'profile_100'),'22023');await reject(()=>reserve(owner,randomUUID(),'profile_1',''),'22023');

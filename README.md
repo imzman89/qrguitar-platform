@@ -2,7 +2,7 @@
 
 QRguitar public beta: permanent digital records for guitars, amps, pedals, builders, shops, collectors, and future owners.
 
-Standard accounts include 5 free owned Profiles. Additional nonexpiring Profile
+Standard accounts include 25 free owned Profiles. Additional nonexpiring Profile
 credits are US$12/1, US$50/10, or US$99/25 when purchases are enabled. Transfers
 are free. Existing Profiles stay available and never consume credits retroactively
 when the allowance changes. Separately approved business exceptions remain intact.

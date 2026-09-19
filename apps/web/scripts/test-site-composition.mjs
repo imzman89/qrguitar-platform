@@ -59,23 +59,23 @@ test("brand logo URLs permit only HTTPS or one-slash site-relative paths", () =>
     remote: "https://assets.example.test/logo.svg"
   });
 });
-test("saved beta allowance copy upgrades to five without changing the 25-credit pack", () => {
+test("saved beta allowance copy upgrades to 25 without changing the 25-credit pack", () => {
   const saved = settings.mergeSiteSettings({
     composition: { home: { sections: [{
       id: "pricing", name: "Pricing", visible: true, blocks: [{
         id: "home-price-beta", name: "Owners", title: "Our owner plan", visible: true,
-        body: "Create up to 25 Profiles with photos. Additional 25 Profiles cost $99.",
-        items: ["Up to 25 Profiles", "25 free owned Profiles", "25 Profile credits for $99"]
+        body: "Create up to 5 Profiles with photos. Additional 25 Profiles cost $99.",
+        items: ["Up to 5 Profiles", "5 free owned Profiles", "25 Profile credits for $99"]
       }]
     }] } },
     content: { "pricing.beta.body": "Create up to 25 Profiles with photos, specifications, privacy controls, history, and downloadable QR codes." }
   });
   const block = saved.composition.home.sections.find(section => section.id === "pricing").blocks[0];
   assert.equal(block.title, "Our owner plan");
-  assert.equal(block.body, "Create up to 5 Profiles with photos. Additional 25 Profiles cost $99.");
-  assert.deepEqual(block.items, ["Up to 5 Profiles", "5 free owned Profiles", "25 Profile credits for $99"]);
-  assert.match(saved.content["pricing.beta.body"], /up to 5 Profiles/);
-  assert.doesNotMatch(JSON.stringify(settings.defaultSiteSettings), /up to 25 Profiles/i);
+  assert.equal(block.body, "Create up to 25 Profiles with photos. Additional 25 Profiles cost $99.");
+  assert.deepEqual(block.items, ["Up to 25 Profiles", "25 free owned Profiles", "25 Profile credits for $99"]);
+  assert.match(saved.content["pricing.beta.body"], /up to 25 Profiles/);
+  assert.doesNotMatch(JSON.stringify(settings.defaultSiteSettings), /up to 5 Profiles/i);
 });
 const defaults = page => structuredClone(settings.defaultEditorialComposition[page].sections);
 const ids = sections => sections.map(section => section.id);

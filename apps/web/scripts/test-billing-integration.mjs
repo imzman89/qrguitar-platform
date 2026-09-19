@@ -183,7 +183,7 @@ function fixture() {
   return f;
 }
 
-async function seedOwned(n = 5) {
+async function seedOwned(n = 25) {
   for (let i = 0; i < n; i++) { const code = "QRG-OFFLINE" + String(i).padStart(3, "0");
     await db.query("insert into guitars(owner_id,qr_code,permanent_path,name,brand) values($1,$2,$3,'Offline guitar','Fixture')", [OWNER, code, "/i/" + code]); }
 }
@@ -200,21 +200,21 @@ async function response(response, expected = 200) { const body = await response.
 const tests = [];
 const test = (name, run) => tests.push({ name, run });
 
-test("authenticated HTTP -> durable SQL order -> real SDK Checkout -> signed webhook -> one grant -> sixth Profile consumes once", async () => {
+test("authenticated HTTP -> durable SQL order -> real SDK Checkout -> signed webhook -> one grant -> 26th Profile consumes once", async () => {
   await seedOwned(); const f = fixture();
   const offers = await response(await f.handlers.offers()); assert.deepEqual(offers.offers.map(value => [value.amount, value.credits]), [[1200, 1], [5000, 10], [9900, 25]]);
   const checkout = await response(await f.checkout()); assert.equal(checkout.status, "checkout");
-  assert.deepEqual(await counts(), { orders: 1, grants: 0, uses: 0, receipts: 0, profiles: 5 });
-  const before = await response(await f.status(checkout.orderId)); assert.equal(before.paidAvailable, 0); assert.equal(before.ownedProfiles, 5);
+  assert.deepEqual(await counts(), { orders: 1, grants: 0, uses: 0, receipts: 0, profiles: 25 });
+  const before = await response(await f.status(checkout.orderId)); assert.equal(before.paidAvailable, 0); assert.equal(before.ownedProfiles, 25);
   assert.deepEqual(before.unresolvedOrder, { orderId: checkout.orderId, requestId: f.requestId, offerKey: "profile_1", status: "open" });
   assert.doesNotMatch(JSON.stringify(before), /cus_|cs_test_|pi_|price_|ownerId|requestKey/);
   f.paid(); assert.equal((await response(await f.webhook())).status, "fulfilled");
   const profile = await newProfile(), created = await directRpc("create_instrument_profile", profile); assert.equal(created.ok, true);
   assert.equal((await directRpc("create_instrument_profile", profile)).qrCode, created.qrCode);
-  const after = await response(await f.status(checkout.orderId)); assert.equal(after.paidGranted, 1); assert.equal(after.paidConsumed, 1); assert.equal(after.paidAvailable, 0); assert.equal(after.ownedProfiles, 6);
+  const after = await response(await f.status(checkout.orderId)); assert.equal(after.paidGranted, 1); assert.equal(after.paidConsumed, 1); assert.equal(after.paidAvailable, 0); assert.equal(after.ownedProfiles, 26);
   await response(await f.webhook()); await response(await f.webhook({ id: "evt_later_success", type: "checkout.session.async_payment_succeeded" }));
   await response(await f.webhook({ id: "evt_old_failure", type: "checkout.session.async_payment_failed" })); await response(await f.webhook({ id: "evt_old_expiry", type: "checkout.session.expired" }));
-  assert.equal((await counts()).grants, 1); assert.equal((await counts()).uses, 1); assert.equal((await counts()).profiles, 6);
+  assert.equal((await counts()).grants, 1); assert.equal((await counts()).uses, 1); assert.equal((await counts()).profiles, 26);
   const exhausted = await newProfile(); await assert.rejects(directRpc("create_instrument_profile", exhausted), error => error.code === "QG001");
 });
 test("unpaid completion grants zero; later current paid evidence grants exactly once", async () => {
@@ -265,7 +265,7 @@ test("refund detected on current payment holds credits before grant and SQL crea
   assert.equal((await response(await f.webhook())).status, "review");
   const status = await response(await f.status()); assert.equal(status.paidGranted, 1); assert.equal(status.hold, true); assert.equal(status.paidAvailable, 0);
   const profile = await newProfile(); await assert.rejects(directRpc("create_instrument_profile", profile), error => error.code === "QG008");
-  assert.equal((await counts()).uses, 0); assert.equal((await counts()).profiles, 5);
+  assert.equal((await counts()).uses, 0); assert.equal((await counts()).profiles, 25);
 });
 test("runtime cannot use test mode against production or an unapproved sandbox database", async () => {
   const f = fixture();
