@@ -110,7 +110,10 @@ function pngStructure(bytes: Uint8Array, findings: Set<string>) {
       if (length !== 0 || !sawData) return false;
       sawEnd = true;
     }
-    if (["eXIf", "iTXt", "tEXt", "zTXt", "iCCP"].includes(type)) findings.add(type === "eXIf" ? "exif" : type === "iCCP" ? "icc" : "text-metadata");
+    if (type[0] === type[0].toLowerCase()) {
+      findings.add(type === "eXIf" ? "exif" : type === "iCCP" ? "icc"
+        : ["iTXt", "tEXt", "zTXt"].includes(type) ? "text-metadata" : "application-metadata");
+    }
     if (type[0] === type[0].toUpperCase() && !knownCritical.has(type)) return false;
     at = end;
     index += 1;
@@ -136,6 +139,7 @@ function webpStructure(bytes: Uint8Array, findings: Set<string>) {
       extended = true;
     }
     if (["EXIF", "XMP ", "ICCP"].includes(type)) findings.add(type === "ICCP" ? "icc" : type.trim().toLowerCase());
+    else if (!["VP8 ", "VP8L", "VP8X", "ALPH"].includes(type)) findings.add("application-metadata");
     at = paddedEnd;
   }
   return at === bytes.length && imageChunks === 1 && (!extended || bytes.length > 30);

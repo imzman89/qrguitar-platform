@@ -26,6 +26,20 @@ function jpegSegment(marker, payload) {
   return Buffer.concat([Buffer.from([0xff, marker, length >> 8, length & 0xff]), payload]);
 }
 function insertAfterSoi(jpeg, segment) { return Buffer.concat([jpeg.subarray(0, 2), segment, jpeg.subarray(2)]); }
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const value of bytes) { crc ^= value; for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1)); }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+function pngChunk(type, payload) {
+  const name = Buffer.from(type, "latin1"), header = Buffer.alloc(4), checksum = Buffer.alloc(4);
+  header.writeUInt32BE(payload.length); checksum.writeUInt32BE(crc32(Buffer.concat([name, payload])));
+  return Buffer.concat([header, name, payload, checksum]);
+}
+function webpChunk(type, payload) {
+  const header = Buffer.alloc(8); header.write(type, 0, 4, "latin1"); header.writeUInt32LE(payload.length, 4);
+  return Buffer.concat([header, payload, ...(payload.length % 2 ? [Buffer.from([0])] : [])]);
+}
 function classicPdf() {
   const header = "%PDF-1.7\n";
   const object = "1 0 obj\n<< /Type /Catalog >>\nendobj\n";
@@ -54,12 +68,26 @@ await check("JPEG ICC and application metadata are visible to the privacy gate",
   const result = await analyzeDeletionContainer(withIcc, "image/jpeg");
   assert.equal(result.structureValid, true); assert.equal(result.safeToRetain, false); assert.ok(result.metadataFindings.includes("icc"));
 });
-await check("a valid PNG is fully consumed and decoded", async () => {
+await check("a valid PNG is fully consumed and decoded while ancillary data stays delete-only", async () => {
   const png = await sharp({ create: { width: 8, height: 8, channels: 4, background: { r: 1, g: 2, b: 3, alpha: 1 } } }).png().toBuffer();
   const result = await analyzeDeletionContainer(png, "image/png");
-  assert.equal(result.structureValid, true); assert.equal(result.safeToRetain, true);
+  assert.equal(result.structureValid, true); assert.equal(result.safeToRetain, false); assert.ok(result.metadataFindings.includes("application-metadata"));
   const trailing = await analyzeDeletionContainer(Buffer.concat([png, Buffer.from("PRIVATE")]), "image/png");
   assert.equal(trailing.structureValid, false); assert.equal(trailing.safeToRetain, false);
+});
+await check("a private PNG ancillary chunk is metadata and delete-only", async () => {
+  const png = await sharp({ create: { width: 8, height: 8, channels: 4, background: { r: 1, g: 2, b: 3, alpha: 1 } } }).png().toBuffer();
+  const hidden = pngChunk("prIv", Buffer.from("SECRET=departing@example.test GPS=private"));
+  const withPrivateChunk = Buffer.concat([png.subarray(0, png.length - 12), hidden, png.subarray(png.length - 12)]);
+  const result = await analyzeDeletionContainer(withPrivateChunk, "image/png");
+  assert.equal(result.structureValid, true); assert.equal(result.safeToRetain, false); assert.ok(result.metadataFindings.includes("application-metadata"));
+});
+await check("an unknown WebP RIFF chunk is metadata and delete-only", async () => {
+  const webp = await sharp({ create: { width: 8, height: 8, channels: 3, background: { r: 3, g: 4, b: 5 } } }).webp().toBuffer();
+  const withPrivateChunk = Buffer.concat([webp, webpChunk("PIII", Buffer.from("SECRET=departing@example.test GPS=private"))]);
+  withPrivateChunk.writeUInt32LE(withPrivateChunk.length - 8, 4);
+  const result = await analyzeDeletionContainer(withPrivateChunk, "image/webp");
+  assert.equal(result.structureValid, true); assert.equal(result.safeToRetain, false); assert.ok(result.metadataFindings.includes("application-metadata"));
 });
 await check("a forged PDF with a fake xref footer is malformed and delete-only", async () => {
   const bytes = Buffer.from("%PDF-1.7\nSECRET=departing@example.test\nstartxref\n0\n%%EOF\n", "latin1");
