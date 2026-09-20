@@ -56,7 +56,7 @@ includes(card, "onKeyDown={handleKeyDown}", "Card galleries must support keyboar
 includes(card, "Math.abs(distance) > 8", "Card drag must use a movement threshold before suppressing Profile navigation.");
 includes(card, 'href={card.profileUrl}', "Cards must retain an explicit accessible Profile link.");
 includes(profile, "scan-hero-gallery", "Public Profiles must render the primary gallery in the hero.");
-includes(profile, "media-gallery-lightbox", "Public Profile photos must support fullscreen viewing.");
+includes(profile, "<PhotoViewer", "Public Profile photos must support fullscreen viewing.");
 includes(profile, "meaningfulTimelineEvents.length", "Timeline visibility must be based on meaningful public history.");
 includes(profile, "externalMedia.length", "Media visibility must be based on supplemental public media.");
 includes(profile, "documentFiles.length", "Documents visibility must be based on visible public documents.");

@@ -24,6 +24,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { BrandLogo } from "../../../components/BrandLogo";
 import { CompactQr } from "../../../components/CompactQr";
 import { FallbackImage } from "../../../components/FallbackImage";
+import { PhotoViewer } from "../../../components/PhotoViewer";
 import { buildProfileIdentityFields, ProfileIdentity } from "../../../components/ProfileIdentity";
 import { ProfileStatusBadges } from "../../../components/ProfileStatusBadges";
 import { RecordShareButton } from "../../../components/RecordShareButton";
@@ -70,10 +71,8 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
   const [requestedMediaIndex, setMediaIndex] = useState(0);
   const [failedGalleryImages, setFailedGalleryImages] = useState<string[]>([]);
   const [activeMedia, setActiveMedia] = useState<string | null>(null);
-  const galleryDialogRef = useRef<HTMLElement | null>(null);
-  const galleryTriggerRef = useRef<HTMLElement | null>(null);
-  const galleryTouchStartX = useRef<number | null>(null);
-  const heroPointerStartX = useRef<number | null>(null);
+  const heroGestureRef = useRef<{ x: number; y: number; pointerId: number } | null>(null);
+  const heroDidSwipeRef = useRef(false);
   const heroThumbnailRailRef = useRef<HTMLDivElement | null>(null);
   const heroThumbnailDragRef = useRef<{ pointerId: number; startX: number; scrollLeft: number } | null>(null);
   const heroThumbnailDidDragRef = useRef(false);
@@ -471,7 +470,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
 
   useEffect(() => {
     const activeThumbnail = heroThumbnailRailRef.current?.querySelector<HTMLElement>(".active");
-    activeThumbnail?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    activeThumbnail?.scrollIntoView({ behavior: "instant", block: "nearest", inline: "center" });
 
     [galleryImages[mediaIndex - 1], galleryImages[mediaIndex + 1]].filter(Boolean).forEach((source) => {
       const image = new window.Image();
@@ -487,81 +486,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
     });
   }, [galleryImages, mediaIndex]);
 
-  useEffect(() => {
-    if (!activeMedia) {
-      return;
-    }
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    galleryDialogRef.current?.focus();
-
-    const currentIndex = Math.max(0, galleryImages.indexOf(activeMedia));
-    [galleryImages[currentIndex - 1], galleryImages[currentIndex + 1]].filter(Boolean).forEach((source) => {
-      const image = new window.Image();
-      image.decoding = "async";
-      image.fetchPriority = "low";
-      image.referrerPolicy = "no-referrer";
-      const srcSet = publicMediaVariantSrcSet(source);
-      if (srcSet) {
-        image.srcset = srcSet;
-        image.sizes = "(max-width: 900px) 360px, 720px";
-      }
-      image.src = publicMediaVariantUrl(source, 1200);
-    });
-
-    function movePhoto(direction: 1 | -1) {
-      const currentIndex = Math.max(0, galleryImages.indexOf(activeMedia || ""));
-      const nextIndex = direction > 0
-        ? (currentIndex >= galleryImages.length - 1 ? 0 : currentIndex + 1)
-        : (currentIndex <= 0 ? galleryImages.length - 1 : currentIndex - 1);
-      setActiveMedia(galleryImages[nextIndex]);
-      setMediaIndex(nextIndex);
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setActiveMedia(null);
-      }
-      if (event.key === "ArrowRight" && galleryImages.length > 1) {
-        movePhoto(1);
-      }
-      if (event.key === "ArrowLeft" && galleryImages.length > 1) {
-        movePhoto(-1);
-      }
-      if (event.key === "Tab" && galleryDialogRef.current) {
-        const focusable = Array.from(
-          galleryDialogRef.current.querySelectorAll<HTMLElement>("button:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])")
-        );
-        if (!focusable.length) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault();
-          last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first.focus();
-        }
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-      galleryTriggerRef.current?.focus();
-    };
-  }, [activeMedia, galleryImages]);
-
-  useEffect(() => {
-    if (!activeMedia) return;
-    const activeThumbnail = galleryDialogRef.current?.querySelector<HTMLElement>(".media-gallery-strip .active");
-    activeThumbnail?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-  }, [activeMedia]);
-
   function openGallery(imageUrl: string) {
-    galleryTriggerRef.current = document.activeElement as HTMLElement | null;
     setActiveMedia(imageUrl);
   }
 
@@ -720,25 +645,34 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
           <section
             className="scan-hero-gallery"
             aria-label={getContentValue(publicContent, "profile.gallery.label")}
-            onPointerDown={(event) => {
-              heroPointerStartX.current = event.clientX;
-            }}
-            onPointerUp={(event) => {
-              const start = heroPointerStartX.current;
-              heroPointerStartX.current = null;
-              if (start == null || Math.abs(event.clientX - start) < 48) return;
-              moveHeroPhoto(event.clientX < start ? 1 : -1);
-            }}
           >
             <div className="scan-hero-media-frame">
               <button
                 className="scan-hero-media"
                 type="button"
                 onClick={() => {
+                  if (heroDidSwipeRef.current) { heroDidSwipeRef.current = false; return; }
                   if (galleryImages.length) {
                     openGallery(galleryImages[mediaIndex]);
                   }
                 }}
+                onPointerDown={(event) => {
+                  if (!event.isPrimary || event.button !== 0) return;
+                  heroDidSwipeRef.current = false;
+                  heroGestureRef.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
+                }}
+                onPointerUp={(event) => {
+                  const gesture = heroGestureRef.current;
+                  if (!gesture || gesture.pointerId !== event.pointerId) return;
+                  heroGestureRef.current = null;
+                  const dx = event.clientX - gesture.x;
+                  const dy = event.clientY - gesture.y;
+                  if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+                    heroDidSwipeRef.current = true;
+                    moveHeroPhoto(dx < 0 ? 1 : -1);
+                  }
+                }}
+                onPointerCancel={() => { heroGestureRef.current = null; heroDidSwipeRef.current = true; }}
                 onKeyDown={(event) => {
                   if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
                     event.preventDefault();
@@ -753,7 +687,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                     key={galleryImages[mediaIndex]}
                     src={publicMediaVariantUrl(galleryImages[mediaIndex], 1200)}
                     srcSet={publicMediaVariantSrcSet(galleryImages[mediaIndex])}
-                    sizes="(max-width: 900px) 360px, 720px"
+                    sizes="(max-width: 760px) calc(100vw - 40px), (max-width: 900px) calc(100vw - 64px), 650px"
                     alt={`${instrumentDisplayName(instrument)} photo ${mediaIndex + 1} of ${galleryImages.length}`}
                     loading="eager"
                     fetchPriority="high"
@@ -872,10 +806,44 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                 showAuthenticityBadge
               }}
               includeCondition={false}
+              hideConfirmedTrust={true}
               className="profile-hero-badges"
               ownerCollection={instrument.publicCollection}
             />
             {instrument.publicCollection ? <div className="profile-member-actions"><SellerWebsiteLink {...instrument.publicCollection} />{instrument.publicCollection.allowMessages ? <MemberMessageLink className="profile-message-link" handle={instrument.publicCollection.handle} profileCode={instrument.qrCode} label={`Message ${instrument.publicCollection.publicName}`} /> : null}</div> : null}
+            <ProfileIdentity
+              values={identityValues}
+              excludeLabels={["Make / Model"]}
+              mediaSummary={[
+                galleryImages.length ? `${galleryImages.length} ${galleryImages.length === 1 ? "photo" : "photos"}` : "",
+                documentFiles.length ? `${documentFiles.length} ${documentFiles.length === 1 ? "document" : "documents"}` : ""
+              ].filter(Boolean).join(" / ")}
+            >
+              {trustItems.length ? (
+                <div className="profile-trust-summary" aria-label="Trust review">
+                  {trustItems.map((item) => (
+                    <details key={item.label}>
+                      <summary><ShieldCheck size={15} /> {item.label}</summary>
+                      <p>{item.note}</p>
+                    </details>
+                  ))}
+                </div>
+              ) : null}
+              <div className="scan-qr">
+                <ProfileQr code={instrument.qrCode} />
+                <div>
+                  <strong>Scan to view</strong>
+                  <span>{shareUrl ? shareUrl.replace(/^https?:\/\//, "") : `qrguitar.com/i/${instrument.qrCode.toLowerCase()}`}</span>
+                </div>
+                <button className="button secondary" type="button" onClick={copyProfileUrl}>
+                  <Copy size={14} />
+                  {copyStatus === "copied" ? "Copied" : "Copy URL"}
+                </button>
+              </div>
+              {shareNotice === "failed" ? (
+                <small className="scan-copy-notice">Copy failed. You can copy the URL from your browser bar.</small>
+              ) : null}
+            </ProfileIdentity>
           </div>
         </section>
 
@@ -890,40 +858,6 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
             {isDistinctSafetyNote(instrument.publicSafetyNote, safetyStatus) ? <p>{instrument.publicSafetyNote}</p> : null}
           </section>
         ) : null}
-
-        <ProfileIdentity
-          values={identityValues}
-          excludeLabels={["Make / Model"]}
-          mediaSummary={[
-            galleryImages.length ? `${galleryImages.length} ${galleryImages.length === 1 ? "photo" : "photos"}` : "",
-            documentFiles.length ? `${documentFiles.length} ${documentFiles.length === 1 ? "document" : "documents"}` : ""
-          ].filter(Boolean).join(" / ")}
-        >
-          {trustItems.length ? (
-            <div className="profile-trust-summary" aria-label="Trust review">
-              {trustItems.map((item) => (
-                <details key={item.label}>
-                  <summary><ShieldCheck size={15} /> {item.label}</summary>
-                  <p>{item.note}</p>
-                </details>
-              ))}
-            </div>
-          ) : null}
-          <div className="scan-qr">
-            <ProfileQr code={instrument.qrCode} />
-            <div>
-              <strong>Scan to view</strong>
-              <span>{shareUrl ? shareUrl.replace(/^https?:\/\//, "") : `qrguitar.com/i/${instrument.qrCode.toLowerCase()}`}</span>
-            </div>
-            <button className="button secondary" type="button" onClick={copyProfileUrl}>
-              <Copy size={14} />
-              {copyStatus === "copied" ? "Copied" : "Copy URL"}
-            </button>
-          </div>
-          {shareNotice === "failed" ? (
-            <small className="scan-copy-notice">Copy failed. You can copy the URL from your browser bar.</small>
-          ) : null}
-        </ProfileIdentity>
 
         {!canEdit ? (
           <aside className="profile-claim-entry" aria-label="Ownership help">
@@ -1044,112 +978,14 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
         />
 
         {activeMedia ? (
-          <div className="media-overlay">
-            <div className="media-overlay-backdrop" onClick={() => setActiveMedia(null)} />
-            <section
-              className="media-overlay-content media-gallery-lightbox"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Media preview"
-              tabIndex={-1}
-              ref={galleryDialogRef}
-              onTouchStart={(event) => { galleryTouchStartX.current = event.changedTouches[0]?.clientX ?? null; }}
-              onTouchEnd={(event) => {
-                const start = galleryTouchStartX.current;
-                const end = event.changedTouches[0]?.clientX;
-                galleryTouchStartX.current = null;
-                if (start == null || end == null || Math.abs(end - start) < 48 || galleryImages.length < 2) return;
-                const currentIndex = Math.max(0, galleryImages.indexOf(activeMedia));
-                const nextIndex = end < start
-                  ? (currentIndex >= galleryImages.length - 1 ? 0 : currentIndex + 1)
-                  : (currentIndex <= 0 ? galleryImages.length - 1 : currentIndex - 1);
-                setActiveMedia(galleryImages[nextIndex]);
-                setMediaIndex(nextIndex);
-              }}
-            >
-              <header className="media-gallery-header">
-                <strong>{instrumentDisplayName(instrument)}</strong>
-                <span>{Math.max(1, galleryImages.indexOf(activeMedia) + 1)} / {galleryImages.length}</span>
-                <button className="media-overlay-close" type="button" onClick={() => setActiveMedia(null)}>
-                  <X size={14} /> Close
-                </button>
-              </header>
-              <div className="media-gallery-stage">
-                {galleryImages.length > 1 ? (
-                  <button
-                    className="media-gallery-nav media-gallery-nav--prev"
-                    type="button"
-                    aria-label="Previous photo"
-                    onClick={() => {
-                      const currentIndex = Math.max(0, galleryImages.indexOf(activeMedia));
-                      const nextIndex = currentIndex <= 0 ? galleryImages.length - 1 : currentIndex - 1;
-                      setActiveMedia(galleryImages[nextIndex]);
-                      setMediaIndex(nextIndex);
-                    }}
-                  >
-                    Previous
-                  </button>
-                ) : null}
-                <img
-                  key={activeMedia}
-                  src={publicMediaVariantUrl(activeMedia, 1200)}
-                  srcSet={publicMediaVariantSrcSet(activeMedia)}
-                  sizes="(max-width: 900px) 360px, 1080px"
-                  alt={`${instrumentDisplayName(instrument)} preview`}
-                  loading="eager"
-                  fetchPriority="high"
-                  decoding="async"
-                  width={1600}
-                  height={1200}
-                  referrerPolicy="no-referrer"
-                  onError={() => markGalleryImageFailed(activeMedia)}
-                />
-                {galleryImages.length > 1 ? (
-                  <button
-                    className="media-gallery-nav media-gallery-nav--next"
-                    type="button"
-                    aria-label="Next photo"
-                    onClick={() => {
-                      const currentIndex = Math.max(0, galleryImages.indexOf(activeMedia));
-                      const nextIndex = currentIndex >= galleryImages.length - 1 ? 0 : currentIndex + 1;
-                      setActiveMedia(galleryImages[nextIndex]);
-                      setMediaIndex(nextIndex);
-                    }}
-                  >
-                    Next
-                  </button>
-                ) : null}
-              </div>
-              {galleryImages.length > 1 ? (
-                <div className="media-gallery-strip" aria-label="Photo thumbnails">
-                  {galleryImages.map((imageUrl, index) => (
-                    <button
-                      className={imageUrl === activeMedia ? "active" : undefined}
-                      type="button"
-                      onClick={() => {
-                        setActiveMedia(imageUrl);
-                        setMediaIndex(index);
-                      }}
-                      aria-label={`Open photo ${index + 1}`}
-                      key={`${imageUrl}-lightbox-${index}`}
-                    >
-                      <img
-                        src={publicMediaVariantUrl(imageUrl, 160)}
-                        alt=""
-                        loading="lazy"
-                        fetchPriority="low"
-                        decoding="async"
-                        width={148}
-                        height={112}
-                        referrerPolicy="no-referrer"
-                        onError={() => markGalleryImageFailed(imageUrl)}
-                      />
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </section>
-          </div>
+          <PhotoViewer
+            images={galleryImages}
+            initialIndex={Math.max(0, galleryImages.indexOf(activeMedia))}
+            title={instrumentDisplayName(instrument)}
+            onClose={() => setActiveMedia(null)}
+            onIndexChange={setMediaIndex}
+            onImageError={markGalleryImageFailed}
+          />
         ) : null}
       </section>
     </main>

@@ -1,8 +1,8 @@
 /* Homepage composition: a single responsive grid and consistent vertical rhythm. */
 .home { color: var(--text); background: var(--canvas); }
 .home :global(.shell) { width: min(100% - 64px, 1200px); max-width: 1200px; }
-.home :global(.hero) { padding: 48px 0 0; min-height: 0; background: radial-gradient(ellipse at 85% 20%, #ffffff06, transparent 55%), var(--canvas); border-bottom: 1px solid var(--line); }
-.home :global(.hero-grid) { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,.94fr); align-items: center; gap: clamp(32px,5vw,72px); padding-bottom: 40px; }
+.home :global(.hero) { padding: 24px 0 0; min-height: 0; background: radial-gradient(ellipse at 85% 20%, #ffffff06, transparent 55%), var(--canvas); border-bottom: 0; }
+.home :global(.hero-grid) { display: grid; grid-template-columns: minmax(0,.9fr) minmax(0,1.1fr); align-items: center; gap: clamp(32px,5vw,72px); padding-bottom: 40px; }
 .home :global(.hero-copy) { max-width: 590px; padding: 0; text-align: left; }
 .home :global(.hero-copy h1) { max-width: 14ch; margin: 20px 0 24px; color: var(--text); font-family: inherit; font-size: clamp(46px,4.7vw,64px); line-height: 1.04; letter-spacing: -.055em; font-weight: 650; text-wrap: balance; }
 .home :global(.hero-copy > p) { max-width: 43ch; margin: 0; font-size: 17px; line-height: 1.65; color: var(--muted); }
@@ -12,24 +12,24 @@
 .betaNote { display: inline-flex; margin-top: 12px; padding-block: 7px; font-size: 12px; color: var(--muted); text-decoration: none; }
 .betaNote:hover { color: var(--text); text-decoration: underline; text-underline-offset: 4px; }
 .heroShowcase { min-width: 0; padding: 0; }
-.home :global(.latest-record-card--skeleton), .home :global(.latest-record-message) { min-height: 450px; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 16px; }
-.valueStrip { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); border-top: 1px solid var(--line); padding-block: 22px; gap: 24px; }
+.home :global(.latest-record-card--skeleton), .home :global(.latest-record-message) { min-height: 450px; background: var(--surface); color: var(--text); border: 0; border-radius: 16px; }
+.valueStrip { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); border-top: 0; padding-block: 22px; gap: 24px; }
 .valueStrip > div { display: flex; align-items: center; gap: 14px; min-width: 0; }
-.valueStrip > div + div { border-left: 1px solid var(--line); padding-left: 24px; }
-.valueStrip svg { flex-shrink: 0; color: var(--gold); }
+.valueStrip > div + div { border-left: 0; padding-left: 24px; }
+.valueStrip svg { flex-shrink: 0; color: var(--muted-strong); }
 .valueStrip strong { display: block; color: var(--text); font-size: 13px; line-height: 1.6; font-weight: 600; }
 .valueStrip small { display: block; color: var(--muted); font-size: 12px; line-height: 1.6; }
-.home :global(.section) { padding-block: 64px; background: var(--canvas); color: var(--text); border: 0; }
+.home :global(.section) { padding-block: 48px; background: var(--canvas); color: var(--text); border: 0; }
 .home :global(.section h2) { max-width: 28ch; margin: 10px 0 16px; color: inherit; font-family: inherit; font-size: clamp(30px,3vw,40px); font-weight: 620; line-height: 1.13; letter-spacing: -.04em; text-wrap: balance; }
 .home :global(.section p) { font-size: 15px; line-height: 1.65; color: var(--muted); }
 .home :global(.eyebrow) { font-size: 11px; letter-spacing: .08em; line-height: 1.7; color: var(--gold); font-weight: 650; }
 .home :global(.section-header) { max-width: 760px; margin: 0 0 28px; text-align: left; }
 .home :global(.section-header h2) { margin-inline: 0; }
 .home :global(.section-header p) { margin: 0; max-width: 64ch; }
-.home :global(.home-lifecycle-section .grid.three) { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; border: 0; counter-reset: process; }
-.home :global(.home-lifecycle-section .card) { counter-increment: process; position: relative; min-height: 0; padding: 24px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: none; }
-.home :global(.home-lifecycle-section .card::before) { content: '0' counter(process); display: block; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; margin-bottom: 30px; }
-.home :global(.home-lifecycle-section .card .icon) { position: absolute; top: 19px; right: 21px; width: 36px; height: 36px; color: var(--gold); background: transparent; }
+.home :global(.home-lifecycle-section .grid.three) { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 48px; border: 0; counter-reset: process; }
+.home :global(.home-lifecycle-section .card) { counter-increment: process; position: relative; min-height: 0; padding: 12px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.home :global(.home-lifecycle-section .card::before) { content: '0' counter(process); display: block; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; margin-bottom: 18px; }
+.home :global(.home-lifecycle-section .card .icon) { position: absolute; top: 4px; right: 0; width: 36px; height: 36px; color: var(--gold); background: transparent; }
 .home :global(.home-lifecycle-section h3) { margin: 0 0 8px; color: var(--text); font-size: 18px; font-weight: 600; letter-spacing: -.02em; }
 .home :global(.home-lifecycle-section .card p) { margin: 0; font-size: 14px; }
 .home :global(.record-holds-section) { padding-top: 8px; }
@@ -37,40 +37,40 @@
 .home :global(.record-holds-copy) { max-width: none; }
 .home :global(.record-holds-copy h2) { max-width: 20ch; }
 .home :global(.record-holds-copy .check-list) { gap: 12px; margin-block: 22px; font-size: 14px; }
-.home :global(.record-holds-visual) { display: grid; grid-template-columns: minmax(0,.9fr) minmax(0,1.1fr); border-radius: 14px; border: 1px solid var(--line); background: var(--surface); box-shadow: none; }
+.home :global(.record-holds-visual) { display: grid; grid-template-columns: minmax(0,.9fr) minmax(0,1.1fr); border-radius: 14px; border: 0; background: var(--surface); box-shadow: none; }
 .home :global(.record-holds-photo) { width: 100%; min-width: 0; min-height: 350px; background: var(--surface-subtle); }
 .home :global(.record-holds-photo > span) { font-size: 11px; font-weight: 600; text-transform: none; }
 .home :global(.record-holds-facts > div) { padding: 18px; grid-template-columns: 22px minmax(0,1fr); gap: 5px 8px; }
 .home :global(.record-holds-facts strong) { font-size: 14px; color: var(--text); font-weight: 600; }
 .home :global(.record-holds-facts p) { font-size: 12px; line-height: 1.5; }
-.home :global(.home-roles-section) { background: var(--surface); border-block: 1px solid var(--line); }
+.home :global(.home-roles-section) { background: var(--canvas); border-block: 0; }
 .home :global(.audience-switcher) { display: block; border: 0; }
 .home :global(.audience-tabs) { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 20px; border: 0; }
-.home :global(.audience-tabs button) { flex: 0 1 auto; min-height: 44px; font-size: 13px; font-weight: 550; padding: 10px 16px; border: 1px solid var(--line); border-radius: 24px; background: transparent; color: var(--muted-strong); text-align: center; }
+.home :global(.audience-tabs button) { flex: 0 1 auto; min-height: 44px; font-size: 13px; font-weight: 550; padding: 10px 16px; border: 0; border-radius: 24px; background: transparent; color: var(--muted-strong); text-align: center; }
 .home :global(.audience-tabs button.is-active) { color: var(--canvas); border-color: var(--text); background: var(--text); }
 .home :global(.audience-tabs button:hover:not(.is-active)) { color: var(--text); background: var(--surface-subtle); }
 .home :global(.audience-tabs button:focus-visible) { outline: 3px solid var(--gold); outline-offset: 3px; }
-.home :global(.audience-panel) { display: grid; grid-template-columns: 48px minmax(0,1fr) auto; min-height: 168px; align-items: center; border: 1px solid var(--line); border-radius: 14px; background: var(--canvas); padding: 28px; gap: 24px; }
+.home :global(.audience-panel) { display: grid; grid-template-columns: 48px minmax(0,1fr) auto; min-height: 168px; align-items: center; border: 0; border-radius: 14px; background: var(--surface); padding: 28px; gap: 24px; }
 .home :global(.audience-panel h3) { margin: 0 0 8px; color: var(--text); font-family: inherit; font-size: 24px; font-weight: 600; letter-spacing: -.025em; }
 .home :global(.audience-panel p) { max-width: 64ch; margin: 0; }
-.home :global(.audience-panel .icon) { width: 44px; height: 44px; display: grid; place-items: center; color: var(--gold); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.home :global(.audience-panel .icon) { width: 44px; height: 44px; display: grid; place-items: center; color: var(--gold); background: var(--surface); border: 0; border-radius: 12px; }
 .home :global(.audience-panel .button) { white-space: nowrap; }
 .home :global(.continuity-layout) { display: grid; grid-template-columns: minmax(0,.9fr) minmax(0,1.1fr); gap: 56px; align-items: center; }
 .home :global(.continuity-list) { border-block: 0; }
-.home :global(.continuity-list article) { display: grid; grid-template-columns: 22px 24px minmax(0,1fr); gap: 14px; background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 20px 0; }
+.home :global(.continuity-list article) { display: grid; grid-template-columns: 22px 24px minmax(0,1fr); gap: 14px; background: transparent; border: 0; border-bottom: 0; border-radius: 0; padding: 20px 0; }
 .home :global(.continuity-list article:last-child) { border-bottom: 0; }
 .home :global(.continuity-list h3) { font-size: 16px; margin: 0 0 6px; color: var(--text); font-weight: 600; }
 .home :global(.continuity-list p) { font-size: 14px; margin: 0; }
-.home :global(.pricing-section) { background: var(--surface); border-block: 1px solid var(--line); }
+.home :global(.pricing-section) { background: var(--surface); border-block: 0; }
 .home :global(.pricing-grid) { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; background: transparent; border: 0; box-shadow: none; max-width: none; margin: 0; }
-.home :global(.price-card) { width: 100%; max-width: none; display: flex; flex-direction: column; min-height: 0; padding: 28px; border: 1px solid var(--line); border-radius: 14px; background: var(--canvas); color: var(--text); box-shadow: none; }
+.home :global(.price-card) { width: 100%; max-width: none; display: flex; flex-direction: column; min-height: 0; padding: 28px; border: 0; border-radius: 14px; background: var(--surface); color: var(--text); box-shadow: none; }
 .home :global(.price-card h3) { color: var(--text); font-size: 18px; font-weight: 600; margin: 0 0 10px; }
 .home :global(.price-card .price) { color: var(--text); font-size: 40px; font-family: inherit; font-weight: 650; letter-spacing: -.05em; line-height: 1.15; margin: 8px 0; }
 .home :global(.price-card p) { margin-block: 10px; }
 .home :global(.price-card ul) { margin-block: 16px 24px; }
 .home :global(.price-card li) { font-size: 14px; line-height: 1.7; color: var(--muted); }
 .home :global(.price-card .button) { margin-top: auto; align-self: flex-start; }
-.home :global(.home-final-cta) { padding-block: 56px; background: var(--canvas); border-bottom: 1px solid var(--line); }
+.home :global(.home-final-cta) { padding-block: 56px; background: var(--canvas); border-bottom: 0; }
 .home :global(.home-final-cta .shell) { display: flex; align-items: center; justify-content: space-between; gap: 32px; }
 .home :global(.home-final-cta .section-header) { margin: 0; max-width: 780px; text-align: left; }
 .home :global(.home-final-cta h2) { max-width: none; font-size: 34px; }
@@ -79,14 +79,14 @@
 .home :global(.home-archive-heading h2) { max-width: 25ch; }
 .home :global(.home-archive-heading p) { margin-bottom: 0; }
 .home :global(.home-archive-heading .text-link) { font-size: 14px; }
-.home :global(.home-archive-controls button) { background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 50%; }
+.home :global(.home-archive-controls button) { background: var(--surface); color: var(--text); border: 0; border-radius: 50%; }
 .home :global(.home-archive-controls button:hover) { background: var(--surface-subtle); }
 .home :global(.home-archive-controls span) { color: var(--muted); }
 .home :global(.home-archive-rail) { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; }
-.home :global(.collectible-card--archive) { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--text); box-shadow: none; }
+.home :global(.collectible-card--archive) { border: 0; border-radius: 14px; background: var(--surface); color: var(--text); box-shadow: none; }
 .home :global(.collectible-card--archive .collectible-card-media) { flex: 0 0 auto; width: 100%; height: auto; min-height: 0; aspect-ratio: 4 / 3; }
 .home :global(.collectible-card--archive .collectible-card-link) { display: flex; flex-direction: column; height: 100%; }
-.home :global(.collectible-card--archive .collectible-card-content) { display: flex; flex: 1; flex-direction: column; gap: 12px; min-height: 0; padding: 20px; background: var(--surface); }
+.home :global(.collectible-card--archive .collectible-card-content) { display: flex; flex: 1; flex-direction: column; gap: 12px; min-height: 0; padding: 18px 0 0; background: transparent; }
 .home :global(.collectible-card--archive .collectible-card-actions) { margin-top: auto; }
 .home :global(.collectible-card--archive h3) { color: var(--text); font-family: inherit; font-size: 20px; font-weight: 600; line-height: 1.25; letter-spacing: -.025em; }
 .home :global(.collectible-card--archive .collectible-card-subtitle) { color: var(--muted); font-size: 13px; }
@@ -131,7 +131,7 @@
   .home :global(.section h2) { font-size: 30px; }
   .home :global(.section-header) { margin-bottom: 22px; }
   .home :global(.home-lifecycle-section .grid.three) { grid-template-columns: minmax(0,1fr); gap: 12px; }
-  .home :global(.home-lifecycle-section .card) { padding: 22px; }
+  .home :global(.home-lifecycle-section .card) { padding: 14px 0; }
   .home :global(.home-lifecycle-section .card::before) { margin-bottom: 22px; }
   .home :global(.record-holds-section) { padding-top: 0; }
   .home :global(.record-holds-layout), .home :global(.continuity-layout) { grid-template-columns: minmax(0,1fr); gap: 24px; }

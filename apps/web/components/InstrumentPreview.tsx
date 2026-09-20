@@ -1,4 +1,4 @@
-import { ExternalLink } from "lucide-react";
+import { Camera, ExternalLink } from "lucide-react";
 import { type CustomProfileField, type CustomProfileLink } from "../lib/local-demo";
 import { formatRecordLocation } from "../lib/record-location";
 
@@ -43,16 +43,12 @@ export function InstrumentPreview({
 
   return (
     <article className="instrument-preview" aria-label="Live instrument profile preview">
-      <div
-        className="instrument-preview-hero"
-        style={
-          heroImageDataUrl
-            ? { backgroundImage: `linear-gradient(180deg, rgba(3,5,6,.14), rgba(3,5,6,.86)), url(${heroImageDataUrl})` }
-            : undefined
-        }
-      >
+      <div className="instrument-preview-photo">
+        {heroImageDataUrl ? <img src={heroImageDataUrl} alt={title} width={800} height={600} decoding="async" /> : <span><Camera size={26} aria-hidden="true" />Add a photo to preview your Profile</span>}
+      </div>
+      <div className="instrument-preview-hero">
         <div className="preview-topline">
-          <span>Live profile preview</span>
+          <span>QRguitar Profile</span>
           <strong>{qrCode}</strong>
         </div>
         <h3>{title}</h3>

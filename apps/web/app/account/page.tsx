@@ -124,13 +124,16 @@ function AccountSettingsPage() {
               <span>{plan || "free"}</span>
               <span>{role || "user"}</span>
             </div>
-            <div className="account-quick-links">
-              <Link href="/dashboard">Dashboard</Link>
-              <Link href="/create">Create Profile</Link>
-              <Link href="/catalog">Explore the Catalog</Link>
-              <Link href="/billing">Profile credits</Link>
-              <Link href="/contact">Support</Link>
-            </div>
+            <details className="account-workspace-links">
+              <summary>Workspace links</summary>
+              <div className="account-quick-links">
+                <Link href="/dashboard">Dashboard</Link>
+                <Link href="/create">Create Profile</Link>
+                <Link href="/catalog">Explore the Catalog</Link>
+                <Link href="/billing">Profile credits</Link>
+                <Link href="/contact">Support</Link>
+              </div>
+            </details>
             <div className="account-summary-grid">
               <div>
                 <strong>{stats.records}</strong>
@@ -166,6 +169,7 @@ function AccountSettingsPage() {
               ))}
             </nav>
 
+            <div className="account-settings-content">
             {activeSection === "overview" ? <PwaInstall /> : null}
 
             <fieldset disabled={isWorking || (state.uncertainSave && (activeSection === "profile" || activeSection === "collection"))} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
@@ -314,6 +318,7 @@ function AccountSettingsPage() {
             {activeSection === "privacy" && <AccountDeletionSection actorId={state.actorId} auth={accountDeletionAuth} />}
             {status ? <p className="form-message account-form-message" role="status">{status}</p> : null}
             {state.uncertainSave && <div className="form-message account-form-message"><p>Reload the saved settings before editing again; reloading replaces the form with the server version.</p><button className="button secondary" type="button" onClick={() => void controller.current?.reload()}>Reload saved account</button></div>}
+            </div>
           </div>
         </div>
       </main>

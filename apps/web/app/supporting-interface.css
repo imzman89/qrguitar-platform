@@ -1,0 +1,66 @@
+/* Supporting public routes use the same open composition as the galleries. */
+@media screen {
+  body[data-product-theme="paper"] .product-guide-page > .section { padding-block: 48px; border: 0; background: var(--canvas); }
+  body[data-product-theme="paper"] .product-guide-page :is(h1,h2,h3) { font-family: inherit; text-transform: none; }
+  body[data-product-theme="paper"] .product-guide-page :is(.section-heading,.centered-heading) { max-width: 720px; margin: 0 0 28px; text-align: left; }
+  body[data-product-theme="paper"] .product-guide-page :is(.product-guide-steps,.product-guide-use-grid,.product-guide-visibility-grid,.product-guide-visibility,.product-guide-ownership-list) { border: 0; box-shadow: none; background: transparent; gap: 24px; }
+  body[data-product-theme="paper"] .product-guide-page :is(.product-guide-steps li,.product-guide-use-grid article,.product-guide-visibility-grid article,.product-guide-visibility > div,.product-guide-ownership-list article) { min-height: 0; padding: 12px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+  body[data-product-theme="paper"] .product-guide-page :is(.product-guide-steps li > span,.product-guide-use-grid article > span) { border: 0; box-shadow: none; background: transparent; color: var(--muted); }
+  body[data-product-theme="paper"] .product-guide-page .product-guide-principles { padding: 24px; border: 0; border-radius: 16px; background: var(--surface); box-shadow: none; }
+  body[data-product-theme="paper"] .product-guide-page .product-guide-principles > div { border: 0; padding: 12px 0; background: transparent; }
+  body[data-product-theme="paper"] .product-guide-page .product-guide-visibility-heading { margin-top: 32px; }
+  body[data-product-theme="paper"] .product-guide-page .product-guide-role-switcher { display: block; margin-top: 24px; border: 0; background: transparent; }
+  body[data-product-theme="paper"] .product-guide-page .product-guide-role-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 20px; border: 0; }
+  body[data-product-theme="paper"] .product-guide-page .product-guide-role-tabs button { flex: 0 0 auto; min-height: 44px; padding: 10px 14px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 500; letter-spacing: 0; text-transform: none; box-shadow: none; }
+  body[data-product-theme="paper"] .product-guide-page .product-guide-role-tabs button:is(:hover,.is-active) { color: var(--text); background: var(--surface-subtle); }
+  body[data-product-theme="paper"] .product-guide-page .product-guide-role-panel { min-height: 0; grid-template-columns: 28px minmax(0,1fr) auto; gap: 20px; padding: 28px; border: 0; border-radius: 16px; background: var(--surface); }
+  body[data-product-theme="paper"] .product-guide-page .product-guide-role-panel > span { font-size: 13px; font-weight: 500; color: var(--muted); }
+  body[data-product-theme="paper"] .product-guide-page .product-guide-role-panel h3 { font-size: 23px; }
+  body[data-product-theme="paper"] .product-guide-page .product-guide-faq-list { display: grid; gap: 10px; }
+  body[data-product-theme="paper"] .product-guide-page .product-guide-faq-list details { padding: 0 20px; border: 0; border-radius: 12px; background: var(--surface); }
+  body[data-product-theme="paper"] .product-guide-page .product-guide-faq-list summary { padding-block: 18px; font-size: 15px; font-weight: 550; }
+  body[data-product-theme="paper"] .product-guide-page .product-guide-faq-list details p { padding-bottom: 18px; }
+  body[data-product-theme="paper"] .product-guide-page .product-guide-cta-inner { border: 0; border-radius: 16px; background: var(--surface); padding: 32px; }
+
+  /* These structural selectors avoid coupling global styles to CSS-module hashes. */
+  body[data-product-theme="paper"] .collection-directory-page .shell > div:has(> label[for="collection-search"]) { padding: 20px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+  body[data-product-theme="paper"] .collection-directory-page .shell > div:has(> a[href^="/collections/"]) { gap: 36px 24px; }
+  body[data-product-theme="paper"] .collection-directory-page a[href^="/collections/"] { border: 0; border-radius: 0; background: transparent; box-shadow: none; overflow: visible; }
+  body[data-product-theme="paper"] .collection-directory-page a[href^="/collections/"] > img { display: block; border-radius: 14px; background: var(--surface); object-fit: contain; }
+  body[data-product-theme="paper"] .collection-directory-page a[href^="/collections/"] > div:not(:has(> h2)) { border-radius: 14px; background: var(--surface); }
+  body[data-product-theme="paper"] .collection-directory-page a[href^="/collections/"] > div:has(> h2) { padding: 16px 0 0; }
+  body[data-product-theme="paper"] .collection-directory-page a[href^="/collections/"] h2 { font-family: inherit; font-size: 21px; line-height: 1.25; font-weight: 600; }
+  body[data-product-theme="paper"] .collection-directory-page a[href^="/collections/"] > div > span { color: var(--muted); font-weight: 450; }
+  body[data-product-theme="paper"] .collection-directory-page a[href^="/collections/"] > div > div { margin-top: 14px; padding-top: 0; border: 0; }
+  body[data-product-theme="paper"] .collection-page .collection-header { padding: 20px 0 32px; border: 0; border-radius: 0; background: transparent; box-shadow: none; gap: 32px; }
+  body[data-product-theme="paper"] .collection-page .collection-header > div:first-child > :is(img,.collection-avatar) { border: 0; box-shadow: none; }
+  body[data-product-theme="paper"] .collection-page .collection-header :is(h1,.collection-count) { font-family: inherit; font-weight: 600; }
+  body[data-product-theme="paper"] .collection-page .collection-header a { font-weight: 500; }
+  body[data-product-theme="paper"] .collection-page .collection-record-grid { gap: 40px 24px; }
+  body[data-product-theme="paper"] .collection-directory-page .collection-directory-hero { padding-block: 16px 32px; border: 0; }
+
+  body[data-product-theme="paper"] .contact-page :is(.contact-direct-card,.contact-topic-card,.contact-checklist) { border: 0; box-shadow: none; }
+  body[data-product-theme="paper"] .contact-page .contact-direct-card { padding: 24px; border-radius: 16px; background: var(--surface); }
+  body[data-product-theme="paper"] .contact-page .contact-topic-grid { gap: 28px; }
+  body[data-product-theme="paper"] .contact-page .contact-topic-card { padding: 20px 0; border-radius: 0; background: transparent; }
+  body[data-product-theme="paper"] .contact-page .contact-topic-card :is(strong,span) { text-transform: none; letter-spacing: 0; }
+  body[data-product-theme="paper"] .contact-page .contact-topic-card strong { font-size: 18px; font-weight: 550; }
+  body[data-product-theme="paper"] .contact-page .contact-topic-card:hover strong { text-decoration: underline; text-underline-offset: 4px; }
+  body[data-product-theme="paper"] .contact-page .contact-checklist { padding: 0; background: transparent; }
+  body[data-product-theme="paper"] .editorial-composed-page > .section:has(> .contact-page) { padding-block: 32px; border: 0; }
+
+  body[data-product-theme="paper"] .auth-layout:not(.account-layout) .auth-card { border: 0; border-radius: 16px; padding: 32px; background: var(--surface); box-shadow: none; }
+  body[data-product-theme="paper"] .auth-layout:not(.account-layout) .auth-mode-switch { border: 0; border-radius: 10px; background: var(--canvas); }
+  body[data-product-theme="paper"] .auth-layout:not(.account-layout) .auth-mode-switch button { border-radius: 7px; font-size: 13px; font-weight: 550; letter-spacing: 0; }
+  body[data-product-theme="paper"] .auth-layout:not(.account-layout) .auth-mode-switch button.active { color: var(--on-action); background: var(--action); }
+  body[data-product-theme="paper"] .auth-layout:not(.account-layout) .auth-card-link-row { border: 0; }
+}
+@media screen and (max-width: 760px) {
+  body[data-product-theme="paper"] .product-guide-page > .section { padding-block: 32px; }
+  body[data-product-theme="paper"] .product-guide-page .product-guide-role-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 14px; }
+  body[data-product-theme="paper"] .product-guide-page .product-guide-role-panel { grid-template-columns: 24px minmax(0,1fr); padding: 22px; }
+  body[data-product-theme="paper"] .product-guide-page .product-guide-role-panel .button { grid-column: 2; justify-self: start; }
+  body[data-product-theme="paper"] .product-guide-page .product-guide-cta-inner { padding: 24px; }
+  body[data-product-theme="paper"] .collection-page .collection-header { gap: 24px; padding-top: 8px; }
+  body[data-product-theme="paper"] .auth-layout:not(.account-layout) .auth-card { padding: 24px; }
+}

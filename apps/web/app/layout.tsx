@@ -1,6 +1,9 @@
 import "./globals.css";
 import "./product.css";
 import "./theme.css";
+import "./interface.css";
+import "./account-interface.css";
+import "./supporting-interface.css";
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { PwaRuntime } from "../components/PwaRuntime";
@@ -21,7 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export const viewport: Viewport = { themeColor: "#0c1718" };
+export const viewport: Viewport = { themeColor: "#101113" };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const organizationJsonLd = buildOrganizationJsonLd();

@@ -1,10 +1,10 @@
 .breadcrumbs {
-  padding: 16px 28px 0;
+  padding: 0 0 16px;
   color: rgba(248, 246, 242, .64);
-  background: rgba(5, 8, 10, .9);
+  background: transparent;
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: .04em;
+  font-weight: 450;
+  letter-spacing: 0;
 }
 
 .breadcrumbs ol,
@@ -47,7 +47,7 @@
 
 @media (max-width: 640px) {
   .breadcrumbs {
-    padding: 13px 18px 0;
+    padding: 0 0 16px;
   }
 
   .current {

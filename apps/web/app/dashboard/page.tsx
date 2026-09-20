@@ -394,7 +394,6 @@ export default function DashboardPage() {
           </nav>
           {dashboardMessage ? <div className="admin-message" role="status">{dashboardMessage}</div> : null}
           {recordsError ? <div className="profile-refresh-notice" role="alert"><p>{recordsError} {recordsLoaded ? "Previously loaded Profiles are shown below." : "Your collection is not yet loaded."}</p><button type="button" className="button secondary" onClick={refreshInstruments}>Try again</button></div> : null}
-          <WorkspaceActions accountType={collectionAccountType} />
 
           <div className="stats-grid dashboard-metric-grid" aria-label="Collection overview">
             {stats.map((stat) => (
@@ -457,7 +456,7 @@ export default function DashboardPage() {
               </div> : null;
             })}
           </details>
-          <section className={`card ${styles.instrumentTable}`} id="saved-profiles">
+          <section className={styles.instrumentTable} id="saved-profiles">
             <div className={styles.tableHeader}>
               <div>
                 <div className="eyebrow">Your instruments</div>
@@ -486,21 +485,14 @@ export default function DashboardPage() {
                   const profileNumber = profileNumbers.get(instrument.qrCode) || 1;
 
                   return (
-                    <article className={styles.instrumentRow} key={instrument.qrCode}>
-                      <span className={styles.profileNumber} aria-label={`Collection profile ${profileNumber}`}>
-                        {String(profileNumber).padStart(2, "0")}
-                      </span>
+                    <article className={styles.instrumentRow} key={instrument.qrCode} aria-label={`Collection profile ${profileNumber}: ${title}`}>
                       <Link className={styles.instrumentBodyLink} href={ownerProfileHref(instrument)} aria-label={`Open ${title} profile`}>
                         <DashboardInstrumentThumb sources={imageSources} title={title} />
                         <div className={styles.instrumentDetails}>
                           <div className={styles.instrumentInfo}>
                             <strong>{title}</strong>
                             <span title={meta}>{meta}</span>
-                            <div className={styles.dashboardIdentity} aria-label="Profile identity">
-                              <span><b>QRguitar ID</b> {instrument.qrCode}</span>
-                              <span><b>Serial Number</b> {instrument.serial || "No serial number"}</span>
-                            </div>
-                            <ProfileStatusBadges record={instrument} includeCategory />
+                            <ProfileStatusBadges record={instrument} includeCondition={false} />
                           </div>
                           <div className={styles.instrumentMeta}>
                             {imageSources.length ? <span>{imageSources.length} {imageSources.length === 1 ? "photo" : "photos"}</span> : null}
@@ -508,10 +500,16 @@ export default function DashboardPage() {
                             {totalDocs ? <span>{publicDocs} public {publicDocs === 1 ? "document" : "documents"}{hiddenDocs ? `, ${hiddenDocs} private` : ""}</span> : null}
                             <span>{instrument.visibility === "private" ? "Private" : instrument.visibility === "unlisted" ? "Unlisted" : "Public"}</span>
                           </div>
+                          <div className={styles.recordIdentity}>
+                            <div className={styles.compactQr}><CompactQr code={instrument.qrCode} label={title} /></div>
+                            <div className={styles.dashboardIdentity} aria-label="Profile identity">
+                              <span><b>QRguitar ID</b> {instrument.qrCode}</span>
+                              <span><b>Serial Number</b> {instrument.serial || "No serial number"}</span>
+                            </div>
+                          </div>
                         </div>
                       </Link>
-                      <aside className={styles.qrActionColumn}>
-                        <div className={styles.compactQr}><CompactQr code={instrument.qrCode} label={title} /><span>{instrument.qrCode}</span></div>
+                      <aside className={styles.qrActionColumn} aria-label={`Actions for ${title}`}>
                         <div className={styles.primaryActions}>
                           <Link className="button" href={ownerProfileHref(instrument)}>{getContentValue(content, "dashboard.card.open")}</Link>
                           <Link className="button secondary" href={`/edit/${instrument.qrCode}`}>{getContentValue(content, "dashboard.card.edit")}</Link>
@@ -521,11 +519,13 @@ export default function DashboardPage() {
                           className={styles.moreButton}
                           type="button"
                           aria-haspopup="dialog"
+                          aria-label={`${getContentValue(content, "dashboard.card.more")} for ${title}`}
+                          title={getContentValue(content, "dashboard.card.more")}
                           onClick={(event) => {
                             setActionTrigger(event.currentTarget);
                             setActionRecord(instrument);
                           }}
-                        ><Ellipsis size={18} /> {getContentValue(content, "dashboard.card.more")}</button>
+                        ><Ellipsis size={20} aria-hidden="true" /></button>
                       </aside>
                     </article>
                   );
@@ -543,6 +543,7 @@ export default function DashboardPage() {
               )}
             </div>
           </section>
+          <WorkspaceActions accountType={collectionAccountType} />
 
         </div>
       </main>
@@ -966,10 +967,10 @@ function latestTransferForInstrument(transfers: DemoTransfer[], qrCode: string) 
 
 function dashboardRecordMeta(instrument: DemoInstrument, condition: "new" | "used") {
   return [
-    instrument.brand,
+    instrument.instrumentType,
     instrument.year,
     condition === "new" ? "New" : "Used"
-  ].filter(Boolean).join(" / ");
+  ].filter(Boolean).join(" · ");
 }
 
 function sameText(first: string, second: string) {

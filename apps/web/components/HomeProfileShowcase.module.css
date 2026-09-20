@@ -1,41 +1,24 @@
-.showcase { width: 100%; min-width: 0; overflow: hidden; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 20px 60px #0005; }
-.topline { min-height: 47px; padding: 8px 19px; display: flex; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); font-size: 11px; letter-spacing: 0; text-transform: uppercase; font-weight: 650; }
-.topline > span { display: flex; align-items: center; gap: 8px; }
-.topline a { display: grid; place-items: center; width: 34px; min-height: 34px; border: 1px solid var(--line); border-radius: 50%; }
-.liveDot { width: 6px; height: 6px; border-radius: 50%; background: var(--positive); flex-shrink: 0; }
-.photoStage { position: relative; height: clamp(260px, 24vw, 320px); background: #101113; border-bottom: 1px solid var(--line); }
-.mainPhoto { width: 100%; height: 100%; display: block; object-fit: contain; }
-.noPhoto { display: grid; place-content: center; justify-items: center; gap: 16px; height: 100%; padding: 24px; color: #e8e1d2; text-align: center; }
-.photoSelector { position: absolute; inset: auto 14px 14px; display: flex; justify-content: center; gap: 7px; flex-wrap: wrap; }
-.photoSelector button { height: 46px; width: 46px; flex: 0 0 46px; border: 2px solid #f5f1e86b; border-radius: 7px; padding: 2px; background: #111c; cursor: pointer; }
-.photoSelector button.selectedPhoto { border-color: #f0a12b; box-shadow: 0 0 0 1px #172018; }
-.photoSelector img { width: 100%; height: 100%; display: block; object-fit: cover; }
-.details { padding: 20px 22px; }
-.kicker { font-size: 10px; letter-spacing: 0; font-weight: 600; color: var(--muted); }
-.identity h2 { font-size: 24px; font-weight: 600; letter-spacing: -.03em; line-height: 1.2; margin: 8px 0 10px; font-family: inherit; text-wrap: balance; }
-.identity p { font-size: 13px; line-height: 1.6; margin: 0; color: var(--muted); }
-.contents { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 12px; }
-.contents span { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted-strong); }
-.passportLink { min-height: 68px; display: flex; align-items: center; gap: 14px; padding: 16px 24px; border-top: 1px solid var(--line); background: var(--surface-subtle); }
-.passportLink > svg { flex-shrink: 0; }
-.passportLink small { display: block; color: var(--muted); letter-spacing: 0; font-size: 10px; margin-bottom: 5px; }
-.passportLink strong { display: block; font-size: 12px; letter-spacing: 0; overflow-wrap: anywhere; }
-.openLabel { display: flex; align-items: center; gap: 6px; font-size: 11px; margin-left: auto; font-weight: 600; }
-.showcase a:hover { color: var(--gold); }
-.showcase a:focus-visible, .showcase button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
-@media (max-width: 760px) {
-  .photoStage { height: clamp(240px, 70vw, 360px); }
-  .details { padding: 20px; }
-  .identity h2 { font-size: 24px; }
-  .passportLink { padding: 16px 20px; gap: 10px; }
-  .openLabel { font-size: 10px; }
-}
-@media (max-width: 360px) { .openLabel { max-width: 65px; } .topline { padding-inline: 14px; font-size: 10px; } }
-
-@media (min-width: 761px) and (max-width: 900px) {
-  .showcase { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
-  .topline { grid-column: 1 / -1; }
-  .photoStage { grid-row: 2 / span 2; height: 300px; border-bottom: 0; border-right: 1px solid var(--line); }
-  .details { align-self: end; }
-  .passportLink { padding: 16px 20px; flex-wrap: wrap; }
-}
+.showcase { width: 100%; min-width: 0; color: var(--text); }
+.topline { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; color: var(--muted); font-size: 12px; font-weight: 500; }
+.topline a { display: grid; place-items: center; width: 36px; height: 36px; color: var(--text); border-radius: 50%; background: var(--surface); }
+.photoStage { position: relative; display: block; width: 100%; height: clamp(300px,30vw,410px); padding: 0; overflow: hidden; border: 0; border-radius: 16px; background: #0b0c0e; cursor: zoom-in; color: white; }
+.mainPhoto { display: block; width: 100%; height: 100%; object-fit: contain; }
+.expand { display: inline-flex; align-items: center; gap: 8px; position: absolute; right: 14px; bottom: 14px; padding: 10px 12px; background: #101113d9; backdrop-filter: blur(12px); border-radius: 20px; font-size: 11px; }
+.noPhoto { display: grid; place-content: center; justify-items: center; gap: 16px; height: 100%; padding: 24px; color: var(--muted); text-align: center; }
+.photoSelector { display: flex; justify-content: center; gap: 9px; overflow-x: auto; padding: 12px 4px 4px; scrollbar-width: thin; }
+.photoSelector button { flex: 0 0 58px; height: 48px; padding: 3px; border: 0; border-radius: 7px; background: var(--surface); opacity: .55; cursor: pointer; }
+.photoSelector button.selectedPhoto { opacity: 1; box-shadow: 0 0 0 1px var(--text); }
+.photoSelector button:hover { opacity: 1; }
+.photoSelector img { width: 100%; height: 100%; display: block; object-fit: contain; border-radius: 4px; }
+.details { display: flex; align-items: end; justify-content: space-between; gap: 16px; padding: 18px 0 12px; }
+.kicker { font-size: 12px; color: var(--muted); }
+.identity h2 { font-size: 23px; font-weight: 600; letter-spacing: -.03em; line-height: 1.2; margin: 5px 0 8px; font-family: inherit; }
+.identity p { font-size: 12px; line-height: 1.5; margin: 0; color: var(--muted); }
+.contents { display: flex; align-items: end; flex-direction: column; gap: 8px; flex-shrink: 0; padding-bottom: 2px; }
+.contents span { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.passportLink { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; font-size: 11px; color: var(--muted); }
+.openLabel { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--text); }
+.showcase a:hover { color: var(--text); }
+.showcase a:focus-visible, .showcase button:focus-visible { outline: 2px solid var(--text); outline-offset: 4px; }
+@media (max-width: 760px) { .photoStage { height: clamp(250px,78vw,400px); } .identity h2 { font-size: 22px; } .details { gap: 12px; } }
+@media (max-width: 360px) { .details { display: block; } .contents { flex-direction: row; margin-top: 12px; } }

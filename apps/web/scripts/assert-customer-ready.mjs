@@ -43,8 +43,8 @@ includes(contract, 'document.visibility === "public"', "Public documents must re
 includes(contract, 'item.isPublic === true', "Public supplemental media must remain visibility-filtered.");
 includes(profile, 'id: "service"', "Public Profiles must expose a conditional Service tab.");
 includes(profile, 'activeTab === "service"', "Service tab must render canonical service content.");
-includes(profile, "media-gallery-lightbox", "Fullscreen gallery must remain available.");
-includes(profile, 'event.key === "Escape"', "Fullscreen gallery must remain Escape-closeable.");
+includes(profile, "<PhotoViewer", "Fullscreen gallery must remain available.");
+includes(read("components/PhotoViewer.tsx"), 'event.key === "Escape"', "Fullscreen gallery must remain Escape-closeable.");
 includes(dashboard, 'file.visibility === "public"', "Dashboard public document counts must be exact.");
 includes(dashboard, "Open Print Suite", "Dashboard must expose one clear Print Suite action.");
 excludes(dashboard, "Print handout &amp; labels", "Dashboard must not retain the legacy handout label.");

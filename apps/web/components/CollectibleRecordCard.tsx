@@ -18,6 +18,7 @@ import { resolveCollectibleCard } from "../lib/collectible-card";
 import type { DemoInstrument } from "../lib/local-demo";
 import { publicMediaVariantUrl } from "../lib/public-media-variant";
 import { ProfileStatusBadges } from "./ProfileStatusBadges";
+import { PhotoViewer } from "./PhotoViewer";
 import { RecordShareButton } from "./RecordShareButton";
 
 type CollectibleRecordCardProps = {
@@ -44,6 +45,7 @@ export function CollectibleRecordCard({
 }: CollectibleRecordCardProps) {
   const router = useRouter();
   const card = useMemo(() => resolveCollectibleCard(record), [record]);
+  const [viewerOpen, setViewerOpen] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [failedImages, setFailedImages] = useState<number[]>([]);
   const [loadedImages, setLoadedImages] = useState<number[]>([]);
@@ -112,7 +114,7 @@ export function CollectibleRecordCard({
       dragState.current.moved = false;
       return;
     }
-    router.push(card.profileUrl);
+    if (card.images.length) setViewerOpen(true);
   }
 
   function handleContentClick(event: MouseEvent<HTMLDivElement>) {
@@ -127,6 +129,11 @@ export function CollectibleRecordCard({
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      if (card.images.length) setViewerOpen(true);
+      return;
+    }
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
     moveGallery(event.key === "ArrowRight" ? 1 : -1);
@@ -141,8 +148,8 @@ export function CollectibleRecordCard({
             className="collectible-card-media-rail"
             role="region"
             aria-roledescription="carousel"
-            aria-label={`${card.title} photos. Image ${activeImageIndex + 1} of ${Math.max(1, galleryImages.length)}.`}
-            tabIndex={0}
+            aria-label={galleryImages.length ? `${card.title} photos. Image ${activeImageIndex + 1} of ${galleryImages.length}. Press Enter to view photos.` : `${card.title}. Photos unavailable.`}
+            tabIndex={galleryImages.length ? 0 : -1}
             onClick={handleRailClick}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -192,7 +199,6 @@ export function CollectibleRecordCard({
               {eyebrow ? <span className="collectible-card-eyebrow"><Globe2 size={13} /> {eyebrow}</span> : null}
               {createdLabel ? <span className="collectible-card-age">{createdLabel}</span> : null}
             </div>
-            <span className="collectible-card-code">{card.code}</span>
             {showGalleryControls ? <span className="collectible-card-image-count">{activeImageIndex + 1}/{galleryImages.length}</span> : null}
           </div>
 
@@ -218,6 +224,7 @@ export function CollectibleRecordCard({
 
           <ProfileStatusBadges record={record} maxBadges={3} ownerCollection={record.publicCollection} />
 
+          <span className="collectible-card-code">{card.code}</span>
           <div className="collectible-card-facts" aria-label="Profile contents">
             {card.publicSerial ? (
               <span className="collectible-card-serial">
@@ -239,6 +246,7 @@ export function CollectibleRecordCard({
         </div>
       </div>
 
+      {viewerOpen ? <PhotoViewer images={card.images} initialIndex={activeImageIndex} title={card.title} onClose={() => setViewerOpen(false)} /> : null}
       <RecordShareButton className="collectible-card-share" code={card.code} title={card.title} />
       {showSecondaryAction ? (
         <Link className="collectible-card-secondary-link" href={secondaryHref}>

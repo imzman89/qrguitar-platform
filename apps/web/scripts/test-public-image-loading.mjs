@@ -18,6 +18,7 @@ const catalog = read("app/catalog/CatalogClient.tsx");
 const homepage = read("components/HomePageClient.tsx");
 const showcase = read("components/HomeProfileShowcase.tsx");
 const profile = read("app/i/[code]/ProfileClient.tsx");
+const photoViewer = read("components/PhotoViewer.tsx");
 const photoOrganizer = read("components/PhotoOrganizer.tsx");
 const compactQr = read("components/CompactQr.tsx");
 const brandLogo = read("components/BrandLogo.tsx");
@@ -62,7 +63,7 @@ function compileFallbackImageComponent(useState) {
   return module.exports.FallbackImage;
 }
 
-function compileCard() {
+function compileCard(extraOverrides = {}) {
   const module = { exports: {} };
   const code = ts.transpileModule(card, {
     compilerOptions: {
@@ -88,7 +89,9 @@ function compileCard() {
       })
     },
     "./ProfileStatusBadges": { ProfileStatusBadges: () => null },
-    "./RecordShareButton": { RecordShareButton: () => null }
+    "./RecordShareButton": { RecordShareButton: () => null },
+    "./PhotoViewer": { PhotoViewer: () => null },
+    ...extraOverrides
   };
   new Function("require", "module", "exports", code)(
     (name) => overrides[name] || require(name), module, module.exports
@@ -152,18 +155,18 @@ test("public media variants are added only to checked public media proxy URLs", 
 
 test("public image surfaces request bounded variants while keeping original URLs as identity", () => {
   assert.match(showcase, /publicMediaVariantUrl\(photos\[activePhoto\], 1200\)/);
-  assert.match(showcase, /srcSet=\{publicMediaVariantSrcSet\(photos\[activePhoto\]\)\} sizes="\(max-width: 900px\) 360px, 560px"/);
+  assert.match(showcase, /srcSet=\{publicMediaVariantSrcSet\(photos\[activePhoto\]\)\} sizes="\(max-width: 760px\) calc\(100vw - 40px\), \(max-width: 900px\) 720px, 620px"/);
   assert.match(showcase, /publicMediaVariantUrl\(photo, 160\)/);
   assert.match(homepage, /src=\{publicMediaVariantUrl\(recordPhoto, 640\)\} srcSet=\{publicMediaVariantSrcSet\(recordPhoto, \[160, 640\]\)\} sizes="\(max-width: 700px\) 360px, 320px"/);
   assert.doesNotMatch(homepage, /<img src=\{recordPhoto\}/);
   assert.match(card, /publicMediaVariantUrl\(imageUrl, 640\)/);
   assert.match(profile, /publicMediaVariantUrl\(galleryImages\[mediaIndex\], 1200\)/);
-  assert.match(profile, /srcSet=\{publicMediaVariantSrcSet\(galleryImages\[mediaIndex\]\)\}[^>]*sizes="\(max-width: 900px\) 360px, 720px"/);
-  assert.match(profile, /publicMediaVariantUrl\(activeMedia, 1200\)/);
-  assert.match(profile, /srcSet=\{publicMediaVariantSrcSet\(activeMedia\)\}[^>]*sizes="\(max-width: 900px\) 360px, 1080px"/);
-  assert.ok((profile.match(/publicMediaVariantUrl\(imageUrl, 160\)/g) || []).length >= 2);
-  assert.ok((profile.match(/image\.srcset = srcSet;/g) || []).length >= 2);
-  assert.ok((profile.match(/image\.src = publicMediaVariantUrl\(source, 1200\);/g) || []).length >= 2);
+  assert.match(profile, /srcSet=\{publicMediaVariantSrcSet\(galleryImages\[mediaIndex\]\)\}[^>]*sizes="\(max-width: 760px\) calc\(100vw - 40px\), \(max-width: 900px\) calc\(100vw - 64px\), 650px"/);
+  assert.match(photoViewer, /publicMediaVariantUrl\(activeSource, 1200\)/);
+  assert.match(photoViewer, /srcSet=\{publicMediaVariantSrcSet\(activeSource\)\}[^>]*sizes="\(max-width: 760px\) 100vw, calc\(100vw - 160px\)"/);
+  assert.ok(((profile + photoViewer).match(/publicMediaVariantUrl\(imageUrl, 160\)/g) || []).length >= 2);
+  assert.ok(((profile + photoViewer).match(/image\.srcset = srcSet;/g) || []).length >= 2);
+  assert.ok(((profile + photoViewer).match(/image\.src = publicMediaVariantUrl\(source, 1200\);/g) || []).length >= 2);
 });
 
 test("shared Profile card link derives its accessible name from visible content", () => {
@@ -256,9 +259,9 @@ test("public Profile reserves LCP priority for visible full-size photos and defe
   assert.match(profile, /filterAvailableImageSources\(allGalleryImages, failedGalleryImages\)/);
   assert.match(profile, /key=\{galleryImages\[mediaIndex\]\}[\s\S]{0,500}loading="eager"[\s\S]{0,120}fetchPriority="high"[\s\S]{0,160}width=\{1200\}[\s\S]{0,80}height=\{900\}[\s\S]{0,120}referrerPolicy="no-referrer"[\s\S]{0,150}markGalleryImageFailed/);
   assert.match(profile, /width=\{168\}[\s\S]{0,80}height=\{126\}[\s\S]{0,120}referrerPolicy="no-referrer"[\s\S]{0,140}markGalleryImageFailed\(imageUrl\)/);
-  assert.match(profile, /key=\{activeMedia\}[\s\S]{0,500}loading="eager"[\s\S]{0,120}fetchPriority="high"[\s\S]{0,160}width=\{1600\}[\s\S]{0,80}height=\{1200\}/);
-  assert.match(profile, /width=\{148\}[\s\S]{0,80}height=\{112\}[\s\S]{0,120}referrerPolicy="no-referrer"[\s\S]{0,140}markGalleryImageFailed\(imageUrl\)/);
-  assert.ok((profile.match(/loading="lazy"[\s\S]{0,100}fetchPriority="low"/g) || []).length >= 3);
+  assert.match(photoViewer, /key=\{activeSource\}[\s\S]{0,500}loading="eager"[\s\S]{0,120}fetchPriority="high"[\s\S]{0,160}width=\{1600\}[\s\S]{0,80}height=\{1200\}/);
+  assert.match(photoViewer, /width=\{112\}[\s\S]{0,50}height=\{112\}[\s\S]{0,100}referrerPolicy="no-referrer"[\s\S]{0,100}markImageFailed\(imageUrl\)/);
+  assert.ok(((profile + photoViewer).match(/loading="lazy"[\s\S]{0,100}fetchPriority="low"/g) || []).length >= 3);
   assert.match(profile, /image\.fetchPriority = "low";[\s\S]{0,80}image\.referrerPolicy = "no-referrer";/);
 });
 
@@ -294,4 +297,183 @@ test("fallback image swaps only the failed source and still calls the caller err
   assert.equal(callerErrors, 1);
   assert.equal(renderToStaticMarkup(FallbackImage(props)), "<span>Image unavailable</span>");
   assert.equal(FallbackImage({ ...props, src: "/recovered.jpg" }).props.src, "/recovered.jpg", "a changed source must get a fresh load attempt");
+});
+
+function findElement(node, predicate) {
+  if (!node || typeof node !== "object") return null;
+  if (Array.isArray(node)) {
+    for (const child of node) { const match = findElement(child, predicate); if (match) return match; }
+    return null;
+  }
+  if (predicate(node)) return node;
+  return findElement(node.props?.children, predicate);
+}
+
+function cardInteractionHarness(images = ["/lead.jpg", "/detail.jpg", "/back.jpg"]) {
+  const states = [], refs = [], navigation = [], scrolls = [];
+  let stateCursor = 0, refCursor = 0;
+  const PhotoViewer = () => null;
+  const Card = compileCard({
+    react: {
+      useMemo: (factory) => factory(), useCallback: (callback) => callback, useEffect() {},
+      useState(initial) {
+        const index = stateCursor++;
+        if (!(index in states)) states[index] = typeof initial === "function" ? initial() : initial;
+        return [states[index], (value) => { states[index] = typeof value === "function" ? value(states[index]) : value; }];
+      },
+      useRef(initial) { const index = refCursor++; return refs[index] ||= { current: initial }; }
+    },
+    "next/navigation": { useRouter: () => ({ push: (url) => navigation.push(url) }) },
+    "./PhotoViewer": { PhotoViewer },
+    "../lib/collectible-card": { resolveCollectibleCard: () => ({
+      images, title: "Test Profile", profileUrl: "/i/TEST", code: "TEST", typeLabel: "Amplifier",
+      summary: "", factLine: "", publicSerial: "", photoCount: images.length, publicDocumentCount: 0
+    }) }
+  });
+  const rail = {
+    clientWidth: 300, scrollLeft: 0,
+    setPointerCapture() {}, releasePointerCapture() {},
+    scrollTo(options) { this.scrollLeft = options.left; scrolls.push(options); },
+    scrollBy(options) { this.scrollLeft += options.left; }
+  };
+  function render() {
+    stateCursor = 0; refCursor = 0;
+    const tree = Card({ record: { qrCode: "TEST" } });
+    const photo = findElement(tree, (node) => node.props?.className === "collectible-card-media-rail");
+    photo.props.ref.current = rail;
+    return { tree, photo, viewer: findElement(tree, (node) => node.type === PhotoViewer) };
+  }
+  return { render, rail, navigation, scrolls };
+}
+
+test("card photo click opens the full gallery at its selected image without changing the Profile route", () => {
+  const harness = cardInteractionHarness();
+  let view = harness.render();
+  harness.rail.scrollLeft = 300;
+  view.photo.props.onScroll({ currentTarget: harness.rail });
+  view = harness.render();
+  view.photo.props.onClick();
+  view = harness.render();
+  assert.ok(view.viewer);
+  assert.equal(view.viewer.props.initialIndex, 1);
+  assert.deepEqual(view.viewer.props.images, ["/lead.jpg", "/detail.jpg", "/back.jpg"]);
+  assert.deepEqual(harness.navigation, []);
+  view.viewer.props.onClose();
+  assert.equal(harness.render().viewer, null);
+});
+
+test("Enter and Space activate the same card photo viewer, while arrow keys only browse the rail", () => {
+  for (const key of ["Enter", " "]) {
+    const harness = cardInteractionHarness();
+    let prevented = 0;
+    harness.render().photo.props.onKeyDown({ key, preventDefault: () => { prevented++; } });
+    assert.ok(harness.render().viewer, key + " opens viewer");
+    assert.equal(prevented, 1);
+    assert.deepEqual(harness.navigation, []);
+  }
+  const harness = cardInteractionHarness();
+  let prevented = 0;
+  harness.render().photo.props.onKeyDown({ key: "ArrowRight", preventDefault: () => { prevented++; } });
+  assert.equal(harness.render().viewer, null);
+  assert.equal(harness.rail.scrollLeft, 300);
+  harness.render().photo.props.onKeyDown({ key: "ArrowLeft", preventDefault: () => { prevented++; } });
+  assert.equal(harness.rail.scrollLeft, 0);
+  assert.equal(prevented, 2);
+  harness.render().photo.props.onKeyDown({ key: "Tab", preventDefault: () => { prevented++; } });
+  assert.equal(prevented, 2, "normal keyboard focus navigation remains native");
+});
+
+test("dragging a card photo does not open its viewer and the next intentional click still works", () => {
+  const harness = cardInteractionHarness();
+  const photo = harness.render().photo;
+  photo.props.onPointerDown({ pointerType: "mouse", pointerId: 1, clientX: 250 });
+  photo.props.onPointerMove({ pointerType: "mouse", pointerId: 1, clientX: 30 });
+  photo.props.onPointerUp({ pointerType: "mouse", pointerId: 1 });
+  photo.props.onClick();
+  assert.equal(harness.render().viewer, null);
+  assert.deepEqual(harness.navigation, []);
+  harness.render().photo.props.onClick();
+  assert.ok(harness.render().viewer);
+});
+
+test("a card without photos cannot open an empty viewer by click or keyboard", () => {
+  const harness = cardInteractionHarness([]);
+  let photo = harness.render().photo;
+  assert.equal(photo.props.tabIndex, -1);
+  assert.doesNotMatch(photo.props["aria-label"], /Press Enter/);
+  photo.props.onClick();
+  assert.equal(harness.render().viewer, null);
+  for (const key of ["Enter", " "]) {
+    photo = harness.render().photo;
+    photo.props.onKeyDown({ key, preventDefault() {} });
+    assert.equal(harness.render().viewer, null);
+  }
+  assert.deepEqual(harness.navigation, []);
+});
+
+function compileStatusBadges() {
+  const module = { exports: {} };
+  const code = ts.transpileModule(read("components/ProfileStatusBadges.tsx"), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX }
+  }).outputText;
+  const Icon = () => null;
+  const overrides = {
+    "lucide-react": { ShieldCheck: Icon, Siren: Icon, UserRound: Icon },
+    "next/link": { __esModule: true, default: ({ children, ...props }) => React.createElement("a", props, children) },
+    "../lib/local-demo": {
+      getInstrumentCondition: (record) => record.condition || "used",
+      getInstrumentVerificationStatus: (record) => record.verificationStatus || "unverified"
+    }
+  };
+  new Function("require", "module", "exports", code)((name) => overrides[name] || require(name), module, module.exports);
+  return module.exports.ProfileStatusBadges;
+}
+
+test("suppressing duplicate hero trust chips preserves safety, sale, originality and condition disclosures", () => {
+  const Badges = compileStatusBadges();
+  const record = { verificationStatus: "verified", authenticityStatus: "confirmed", safetyStatus: "stolen", saleStatus: "for_sale", originalityStatus: "modified", condition: "used", instrumentType: "Amplifier" };
+  const html = renderToStaticMarkup(React.createElement(Badges, { record, hideConfirmedTrust: true, includeCategory: true }));
+  assert.doesNotMatch(html, /Verified by QRguitar|Authenticity Confirmed|Unverified|Authenticity Unconfirmed/);
+  for (const label of ["Reported Stolen", "For Sale", "Modified", "Used", "Amplifier"]) assert.ok(html.includes(label), label + " remains visible");
+  assert.match(profile, /hideConfirmedTrust=\{true\}[\s\S]{0,80}className="profile-hero-badges"/);
+});
+
+test("status trust chips remain enabled by default and still respect their individual visibility settings", () => {
+  const Badges = compileStatusBadges();
+  const record = { verificationStatus: "verified", authenticityStatus: "confirmed" };
+  const defaultHtml = renderToStaticMarkup(React.createElement(Badges, { record }));
+  assert.match(defaultHtml, /Verified by QRguitar/);
+  assert.match(defaultHtml, /Authenticity Confirmed/);
+  const hiddenHtml = renderToStaticMarkup(React.createElement(Badges, { record: { ...record, showVerificationBadge: false, showAuthenticityBadge: false } }));
+  assert.doesNotMatch(hiddenHtml, /Verified by QRguitar|Authenticity Confirmed/);
+});
+
+
+test("card content opens its Profile without hijacking nested collection links or action buttons", () => {
+  const harness = cardInteractionHarness();
+  const { tree } = harness.render();
+  const content = findElement(tree, (node) => node.props?.className === "collectible-card-content");
+  assert.ok(content);
+  content.props.onClick({ target: { closest: () => ({ tagName: "A" }) } });
+  content.props.onClick({ target: { closest: () => ({ tagName: "BUTTON" }) } });
+  assert.deepEqual(harness.navigation, []);
+  content.props.onClick({ target: { closest: () => null } });
+  assert.deepEqual(harness.navigation, ["/i/TEST"]);
+  assert.equal(harness.render().viewer, null);
+});
+
+
+test("hero de-duplication preserves unverified and unconfirmed disclosures in every mixed trust state", () => {
+  const Badges = compileStatusBadges();
+  for (const verificationStatus of ["unverified", "verified"]) {
+    for (const authenticityStatus of ["unconfirmed", "confirmed"]) {
+      const record = { verificationStatus, authenticityStatus };
+      const html = renderToStaticMarkup(React.createElement(Badges, { record, hideConfirmedTrust: true }));
+      assert.equal(html.includes("Unverified"), verificationStatus === "unverified", "verification disclosure: " + JSON.stringify(record));
+      assert.equal(html.includes("Authenticity Unconfirmed"), authenticityStatus === "unconfirmed", "authenticity disclosure: " + JSON.stringify(record));
+      assert.doesNotMatch(html, /Verified by QRguitar|Authenticity Confirmed/, "confirmed details must not be duplicated as badges");
+    }
+  }
+  const hidden = renderToStaticMarkup(React.createElement(Badges, { record: { verificationStatus: "unverified", authenticityStatus: "unconfirmed", showVerificationBadge: false, showAuthenticityBadge: false }, hideConfirmedTrust: true }));
+  assert.doesNotMatch(hidden, /Unverified|Authenticity Unconfirmed/, "saved display preferences still apply");
 });

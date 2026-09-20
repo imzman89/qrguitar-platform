@@ -1,0 +1,121 @@
+/* Screen composition shared by public galleries and the signed-in workspace. */
+@media screen {
+  body[data-product-theme="paper"], body[data-product-theme="paper"] :is(.home-page,.brand-frame,.scan-topbar,.nav,.footer) { --action: #f5f5f7; --action-hover: #dce0e6; --gold: #e1e3e7; --gold-2: #e1e3e7; --selected-surface: #292c31; }
+  body[data-product-theme="paper"] :is(.button.secondary,.button.ghost) { background: var(--surface-subtle); border-color: transparent; color: var(--text); }
+  body[data-product-theme="paper"] :is(.button,.nav a,.nav button) { text-transform: none; letter-spacing: 0; }
+  body[data-product-theme="paper"] .nav { border: 0; box-shadow: none; background: #101113f2; }
+  body[data-product-theme="paper"] main :is(.catalog-filters,.catalog-more-filters,.collection-filters) { padding: 20px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+  body[data-product-theme="paper"] :is(.catalog-filter-grid,.catalog-summary,.collection-header) { border: 0; box-shadow: none; }
+  body[data-product-theme="paper"] .catalog-page .catalog-more-filters { padding-block: 4px; margin-block: 0; }
+  body[data-product-theme="paper"] .catalog-page .catalog-more-filters > summary { min-height: 44px; padding: 8px 0; font-size: 13px; font-weight: 500; }
+  body[data-product-theme="paper"] .catalog-page .catalog-filters label > span { font-size: 12px; font-weight: 500; text-transform: none; }
+  body[data-product-theme="paper"] .catalog-grid { gap: 40px 24px; }
+  body[data-product-theme="paper"] :is(.collectible-card,.collectible-card-link,.collectible-card-content) { border: 0; border-radius: 0; background: transparent; box-shadow: none; overflow: visible; }
+  body[data-product-theme="paper"] .collectible-card:hover { transform: none; box-shadow: none; }
+  body[data-product-theme="paper"] .collectible-card-link { display: flex; flex-direction: column; height: 100%; }
+  body[data-product-theme="paper"] .collectible-card-media { flex: 0 0 auto; width: 100%; height: auto; min-height: 0; aspect-ratio: 4 / 3; border: 0; border-radius: 14px; overflow: hidden; background: #0b0c0e; }
+  body[data-product-theme="paper"] .collectible-card-image { object-fit: contain; }
+  body[data-product-theme="paper"] .collectible-card-media-rail { cursor: zoom-in; }
+  body[data-product-theme="paper"] .collectible-card-media::after { display: none; }
+  body[data-product-theme="paper"] .collectible-card-content { display: flex; flex: 1; flex-direction: column; gap: 10px; min-height: 0; padding: 16px 0 0; }
+  body[data-product-theme="paper"] .collectible-card h3 { font-size: 20px; line-height: 1.25; font-weight: 600; margin: 5px 0 7px; }
+  body[data-product-theme="paper"] .collectible-card-type { font-size: 12px; font-weight: 450; text-transform: none; letter-spacing: 0; color: var(--muted); }
+  body[data-product-theme="paper"] .collectible-card-subtitle { font-size: 13px; }
+  body[data-product-theme="paper"] .collectible-card-code { position: static; display: block; width: auto; min-height: 0; padding: 0; border: 0; border-radius: 0; color: var(--muted); background: transparent; font-size: 11px; font-weight: 450; letter-spacing: .025em; }
+  body[data-product-theme="paper"] :is(.collectible-card-facts,.collectible-card-actions) { border: 0; background: transparent; padding: 0; margin: 0; }
+  body[data-product-theme="paper"] .collectible-card-facts { gap: 12px; }
+  body[data-product-theme="paper"] .collectible-card-facts > span { border: 0; background: transparent; padding: 0; font-size: 11px; }
+  body[data-product-theme="paper"] .collectible-card-actions { margin-top: auto; padding-top: 2px; }
+  body[data-product-theme="paper"] .collectible-card-cta { display: inline-flex; justify-content: flex-start; gap: 10px; min-height: 42px; padding: 0; border: 0; background: transparent; border-radius: 0; color: var(--text); font-size: 13px; font-weight: 600; }
+  body[data-product-theme="paper"] .collectible-card-cta:hover { text-decoration: underline; text-underline-offset: 4px; }
+  body[data-product-theme="paper"] :is(.record-badge,.record-status-badge,.collectible-card-collection-link) { border: 0; background: transparent; box-shadow: none; padding: 0; font-size: 11px; font-weight: 500; }
+  body[data-product-theme="paper"] .record-badge-row { gap: 8px 14px; }
+  body[data-product-theme="paper"] :is(.collectible-card-gallery-controls button,.collectible-card-share .record-share-button) { width: 38px; min-height: 38px; border: 0; border-radius: 50%; background: #181a1de6; color: #f5f5f7; backdrop-filter: blur(8px); }
+  body[data-product-theme="paper"] .collectible-card-image-count { border: 0; background: #181a1ddb; padding: 6px 10px; border-radius: 20px; font-weight: 500; }
+  body[data-product-theme="paper"] .scan-profile .scan-shell { width: min(1200px,calc(100% - 64px)); background: transparent; border: 0; border-radius: 0; box-shadow: none; overflow: visible; }
+  body[data-product-theme="paper"] .scan-profile .scan-topbar { min-height: 56px; height: auto; padding: 0 0 20px; border: 0; background: transparent; }
+  body[data-product-theme="paper"] .scan-profile .scan-hero { grid-template-columns: minmax(0,1.12fr) minmax(0,.88fr); align-items: start; gap: 40px; background: transparent; border: 0; }
+  body[data-product-theme="paper"] .scan-profile .scan-hero-gallery { display: block; min-height: 0; border: 0; background: transparent; }
+  body[data-product-theme="paper"] .scan-profile .scan-hero-gallery .scan-hero-media { height: 520px; min-height: 0; aspect-ratio: auto; border: 0; border-radius: 16px; background: #0b0c0e; touch-action: pan-y pinch-zoom; }
+  body[data-product-theme="paper"] .scan-profile .scan-hero-media img { max-height: none; width: 100%; height: 100%; object-fit: contain; }
+  body[data-product-theme="paper"] .scan-profile .scan-hero-media::after { display: none; }
+  body[data-product-theme="paper"] .scan-profile .scan-hero-photo-count { border: 0; font-size: 11px; font-weight: 500; background: #181a1ddb; }
+  body[data-product-theme="paper"] .scan-profile .scan-hero-gallery-controls button { border: 0; background: #181a1de6; border-radius: 50%; width: 42px; height: 42px; color: #fff; box-shadow: none; }
+  body[data-product-theme="paper"] .scan-profile .scan-hero-thumbnails { display: flex; justify-content: flex-start; gap: 10px; padding: 14px 4px 4px; border: 0; background: transparent; }
+  body[data-product-theme="paper"] .scan-profile .scan-hero-thumbnails button { flex: 0 0 68px; width: 68px; height: 56px; min-height: 0; padding: 3px; border: 0; border-radius: 7px; background: var(--surface); opacity: .55; }
+  body[data-product-theme="paper"] .scan-profile .scan-hero-thumbnails button.active { opacity: 1; box-shadow: 0 0 0 1px var(--text); }
+  body[data-product-theme="paper"] .scan-profile .scan-hero-thumbnails img { width: 100%; height: 100%; object-fit: contain; border-radius: 4px; }
+  body[data-product-theme="paper"] .scan-profile .scan-hero-info { display: block; padding: 12px 0 0; background: transparent; }
+  body[data-product-theme="paper"] .scan-profile .scan-hero-info h1 { font-size: clamp(30px,3vw,42px); margin: 12px 0 18px; }
+  body[data-product-theme="paper"] .scan-profile .builder-mark { font-size: 13px; }
+  body[data-product-theme="paper"] .scan-profile .profile-member-actions { margin-top: 14px; }
+  body[data-product-theme="paper"] .scan-profile .identity-card { width: 100%; margin: 20px 0 0; border: 0; border-radius: 0; background: transparent; backdrop-filter: none; box-shadow: none; }
+  body[data-product-theme="paper"] .scan-profile .identity-card-header { min-height: 0; padding: 0 0 16px; border: 0; font-size: 11px; }
+  body[data-product-theme="paper"] .scan-profile .identity-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px 24px; }
+  body[data-product-theme="paper"] .scan-profile .identity-cell { min-height: 0; padding: 0; gap: 5px; border: 0; background: transparent; }
+  body[data-product-theme="paper"] .scan-profile .identity-cell span { font-size: 12px; letter-spacing: 0; text-transform: none; }
+  body[data-product-theme="paper"] .scan-profile .identity-cell strong { font-size: 15px; font-weight: 500; overflow-wrap: anywhere; }
+  body[data-product-theme="paper"] .scan-profile .profile-trust-summary { display: flex; flex-wrap: wrap; gap: 12px 20px; border: 0; background: transparent; margin: 20px 0 0; }
+  body[data-product-theme="paper"] .scan-profile .profile-trust-summary > details { padding: 0; border: 0; }
+  body[data-product-theme="paper"] .scan-profile .scan-qr { grid-template-columns: 64px minmax(0,1fr) auto; gap: 12px; padding: 16px; margin-top: 20px; border: 0; border-radius: 12px; background: var(--surface); }
+  body[data-product-theme="paper"] .scan-profile .scan-qr .qr-placeholder { width: 64px; height: 64px; min-width: 64px; border: 0; }
+  body[data-product-theme="paper"] .scan-profile .scan-qr strong { font-size: 12px; text-transform: none; }
+  body[data-product-theme="paper"] .scan-profile .scan-qr span { font-size: 11px; }
+  body[data-product-theme="paper"] .scan-profile .scan-qr .button { min-height: 40px; font-size: 11px; padding: 8px 10px; }
+  body[data-product-theme="paper"] .scan-profile .scan-actions { padding: 24px 0 12px; border: 0; background: transparent; }
+  body[data-product-theme="paper"] .scan-profile .scan-actions :is(a,button) { border: 0; border-radius: 8px; background: var(--surface); }
+  body[data-product-theme="paper"] .scan-profile .scan-tabs { padding: 12px 0 0; gap: 24px; border: 0; background: transparent; }
+  body[data-product-theme="paper"] .scan-profile .scan-tabs button { padding-inline: 0; font-weight: 500; font-size: 14px; }
+  body[data-product-theme="paper"] .scan-profile .scan-tab-panel { padding: 28px 0; border: 0; background: transparent; }
+  body[data-product-theme="paper"] :is(.profile-data-grid > span,.ownership-grid > span,.maker-signature,.public-spec-list span,.profile-market-card) { border: 0; border-radius: 0; background: transparent; padding: 8px 0; }
+  body[data-product-theme="paper"] .scan-profile .scan-overview { gap: 48px; }
+  body[data-product-theme="paper"] .dashboard-hero { padding-bottom: 20px; border: 0; }
+  body[data-product-theme="paper"] .dashboard-metric-grid { gap: 24px; margin-block: 24px; }
+  body[data-product-theme="paper"] .dashboard-metric { min-height: 0; border: 0; border-radius: 0; padding: 0; background: transparent; box-shadow: none; }
+  body[data-product-theme="paper"] .dashboard-metric strong { font-size: 28px; }
+  body[data-product-theme="paper"] :is(.dashboard-workspace-links a,.dashboard-workspace-links button,.dashboard-trust-summary span,.dashboard-trust-summary button) { border: 0; background: transparent; border-radius: 0; padding: 4px 0; }
+  body[data-product-theme="paper"] .dashboard-workspace-links { gap: 18px; }
+  body[data-product-theme="paper"] .dashboard-trust-summary { gap: 20px; }
+  body[data-product-theme="paper"] .footer { border: 0; }
+  body[data-product-theme="paper"] .brand-frame { border: 0; }
+  body[data-product-theme="paper"] .home-page .home-lifecycle-section .card { background: transparent; padding-inline: 0; border: 0; }
+  body[data-product-theme="paper"] .home-page .button.secondary { background: var(--surface-subtle); border-color: transparent; }
+  body[data-product-theme="paper"] .home-page .price-card { background: var(--surface); }
+  body[data-product-theme="paper"] .home-page .record-holds-facts > div { border: 0; }
+  body[data-product-theme="paper"] .scan-profile .profile-claim-entry { margin: 24px 0 0; padding: 16px 20px; border: 0; border-radius: 12px; background: var(--surface); }
+  body[data-product-theme="paper"] .scan-profile .scan-overview h2 { text-transform: none; letter-spacing: -.02em; font-size: 22px; }
+  body[data-product-theme="paper"] .collectible-card .collectible-card-cta { text-transform: none; letter-spacing: 0; }
+  body[data-product-theme="paper"] .collectible-card .collectible-card-serial > span { display: flex; align-items: baseline; gap: 5px; }
+  body[data-product-theme="paper"] .collectible-card .collectible-card-facts :is(small,strong) { font-size: 11px; font-weight: 450; line-height: 1.5; text-transform: none; letter-spacing: 0; }
+  body[data-product-theme="paper"] .collectible-card .record-owner-link { border: 0; background: transparent; padding: 0; }
+
+}
+@media screen and (max-width: 900px) {
+  body[data-product-theme="paper"] .scan-profile .scan-hero { grid-template-columns: minmax(0,1fr); gap: 24px; }
+  body[data-product-theme="paper"] .scan-profile .scan-hero-info { padding: 0; }
+  body[data-product-theme="paper"] .scan-profile .scan-hero-gallery .scan-hero-media { height: clamp(280px,65vw,500px); }
+}
+@media screen and (max-width: 760px) {
+  body[data-product-theme="paper"] .scan-profile .scan-shell { width: calc(100% - 40px); }
+  body[data-product-theme="paper"] .scan-profile .scan-hero-info h1 { font-size: 32px; }
+  body[data-product-theme="paper"] .scan-profile .scan-overview { gap: 24px; }
+  body[data-product-theme="paper"] .scan-profile .scan-qr { padding: 12px; gap: 10px; }
+  body[data-product-theme="paper"] .scan-profile .scan-qr .button { grid-column: auto; width: auto; }
+  body[data-product-theme="paper"] .collectible-card h3 { font-size: 21px; }
+}
+@media screen and (max-width: 360px) {
+  body[data-product-theme="paper"] .scan-profile .scan-shell { width: calc(100% - 32px); }
+  body[data-product-theme="paper"] .scan-profile .scan-qr { grid-template-columns: 64px minmax(0,1fr); }
+  body[data-product-theme="paper"] .scan-profile .scan-qr .button { grid-column: 2; justify-self: start; }
+}
+
+@media screen {
+  body[data-product-theme="paper"] .dashboard-page .dashboard-metric-grid { gap: 12px; margin-block: 20px 12px; }
+  body[data-product-theme="paper"] .dashboard-page .dashboard-metric { padding: 12px 16px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); }
+  body[data-product-theme="paper"] .dashboard-page .dashboard-metric:is(.is-active,:hover) { background: var(--surface-subtle); color: var(--text); }
+  body[data-product-theme="paper"] .dashboard-page .dashboard-metric span { font-weight: 500; }
+  body[data-product-theme="paper"] .dashboard-page .dashboard-transfer-overview { min-height: 0; padding: 14px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+  body[data-product-theme="paper"] .dashboard-page .dashboard-transfer-overview > summary { font-size: 13px; font-weight: 500; }
+  body[data-product-theme="paper"] .dashboard-page .dashboard-workspace-links :is(a,button) { min-height: 44px; font-weight: 500; }
+  body[data-product-theme="paper"] .brand-frame nav a[aria-current="page"] { background: var(--surface-subtle); color: var(--text); }
+}

@@ -10,6 +10,7 @@ import {
 type ProfileStatusBadgesProps = {
   record: DemoInstrument;
   includeCondition?: boolean;
+  hideConfirmedTrust?: boolean;
   includeCategory?: boolean;
   maxBadges?: number;
   className?: string;
@@ -19,6 +20,7 @@ type ProfileStatusBadgesProps = {
 export function ProfileStatusBadges({
   record,
   includeCondition = true,
+  hideConfirmedTrust = false,
   includeCategory = false,
   maxBadges,
   className = "",
@@ -39,8 +41,8 @@ export function ProfileStatusBadges({
 
   const badges: ReactNode[] = [];
   if (safetyStatus !== "clear") badges.push(<StatusBadge key="safety" tone={safetyStatus === "recovered" ? "recovered" : "safety"} label={safetyStatusLabel(safetyStatus)} icon={<Siren aria-hidden="true" />} />);
-  if (record.showVerificationBadge !== false) badges.push(<StatusBadge key="verification" tone={verificationStatus === "verified" ? "verified" : "unverified"} label={verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"} icon={<ShieldCheck aria-hidden="true" />} />);
-  if (record.showAuthenticityBadge !== false) badges.push(<StatusBadge key="authenticity" tone={authenticityStatus === "confirmed" ? "auth-confirmed" : "auth-unconfirmed"} label={authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"} icon={<ShieldCheck aria-hidden="true" />} />);
+  if (record.showVerificationBadge !== false && (!hideConfirmedTrust || verificationStatus !== "verified")) badges.push(<StatusBadge key="verification" tone={verificationStatus === "verified" ? "verified" : "unverified"} label={verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"} icon={<ShieldCheck aria-hidden="true" />} />);
+  if (record.showAuthenticityBadge !== false && (!hideConfirmedTrust || authenticityStatus !== "confirmed")) badges.push(<StatusBadge key="authenticity" tone={authenticityStatus === "confirmed" ? "auth-confirmed" : "auth-unconfirmed"} label={authenticityStatus === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"} icon={<ShieldCheck aria-hidden="true" />} />);
   if (saleStatus) badges.push(<StatusBadge key="sale" tone="sale" label={saleStatus} />);
   if (originalityStatus) badges.push(<StatusBadge key="originality" tone="disclosure" label={originalityStatus} />);
   if (includeCondition) badges.push(<StatusBadge key="condition" tone="condition" label={condition === "new" ? "New" : "Used"} />);
