@@ -1102,6 +1102,12 @@ export default function SiteEditorPage() {
         <button type="button" className="button secondary" onClick={() => void copySettingsExport()}><Clipboard size={16} /> Copy export</button>
       </div>
       {copyExportFeedback ? <p className="form-message" role="status" aria-live="polite">{copyExportFeedback}</p> : null}
+      <div className="form-actions">
+        {writeBusy || hasChanges || draftMeta || editorIssue
+          ? <button type="button" className="button secondary" disabled>Review recovery introduction</button>
+          : <Link className="button secondary" href="/site-editor/recovery-copy">Review recovery introduction</Link>}
+      </div>
+      <p className="cms-section-intro">The separate recovery tool reviews only the password-reset introduction. Finish current edits and resolve any shared draft before using it.</p>
     </section>
   );
 

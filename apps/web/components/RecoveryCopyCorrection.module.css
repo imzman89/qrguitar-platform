@@ -1,0 +1,19 @@
+.root { width: min(820px, calc(100% - 40px)); margin: 32px auto 64px; color: var(--text); }
+.root > a { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted-strong); }
+.root header { margin-block: 20px 24px; }
+.root h1 { margin: 0 0 14px; font-size: clamp(1.75rem, 4vw, 2.5rem); line-height: 1.2; }
+.root h2 { margin: 0 0 10px; font-size: 1rem; line-height: 1.4; }
+.root p { line-height: 1.6; }
+.root header p { max-width: 68ch; color: var(--muted-strong); }
+.feedback { padding: 16px; border-radius: 8px; background: var(--surface-subtle); overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-block: 20px; }
+.actions :is(button,a), .root > button { min-height: 44px; }
+.actions a { display: inline-flex; align-items: center; }
+.review { display: grid; gap: 24px; margin-block: 28px; min-width: 0; }
+.review dl { display: grid; gap: 12px; margin: 0; }
+.review dt { margin-bottom: 4px; color: var(--muted-strong); font-size: .875rem; }
+.review dd { margin: 0; overflow-wrap: anywhere; }
+.exactValue { margin: 0; padding: 16px; white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 8px; background: var(--surface); }
+.confirm { display: flex; gap: 12px; align-items: flex-start; min-height: 44px; margin-block: 20px; padding-block: 10px; line-height: 1.5; }
+.confirm input { flex: 0 0 auto; width: 18px; height: 18px; margin-top: 3px; accent-color: var(--action); }
+.root :is(button,a,input):focus-visible { outline: 2px solid var(--action); outline-offset: 3px; }
