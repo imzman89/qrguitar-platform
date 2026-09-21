@@ -1,0 +1,9 @@
+.footer { padding:48px 0 32px; background:var(--canvas); color:var(--muted); border-top:1px solid var(--line); }
+.footer :global(.footer-grid) { display:grid; grid-template-columns:1fr 1.4fr; gap:48px; align-items:start; }
+.footer :global(.brand-logo--footer) { width:140px; height:auto; }
+.footer :global(.footer-brand-block p) { max-width:32ch; margin:16px 0 0; font-size:14px; line-height:1.6; }
+.footer :global(.footer-links) { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px 20px; }
+.footer :global(.footer-links) :is(a,button) { display:flex; align-items:center; min-height:44px; padding:6px 0; border:0; background:transparent; color:var(--muted); font:inherit; font-size:14px; line-height:1.5; text-align:left; text-transform:none; letter-spacing:0; }
+.footer :global(.footer-links) :is(a,button):hover { color:var(--text); }
+.footer a[href^="mailto:"] { grid-column:1/-1; }
+@media(max-width:700px) { .footer { padding:32px 0 24px; } .footer :global(.footer-grid) { grid-template-columns:1fr; gap:24px; } .footer :global(.footer-links) { grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 20px; } }

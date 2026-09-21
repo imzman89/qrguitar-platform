@@ -23,6 +23,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(canonicalUrl, 308);
   }
   const draftPreviewRequest = request.nextUrl.searchParams.get("cmsPreview") === "draft";
+  const publishedPreviewRequest = request.nextUrl.searchParams.get("cmsPreview") === "published";
   const requestHeaders = new Headers(request.headers);
   if (draftPreviewRequest) requestHeaders.set("x-qrguitar-site-preview", "draft");
   else requestHeaders.delete("x-qrguitar-site-preview");
@@ -30,7 +31,7 @@ export function middleware(request: NextRequest) {
   if (isNoindexPathname(request.nextUrl.pathname)) {
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
   }
-  if (request.nextUrl.pathname === "/api/site-editor/preview" || draftPreviewRequest) {
+  if (request.nextUrl.pathname === "/api/site-editor/preview" || draftPreviewRequest || publishedPreviewRequest) {
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
     response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
     for (const header of securityHeaders({ preview: true, checkout: isCheckoutPath(request.nextUrl.pathname) })) {

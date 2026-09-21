@@ -56,6 +56,16 @@ const attachmentRows = [10, 420].map((index) => ({
   mime_type: "image/jpeg", file_size_bytes: 1234, storage_path: `${threadConversation.id}/${actor}/${index}.jpg`
 }));
 
+// Model PostgreSQL timestamp comparison at microsecond precision, independently
+// of the server's cursor serializer. Date alone would hide the reported defect.
+function timestampMicros(value) {
+  const fraction = value.match(/\.(\d+)(?=Z|[+-]\d\d:\d\d$)/)?.[1] || "";
+  const wholeSecond = value.replace(/\.\d+(?=Z|[+-]\d\d:\d\d$)/, "");
+  return BigInt(Date.parse(wholeSecond)) * 1000n + BigInt(fraction.padEnd(6, "0"));
+}
+const timeKey = (conversationId, timestamp) => `${conversationId}|${timestampMicros(timestamp)}`;
+const timestampCompare = (a, b) => timestampMicros(a) < timestampMicros(b) ? -1 : timestampMicros(a) > timestampMicros(b) ? 1 : 0;
+
 class Query {
   constructor(client, table) { this.client = client; this.table = table; this.filters = []; this.orders = []; this.cap = null; }
   select() { return this; }
@@ -66,12 +76,12 @@ class Query {
     let match = expression.match(/^user_a\.eq\.([0-9a-f-]+),user_b\.eq\.([0-9a-f-]+)$/i);
     if (match) { this.filters.push((row) => row.user_a === match[1] || row.user_b === match[2]); return this; }
     match = expression.match(/^updated_at\.lt\.([^,]+),and\(updated_at\.eq\.([^,]+),id\.lt\.([0-9a-f-]+)\)$/i);
-    if (match) { this.filters.push((row) => row.updated_at < match[1] || (row.updated_at === match[2] && row.id < match[3])); return this; }
+    if (match) { this.filters.push((row) => timestampCompare(row.updated_at, match[1]) < 0 || (timestampCompare(row.updated_at, match[2]) === 0 && row.id < match[3])); return this; }
     match = expression.match(/^created_at\.lt\.([^,]+),and\(created_at\.eq\.([^,]+),id\.lt\.([0-9a-f-]+)\)$/i);
-    if (match) { this.filters.push((row) => row.created_at < match[1] || (row.created_at === match[2] && row.id < match[3])); return this; }
+    if (match) { this.filters.push((row) => timestampCompare(row.created_at, match[1]) < 0 || (timestampCompare(row.created_at, match[2]) === 0 && row.id < match[3])); return this; }
     const exact = [...expression.matchAll(/and\(conversation_id\.eq\.([0-9a-f-]+),created_at\.eq\.([^)]+)\)/gi)]
-      .map((item) => `${item[1]}|${item[2]}`);
-    if (exact.length) { const allowed = new Set(exact); this.filters.push((row) => allowed.has(`${row.conversation_id}|${row.created_at}`)); return this; }
+      .map((item) => timeKey(item[1], item[2]));
+    if (exact.length) { const allowed = new Set(exact); this.filters.push((row) => allowed.has(timeKey(row.conversation_id, row.created_at))); return this; }
     throw new Error(`Unhandled ${this.table} or filter: ${expression}`);
   }
   order(column, options = {}) { this.orders.push({ column, ascending: options.ascending !== false }); return this; }
@@ -82,7 +92,7 @@ class Query {
     if (this.orders.length) rows.sort((left, right) => {
       for (const order of this.orders) {
         const a = left[order.column], b = right[order.column];
-        const compared = a === b ? 0 : a === null ? 1 : b === null ? -1 : a < b ? -1 : 1;
+        const compared = a === b ? 0 : a === null ? 1 : b === null ? -1 : order.column.endsWith("_at") ? timestampCompare(a, b) : a < b ? -1 : 1;
         if (compared) return order.ascending ? compared : -compared;
       }
       return 0;
@@ -129,6 +139,59 @@ assert.ok(previewFilters.length >= 5);
 assert.ok(Math.max(...previewFilters.map((filter) => Buffer.byteLength(filter, "utf8"))) < 4096);
 assert.equal(server.decodeMemberConversationCursor("mm1.bad"), null);
 assert.equal(server.decodeMemberConversationCursor("mc1.not-json"), null);
+
+const microStamp = (index) => `2026-09-20T23:59:37.${String(416998 - index).padStart(6, "0")}+00:00`;
+const microConversations = Array.from({ length: 28 }, (_, index) => ({
+  ...conversationRows[0], id: uuid("f", index + 1), updated_at: microStamp(index), last_message_at: microStamp(index)
+}));
+const microPreviews = microConversations.map((row, index) => ({
+  id: uuid("9", index + 1), conversation_id: row.id, sender_id: peer, body: `Microsecond preview ${index}`, created_at: row.last_message_at
+}));
+const microClient = fakeClient({ conversations: microConversations, messages: microPreviews });
+const firstMicroPage = await server.listMemberConversations(microClient, actor);
+assert.equal(firstMicroPage.conversations[0].lastMessage?.body, "Microsecond preview 0", "Real PostgreSQL microseconds must survive exact inbox lookup");
+const microCursor = server.decodeMemberConversationCursor(firstMicroPage.nextCursor);
+assert.equal(microCursor.updatedAt, "2026-09-20T23:59:37.416974Z");
+const secondMicroPage = await server.listMemberConversations(microClient, actor, microCursor);
+assert.deepEqual([...firstMicroPage.conversations, ...secondMicroPage.conversations].map(row => row.id), microConversations.map(row => row.id), "Conversations within one millisecond must not disappear at the page boundary");
+assert.equal(secondMicroPage.nextCursor, null);
+
+const microThread = Array.from({ length: 205 }, (_, index) => ({
+  ...microPreviews[0], id: uuid("8", index + 1), created_at: microStamp(index), body: `Microsecond thread ${index}`
+}));
+const microThreadClient = fakeClient({ conversations: [microConversations[0]], messages: microThread });
+const firstMicroThread = await server.loadMemberConversation(microThreadClient, actor, microConversations[0].id);
+const microMessageCursor = server.decodeMemberMessageCursor(firstMicroThread.nextMessageCursor);
+assert.equal(microMessageCursor.createdAt, "2026-09-20T23:59:37.416799Z");
+const secondMicroThread = await server.loadMemberConversation(microThreadClient, actor, microConversations[0].id, microMessageCursor);
+assert.equal(secondMicroThread.messages.length, 5, "Messages within one millisecond must survive pagination");
+assert.equal(new Set([...firstMicroThread.messages, ...secondMicroThread.messages].map(row => row.id)).size, 205);
+const mergedMicroThread = messaging.mergeMemberMessagePages(firstMicroThread.messages, secondMicroThread.messages);
+assert.deepEqual(mergedMicroThread.map(row => row.id), [...microThread].reverse().map(row => row.id), "Client history merges must preserve microsecond chronology rather than sort same-millisecond messages by UUID");
+assert.deepEqual(messaging.mergeMemberMessagePages(mergedMicroThread, firstMicroThread.messages).map(row => row.id), mergedMicroThread.map(row => row.id), "Refresh must preserve the full-precision order across loaded pages");
+
+const laterMessage = { ...firstMicroThread.messages[0], id: uuid("1", 1), createdAt: "2026-09-20T23:59:37.416999Z", body: "Later" };
+const earlierMessage = { ...firstMicroThread.messages[0], id: uuid("f", 1), createdAt: "2026-09-21T01:59:37.416001+02:00", body: "Earlier" };
+assert.deepEqual(messaging.mergeMemberMessagePages([laterMessage], [earlierMessage]).map(row => row.body), ["Earlier", "Later"], "Timezone normalization and microseconds take precedence over reversed UUID order");
+const equalTimestampA = { ...earlierMessage, createdAt: "2026-09-20T23:59:37.416900Z" };
+const equalTimestampB = { ...laterMessage, createdAt: "2026-09-20T18:59:37.4169-05:00" };
+assert.deepEqual(messaging.mergeMemberMessagePages([equalTimestampA], [equalTimestampB]).map(row => row.id), [laterMessage.id, earlierMessage.id], "Equivalent offsets and trailing zeros use the existing UUID tie-breaker");
+const zeroMicros = { ...earlierMessage, createdAt: "2026-09-20T23:59:37.416Z" };
+assert.deepEqual(messaging.mergeMemberMessagePages([laterMessage], [zeroMicros]).map(row => row.id), [earlierMessage.id, laterMessage.id], "Millisecond-only timestamps remain compatible");
+const invalidTimestamp = { ...earlierMessage, createdAt: "not a timestamp" };
+assert.deepEqual(messaging.mergeMemberMessagePages([invalidTimestamp], [laterMessage]).map(row => row.id), [laterMessage.id, earlierMessage.id], "Malformed timestamps retain the existing deterministic UUID fallback");
+const replacement = { ...earlierMessage, body: "Refreshed earlier message", attachments: [{ id: "newly-signed" }] };
+const replaced = messaging.mergeMemberMessagePages([laterMessage, earlierMessage], [replacement]);
+assert.equal(replaced.length, 2);assert.equal(replaced[0], replacement, "Incoming duplicate IDs still replace stale message and attachment data");
+
+const offsetClient = fakeClient({ conversations: [{ ...microConversations[0], last_message_at: "2026-09-21T01:59:37.416998+02:00" }], messages: [microPreviews[0]] });
+assert.equal((await server.listMemberConversations(offsetClient, actor)).conversations[0].lastMessage?.body, "Microsecond preview 0", "Timezone normalization must retain all fractional digits");
+const cursorWithTime = timestamp => `mc1.${Buffer.from(JSON.stringify([timestamp, microConversations[0].id]), "utf8").toString("base64url")}`;
+assert.equal(server.decodeMemberConversationCursor(cursorWithTime("2026-09-20T23:59:37.416998Z")).updatedAt, "2026-09-20T23:59:37.416998Z");
+assert.equal(server.decodeMemberConversationCursor(cursorWithTime("2026-09-20T23:59:37.416Z")).updatedAt, "2026-09-20T23:59:37.416Z", "Previously issued millisecond cursors remain valid");
+for (const invalid of ["2026-02-30T23:59:37.416998Z", "2026-09-20T24:00:00.000Z", "2026-09-20T23:59:60.000Z", "2026-09-20T23:59:37.4169981Z", "2026-09-20T23:59:37.416998Z),id.gt.0", "2026-09-20T23:59:37.416998+00:00"]) {
+  assert.equal(server.decodeMemberConversationCursor(cursorWithTime(invalid)), null, `Reject invalid or noncanonical cursor timestamp ${invalid}`);
+}
 
 const threadClient = fakeClient({ conversations: [threadConversation], messages: threadMessages, attachments: attachmentRows });
 const threadPages = [];
@@ -189,4 +252,4 @@ assert.equal((await threadRoute.GET(new Request(`https://www.qrguitar.com/api/me
 assert.equal((await threadRoute.GET(new Request(`https://www.qrguitar.com/api/messages/${threadConversation.id}?cursor=${encodeURIComponent(validMessageCursor)}`), context)).status, 200);
 assert.equal(messageCursorSeen.id, server.decodeMemberMessageCursor(validMessageCursor).id);
 
-console.log("PASS member messaging cursor pagination covers 121 conversations, 425 messages, exact previews, signed attachments, API validation, and client merges");
+console.log("PASS member messaging cursor pagination covers 121 conversations, 425 messages, PostgreSQL microsecond previews, 28 same-millisecond conversations, 205 same-millisecond messages, timezone/invalid-date cases, signed attachments, API validation, and full-precision client merge ordering");

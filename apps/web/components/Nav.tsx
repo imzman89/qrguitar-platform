@@ -66,7 +66,7 @@ export function Nav() {
   }, [isOpen, accountMenuOpen]);
 
   const navigation = [
-    { href: "/dashboard", label: getContentValue(content, "global.navigation.dashboard") },
+    ...(isSignedIn ? [{ href: "/dashboard", label: getContentValue(content, "global.navigation.dashboard") }] : []),
     { href: "/catalog", label: getContentValue(content, "global.navigation.catalog") },
     { href: "/collections", label: "Collections" },
     { href: "/how-it-works", label: getContentValue(content, "global.navigation.howItWorks") },
@@ -74,7 +74,12 @@ export function Nav() {
   ];
 
   return (
-    <header className={`brand-frame ${styles.header}`} ref={headerRef}>
+    <header className={`brand-frame ${styles.header}`} ref={headerRef} onBlur={(event) => {
+      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+        setIsOpen(false);
+        setAccountMenuOpen(false);
+      }
+    }}>
       <div className={`shell ${styles.inner}`}>
         <Link className={styles.brand} href="/" aria-label="QRguitar homepage">
           <BrandLogo className={styles.logo} />

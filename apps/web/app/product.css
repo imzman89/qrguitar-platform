@@ -1,9 +1,10 @@
+@layer product {
 /* Shared product controls. Page composition belongs to each route. */
 @media screen {
   body .button { min-height: 48px; padding: 12px 20px; font-size: .9375rem; line-height: 1.45; font-weight: 650; letter-spacing: 0; text-transform: none; border-radius: 6px; }
   body .button:disabled { cursor: not-allowed; opacity: .55; }
   body :is(input,select,textarea) { font-size: 1rem; }
-  body .field > label, body .catalog-filters label > span { font-size: .875rem; line-height: 1.5; }
+  body .field > label { font-size: .875rem; line-height: 1.5; }
   body :is(a,button,input,select,textarea,summary,[tabindex]):focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
   body .auth-mode-switch button { min-height: 48px; font-size: .9375rem; }
   body .auth-card form { display: grid; gap: 20px; min-width: 0; }
@@ -19,14 +20,9 @@
   body .create-welcome .auth-card { padding: clamp(28px,5vw,56px); gap: 20px; }
   body .create-welcome h1 { max-width: 19ch; margin: 0; font-size: clamp(34px,4vw,52px); letter-spacing: -.035em; line-height: 1.12; }
   body .create-welcome p { max-width: 62ch; font-size: 1.0625rem; line-height: 1.7; }
-  body .catalog-filters input, body .catalog-filters select { min-height: 48px; }
-  body .catalog-summary { font-size: .9375rem; }
   body .dashboard-workspace-links :is(a,button) { font-size: .875rem; min-height: 48px; line-height: 1.4; }
   body .dashboard-metric span { font-size: .875rem; line-height: 1.4; }
   body .record-badge { font-size: .75rem; line-height: 1.5; }
-  body .collectible-card-subtitle { font-size: .9375rem; line-height: 1.5; }
-  body .collectible-card-facts > span { font-size: .75rem; line-height: 1.45; }
-  body .collectible-card-action { font-size: .875rem; min-height: 44px; }
   body .collection-directory-empty, body .collection-directory-empty h2 { color: var(--text); }
 }
 @media screen and (max-width: 430px) {
@@ -45,3 +41,5 @@
 .owner-profile-gate h1 { font-size: clamp(2rem, 5vw, 3rem); line-height: 1.1; }
 .owner-profile-gate p { margin: 20px 0; line-height: 1.6; color: var(--muted, #b5b4b0); }
 .owner-profile-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+
+}

@@ -75,6 +75,7 @@ function compileCard(extraOverrides = {}) {
   const Icon = () => null;
   const Link = ({ children, ...props }) => React.createElement("a", props, children);
   const overrides = {
+    "./CollectibleRecordCard.module.css": { __esModule: true, default: new Proxy({}, { get: (_, key) => key }) },
     "lucide-react": { ArrowRight: Icon, Camera: Icon, ChevronLeft: Icon, ChevronRight: Icon, FileText: Icon, Globe2: Icon, Hash: Icon },
     "next/link": { __esModule: true, default: Link },
     "next/navigation": { useRouter: () => ({ push() {} }) },
@@ -120,6 +121,27 @@ function compileCollectibleResolver() {
   return module.exports.resolveCollectibleCard;
 }
 
+function renderHomepageShowcase() {
+  const module = { exports: {} };
+  const code = ts.transpileModule(showcase, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX }
+  }).outputText;
+  const Icon = () => null;
+  const overrides = {
+    "./HomeProfileShowcase.module.css": { __esModule: true, default: new Proxy({}, { get: (_, key) => key }) },
+    "lucide-react": { ArrowUpRight: Icon, Camera: Icon },
+    "next/link": { __esModule: true, default: ({ children, ...props }) => React.createElement("a", props, children) },
+    "../lib/public-media-variant": compilePublicMediaVariant(),
+    "../lib/collectible-card": { resolveCollectibleCard: () => ({
+      images: ["/lead.jpg", "/detail.jpg"], title: "Test amplifier", typeLabel: "Amplifier",
+      photoCount: 2, factLine: "Fender • 1991", profileUrl: "/i/QRG-TEST", code: "QRG-TEST"
+    }) },
+    "./PhotoViewer": { PhotoViewer: () => null }
+  };
+  new Function("require", "module", "exports", code)((name) => overrides[name] || require(name), module, module.exports);
+  return renderToStaticMarkup(React.createElement(module.exports.HomeProfileShowcase, { record: { qrCode: "QRG-TEST" } }));
+}
+
 function compileInstrumentCategories() {
   const module = { exports: {} };
   const source = read("lib/instrument-categories.ts");
@@ -156,14 +178,14 @@ test("public media variants are added only to checked public media proxy URLs", 
 test("public image surfaces request bounded variants while keeping original URLs as identity", () => {
   assert.match(showcase, /publicMediaVariantUrl\(photos\[activePhoto\], 1200\)/);
   assert.match(showcase, /srcSet=\{publicMediaVariantSrcSet\(photos\[activePhoto\]\)\} sizes="\(max-width: 760px\) calc\(100vw - 40px\), \(max-width: 900px\) 720px, 620px"/);
-  assert.match(showcase, /publicMediaVariantUrl\(photo, 160\)/);
+  assert.equal((renderHomepageShowcase().match(/<img\b/g) || []).length, 1, "The homepage loads its lead photo; additional photos open on demand in the gallery.");
   assert.match(homepage, /src=\{publicMediaVariantUrl\(recordPhoto, 640\)\} srcSet=\{publicMediaVariantSrcSet\(recordPhoto, \[160, 640\]\)\} sizes="\(max-width: 700px\) 360px, 320px"/);
   assert.doesNotMatch(homepage, /<img src=\{recordPhoto\}/);
   assert.match(card, /publicMediaVariantUrl\(imageUrl, 640\)/);
   assert.match(profile, /publicMediaVariantUrl\(galleryImages\[mediaIndex\], 1200\)/);
-  assert.match(profile, /srcSet=\{publicMediaVariantSrcSet\(galleryImages\[mediaIndex\]\)\}[^>]*sizes="\(max-width: 760px\) calc\(100vw - 40px\), \(max-width: 900px\) calc\(100vw - 64px\), 650px"/);
+  assert.match(profile, /srcSet=\{publicMediaVariantSrcSet\(galleryImages\[mediaIndex\]\)\}[^>]*sizes="\(max-width: 540px\) calc\(100vw - 32px\), \(max-width: 760px\) calc\(100vw - 40px\), \(max-width: 900px\) 720px, 684px"/);
   assert.match(photoViewer, /publicMediaVariantUrl\(activeSource, 1200\)/);
-  assert.match(photoViewer, /srcSet=\{publicMediaVariantSrcSet\(activeSource\)\}[^>]*sizes="\(max-width: 760px\) 100vw, calc\(100vw - 160px\)"/);
+  assert.match(photoViewer, /srcSet=\{publicMediaVariantSrcSet\(activeSource\)\}[^>]*sizes="calc\(100vw - 24px\)"/);
   assert.ok(((profile + photoViewer).match(/publicMediaVariantUrl\(imageUrl, 160\)/g) || []).length >= 2);
   assert.ok(((profile + photoViewer).match(/image\.srcset = srcSet;/g) || []).length >= 2);
   assert.ok(((profile + photoViewer).match(/image\.src = publicMediaVariantUrl\(source, 1200\);/g) || []).length >= 2);
@@ -211,7 +233,9 @@ test("Catalog grants high priority to exactly the first visible Profile card", (
 
 test("Homepage keeps only its above-the-fold showcase eager and defers supporting media", () => {
   assert.match(showcase, /loading="eager" fetchPriority="high" decoding="async" width=\{1200\} height=\{900\}/);
-  assert.match(showcase, /loading="lazy" fetchPriority="low" decoding="async" width=\{92\} height=\{92\}/);
+  const heroPhotos = [...renderHomepageShowcase().matchAll(/<img\b[^>]*>/g)].map((match) => match[0]);
+  assert.equal(heroPhotos.length, 1);
+  assert.match(heroPhotos[0], /loading="eager"/);
   assert.equal((showcase.match(/fetchPriority="high"/g) || []).length, 1);
   assert.match(homepage, /loading="lazy" fetchPriority="low" decoding="async" width=\{1200\} height=\{900\}/);
   assert.doesNotMatch(homepage, /prioritizeLeadImage/);
@@ -233,15 +257,17 @@ test("every upload category reaches Profile cards unchanged", () => {
 });
 
 test("homepage Profile copy uses the saved category instead of a hard-coded instrument label", () => {
-  assert.match(showcase, /QRguitar Profile<\/span>/);
-  assert.match(showcase, /className=\{styles\.kicker\}>\{card\.typeLabel\}<\/span>/);
+  const showcaseHtml = renderHomepageShowcase();
+  assert.match(showcaseHtml, /QRguitar Profile · Amplifier/);
+  assert.match(showcaseHtml, /href="\/i\/QRG-TEST"/);
+  assert.match(showcaseHtml, /aria-label="View all photos of Test amplifier"/);
   assert.doesNotMatch(showcase, /A real QRguitar Profile|THE INSTRUMENT/);
 });
 
-test("homepage hero stacks before tablet columns become too narrow", () => {
-  assert.match(homeStyles, /@media \(max-width: 900px\)[\s\S]*?\.home :global\(\.hero-grid\) \{[^}]*max-width: 720px;[^}]*grid-template-columns: minmax\(0,1fr\);/);
-  assert.doesNotMatch(homeStyles, /@media \(max-width: 900px\)[\s\S]*?\.home :global\(\.hero-grid\) \{[^}]*width: 100%;/);
-  assert.match(homeStyles, /@media \(max-width: 900px\)[\s\S]*?\.heroShowcase \{[^}]*width: 100%;[^}]*max-width: 720px;/);
+test("homepage hero and archive reflow into a single column on phones", () => {
+  assert.match(homeStyles, /@media\s*\(max-width:760px\)[\s\S]*?\.home :global\(\.hero-grid\)\s*\{[^}]*grid-template-columns:1fr/);
+  assert.match(homeStyles, /@media\s*\(max-width:520px\)[\s\S]*?\.home :global\(\.home-archive-rail\)\s*\{[^}]*grid-template-columns:1fr/);
+  assert.doesNotMatch(homeStyles, /scroll-snap-type:\s*x mandatory/);
 });
 
 test("failed gallery sources are removed without mutating or reordering the remaining photos", () => {
@@ -309,7 +335,7 @@ function findElement(node, predicate) {
   return findElement(node.props?.children, predicate);
 }
 
-function cardInteractionHarness(images = ["/lead.jpg", "/detail.jpg", "/back.jpg"]) {
+function cardInteractionHarness(images = ["/lead.jpg", "/detail.jpg", "/back.jpg"], variant = "catalog") {
   const states = [], refs = [], navigation = [], scrolls = [];
   let stateCursor = 0, refCursor = 0;
   const PhotoViewer = () => null;
@@ -338,7 +364,7 @@ function cardInteractionHarness(images = ["/lead.jpg", "/detail.jpg", "/back.jpg
   };
   function render() {
     stateCursor = 0; refCursor = 0;
-    const tree = Card({ record: { qrCode: "TEST" } });
+    const tree = Card({ record: { qrCode: "TEST" }, variant });
     const photo = findElement(tree, (node) => node.props?.className === "collectible-card-media-rail");
     photo.props.ref.current = rail;
     return { tree, photo, viewer: findElement(tree, (node) => node.type === PhotoViewer) };
@@ -360,6 +386,29 @@ test("card photo click opens the full gallery at its selected image without chan
   assert.deepEqual(harness.navigation, []);
   view.viewer.props.onClose();
   assert.equal(harness.render().viewer, null);
+});
+
+test("archive preview announces the complete photo count and opens every public photo", () => {
+  const images = ["/lead.jpg", "/detail.jpg", "/back.jpg", "/serial.jpg"];
+  const harness = cardInteractionHarness(images, "archive");
+  let view = harness.render();
+  const inlineImages = [];
+  function collectImages(node) {
+    if (Array.isArray(node)) return node.forEach(collectImages);
+    if (!node || typeof node !== "object") return;
+    if (node.type === "img") inlineImages.push(node);
+    collectImages(node.props?.children);
+  }
+  collectImages(view.tree);
+  assert.equal(inlineImages.length, 1, "the archive keeps its single-image loading budget");
+  assert.equal(view.photo.props["aria-label"], "Test Profile photo preview. 4 photos available. Press Enter to view photos.");
+  assert.equal(inlineImages[0].props.alt, "Test Profile preview photo 1 of 4");
+  view.photo.props.onClick();
+  view = harness.render();
+  assert.ok(view.viewer);
+  assert.deepEqual(view.viewer.props.images, images, "the viewer receives the complete public gallery, not the preview slice");
+  assert.equal(view.viewer.props.initialIndex, 0);
+  assert.deepEqual(harness.navigation, []);
 });
 
 test("Enter and Space activate the same card photo viewer, while arrow keys only browse the rail", () => {
@@ -435,7 +484,7 @@ test("suppressing duplicate hero trust chips preserves safety, sale, originality
   const html = renderToStaticMarkup(React.createElement(Badges, { record, hideConfirmedTrust: true, includeCategory: true }));
   assert.doesNotMatch(html, /Verified by QRguitar|Authenticity Confirmed|Unverified|Authenticity Unconfirmed/);
   for (const label of ["Reported Stolen", "For Sale", "Modified", "Used", "Amplifier"]) assert.ok(html.includes(label), label + " remains visible");
-  assert.match(profile, /hideConfirmedTrust=\{true\}[\s\S]{0,80}className="profile-hero-badges"/);
+  assert.match(profile, /hideConfirmedTrust=\{true\}[\s\S]{0,80}className=\{styles\["profile-hero-badges"\]\}/);
 });
 
 test("status trust chips remain enabled by default and still respect their individual visibility settings", () => {
@@ -476,4 +525,65 @@ test("hero de-duplication preserves unverified and unconfirmed disclosures in ev
   }
   const hidden = renderToStaticMarkup(React.createElement(Badges, { record: { verificationStatus: "unverified", authenticityStatus: "unconfirmed", showVerificationBadge: false, showAuthenticityBadge: false }, hideConfirmedTrust: true }));
   assert.doesNotMatch(hidden, /Unverified|Authenticity Unconfirmed/, "saved display preferences still apply");
+});
+
+
+test("cards mount only the selected photograph and its neighbors while reporting the complete public photo count", () => {
+  const images = Array.from({ length: 20 }, (_, index) => "/photo-" + index + ".jpg");
+  const Card = compileCard({ "../lib/collectible-card": { resolveCollectibleCard: () => ({
+    images, title: "Large gallery", profileUrl: "/i/TEST", code: "TEST", typeLabel: "Amplifier", summary: "", factLine: "", publicSerial: "", photoCount: images.length, publicDocumentCount: 0, collection: null
+  }) } });
+  const html = renderToStaticMarkup(React.createElement(Card, { record: { qrCode: "TEST" } }));
+  assert.equal((html.match(/<img\b/g) || []).length, 2, "a large public gallery must not start twenty image requests per card");
+  assert.match(html, /1\/20/);
+  assert.doesNotMatch(html, /photo-19\.jpg/);
+  const archive = renderToStaticMarkup(React.createElement(Card, { record: { qrCode: "TEST" }, variant: "archive" }));
+  assert.equal((archive.match(/<img\b/g) || []).length, 1);
+  assert.match(archive, /20 photos/, "a one-image card preview still reports the real public gallery size");
+});
+
+test("photo upload failure stays attached to its source through reordering and leaves recovery controls usable", () => {
+  const module = { exports: {} };
+  const code = ts.transpileModule(photoOrganizer, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX }
+  }).outputText;
+  new Function("require", "module", "exports", code)((name) => name === "react"
+    ? { useState: (initial) => [initial, () => {}], useRef: (initial) => ({ current: initial }) }
+    : require(name), module, module.exports);
+  const Organizer = module.exports.PhotoOrganizer;
+  const original = ["/lead.jpg", "/detail.jpg", "/back.jpg"];
+  let images = [...original];
+  let mainImage = "/detail.jpg";
+  const removed = [];
+  const errorMessage = "Upload failed. Your selected photograph is preserved; remove it or retry the saved form.";
+  const render = () => Organizer({
+    images, mainImage,
+    statusByImage: { "/lead.jpg": { state: "error", message: errorMessage } },
+    onSelectMain: (source) => { mainImage = source; },
+    onRemove: (source) => { removed.push(source); images = images.filter((image) => image !== source); },
+    onMove: (from, to) => { const next = [...images]; next.splice(to, 0, next.splice(from, 1)[0]); images = next; }
+  });
+  const tileAt = (tree, index) => findElement(tree, (node) => node.type === "article" && node.props["data-photo-index"] === index);
+  const plain = (node) => Array.isArray(node) ? node.map(plain).join("") : typeof node === "string" ? node : node?.props ? plain(node.props.children) : "";
+  let tree = render();
+  let failedTile = tileAt(tree, 0);
+  assert.equal(findElement(failedTile, (node) => node.props?.role === "alert").props.children[0].props.children, errorMessage);
+  const menu = findElement(failedTile, (node) => node.type === "details");
+  assert.equal(findElement(menu, (node) => node.type === "summary").props["aria-label"], "More options for photo 1");
+  assert.equal(findElement(menu, (node) => node.type === "button" && plain(node).includes("Move earlier")).props.disabled, true);
+  const moveLater = findElement(menu, (node) => node.type === "button" && plain(node).includes("Move later"));
+  assert.equal(moveLater.props.disabled, false);
+  moveLater.props.onClick();
+  assert.deepEqual(images, ["/detail.jpg", "/lead.jpg", "/back.jpg"]);
+  assert.deepEqual(original, ["/lead.jpg", "/detail.jpg", "/back.jpg"], "reordering must not mutate caller-owned input");
+  tree = render();
+  failedTile = tileAt(tree, 1);
+  assert.equal(findElement(failedTile, (node) => node.type === "img").props.src, "/lead.jpg");
+  assert.match(plain(findElement(failedTile, (node) => node.props?.role === "alert")), /selected photograph is preserved/);
+  assert.equal(findElement(tileAt(tree, 0), (node) => node.props?.role === "alert"), null, "the error cannot move to the next photo by index");
+  findElement(failedTile, (node) => node.type === "button" && node.props["aria-label"] === "Set photo 2 as main").props.onClick();
+  assert.equal(mainImage, "/lead.jpg");
+  findElement(failedTile, (node) => node.type === "button" && node.props["aria-label"] === "Remove photo 2").props.onClick();
+  assert.deepEqual(removed, ["/lead.jpg"]);
+  assert.deepEqual(images, ["/detail.jpg", "/back.jpg"]);
 });

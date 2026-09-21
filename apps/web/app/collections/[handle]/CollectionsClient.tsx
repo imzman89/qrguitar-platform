@@ -1,6 +1,7 @@
 "use client";
 
 import { Search } from "lucide-react";
+import styles from "../collections.module.css";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CollectibleRecordCard } from "../../../components/CollectibleRecordCard";
@@ -32,19 +33,24 @@ export function CollectionsClient({ records, content }: { records: DemoInstrumen
   if (!records.length) return <div className="empty-state"><h2>No public instrument Profiles yet.</h2><p>This member hasn’t added any instruments to their public collection yet.</p><Link className="button secondary" href="/collections">Explore other collections</Link></div>;
 
   return <>
-    <div className="collection-filters" aria-label="Collection filters">
-      <label><span>Search</span><div className="search-input"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Title, brand, year, location..." /></div></label>
+    <div className={styles.memberFilters} aria-label="Collection filters">
+      <label><span>Search</span><div className={styles.search}><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Title, brand, year, location..." /></div></label>
       <label><span>Brand</span><select value={brand} onChange={(event) => setBrand(event.target.value)}>{brands.map((item) => <option key={item}>{item}</option>)}</select></label>
+      <label><span>Sort</span><select value={sort} onChange={(event) => setSort(event.target.value)}><option>Newest</option><option>Oldest</option><option>Title</option></select></label>
+    </div>
+    <details className={styles.memberAdvanced}>
+      <summary>More filters{condition !== "All conditions" || availability !== "All availability" || type !== "All types" ? " · Active" : ""}</summary>
+      <div className={styles.memberFilterFields}>
       <label><span>Condition</span><select value={condition} onChange={(event) => setCondition(event.target.value)}><option>All conditions</option><option>New</option><option>Used</option></select></label>
       <label><span>Availability</span><select value={availability} onChange={(event) => setAvailability(event.target.value)}><option>All availability</option><option>For sale</option><option>Not for sale</option></select></label>
       <label><span>Type</span><select value={type} onChange={(event) => setType(event.target.value)}>{types.map((item) => <option key={item}>{item}</option>)}</select></label>
-      <label><span>Sort</span><select value={sort} onChange={(event) => setSort(event.target.value)}><option>Newest</option><option>Oldest</option><option>Title</option></select></label>
-    </div>
+      </div>
+    </details>
     <p className="collection-result-count" role="status">
       {getContentValue(content, "collections.results.count").replace("{count}", String(visible.length))}
     </p>
     {hasFilters && <div className="form-actions"><button className="button secondary" type="button" onClick={clearFilters}>Clear filters</button></div>}
-    <div className="catalog-record-grid collection-record-grid">
+    <div className={`${styles.profileGrid} catalog-record-grid collection-record-grid`}>
       {visible.map((record) => <CollectibleRecordCard key={record.qrCode} record={record} content={content} />)}
     </div>
     {!visible.length ? (

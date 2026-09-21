@@ -5,7 +5,7 @@ import { RefreshCw } from "lucide-react";
 import { createBrowserSupabaseClient } from "../../../lib/supabase-browser";
 import { createPayPalAdminReviewsClient, initialPayPalAdminReviewsState } from "../../../lib/paypal-admin-reviews-client";
 import type { PayPalAdminReview, PayPalReviewAction, PayPalWebhookDelivery } from "../../../lib/paypal-admin-reviews";
-import styles from "../../billing/billing.module.css";
+import styles from "./payments.module.css";
 
 const money = (amount: number, currency = "USD") => new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount / 100);
 const reasonLabels: Record<string, string> = {

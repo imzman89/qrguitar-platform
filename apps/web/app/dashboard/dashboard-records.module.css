@@ -1,7 +1,41 @@
+.dashboard { display: grid; gap: 24px; min-width: 0; }
+.header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; min-width: 0; }
+.header > div:first-child { display: grid; gap: 9px; min-width: 0; }
+.header :global(.eyebrow) { color: var(--muted); font-size: .75rem; font-weight: 500; letter-spacing: 0; text-transform: none; }
+.header h1 { margin: 0; max-width: 25ch; font-size: clamp(1.75rem,2.7vw,2.3rem); font-weight: 600; line-height: 1.17; letter-spacing: -.04em; }
+.header p { margin: 0; max-width: 58ch; color: var(--muted); font-size: .875rem; line-height: 1.6; }
+.headerActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; flex: 0 0 auto; max-width: 235px; }
+.headerActions :global(.button) { min-height: 44px; font-size: .8125rem; }
+.collectionControls { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-width: 0; }
+.search { display: flex; align-items: center; gap: 9px; min-width: 180px; width: min(280px,100%); padding: 0 13px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--field-surface,var(--surface)); color: var(--muted); }
+.search:focus-within { outline: 2px solid var(--action); outline-offset: 2px; }
+.search svg { flex-shrink: 0; }
+.search input { width: 100%; min-width: 0; min-height: 42px; padding: 10px 0; border: 0; outline: 0; color: var(--text); background: transparent; font: inherit; font-size: .8125rem; }
+.search input::placeholder { color: var(--muted); opacity: 1; }
+.filters { display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 3px 0; scrollbar-width: thin; }
+.filters button { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; min-height: 42px; padding: 10px 14px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-size: .8125rem; cursor: pointer; }
+.filters strong { order: 2; font-size: .75rem; font-weight: 500; opacity: .8; }
+.filters button.filterActive, .filters button:hover { color: var(--text); background: var(--surface-subtle); }
+.filters button:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
+.toolsArea { display: grid; gap: 22px; padding-top: 12px; }
+.toolLinks { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.toolLinks :is(a,button) { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0; border: 0; background: transparent; color: var(--muted-strong,var(--text)); font: inherit; font-size: .8125rem; text-decoration: none; cursor: pointer; }
+.toolLinks :is(a,button):hover { color: var(--text); text-decoration: underline; text-underline-offset: 4px; }
+.toolLinks span { color: var(--muted); font-size: .75rem; }
+.trustSummary { display: flex; flex-wrap: wrap; gap: 12px 24px; color: var(--muted); font-size: .75rem; }
+.trustSummary b { color: var(--text); font-weight: 500; }
+.trustSummary button { border: 0; background: transparent; color: var(--text); font: inherit; text-decoration: underline; cursor: pointer; }
+.transfers { border: 0; padding: 0; background: transparent; }
+.transfers summary { display: flex; align-items: center; gap: 12px; min-height: 44px; color: var(--text); font-size: .875rem; font-weight: 550; cursor: pointer; }
+.transfers summary span { color: var(--muted); font-size: .75rem; font-weight: 400; }
+.transfers > p { margin: 6px 0 16px; max-width: 76ch; color: var(--muted); font-size: .8125rem; line-height: 1.6; }
+@media(max-width: 1120px) { .collectionControls { align-items: stretch; flex-direction: column; gap: 12px; } .search { width: 100%; } .header { flex-direction: column; gap: 18px; } .headerActions { justify-content: flex-start; max-width: none; } }
+@media(max-width: 760px) { .search input { font-size: 1rem; } .dashboard { gap: 20px; } .header h1 { font-size: 1.875rem; } .headerActions { gap: 8px; } .filters { gap: 4px; } .filters button { padding-inline: 11px; } .toolsArea { padding-top: 4px; } }
+
 /* Owner collection: photographs, useful details, and direct controls. */
 .instrumentTable {
   min-width: 0;
-  margin: 32px 0;
+  margin: 0;
   padding: 0;
   border: 0;
   background: transparent;
@@ -13,7 +47,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 24px;
+  margin-bottom: 18px;
 }
 .tableHeader h3 { margin: 3px 0 0; font-size: 1.35rem; }
 
@@ -40,7 +74,7 @@
   min-width: 0;
   color: inherit;
   text-decoration: none;
-  border-radius: 14px;
+  border-radius: 4px;
 }
 .instrumentBodyLink:focus-visible { outline: 2px solid var(--text); outline-offset: 5px; }
 .instrumentThumb {
@@ -51,9 +85,10 @@
   aspect-ratio: 4 / 3;
   overflow: hidden;
   border: 0;
-  border-radius: 14px;
-  background: var(--surface-subtle, var(--panel-2));
+  border-radius: 4px;
+  background: transparent;
 }
+.instrumentThumb:has(> span) { background: var(--surface); }
 .instrumentThumb img {
   display: block;
   width: 100%;
@@ -140,9 +175,9 @@
   letter-spacing: 0;
   white-space: nowrap;
 }
-:global(body[data-product-theme]) .primaryActions :global(.button):first-child { background: var(--text); color: var(--bg); }
+:global(body[data-product-theme]) .primaryActions :global(.button):first-child { background: var(--surface-subtle); color: var(--text); }
 :global(body[data-product-theme]) .primaryActions :global(.button):hover { background: var(--panel); color: var(--text); }
-:global(body[data-product-theme]) .primaryActions :global(.button):first-child:hover { background: var(--muted-strong); color: var(--bg); }
+:global(body[data-product-theme]) .primaryActions :global(.button):first-child:hover { background: var(--surface); color: var(--text); }
 .moreButton {
   display: grid;
   place-items: center;
@@ -212,7 +247,7 @@
   .instrumentList { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 24px; }
 }
 @media (max-width: 760px) {
-  .instrumentTable { margin-block: 24px; }
+  .instrumentTable { margin-block: 0; }
   .tableHeader { gap: 14px; margin-bottom: 20px; }
   .tableHeader h3 { font-size: 1.2rem; }
   .tableHeader :global(.button) { padding-inline: 12px; font-size: .8125rem; }

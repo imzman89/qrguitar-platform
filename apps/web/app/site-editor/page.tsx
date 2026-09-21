@@ -30,6 +30,7 @@ import {
   X
 } from "lucide-react";
 import Link from "next/link";
+import styles from "./site-editor.module.css";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Footer } from "../../components/Footer";
@@ -41,7 +42,6 @@ import {
   contentCoverageSummary,
   contentPagesForArea,
   contentRegistry,
-  defaultContentValues,
   validateContentValues,
   type ContentArea,
   type ContentRegistryEntry
@@ -134,34 +134,6 @@ const legacyContentBindings: Record<string, (settings: EditableSiteSettings, val
   "seo.global.description": (settings, value) => ({ ...settings, seo: { ...settings.seo, description: value } }),
   "seo.global.image": (settings, value) => ({ ...settings, seo: { ...settings.seo, image: value } })
 };
-
-function hydrateLegacyContent(settings: EditableSiteSettings) {
-  const content = { ...settings.content };
-  const legacy: Record<string, string> = {
-    "global.brand.name": settings.brandName,
-    "global.brand.tagline": settings.tagline,
-    "home.hero.eyebrow": settings.hero.eyebrow,
-    "home.hero.headline": settings.hero.headline,
-    "home.hero.body": settings.hero.body,
-    "home.hero.primaryCta": settings.hero.primaryCta,
-    "home.hero.secondaryCta": settings.hero.secondaryCta,
-    "home.lifecycle.headline": settings.sections.howHeadline,
-    "home.lifecycle.body": settings.sections.howBody,
-    "home.pricing.headline": settings.sections.pricingHeadline,
-    "home.pricing.body": settings.sections.pricingBody,
-    "dashboard.hero.headline": settings.dashboard.pageTitle,
-    "dashboard.hero.body": settings.dashboard.subtitle,
-    "dashboard.empty.title": settings.dashboard.emptyCollectionTitle,
-    "dashboard.empty.body": settings.dashboard.emptyCollectionBody,
-    "seo.global.title": settings.seo.title,
-    "seo.global.description": settings.seo.description,
-    "seo.global.image": settings.seo.image
-  };
-  for (const [key, value] of Object.entries(legacy)) {
-    if (content[key] === defaultContentValues[key] && value && value !== defaultContentValues[key]) content[key] = value;
-  }
-  return { ...settings, content };
-}
 
 function formatTime(value?: string) {
   if (!value) return "Not yet";
@@ -282,6 +254,7 @@ export default function SiteEditorPage() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [editorMode, setEditorMode] = useState<EditorMode>("content");
   const [openFieldSection, setOpenFieldSection] = useState("");
+  const [editingSurface, setEditingSurface] = useState<"content" | "arrangement">("content");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
   const [advancedJson, setAdvancedJson] = useState("");
@@ -348,6 +321,10 @@ export default function SiteEditorPage() {
   }, [fieldGroups]);
 
   useEffect(() => {
+    setEditingSurface("content");
+  }, [selected.area, selected.page]);
+
+  useEffect(() => {
     setEmailTestFeedback(null);
   }, [activeSectionName, selected.area, selected.page]);
 
@@ -372,8 +349,8 @@ export default function SiteEditorPage() {
   const applyPayload = useCallback((payload: SiteEditorPayload, preferDraft = true, submittedSnapshot?: string) => {
     if (typeof payload.publishedVersion !== "string" || typeof payload.draftVersion !== "string" || !payload.published) throw new Error("Incomplete editor snapshot.");
     versionsRef.current = { publishedVersion: payload.publishedVersion, draftVersion: payload.draftVersion };
-    const nextPublished = hydrateLegacyContent(mergeSiteSettings(payload.published));
-    const nextDraft = payload.draft ? hydrateLegacyContent(mergeSiteSettings(payload.draft)) : null;
+    const nextPublished = mergeSiteSettings(payload.published);
+    const nextDraft = payload.draft ? mergeSiteSettings(payload.draft) : null;
     setPublished(nextPublished);
     setPublishedAt(payload.publishedAt || "");
     const next = preferDraft && nextDraft ? nextDraft : nextPublished;
@@ -401,7 +378,7 @@ export default function SiteEditorPage() {
     if (controller.pending) {
       let recovered = controller.pending.localSnapshot;
       try { recovered = window.localStorage.getItem(`${crashRecoveryKey}:${actorId}`) || recovered; } catch { /* request snapshot remains available */ }
-      try { setSettings(hydrateLegacyContent(mergeSiteSettings(JSON.parse(recovered)))); } catch { /* keep server copy visible */ }
+      try { setSettings(mergeSiteSettings(JSON.parse(recovered))); } catch { /* keep server copy visible */ }
       setEditorIssue("uncertain"); setStatus("error"); setMessage("A previous save needs confirmation. Retry it before making another change.");
     } else if (controller.storageProblem) {
       setEditorIssue("error"); setStatus("error"); setMessage("Recovery storage is unavailable. Export your local changes before reloading.");
@@ -446,7 +423,7 @@ export default function SiteEditorPage() {
           const payload = await (retry ? controller.retry() : controller.mutate({ action, ...body, ...(["save_draft", "publish"].includes(action) ? { settings: submitted } : {}) }, versionsRef.current, localSnapshot)) as SiteEditorPayload;
           if (mutationsRef.current !== controller) return;
           applyPayload(payload, true, localSnapshot);
-          const serverSnapshot = JSON.stringify(payload.draft ? hydrateLegacyContent(mergeSiteSettings(payload.draft)) : hydrateLegacyContent(mergeSiteSettings(payload.published)));
+          const serverSnapshot = JSON.stringify(mergeSiteSettings(payload.draft || payload.published));
           const newerEdits = JSON.stringify(settingsRef.current) !== serverSnapshot;
           if (payload.superseded) {
             setEditorIssue("conflict"); setStatus("error"); setMessage("Your previous change was saved. Another edit followed it; export local changes and reload before continuing.");
@@ -620,9 +597,8 @@ export default function SiteEditorPage() {
     if (JSON.stringify(settings) !== lastServerDraft.current && hasChanges) setStatus("dirty");
     const timer = window.setTimeout(() => {
       if (writeTask.current || manualPending.current || issueRef.current) return;
-      if (!hasChanges) {
-        if (draftMeta) void executeEditor("discard_draft", { note: "Draft matched the published version" });
-      } else if (JSON.stringify(settingsRef.current) !== lastServerDraft.current) {
+      // Normalized equality cannot prove that a stored draft is identical. Discard requires confirmation.
+      if (hasChanges && JSON.stringify(settingsRef.current) !== lastServerDraft.current) {
         void executeEditor("save_draft", { note: "Autosaved draft", area: `${selected.area} / ${selected.page}` });
       }
     }, 1800);
@@ -669,7 +645,7 @@ export default function SiteEditorPage() {
     }
     try {
       const parsed = JSON.parse(advancedJson) as Partial<EditableSiteSettings>;
-      const next = hydrateLegacyContent(mergeSiteSettings(parsed));
+      const next = mergeSiteSettings(parsed);
       const validation = validateEditorSettings(next, parsed.brandLogos);
       if (Object.keys(validation).length) {
         setErrors(validation);
@@ -837,7 +813,11 @@ export default function SiteEditorPage() {
 
   const standardEditor = (
     <div className="cms-fields">
-      {compositionPageKey ? (
+      {compositionPageKey ? <div className={styles.editModes} role="group" aria-label="Page editing view">
+        <button type="button" aria-pressed={editingSurface === "content"} onClick={() => setEditingSurface("content")}>Page content</button>
+        <button type="button" aria-pressed={editingSurface === "arrangement"} onClick={() => setEditingSurface("arrangement")}>Section arrangement</button>
+      </div> : null}
+      {compositionPageKey && editingSurface === "arrangement" ? (
         <SiteCompositionEditor
           pageKey={compositionPageKey}
           sections={settings.composition[compositionPageKey].sections}
@@ -850,15 +830,32 @@ export default function SiteEditorPage() {
             }
           }))}
         />
-      ) : null}
+      ) : <>
+      {fieldGroups.length > 1 ? <>
+      <label className={styles.sectionSelect} htmlFor="cms-active-section">
+        <span>Content section</span>
+        <select id="cms-active-section" value={openFieldSection || fieldGroups[0]?.[0] || ""} onChange={(event) => setOpenFieldSection(event.target.value)}>
+          {fieldGroups.map(([section]) => <option key={section} value={section}>{section}</option>)}
+        </select>
+      </label>
+      <nav className={styles.sectionNav} aria-label="Page content sections">
+        {fieldGroups.map(([section, entries]) => <button
+          key={section}
+          type="button"
+          aria-current={section === (openFieldSection || fieldGroups[0]?.[0]) ? "true" : undefined}
+          aria-controls="cms-fields-canvas"
+          onClick={() => setOpenFieldSection(section)}
+        ><span>{section}</span><small>{entries.length}</small></button>)}
+      </nav></> : null}
+      <div id="cms-fields-canvas" className={styles.fieldCanvas}>
       {fieldGroups.map(([section, entries]) => {
-        const isOpen = section === openFieldSection;
+        const isOpen = section === (openFieldSection || fieldGroups[0]?.[0]);
+        if (!isOpen) return null;
         return (
         <section className={`cms-field-group cms-content-section${isOpen ? " is-open" : ""}`} key={section}>
-          <button type="button" className="cms-content-section-head" aria-expanded={isOpen} onClick={() => setOpenFieldSection(isOpen ? "" : section)}>
+          <header className="cms-content-section-head">
             <span><small>{selected.page}</small><strong>{section}</strong><em>{entries.length} {entries.length === 1 ? "field" : "fields"}</em></span>
-            <ChevronDown className={isOpen ? "is-open" : ""} size={18} />
-          </button>
+          </header>
           {isOpen ? <div className="cms-field-list">
             {entries.map((entry) => {
               const value = settings.content[entry.key] ?? entry.defaultValue;
@@ -892,7 +889,9 @@ export default function SiteEditorPage() {
           </div> : null}
         </section>
       )})}
+      </div>
       {!selectedEntries.length ? <div className="cms-empty"><Search size={22} /><h2>No content matched on {selected.page}.</h2><p>Try a section name, field label, or content key from this page.</p></div> : null}
+      </>}
     </div>
   );
 
@@ -1108,31 +1107,41 @@ export default function SiteEditorPage() {
 
   if (!authorized) {
     return (
-      <><Nav /><main className="section cms-access"><div className="shell"><section className="card"><div className="eyebrow">Admin tools</div><h1>{status === "loading" ? "Checking Site Editor access." : initialLoadFailure === "unavailable" ? "Site Editor is temporarily unavailable." : "Admin access required."}</h1><p>{message}</p>{status !== "loading" ? <div className="form-actions">{initialLoadFailure === "unavailable" ? <button className="button" type="button" onClick={() => { setInitialLoadFailure(""); setStatus("loading"); setMessage("Retrying Site Editor…"); setLoadAttempt((attempt) => attempt + 1); }}><RefreshCw size={15} /> Retry</button> : <Link className="button" href={`/login?next=${encodeURIComponent(editorContinuation)}`}>Sign in</Link>}{adminEntry ? <Link className="button secondary" href="/admin"><ArrowLeft size={15} /> Back to Admin</Link> : null}</div> : null}</section></div></main><Footer /></>
+      <><Nav /><main className={`section cms-access ${styles.access}`}><div className="shell"><section className="card"><div className="eyebrow">Admin tools</div><h1>{status === "loading" ? "Checking Site Editor access." : initialLoadFailure === "unavailable" ? "Site Editor is temporarily unavailable." : "Admin access required."}</h1><p>{message}</p>{status !== "loading" ? <div className="form-actions">{initialLoadFailure === "unavailable" ? <button className="button" type="button" onClick={() => { setInitialLoadFailure(""); setStatus("loading"); setMessage("Retrying Site Editor…"); setLoadAttempt((attempt) => attempt + 1); }}><RefreshCw size={15} /> Retry</button> : <Link className="button" href={`/login?next=${encodeURIComponent(editorContinuation)}`}>Sign in</Link>}{adminEntry ? <Link className="button secondary" href="/admin"><ArrowLeft size={15} /> Back to Admin</Link> : null}</div> : null}</section></div></main><Footer /></>
     );
   }
 
   return (
     <>
       <Nav />
-      <main className={previewOpen ? "cms-page is-preview-open" : "cms-page"}>
+      <main className={`${styles.studio} ${previewOpen ? "cms-page is-preview-open" : "cms-page"}`}>
         <header className="cms-commandbar">
           <div>
             <button ref={sidebarTriggerRef} type="button" className="cms-mobile-tree" onClick={() => setSidebarOpen(true)} aria-label="Open content tree" aria-expanded={sidebarOpen} aria-controls="cms-content-tree"><Menu size={18} /></button>
             {adminEntry ? <Link className="cms-admin-back" href="/admin" aria-label="Back to Admin"><ArrowLeft size={15} /> Back to Admin</Link> : null}
-            <div><span>Content Studio</span><strong>{selected.page}</strong></div>
+            <div><span>QRguitar / Admin</span><strong>Content Studio</strong></div>
           </div>
           <div className={`cms-save-state is-${status}`} aria-live="polite">
-            {status === "saving" ? <RefreshCw size={14} className="spin" /> : status === "saved" ? <Check size={14} /> : status === "error" ? <X size={14} /> : <Cloud size={14} />}
-            <span>{status === "dirty" ? `${changeCount || 1} unpublished ${changeCount === 1 ? "change" : "changes"}` : status === "saving" ? "Saving draft…" : message}</span>
-            {editorIssue ? <div role="alert"><button type="button" onClick={exportLocalChanges}>Export local changes</button>{editorIssue === "uncertain" ? <button type="button" disabled={writeBusy} onClick={() => void executeEditor("", {}, true, true)}>Retry the same save</button> : null}{editorIssue === "error" && !mutationsRef.current?.storageProblem ? <button type="button" disabled={writeBusy} onClick={() => { setEditorIssue(""); setStatus("dirty"); }}>Resume saving</button> : null}<button type="button" disabled={writeBusy} onClick={() => { exportLocalChanges(); window.location.reload(); }}>Export and reload latest</button></div> : null}
+            {editorIssue ? <X size={14} /> : status === "saving" ? <RefreshCw size={14} className="spin" /> : status === "saved" ? <Check size={14} /> : status === "error" ? <X size={14} /> : <Cloud size={14} />}
+            <span>{editorIssue ? "Save needs attention" : status === "dirty" ? `${changeCount || 1} unpublished ${changeCount === 1 ? "change" : "changes"}` : status === "saving" ? "Saving draft…" : message}</span>
           </div>
-          <div className="cms-command-actions">
-            <button type="button" className="button secondary" onClick={() => setConfirmAction({ kind: "discard" })} disabled={mutationLocked || (!draftMeta && !hasChanges)} title={editorIssue ? "Resolve the current save issue before discarding the draft." : undefined}>Discard draft</button>
-            <button ref={previewTriggerRef} type="button" className="button secondary" onClick={() => previewOpen ? closePreview() : setPreviewOpen(true)} aria-expanded={previewOpen} aria-controls="cms-site-preview"><Eye size={16} /> {previewOpen ? "Hide preview" : "Preview"}</button>
+            <button type="button" className={`button secondary ${styles.discard}`} onClick={() => setConfirmAction({ kind: "discard" })} disabled={mutationLocked || (!draftMeta && !hasChanges)} title={editorIssue ? "Resolve the current save issue before discarding the draft." : undefined}>Discard draft</button>
+          <div className={styles.commandActions}>
+            <button ref={previewTriggerRef} type="button" className="button secondary" onClick={() => previewOpen ? closePreview() : setPreviewOpen(true)} aria-expanded={previewOpen} aria-controls="cms-site-preview"><Eye size={16} /> {previewOpen ? "Back to editing" : "Preview"}</button>
             <button type="button" className="button" onClick={() => setConfirmAction({ kind: "publish" })} disabled={mutationLocked || status === "saving" || !hasChanges} title={editorIssue ? "Resolve the current save issue before publishing." : undefined}><Send size={16} /> Publish</button>
           </div>
         </header>
+
+        {editorIssue ? <section className={styles.issueNotice} role="alert" aria-labelledby="cms-save-issue-title">
+          <strong id="cms-save-issue-title">Save needs attention</strong>
+          <p>{message}</p>
+          <div className={styles.issueActions}>
+            <button type="button" className="button secondary" onClick={exportLocalChanges}>Export local changes</button>
+            {editorIssue === "uncertain" ? <button type="button" className="button secondary" disabled={writeBusy} onClick={() => void executeEditor("", {}, true, true)}>Retry the same save</button> : null}
+            {editorIssue === "error" && !mutationsRef.current?.storageProblem ? <button type="button" className="button secondary" disabled={writeBusy} onClick={() => { setEditorIssue(""); setStatus("dirty"); }}>Resume saving</button> : null}
+            <button type="button" className="button secondary" disabled={writeBusy} onClick={() => { exportLocalChanges(); window.location.reload(); }}>Export and reload latest</button>
+          </div>
+        </section> : null}
 
         <div className={previewOpen ? "cms-workspace" : "cms-workspace is-preview-collapsed"}>
           <aside ref={sidebarRef} id="cms-content-tree" className={sidebarOpen ? "cms-sidebar is-open" : "cms-sidebar"} role={sidebarOpen ? "dialog" : undefined} aria-modal={sidebarOpen ? true : undefined} aria-label="Site content navigation" tabIndex={sidebarOpen ? -1 : undefined}>
@@ -1150,12 +1159,13 @@ export default function SiteEditorPage() {
                 <div className="cms-editor-timestamps">
                   {draftMeta?.updatedAt
                     ? <span>Draft saved <strong>{formatTime(draftMeta.updatedAt)}</strong></span>
-                    : <span>Draft <strong>None</strong></span>}
-                  <span>Published <strong>{formatTime(publishedAt)}</strong></span>
+                    : <span>No saved draft</span>}
+                  {publishedAt ? <span>Published <strong>{formatTime(publishedAt)}</strong></span> : <span>Publish date unavailable</span>}
                 </div>
               </div>
               <button type="button" className="button secondary cms-review-changes" onClick={() => setShowCompare((value) => !value)} disabled={!changeCount} aria-expanded={showCompare} aria-controls="cms-change-review"><Clock3 size={16} /> {changeCount ? `Review ${changeCount} ${changeCount === 1 ? "change" : "changes"}` : "No changes"}</button>
             </div>
+            <p className={styles.publishScope}>Drafts save automatically. Publishing applies all changes across the site.</p>
             {showCompare ? (
               <section className="cms-compare" id="cms-change-review" aria-label="Draft changes compared with published settings">
                 <header><strong>Draft compared with published</strong><button type="button" onClick={() => setShowCompare(false)} aria-label="Close comparison"><X size={16} /></button></header>
@@ -1195,13 +1205,13 @@ export default function SiteEditorPage() {
         {confirmAction ? (
           <div className="cms-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmAction(null); }}>
             <section ref={confirmDialogRef} className="cms-modal" role="dialog" aria-modal="true" aria-labelledby="cms-confirm-title" aria-describedby="cms-confirm-description" tabIndex={-1}>
-              <header><div><span>Publishing safety</span><h2 id="cms-confirm-title">{confirmAction.kind === "discard" ? "Discard shared draft?" : confirmAction.kind === "publish" ? `Publish ${selected.page}?` : "Restore this revision?"}</h2></div><button ref={confirmCloseRef} type="button" onClick={() => setConfirmAction(null)} aria-label="Close confirmation"><X size={18} /></button></header>
+              <header><div><span>Publishing safety</span><h2 id="cms-confirm-title">{confirmAction.kind === "discard" ? "Discard shared draft?" : confirmAction.kind === "publish" ? "Publish all draft changes?" : "Restore this revision?"}</h2></div><button ref={confirmCloseRef} type="button" onClick={() => setConfirmAction(null)} aria-label="Close confirmation"><X size={18} /></button></header>
               <p id="cms-confirm-description">{confirmAction.kind === "discard"
                 ? "This removes the current shared draft and returns the editor to the published version. Published pages will not change."
                 : confirmAction.kind === "publish"
                   ? `${changeCount || 1} unpublished ${changeCount === 1 ? "change" : "changes"} will be published globally. The prior live version stays available in revision history.`
                   : `This copies the version published ${formatTime(confirmAction.revision.publishedAt)} into the shared draft. It will not go live until you publish it.`}</p>
-              {confirmAction.kind === "publish" ? <label className="cms-release-note">Release note (optional)<input value={note} onChange={(event) => setNote(event.target.value)} placeholder={`What changed on ${selected.page}?`} maxLength={180} /></label> : null}
+              {confirmAction.kind === "publish" ? <label className="cms-release-note">Release note (optional)<input value={note} onChange={(event) => setNote(event.target.value)} placeholder="What changed in this release?" maxLength={180} /></label> : null}
               <div className="cms-modal-actions">
                 <button type="button" className="button secondary" onClick={() => setConfirmAction(null)}>Cancel</button>
                 <button type="button" className="button" disabled={mutationLocked} onClick={() => {

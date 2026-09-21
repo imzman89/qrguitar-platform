@@ -1,3 +1,4 @@
+import styles from "./contact.module.css";
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import { EditorialIcon } from "../../components/EditorialIcon";
@@ -23,7 +24,7 @@ export default async function ContactPage() {
   return (
     <>
       <Nav />
-      <main className="editorial-composed-page">
+      <main className={`editorial-composed-page ${styles.contact}`}>
         <section className="section" style={sectionStyle("hero")}>
           <div className="shell legal-page contact-page">
             <div className="contact-hero">
@@ -67,6 +68,7 @@ export default async function ContactPage() {
                 <li>A short description of what you need</li>
               </ul>
               <p className="fine-print">{getContentValue(settings.content, "contact.support.body")}</p>
+              {getContentValue(settings.content, "contact.support.body") !== getContentValue(settings.content, "contact.support.securityGuidance") ? <p className="fine-print">{getContentValue(settings.content, "contact.support.securityGuidance")}</p> : null}
             </div>
           </div>
         </section>

@@ -19,7 +19,7 @@ function compile(relative, imports, globals) {
   const input = fs.readFileSync(path.join(source, 'apps/web', relative), 'utf8');
   const code = ts.transpileModule(input, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const module = { exports: {} };
-  new Function('require', 'module', 'exports', ...Object.keys(globals), code)(name => Object.hasOwn(imports, name) ? imports[name] : require(name), module, module.exports, ...Object.values(globals));
+  new Function('require', 'module', 'exports', ...Object.keys(globals), code)(name => Object.hasOwn(imports, name) ? imports[name] : name.endsWith('.module.css') ? { __esModule: true, default: new Proxy({}, { get: (_, key) => String(key) }) } : require(name), module, module.exports, ...Object.values(globals));
   return module.exports;
 }
 function find(tree, predicate) {
@@ -33,7 +33,7 @@ function text(tree) {
   return React.Children.toArray(tree.props?.children).map(text).join(' ');
 }
 function fixture(page, options = {}) {
-  const f = { actor: options.actor ?? (page === 'reset-password' ? 'a' : ''), clears: 0, writes: 0, navigations: [], calls: [], tracking: [], reads: 0, disposed: false };
+  const f = { actor: options.actor ?? (page === 'reset-password' ? 'a' : ''), clears: 0, writes: 0, navigations: [], history: [], calls: [], tracking: [], reads: 0, disposed: false };
   const states = [], effects = [], listeners = new Set(), timers = new Map();
   let cursor = 0, effectCursor = 0, dirty = true, tree, now = 0, timerId = 0;
   const setTimer = (callback, delay) => { const id = ++timerId; timers.set(id, { at: now + delay, callback }); return id; };
@@ -67,7 +67,7 @@ function fixture(page, options = {}) {
   const router = { replace: href => f.navigations.push(href) };
   const location = new URL('https://www.qrguitar.com/' + page + (options.search || '?next=%2Fdashboard'));
   const globals = {
-    window: { location, history: { replaceState() {} }, setTimeout: setTimer, clearTimeout: clearTimer, dispatchEvent() {} },
+    window: { location, history: { replaceState(_state, _title, href) { f.history.push(href); } }, setTimeout: setTimer, clearTimeout: clearTimer, dispatchEvent() {} },
     setTimeout: setTimer, clearTimeout: clearTimer, CustomEvent: class { constructor(type) { this.type = type; } },
   };
   const imports = {
@@ -119,6 +119,62 @@ function fixture(page, options = {}) {
   f.listenerCount = () => listeners.size;
   f.render(); return f;
 }
+
+
+test('login: tab keyboard activation updates focus, one tab stop and labelled panel without losing the return path', async () => {
+  const f = fixture('login', { search: '?next=%2Fownership-claim%3Fcode%3DQRG-TEST' }); await f.flush(); f.fill();
+  const focused = [];
+  for (const mode of ['login', 'register']) f.node(node => node.props?.id === 'auth-' + mode + '-tab').props.ref.current = { focus: () => focused.push(mode) };
+  const check = mode => {
+    for (const candidate of ['login', 'register']) {
+      const tab = f.node(node => node.props?.id === 'auth-' + candidate + '-tab');
+      assert.equal(tab.props['aria-selected'], candidate === mode);
+      assert.equal(tab.props.tabIndex, candidate === mode ? 0 : -1);
+      assert.equal(tab.props['aria-controls'], 'auth-access-panel');
+    }
+    const panel = f.node(node => node.props?.id === 'auth-access-panel');
+    assert.equal(panel.props.role, 'tabpanel'); assert.equal(panel.props['aria-labelledby'], 'auth-' + mode + '-tab');
+    assert.equal(f.node(node => node.props?.id === 'email').props.value, 'owner@example.test');
+  };
+  check('login');
+  for (const [from, key, target] of [['login', 'ArrowRight', 'register'], ['register', 'ArrowLeft', 'login'], ['login', 'ArrowLeft', 'register'], ['register', 'ArrowRight', 'login'], ['login', 'End', 'register'], ['register', 'Home', 'login']]) {
+    let prevented = false;
+    f.node(node => node.props?.id === 'auth-' + from + '-tab').props.onKeyDown({ key, preventDefault() { prevented = true; } }); f.render();
+    assert.equal(prevented, true); assert.equal(focused.at(-1), target); check(target);
+    const url = new URL(f.history.at(-1), 'https://www.qrguitar.com');
+    assert.equal(url.searchParams.get('next'), '/ownership-claim?code=QRG-TEST'); assert.equal(url.searchParams.get('mode'), target);
+  }
+  f.input('password', 'still-entering-password');
+  f.node(node => node.props?.id === 'auth-login-tab').props.onKeyDown({ key: 'Home', preventDefault() {} }); f.render();
+  assert.equal(f.node(node => node.props?.id === 'password').props.value, 'still-entering-password');
+  const historyCount = f.history.length, focusCount = focused.length;
+  for (const key of ['Tab', 'ArrowDown']) f.node(node => node.props?.id === 'auth-login-tab').props.onKeyDown({ key, preventDefault() { assert.fail('Unrelated key must remain native'); } });
+  f.node(node => node.props?.id === 'auth-login-tab').props.onKeyDown({ key: 'ArrowLeft', altKey: true, preventDefault() { assert.fail('Browser shortcut must remain native'); } });
+  assert.equal(f.history.length, historyCount); assert.equal(focused.length, focusCount); assert.equal(f.calls.length, 0); f.dispose();
+});
+
+test('login: pending authentication ignores tab keyboard activation and preserves its credentials', async () => {
+  const gate = deferred(), f = fixture('login', { signInWithPassword: () => gate.promise }); await f.flush(); f.fill(); f.submit(); await f.flush();
+  const tab = f.node(node => node.props?.id === 'auth-login-tab');
+  f.node(node => node.props?.id === 'auth-register-tab').props.ref.current = { focus() { assert.fail('Pending request must not move to another tab'); } };
+  assert.equal(tab.props.disabled, true);
+  for (const key of ['ArrowRight', 'End']) tab.props.onKeyDown({ key, preventDefault() {} }); f.render();
+  assert.equal(f.node(node => node.props?.id === 'auth-login-tab').props['aria-selected'], true);
+  assert.equal(f.node(node => node.props?.id === 'password').props.value, 'new-password-123');
+  assert.equal(f.history.length, 0); assert.equal(f.count('signInWithPassword'), 1);
+  gate.resolve({ data: { session: null }, error: Error('Invalid login credentials') }); await f.flush(); f.dispose();
+});
+
+test('login: password reset has no orphan tab semantics and returns to the sign-in panel', async () => {
+  const f = fixture('login', { search: '?mode=reset&next=%2Faccount' }); await f.flush(); f.input('email', 'owner@example.test');
+  assert.equal(f.node(node => node.props?.role === 'tablist'), undefined);
+  assert.equal(f.node(node => node.props?.role === 'tabpanel'), undefined);
+  f.click('Back to sign in');
+  assert.equal(f.node(node => node.props?.id === 'auth-login-tab').props.tabIndex, 0);
+  assert.equal(f.node(node => node.props?.role === 'tabpanel').props['aria-labelledby'], 'auth-login-tab');
+  assert.equal(f.node(node => node.props?.id === 'email').props.value, 'owner@example.test');
+  const url = new URL(f.history.at(-1), 'https://www.qrguitar.com'); assert.equal(url.searchParams.get('next'), '/account'); assert.equal(f.calls.length, 0); f.dispose();
+});
 
 for (const page of ['login', 'reset-password']) {
   test(page + ': late initial signed-in read cannot overwrite a sign-out event', async () => {

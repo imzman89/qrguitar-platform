@@ -20,7 +20,8 @@ const threadRoute = read("app/api/messages/[conversationId]/route.ts");
 
 assert.match(status, /Owned by <strong>/);
 assert.match(status, /href={`\/collections\/\$\{ownerCollection\.handle\}`}/);
-assert.match(card, /ownerCollection={record\.publicCollection}/);
+assert.match(card, /ownerCollection={card\.collection \|\| undefined}/);
+assert.match(read("lib/collectible-card.ts"), /collection: record\.publicCollection \|\| null/);
 assert.match(profile, /ownerCollection={instrument\.publicCollection}/);
 assert.match(profile, /MemberMessageLink/);
 assert.match(member, /MemberMessageLink/);

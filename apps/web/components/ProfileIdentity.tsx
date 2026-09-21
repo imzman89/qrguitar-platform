@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import styles from "./ProfileIdentity.module.css";
 
 export type ProfileIdentityField = {
   label: "QRguitar ID" | "Make / Model" | "Serial Number" | "Year" | "Location" | "Type" | "Availability";
@@ -55,19 +56,19 @@ export function ProfileIdentity({
   const fields = buildProfileIdentityFields(values).filter((field) => !excludeLabels.includes(field.label));
 
   return (
-    <section className="identity-card">
-      <header className="identity-card-header">
-        <span>Profile Identity</span>
-        {mediaSummary ? <span className="identity-media-summary">{mediaSummary}</span> : null}
+    <section className={styles["identity-card"]}>
+      <header className={styles["identity-card-header"]}>
+        <span>At a glance</span>
+        {mediaSummary ? <span className={styles["identity-media-summary"]}>{mediaSummary}</span> : null}
       </header>
-      <div className="identity-grid">
+      <dl className={styles["identity-grid"]}>
         {fields.map((field) => (
-          <div className="identity-cell" key={field.label}>
-            <span>{field.label}</span>
-            <strong>{field.value}</strong>
+          <div className={styles["identity-cell"]} key={field.label}>
+            <dt>{field.label}</dt>
+            <dd>{field.value}</dd>
           </div>
         ))}
-      </div>
+      </dl>
       {children}
     </section>
   );

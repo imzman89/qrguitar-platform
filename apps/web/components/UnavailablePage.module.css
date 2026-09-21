@@ -1,0 +1,159 @@
+.page {
+  min-height: 100svh;
+  color: var(--text, #f4f4f4);
+  background: var(--canvas, #101113);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(100% - 64px, 1280px);
+  min-height: 88px;
+  margin-inline: auto;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  flex: 0 0 auto;
+}
+
+.logo {
+  display: block;
+  width: 150px;
+  height: auto;
+}
+
+.navigation {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.navigation a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--muted-strong, #c4c7cb);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.navigation a:hover {
+  color: var(--text, #f4f4f4);
+}
+
+.main {
+  width: min(100% - 64px, 1280px);
+  margin-inline: auto;
+  padding-block: clamp(64px, 12vh, 128px);
+}
+
+.content {
+  max-width: 650px;
+}
+
+.content h1 {
+  margin: 0;
+  color: var(--text, #f4f4f4);
+  font-size: clamp(32px, 4vw, 48px);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.content p {
+  max-width: 520px;
+  margin: 20px 0 0;
+  color: var(--muted-strong, #c4c7cb);
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.actions > a,
+.actions > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  max-width: 100%;
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text, #f4f4f4);
+  background: var(--surface, #191b1e);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.actions > :first-child {
+  color: var(--on-action, #101113);
+  background: var(--action, #ff9a32);
+}
+
+.actions > :hover {
+  filter: brightness(1.1);
+}
+
+.page a:focus-visible,
+.page button:focus-visible {
+  outline: 2px solid var(--action, #ff9a32);
+  outline-offset: 4px;
+}
+
+@media (max-width: 600px) {
+  .header,
+  .main {
+    width: calc(100% - 40px);
+  }
+
+  .header {
+    min-height: 76px;
+    gap: 12px;
+  }
+
+  .logo {
+    width: 126px;
+  }
+
+  .navigation {
+    gap: 12px;
+  }
+
+  .navigation a {
+    font-size: 13px;
+  }
+
+  .main {
+    padding-block: 64px;
+  }
+
+  .content p {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 359px) {
+  .header {
+    flex-wrap: wrap;
+    padding-block: 12px;
+    gap: 0 16px;
+  }
+}

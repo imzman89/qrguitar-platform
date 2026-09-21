@@ -24,11 +24,12 @@ export default async function CollectionsDirectoryPage() {
   return <>
     <script id="qrguitar-collections-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
     <Nav />
-    <main className="section collection-directory-page">
+    <main className={`section collection-directory-page ${styles.directory}`}>
       <div className="shell">
-        <nav className={styles.navigation} aria-label="Explore QRguitar"><Link href="/catalog">Browse instrument Profiles</Link><Link href="/account?section=collection">Your collection settings</Link></nav>
-        <header className="collection-directory-hero"><div><div className="eyebrow">Member collections</div><h1>Meet the people behind the instruments.</h1><p>Explore public collections from players, collectors, stores, builders, brands, and repair shops. Open a collection to view that member’s public instrument Profiles.</p></div>{collections.length ? <Link className="button" href="/account?section=collection">Publish your collection</Link> : null}</header>
+
+        <header className="collection-directory-hero"><div><div className="eyebrow">Member collections</div><h1>Meet the people behind the instruments.</h1><p>Explore public collections from players, collectors, stores, builders, brands, and repair shops. Open a collection to view that member’s public instrument Profiles.</p></div>{collections.length ? <Link className="button" href="/account?section=collection">Set up your collection</Link> : null}</header>
         <CollectionsDirectoryClient collections={collections} />
+        <nav className={styles.navigation} aria-label="Explore QRguitar"><Link href="/catalog">Browse instrument Profiles</Link><Link href="/account?section=collection">Your collection settings</Link></nav>
       </div>
     </main>
     <Footer />

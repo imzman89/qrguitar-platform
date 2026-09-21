@@ -20,7 +20,11 @@ import { Nav } from "../../components/Nav";
 import { getContentValue } from "../../lib/content-registry";
 import { resolveVisibleEditorialSections, type EditableSiteSettings } from "../../lib/site-settings";
 
-export function HowItWorksClient({ settings }: { settings: EditableSiteSettings }) {
+import { CollectibleRecordCard } from "../../components/CollectibleRecordCard";
+import type { DemoInstrument } from "../../lib/local-demo";
+import styles from "./guide.module.css";
+
+export function HowItWorksClient({ settings, example = null }: { settings: EditableSiteSettings; example?: DemoInstrument | null }) {
   const [activeAudience, setActiveAudience] = useState(0);
   const content = settings.content;
   const sections = resolveVisibleEditorialSections(settings, "howItWorks");
@@ -45,7 +49,7 @@ export function HowItWorksClient({ settings }: { settings: EditableSiteSettings 
   return (
     <>
       <Nav />
-      <main className="editorial-composed-page product-guide-page">
+      <main className={`editorial-composed-page product-guide-page ${styles.guide}`}>
         {visibleSectionIds.has("hero") ? (
           <section className="section product-guide-hero" style={sectionStyle("hero")}>
             <div className="shell product-guide-hero-inner">
@@ -58,11 +62,7 @@ export function HowItWorksClient({ settings }: { settings: EditableSiteSettings 
                   <Link className="button secondary" href="/catalog">Explore the Catalog</Link>
                 </div>
               </div>
-              <div className="product-guide-principles" aria-label="QRguitar essentials">
-                <div><QrCode /><strong>One QRguitar ID</strong><span>The Profile URL and printable QR stay the same.</span></div>
-                <div><Eye /><strong>Owner-controlled privacy</strong><span>Choose Public, Unlisted, or Private for each Profile.</span></div>
-                <div><Repeat2 /><strong>Secure ownership handoff</strong><span>A scan opens the Profile. It never transfers ownership.</span></div>
-              </div>
+
             </div>
           </section>
         ) : null}
@@ -74,14 +74,14 @@ export function HowItWorksClient({ settings }: { settings: EditableSiteSettings 
                 <div className="eyebrow">HOW IT WORKS</div>
                 <h2>{getContentValue(content, "howItWorks.lifecycle.heading")}</h2>
               </div>
-              <ol className="product-guide-steps">
+              <div className={styles.walkthrough}><ol className="product-guide-steps">
                 {blocks("lifecycle").map((item, index) => (
                   <li key={item.id}>
                     <span>{String(index + 1).padStart(2, "0")}</span>
                     <div><h3>{item.title}</h3><p>{item.body}</p></div>
                   </li>
                 ))}
-              </ol>
+              </ol>{example ? <aside className={styles.example} aria-label="A real QRguitar Profile"><CollectibleRecordCard record={example} variant="archive" content={settings.content} /></aside> : null}</div>
             </div>
           </section>
         ) : null}
@@ -148,10 +148,15 @@ export function HowItWorksClient({ settings }: { settings: EditableSiteSettings 
               <div className="section-heading centered-heading"><div className="eyebrow">FOR THE INSTRUMENT COMMUNITY</div><h2>{getContentValue(content, "howItWorks.roles.heading")}</h2></div>
               <div className="product-guide-role-switcher">
                 <div className="product-guide-role-tabs" role="tablist" aria-label="Choose your role">
-                  {roleBlocks.map((item, index) => <button className={index === activeAudience ? "is-active" : ""} type="button" role="tab" aria-selected={index === activeAudience} key={item.id} onClick={() => setActiveAudience(index)}>{item.title}</button>)}
+                  {roleBlocks.map((item, index) => <button className={index === activeAudience ? "is-active" : ""} type="button" role="tab" id={`guide-audience-${index}`} aria-controls="guide-audience-panel" tabIndex={index === activeAudience ? 0 : -1} aria-selected={index === activeAudience} key={item.id} onClick={() => setActiveAudience(index)} onKeyDown={(event) => {
+                    const target = event.key === "ArrowRight" ? (index + 1) % roleBlocks.length : event.key === "ArrowLeft" ? (index - 1 + roleBlocks.length) % roleBlocks.length : event.key === "Home" ? 0 : event.key === "End" ? roleBlocks.length - 1 : null;
+                    if (target === null) return;
+                    event.preventDefault(); setActiveAudience(target);
+                    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[target]?.focus();
+                  }}>{item.title}</button>)}
                 </div>
                 {selectedAudience ? (
-                  <article className="product-guide-role-panel" role="tabpanel">
+                  <article className="product-guide-role-panel" role="tabpanel" id="guide-audience-panel" aria-labelledby={`guide-audience-${activeAudience}`}>
                     <span>{String(activeAudience + 1).padStart(2, "0")}</span>
                     <div><h3>{selectedAudience.title}</h3><p>{selectedAudience.body}</p></div>
                     <Link className="button secondary" href={selectedAudience.ctaUrl || "/create"}>{selectedAudience.ctaLabel || "Create a Profile"}</Link>

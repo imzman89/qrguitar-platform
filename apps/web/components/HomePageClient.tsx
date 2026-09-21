@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ChevronLeft, ChevronRight, Fingerprint, ShieldCheck, RefreshCw } from "lucide-react";
-import { Fragment, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, Fingerprint, ShieldCheck, RefreshCw } from "lucide-react";
+import { Fragment, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CollectibleRecordCard } from "./CollectibleRecordCard";
 import { Footer } from "./Footer";
 import { EditorialIcon } from "./EditorialIcon";
@@ -15,6 +15,8 @@ import { getProfilePhotoUrls } from "../lib/instrument-profile-contract";
 import { publicMediaVariantSrcSet, publicMediaVariantUrl } from "../lib/public-media-variant";
 import { buildEditableHomeCopy, fetchPublishedSiteSettings, type EditableSiteSettings } from "../lib/site-settings";
 
+import { selectHomeFeaturedProfile } from "../lib/home-featured-profile";
+import { getContentValue } from "../lib/content-registry";
 import styles from "./HomePageClient.module.css";
 
 export function HomePageClient({
@@ -27,9 +29,6 @@ export function HomePageClient({
   const [settings, setSettings] = useState<EditableSiteSettings | null>(initialSettings);
   const [activeAudience, setActiveAudience] = useState(0);
   const [failedRecordPhotos, setFailedRecordPhotos] = useState<string[]>([]);
-  const [archiveIndex, setArchiveIndex] = useState(0);
-  const archiveRailRef = useRef<HTMLDivElement | null>(null);
-  const archiveDrag = useRef({ pointerId: -1, startX: 0, scrollLeft: 0 });
 
   useEffect(() => {
     void fetchPublishedSiteSettings().then((published) => {
@@ -83,7 +82,7 @@ export function HomePageClient({
     };
   }, [settings]);
 
-  const initialLatestRecord = initialRecords[0] || null;
+  const initialLatestRecord = selectHomeFeaturedProfile(initialRecords);
   const heroImages = new Set(initialLatestRecord ? getProfilePhotoUrls(initialLatestRecord) : []);
   const archiveImages = new Set(heroImages);
   const archiveRecords = initialRecords.filter((record) => {
@@ -105,58 +104,6 @@ export function HomePageClient({
   const audienceBlocks = sectionBlocks("roles");
   const selectedAudience = audienceBlocks[activeAudience] || audienceBlocks[0];
 
-  function beginArchiveDrag(event: PointerEvent<HTMLDivElement>) {
-    if (event.pointerType !== "mouse") return;
-    if ((event.target as HTMLElement).closest(".collectible-card")) return;
-    const rail = archiveRailRef.current;
-    if (!rail) return;
-    archiveDrag.current = { pointerId: event.pointerId, startX: event.clientX, scrollLeft: rail.scrollLeft };
-    rail.setPointerCapture(event.pointerId);
-  }
-
-  function moveArchiveDrag(event: PointerEvent<HTMLDivElement>) {
-    if (event.pointerType !== "mouse") return;
-    const rail = archiveRailRef.current;
-    if (!rail || archiveDrag.current.pointerId !== event.pointerId) return;
-    rail.scrollLeft = archiveDrag.current.scrollLeft - (event.clientX - archiveDrag.current.startX);
-  }
-
-  function endArchiveDrag(event: PointerEvent<HTMLDivElement>) {
-    if (event.pointerType !== "mouse") return;
-    const rail = archiveRailRef.current;
-    if (!rail || archiveDrag.current.pointerId !== event.pointerId) return;
-    rail.releasePointerCapture(event.pointerId);
-    archiveDrag.current.pointerId = -1;
-  }
-
-  function handleArchiveKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-    event.preventDefault();
-    event.currentTarget.scrollBy({
-      left: (event.key === "ArrowRight" ? 1 : -1) * Math.max(280, event.currentTarget.clientWidth * 0.72),
-      behavior: "smooth"
-    });
-  }
-
-  function moveArchive(direction: -1 | 1) {
-    const rail = archiveRailRef.current;
-    if (!rail || !archiveRecords.length) return;
-    const next = Math.max(0, Math.min(archiveRecords.length - 1, archiveIndex + direction));
-    const target = rail.children.item(next) as HTMLElement | null;
-    rail.scrollTo({ left: target?.offsetLeft || 0, behavior: "smooth" });
-    setArchiveIndex(next);
-  }
-
-  function updateArchiveIndex() {
-    const rail = archiveRailRef.current;
-    if (!rail || !rail.children.length) return;
-    const cards = Array.from(rail.children) as HTMLElement[];
-    const next = cards.reduce((closest, card, index) => (
-      Math.abs(card.offsetLeft - rail.scrollLeft) < Math.abs(cards[closest].offsetLeft - rail.scrollLeft) ? index : closest
-    ), 0);
-    setArchiveIndex(next);
-  }
-
   const renderedSections: Record<string, ReactNode> = {
     hero: (
       <section className="hero">
@@ -167,9 +114,9 @@ export function HomePageClient({
             <p>{copy.hero.body}</p>
             <div className="hero-actions">
               <Link className="button" href="/create">{copy.hero.primaryCta}<ArrowRight size={17} aria-hidden="true" /></Link>
-              <Link className="button secondary" href="/catalog">{copy.hero.secondaryCta}</Link>
+              <Link className="button secondary" href={initialLatestRecord ? `/i/${encodeURIComponent(initialLatestRecord.qrCode)}` : "/catalog"}>{initialLatestRecord ? getContentValue(settings?.content || {}, "home.hero.viewProfile") : copy.hero.secondaryCta}</Link>
             </div>
-            <a className={styles.betaNote} href="#pricing">Free during public beta · View plans</a>
+            <a className={styles.betaNote} href="#pricing">{getContentValue(settings?.content || {}, "home.hero.accessNote")}</a>
           </div>
           <div className={styles.heroShowcase}><LatestPublicRecord initialRecord={initialLatestRecord} content={settings?.content} presentation="showcase" /></div>
         </div>
@@ -190,31 +137,10 @@ export function HomePageClient({
                 <p>{settings?.content["home.archive.body"] || "Browse real QRguitar Profiles from the public Catalog."}</p>
               </div>
               <div className="home-archive-actions">
-                <div className="home-archive-controls" aria-label="Browse archive Profiles">
-                  <button type="button" onClick={() => moveArchive(-1)} disabled={archiveIndex === 0} aria-label="Previous Profile">
-                    <ChevronLeft size={17} aria-hidden="true" />
-                  </button>
-                  <span aria-live="polite">{archiveIndex + 1} / {archiveRecords.length}</span>
-                  <button type="button" onClick={() => moveArchive(1)} disabled={archiveIndex === archiveRecords.length - 1} aria-label="Next Profile">
-                    <ChevronRight size={17} aria-hidden="true" />
-                  </button>
-                </div>
                 <Link className="text-link" href="/catalog">{settings?.content["home.archive.viewAll"] || "View all Profiles"}</Link>
               </div>
             </div>
-            <div
-              ref={archiveRailRef}
-              className="home-archive-rail"
-              role="region"
-              aria-label="Explore additional QRguitar Profiles"
-              tabIndex={0}
-              onPointerDown={beginArchiveDrag}
-              onPointerMove={moveArchiveDrag}
-              onPointerUp={endArchiveDrag}
-              onPointerCancel={endArchiveDrag}
-              onKeyDown={handleArchiveKeyDown}
-              onScroll={updateArchiveIndex}
-            >
+            <div className="home-archive-rail" aria-label="Explore additional QRguitar Profiles">
               {archiveRecords.map((record) => (
                 <CollectibleRecordCard
                   key={record.qrCode}
@@ -269,10 +195,13 @@ export function HomePageClient({
         <div className="shell">
           <div className="section-header"><div className="eyebrow">{copy.audiences.eyebrow}</div><h2>{copy.audiences.headline}</h2>{copy.audiences.body ? <p>{copy.audiences.body}</p> : null}</div>
           <div className="audience-switcher">
-            <div className="audience-tabs" role="tablist" aria-label="Choose how you use QRguitar">
-              {audienceBlocks.map((item, index) => <button className={index === activeAudience ? "is-active" : ""} key={item.id} type="button" role="tab" aria-selected={index === activeAudience} onClick={() => setActiveAudience(index)}>{item.title}</button>)}
+            <div className="audience-tabs" role="tablist" aria-label="Choose how you use QRguitar" onKeyDown={(event) => {
+              const next = event.key === "ArrowRight" ? (activeAudience + 1) % audienceBlocks.length : event.key === "ArrowLeft" ? (activeAudience - 1 + audienceBlocks.length) % audienceBlocks.length : event.key === "Home" ? 0 : event.key === "End" ? audienceBlocks.length - 1 : null;
+              if (next !== null) { event.preventDefault(); setActiveAudience(next); (event.currentTarget.querySelectorAll<HTMLButtonElement>("[role=tab]")[next])?.focus(); }
+            }}>
+              {audienceBlocks.map((item, index) => <button className={index === activeAudience ? "is-active" : ""} key={item.id} type="button" role="tab" id={`home-audience-${index}`} aria-controls="home-audience-panel" tabIndex={index === activeAudience ? 0 : -1} aria-selected={index === activeAudience} onClick={() => setActiveAudience(index)}>{item.title}</button>)}
             </div>
-            {selectedAudience ? <article className="audience-panel" role="tabpanel"><div className="icon"><EditorialIcon name={selectedAudience.icon} size={30} /></div><div><h3>{selectedAudience.title}</h3><p>{selectedAudience.body}</p></div><Link className="button secondary" href={selectedAudience.ctaUrl || "/how-it-works"}>{selectedAudience.ctaLabel || "See the workflow"}</Link></article> : null}
+            {selectedAudience ? <article className="audience-panel" role="tabpanel" id="home-audience-panel" aria-labelledby={`home-audience-${activeAudience}`}><div className="icon"><EditorialIcon name={selectedAudience.icon} size={30} /></div><div><h3>{selectedAudience.title}</h3><p>{selectedAudience.body}</p></div><Link className="button secondary" href={selectedAudience.ctaUrl || "/how-it-works"}>{selectedAudience.ctaLabel || "See the workflow"}</Link></article> : null}
           </div>
         </div>
       </section>
@@ -305,6 +234,7 @@ export function HomePageClient({
           <div className="pricing-grid">
             {sectionBlocks("pricing").map((plan) => <PricingCard key={plan.id} name={plan.title} price={plan.label || ""} copy={plan.body} features={plan.items || []} cta={plan.ctaLabel} href={plan.ctaUrl} />)}
           </div>
+          <div className={styles.creditNote}><div><h3>{getContentValue(settings?.content || {}, "home.pricing.creditsTitle")}</h3><p>{getContentValue(settings?.content || {}, "home.pricing.creditsBody")}</p></div><Link className="button secondary" href="/billing">{getContentValue(settings?.content || {}, "home.pricing.creditsCta")}</Link></div>
         </div>
       </section>
     ),

@@ -204,10 +204,87 @@ await test("page applies only a verified successful mutation receipt once", asyn
 await test("signed-out page renders login return intent without private controls or claim records", () => {
   const params = new URLSearchParams({ code: "QRG-SYNTH", handoff: "buyer-code" }); let index = 0;
   const empty = () => null;
-  const Component = compile(functions.get("OwnershipClaimContent"), { React, useSiteContent: () => ({}), useSearchParams: () => params, claimReturnPath, useRef: value => ({ current: value }), useMemo: fn => fn(), useEffect() {}, useState: initial => [index++ === 4 ? false : typeof initial === "function" ? initial() : initial, () => {}], scenarioDefinitions: [], statusSteps: [], getContentValue: (_, key) => key,
+  const Component = compile(functions.get("OwnershipClaimContent"), { React, workflow: { claims: "claims-workspace" }, useSiteContent: () => ({}), useSearchParams: () => params, claimReturnPath, useRef: value => ({ current: value }), useMemo: fn => fn(), useEffect() {}, useState: initial => [index++ === 4 ? false : typeof initial === "function" ? initial() : initial, () => {}], scenarioDefinitions: [], statusSteps: [], getContentValue: (_, key) => key,
     Nav: empty, Footer: empty, ShieldCheck: empty, Link: ({ children, ...props }) => React.createElement("a", props, children)
   }, "OwnershipClaimContent");
   const html = renderToStaticMarkup(React.createElement(Component));
   assert.match(html, /next=%2Fownership-claim%3Fcode%3DQRG-SYNTH%26handoff%3Dbuyer-code/); assert.doesNotMatch(html, /type="file"|Accept handoff|Submit for review/);
 });
+
+function claimChooserHarness(search = "") {
+  const empty = () => null;
+  const icons = Object.fromEntries(["ArrowLeft", "Check", "FileCheck2", "Gift", "Handshake", "PackageCheck", "ShieldCheck", "Store", "Wrench"].map(name => [name, empty]));
+  const definition = ast.statements.flatMap(statement => ts.isVariableStatement(statement) ? [...statement.declarationList.declarations] : []).find(item => item.name.getText(ast) === "scenarioDefinitions");
+  const actualScenarios = compile("const scenarioDefinitions = " + definition.initializer.getText(ast), icons, "scenarioDefinitions");
+  const params = new URLSearchParams(search);
+  const values = [], refs = [], frames = [], focused = [];
+  let currentTree;
+  let stateIndex = 0, refIndex = 0;
+  const Component = compile(functions.get("OwnershipClaimContent"), {
+    React, ...icons, workflow: { claims: "claims-workspace" }, useSiteContent: () => ({}), useSearchParams: () => params, claimReturnPath,
+    useState(initial) {
+      const index = stateIndex++;
+      if (!(index in values)) values[index] = index === 4 ? true : typeof initial === "function" ? initial() : initial;
+      return [values[index], next => { values[index] = typeof next === "function" ? next(values[index]) : next; }];
+    },
+    useRef(initial) { const index = refIndex++; return refs[index] ||= { current: initial }; },
+    useMemo: fn => fn(), useEffect() {}, scenarioDefinitions: actualScenarios, statusSteps: [], getContentValue: (_, key) => key,
+    createChallengeCode: () => "ABC234", window: { requestAnimationFrame(callback) { frames.push(callback); } },
+    document: { getElementById(id) { const node = claimElements(currentTree, item => item.props.id === id)[0]; return node ? { focus() { focused.push(id); }, scrollIntoView() {}, querySelector(selector) { assert.equal(selector, "button"); return claimElements(node, item => item.type === "button").length ? { focus() { focused.push(id + " button"); } } : null; } } : null; } },
+    Nav: empty, Footer: empty, Link: ({ children, ...props }) => React.createElement("a", props, children)
+  }, "OwnershipClaimContent");
+  return { focused, flushFrames() { while (frames.length) frames.shift()(); }, render() { stateIndex = 0; refIndex = 0; return currentTree = Component(); } };
+}
+function claimElements(tree, predicate) {
+  if (!React.isValidElement(tree)) return [];
+  return [...(predicate(tree) ? [tree] : []), ...React.Children.toArray(tree.props.children).flatMap(child => claimElements(child, predicate))];
+}
+const situationButtons = tree => claimElements(tree, node => node.type === "button" && String(node.props.className).includes("claim-scenario-card"));
+const changeSituation = tree => claimElements(tree, node => node.type === "button" && renderToStaticMarkup(node).includes("Change situation"))[0];
+await test("choosing a situation focuses the relevant form and Change situation restores all choices", () => {
+  const ui = claimChooserHarness("code=QRG-SYNTH");
+  let tree = ui.render();
+  assert.equal(situationButtons(tree).length, 6);
+  assert.equal(claimElements(tree, node => node.type === "form").length, 0);
+  situationButtons(tree)[0].props.onClick();
+  tree = ui.render();
+  assert.equal(situationButtons(tree).length, 0, "selected flow must not retain six cards above the form");
+  assert.equal(claimElements(tree, node => node.type === "form").length, 1);
+  let html = renderToStaticMarkup(tree);
+  assert.match(html, /claimCenter.scenarios.store.title/);
+  assert.match(html, /Private buyer handoff/);
+  assert.match(html, /Submit for review/);
+  ui.flushFrames();
+  assert.equal(ui.focused.at(-1), "claim-workspace-heading");
+  assert.match(html, /value="QRG-SYNTH"/);
+  const acquisition = claimElements(tree, node => node.type === "textarea" && node.props.maxLength === 3000)[0];
+  acquisition.props.onChange({ target: { value: "Purchased in September" } });
+  changeSituation(tree).props.onClick();
+  tree = ui.render();
+  assert.equal(situationButtons(tree).length, 6);
+  assert.equal(claimElements(tree, node => node.type === "form").length, 0);
+  assert.equal(changeSituation(tree), undefined);
+  ui.flushFrames();
+  assert.equal(ui.focused.at(-1), "claim-situations button");
+  situationButtons(tree)[5].props.onClick();
+  tree = ui.render();
+  html = renderToStaticMarkup(tree);
+  assert.equal(situationButtons(tree).length, 0);
+  assert.match(html, /claimCenter.scenarios.legacy.title/);
+  assert.match(html, /Private possession challenge/);
+  assert.match(html, /ABC234/);
+  assert.match(html, /Purchased in September/);
+  assert.match(html, /type="file"/);
+  assert.doesNotMatch(html, /Private buyer handoff code/);
+});
+await test("buyer-code deep links open the selected handoff without an extra situation chooser", () => {
+  const ui = claimChooserHarness("code=QRG-SYNTH&handoff=buyer-code");
+  const tree = ui.render(), html = renderToStaticMarkup(tree);
+  assert.equal(situationButtons(tree).length, 0);
+  assert.match(html, /claimCenter.scenarios.builder.title/);
+  assert.match(html, /Private buyer handoff code/);
+  assert.match(html, /Order reference supplied by the seller/);
+  assert.ok(changeSituation(tree));
+});
+
 console.log(`${count} ownership claim client cases passed.`);

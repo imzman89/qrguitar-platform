@@ -29,11 +29,11 @@ const authEffect=effects.find(e=>e.includes("let authResolved"));
 const recordsEffect=effects.find(e=>e.includes("loadDashboardInstruments(token"));
 await test("late initial session cannot replace a newer account event",async()=>{
   const initial=deferred();let listener,unsubscribed=false;
-  const state={visibilityPendingCodes:[],user:null,authChecked:false,dashboardMessage:"",instruments:[{private:"old"}],transfers:[{private:"old"}],serviceRequests:[],quickEditRecord:{private:"old"},actionRecord:{private:"old"},collectionHandle:"old",collectionAccountType:"shop",recordsLoaded:true,recordsError:""};
+  const state={visibilityPendingCodes:[],user:null,authChecked:false,dashboardMessage:"",instruments:[{private:"old"}],transfers:[{private:"old"}],serviceRequests:[],quickEditRecord:{private:"old"},actionRecord:{private:"old"},collectionHandle:"old",collectionAccountType:"shop",searchQuery:"old private serial",recordsLoaded:true,recordsError:""};
   const env={visibilityRequests:{current:new Map()},removalRequests:{current:new Map()},...stateSetters(state),sessionEmail:{current:"old"},accountRevision:{current:0},window:{setTimeout:()=>1,clearTimeout:()=>{}},mapSupabaseUser:compile(functions.get("mapSupabaseUser"),{},"mapSupabaseUser"),createBrowserSupabaseClient:()=>({auth:{getSession:()=>initial.promise,onAuthStateChange:cb=>{listener=cb;return{data:{subscription:{unsubscribe:()=>{unsubscribed=true}}}}}}})};
   const dispose=compile("const effect="+authEffect+";",env,"effect")();
   listener("SIGNED_IN",{user:{email:"new@example.invalid"}});
-  assert.equal(state.user.email,"new@example.invalid");assert.deepEqual(state.instruments,[]);assert.equal(state.actionRecord,null);assert.equal(state.quickEditRecord,null);assert.equal(state.collectionHandle,"");
+  assert.equal(state.user.email,"new@example.invalid");assert.deepEqual(state.instruments,[]);assert.equal(state.actionRecord,null);assert.equal(state.quickEditRecord,null);assert.equal(state.collectionHandle,"");assert.equal(state.searchQuery,"");
   initial.resolve({data:{session:{user:{email:"old@example.invalid"}}}});await tick();assert.equal(state.user.email,"new@example.invalid");
   listener("SIGNED_OUT",null);assert.equal(state.user,null);assert.deepEqual(state.transfers,[]);assert.equal(state.recordsLoaded,false);dispose();assert.equal(unsubscribed,true);
 });
@@ -65,5 +65,14 @@ await test("deadline aborts and ignores even a late successful response",async()
 });
 await test("completed collection snapshot updates all counts together",async()=>{
   const h=recordsHarness();await tick();assert.deepEqual(h.state.instruments,[{id:"new"}]);assert.equal(h.state.recordsLoaded,true);assert.equal(h.state.recordsError,"");assert.equal(h.state.loadingRecords,false);h.dispose();
+});
+await test("collection search finds identity fields and composes with visibility without searching private notes",async()=>{
+  const matches=compile(functions.get("matchesDashboardSearch"),{},"matchesDashboardSearch");
+  const visible=compile(functions.get("matchesDashboardFilter"),{},"matchesDashboardFilter");
+  const records=[{name:"Stage amplifier",brand:"Fender",model:"Vibroverb",serial:"AB-001",qrCode:"QRG-EXAMPLE",instrumentType:"Amplifier",visibility:"private",summary:"Private repair note"},{name:"Travel acoustic",brand:"Martin",model:"D-18",serial:"CD002",qrCode:"QRG-OTHER",instrumentType:"Acoustic Guitar",visibility:"public"}];
+  for(const query of ["FENDER vibro", "ab-001", "qrg-example", "AMPlifier", "  "])assert.equal(matches(records[0],query),true);
+  assert.equal(matches(records[0],"Private repair note"),false);
+  assert.deepEqual(records.filter(r=>visible(r,"public")&&matches(r,"fender")),[]);
+  assert.deepEqual(records.filter(r=>visible(r,"private")&&matches(r,"amp")),[records[0]]);
 });
 console.log(count+" dashboard behavior cases passed.");

@@ -31,6 +31,8 @@ export function ActionDrawer({ children, eyebrow, onClose, returnFocusTo, title 
     panelRef.current?.focus();
 
     function handleKeyDown(event: KeyboardEvent) {
+      // A native child dialog owns its keyboard interaction, including Escape.
+      if (event.defaultPrevented || (event.target instanceof HTMLElement && event.target.closest("dialog[open]"))) return;
       if (event.key === "Escape") {
         event.preventDefault();
         onClose();

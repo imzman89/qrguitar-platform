@@ -1,0 +1,67 @@
+.workspace { min-height: 65vh; padding: 32px 0 72px; background: var(--canvas); color: var(--text); }
+.workspace :global(.admin-service-shell) { width: min(1120px, calc(100% - 64px)); max-width: none; margin-inline: auto; }
+.workspace :global(.service-back) { min-height: 44px; margin-bottom: 16px; color: var(--muted); font-size: 13px; font-weight: 500; }
+.workspace :global(.admin-service-hero) { grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 32px; margin-bottom: 28px; }
+.workspace :global(.eyebrow) { margin: 0 0 8px; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .08em; }
+.workspace :global(.admin-service-hero h1) { margin: 0 0 12px; color: var(--text); font-family: inherit; font-size: clamp(28px, 3vw, 40px); font-weight: 600; line-height: 1.15; letter-spacing: -.04em; }
+.workspace :global(.admin-service-hero p) { max-width: 690px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.workspace :global(.admin-service-counts) { display: flex; flex-wrap: nowrap; gap: 24px; padding-top: 24px; }
+.workspace :global(.admin-service-counts span) { min-width: 68px; gap: 2px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 12px; }
+.workspace :global(.admin-service-counts strong) { color: var(--text); font-size: 28px; font-weight: 550; line-height: 1.2; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.workspace :global(.admin-service-filters) { grid-template-columns: minmax(0, 1fr) minmax(170px, 220px) auto; align-items: stretch; gap: 10px; margin: 0 0 32px; }
+.workspace :global(.admin-service-filters label) { min-width: 0; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--muted); }
+.workspace :global(.admin-service-filters label svg) { flex-shrink: 0; }
+.workspace :global(.admin-service-filters input) { width: 100%; min-width: 0; min-height: 44px; padding: 10px 0; border: 0; border-radius: 0; background: transparent; color: var(--text); font: inherit; font-size: 14px; }
+.workspace :global(.admin-service-filters input::placeholder) { color: var(--muted); opacity: 1; }
+.workspace :global(.admin-service-filters select) { min-width: 0; min-height: 44px; padding: 10px 34px 10px 12px; border: 1px solid var(--line); border-radius: 9px; color: var(--text); background: var(--surface); font: inherit; font-size: 14px; }
+.workspace :global(.button) { min-height: 44px; padding: 10px 16px; border-radius: 9px; font-family: inherit; font-size: 13px; font-weight: 600; line-height: 1.4; text-transform: none; letter-spacing: 0; }
+.workspace :global(.button.secondary) { border: 1px solid var(--line); background: var(--surface); color: var(--text); }
+.workspace :global(.button.secondary:hover:not(:disabled)) { background: var(--surface-subtle); }
+.workspace :global(.admin-service-section) { margin-bottom: 32px; }
+.workspace :global(.admin-section-head) { margin-bottom: 16px; }
+.workspace :global(.admin-section-head .eyebrow) { display: none; }
+.workspace :global(.admin-section-head h2) { margin: 0 0 6px; color: var(--text); font-family: inherit; font-size: 22px; font-weight: 600; letter-spacing: -.025em; }
+.workspace :global(.admin-section-head p) { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.workspace :global(.admin-service-list) { gap: 12px; }
+.workspace :global(.admin-service-card) { min-width: 0; gap: 16px 24px; padding: 24px; border: 0; border-radius: 14px; background: var(--surface); color: var(--text); box-shadow: none; }
+.workspace :global(.admin-service-card__main) { min-width: 0; gap: 12px; }
+.workspace :global(.admin-service-card__main svg) { flex-shrink: 0; width: 20px; color: var(--muted); }
+.workspace :global(.admin-service-card__main strong) { font-size: 15px; font-weight: 600; }
+.workspace :global(.admin-service-card__main span), .workspace :global(.admin-service-card__main small), .workspace :global(.admin-service-note) { color: var(--muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.workspace :global(.admin-service-card > .button) { grid-column: 1 / -1; justify-self: start; background: var(--surface-subtle); }
+.workspace :global(.service-provider-state) { justify-self: start; padding: 5px 9px; border: 0; border-radius: 6px; background: var(--surface-subtle); color: var(--muted); font-size: 11px; font-weight: 550; text-transform: none; }
+.workspace :global(.service-provider-state.verified) { color: var(--positive); }
+.workspace :global(.admin-service-submission__heading) { align-items: flex-start; gap: 20px; }
+.workspace :global(.admin-service-submission__heading h3) { margin: 10px 0 6px; color: var(--text); font-family: inherit; font-size: 21px; font-weight: 600; letter-spacing: -.025em; }
+.workspace :global(.admin-service-submission__heading p), .workspace :global(.admin-service-submission > p) { color: var(--muted); font-size: 14px; line-height: 1.65; overflow-wrap: anywhere; }
+.workspace :global(.admin-service-submission__heading > .text-link) { display: inline-flex; flex-shrink: 0; align-items: center; min-height: 44px; font-size: 13px; }
+.workspace :global(.admin-service-meta) { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin: 22px 0; padding: 0; }
+.workspace :global(.admin-service-meta > span) { min-width: 0; padding: 0; border: 0; background: transparent; color: var(--text); font-size: 12px; overflow-wrap: anywhere; }
+.workspace :global(.admin-service-meta strong) { display: block; margin-bottom: 5px; color: var(--muted); font-size: 11px; font-weight: 500; text-transform: none; letter-spacing: 0; }
+.workspace :global(.admin-service-submission details) { padding-top: 0; border-top: 1px solid var(--line); }
+.workspace :global(.admin-service-submission summary) { min-height: 44px; color: var(--text); font-size: 13px; font-weight: 550; }
+.workspace :global(.admin-service-submission ul) { padding-left: 20px; }
+.workspace :global(.admin-service-submission li) { color: var(--muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.workspace :global(.admin-service-actions) { gap: 10px; margin-top: 20px; }
+.workspace :global(.admin-panel-card), .workspace :global(.admin-empty) { margin: 0; padding: 28px; border: 0; border-radius: 14px; background: var(--surface); color: var(--muted); box-shadow: none; }
+.workspace :global(.admin-panel-card h2) { margin-top: 0; color: var(--text); font-size: 23px; font-family: inherit; font-weight: 600; letter-spacing: -.025em; }
+.workspace :global(.admin-panel-card p) { color: var(--muted); }
+.workspace :global(.admin-message) { margin: 0 0 24px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--text); font-size: 14px; }
+.workspace :global(button:focus-visible), .workspace :global(a:focus-visible), .workspace :global(input:focus-visible), .workspace :global(select:focus-visible), .workspace :global(summary:focus-visible) { outline: 2px solid var(--action); outline-offset: 3px; }
+@media (max-width: 760px) {
+  .workspace { padding: 18px 0 48px; }
+  .workspace :global(.admin-service-shell) { width: calc(100% - 36px); }
+  .workspace :global(.service-back) { margin-bottom: 12px; }
+  .workspace :global(.admin-service-hero) { grid-template-columns: minmax(0, 1fr); gap: 20px; margin-bottom: 24px; }
+  .workspace :global(.admin-service-hero h1) { font-size: 30px; }
+  .workspace :global(.admin-service-counts) { gap: 32px; padding-top: 0; }
+  .workspace :global(.admin-service-counts span) { display: flex; align-items: baseline; gap: 8px; }
+  .workspace :global(.admin-service-counts strong) { font-size: 24px; }
+  .workspace :global(.admin-service-filters) { grid-template-columns: minmax(0, 1fr) auto; margin-bottom: 28px; }
+  .workspace :global(.admin-service-filters label) { grid-column: 1 / -1; }
+  .workspace :global(.admin-service-filters input), .workspace :global(.admin-service-filters select) { font-size: 16px; }
+  .workspace :global(.admin-service-card) { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 20px 18px; }
+  .workspace :global(.admin-service-submission__heading) { gap: 6px; }
+  .workspace :global(.admin-service-meta) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 14px; }
+  .workspace :global(.admin-panel-card), .workspace :global(.admin-empty) { padding: 24px 18px; }
+}

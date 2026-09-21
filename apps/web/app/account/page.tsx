@@ -1,5 +1,9 @@
 "use client";
 
+import { OwnerWorkspace } from "../../components/OwnerWorkspace";
+import authStyles from "../../components/AuthForm.module.css";
+import styles from "./account.module.css";
+
 import { PwaInstall } from "../../components/PwaInstall";
 
 import Link from "next/link";
@@ -85,15 +89,15 @@ function AccountSettingsPage() {
 
   if (state.phase === "loading") return <AccountLoading />;
 
-  if (state.phase === "error") return <><Nav /><main className="section auth-page"><div className="shell auth-layout"><section className="card auth-card sign-in-required-card" role="alert"><div className="eyebrow">Account</div><h1>Your account could not be loaded.</h1><p>{status}</p><button className="button" type="button" onClick={() => void controller.current?.reload()}>Try again</button></section>{state.actorId && <AccountDeletionSection actorId={state.actorId} auth={accountDeletionAuth} />}</div></main><Footer /></>;
+  if (state.phase === "error") return <><Nav /><main className={authStyles.page}><div className={authStyles.layout}><section className={authStyles.formPanel} role="alert"><div className="eyebrow">Account</div><h1>Your account could not be loaded.</h1><p>{status}</p><button className="button" type="button" onClick={() => void controller.current?.reload()}>Try again</button></section>{state.actorId && <AccountDeletionSection actorId={state.actorId} auth={accountDeletionAuth} />}</div></main><Footer /></>;
 
   if (state.phase === "signed-out") {
     return (
       <>
         <Nav />
-        <main className="section auth-page">
-          <div className="shell auth-layout">
-            <section className="card auth-card sign-in-required-card">
+        <main className={authStyles.page}>
+          <div className={authStyles.layout}>
+            <section className={authStyles.formPanel}>
               <div className="eyebrow">Account</div>
               <h1>Sign in to manage your account.</h1>
               <p>Update your display name, password access, and account details from one place.</p>
@@ -113,53 +117,19 @@ function AccountSettingsPage() {
   return (
     <>
       <Nav />
-      <main className="section auth-page">
-        <div className="shell auth-layout account-layout">
-          <section className="account-hero-copy">
-            <div className="eyebrow">Account</div>
+      <OwnerWorkspace current="account">
+        <div className={styles.account}>
+          <header className={styles.header}>
             <h1>{getContentValue(content, "account.hero.headline")}</h1>
             <p>{getContentValue(content, "account.hero.body")}</p>
-            <div className="mini-chip-row">
-              <span>{accountStatus || "active"}</span>
-              <span>{plan || "free"}</span>
-              <span>{role || "user"}</span>
-            </div>
-            <details className="account-workspace-links">
-              <summary>Workspace links</summary>
-              <div className="account-quick-links">
-                <Link href="/dashboard">Dashboard</Link>
-                <Link href="/create">Create Profile</Link>
-                <Link href="/catalog">Explore the Catalog</Link>
-                <Link href="/billing">Profile credits</Link>
-                <Link href="/contact">Support</Link>
-              </div>
-            </details>
-            <div className="account-summary-grid">
-              <div>
-                <strong>{stats.records}</strong>
-                <span>Total profiles</span>
-              </div>
-              <div>
-                <strong>{stats.publicRecords}</strong>
-                <span>Public</span>
-              </div>
-              <div>
-                <strong>{stats.privateRecords + stats.unlistedRecords}</strong>
-                <span>Private or unlisted</span>
-              </div>
-              <div>
-                <strong>{stats.recordsWithPhotos}/{stats.records}</strong>
-                <span>With photos</span>
-              </div>
-            </div>
-          </section>
+          </header>
 
-          <div className="account-settings-stack">
-            <nav className="account-section-nav" aria-label="Account sections">
+          <div className={styles.settings}>
+            <nav className={styles.sectionNav} aria-label="Account sections">
               {accountSections.map((section) => (
                 <button
                   aria-current={activeSection === section.id ? "page" : undefined}
-                  className={activeSection === section.id ? "active" : ""}
+                  className={activeSection === section.id ? styles.active : undefined}
                   key={section.id}
                   onClick={() => setActiveSection(section.id)}
                   type="button"
@@ -169,28 +139,33 @@ function AccountSettingsPage() {
               ))}
             </nav>
 
-            <div className="account-settings-content">
+            <div className={styles.content}>
             {activeSection === "overview" ? <PwaInstall /> : null}
 
             <fieldset disabled={isWorking || (state.uncertainSave && (activeSection === "profile" || activeSection === "collection"))} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
             {activeSection === "overview" ? (
-              <section className="card auth-card account-settings-card account-overview-card">
-                <div className="auth-card-head">
-                  <span>Workspace</span>
-                  <strong><ShieldCheck size={18} aria-hidden="true" /> Account overview</strong>
+              <section className={styles.panel}>
+                <div className={styles.identity}>
+                  <div className={styles.avatar} aria-hidden="true">{(displayName || email || "Q").slice(0, 1).toUpperCase()}</div>
+                  <div><h2>{displayName || "Your account"}</h2><p>{email}</p><small>{accountStatus || "active"} · {plan || "free"} · {role || "user"}</small></div>
                 </div>
-                <p className="account-card-copy">Manage your identity, public collection, access, and privacy without leaving your owner workspace.</p>
-                <div className="account-overview-actions">
-                  <button type="button" onClick={() => setActiveSection("profile")}><UserRound size={17} aria-hidden="true" /><span><b>Profile details</b><small>Update the name connected to your Profiles.</small></span></button>
-                  <button type="button" onClick={() => setActiveSection("collection")}><UsersRound size={17} aria-hidden="true" /><span><b>Public collection</b><small>Group your public Profiles under one shareable link.</small></span></button>
-                  <button type="button" onClick={() => setActiveSection("security")}><LockKeyhole size={17} aria-hidden="true" /><span><b>Security</b><small>Reset your password or sign out securely.</small></span></button>
-                  <Link href="/dashboard"><ShieldCheck size={17} aria-hidden="true" /><span><b>Profile controls</b><small>Manage visibility, serial display, documents, and QR tools.</small></span></Link>
+                <div className={styles.metrics} aria-label="Collection summary">
+                  <div><strong>{stats.records}</strong><span>Profiles</span></div>
+                  <div><strong>{stats.publicRecords}</strong><span>Public</span></div>
+                  <div><strong>{stats.privateRecords + stats.unlistedRecords}</strong><span>Private or unlisted</span></div>
+                  <div><strong>{stats.recordsWithPhotos}/{stats.records}</strong><span>With photos</span></div>
                 </div>
+                <div className={styles.overviewRows}>
+                  <div><span><b>Profile details</b><small>Your name and the tools you use.</small></span><button type="button" className="button secondary" onClick={() => setActiveSection("profile")}>Edit details</button></div>
+                  <div><span><b>Public collection</b><small>{publishedHref ? "Your saved collection is ready to share." : "Bring your public Profiles together on one page."}</small></span><button type="button" className="button secondary" onClick={() => setActiveSection("collection")}>{publishedHref ? "Manage collection" : "Set up collection"}</button></div>
+                  <div><span><b>Account access</b><small>Manage your password and active sign-in.</small></span><button type="button" className="button secondary" onClick={() => setActiveSection("security")}>Security</button></div>
+                </div>
+                <Link className={styles.textLink} href="/dashboard">Open your collection <span aria-hidden="true">↗</span></Link>
               </section>
             ) : null}
 
-            {activeSection === "profile" ? <section className="card auth-card account-settings-card">
-              <div className="auth-card-head">
+            {activeSection === "profile" ? <section className={styles.panel}>
+              <div className={styles.panelHeading}>
                 <span>Profile</span>
                 <strong><UserRound size={18} aria-hidden="true" /> {getContentValue(content, "account.profile.heading")}</strong>
               </div>
@@ -220,12 +195,12 @@ function AccountSettingsPage() {
               </div>
             </section> : null}
 
-            {activeSection === "collection" ? <section className="card auth-card account-settings-card" id="public-collection">
-              <div className="auth-card-head">
+            {activeSection === "collection" ? <section className={styles.panel} id="public-collection">
+              <div className={styles.panelHeading}>
                 <span>Public collection</span>
                 <strong><UsersRound size={18} aria-hidden="true" /> Your public collection</strong>
               </div>
-              <p className="account-card-copy">Create one shareable page for your public QRguitar Profiles. Enable your collection and make at least one instrument Profile public to appear in Member Collections. Private and unlisted Profiles never appear there.</p>
+              <p className={styles.copy}>Create one shareable page for your public QRguitar Profiles. Enable your collection and make at least one instrument Profile public to appear in Member Collections. Private and unlisted Profiles never appear there.</p>
               <label className="toggle-field">
                 <input type="checkbox" checked={publicCollection.enabled} onChange={(event) => setPublicCollection((current) => ({ ...current, enabled: event.target.checked }))} />
                 Show my public Profiles together on a public collection page
@@ -253,12 +228,12 @@ function AccountSettingsPage() {
               {(publicCollection.handle !== state.account?.publicCollection.handle || publicCollection.enabled !== state.account?.publicCollection.enabled) && <p className="field-note">Save your changes to update the public collection link. The preview opens your last saved collection.</p>}
             </section> : null}
 
-            {activeSection === "security" ? <section className="card auth-card account-settings-card">
-              <div className="auth-card-head">
+            {activeSection === "security" ? <section className={styles.panel}>
+              <div className={styles.panelHeading}>
                 <span>{getContentValue(content, "account.security.heading")}</span>
                 <strong><LockKeyhole size={18} aria-hidden="true" /> Password access</strong>
               </div>
-              <p className="account-card-copy">Send yourself a secure reset link any time. QRguitar never shows or stores your password in this dashboard.</p>
+              <p className={styles.copy}>Send yourself a secure reset link any time. QRguitar never shows or stores your password in this dashboard.</p>
               <div className="form-actions">
                 <button className="button secondary" type="button" onClick={sendPasswordReset} disabled={isWorking}>
                   {getContentValue(content, "account.actions.reset")}
@@ -269,30 +244,30 @@ function AccountSettingsPage() {
               </div>
             </section> : null}
 
-            {activeSection === "notifications" ? <section className="card auth-card account-settings-card">
-              <div className="auth-card-head">
+            {activeSection === "notifications" ? <section className={styles.panel}>
+              <div className={styles.panelHeading}>
                 <span>Notifications</span>
                 <strong><ShieldCheck size={18} aria-hidden="true" /> Account notices</strong>
               </div>
-              <p className="account-card-copy">Security, transfer, claim, and service-review notices are sent to your account email when action is required.</p>
-              <div className="account-status-grid">
+              <p className={styles.copy}>Security, transfer, claim, and service-review notices are sent to your account email when action is required.</p>
+              <div className={styles.statusGrid}>
                 <div><span>Delivery email</span><strong>{email}</strong></div>
                 <div><span>Required notices</span><strong>Enabled</strong></div>
               </div>
               <p className="field-note">Required account and ownership notices cannot be disabled during public beta.</p>
             </section> : null}
 
-            {activeSection === "provider" ? <section className="card auth-card account-settings-card">
-              <div className="auth-card-head">
+            {activeSection === "provider" ? <section className={styles.panel}>
+              <div className={styles.panelHeading}>
                 <span>Provider / Business</span>
                 <strong><ShieldCheck size={18} aria-hidden="true" /> Business tools</strong>
               </div>
-              <div className="account-status-grid">
+              <div className={styles.statusGrid}>
                 <div><span>Status</span><strong>{accountStatus || "active"}</strong></div>
                 <div><span>Plan</span><strong>{plan || "free"}</strong></div>
                 <div><span>Role</span><strong>{role || "user"}</strong></div>
               </div>
-              <p className="account-card-copy">{getWorkspace(publicCollection.accountType).description}</p>
+              <p className={styles.copy}>{getWorkspace(publicCollection.accountType).description}</p>
               <div className="form-actions">
                 <Link className="button" href="/dashboard/service">Open service workbench</Link>
                 <Link className="button secondary" href="/dashboard/import">Open Bulk Import</Link>
@@ -300,12 +275,12 @@ function AccountSettingsPage() {
               </div>
             </section> : null}
 
-            {activeSection === "privacy" ? <section className="card auth-card account-settings-card">
-              <div className="auth-card-head">
+            {activeSection === "privacy" ? <section className={styles.panel}>
+              <div className={styles.panelHeading}>
                 <span>Privacy &amp; Data</span>
                 <strong><ShieldCheck size={18} aria-hidden="true" /> Profile controls</strong>
               </div>
-              <p className="account-card-copy">
+              <p className={styles.copy}>
                 Each Profile controls visibility, private documents, service history, Serial Number display, and QR downloads from its editor.
               </p>
               <div className="form-actions">
@@ -316,17 +291,17 @@ function AccountSettingsPage() {
 
             </fieldset>
             {activeSection === "privacy" && <AccountDeletionSection actorId={state.actorId} auth={accountDeletionAuth} />}
-            {status ? <p className="form-message account-form-message" role="status">{status}</p> : null}
-            {state.uncertainSave && <div className="form-message account-form-message"><p>Reload the saved settings before editing again; reloading replaces the form with the server version.</p><button className="button secondary" type="button" onClick={() => void controller.current?.reload()}>Reload saved account</button></div>}
+            {status ? <p className="form-message" role="status">{status}</p> : null}
+            {state.uncertainSave && <div className="form-message"><p>Reload the saved settings before editing again; reloading replaces the form with the server version.</p><button className="button secondary" type="button" onClick={() => void controller.current?.reload()}>Reload saved account</button></div>}
             </div>
           </div>
         </div>
-      </main>
+      </OwnerWorkspace>
       <Footer />
     </>
   );
 }
 
 function AccountLoading() {
-  return <><Nav /><main className="section auth-page"><div className="shell auth-layout"><section className="card auth-card sign-in-required-card" aria-live="polite" aria-busy="true"><div className="eyebrow">Account</div><h1>Loading your account...</h1><p>Checking your QRguitar session and owner workspace.</p></section></div></main><Footer /></>;
+  return <><Nav /><main className={authStyles.page}><div className={authStyles.layout}><section className={authStyles.formPanel} aria-live="polite" aria-busy="true"><div className="eyebrow">Account</div><h1>Loading your account...</h1><p>Checking your QRguitar session and owner workspace.</p></section></div></main><Footer /></>;
 }

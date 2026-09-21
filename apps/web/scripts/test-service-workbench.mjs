@@ -628,7 +628,7 @@ function renderEditor(status, removalId = "", phase = "ready", patch = {}, disca
   const empty = () => null;
   const env = { React, useState: () => [values[index++], () => {}], useRef: () => ({ current: refIndex++ === 0 ? options.controller || null : null }), useEffect() {}, useSiteContent: () => ({}), initialWorkbenchState, categories: ["Setup"], getContentValue: (_, key) => key, serviceResumePath,
     Nav: empty, Footer: empty, ArrowLeft: empty, CheckCircle2: empty, FileLock2: empty, Upload: empty,
-    Link: ({ children, ...props }) => React.createElement("a", props, children), styles: new Proxy({}, { get: (_, name) => name }) };
+    Link: ({ children, ...props }) => React.createElement("a", props, children), styles: new Proxy({}, { get: (_, name) => name }), workflow: new Proxy({}, { get: (_, name) => name }) };
   const code = ts.transpileModule(editorComponent, { compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React } }).outputText;
   const Component = new Function(...Object.keys(env), code + "\nreturn ServiceWorkEditor;")(...Object.values(env));
   return options.tree ? Component({ qrCode: "QRG-TEST", requestedId: "33333333-3333-4333-8333-333333333333" }) : renderToStaticMarkup(React.createElement(Component, { qrCode: "QRG-TEST", requestedId: "33333333-3333-4333-8333-333333333333" }));

@@ -42,7 +42,7 @@ function fixture(kind, options = {}) {
   };
   const window = { location: { origin: 'https://www.qrguitar.com' }, navigator: options.missingClipboard ? {} : { clipboard: { writeText: value => { f.copies.push(value); return options.copy ? options.copy(value) : Promise.resolve(); } } } };
   const noop = () => null;
-  const env = { ...hooks, window, BadgeCheck: noop, Copy: noop, LogIn: noop, Repeat2: noop, ShieldCheck: noop, Mail: noop, Nav: noop, Footer: noop, Link: 'a',
+  const env = { ...hooks, window, workflow: new Proxy({}, { get: (_, name) => name }), BadgeCheck: noop, Copy: noop, LogIn: noop, Repeat2: noop, ShieldCheck: noop, Mail: noop, Nav: noop, Footer: noop, Link: 'a',
     useParams: () => params, transferStatusLabel: value => value.status, getSupabaseAccessToken: async () => 'synthetic-token', AbortController,
     optionalTrackingProductEvents: { ownershipTransferCompleted: 'ownership_transfer_completed' },
     dispatchOptionalTrackingProductEvent: async event => { f.tracking.push(event); return true; },
@@ -80,7 +80,7 @@ function fixture(kind, options = {}) {
 async function ready(kind, options) { const f = fixture(kind, options); await tick(); f.render(); return f; }
 
 for (const kind of ['dashboard', 'transfer']) {
-  const label = kind === 'dashboard' ? 'Copy Claim Link' : 'Copy Record Link';
+  const label = kind === 'dashboard' ? 'Copy Claim Link' : 'Copy Profile Link';
   test(kind + ': no success before fulfillment; current success reports copied', async () => {
     const d = deferred(), f = await ready(kind, { copy: () => d.promise }); f.click(label); assert.equal(f.message(), '');
     d.resolve(); await tick(); assert.match(f.message(), /copied/i); assert.equal(f.copies.length, 1); f.unmount(); assert.equal(f.timers.size, 0);
@@ -134,7 +134,7 @@ test('dashboard: effect cleanup/setup replay invalidates old copy and permits a 
   f.click('Copy Claim Link'); await tick(); const message = f.message(); a.reject(Error('old')); await tick(); assert.equal(f.message(), message); assert.match(message, /copied/); f.unmount();
 });
 for (const change of ['auth', 'route']) test('transfer: ' + change + ' reload invalidates earlier Profile copy', async () => {
-  const d = deferred(), f = await ready('transfer', { copy: () => d.promise }); f.click('Copy Record Link'); if (change === 'auth') f.auth(); else f.route('transfer-b'); await tick(); f.render();
+  const d = deferred(), f = await ready('transfer', { copy: () => d.promise }); f.click('Copy Profile Link'); if (change === 'auth') f.auth(); else f.route('transfer-b'); await tick(); f.render();
   assert.equal(f.message(), ''); d.resolve(); await tick(); assert.equal(f.message(), ''); f.unmount();
 });
 

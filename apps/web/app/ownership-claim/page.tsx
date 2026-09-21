@@ -1,5 +1,6 @@
 "use client";
 
+import workflow from "../../components/WorkflowWorkspace.module.css";
 import { ArrowLeft, Check, FileCheck2, Gift, Handshake, PackageCheck, ShieldCheck, Store, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -131,7 +132,15 @@ function OwnershipClaimContent() {
     setMessage("");
     const next = scenarios.find((item) => item.id === id);
     setChallengeCode(next?.claimType === "legacy_review" ? createChallengeCode() : "");
-    window.requestAnimationFrame(() => document.getElementById("claim-workspace")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    window.requestAnimationFrame(() => {
+      document.getElementById("claim-workspace-heading")?.focus({ preventScroll: true });
+      document.getElementById("claim-workspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  function changeScenario() {
+    setScenarioId("");
+    window.requestAnimationFrame(() => document.getElementById("claim-situations")?.querySelector("button")?.focus());
   }
 
   async function collectEvidence(files: FileList | null, response: boolean) {
@@ -202,7 +211,7 @@ function OwnershipClaimContent() {
   return (
     <>
       <Nav />
-      <main className="section claim-center-page">
+      <main className={`section claim-center-page ${workflow.claims}`}>
         <div className="shell">
           <header className="claim-center-hero">
             <div><div className="eyebrow">Ownership Claim Center</div><h1>{getContentValue(content, "claimCenter.hero.headline")}</h1><p className="lede">{getContentValue(content, "claimCenter.hero.body")}</p></div>
@@ -222,16 +231,18 @@ function OwnershipClaimContent() {
                 <button type="button" className="button secondary" disabled={busy || evidenceReading || claimsLoading} onClick={() => void reloadClaimsRef.current()}>Refresh request status</button>
               </div>
               <fieldset disabled={busy || evidenceReading} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-              <section className="claim-scenario-grid" aria-label="Ownership situations">
+              {!scenario ? (
+              <section className="claim-scenario-grid" id="claim-situations" aria-label="Ownership situations">
                 {scenarios.map((item) => {
                   const Icon = item.icon;
                   return <button className={scenarioId === item.id ? "claim-scenario-card is-active" : "claim-scenario-card"} type="button" key={item.id} aria-pressed={scenarioId === item.id} onClick={() => chooseScenario(item.id)}><Icon aria-hidden="true" /><span><b>{item.title}</b><small>{item.copy}</small></span></button>;
                 })}
               </section>
+              ) : null}
 
               {scenario ? (
                 <section className="claim-workspace" id="claim-workspace">
-                  <header><button type="button" onClick={() => setScenarioId("")}><ArrowLeft aria-hidden="true" /> Change situation</button><div><span>Selected path</span><h2>{scenario.title}</h2></div></header>
+                  <header><button type="button" onClick={changeScenario}><ArrowLeft aria-hidden="true" /> Change situation</button><div><span>Selected path</span><h2 id="claim-workspace-heading" tabIndex={-1}>{scenario.title}</h2></div></header>
                   {scenario.preferredTransfer ? (
                     <div className="claim-preferred-path">
                       <Handshake aria-hidden="true" />
@@ -309,7 +320,7 @@ function OwnershipClaimContent() {
 
 export default function OwnershipClaimPage() {
   return (
-    <Suspense fallback={<main className="section claim-center-page"><div className="shell"><section className="card claim-callout"><div><h1>Opening Ownership Claim Center.</h1><p>Loading your secure ownership options.</p></div></section></div></main>}>
+    <Suspense fallback={<main className={`section claim-center-page ${workflow.claims}`}><div className="shell"><section className="card claim-callout"><div><h1>Opening Ownership Claim Center.</h1><p>Loading your secure ownership options.</p></div></section></div></main>}>
       <OwnershipClaimContent />
     </Suspense>
   );

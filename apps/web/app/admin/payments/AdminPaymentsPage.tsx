@@ -9,7 +9,7 @@ import { createBrowserSupabaseClient } from "../../../lib/supabase-browser";
 import { createAdminPaymentsClient, initialAdminPaymentsState } from "../../../lib/direct-payments-client";
 import type { DirectOrder } from "../../../lib/direct-payments";
 import PayPalReviewQueue from "./PayPalReviewQueue";
-import styles from "../../billing/billing.module.css";
+import styles from "./payments.module.css";
 
 const money = (amount: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount / 100);
 const label = (method: string) => method === "cashapp" ? "Cash App" : method === "venmo" ? "Venmo" : method === "paypal" ? "PayPal checkout" : "Zelle";

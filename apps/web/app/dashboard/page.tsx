@@ -1,8 +1,11 @@
 "use client";
 
+import { OwnerWorkspace } from "../../components/OwnerWorkspace";
+import authStyles from "../../components/AuthForm.module.css";
+
 import { ownerProfileHref } from "../../lib/owner-profile";
 
-import { BookOpenText, Copy, Ellipsis, EyeOff, FileSpreadsheet, FileText, ImagePlus, Mail, Printer, Repeat2, ShieldCheck, UsersRound, Wrench } from "lucide-react";
+import { BookOpenText, Copy, Ellipsis, EyeOff, FileSpreadsheet, FileText, ImagePlus, Mail, Printer, Repeat2, Search, ShieldCheck, UsersRound, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActionDrawer } from "../../components/ActionDrawer";
@@ -122,6 +125,7 @@ export default function DashboardPage() {
   const workspace = getWorkspace(collectionAccountType);
   const [actionRecord, setActionRecord] = useState<DemoInstrument | null>(null);
   const [actionTrigger, setActionTrigger] = useState<HTMLElement | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     void fetchPublishedSiteSettings().then((published) => {
@@ -157,7 +161,7 @@ export default function DashboardPage() {
         accountRevisionRef.current++;
         visibilityRequests.current.clear(); removalRequests.current.clear(); setVisibilityPendingCodes([]);
         setInstruments([]); setTransfers([]); setServiceRequests([]);
-        setQuickEditRecord(null); setActionRecord(null);
+        setQuickEditRecord(null); setActionRecord(null); setSearchQuery("");
         setCollectionHandle(""); setCollectionAccountType("");
         setRecordsLoaded(false); setRecordsError("");
       }
@@ -243,8 +247,8 @@ export default function DashboardPage() {
     [chronologicalInstruments]
   );
   const displayedInstruments = useMemo(
-    () => chronologicalInstruments.filter((instrument) => matchesDashboardFilter(instrument, activeFilter)),
-    [activeFilter, chronologicalInstruments]
+    () => chronologicalInstruments.filter((instrument) => matchesDashboardFilter(instrument, activeFilter) && matchesDashboardSearch(instrument, searchQuery)),
+    [activeFilter, chronologicalInstruments, searchQuery]
   );
 
   function refreshInstruments() { setLoadAttempt(value => value + 1); }
@@ -333,15 +337,15 @@ export default function DashboardPage() {
     }
   }
 
-  if (!authChecked) return <><Nav /><main className="section auth-page"><div className="shell"><section className="card auth-card"><div className="eyebrow">Your collection</div><h1>Opening your dashboard…</h1><p role="status">Checking your account.</p></section></div></main><Footer /></>;
+  if (!authChecked) return <><Nav /><main className={authStyles.page}><div className={authStyles.layout}><section className={authStyles.formPanel}><div className="eyebrow">Your collection</div><h1>Opening your dashboard…</h1><p role="status">Checking your account.</p></section></div></main><Footer /></>;
 
   if (!user) {
     return (
       <>
         <Nav />
-        <main className="section auth-page">
-          <div className="shell">
-            <section className="card auth-card sign-in-required-card dashboard-signin-card">
+        <main className={authStyles.page}>
+          <div className={authStyles.layout}>
+            <section className={authStyles.formPanel}>
               <div className="dashboard-signin-icon"><ShieldCheck size={24} /></div>
               <div className="eyebrow">Dashboard</div>
               <h2>Sign in to manage your QRguitar Profiles.</h2>
@@ -373,44 +377,138 @@ export default function DashboardPage() {
   return (
     <>
       <Nav />
-      <main className="section dashboard-page">
-        <div className="shell">
-          <div className="dashboard-hero">
+      <OwnerWorkspace current="collection">
+        <div className={styles.dashboard}>
+          <div className={styles.header}>
             <div>
               <div className="eyebrow">{workspace.label}</div>
-              <h1>{collectionAccountType ? workspace.title : getContentValue(content, "dashboard.hero.headline")}</h1>
+              <h1>{getContentValue(content, "dashboard.hero.headline")}</h1>
               <p>{collectionAccountType ? workspace.description : getContentValue(content, "dashboard.hero.body")}</p>
             </div>
-            <div className="dashboard-buttons">
+            <div className={styles.headerActions}>
               {collectionAccountType === "luthier" ? <Link className="button" href="/dashboard/service"><Wrench size={16} /> Open service workbench</Link> : <Link className="button" href="/create">{getContentValue(content, "dashboard.actions.create")}</Link>}
               {collectionAccountType === "shop" || collectionAccountType === "builder" ? <Link className="button secondary" href="/dashboard/import"><FileSpreadsheet size={16} /> {getContentValue(content, "dashboard.actions.bulk")}</Link> : <Link className="button secondary" href={collectionAccountType === "luthier" ? "/create" : "/account?section=collection"}>{collectionAccountType === "luthier" ? "Add your own instrument" : "Set up public collection"}</Link>}
             </div>
           </div>
-          <nav className="dashboard-workspace-links" aria-label="Owner tools">
-            <button type="button" onClick={focusServiceRequests}><Wrench size={15} /> Service review <span>{recordsLoaded ? pendingServiceRequests : "—"}</span></button>
-            <Link href="/ownership-claim">Ownership claims</Link>
-            <a href="#ownership-transfers">Ownership transfers <span>{recordsLoaded ? pendingTransfers : "—"}</span></a>
-            <Link href="/account?section=collection" title="Publish your public Profiles together and control member inquiries"><UsersRound size={15} /> Collection &amp; inquiries <span>{collectionHandle ? "Live" : "Set up"}</span></Link>
-          </nav>
+
           {dashboardMessage ? <div className="admin-message" role="status">{dashboardMessage}</div> : null}
           {recordsError ? <div className="profile-refresh-notice" role="alert"><p>{recordsError} {recordsLoaded ? "Previously loaded Profiles are shown below." : "Your collection is not yet loaded."}</p><button type="button" className="button secondary" onClick={refreshInstruments}>Try again</button></div> : null}
 
-          <div className="stats-grid dashboard-metric-grid" aria-label="Collection overview">
+          <div className={styles.collectionControls}>
+          <div className={styles.filters} aria-label="Collection overview">
             {stats.map((stat) => (
               <button
-                className={`stat-card dashboard-metric ${activeFilter === stat.filter ? "is-active" : ""}`}
+                className={activeFilter === stat.filter ? styles.filterActive : undefined}
                 type="button"
                 key={stat.label}
+                title={stat.helper}
                 aria-pressed={activeFilter === stat.filter}
                 onClick={() => setActiveFilter(stat.filter)}
               >
                 <strong>{stat.value}</strong>
                 <span>{stat.label}</span>
-                <small>{stat.helper}</small>
+
               </button>
             ))}
           </div>
-          <div className="dashboard-trust-summary" aria-label="Trust summary">
+          <label className={styles.search}>
+            <Search size={17} aria-hidden="true" />
+            <input type="search" aria-label="Search your collection" placeholder="Search your collection" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
+          </label>
+          </div>
+          <section className={styles.instrumentTable} id="saved-profiles">
+            <div className={styles.tableHeader}>
+              <div>
+                <h3>{getContentValue(content, "dashboard.collection.title")}</h3>
+              </div>
+
+            </div>
+            <div className={styles.instrumentList}>
+              {loadingRecords ? (
+                <div className="card auth-card">
+                  <h3>Loading your Profiles...</h3>
+                  <p>Pulling your saved Profiles now.</p>
+                </div>
+              ) : !recordsLoaded && recordsError ? (
+                <div className="card auth-card"><h3>Collection unavailable</h3><p>Use Try again above to reload your Profiles.</p></div>
+              ) : displayedInstruments.length ? (
+                displayedInstruments.map((instrument) => {
+                  const totalDocs = instrument.documentFiles?.length || 0;
+                  const publicDocs = instrument.documentFiles?.filter((file) => file.visibility === "public").length || 0;
+                  const hiddenDocs = Math.max(0, totalDocs - publicDocs);
+                  const imageSources = getProfilePhotoUrls(instrument);
+                  const serviceEntries = getServiceHistoryEntries(instrument);
+                  const condition = getInstrumentCondition(instrument);
+                  const title = dashboardRecordTitle(instrument);
+                  const meta = dashboardRecordMeta(instrument, condition);
+                  const profileNumber = profileNumbers.get(instrument.qrCode) || 1;
+
+                  return (
+                    <article className={styles.instrumentRow} key={instrument.qrCode} aria-label={`Collection profile ${profileNumber}: ${title}`}>
+                      <Link className={styles.instrumentBodyLink} href={ownerProfileHref(instrument)} aria-label={`${getContentValue(content, "dashboard.card.open")}: ${title}`}>
+                        <DashboardInstrumentThumb sources={imageSources} title={title} />
+                        <div className={styles.instrumentDetails}>
+                          <div className={styles.instrumentInfo}>
+                            <strong>{title}</strong>
+                            <span title={meta}>{meta}</span>
+                            <ProfileStatusBadges record={instrument} includeCondition={false} />
+                          </div>
+                          <div className={styles.instrumentMeta}>
+                            {imageSources.length ? <span>{imageSources.length} {imageSources.length === 1 ? "photo" : "photos"}</span> : null}
+                            {serviceEntries.length ? <span>{serviceEntries.length} service {serviceEntries.length === 1 ? "entry" : "entries"}</span> : null}
+                            {totalDocs ? <span>{publicDocs} public {publicDocs === 1 ? "document" : "documents"}{hiddenDocs ? `, ${hiddenDocs} private` : ""}</span> : null}
+                            <span>{instrument.visibility === "private" ? "Private" : instrument.visibility === "unlisted" ? "Unlisted" : "Public"}</span>
+                          </div>
+                          <div className={styles.recordIdentity}>
+                            <div className={styles.compactQr}><CompactQr code={instrument.qrCode} label={title} /></div>
+                            <div className={styles.dashboardIdentity} aria-label="Profile identity">
+                              <span><b>QRguitar ID</b> {instrument.qrCode}</span>
+                              <span><b>Serial Number</b> {instrument.serial || "No serial number"}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </Link>
+                      <aside className={styles.qrActionColumn} aria-label={`Actions for ${title}`}>
+                        <div className={styles.primaryActions}>
+                          <Link className="button secondary" href={`/edit/${instrument.qrCode}`}>{getContentValue(content, "dashboard.card.edit")}</Link>
+                          <button className="button secondary" type="button" onClick={() => setQuickEditRecord(instrument)}>Quick Edit</button>
+                        </div>
+                        <button
+                          className={styles.moreButton}
+                          type="button"
+                          aria-haspopup="dialog"
+                          aria-label={`${getContentValue(content, "dashboard.card.more")} for ${title}`}
+                          title={getContentValue(content, "dashboard.card.more")}
+                          onClick={(event) => {
+                            setActionTrigger(event.currentTarget);
+                            setActionRecord(instrument);
+                          }}
+                        ><Ellipsis size={20} aria-hidden="true" /></button>
+                      </aside>
+                    </article>
+                  );
+                })
+              ) : (
+                <div className="card auth-card">
+                  <h3>{instruments.length ? "No matching Profiles." : dashboardCopy.emptyCollectionTitle}</h3>
+                  <p>{instruments.length ? "Try a different search or visibility filter." : dashboardCopy.emptyCollectionBody}</p>
+                  {instruments.length ? (
+                    <button className="button" type="button" onClick={() => { setActiveFilter("all"); setSearchQuery(""); }}>Show All Profiles</button>
+                  ) : (
+                    <Link className="button" href="/create">{dashboardCopy.firstRecordCtaLabel}</Link>
+                  )}
+                </div>
+              )}
+            </div>
+          </section>
+          <section className={styles.toolsArea} aria-label="Ownership and workspace tools">
+          <nav className={styles.toolLinks} aria-label="Owner tools">
+            <button type="button" onClick={focusServiceRequests}><Wrench size={15} /> Service review <span>{recordsLoaded ? pendingServiceRequests : "—"}</span></button>
+            <Link href="/ownership-claim">Ownership claims</Link>
+            <a href="#ownership-transfers">Ownership transfers <span>{recordsLoaded ? pendingTransfers : "—"}</span></a>
+            <Link href="/account?section=collection" title="Publish your public Profiles together and control member inquiries"><UsersRound size={15} /> Collection &amp; inquiries <span>{collectionHandle ? "Live" : "Set up"}</span></Link>
+          </nav>
+          <div className={styles.trustSummary} aria-label="Trust summary">
             <span><b>{recordsLoaded ? verifiedRecords : "—"}</b> Verified</span>
             <span><b>{recordsLoaded ? authenticityConfirmedRecords : "—"}</b> Authenticity Confirmed</span>
             {activeFilter !== "all" ? <button type="button" onClick={() => setActiveFilter("all")}>Clear filter</button> : null}
@@ -445,7 +543,7 @@ export default function DashboardPage() {
             </section>
           ) : null}
 
-          <details className="card dashboard-transfer-overview" id="ownership-transfers">
+          <details className={styles.transfers} id="ownership-transfers">
             <summary>Ownership transfers <span>{recordsLoaded ? pendingTransfers : "—"} pending</span></summary>
             <p>To send an instrument to a new owner, open its More menu below and choose Transfer Ownership. The instrument keeps its QRguitar ID, QR link, and history.</p>
             {transfers.filter((transfer) => transfer.status === "sent" && instrumentCodes.has(transfer.guitarQrCode.toUpperCase())).map((transfer) => {
@@ -456,97 +554,11 @@ export default function DashboardPage() {
               </div> : null;
             })}
           </details>
-          <section className={styles.instrumentTable} id="saved-profiles">
-            <div className={styles.tableHeader}>
-              <div>
-                <div className="eyebrow">Your instruments</div>
-                <h3>{getContentValue(content, "dashboard.collection.title")}</h3>
-              </div>
-              <Link className="button secondary" href="/create">Create Profile</Link>
-            </div>
-            <div className={styles.instrumentList}>
-              {loadingRecords ? (
-                <div className="card auth-card">
-                  <h3>Loading your Profiles...</h3>
-                  <p>Pulling your saved Profiles now.</p>
-                </div>
-              ) : !recordsLoaded && recordsError ? (
-                <div className="card auth-card"><h3>Collection unavailable</h3><p>Use Try again above to reload your Profiles.</p></div>
-              ) : displayedInstruments.length ? (
-                displayedInstruments.map((instrument) => {
-                  const totalDocs = instrument.documentFiles?.length || 0;
-                  const publicDocs = instrument.documentFiles?.filter((file) => file.visibility === "public").length || 0;
-                  const hiddenDocs = Math.max(0, totalDocs - publicDocs);
-                  const imageSources = getProfilePhotoUrls(instrument);
-                  const serviceEntries = getServiceHistoryEntries(instrument);
-                  const condition = getInstrumentCondition(instrument);
-                  const title = dashboardRecordTitle(instrument);
-                  const meta = dashboardRecordMeta(instrument, condition);
-                  const profileNumber = profileNumbers.get(instrument.qrCode) || 1;
-
-                  return (
-                    <article className={styles.instrumentRow} key={instrument.qrCode} aria-label={`Collection profile ${profileNumber}: ${title}`}>
-                      <Link className={styles.instrumentBodyLink} href={ownerProfileHref(instrument)} aria-label={`Open ${title} profile`}>
-                        <DashboardInstrumentThumb sources={imageSources} title={title} />
-                        <div className={styles.instrumentDetails}>
-                          <div className={styles.instrumentInfo}>
-                            <strong>{title}</strong>
-                            <span title={meta}>{meta}</span>
-                            <ProfileStatusBadges record={instrument} includeCondition={false} />
-                          </div>
-                          <div className={styles.instrumentMeta}>
-                            {imageSources.length ? <span>{imageSources.length} {imageSources.length === 1 ? "photo" : "photos"}</span> : null}
-                            {serviceEntries.length ? <span>{serviceEntries.length} service {serviceEntries.length === 1 ? "entry" : "entries"}</span> : null}
-                            {totalDocs ? <span>{publicDocs} public {publicDocs === 1 ? "document" : "documents"}{hiddenDocs ? `, ${hiddenDocs} private` : ""}</span> : null}
-                            <span>{instrument.visibility === "private" ? "Private" : instrument.visibility === "unlisted" ? "Unlisted" : "Public"}</span>
-                          </div>
-                          <div className={styles.recordIdentity}>
-                            <div className={styles.compactQr}><CompactQr code={instrument.qrCode} label={title} /></div>
-                            <div className={styles.dashboardIdentity} aria-label="Profile identity">
-                              <span><b>QRguitar ID</b> {instrument.qrCode}</span>
-                              <span><b>Serial Number</b> {instrument.serial || "No serial number"}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
-                      <aside className={styles.qrActionColumn} aria-label={`Actions for ${title}`}>
-                        <div className={styles.primaryActions}>
-                          <Link className="button" href={ownerProfileHref(instrument)}>{getContentValue(content, "dashboard.card.open")}</Link>
-                          <Link className="button secondary" href={`/edit/${instrument.qrCode}`}>{getContentValue(content, "dashboard.card.edit")}</Link>
-                          <button className="button secondary" type="button" onClick={() => setQuickEditRecord(instrument)}>Quick Edit</button>
-                        </div>
-                        <button
-                          className={styles.moreButton}
-                          type="button"
-                          aria-haspopup="dialog"
-                          aria-label={`${getContentValue(content, "dashboard.card.more")} for ${title}`}
-                          title={getContentValue(content, "dashboard.card.more")}
-                          onClick={(event) => {
-                            setActionTrigger(event.currentTarget);
-                            setActionRecord(instrument);
-                          }}
-                        ><Ellipsis size={20} aria-hidden="true" /></button>
-                      </aside>
-                    </article>
-                  );
-                })
-              ) : (
-                <div className="card auth-card">
-                  <h3>{instruments.length ? "No Profiles match this filter." : dashboardCopy.emptyCollectionTitle}</h3>
-                  <p>{instruments.length ? "Choose another collection metric or clear the filter." : dashboardCopy.emptyCollectionBody}</p>
-                  {instruments.length ? (
-                    <button className="button" type="button" onClick={() => setActiveFilter("all")}>Show All Profiles</button>
-                  ) : (
-                    <Link className="button" href="/create">{dashboardCopy.firstRecordCtaLabel}</Link>
-                  )}
-                </div>
-              )}
-            </div>
-          </section>
           <WorkspaceActions accountType={collectionAccountType} />
+          </section>
 
         </div>
-      </main>
+      </OwnerWorkspace>
       {quickEditRecord ? <ProfileQuickEdit key={`${renderedAccountRevision}:${quickEditRecord.qrCode}`} record={quickEditRecord} isSessionCurrent={() => accountRevision.current === renderedAccountRevision} onClose={() => { if (accountRevision.current === renderedAccountRevision) setQuickEditRecord(null); }} onSaved={(saved) => { if (accountRevision.current !== renderedAccountRevision) return; setInstruments((current) => current.map((item) => item.qrCode === saved.qrCode ? saved : item)); setQuickEditRecord(null); setDashboardMessage("Quick Edit saved."); }} /> : null}
       {actionRecord ? (
         <ActionDrawer eyebrow="Profile actions" title={dashboardRecordTitle(actionRecord)} returnFocusTo={actionTrigger} onClose={() => setActionRecord(null)}>
@@ -899,6 +911,13 @@ function matchesDashboardFilter(instrument: DemoInstrument, filter: DashboardFil
   if (filter === "public") return instrument.visibility === "public";
   if (filter === "private") return instrument.visibility === "private" || instrument.visibility === "unlisted";
   return true;
+}
+
+function matchesDashboardSearch(instrument: DemoInstrument, query: string) {
+  const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  const searchable = [instrument.name, instrument.brand, instrument.model, instrument.serial, instrument.qrCode, instrument.instrumentType]
+    .map((value) => String(value || "").toLocaleLowerCase()).join(" ");
+  return terms.every((term) => searchable.includes(term));
 }
 
 function dashboardRecordTitle(instrument: DemoInstrument) {

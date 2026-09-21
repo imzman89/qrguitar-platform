@@ -34,5 +34,5 @@ export function StartConversation({ handle, profileCode }: { handle: string; pro
     })();
   }, [handle, profileCode, router]);
 
-  return <div className={styles.state}>{error ? <MessageCircle /> : <LoaderCircle className={styles.spin} />}<h2>{error ? "Conversation unavailable" : "Opening conversation"}</h2><p>{error || "Creating a private QRguitar conversation."}</p>{error ? <><Link className="button" href={`/collections/${handle}`}>Return to member page</Link><Link className="text-link" href="/messages">Open Messages</Link></> : null}</div>;
+  return <div className={styles.state}>{error ? <MessageCircle /> : <LoaderCircle className={styles.spin} />}<h1>{error ? "Conversation unavailable" : "Opening conversation"}</h1><p>{error || "Creating a private QRguitar conversation."}</p>{error ? <><Link className="button" href={`/collections/${handle}`}>Return to member page</Link><Link className="text-link" href="/messages">Open Messages</Link></> : null}</div>;
 }

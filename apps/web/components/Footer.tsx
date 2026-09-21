@@ -7,6 +7,8 @@ import { defaultSiteSettings, fetchPublishedSiteSettings, type EditableSiteSetti
 import { useAuthNavigation } from "../lib/use-auth-navigation";
 import { getContentValue } from "../lib/content-registry";
 
+import styles from "./Footer.module.css";
+
 export function Footer() {
   const [settings, setSettings] = useState<EditableSiteSettings>(defaultSiteSettings);
   const { signedIn: isSignedIn, signingOut, logoutError, logout } = useAuthNavigation();
@@ -26,14 +28,14 @@ export function Footer() {
     ?.blocks.filter((block) => block.visible) || [];
 
   return (
-    <footer className="footer">
+    <footer className={`footer ${styles.footer}`}>
       <div className="shell footer-grid">
         <div className="footer-brand-block">
           <BrandLogo className="brand-logo brand-logo--footer" />
           <p>{getContentValue(settings.content, "global.footer.description") || settings.tagline}</p>
         </div>
         <nav className="footer-links" aria-label="Footer navigation">
-          {footerLinks.map((item) => <Link href={item.ctaUrl || "/"} key={item.id}>{item.ctaLabel || item.title}</Link>)}
+          {footerLinks.filter((item) => isSignedIn || item.ctaUrl !== "/dashboard").map((item) => <Link href={item.ctaUrl || "/"} key={item.id}>{item.ctaLabel || item.title}</Link>)}
           {isSignedIn ? (
             <button type="button" disabled={signingOut} onClick={() => void logout()}>{signingOut ? "Signing out..." : "Logout"}</button>
           ) : (

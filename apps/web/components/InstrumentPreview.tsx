@@ -38,7 +38,16 @@ export function InstrumentPreview({
     ? [makeModel, year.trim(), formatRecordLocation({ location })].filter(Boolean).join(" • ")
     : [year.trim(), formatRecordLocation({ location })].filter(Boolean).join(" • ");
   const formattedLocation = formatRecordLocation({ location });
-  const visibleFields = customFields.filter((field) => field.label.trim() && field.value.trim()).slice(0, 4);
+  const shownTypes = new Set<string>();
+  const visibleFields = customFields.filter((field) => {
+    if (!field.label.trim() || !field.value.trim()) return false;
+    if (["type", "instrument type"].includes(field.label.trim().toLowerCase())) {
+      const value = field.value.trim().toLowerCase();
+      if (shownTypes.has(value)) return false;
+      shownTypes.add(value);
+    }
+    return true;
+  }).slice(0, 4);
   const visibleLinks = customLinks.filter((link) => link.label.trim() && link.url.trim()).slice(0, 3);
 
   return (

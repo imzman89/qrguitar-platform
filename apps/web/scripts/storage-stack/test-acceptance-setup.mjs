@@ -82,11 +82,27 @@ test('fresh full repository schema needs exactly two operator-provisioned privat
     const readiness = async () => (await db.query('select public.qrguitar_release_readiness() value')).rows[0].value;
     const before = await readiness();
     assert.equal(before.ready, false);
+    const manifest = JSON.parse(fs.readFileSync(path.join(repo, 'apps/web/scripts/release-readiness-manifest.json'), 'utf8'));
+    assert.equal(manifest.releaseVersion, '2026-09-17.13', 'Review the fixed diagnostic vocabulary when the schema contract changes');
+    const beforeProjection = readinessProjection(before, manifest);
+    assert.equal(beforeProjection.ready, false);
+    assert.equal(beforeProjection.exactCheckSet, true);
+    assert.deepEqual(beforeProjection.checks.filter(row => !row.ok), [{ name: 'private_storage_buckets', ok: false }]);
     assert.deepEqual(before.checks.filter(item => !item.ok).map(item => item.name), ['private_storage_buckets']);
-    assert.deepEqual((await db.query('select id from storage.buckets order by id')).rows.map(row => row.id), ['service-evidence']);
+    assert.deepEqual((await db.query('select id, public from storage.buckets order by id')).rows, [
+      { id: 'member-message-media', public: false }, { id: 'service-evidence', public: false }
+    ]);
     for (const id of ['instrument-media', 'instrument-documents']) await db.query('insert into storage.buckets(id,name,public)values($1,$1,false)', [id]);
     const after = await readiness(); assert.equal(after.ready, true); assert.equal(after.checks.length, 14); assert.ok(after.checks.every(item => item.ok));
-    assert.equal(after.releaseVersion, JSON.parse(fs.readFileSync(path.join(repo, 'apps/web/scripts/release-readiness-manifest.json'), 'utf8')).releaseVersion);
+    assert.equal(after.releaseVersion, manifest.releaseVersion);
+    const expectedProjection = { expectedReleaseVersion: manifest.releaseVersion, releaseVersion: manifest.releaseVersion,
+      ready: true, exactCheckSet: true, checks: READINESS_LABELS.map(name => ({ name, ok: true })) };
+    const projection = readinessProjection({ ...after, privateData: 'never-print-private-actor',
+      checks: after.checks.map(row => ({ ...row, detail: '?token=never-print-capability' })) }, manifest);
+    assert.deepEqual(projection, expectedProjection);
+    const printed = safeReport(projection);
+    assert.ok(!printed.includes('never-print'));
+    assert.deepEqual(JSON.parse(printed), expectedProjection);
     assert.equal((await db.query('select count(*)::int n from auth.users')).rows[0].n, 0);
     assert.equal((await db.query('select count(*)::int n from storage.objects')).rows[0].n, 0);
   } finally { globalThis.fetch = savedFetch; await db.close(); }
@@ -176,4 +192,22 @@ test('readiness projection excludes private RPC fields and arbitrary version/che
 test('readiness projection rejects a manifest outside the fixed diagnostic vocabulary', () => {
   assert.throws(() => readinessProjection({}, { releaseVersion: '2026-09-17.6', checks: ['private-label'] }));
   assert.throws(() => readinessProjection({}, { ...readinessManifest(), releaseVersion: 'private-version' }));
+});
+
+test('current manifest accepts only reviewed diagnostic values and rejects future or private versions', () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(repo, 'apps/web/scripts/release-readiness-manifest.json'), 'utf8'));
+  for (const releaseVersion of ['2026-09-17.11', '2026-09-17.12', '2026-09-17.14', '?token=private-version']) {
+    assert.throws(() => readinessProjection({}, { ...manifest, releaseVersion }));
+    const projected = readinessProjection({ releaseVersion, ready: '?token=private-ready', privateData: 'never-print',
+      checks: [{ name: 'private-actor-label', ok: true }, { name: 'function_security', ok: '?token=private-flag' }] }, manifest);
+    assert.equal(projected.expectedReleaseVersion, manifest.releaseVersion);
+    assert.equal(projected.releaseVersion, 'unexpected');
+    assert.equal(projected.ready, null);
+    assert.equal(projected.exactCheckSet, false);
+    assert.deepEqual(projected.checks, READINESS_LABELS.map(name => ({ name, ok: null })));
+    const printed = safeReport(projected);
+    assert.ok(!printed.includes(releaseVersion));
+    assert.ok(!printed.includes('never-print'));
+    assert.ok(!printed.includes('private-actor-label'));
+  }
 });

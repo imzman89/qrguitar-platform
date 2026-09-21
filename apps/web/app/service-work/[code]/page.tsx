@@ -1,5 +1,6 @@
 "use client";
 
+import workflow from "../../../components/WorkflowWorkspace.module.css";
 import { ArrowLeft, CheckCircle2, FileLock2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
@@ -15,7 +16,7 @@ import styles from "./service-evidence.module.css";
 const categories = ["Setup", "Repair", "Electronics", "Fretwork", "Structural Repair", "Finish Work", "Restoration", "Modification", "Inspection", "Appraisal", "Amplifier Service", "Other"];
 
 export default function ServiceWorkPage() {
-  return <Suspense fallback={<><Nav /><main className="service-work-page"><section className="section"><div className="shell service-work-shell"><p role="status">Loading service work...</p></div></section></main><Footer /></>}><ServiceWorkRoute /></Suspense>;
+  return <Suspense fallback={<><Nav /><main className={`service-work-page ${workflow.service}`}><section className="section"><div className="shell service-work-shell"><p role="status">Loading service work...</p></div></section></main><Footer /></>}><ServiceWorkRoute /></Suspense>;
 }
 
 function ServiceWorkRoute() {
@@ -63,7 +64,7 @@ function ServiceWorkEditor({ qrCode, requestedId }: { qrCode: string; requestedI
   const recoveryBlocked = Boolean(submission && (recovery.phase !== "confirmed" || recovery.attempt || recovery.pendingCount > 0));
   const disabled = Boolean(busy) || closed || Boolean(state.uncertain) || recoveryBlocked;
 
-  return <><Nav /><main className="service-work-page"><section className="section"><div className="shell service-work-shell">
+  return <><Nav /><main className={`service-work-page ${workflow.service}`}><section className="section"><div className="shell service-work-shell">
     <Link className="text-link service-back" href={`/i/${encodeURIComponent(qrCode)}`}><ArrowLeft size={16} /> Back to Profile</Link>
     <p><Link className="text-link" href="/dashboard/service">Recent service work</Link></p>
     <div className="service-work-heading"><div><div className="eyebrow">Service provider workspace</div><h1>{getContentValue(content, "serviceProviders.hero.headline")}</h1><p>{getContentValue(content, "serviceProviders.hero.body")}</p></div><div className="service-privacy-note"><FileLock2 /><strong>{getContentValue(content, "serviceProviders.evidence.label")}</strong><span>{getContentValue(content, "serviceProviders.evidence.help")}</span></div></div>

@@ -269,6 +269,7 @@ function renderAdmin(overrides = {}) {
   const component = { exports: {} };
   new Function("require", "module", "exports", compiled)(specifier => {
     if (specifier === "react") return { ...React, useEffect() {}, useState(initial) { const name = names[index++]; assert.ok(name); return [Object.hasOwn(state, name) ? state[name] : typeof initial === "function" ? initial() : initial, () => {}]; } };
+    if (specifier.endsWith(".module.css")) return new Proxy({}, { get: (_target, key) => key === "__esModule" ? false : String(key) });
     if (specifier === "next/link") return ({ children, ...props }) => React.createElement("a", props, children);
     if (specifier.endsWith("/Nav")) return { Nav: () => null };
     if (specifier.endsWith("/Footer")) return { Footer: () => null };

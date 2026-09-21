@@ -8,6 +8,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Footer } from "../../../components/Footer";
 import { InstrumentPreview } from "../../../components/InstrumentPreview";
+import { EditorTimelineEntry } from "../../../components/EditorTimelineEntry";
 import { Nav } from "../../../components/Nav";
 import { PhotoOrganizer, type PhotoOrganizerStatus } from "../../../components/PhotoOrganizer";
 import { getContentValue } from "../../../lib/content-registry";
@@ -26,6 +27,7 @@ import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../../li
 import { qrCodeFromSerial } from "../../../lib/qrguitar-id";
 import { canonicalInstrumentBrand, establishedInstrumentBrands } from "../../../lib/instrument-brands";
 import { useSiteContent } from "../../../lib/use-site-content";
+import styles from "./edit.module.css";
 
 const emptyForm = {
   name: "",
@@ -1058,12 +1060,19 @@ export default function EditInstrumentPage() {
   return ready && original && !forbidden ? (
     <>
       <Nav />
-      <main className="section create-page">
-        <div className="shell split create-layout">
+      <main className={`${styles.page} section create-page`}>
+        <div className={`${styles.layout} shell create-layout`}>
           <div>
             <div className="eyebrow">Edit Profile</div>
             <h1>{getContentValue(content, "edit.hero.headline")}</h1>
             <p>{getContentValue(content, "edit.hero.body")}</p>
+            {original.safetyStatus === "lost" || original.safetyStatus === "stolen" ? (
+              <div className={styles.safetyNotice}>
+                <strong>{safetyStatusLabel(original.safetyStatus)}</strong>
+                <span>This Profile has an active safety alert.</span>
+                <a href="#privacy-safety">Review safety status</a>
+              </div>
+            ) : null}
               <div className="permanent-id">
                 <span>QRguitar ID</span>
                 <strong>{qrCodeFromSerial(form.serial) || original?.qrCode || code}</strong>
@@ -1103,6 +1112,7 @@ export default function EditInstrumentPage() {
                 <a aria-current={activeEditorSection === "service" ? "location" : undefined} href="#service">Service</a>
                 <a aria-current={activeEditorSection === "media" ? "location" : undefined} href="#media">Media</a>
                 <a aria-current={activeEditorSection === "documents" ? "location" : undefined} href="#documents">Documents</a>
+                <a aria-current={activeEditorSection === "trust-verification" ? "location" : undefined} href="#trust-verification">Trust</a>
                 <a aria-current={activeEditorSection === "privacy-safety" ? "location" : undefined} href="#privacy-safety">Privacy &amp; Safety</a>
                 <a aria-current={activeEditorSection === "qr-print" ? "location" : undefined} href="#qr-print">QR &amp; Print</a>
               </nav>
@@ -1125,135 +1135,11 @@ export default function EditInstrumentPage() {
                   <option value="service">Service</option>
                   <option value="media">Media</option>
                   <option value="documents">Documents</option>
+                  <option value="trust-verification">Trust</option>
                   <option value="privacy-safety">Privacy &amp; Safety</option>
                   <option value="qr-print">QR &amp; Print</option>
                 </select>
               </label>
-              <section className="card verification-card" aria-label="Trust and verification">
-                <div>
-                  <span className="eyebrow">Trust & Verification</span>
-                  <h3>{verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"}</h3>
-                  <p>
-                    {verificationStatus === "verified"
-                      ? "This Profile is verified by QRguitar."
-                      : "Verified Profiles are available with paid QRguitar verification. Paid verification is handled manually during beta."}
-                  </p>
-                  <p>
-                    {authenticityStatus === "confirmed"
-                      ? "Authenticity confirmed by QRguitar from available evidence."
-                      : "Authenticity confirmation is available as a paid review feature. Paid verification and authenticity review are handled manually during beta."}
-                  </p>
-                </div>
-                <div className="form-grid">
-                  {canManageVerification ? (
-                    <>
-                    <div className="form-section-heading custom-wide">
-                      <span className="eyebrow">Admin Trust Controls</span>
-                      <p>Set binary trust badges and notes. These changes save through the main Save Changes button.</p>
-                    </div>
-                    <div className="field">
-                      <label htmlFor="verificationStatus">Admin verification status</label>
-                      <select
-                        id="verificationStatus"
-                        value={verificationStatus}
-                        onChange={(event) => setVerificationStatus(event.target.value === "verified" ? "verified" : "unverified")}
-                      >
-                        <option value="unverified">Unverified</option>
-                        <option value="verified">Verified</option>
-                      </select>
-                    </div>
-                    <div className="field">
-                      <label htmlFor="authenticityStatus">Admin authenticity status</label>
-                      <select
-                        id="authenticityStatus"
-                        value={authenticityStatus}
-                        onChange={(event) => setAuthenticityStatus(event.target.value === "confirmed" ? "confirmed" : "unconfirmed")}
-                      >
-                        <option value="unconfirmed">Authenticity Unconfirmed</option>
-                        <option value="confirmed">Authenticity Confirmed</option>
-                      </select>
-                    </div>
-                    <label className="toggle-field custom-wide">
-                      <input type="checkbox" checked={serialExceptionApproved} onChange={(event) => setSerialExceptionApproved(event.target.checked)} />
-                      Approve verification/authenticity exception for a no-serial brand, retailer, or build
-                    </label>
-                    <div className="field custom-wide">
-                      <label htmlFor="internalVerificationNote">Internal verification note</label>
-                      <textarea id="internalVerificationNote" rows={3} value={internalVerificationNote} onChange={(event) => setInternalVerificationNote(event.target.value)} />
-                    </div>
-                    <div className="field custom-wide">
-                      <label htmlFor="publicVerificationNote">Public verification note</label>
-                      <textarea id="publicVerificationNote" rows={3} value={publicVerificationNote} onChange={(event) => setPublicVerificationNote(event.target.value)} />
-                    </div>
-                    <div className="field custom-wide">
-                      <label htmlFor="internalAuthenticityNote">Internal authenticity note</label>
-                      <textarea id="internalAuthenticityNote" rows={3} value={internalAuthenticityNote} onChange={(event) => setInternalAuthenticityNote(event.target.value)} />
-                    </div>
-                    <div className="field custom-wide">
-                      <label htmlFor="publicAuthenticityNote">Public authenticity note</label>
-                      <textarea id="publicAuthenticityNote" rows={3} value={publicAuthenticityNote} onChange={(event) => setPublicAuthenticityNote(event.target.value)} />
-                    </div>
-                    </>
-                  ) : null}
-                  <label className="toggle-field">
-                    <input type="checkbox" checked={showVerificationBadge} onChange={(event) => setShowVerificationBadge(event.target.checked)} />
-                    Show verification badge publicly
-                  </label>
-                  <label className="toggle-field">
-                    <input type="checkbox" checked={showAuthenticityBadge} onChange={(event) => setShowAuthenticityBadge(event.target.checked)} />
-                    Show authenticity status publicly
-                  </label>
-                  {authenticityStatus === "confirmed" && !showAuthenticityBadge ? <p className="field-note custom-wide">Authenticity is confirmed, but the public badge is currently hidden. Turn this on and use Save Changes to publish it.</p> : null}
-                </div>
-              </section>
-              <section className="card verification-card" id="privacy-safety" aria-label="Lost or stolen alert">
-                <div>
-                  <span className="eyebrow">Lost / Stolen Alert</span>
-                  <h3>{safetyStatusLabel(safetyStatus)}</h3>
-                  <p>Mark a record lost or stolen so anyone who scans the QR can see the alert.</p>
-                </div>
-                <div className="form-grid">
-                  <div className="field">
-                    <label htmlFor="safetyStatus">Current status</label>
-                    <select
-                      id="safetyStatus"
-                      value={safetyStatus}
-                      onChange={(event) => setSafetyStatus(event.target.value === "lost" || event.target.value === "stolen" || event.target.value === "recovered" ? event.target.value : "clear")}
-                    >
-                      <option value="clear">No Alert</option>
-                      <option value="lost">Reported Lost</option>
-                      <option value="stolen">Reported Stolen</option>
-                      <option value="recovered">Recovered</option>
-                    </select>
-                  </div>
-                  {safetyStatus === "clear" ? (
-                    <div className="field custom-wide">
-                      <label>No public safety alert</label>
-                      <span className="fine-print">No public safety alert is shown while status is No Alert.</span>
-                    </div>
-                  ) : (
-                    <div className="field custom-wide">
-                      <label htmlFor="publicSafetyNote">Public safety note</label>
-                      <textarea
-                        id="publicSafetyNote"
-                        rows={3}
-                        value={publicSafetyNote}
-                        onChange={(event) => setPublicSafetyNote(event.target.value)}
-                        placeholder={safetyStatus === "lost" ? "Reported Lost: This instrument has been marked lost by the current owner." : safetyStatus === "stolen" ? "Reported Stolen: This instrument has been marked stolen by the current owner." : "Recovered status note."}
-                      />
-                    </div>
-                  )}
-                  <div className="field custom-wide">
-                    <label htmlFor="safetyNote">Private/internal note</label>
-                    <textarea
-                      id="safetyNote"
-                      rows={3}
-                      value={safetyNote}
-                      onChange={(event) => setSafetyNote(event.target.value)}
-                    />
-                  </div>
-                </div>
-              </section>
             <form className="card form" id="identity">
               <input
                 aria-hidden="true"
@@ -1764,30 +1650,7 @@ export default function EditInstrumentPage() {
                 {serviceEvents.length ? (
                   <div className="timeline-list">
                     {serviceEvents.map((entry) => (
-                      <article className="timeline-item" key={entry.id}>
-                        <span>{entry.serviceDate || "Date unavailable"} · {entry.isPublic ? "Public" : "Private"}</span>
-                        <h3>{entry.title}</h3>
-                        <p className="service-provenance">
-                          {entry.sourceKind === "provider_submitted_owner_approved"
-                            ? `Provider-submitted · Owner-approved${entry.providerVerifiedAt ? " · Verified Service Provider" : ""}${entry.evidenceReviewedAt ? " · QRguitar-reviewed evidence" : ""}`
-                            : "Owner-reported service"}
-                        </p>
-                        <p>{[entry.eventType, entry.shopName, entry.location].filter(Boolean).join(" · ") || "Service entry"}</p>
-                        {entry.publicDescription ? <p>{entry.publicDescription}</p> : null}
-                        {entry.privateNotes ? <p className="fine-print">Private: {entry.privateNotes}</p> : null}
-                        {entry.canEdit === false ? (
-                          <p className="fine-print">{entry.lockedReason || "Locked historical service entry. Contact QRguitar admin to correct provenance."}</p>
-                        ) : (
-                          <div className="form-actions">
-                            <button className="button secondary" type="button" onClick={() => editServiceEvent(entry)}>
-                              Edit Entry
-                            </button>
-                            <button className="button secondary" type="button" onClick={() => void deleteServiceEntry(entry)} disabled={savingService}>
-                              Delete Entry
-                            </button>
-                          </div>
-                        )}
-                      </article>
+                      <EditorTimelineEntry key={entry.id} entry={entry} saving={savingService} onEdit={editServiceEvent} onDelete={(event) => void deleteServiceEntry(event)} />
                     ))}
                   </div>
                 ) : (
@@ -1824,6 +1687,134 @@ export default function EditInstrumentPage() {
                   </label>
                 </div>
               </section>
+            </form>
+            <div className={styles.secondarySections}>
+              <section className="card verification-card" id="trust-verification" aria-label="Trust and verification">
+                <div>
+                  <span className="eyebrow">Trust & Verification</span>
+                  <h3>{verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"}</h3>
+                  <p>
+                    {verificationStatus === "verified"
+                      ? "This Profile is verified by QRguitar."
+                      : "Verified Profiles are available with paid QRguitar verification. Paid verification is handled manually during beta."}
+                  </p>
+                  <p>
+                    {authenticityStatus === "confirmed"
+                      ? "Authenticity confirmed by QRguitar from available evidence."
+                      : "Authenticity confirmation is available as a paid review feature. Paid verification and authenticity review are handled manually during beta."}
+                  </p>
+                </div>
+                <div className="form-grid">
+                  {canManageVerification ? (
+                    <>
+                    <div className="form-section-heading custom-wide">
+                      <span className="eyebrow">Admin Trust Controls</span>
+                      <p>Set binary trust badges and notes. These changes save through the main Save Changes button.</p>
+                    </div>
+                    <div className="field">
+                      <label htmlFor="verificationStatus">Admin verification status</label>
+                      <select
+                        id="verificationStatus"
+                        value={verificationStatus}
+                        onChange={(event) => setVerificationStatus(event.target.value === "verified" ? "verified" : "unverified")}
+                      >
+                        <option value="unverified">Unverified</option>
+                        <option value="verified">Verified</option>
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label htmlFor="authenticityStatus">Admin authenticity status</label>
+                      <select
+                        id="authenticityStatus"
+                        value={authenticityStatus}
+                        onChange={(event) => setAuthenticityStatus(event.target.value === "confirmed" ? "confirmed" : "unconfirmed")}
+                      >
+                        <option value="unconfirmed">Authenticity Unconfirmed</option>
+                        <option value="confirmed">Authenticity Confirmed</option>
+                      </select>
+                    </div>
+                    <label className="toggle-field custom-wide">
+                      <input type="checkbox" checked={serialExceptionApproved} onChange={(event) => setSerialExceptionApproved(event.target.checked)} />
+                      Approve verification/authenticity exception for a no-serial brand, retailer, or build
+                    </label>
+                    <div className="field custom-wide">
+                      <label htmlFor="internalVerificationNote">Internal verification note</label>
+                      <textarea id="internalVerificationNote" rows={3} value={internalVerificationNote} onChange={(event) => setInternalVerificationNote(event.target.value)} />
+                    </div>
+                    <div className="field custom-wide">
+                      <label htmlFor="publicVerificationNote">Public verification note</label>
+                      <textarea id="publicVerificationNote" rows={3} value={publicVerificationNote} onChange={(event) => setPublicVerificationNote(event.target.value)} />
+                    </div>
+                    <div className="field custom-wide">
+                      <label htmlFor="internalAuthenticityNote">Internal authenticity note</label>
+                      <textarea id="internalAuthenticityNote" rows={3} value={internalAuthenticityNote} onChange={(event) => setInternalAuthenticityNote(event.target.value)} />
+                    </div>
+                    <div className="field custom-wide">
+                      <label htmlFor="publicAuthenticityNote">Public authenticity note</label>
+                      <textarea id="publicAuthenticityNote" rows={3} value={publicAuthenticityNote} onChange={(event) => setPublicAuthenticityNote(event.target.value)} />
+                    </div>
+                    </>
+                  ) : null}
+                  <label className="toggle-field">
+                    <input type="checkbox" checked={showVerificationBadge} onChange={(event) => setShowVerificationBadge(event.target.checked)} />
+                    Show verification badge publicly
+                  </label>
+                  <label className="toggle-field">
+                    <input type="checkbox" checked={showAuthenticityBadge} onChange={(event) => setShowAuthenticityBadge(event.target.checked)} />
+                    Show authenticity status publicly
+                  </label>
+                  {authenticityStatus === "confirmed" && !showAuthenticityBadge ? <p className="field-note custom-wide">Authenticity is confirmed, but the public badge is currently hidden. Turn this on and use Save Changes to publish it.</p> : null}
+                </div>
+              </section>
+              <section className="card verification-card" id="privacy-safety" aria-label="Lost or stolen alert">
+                <div>
+                  <span className="eyebrow">Lost / Stolen Alert</span>
+                  <h3>{safetyStatusLabel(safetyStatus)}</h3>
+                  <p>Mark a record lost or stolen so anyone who scans the QR can see the alert.</p>
+                </div>
+                <div className="form-grid">
+                  <div className="field">
+                    <label htmlFor="safetyStatus">Current status</label>
+                    <select
+                      id="safetyStatus"
+                      value={safetyStatus}
+                      onChange={(event) => setSafetyStatus(event.target.value === "lost" || event.target.value === "stolen" || event.target.value === "recovered" ? event.target.value : "clear")}
+                    >
+                      <option value="clear">No Alert</option>
+                      <option value="lost">Reported Lost</option>
+                      <option value="stolen">Reported Stolen</option>
+                      <option value="recovered">Recovered</option>
+                    </select>
+                  </div>
+                  {safetyStatus === "clear" ? (
+                    <div className="field custom-wide">
+                      <label>No public safety alert</label>
+                      <span className="fine-print">No public safety alert is shown while status is No Alert.</span>
+                    </div>
+                  ) : (
+                    <div className="field custom-wide">
+                      <label htmlFor="publicSafetyNote">Public safety note</label>
+                      <textarea
+                        id="publicSafetyNote"
+                        rows={3}
+                        value={publicSafetyNote}
+                        onChange={(event) => setPublicSafetyNote(event.target.value)}
+                        placeholder={safetyStatus === "lost" ? "Reported Lost: This instrument has been marked lost by the current owner." : safetyStatus === "stolen" ? "Reported Stolen: This instrument has been marked stolen by the current owner." : "Recovered status note."}
+                      />
+                    </div>
+                  )}
+                  <div className="field custom-wide">
+                    <label htmlFor="safetyNote">Private/internal note</label>
+                    <textarea
+                      id="safetyNote"
+                      rows={3}
+                      value={safetyNote}
+                      onChange={(event) => setSafetyNote(event.target.value)}
+                    />
+                  </div>
+                </div>
+              </section>
+            </div>
               {message ? <p className="form-message">{message}</p> : null}
               <div className="form-actions editor-save-bar">
                 <button className="button" type="button" onClick={() => void saveChanges(false)} disabled={savingRecord || savingSafety} aria-busy={recordSaveAction === "save"}>
@@ -1838,7 +1829,7 @@ export default function EditInstrumentPage() {
                   Back to Dashboard
                 </Link>
               </div>
-            </form>
+
           </div>
 
           <aside className="record-preview">

@@ -26,6 +26,7 @@ function loader(imports = {}, bindings = {}) {
     } }).outputText;
     new Function('require', 'module', 'exports', ...Object.keys(bindings), code)(name => {
       if (Object.hasOwn(imports, name)) return imports[name];
+      if (name.endsWith('.module.css')) return { __esModule: true, default: new Proxy({}, { get: (_target, key) => String(key) }) };
       if (!name.startsWith('.')) return require(name);
       const absolute = path.resolve(path.dirname(file), name);
       const relativeName = path.relative(file.startsWith(path.resolve(sourceRoot) + path.sep) ? sourceRoot : repo, absolute);
@@ -40,6 +41,7 @@ const settings = real('apps/web/lib/site-settings.ts');
 const registry = real('apps/web/lib/content-registry.ts');
 const bulk = real('apps/web/lib/bulk-import.ts');
 const editorClient = real('apps/web/lib/site-editor-client.ts');
+const editorServer = real('apps/web/lib/site-editor-server.ts');
 
 function hookRuntime() {
   let cursor = 0, dirty = true, mounted = true, tree, Component, props = {}, lateWrites = 0;
@@ -107,8 +109,8 @@ function browser(options) {
 async function editor(t, options = {}) {
   const f = hookRuntime(), b = browser(options), mutations = [];
   let generation = 0;
-  const payload = { ok: true, editorActorId: 'actor-a', publishedVersion: '0', draftVersion: '0', published: structuredClone(settings.defaultSiteSettings), draft: null, revisions: options.revisions || [] };
-  const mutate = async body => { mutations.push(body); return options.mutate ? options.mutate(body) : { ...payload, message: 'Saved fixture operation.', draft: body.settings || payload.published }; };
+  const payload = { ok: true, editorActorId: 'actor-a', publishedVersion: '0', draftVersion: '0', published: structuredClone(settings.defaultSiteSettings), draft: null, revisions: options.revisions || [], ...options.payload };
+  const mutate = async (body, versions) => { mutations.push(body); return options.mutate ? options.mutate(body, versions) : { ...payload, message: 'Saved fixture operation.', draft: body.settings || payload.published }; };
   const recovered = structuredClone(settings.defaultSiteSettings); recovered.colors.gold = '#abcdef';
   const pending = options.pendingIssue ? { localSnapshot: JSON.stringify(recovered) } : null;
   const EditorMutationError = editorClient.EditorMutationError;
@@ -128,7 +130,7 @@ async function editor(t, options = {}) {
       createEditorMutationController: () => ({ mutate, retry: () => { throw Error('Unexpected retry'); }, pending, storageProblem: null }) },
     '../../lib/site-preview-client': { clearSitePreviewCookie: async () => {}, openSiteDraftPreview: async () => '/fixture', sitePreviewGeneration: () => generation, sitePreviewInvalidatedEvent: 'fixture-invalidate' },
     '../../lib/supabase-browser': { getSupabaseAccessToken: async () => 'fixture-token', createBrowserSupabaseClient: () => ({ auth: { getSession: async () => ({ data: { session: { user: { id: 'actor-a' }, access_token: 'fixture-token' } } }) } }) }
-  }, { window: b.window, document: b.document, navigator: b.navigator, URL: b.URL, crypto: { randomUUID: () => 'fixture-request' }, fetch: fetchEditor });
+  }, { window: b.window, document: b.document, navigator: b.navigator, URL: b.URL, HTMLElement: class {}, crypto: { randomUUID: () => 'fixture-request' }, fetch: fetchEditor });
   f.mount(load('apps/web/app/site-editor/page.tsx').default); await f.flush();
   if (!options.loadError) { f.click('Advanced'); f.click('Advanced JSON'); await f.flush(); }
   t.after(() => f.dispose());
@@ -166,6 +168,116 @@ async function importer(t, options = {}) {
   });
 }
 
+test('editor headline autosave preserves explicitly saved typed defaults and unrelated settings', async t => {
+  const published = settings.mergeSiteSettings(structuredClone(settings.defaultSiteSettings));
+  const expected = structuredClone(published);
+  expected.content['home.hero.headline'] = 'Browser CMS Review 20260920';
+  expected.hero.headline = 'Browser CMS Review 20260920';
+  const f = await editor(t, { payload: { published } });
+  f.click('Content');
+  f.find(node => node.type === 'input' && node.props.id === 'content-home-hero-headline').props.onChange({ target: { value: expected.hero.headline } });
+  f.render(); f.runAutosave(); await f.flush();
+  assert.equal(f.mutations.length, 1);
+  assert.equal(f.mutations[0].action, 'save_draft');
+  assert.deepEqual(f.mutations[0].settings, expected, 'a headline edit must not replace saved typed defaults with legacy SEO or dashboard aliases');
+});
+
+test('shared settings normalization preserves explicit typed defaults over legacy aliases', () => {
+  const source = structuredClone(settings.defaultSiteSettings);
+  const merged = settings.mergeSiteSettings(source);
+  for (const key of ['seo.global.title', 'seo.global.description', 'dashboard.empty.title', 'dashboard.empty.body']) {
+    assert.equal(merged.content[key], source.content[key]);
+  }
+  assert.deepEqual(settings.mergeSiteSettings(merged), merged, 'normalization is idempotent for saved typed content');
+});
+
+test('shared settings normalization backfills absent typed keys from actual legacy values only', () => {
+  const legacy = { hero: { headline: 'Legacy homepage headline' }, seo: { title: 'Legacy title' }, dashboard: { emptyCollectionTitle: 'Legacy collection title' } };
+  const merged = settings.mergeSiteSettings(legacy);
+  assert.equal(merged.content['home.hero.headline'], 'Legacy homepage headline');
+  assert.equal(merged.content['seo.global.title'], 'Legacy title');
+  assert.equal(merged.content['dashboard.empty.title'], 'Legacy collection title');
+  assert.equal(merged.content['dashboard.empty.body'], registry.defaultContentValues['dashboard.empty.body'], 'missing legacy values must not override current defaults');
+  const explicit = settings.mergeSiteSettings({ ...legacy, content: { 'seo.global.title': registry.defaultContentValues['seo.global.title'], 'home.hero.headline': '' } });
+  assert.equal(explicit.content['seo.global.title'], registry.defaultContentValues['seo.global.title']);
+  assert.equal(explicit.content['home.hero.headline'], registry.defaultContentValues['home.hero.headline'], 'an empty required typed field keeps registry fallback behavior instead of inheriting a legacy alias');
+});
+
+test('editor load preserves a stored draft whose different wording normalizes to the published value', async t => {
+  const publishedValue = structuredClone(settings.defaultSiteSettings);
+  publishedValue.content['contact.hero.body'] = 'Browse instrument profiles.';
+  const draftSettings = structuredClone(publishedValue);
+  draftSettings.content['contact.hero.body'] = 'Browse instrument records.';
+  assert.notDeepEqual(draftSettings, publishedValue, 'the stored draft contains a real text difference');
+  const payload = editorServer.mapEditorState({
+    publishedValue, publishedVersion: 'published-original', publishedAt: '2026-09-20T12:00:00Z',
+    draftValue: { settings: draftSettings, note: 'Existing wording draft', changedFields: ['contact.hero.body'] },
+    draftVersion: 'draft-original', draftUpdatedAt: '2026-09-20T12:01:00Z', revisionRows: []
+  });
+  assert.deepEqual(payload.draft, payload.published, 'the actual API normalizer hides this stored difference');
+  const f = await editor(t, { payload });
+  assert.deepEqual(f.mutations, [], 'loading only reads the snapshot before the timer');
+  f.runAutosave(); await f.flush();
+  assert.deepEqual(f.mutations, [], 'opening the editor must not discard an existing draft based on normalized equality');
+});
+test('opening identical or different shared drafts keeps them until an explicit action', async t => {
+  for (const changed of [false, true]) {
+    const published = structuredClone(settings.defaultSiteSettings);
+    const draft = structuredClone(published);
+    if (changed) draft.content['contact.hero.body'] = 'A separate shared draft change.';
+    const payload = { published, draft, draftMeta: { note: 'Keep this draft' }, publishedVersion: 'p-observed', draftVersion: 'd-observed' };
+    const f = await editor(t, { payload });
+    f.runAutosave(); await f.flush();
+    assert.deepEqual(f.mutations, [], changed ? 'an unrelated effective draft is not re-saved or discarded' : 'an identical draft is not discarded on entry');
+    assert.equal(f.button('Discard draft').props.disabled, false, 'the confirmed discard remains available');
+    assert.equal(JSON.parse(f.json().props.value).content['contact.hero.body'], draft.content['contact.hero.body']);
+  }
+});
+
+test('dirty edits still autosave using observed versions and preserving another draft field', async t => {
+  const published = structuredClone(settings.defaultSiteSettings), draft = structuredClone(published);
+  draft.content['contact.hero.body'] = 'Existing shared draft text.';
+  const payload = { published, draft, draftMeta: { note: 'Existing draft' }, publishedVersion: 'p-loaded', draftVersion: 'd-loaded' };
+  let observedVersions;
+  const f = await editor(t, { payload, mutate: async (body, versions) => {
+    observedVersions = structuredClone(versions);
+    return { ...payload, draft: body.settings, draftVersion: 'd-saved', message: 'Draft saved.' };
+  } });
+  f.click('Content');
+  const field = f.find(node => node.type === 'input' && node.props.id === 'content-home-hero-headline');
+  field.props.onChange({ target: { value: 'An intentionally edited headline' } }); f.render();
+  f.runAutosave(); await f.flush();
+  assert.equal(f.mutations.length, 1);
+  assert.equal(f.mutations[0].action, 'save_draft');
+  assert.deepEqual(observedVersions, { publishedVersion: 'p-loaded', draftVersion: 'd-loaded' });
+  assert.equal(f.mutations[0].settings.content['home.hero.headline'], 'An intentionally edited headline');
+  assert.equal(f.mutations[0].settings.content['contact.hero.body'], 'Existing shared draft text.');
+});
+
+test('discard remains a confirmed action with the loaded published and draft versions', async t => {
+  const published = structuredClone(settings.defaultSiteSettings), draft = structuredClone(published);
+  draft.content['contact.hero.body'] = 'Draft selected for an intentional discard.';
+  const payload = { published, draft, draftMeta: { note: 'Existing draft' }, publishedVersion: 'p-discard', draftVersion: 'd-discard' };
+  let observedVersions;
+  const f = await editor(t, { payload, mutate: async (body, versions) => {
+    observedVersions = structuredClone(versions);
+    return { ...payload, draft: null, draftMeta: null, draftVersion: '', message: 'Draft discarded.' };
+  } });
+  f.click('Discard draft');
+  assert.match(f.text(), /Discard shared draft\?/);
+  assert.deepEqual(f.mutations, []);
+  f.click('Cancel');
+  assert.deepEqual(f.mutations, []);
+  f.click('Discard draft');
+  const dialog = f.find(node => node.props?.role === 'dialog' && node.props['aria-labelledby'] === 'cms-confirm-title');
+  const confirm = nodes(dialog).find(node => node.type === 'button' && text(node).trim() === 'Discard draft');
+  assert.ok(confirm && !confirm.props.disabled);
+  confirm.props.onClick(); f.render(); await f.flush();
+  assert.equal(f.mutations.length, 1);
+  assert.equal(f.mutations[0].action, 'discard_draft');
+  assert.deepEqual(observedVersions, { publishedVersion: 'p-discard', draftVersion: 'd-discard' });
+  assert.equal(f.button('Discard draft').props.disabled, true, 'confirmed discard clears the loaded draft');
+});
 test('admin Site Editor entry keeps its admin return path and sign-in continuation', async t => {
   const authorized = await editor(t, { pathname: '/admin/site-editor' });
   assert.ok(authorized.all().some(node => node.props?.href === '/admin' && text(node).includes('Back to Admin')));
@@ -188,6 +300,63 @@ test('pending exact-save recovery disables publish, discard and restore controls
   assert.equal(f.button('Retry the same save').props.disabled, false);
   f.click('Revision history');
   assert.equal(f.button('Restore to draft').props.disabled, true);
+});
+
+test('save recovery details remain outside the compact toolbar with usable actions and honest timestamps', async t => {
+  const f = await editor(t, { pendingIssue: true });
+  const toolbar = f.find(node => node.type === 'header' && node.props.className === 'cms-commandbar');
+  const notice = f.find(node => node.props?.role === 'alert' && node.props.className === 'issueNotice');
+  assert.equal(f.saveStatus(), 'Save needs attention');
+  assert.equal(nodes(toolbar).includes(notice), false, 'the detailed alert is not clipped by the toolbar');
+  assert.match(text(notice), /A previous save needs confirmation\. Retry it before making another change\./);
+  assert.doesNotMatch(text(toolbar), /A previous save needs confirmation|Export local changes|Retry the same save/);
+  for (const label of ['Export local changes', 'Retry the same save', 'Export and reload latest']) {
+    const button = f.button(label);
+    assert.ok(nodes(notice).includes(button), label + ' stays in the recovery notice');
+    assert.match(button.props.className, /button secondary/);
+  }
+  assert.equal(f.button('Retry the same save').props.disabled, false);
+  assert.equal(f.button('Publish').props.disabled, true);
+  assert.equal(f.button('Discard draft').props.disabled, true);
+  f.click('Export local changes');
+  assert.equal(f.downloads.length, 1);
+  assert.deepEqual(f.mutations, []);
+  assert.match(f.text(), /No saved draft/);
+  assert.match(f.text(), /Publish date unavailable/);
+  assert.doesNotMatch(f.text(), /DraftNone|PublishedNot yet/);
+});
+
+test('editor content and arrangement navigation preserve draft text without mutations', async t => {
+  const f = await editor(t); f.click('Content');
+  const field = f.find(node => node.type === 'input' && node.props.id === 'content-home-hero-headline');
+  field.props.onChange({ target: { value: 'My edited headline' } }); f.render();
+  f.click('Section arrangement');
+  assert.equal(f.all().filter(node => node.type === 'SiteCompositionEditor').length, 1);
+  assert.equal(f.all().some(node => node.props?.id === 'content-home-hero-headline'), false);
+  f.click('Page content');
+  assert.equal(f.find(node => node.type === 'input' && node.props.id === 'content-home-hero-headline').props.value, 'My edited headline');
+  assert.equal(f.mutations.length, 0);
+  const nav = f.find(node => node.props?.['aria-label'] === 'Page content sections');
+  const other = nodes(nav).filter(node => node.type === 'button')[1];
+  other.props.onClick(); f.render();
+  assert.equal(f.all().some(node => node.props?.id === 'content-home-hero-headline'), false);
+  assert.equal(f.all().filter(node => String(node.props?.className || '').includes('cms-content-section is-open')).length, 1);
+  const sectionPicker = f.find(node => node.type === 'select' && node.props.id === 'cms-active-section');
+  const firstSection = sectionPicker.props.children[0].props.value;
+  sectionPicker.props.onChange({ target: { value: firstSection } }); f.render();
+  assert.equal(f.find(node => node.props?.id === 'content-home-hero-headline').props.value, 'My edited headline');
+  f.click('Section arrangement'); f.click('Homepage'); f.click('Page content');
+  assert.equal(f.mutations.length, 0);
+});
+
+test('publishing confirmation states the complete shared-draft scope', async t => {
+  const f = await editor(t); f.click('Content');
+  f.find(node => node.type === 'input' && node.props.id === 'content-home-hero-headline').props.onChange({ target: { value: 'Another edited headline' } }); f.render();
+  f.click('Publish');
+  assert.match(f.text(), /Publish all draft changes\?/);
+  assert.match(f.text(), /will be published globally/);
+  assert.equal(f.mutations.length, 0);
+  f.click('Cancel'); assert.equal(f.mutations.length, 0);
 });
 
 test('editor copy confirms the exact settings export without changing save status', async t => {

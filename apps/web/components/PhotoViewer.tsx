@@ -33,6 +33,8 @@ export function PhotoViewer({ images, initialIndex = 0, title, onClose, onImageE
   const photos = filterAvailableImageSources(images, failedSources);
   const activeIndex = Math.max(0, photos.indexOf(selectedSource));
   const activeSource = photos[activeIndex];
+  const previousSource = photos[activeIndex - 1];
+  const nextSource = photos[activeIndex + 1];
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -59,7 +61,10 @@ export function PhotoViewer({ images, initialIndex = 0, title, onClose, onImageE
     setPan({ x: 0, y: 0 });
     const currentThumbnail = stripRef.current?.querySelector<HTMLElement>('[aria-current="true"]');
     currentThumbnail?.scrollIntoView({ block: "nearest", inline: "center", behavior: "instant" });
-    const adjacentSources = [photos[activeIndex - 1], photos[activeIndex + 1]].filter(Boolean);
+  }, [activeSource]);
+
+  useEffect(() => {
+    const adjacentSources = [previousSource, nextSource].filter(Boolean);
     adjacentSources.forEach((source) => {
       const image = new window.Image();
       image.decoding = "async";
@@ -68,11 +73,11 @@ export function PhotoViewer({ images, initialIndex = 0, title, onClose, onImageE
       const srcSet = publicMediaVariantSrcSet(source);
       if (srcSet) {
         image.srcset = srcSet;
-        image.sizes = "(max-width: 760px) 100vw, calc(100vw - 160px)";
+        image.sizes = "calc(100vw - 24px)";
       }
       image.src = publicMediaVariantUrl(source, 1200);
     });
-  }, [activeSource]);
+  }, [previousSource, nextSource]);
 
   function selectPhoto(index: number) {
     const source = photos[index];
@@ -189,7 +194,7 @@ export function PhotoViewer({ images, initialIndex = 0, title, onClose, onImageE
             ref={imageRef}
             src={publicMediaVariantUrl(activeSource, 1200)}
             srcSet={publicMediaVariantSrcSet(activeSource)}
-            sizes="(max-width: 760px) 100vw, calc(100vw - 160px)"
+            sizes="calc(100vw - 24px)"
             alt={title + " photo " + (activeIndex + 1) + " of " + photos.length}
             loading="eager"
             fetchPriority="high"

@@ -1,0 +1,53 @@
+/* The intro contains three sequential blocks, not a second side-by-side form. */
+.page :global(.bulk-import-workspace > .bulk-import-grid) {
+  grid-template-columns: minmax(240px, 0.75fr) minmax(0, 1.7fr);
+  align-items: start;
+  gap: 20px 32px;
+}
+
+.page :global(.bulk-import-grid > .bulk-import-intro) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  align-items: start;
+  gap: 14px;
+  min-width: 0;
+  grid-column: 1;
+}
+
+.page :global(.bulk-import-intro > h2),
+.page :global(.bulk-import-intro > p) {
+  margin: 0;
+}
+
+.page :global(.bulk-import-intro > .import-file-drop) {
+  width: 100%;
+  min-width: 0;
+  margin-top: 4px;
+}
+
+.page :global(.import-file-drop > svg) {
+  flex: 0 0 auto;
+}
+
+.page :global(.import-file-drop > span),
+.page :global(.bulk-import-grid > .field) {
+  min-width: 0;
+}
+
+.page :global(.bulk-import-grid > .field textarea) {
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .page :global(.bulk-import-workspace > .bulk-import-grid) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  .page :global(.bulk-import-grid > .field),
+  .page :global(.bulk-import-grid > .bulk-import-actions) {
+    grid-column: 1;
+  }
+}
+

@@ -46,7 +46,7 @@ export function navigationFixture(component, options = {}) {
   const imports = {
     react: hooks, 'next/link': { default: 'a', __esModule: true }, 'next/navigation': { usePathname: () => '/' },
     'lucide-react': { LogOut: () => null, Menu: () => null, UserRound: () => null, X: () => null },
-    './BrandLogo': { BrandLogo: () => null }, './Nav.module.css': { default: {}, __esModule: true },
+    './BrandLogo': { BrandLogo: () => null }, './Nav.module.css': { default: {}, __esModule: true }, './Footer.module.css': { default: {}, __esModule: true },
     '../lib/supabase-browser': browser, '../lib/use-auth-navigation': hook,
     '../lib/site-settings': { defaultSiteSettings: settings, fetchPublishedSiteSettings: options.published || (async () => settings) },
     '../lib/content-registry': { getContentValue: (content, key) => content[key] || key },

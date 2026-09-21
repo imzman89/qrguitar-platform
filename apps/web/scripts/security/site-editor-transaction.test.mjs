@@ -55,9 +55,34 @@ try {
   assert.equal(replay.replayed,true);assert.deepEqual(replay.state,first.state);assert.deepEqual(await snapshot(),before);
   await assert.rejects(mutate({...body,note:'different wire body'}),e=>e.code==='QSE02');
  });
- await test('stale draft blocks save, discard, restore, and publish without writes',async()=>{
-  const stale=await request();await mutate(await request(),settings('Other tab'));
-  for(const action of ['save_draft','discard_draft','restore_revision','publish']) { const before=await snapshot();await assert.rejects(mutate({...stale,requestId:randomUUID(),action}),e=>e.code==='QSE01');assert.deepEqual(await snapshot(),before); }
+ await test('reading identical draft state is read-only; explicit matched discard preserves published and unrelated data',async()=>{
+  const published=(await state()).publishedValue;
+  await mutate(await request(),published);
+  const before=await snapshot(), observed=await state();
+  assert.deepEqual(observed.draftValue.settings,observed.publishedValue);
+  assert.deepEqual(await snapshot(),before,'the read creates no writes, audits or receipts');
+  const result=await mutate(await request('discard_draft'),null);
+  assert.equal(result.state.draftValue,null);assert.equal(result.state.draftVersion,'');
+  assert.equal(result.state.publishedVersion,observed.publishedVersion);
+  assert.deepEqual(result.state.publishedValue,published);
+  assert.deepEqual(result.state.revisionRows,observed.revisionRows);
+  const after=await snapshot();
+  assert.deepEqual(after.content.filter(row=>row.content_key!=='site-editor:draft'),before.content.filter(row=>row.content_key!=='site-editor:draft'));
+  assert.equal(after.audit.length,before.audit.length+1);assert.equal(after.receipts.length,before.receipts.length+1);
+ });
+ await test('a draft that matched on load cannot discard a concurrent changed draft or publication',async()=>{
+  for(const concurrentAction of ['save_draft','publish']) {
+   const published=(await state()).publishedValue;
+   await mutate(await request(),published);
+   const stale=await request();
+   const observed=await state();assert.deepEqual(observed.draftValue.settings,observed.publishedValue);
+   await mutate(await request(concurrentAction),settings('Another editor changed '+concurrentAction));
+   for(const action of ['save_draft','discard_draft','restore_revision','publish']) {
+    const before=await snapshot();
+    await assert.rejects(mutate({...stale,requestId:randomUUID(),action}),e=>e.code==='QSE01');
+    assert.deepEqual(await snapshot(),before,'stale '+action+' cannot change content, audit or receipt state');
+   }
+  }
  });
  await test('draft created after publish snapshot is retained when publish conflicts',async()=>{
   await mutate(await request('discard_draft'),null);const old=await request('publish');await mutate(await request(),settings('New shared draft'));

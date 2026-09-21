@@ -725,6 +725,36 @@ function normalizeCopyObject<T>(value: T): T {
   return value;
 }
 
+function mergeLegacyContent(settings?: Partial<EditableSiteSettings> | null) {
+  const content = { ...(settings?.content || {}) };
+  const legacy: Record<string, string | undefined> = {
+    "global.brand.name": settings?.brandName,
+    "global.brand.tagline": settings?.tagline,
+    "home.hero.eyebrow": settings?.hero?.eyebrow,
+    "home.hero.headline": settings?.hero?.headline,
+    "home.hero.body": settings?.hero?.body,
+    "home.hero.primaryCta": settings?.hero?.primaryCta,
+    "home.hero.secondaryCta": settings?.hero?.secondaryCta,
+    "home.lifecycle.headline": settings?.sections?.howHeadline,
+    "home.lifecycle.body": settings?.sections?.howBody,
+    "home.pricing.headline": settings?.sections?.pricingHeadline,
+    "home.pricing.body": settings?.sections?.pricingBody,
+    "dashboard.hero.headline": settings?.dashboard?.pageTitle,
+    "dashboard.hero.body": settings?.dashboard?.subtitle,
+    "dashboard.empty.title": settings?.dashboard?.emptyCollectionTitle,
+    "dashboard.empty.body": settings?.dashboard?.emptyCollectionBody,
+    "seo.global.title": settings?.seo?.title,
+    "seo.global.description": settings?.seo?.description,
+    "seo.global.image": settings?.seo?.image
+  };
+  // An explicitly stored typed value wins, including the current default or
+  // an empty value. Legacy fields only supply keys absent from older snapshots.
+  for (const [key, value] of Object.entries(legacy)) {
+    if (!Object.prototype.hasOwnProperty.call(content, key) && typeof value === "string") content[key] = value;
+  }
+  return mergeContentValues(content);
+}
+
 export function mergeSiteSettings(settings?: Partial<EditableSiteSettings> | null): EditableSiteSettings {
   const sections: Partial<EditableSiteSettings["sections"]> = settings?.sections || {};
   const hasInstrumentCategories = Object.prototype.hasOwnProperty.call(settings || {}, "instrumentCategories");
@@ -769,7 +799,7 @@ export function mergeSiteSettings(settings?: Partial<EditableSiteSettings> | nul
       ...(settings?.dashboard || {})
     },
     composition: normalizeEditorialComposition(settings?.composition),
-    content: mergeContentValues(settings?.content as Record<string, unknown> | undefined)
+    content: mergeLegacyContent(settings)
   });
 }
 

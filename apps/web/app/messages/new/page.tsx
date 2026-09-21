@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import styles from "../../../components/MessagesClient.module.css";
 import { Footer } from "../../../components/Footer";
 import { Nav } from "../../../components/Nav";
 import { StartConversation } from "../../../components/StartConversation";
@@ -12,5 +13,5 @@ export default async function NewConversationPage({ searchParams }: { searchPara
   const query = await searchParams;
   const handle = cleanCollectionHandle(query.member);
   const profileCode = /^QRG-[A-Z0-9-]{4,40}$/.test(String(query.profile || "").toUpperCase()) ? String(query.profile).toUpperCase() : "";
-  return <><Nav /><main>{handle ? <StartConversation handle={handle} profileCode={profileCode} /> : <div className="page-shell"><p>Choose a member from <Link href="/collections">Member Collections</Link>.</p></div>}</main><Footer /></>;
+  return <><Nav /><main>{handle ? <StartConversation handle={handle} profileCode={profileCode} /> : <div className={styles.state}><h1>Start a conversation</h1><p>Choose a member to start a private conversation.</p><Link className="button" href="/collections">Browse member collections</Link></div>}</main><Footer /></>;
 }

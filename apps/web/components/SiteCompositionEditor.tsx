@@ -189,7 +189,7 @@ export function SiteCompositionEditor({ pageKey, sections, errors = {}, onChange
   }
 
   return (
-    <section className="cms-field-group cms-composition-editor">
+    <section className="cms-field-group cms-composition-editor" aria-label={`${editorialPageLabels[pageKey]} section arrangement`}>
       <header>
         <div><span>Page sections</span><h2>Arrange {editorialPageLabels[pageKey]}</h2></div>
         <span>{sections.length} sections</span>
@@ -277,6 +277,7 @@ export function SiteCompositionEditor({ pageKey, sections, errors = {}, onChange
                     onDragEnd={() => { drag.current = null; }}
                     onDragOver={(event) => dragOver(event, "block", section)}
                     onDrop={(event) => drop(event, "block", sectionIndex, blockIndex)}
+                    aria-current={focusedBlock?.id === block.id ? "true" : undefined}
                     onClick={() => setFocusedBlockId(block.id)}
                   >
                     <GripVertical size={15} aria-hidden="true" />
@@ -289,6 +290,8 @@ export function SiteCompositionEditor({ pageKey, sections, errors = {}, onChange
                 {focusedBlock ? (
                   <section className="cms-focused-block" aria-label={`Edit ${focusedBlock.name || "unnamed item"}`}>
                     <header><div><span>Selected item</span><h3>{focusedBlock.name || "Unnamed item"}</h3></div><span className={focusedBlock.visible ? "cms-visibility is-visible" : "cms-visibility"}>{focusedBlock.visible ? "Shown" : "Hidden"}</span></header>
+                      <details className="cms-item-actions">
+                        <summary>Item actions</summary>
                       <div className="cms-block-actions">
                         <button type="button" disabled={focusedBlockIndex === 0} onClick={() => reorderBlock(sectionIndex, focusedBlockIndex, focusedBlockIndex - 1)}><ArrowUp size={14} /> Move up</button>
                         <button type="button" disabled={focusedBlockIndex === section.blocks.length - 1} onClick={() => reorderBlock(sectionIndex, focusedBlockIndex, focusedBlockIndex + 1)}><ArrowDown size={14} /> Move down</button>
@@ -296,6 +299,7 @@ export function SiteCompositionEditor({ pageKey, sections, errors = {}, onChange
                         <button type="button" onClick={() => updateBlock(sectionIndex, focusedBlockIndex, { visible: !focusedBlock.visible })}>{focusedBlock.visible ? <EyeOff size={14} /> : <Eye size={14} />} {focusedBlock.visible ? "Hide" : "Show"}</button>
                         <button type="button" className="is-danger" disabled={focusedBlock.protected || section.blocks.length <= 1} onClick={() => removeBlock(sectionIndex, focusedBlockIndex)}><Trash2 size={14} /> Remove</button>
                       </div>
+                      </details>
                       <div className="cms-block-fields">
                         <label className={focusedError("name") ? "has-error" : ""} htmlFor={controlId(`${focusedBlockPath}.name`)}>
                           Item name

@@ -2,7 +2,7 @@
 
 import { Download, X } from "lucide-react";
 import QRCode from "qrcode";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { defaultQrStyle, type QrStyle } from "../lib/local-demo";
 import { publicProfileUrl } from "../lib/profile-url";
 import { beginQrRender, qrColorError, qrRenderOptions } from "../lib/qr-output";
@@ -34,6 +34,8 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHando
   const [appliedStyleKey, setAppliedStyleKey] = useState(JSON.stringify(qrStyle ?? defaultQrStyle));
   const [isEditing, setIsEditing] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const previewRef = useRef<HTMLDialogElement>(null);
+  const previewCloseRef = useRef<HTMLButtonElement>(null);
   const isTransparent = style.background === "transparent";
 
   const incomingStyle = useMemo(
@@ -57,6 +59,7 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHando
   const styleCurrent = appliedStyleKey === incomingStyleKey;
   const dataUrl = styleCurrent && rendered.key === renderKey && !colorError ? rendered.url : "";
   const renderError = styleCurrent ? colorError || (rendered.key === renderKey ? rendered.error : "") : "";
+  const previewVisible = isLightboxOpen && Boolean(dataUrl);
 
   useEffect(() => {
     setStyle((current) => (areQrStylesEqual(current, incomingStyle) ? current : incomingStyle));
@@ -72,19 +75,20 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHando
   }, [code, displayLabel, profileUrl, style, renderKey, colorError, styleCurrent]);
 
   useEffect(() => {
-    if (!isLightboxOpen) {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setIsLightboxOpen(false);
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isLightboxOpen]);
+    const dialog = previewRef.current;
+    if (!previewVisible || !dialog) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    // Native modality makes the underlying Profile drawer inert without hiding this child.
+    dialog.showModal();
+    previewCloseRef.current?.focus({ preventScroll: true });
+    return () => {
+      dialog.close();
+      document.body.style.overflow = previousOverflow;
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
+    };
+  }, [previewVisible]);
 
   function updateStyle(next: Partial<QrStyle>) {
     setStyle((current) => {
@@ -217,12 +221,37 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHando
         </div>
       ) : null}
 
-      {isLightboxOpen && dataUrl ? (
-        <div className="media-overlay-backdrop" onClick={() => setIsLightboxOpen(false)} role="presentation">
-          <div className="media-overlay-content qr-lightbox" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="QR preview">
+      {previewVisible ? (
+        <dialog
+          ref={previewRef}
+          className="media-overlay-backdrop"
+          style={{ margin: 0, width: "100vw", maxWidth: "none", height: "100dvh", maxHeight: "none", border: 0, color: "inherit" }}
+          aria-label="QR preview"
+          onClick={(event) => { if (event.target === event.currentTarget) setIsLightboxOpen(false); }}
+          onCancel={(event) => { event.preventDefault(); event.stopPropagation(); setIsLightboxOpen(false); }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              event.stopPropagation();
+              setIsLightboxOpen(false);
+            } else if (event.key === "Tab") {
+              // Keep the outer drawer's document-level keyboard handler out of this modal.
+              event.stopPropagation();
+              const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("button:not([disabled]), a[href]"));
+              const first = controls[0];
+              const last = controls[controls.length - 1];
+              if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault(); last?.focus();
+              } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault(); first?.focus();
+              }
+            }
+          }}
+        >
+          <div className="media-overlay-content qr-lightbox" onClick={(event) => event.stopPropagation()}>
             <div className="qr-lightbox-header">
               <strong>QR Preview</strong>
-              <button className="media-overlay-close qr-lightbox-close" type="button" onClick={() => setIsLightboxOpen(false)} aria-label="Close QR preview">
+              <button ref={previewCloseRef} className="media-overlay-close qr-lightbox-close" type="button" onClick={() => setIsLightboxOpen(false)} aria-label="Close QR preview">
                 <X size={14} />
                 <span>Close</span>
               </button>
@@ -239,7 +268,7 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHando
               </a>
             </div>
           </div>
-        </div>
+        </dialog>
       ) : null}
     </div>
   );

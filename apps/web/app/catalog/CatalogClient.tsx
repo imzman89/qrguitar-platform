@@ -2,9 +2,9 @@
 
 import { matchesCatalogQuery } from "../../lib/catalog-search";
 
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CollectibleRecordCard } from "../../components/CollectibleRecordCard";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
@@ -16,24 +16,42 @@ import {
 import { getServiceHistoryEntries } from "../../lib/instrument-profile-contract";
 import { getContentValue } from "../../lib/content-registry";
 import type { EditorialComposition } from "../../lib/site-settings";
+import { catalogFilterUrl, defaultCatalogFilters, readCatalogFilters, type CatalogFilters } from "../../lib/catalog-filter-state";
+import styles from "./CatalogClient.module.css";
 
 export function CatalogClient({ initialRecords, content }: { initialRecords: DemoInstrument[]; content: Record<string, string>; composition: EditorialComposition["catalog"] }) {
   const [records, setRecords] = useState<DemoInstrument[]>(dedupeByCodeAndDate(initialRecords));
   const [hasLoadedRecords, setHasLoadedRecords] = useState(initialRecords.length > 0);
-  const [brand, setBrand] = useState("All brands");
-  const [availability, setAvailability] = useState("All availability");
-  const [condition, setCondition] = useState("All conditions");
-  const [trust, setTrust] = useState("All trust statuses");
-  const [authenticity, setAuthenticity] = useState("All authenticity statuses");
-  const [originality, setOriginality] = useState("All originality statuses");
-  const [safety, setSafety] = useState("All safety statuses");
-  const [service, setService] = useState("All service histories");
-  const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState<CatalogFilters>({ ...defaultCatalogFilters });
+  const { brand, availability, condition, trust, authenticity, originality, safety, service, query, sortMode } = filters;
+  const serialLookupRevision = useRef(0);
   const [exactMatchCode, setExactMatchCode] = useState("");
   const [serialLookupMessage, setSerialLookupMessage] = useState("");
   const [showOwnershipClaim, setShowOwnershipClaim] = useState(false);
   const [serialLookupBusy, setSerialLookupBusy] = useState(false);
-  const [sortMode, setSortMode] = useState<"Newest" | "Oldest" | "Title" | "Year">("Newest");
+
+  function clearSerialLookup() {
+    serialLookupRevision.current++;
+    setExactMatchCode(""); setSerialLookupMessage(""); setShowOwnershipClaim(false); setSerialLookupBusy(false);
+  }
+  function updateFilters(patch: Partial<CatalogFilters>, replace = false) {
+    const next = { ...filters, ...patch };
+    setFilters(next);
+    clearSerialLookup();
+    const url = catalogFilterUrl(window.location.pathname, window.location.search, next) + window.location.hash;
+    if (url !== window.location.pathname + window.location.search + window.location.hash) {
+      window.history[replace ? "replaceState" : "pushState"](window.history.state, "", url);
+    }
+  }
+  function resetFilters() { updateFilters({ ...defaultCatalogFilters }); }
+  useEffect(() => {
+    const lookupRevisionRef = serialLookupRevision;
+    const restore = () => { setFilters(readCatalogFilters(window.location.search)); clearSerialLookup(); };
+    restore();
+    window.addEventListener("popstate", restore);
+    return () => { lookupRevisionRef.current++; window.removeEventListener("popstate", restore); };
+  }, []);
+
 
   const loadRecords = useCallback(async () => {
     try {
@@ -77,7 +95,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
     };
   }, [loadRecords]);
 
-  const brands = useMemo(() => ["All brands", ...unique(records.map((record) => record.brand).filter(Boolean))], [records]);
+  const brands = useMemo(() => ["All brands", ...unique([...records.map((record) => record.brand), brand === "All brands" ? "" : brand].filter(Boolean))], [records, brand]);
 
   const hasFilterOrSearch = brand !== "All brands"
     || availability !== "All availability"
@@ -145,6 +163,9 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
   };
   const hasAdvancedFilters = Object.values(availableFilters).some(Boolean);
 
+  const filterLabels: Record<keyof CatalogFilters, string> = { query: "Search", brand: "Brand", availability: "Availability", condition: "Condition", trust: "Trust", authenticity: "Authenticity", originality: "Originality", safety: "Safety", service: "Service", sortMode: "Sort" };
+  const activeFilters = (Object.keys(filters) as Array<keyof CatalogFilters>).filter((key) => key !== "sortMode" && filters[key] !== defaultCatalogFilters[key]);
+
   async function searchExactSerial() {
     const serial = query.trim();
     if (serial.length < 4) {
@@ -152,6 +173,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
       return;
     }
 
+    const lookupRevision = ++serialLookupRevision.current;
     setSerialLookupBusy(true);
     setSerialLookupMessage("");
     setShowOwnershipClaim(false);
@@ -169,6 +191,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
         instrument?: DemoInstrument;
       } | null;
 
+      if (lookupRevision !== serialLookupRevision.current) return;
       if (!response.ok || !payload?.ok) {
         setSerialLookupMessage(payload?.message || "Exact serial lookup is temporarily unavailable.");
         return;
@@ -182,38 +205,39 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
       setShowOwnershipClaim(payload.match === "none");
       setSerialLookupMessage(payload.message || "No public QRguitar Profile matches that exact serial.");
     } catch {
+      if (lookupRevision !== serialLookupRevision.current) return;
       setSerialLookupMessage("Exact serial lookup is temporarily unavailable.");
     } finally {
-      setSerialLookupBusy(false);
+      if (lookupRevision === serialLookupRevision.current) setSerialLookupBusy(false);
     }
   }
 
   return (
     <>
       <Nav />
-      <main className="section catalog-page">
-        <div className="shell">
-          <div className="dashboard-hero">
+      <main className={styles["catalog-page"]}>
+        <div className={styles["shell"]}>
+          <div className={styles["dashboard-hero"]}>
             <div>
-              <div className="eyebrow">{getContentValue(content, "catalog.hero.eyebrow")}</div>
+              <div className={styles["eyebrow"]}>{getContentValue(content, "catalog.hero.eyebrow")}</div>
               <h1>{getContentValue(content, "catalog.hero.headline")}</h1>
               <p>{getContentValue(content, "catalog.hero.body")}</p>
             </div>
-            <div className="catalog-hero-actions">
+            <div className={styles["catalog-hero-actions"]}>
               <Link className="button" href="/create">{getContentValue(content, "catalog.actions.create")}</Link>
               <Link className="text-link" href="/collections">Browse member collections</Link>
             </div>
           </div>
 
-          <section className="catalog-filters" aria-label="Catalog filters">
-            <label className="catalog-search">
+          <section className={styles["catalog-filters"]} aria-label="Catalog filters">
+            <label className={styles["catalog-search"]}>
               Search
               <span>
                 <Search size={16} />
                 <input
                   value={query}
                   onChange={(event) => {
-                    setQuery(event.target.value);
+                    updateFilters({ query: event.target.value }, true);
                     setExactMatchCode("");
                     setSerialLookupMessage("");
                     setShowOwnershipClaim(false);
@@ -228,7 +252,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
                 />
                 <button
                   type="button"
-                  className="catalog-exact-search"
+                  className={styles["catalog-exact-search"]}
                   onClick={() => void searchExactSerial()}
                   disabled={serialLookupBusy}
                   aria-label="Find exact serial"
@@ -240,13 +264,13 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
             </label>
             <label>
               Brand
-              <select value={brand} onChange={(event) => setBrand(event.target.value)}>
+              <select value={brand} onChange={(event) => updateFilters({ brand: event.target.value })}>
                 {brands.map((item) => <option key={item}>{item}</option>)}
               </select>
             </label>
             <label>
               Sort
-              <select value={sortMode} onChange={(event) => setSortMode(event.target.value as typeof sortMode)}>
+              <select value={sortMode} onChange={(event) => updateFilters({ sortMode: event.target.value as typeof sortMode })}>
                 <option>Newest</option>
                 <option>Oldest</option>
                 <option>Title</option>
@@ -256,29 +280,35 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
           </section>
 
           {hasAdvancedFilters ? (
-            <details className="catalog-more-filters">
-              <summary><SlidersHorizontal size={15} /> More filters</summary>
-              <div className="catalog-filter-grid">
-                {availableFilters.availability ? <label>Availability<select value={availability} onChange={(event) => setAvailability(event.target.value)}><option>All availability</option><option>For Sale</option><option>Not for Sale</option></select></label> : null}
-                {availableFilters.condition ? <label>Condition<select value={condition} onChange={(event) => setCondition(event.target.value)}><option>All conditions</option><option>New</option><option>Used</option></select></label> : null}
-                {availableFilters.trust ? <label>Trust<select value={trust} onChange={(event) => setTrust(event.target.value)}><option>All trust statuses</option><option>Verified</option><option>Unverified</option></select></label> : null}
-                {availableFilters.authenticity ? <label>Authenticity<select value={authenticity} onChange={(event) => setAuthenticity(event.target.value)}><option>All authenticity statuses</option><option>Authenticity Confirmed</option><option>Authenticity Unconfirmed</option></select></label> : null}
-                {availableFilters.originality ? <label>Originality<select value={originality} onChange={(event) => setOriginality(event.target.value)}><option>All originality statuses</option><option>All Original</option><option>Modified</option></select></label> : null}
-                {availableFilters.safety ? <label>Safety<select value={safety} onChange={(event) => setSafety(event.target.value)}><option>All safety statuses</option><option>Safety Alert</option></select></label> : null}
-                {availableFilters.service ? <label>Service History<select value={service} onChange={(event) => setService(event.target.value)}><option>All service histories</option><option>Has Service History</option></select></label> : null}
+            <details className={styles["catalog-more-filters"]}>
+              <summary><SlidersHorizontal size={15} /> Filters{activeFilters.length ? <span>{activeFilters.length}</span> : null}</summary>
+              <div className={styles["catalog-filter-grid"]}>
+                {availableFilters.availability ? <label>Availability<select value={availability} onChange={(event) => updateFilters({ availability: event.target.value })}><option>All availability</option><option>For Sale</option><option>Not for Sale</option></select></label> : null}
+                {availableFilters.condition ? <label>Condition<select value={condition} onChange={(event) => updateFilters({ condition: event.target.value })}><option>All conditions</option><option>New</option><option>Used</option></select></label> : null}
+                {availableFilters.trust ? <label>Trust<select value={trust} onChange={(event) => updateFilters({ trust: event.target.value })}><option>All trust statuses</option><option>Verified</option><option>Unverified</option></select></label> : null}
+                {availableFilters.authenticity ? <label>Authenticity<select value={authenticity} onChange={(event) => updateFilters({ authenticity: event.target.value })}><option>All authenticity statuses</option><option>Authenticity Confirmed</option><option>Authenticity Unconfirmed</option></select></label> : null}
+                {availableFilters.originality ? <label>Originality<select value={originality} onChange={(event) => updateFilters({ originality: event.target.value })}><option>All originality statuses</option><option>All Original</option><option>Modified</option></select></label> : null}
+                {availableFilters.safety ? <label>Safety<select value={safety} onChange={(event) => updateFilters({ safety: event.target.value })}><option>All safety statuses</option><option>Safety Alert</option></select></label> : null}
+                {availableFilters.service ? <label>Service History<select value={service} onChange={(event) => updateFilters({ service: event.target.value })}><option>All service histories</option><option>Has Service History</option></select></label> : null}
               </div>
             </details>
           ) : null}
 
+          {activeFilters.length ? (
+            <div className={styles["catalog-active-filters"]} aria-label="Active filters">
+              {activeFilters.map((key) => <button key={key} type="button" onClick={() => updateFilters({ [key]: defaultCatalogFilters[key] })} aria-label={`Remove ${filterLabels[key]} filter: ${filters[key]}`}><span>{filterLabels[key]}: {filters[key]}</span><X size={12} aria-hidden="true" /></button>)}
+            </div>
+          ) : null}
+
           {serialLookupMessage ? (
-            <div className={exactMatchCode ? "catalog-lookup-result is-match" : "catalog-lookup-result"} role="status">
+            <div className={styles["catalog-lookup-result"]} role="status">
               <span>{serialLookupMessage}</span>
               {showOwnershipClaim ? <Link className="button secondary" href="/ownership-claim">Start ownership claim</Link> : null}
             </div>
           ) : null}
 
-          <section className="catalog-summary" aria-label="Catalog discovery highlights">
-            <div className="catalog-toolbar">
+          <section className={styles["catalog-summary"]} aria-label="Catalog discovery highlights">
+            <div className={styles["catalog-toolbar"]} aria-live="polite">
               <p><strong>{formatResultLabel(
                 getContentValue(content, hasFilterOrSearch ? "catalog.results.filtered" : "catalog.results.all"),
                 visibleCount
@@ -287,20 +317,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
                 <button
                   className="button secondary"
                   type="button"
-                  onClick={() => {
-                    setBrand("All brands");
-                    setAvailability("All availability");
-                    setCondition("All conditions");
-                    setTrust("All trust statuses");
-                    setAuthenticity("All authenticity statuses");
-                    setOriginality("All originality statuses");
-                    setSafety("All safety statuses");
-                    setService("All service histories");
-                    setQuery("");
-                    setExactMatchCode("");
-                    setSerialLookupMessage("");
-                    setShowOwnershipClaim(false);
-                  }}
+                  onClick={resetFilters}
                 >
                   <SlidersHorizontal size={14} />
                   {getContentValue(content, "catalog.actions.reset")}
@@ -309,11 +326,11 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
             </div>
           </section>
 
-          <section className="catalog-grid" aria-label="QRguitar Profiles">
+          <section className={styles["catalog-grid"]} aria-label="QRguitar Profiles">
             {!hasLoadedRecords ? (
-              <div className="card catalog-empty">
-                <div className="eyebrow">Loading QRguitar Profiles</div>
-                <h3>Opening the catalog.</h3>
+              <div className={styles["catalog-empty"]}>
+                <div className={styles["eyebrow"]}>Loading QRguitar Profiles</div>
+                <h2>Opening the catalog.</h2>
                 <p>Fetching the latest QRguitar Profiles now.</p>
               </div>
             ) : visibleRecords.length ? (
@@ -327,9 +344,9 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
                 />
               ))
             ) : (
-              <div className="card catalog-empty">
-                <div className="eyebrow">No profiles found</div>
-                <h3>{getContentValue(content, "catalog.empty.title")}</h3>
+              <div className={styles["catalog-empty"]}>
+                <div className={styles["eyebrow"]}>No profiles found</div>
+                <h2>{getContentValue(content, "catalog.empty.title")}</h2>
                 <p>{getContentValue(content, "catalog.empty.body")}</p>
               </div>
             )}

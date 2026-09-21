@@ -49,6 +49,7 @@ import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } f
 import { appendFailedImageSource, filterAvailableImageSources } from "../../../lib/image-fallback";
 import { publicMediaVariantSrcSet, publicMediaVariantUrl } from "../../../lib/public-media-variant";
 import { ProfileBreadcrumbs } from "./ProfileBreadcrumbs";
+import styles from "./ProfileClient.module.css";
 
 type ProfileTab = "overview" | "specs" | "timeline" | "service" | "ownership" | "media" | "repairs" | "documents";
 const PROFILE_FETCH_TIMEOUT_MS = 28000;
@@ -469,7 +470,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
   }, []);
 
   useEffect(() => {
-    const activeThumbnail = heroThumbnailRailRef.current?.querySelector<HTMLElement>(".active");
+    const activeThumbnail = heroThumbnailRailRef.current?.querySelector<HTMLElement>('[aria-current="true"]');
     activeThumbnail?.scrollIntoView({ behavior: "instant", block: "nearest", inline: "center" });
 
     [galleryImages[mediaIndex - 1], galleryImages[mediaIndex + 1]].filter(Boolean).forEach((source) => {
@@ -504,9 +505,9 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
 
   if (!resolved) {
     return (
-      <main className="scan-profile">
-        <section className="scan-shell">
-          <section className="scan-tab-panel" aria-label="Loading profile">
+      <main className={styles["scan-profile"]}>
+        <section className={styles["scan-shell"]}>
+          <section className={styles["scan-tab-panel"]} aria-label="Loading profile">
             <h2>Loading instrument profile</h2>
             <p>Checking the Profile now.</p>
           </section>
@@ -517,13 +518,13 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
 
   if (!instrument) {
     return (
-      <main className="scan-profile">
-        <section className="scan-shell">
-          <section className="scan-tab-panel" aria-label={profileLoadError ? "Profile unavailable" : "Profile not found"}>
+      <main className={styles["scan-profile"]}>
+        <section className={styles["scan-shell"]}>
+          <section className={styles["scan-tab-panel"]} aria-label={profileLoadError ? "Profile unavailable" : "Profile not found"}>
             <h2>{profileLoadError ? "Profile temporarily unavailable" : "Instrument profile not found"}</h2>
             <p>{profileLoadError ? "We could not load this Profile. Please try again." : "This QRguitar Profile has not been published."}</p>
             {profileLoadError ? <button type="button" className="button" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button> : null}
-            <div className="scan-actions">
+            <div className={styles["scan-actions"]}>
               <Action icon={<Home />} label="Go to homepage" onClick={() => router.push("/")} />
               <Action icon={<Download />} label="Browse catalog" onClick={() => router.push("/catalog")} />
             </div>
@@ -587,8 +588,8 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
     qrGuitarId: instrument.qrCode,
     brand: instrument.brand,
     model: instrument.model,
-    serialNumber: instrument.serial,
-    showSerial: Boolean(instrument.serial),
+    serialNumber: presentation?.serialNumber || "",
+    showSerial: Boolean(presentation?.serialNumber),
     noSerialNumber: instrument.serialExceptionApproved && !instrument.serial,
     year: instrument.year,
     location: formattedLocation,
@@ -623,32 +624,60 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
   const officialBrandLogoUrl = instrument.brand ? brandLogos[normalizeBrandLogoKey(instrument.brand)] || "" : "";
 
   return (
-    <main className="scan-profile">
-      <section className="scan-shell">
-        {ownerPreview && instrument ? <div className="profile-refresh-notice" role="status"><p><strong>Owner preview.</strong> {instrument.visibility === "private" ? "This Profile is private. Its QR link will work for visitors when you make it public." : "You are viewing this Profile from your account."}</p><Link className="button secondary" href={"/edit/" + encodeURIComponent(instrument.qrCode)}>Edit Profile</Link><Link href="/dashboard">Back to collection</Link></div> : null}
+    <main className={styles["scan-profile"]}>
+      <section className={styles["scan-shell"]}>
+        {ownerPreview && instrument ? <div className={styles["profile-refresh-notice"]} role="status"><p><strong>Owner preview.</strong> {instrument.visibility === "private" ? "This Profile is private. Visitors cannot open its QR link." : "You are viewing this Profile from your account."}</p><Link className="button secondary" href={"/edit/" + encodeURIComponent(instrument.qrCode)}>Edit Profile</Link><Link href="/dashboard">Back to collection</Link></div> : null}
         {profileLoadError ? (
-          <div className="profile-refresh-notice" role="status">
+          <div className={styles["profile-refresh-notice"]} role="status">
             <p>This is the last loaded Profile. We could not check for updates.</p>
             <button type="button" className="button secondary" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button>
           </div>
         ) : null}
         <ProfileBreadcrumbs current={instrumentDisplayName(instrument)} />
-        <div className="scan-topbar">
+        <div className={styles["scan-topbar"]}>
           <button type="button" aria-label="Back to homepage" onClick={() => router.push("/")}>
             <ArrowLeft size={24} />
           </button>
-          <BrandLogo className="scan-brand" />
-          <RecordShareButton className="scan-share-button" code={instrument.qrCode} title={instrumentDisplayName(instrument)} />
+          <BrandLogo className={styles["scan-brand"]} />
+          <RecordShareButton className={styles["scan-share-button"]} code={instrument.qrCode} title={instrumentDisplayName(instrument)} />
         </div>
 
-        <section className="scan-hero">
+        <section className={styles["scan-hero"]}>
+          <header className={styles["profile-heading"]}>
+            <p className={styles["profile-kicker"]}>{[instrument.brand, instrument.year, instrument.instrumentType].filter(Boolean).join(" · ")}</p>
+            <h1>{instrumentDisplayName(instrument)}</h1>
+            <ProfileStatusBadges
+              record={{
+                ...instrument,
+                showVerificationBadge,
+                showAuthenticityBadge
+              }}
+              includeCondition={false}
+              hideConfirmedTrust={true}
+              className={styles["profile-hero-badges"]}
+              ownerCollection={instrument.publicCollection}
+            />
+            {instrument.publicCollection ? <div className={styles["profile-member-actions"]}><SellerWebsiteLink {...instrument.publicCollection} />{instrument.publicCollection.allowMessages ? <MemberMessageLink className={styles["profile-message-link"]} handle={instrument.publicCollection.handle} profileCode={instrument.qrCode} label={`Message ${instrument.publicCollection.publicName}`} /> : null}</div> : null}
+
+        {safetyStatus === "lost" || safetyStatus === "stolen" ? (
+          <section className={styles["scan-safety-alert"]} aria-label={`Reported ${safetyStatus}`}>
+            <strong>{safetyStatus === "lost" ? "Reported Lost" : "Reported Stolen"}</strong>
+            <p>
+              {safetyStatus === "lost"
+                ? "This instrument has been marked lost by the current owner."
+                : "This instrument has been marked stolen by the current owner."}
+            </p>
+            {isDistinctSafetyNote(instrument.publicSafetyNote, safetyStatus) ? <p>{instrument.publicSafetyNote}</p> : null}
+          </section>
+        ) : null}
+          </header>
           <section
-            className="scan-hero-gallery"
+            className={styles["scan-hero-gallery"]}
             aria-label={getContentValue(publicContent, "profile.gallery.label")}
           >
-            <div className="scan-hero-media-frame">
+            <div className={styles["scan-hero-media-frame"]}>
               <button
-                className="scan-hero-media"
+                className={styles["scan-hero-media"]}
                 type="button"
                 onClick={() => {
                   if (heroDidSwipeRef.current) { heroDidSwipeRef.current = false; return; }
@@ -687,7 +716,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                     key={galleryImages[mediaIndex]}
                     src={publicMediaVariantUrl(galleryImages[mediaIndex], 1200)}
                     srcSet={publicMediaVariantSrcSet(galleryImages[mediaIndex])}
-                    sizes="(max-width: 760px) calc(100vw - 40px), (max-width: 900px) calc(100vw - 64px), 650px"
+                    sizes="(max-width: 540px) calc(100vw - 32px), (max-width: 760px) calc(100vw - 40px), (max-width: 900px) 720px, 684px"
                     alt={`${instrumentDisplayName(instrument)} photo ${mediaIndex + 1} of ${galleryImages.length}`}
                     loading="eager"
                     fetchPriority="high"
@@ -698,28 +727,30 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                     onError={() => markGalleryImageFailed(galleryImages[mediaIndex])}
                   />
                 ) : (
-                  <div className="scan-hero-empty">{allGalleryImages.length ? "Photos are currently unavailable" : "No main photo yet"}</div>
+                  <div className={styles["scan-hero-empty"]}>{allGalleryImages.length ? "Photos are currently unavailable" : "No main photo yet"}</div>
                 )}
-                {galleryImages.length ? (
-                  <span className="scan-hero-photo-count">
-                    {mediaIndex + 1}/{galleryImages.length}
-                  </span>
-                ) : null}
               </button>
-              {galleryImages.length > 1 ? (
-                <div className="scan-hero-gallery-controls">
-                  <button type="button" onClick={() => moveHeroPhoto(-1)} aria-label={getContentValue(publicContent, "profile.gallery.previous")}>
-                    <ArrowLeft size={18} />
-                  </button>
-                  <button type="button" onClick={() => moveHeroPhoto(1)} aria-label={getContentValue(publicContent, "profile.gallery.next")}>
-                    <ArrowRight size={18} />
-                  </button>
+              {galleryImages.length ? (
+                <div className={styles["scan-hero-gallery-footer"]}>
+                  <span className={styles["scan-hero-photo-count"]} aria-live="polite" aria-atomic="true">
+                    {mediaIndex + 1} / {galleryImages.length}
+                  </span>
+                  {galleryImages.length > 1 ? (
+                    <div className={styles["scan-hero-gallery-controls"]}>
+                      <button type="button" onClick={() => moveHeroPhoto(-1)} aria-label={getContentValue(publicContent, "profile.gallery.previous")}>
+                        <ArrowLeft size={18} />
+                      </button>
+                      <button type="button" onClick={() => moveHeroPhoto(1)} aria-label={getContentValue(publicContent, "profile.gallery.next")}>
+                        <ArrowRight size={18} />
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>
             {galleryImages.length > 1 ? (
               <div
-                className="scan-hero-thumbnails"
+                className={styles["scan-hero-thumbnails"]}
                 ref={heroThumbnailRailRef}
                 aria-label="Choose a photograph"
                 onWheel={(event) => {
@@ -765,7 +796,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
               >
                 {galleryImages.map((imageUrl, index) => (
                   <button
-                    className={index === mediaIndex ? "active" : undefined}
+                    className={index === mediaIndex ? styles.active : undefined}
                     type="button"
                     onClick={() => {
                       if (heroThumbnailDidDragRef.current) {
@@ -794,33 +825,17 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
               </div>
             ) : null}
           </section>
-          <div className="scan-hero-info">
-            <div className="builder-mark">
-              <span>{instrument.brand || "QRguitar"}</span>
-            </div>
-            <h1>{instrumentDisplayName(instrument)}</h1>
-            <ProfileStatusBadges
-              record={{
-                ...instrument,
-                showVerificationBadge,
-                showAuthenticityBadge
-              }}
-              includeCondition={false}
-              hideConfirmedTrust={true}
-              className="profile-hero-badges"
-              ownerCollection={instrument.publicCollection}
-            />
-            {instrument.publicCollection ? <div className="profile-member-actions"><SellerWebsiteLink {...instrument.publicCollection} />{instrument.publicCollection.allowMessages ? <MemberMessageLink className="profile-message-link" handle={instrument.publicCollection.handle} profileCode={instrument.qrCode} label={`Message ${instrument.publicCollection.publicName}`} /> : null}</div> : null}
+          <div className={styles["scan-hero-info"]}>
             <ProfileIdentity
               values={identityValues}
-              excludeLabels={["Make / Model"]}
+              excludeLabels={["Make / Model", "Year", "Type", "QRguitar ID"]}
               mediaSummary={[
                 galleryImages.length ? `${galleryImages.length} ${galleryImages.length === 1 ? "photo" : "photos"}` : "",
                 documentFiles.length ? `${documentFiles.length} ${documentFiles.length === 1 ? "document" : "documents"}` : ""
               ].filter(Boolean).join(" / ")}
             >
               {trustItems.length ? (
-                <div className="profile-trust-summary" aria-label="Trust review">
+                <div className={styles["profile-trust-summary"]} aria-label="Trust review">
                   {trustItems.map((item) => (
                     <details key={item.label}>
                       <summary><ShieldCheck size={15} /> {item.label}</summary>
@@ -829,7 +844,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                   ))}
                 </div>
               ) : null}
-              <div className="scan-qr">
+              <div className={styles["scan-qr"]}>
                 <ProfileQr code={instrument.qrCode} />
                 <div>
                   <strong>Scan to view</strong>
@@ -841,36 +856,18 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                 </button>
               </div>
               {shareNotice === "failed" ? (
-                <small className="scan-copy-notice">Copy failed. You can copy the URL from your browser bar.</small>
+                <small className={styles["scan-copy-notice"]}>Copy failed. You can copy the URL from your browser bar.</small>
               ) : null}
             </ProfileIdentity>
           </div>
         </section>
 
-        {safetyStatus === "lost" || safetyStatus === "stolen" ? (
-          <section className={`scan-safety-alert scan-safety-alert--${safetyStatus}`} aria-label={`Reported ${safetyStatus}`}>
-            <strong>{safetyStatus === "lost" ? "Reported Lost" : "Reported Stolen"}</strong>
-            <p>
-              {safetyStatus === "lost"
-                ? "This instrument has been marked lost by the current owner."
-                : "This instrument has been marked stolen by the current owner."}
-            </p>
-            {isDistinctSafetyNote(instrument.publicSafetyNote, safetyStatus) ? <p>{instrument.publicSafetyNote}</p> : null}
-          </section>
-        ) : null}
 
-        {!canEdit ? (
-          <aside className="profile-claim-entry" aria-label="Ownership help">
-            <div>
-              <strong>Need ownership help?</strong>
-              <span>Scanning the QR code never changes ownership. Start a private request when the current owner cannot send a transfer.</span>
-            </div>
-            <Link className="button secondary" href={`/ownership-claim?code=${encodeURIComponent(instrument.qrCode)}`}>Start ownership request</Link>
-          </aside>
-        ) : null}
+
+
 
         {canEdit ? (
-        <section className="scan-actions" aria-label="Owner profile actions">
+        <section className={styles["scan-actions"]} aria-label="Owner profile actions">
           {canEdit ? (
             <Action
               icon={<SlidersHorizontal />}
@@ -894,7 +891,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
         ) : null}
 
         {canSubmitService ? (
-          <section className="scan-actions" aria-label="Service provider actions">
+          <section className={styles["scan-actions"]} aria-label="Service provider actions">
             <Action
               icon={<Wrench />}
               label="Submit service record"
@@ -904,23 +901,23 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
         ) : null}
 
         {actionNotice ? (
-          <section className="scan-action-panel" role="status" aria-live="polite">
+          <section className={styles["scan-action-panel"]} role="status" aria-live="polite">
             <div>
               {actionNotice === "transfer" ? (
                 <>
-                  <span className="scan-action-icon"><Share2 size={16} /> Ownership tools are in beta</span>
+                  <span className={styles["scan-action-icon"]}><Share2 size={16} /> Ownership tools are in beta</span>
                   <p>Contact support@qrguitar.com if you need help with an ownership change.</p>
                 </>
               ) : null}
               {actionNotice === "documents" ? (
                 <>
-                  <span className="scan-action-icon"><FileText size={16} /> Documents</span>
+                  <span className={styles["scan-action-icon"]}><FileText size={16} /> Documents</span>
                   <p>Public files appear here for buyers and shops. The owner controls which files stay private and which are public.</p>
                 </>
               ) : null}
               {actionNotice === "owner" ? (
                 <>
-                  <span className="scan-action-icon"><ShieldCheck size={16} /> Owner/admin access required</span>
+                  <span className={styles["scan-action-icon"]}><ShieldCheck size={16} /> Owner/admin access required</span>
                   <p>Only the owner or admin can edit this profile. Sign in as the profile owner to make changes.</p>
                 </>
               ) : null}
@@ -929,10 +926,10 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
           </section>
         ) : null}
 
-        <nav className="scan-tabs" aria-label="Instrument profile sections" role="tablist">
+        <nav className={styles["scan-tabs"]} aria-label="Instrument profile sections" role="tablist">
           {visibleTabs.map((tab) => (
             <button
-              className={activeTab === tab.id ? "active" : undefined}
+              className={activeTab === tab.id ? styles.active : undefined}
               data-profile-tab={tab.id}
               type="button"
               role="tab"
@@ -950,17 +947,18 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                 const nextTab = visibleTabs[(currentIndex + direction + visibleTabs.length) % visibleTabs.length];
                 switchTab(nextTab.id);
                 requestAnimationFrame(() => {
-                  document.querySelector<HTMLButtonElement>(`.scan-tabs button[data-profile-tab="${nextTab.id}"]`)?.focus();
+                  document.querySelector<HTMLButtonElement>(`[data-profile-tab="${nextTab.id}"]`)?.focus();
                 });
               }}
               key={tab.id}
             >
-              {tab.label}{tab.count ? <span className="scan-tab-count">{tab.count}</span> : null}
+              {tab.label}{tab.count ? <span className={styles["scan-tab-count"]}>{tab.count}</span> : null}
             </button>
           ))}
         </nav>
 
           <ProfilePanel
+            detailsHeading={getContentValue(publicContent, "profile.details.heading")}
           activeTab={activeTab}
           instrument={instrument}
           specs={specs}
@@ -976,6 +974,16 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
           timelineEvents={timelineEvents}
           serviceEntries={presentation?.serviceEntries || []}
         />
+
+        {!canEdit ? (
+          <details className={styles["profile-claim-entry"]}>
+            <summary>Ownership &amp; transfers</summary>
+            <div>
+              <p>Scanning this QR code opens the Profile. It never changes ownership. Ask the current owner for a transfer, or start a private request if they cannot send one.</p>
+              <Link href={`/ownership-claim?code=${encodeURIComponent(instrument.qrCode)}`}>Start ownership request <ArrowRight size={14} aria-hidden="true" /></Link>
+            </div>
+          </details>
+        ) : null}
 
         {activeMedia ? (
           <PhotoViewer
@@ -1009,6 +1017,7 @@ function hasMeaningfulPublicValue(value?: string) {
 }
 
 function ProfilePanel({
+  detailsHeading,
   activeTab,
   instrument,
   specs,
@@ -1024,6 +1033,7 @@ function ProfilePanel({
   timelineEvents,
   serviceEntries
 }: {
+  detailsHeading: string;
   activeTab: ProfileTab;
   instrument: DemoInstrument;
   specs: Array<{ label: string; value?: string }>;
@@ -1045,9 +1055,9 @@ function ProfilePanel({
     const visibleSpecs = [...specs, ...optionalSpecs].filter((spec) => hasMeaningfulPublicValue(spec.value));
 
     return (
-      <section className="scan-tab-panel">
-        <PanelHeader icon={<SlidersHorizontal />} label="Profile details" title="Specifications, setup notes, and Serial Number." />
-        <div className="profile-data-grid">
+      <section className={styles["scan-tab-panel"]}>
+        <PanelHeader icon={<SlidersHorizontal />} label="Profile details" title={detailsHeading} />
+        <div className={styles["profile-data-grid"]}>
           {visibleSpecs.map((spec) => (
             <span key={spec.label}><strong>{spec.label}</strong>{spec.value}</span>
           ))}
@@ -1068,9 +1078,9 @@ function ProfilePanel({
     const ownershipTransferCount = Math.max(0, Number(instrument.ownershipTransferCount || 0));
 
     return (
-      <section className="scan-tab-panel">
+      <section className={styles["scan-tab-panel"]}>
         <PanelHeader icon={<Clock3 />} label="Timeline" title="Events recorded for this instrument." />
-        <div className="timeline-list">
+        <div className={styles["timeline-list"]}>
           {publicTimelineEvents.map((entry) => (
             <TimelineItem
               date={formatTimelineEntryDate(entry)}
@@ -1097,7 +1107,7 @@ function ProfilePanel({
               copy="QRguitar keeps the permanent profile with the instrument while prior-owner details stay private."
             />
           ) : null}
-          <div className="timeline-origin-marker">
+          <div className={styles["timeline-origin-marker"]}>
             <Clock3 aria-hidden="true" />
             <span><strong>Profile created</strong>{createdDate}</span>
           </div>
@@ -1108,9 +1118,9 @@ function ProfilePanel({
 
   if (activeTab === "service") {
     return (
-      <section className="scan-tab-panel">
+      <section className={styles["scan-tab-panel"]}>
         <PanelHeader icon={<Wrench />} label="Service" title="Owner-approved work connected to this instrument." />
-        <div className="timeline-list">
+        <div className={styles["timeline-list"]}>
           {serviceEntries.map((entry) => (
             <TimelineItem
               date={formatTimelineEntryDate(entry)}
@@ -1127,9 +1137,9 @@ function ProfilePanel({
   if (activeTab === "ownership") {
     const ownershipTransferCount = Math.max(0, Number(instrument.ownershipTransferCount || 0));
     return (
-      <section className="scan-tab-panel">
+      <section className={styles["scan-tab-panel"]}>
         <PanelHeader icon={<Repeat2 />} label="Ownership" title="Brand, retailer, owner, and future buyer stay connected around the same instrument." />
-        <div className="ownership-grid">
+        <div className={styles["ownership-grid"]}>
           <span><strong>Current owner</strong>{instrument.owner || "Unclaimed"}</span>
           {instrument.builder ? <span><strong>Builder</strong>{instrument.builder}</span> : null}
           <span><strong>Recorded transfers</strong>{ownershipTransferCount || "None yet"}</span>
@@ -1145,13 +1155,13 @@ function ProfilePanel({
 
   if (activeTab === "media") {
     return (
-      <section className="scan-tab-panel">
+      <section className={styles["scan-tab-panel"]}>
         <PanelHeader icon={<ImageIcon />} label="Media" title="Public video, audio, and external media connected to this instrument." />
-        <div className="external-media-grid">
+        <div className={styles["external-media-grid"]}>
           {externalMedia.map((item) => {
             const embedUrl = externalMediaEmbedUrl(item);
             return (
-              <article className="external-media-card" key={item.id}>
+              <article className={styles["external-media-card"]} key={item.id}>
                 {embedUrl ? (
                   <iframe
                     src={embedUrl}
@@ -1178,10 +1188,10 @@ function ProfilePanel({
     const serviceNotes = optionalSpecs.filter((spec) => /service|setup|repair/i.test(spec.label));
 
     return (
-      <section className="scan-tab-panel">
+      <section className={styles["scan-tab-panel"]}>
         <PanelHeader icon={<MessageCircle />} label="Repairs" title="A repair bench can see what happened before and add what happened today." />
         {serviceNotes.length ? (
-          <div className="profile-data-grid">
+          <div className={styles["profile-data-grid"]}>
             {serviceNotes.map((spec) => (
               <span key={spec.label}><strong>{spec.label}</strong>{spec.value}</span>
             ))}
@@ -1200,10 +1210,10 @@ function ProfilePanel({
     const hasVisibleDocuments = documentFiles.length > 0;
     const isPrivateListing = instrument.visibility === "private";
     return (
-      <section className="scan-tab-panel">
+      <section className={styles["scan-tab-panel"]}>
         <PanelHeader icon={<FileText />} label="Documents" title="The important paperwork follows the instrument." />
         {hasVisibleDocuments ? (
-          <div className="document-list">
+          <div className={styles["document-list"]}>
             {documentFiles.map((file, index) => (
               <DocumentItem
                 key={`${file.name}-${index}`}
@@ -1219,12 +1229,12 @@ function ProfilePanel({
             ))}
           </div>
         ) : isPrivateListing ? (
-          <div className="media-placeholder-grid">
+          <div className={styles["media-placeholder-grid"]}>
             <span>No documents uploaded yet.</span>
             <span>Private listings keep paperwork with the owner until it is shared.</span>
           </div>
         ) : (
-          <div className="media-placeholder-grid">
+          <div className={styles["media-placeholder-grid"]}>
             <span>No public documents yet.</span>
             <span>Owners can mark certificates, receipts, or spec sheets as public later.</span>
           </div>
@@ -1234,7 +1244,7 @@ function ProfilePanel({
   }
 
   return (
-    <section className="scan-tab-panel scan-overview">
+    <section className={styles["scan-tab-panel"] + " " + styles["scan-overview"]}>
       <div>
         {meaningfulProfileSummary(instrument.summary) ? (
           <>
@@ -1243,22 +1253,22 @@ function ProfilePanel({
           </>
         ) : null}
         {optionalSpecs.length ? (
-          <div className="public-spec-list">
+          <div className={styles["public-spec-list"]}>
             {optionalSpecs.map((spec) => (
               <span key={spec.label}><strong>{spec.label}</strong>{spec.value}</span>
             ))}
           </div>
         ) : null}
         {profileLinks.length ? (
-          <div className="public-link-list">
+          <div className={styles["public-link-list"]}>
             {profileLinks.map((link) => (
               <a href={link.href} target="_blank" rel="ugc nofollow noopener noreferrer" key={link.label}>{link.label}</a>
             ))}
           </div>
         ) : null}
       </div>
-      {instrument.brand ? (
-        <div className={`maker-signature ${officialBrandLogoUrl ? "maker-signature--logo" : "maker-signature--text"}`}>
+      {officialBrandLogoUrl ? (
+        <div className={styles["maker-signature"]}>
           <FallbackImage
             src={officialBrandLogoUrl}
             alt={`${instrument.brand} official logo`}
@@ -1271,7 +1281,6 @@ function ProfilePanel({
             fallback={<span>Brand</span>}
           />
           <strong>{instrument.brand}</strong>
-          <em>{isVerifiedRecord ? "Verified by QRguitar" : "Unverified"}</em>
         </div>
       ) : null}
     </section>
@@ -1296,7 +1305,7 @@ function isDistinctSafetyNote(note: string | undefined, status: string) {
 
 function PanelHeader({ icon, label, title }: { icon: ReactNode; label: string; title: string }) {
   return (
-    <div className="panel-header">
+    <div className={styles["panel-header"]}>
       <span>{icon}{label}</span>
       <h2>{title}</h2>
     </div>
@@ -1305,7 +1314,7 @@ function PanelHeader({ icon, label, title }: { icon: ReactNode; label: string; t
 
 function TimelineItem({ date, title, copy }: { date: string; title: string; copy: string }) {
   return (
-    <article className="timeline-item">
+    <article className={styles["timeline-item"]}>
       <span>{date}</span>
       <h3>{title}</h3>
       <p>{copy}</p>
@@ -1315,8 +1324,8 @@ function TimelineItem({ date, title, copy }: { date: string; title: string; copy
 
 function EmptyPanel({ title, copy }: { title: string; copy: string }) {
   return (
-    <div className="collaboration-thread compact">
-      <div className="panel-header">
+    <div className={styles["collaboration-thread"] + " " + styles["compact"]}>
+      <div className={styles["panel-header"]}>
         <span><MessageCircle size={18} /> Profile note</span>
         <h2>{title}</h2>
       </div>
@@ -1327,7 +1336,7 @@ function EmptyPanel({ title, copy }: { title: string; copy: string }) {
 
 function ProfileQr({ code }: { code: string }) {
   return (
-    <div className="qr-placeholder" aria-label={`QR code for ${code}`}>
+    <div className={styles["qr-placeholder"]} aria-label={`QR code for ${code}`}>
       <CompactQr code={code} label={code} />
     </div>
   );
@@ -1409,7 +1418,7 @@ function externalMediaEmbedUrl(item: ExternalMediaItem) {
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="identity-cell">
+    <div className={styles["identity-cell"]}>
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
@@ -1419,7 +1428,7 @@ function Meta({ label, value }: { label: string; value: string }) {
 function Action({ icon, label, active, disabled, onClick }: { icon: ReactNode; label: string; active?: boolean; disabled?: boolean; onClick: () => void }) {
   return (
     <button
-      className={[active ? "active" : undefined, disabled ? "disabled" : undefined].filter(Boolean).join(" ") || undefined}
+      className={[styles["profile-action"], active ? styles.active : undefined].filter(Boolean).join(" ")}
       type="button"
       disabled={Boolean(disabled)}
       onClick={onClick}
@@ -1434,7 +1443,7 @@ function Action({ icon, label, active, disabled, onClick }: { icon: ReactNode; l
 
 function DocumentItem({ title, copy, onView, href }: { title: string; copy: string; onView?: () => void; href?: string }) {
   return (
-    <article className="document-item">
+    <article className={styles["document-item"]}>
       <FileText size={22} />
       <div>
         <strong>{title}</strong>

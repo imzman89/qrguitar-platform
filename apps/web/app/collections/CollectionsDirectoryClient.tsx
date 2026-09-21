@@ -17,7 +17,7 @@ export function CollectionsDirectoryClient({ collections }: { collections: Direc
   if (!collections.length) return <div className={styles.empty}>
     <UsersRound size={30} aria-hidden="true" /><h2>The first public collection starts with you.</h2>
     <p>Turn on your public collection and make at least one instrument Profile public to appear here. Private and unlisted Profiles stay hidden.</p>
-    <div className="form-actions"><Link className="button" href="/account?section=collection">Publish your collection</Link><Link className="button secondary" href="/catalog">Browse instrument Profiles</Link></div>
+    <div className="form-actions"><Link className="button" href="/account?section=collection">Set up your collection</Link><Link className="button secondary" href="/catalog">Browse instrument Profiles</Link></div>
   </div>;
 
   return <>

@@ -1,0 +1,29 @@
+.workspace { min-height: 64vh; padding: 36px 0 72px; color: var(--text); background: var(--canvas); }
+.layout { display: grid; grid-template-columns: 172px minmax(0,1fr); align-items: start; gap: 42px; width: min(1320px,calc(100% - 64px)); margin-inline: auto; }
+.rail { position: sticky; top: 24px; display: grid; gap: 28px; min-width: 0; padding-top: 5px; }
+.desktopNav, .mobileNav nav { display: grid; gap: 5px; }
+.rail nav a { display: flex; align-items: center; gap: 11px; min-height: 44px; padding: 11px 12px; border-radius: 9px; color: var(--muted); font-size: .8125rem; font-weight: 550; text-decoration: none; line-height: 1.4; }
+.rail nav a svg { flex-shrink: 0; }
+.rail nav a:hover { background: var(--surface); color: var(--text); }
+.rail nav a[aria-current="page"] { background: var(--surface-subtle); color: var(--text); }
+.rail a:focus-visible, .rail summary:focus-visible { outline: 2px solid var(--action); outline-offset: 4px; }
+.explore { display: flex; justify-content: space-between; gap: 10px; padding: 8px 12px; color: var(--muted); font-size: .75rem; text-decoration: none; }
+.explore:hover { color: var(--text); }
+.content { min-width: 0; }
+.content h1 { margin: 0; max-width: 28ch; color: var(--text); font-family: inherit; font-size: clamp(1.75rem,3vw,2.5rem); font-weight: 600; line-height: 1.15; letter-spacing: -.045em; text-wrap: balance; }
+.content h2 { color: var(--text); font-family: inherit; letter-spacing: -.025em; }
+.content :global(.button) { min-height: 44px; border-radius: 9px; font-size: .8125rem; letter-spacing: 0; text-transform: none; }
+.mobileNav { display: none; }
+@media (max-width: 1050px) { .layout { grid-template-columns: 152px minmax(0,1fr); gap: 28px; } .rail nav a { padding-inline: 10px; font-size: .75rem; } }
+@media (max-width: 760px) {
+  .workspace { padding: 16px 0 48px; }
+  .layout { grid-template-columns: minmax(0,1fr); gap: 24px; width: calc(100% - 36px); }
+  .rail { position: static; display: block; padding: 0; }
+  .desktopNav, .explore { display: none; }
+  .mobileNav { display: block; color: var(--muted); font-size: .8125rem; }
+  .mobileNav summary { width: fit-content; min-height: 36px; padding-block: 8px; cursor: pointer; }
+  .mobileNav nav { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 4px; margin-top: 8px; padding: 8px; background: var(--surface); border-radius: 12px; }
+  .mobileNav:not([open]) nav { display: none; }
+  .rail nav a { font-size: .8125rem; }
+  .content h1 { max-width: none; font-size: 1.875rem; }
+}

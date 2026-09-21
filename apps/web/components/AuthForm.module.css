@@ -1,0 +1,31 @@
+.page { display: grid; align-content: center; min-height: 65vh; padding: 48px 20px 64px; color: var(--text); background: var(--canvas); }
+.layout { display: grid; gap: 28px; width: 100%; max-width: 440px; margin-inline: auto; }
+.heading { display: grid; gap: 12px; text-align: left; }
+.heading :global(.eyebrow) { color: var(--muted); font-size: .75rem; font-weight: 500; text-transform: none; letter-spacing: 0; }
+.heading h1 { margin: 0; color: var(--text); font-family: inherit; font-size: clamp(1.875rem,3vw,2.25rem); font-weight: 600; line-height: 1.15; letter-spacing: -.045em; }
+.heading p { margin: 0; color: var(--muted); font-size: .9375rem; line-height: 1.65; }
+.formPanel { display: grid; gap: 22px; min-width: 0; border: 0; padding: 0; background: transparent; }
+.formPanel > :is(h1,h2) { margin: 0; color: var(--text); font-family: inherit; font-size: clamp(1.625rem,3vw,2rem); font-weight: 600; line-height: 1.2; letter-spacing: -.035em; }
+.formPanel > p { margin: 0; color: var(--muted); font-size: .875rem; line-height: 1.65; }
+.formPanel > :global(.eyebrow) { color: var(--muted); font-size: .75rem; font-weight: 500; letter-spacing: 0; text-transform: none; }
+.formPanel form { display: grid; gap: 20px; }
+.modeSwitch { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 5px; padding: 5px; border-radius: 11px; background: var(--surface); }
+.modeSwitch button { min-height: 42px; padding: 10px; border: 0; border-radius: 8px; color: var(--muted); background: transparent; font: inherit; font-size: .875rem; font-weight: 500; cursor: pointer; }
+.modeSwitch button.active { color: var(--text); background: var(--surface-subtle); }
+.modeSwitch button:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
+.formPanel :global(.field) { display: grid; gap: 8px; margin: 0; }
+.formPanel :global(.field) label { color: var(--text); font-size: .8125rem; font-weight: 500; }
+.formPanel :global(.field) input { width: 100%; min-height: 48px; padding: 12px 14px; border: 1px solid var(--border-strong); border-radius: 9px; color: var(--text); background: var(--field-surface,var(--surface)); font: inherit; font-size: .9375rem; }
+.formPanel :global(.field) input:focus-visible { outline: 2px solid var(--action); outline-offset: 3px; }
+.formPanel :global(.fine-print) { margin: 0; color: var(--muted); font-size: .75rem; line-height: 1.6; }
+.formPanel :global(.fine-print) a { color: var(--muted); text-decoration: none; }
+.formPanel :global(.fine-print) a:hover { color: var(--text); text-decoration: underline; }
+.formPanel :global(.form-actions) { display: grid; gap: 10px; margin: 0; padding: 0; }
+.formPanel :global(.button) { width: 100%; min-height: 48px; border-radius: 9px; font-size: .875rem; font-weight: 600; }
+.formPanel :global(.link-button) { width: fit-content; min-height: 36px; border: 0; padding: 5px 0; color: var(--muted-strong,var(--text)); background: transparent; font: inherit; font-size: .8125rem; text-decoration: none; cursor: pointer; }
+.formPanel :global(.link-button):hover { text-decoration: underline; text-underline-offset: 4px; }
+.formPanel :global(.form-message) { margin: 0; padding: 14px 16px; border: 0; border-radius: 9px; font-size: .8125rem; line-height: 1.6; }
+.stateHeading { display: grid; gap: 5px; }
+.stateHeading span { color: var(--muted); font-size: .75rem; }
+.stateHeading strong { color: var(--text); font-size: 1.0625rem; font-weight: 550; line-height: 1.4; }
+@media(max-width: 600px) { .page { min-height: 60vh; align-content: start; padding: 32px 20px 48px; } .layout { gap: 24px; } .formPanel :global(.field) input { font-size: 1rem; } }

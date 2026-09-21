@@ -29,7 +29,7 @@
     "test:site-editor": "node scripts/assert-site-editor.mjs",
     "test:core-behavior": "node scripts/test-core-behavior.mjs",
     "test:public-data-reliability": "node scripts/assert-public-data-reliability.mjs",
-    "test:public-images": "node --test scripts/test-public-image-loading.mjs scripts/test-photo-viewer.mjs",
+    "test:public-images": "node --test scripts/test-public-image-loading.mjs scripts/test-photo-viewer.mjs scripts/test-public-layout-contract.mjs",
     "test:bulk-import": "node --test scripts/test-bulk-import.mjs scripts/test-bulk-session.mjs",
     "test:security": "node scripts/security/service-events.test.mjs && node scripts/security/server-data-boundary.test.mjs",
     "test:bulk-concurrency": "node scripts/test-bulk-import-concurrency.mjs",

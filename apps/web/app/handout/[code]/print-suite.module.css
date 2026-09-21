@@ -1,5 +1,5 @@
 .screenChrome { display: contents; }
-.root:global(.handout-page) { padding: 32px 0 64px; background: var(--bg); color: var(--text); }
+.root:global(.handout-page) { padding: 32px 0 64px; background: var(--canvas); color: var(--text); }
 .root :global(.handout-shell) { width: min(1280px, calc(100% - 48px)); max-width: none; }
 .root :global(.print-kit-toolbar) { margin-bottom: 24px; }
 .root :global(.print-kit-toolbar) h1 { font-size: 30px; line-height: 1.15; }
@@ -7,44 +7,51 @@
 .root :global(.print-kit-back-link) { color: var(--muted-strong); }
 .root :global(.print-kit-back-link):hover { color: var(--text); }
 .workspace { display: grid; grid-template-columns: 288px minmax(0, 1fr); gap: 24px; align-items: start; }
-.controlRail { display: grid; gap: 22px; min-width: 0; position: sticky; top: 16px; max-height: calc(100dvh - 32px); overflow-y: auto; padding: 2px 16px 16px 0; scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+.controlRail { display: grid; gap: 22px; min-width: 0; position: sticky; top: 16px; max-height: calc(100dvh - 32px); overflow-y: auto; padding: 2px 16px 16px 0; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 .controlSection { display: grid; gap: 10px; border: 0; padding: 0; margin: 0; min-width: 0; }
 .controlLabel { display: block; color: var(--text); font-size: 14px; font-weight: 650; padding: 0; margin-bottom: 4px; }
 .formatList { display: grid; gap: 4px; }
-.formatList button { display: grid; gap: 4px; text-align: left; border: 1px solid transparent; background: transparent; color: var(--text); padding: 11px 12px; border-radius: 5px; cursor: pointer; }
+.formatList button { display: grid; gap: 4px; text-align: left; border: 1px solid transparent; background: transparent; color: var(--text); padding: 11px 12px; border-radius: 9px; cursor: pointer; }
 .formatList strong { font-size: 14px; font-weight: 650; }
 .formatList span { font-size: 12px; line-height: 1.5; color: var(--muted); }
-.formatList .selectedFormat { background: var(--panel-2); border-color: var(--border-strong); }
-.formatList button:hover { background: var(--panel-2); }
+.formatList .selectedFormat { background: var(--surface-subtle); border-color: transparent; }
+.formatList button:hover { background: var(--surface-subtle); }
 .formatList .selectedFormat strong { color: var(--gold); }
 .root button:focus-visible, .root a:focus-visible, .controlRail select:focus-visible, .controlRail input:focus-visible, .controlRail textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .controlGrid { display: grid; gap: 14px; }
 .controlGrid label { display: grid; gap: 7px; color: var(--text); font-size: 13px; }
-.controlRail select, .controlRail textarea, .controlRail input[type="text"] { width: 100%; min-width: 0; background: var(--panel); color: var(--text); border: 1px solid var(--border-strong); border-radius: 4px; padding: 10px; font: inherit; font-size: 14px; line-height: 1.5; }
+.controlRail select, .controlRail textarea, .controlRail input[type="text"] { width: 100%; min-width: 0; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 8px; min-height: 44px; padding: 10px 12px; font: inherit; font-size: 14px; line-height: 1.5; }
 .controlRail textarea { resize: vertical; min-height: 88px; }
 .controlRail small { color: var(--muted); font-size: 12px; line-height: 1.5; }
-.choice { display: flex; align-items: flex-start; gap: 9px; color: var(--text); font-size: 13px; cursor: pointer; }
+.choice { display: flex; align-items: flex-start; min-height: 44px; padding-block: 8px; gap: 9px; color: var(--text); font-size: 13px; cursor: pointer; }
 .choice input, .toggleGrid input { flex-shrink: 0; width: 16px; height: 16px; margin: 3px 0 0; accent-color: var(--action, var(--gold)); }
 .choice span { display: grid; gap: 4px; }
 .choice strong { font-size: 13px; font-weight: 550; }
-.toggleGrid { display: grid; gap: 10px; }
-.toggleGrid label { display: flex; align-items: flex-start; gap: 9px; color: var(--text); font-size: 13px; cursor: pointer; }
+.toggleGrid { display: grid; gap: 2px; }
+.toggleGrid label { display: flex; align-items: flex-start; min-height: 44px; padding-block: 10px; gap: 9px; color: var(--text); font-size: 13px; cursor: pointer; }
 .controlActions { border-top: 1px solid var(--line); padding-top: 15px; display: flex; gap: 10px; }
-.resetButton, .doneButton { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 42px; background: var(--panel); color: var(--text); padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: 4px; font-size: 13px; cursor: pointer; }
-.previewStage { min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.resetButton, .doneButton { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; background: var(--surface); color: var(--text); padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; cursor: pointer; }
+.previewStage { min-width: 0; background: var(--surface); border: 0; border-radius: 14px; overflow: hidden; }
+.previewStageEmpty { grid-column: 1 / -1; }
 .previewToolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 15px 18px; border-bottom: 1px solid var(--line); }
 .previewToolbar > div:first-child { min-width: 0; display: grid; gap: 4px; }
 .previewToolbar strong { color: var(--text); font-size: 14px; }
 .previewToolbar span { color: var(--muted); font-size: 12px; }
 .zoomControls { display: flex; align-items: center; gap: 10px; }
 .zoomControls output { width: 42px; text-align: center; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-.zoomControls button { flex: 0 0 auto; width: 44px; height: 44px; background: transparent; color: var(--text); border: 1px solid var(--border-strong); border-radius: 4px; display: grid; place-items: center; cursor: pointer; }
+.zoomControls button { flex: 0 0 auto; width: 44px; height: 44px; background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: 8px; display: grid; place-items: center; cursor: pointer; }
 .zoomControls button:disabled { opacity: 0.4; cursor: default; }
-.zoomControls button:hover:not(:disabled), .resetButton:hover, .doneButton:hover { background: var(--panel-2); border-color: var(--muted); }
+.zoomControls button:hover:not(:disabled), .resetButton:hover, .doneButton:hover { background: var(--surface-subtle); border-color: var(--muted); }
 .validation { padding: 11px 18px; display: flex; gap: 8px; align-items: flex-start; color: var(--text); font-size: 13px; line-height: 1.5; }
 .validation svg { flex: 0 0 auto; margin-top: 2px; }
 .scopeNotice { margin: 0; padding: 2px 18px 12px; color: var(--gold); font-size: 13px; line-height: 1.5; }
-.canvasViewport { min-width: 0; overflow: auto; overscroll-behavior-inline: contain; padding: 24px; background: #101819; scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+.canvasViewport { min-width: 0; overflow: auto; overscroll-behavior-inline: contain; padding: 24px; background: var(--surface-subtle); scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.loadStatus { display: grid; justify-items: start; gap: 12px; max-width: 640px; padding: 20px 0; color: var(--text); }
+.loadStatus > svg { width: 24px; height: 24px; color: var(--muted-strong); }
+.loadStatus h2 { margin: 0; color: var(--text); font-size: 22px; line-height: 1.3; letter-spacing: -0.02em; }
+.loadStatus p { margin: 0; color: var(--muted-strong); font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; }
+.retryButton { min-height: 44px; margin-top: 4px; padding: 10px 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.retryButton:hover { background: var(--surface-subtle); border-color: var(--muted); }
 .paperSpace { position: relative; margin: 0 auto; overflow: clip; flex-shrink: 0; box-shadow: 0 4px 18px #0003; }
 .pageCanvas { box-sizing: border-box; width: var(--paper-width); height: var(--paper-height); padding: var(--paper-margin); background: #fff; transform: scale(var(--preview-scale)); transform-origin: top left; }
 .printUnavailable { display: none; }
@@ -62,14 +69,15 @@
 .mobileControlsButton, .mobileControlsBackdrop, .mobileControlsHeader, .doneButton { display: none; }
 @media (max-width: 1000px) {
   .workspace { grid-template-columns: minmax(0, 1fr); }
-  .mobileControlsButton { display: inline-flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--border-strong); border-radius: 4px; color: var(--text); padding: 11px 15px; margin-bottom: 14px; font-size: 14px; cursor: pointer; }
+  .mobileControlsButton { display: inline-flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; color: var(--text); padding: 11px 15px; margin-bottom: 14px; font-size: 14px; cursor: pointer; }
+  .mobileControlsButton:disabled { opacity: 0.45; cursor: default; }
   .controlRail { display: none; }
-  .controlRailOpen { display: grid; position: fixed; inset: auto 0 0; z-index: 101; max-height: min(85dvh, 850px); padding: 20px 24px max(20px, env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--border-strong); border-radius: 8px 8px 0 0; overflow-y: auto; }
+  .controlRailOpen { display: grid; position: fixed; inset: auto 0 0; z-index: 101; max-height: min(85dvh, 850px); padding: 20px 24px max(20px, env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--line); border-radius: 8px 8px 0 0; overflow-y: auto; }
   .mobileControlsBackdrop { display: block; position: fixed; inset: 0; z-index: 100; background: #0009; border: 0; cursor: pointer; }
-  .mobileControlsHeader { display: flex; justify-content: space-between; align-items: center; color: var(--text); position: sticky; top: -20px; background: var(--panel); padding-block: 10px; z-index: 1; }
-  .mobileControlsHeader button { display: grid; place-items: center; width: 40px; height: 40px; background: transparent; border: 1px solid var(--border-strong); border-radius: 4px; color: inherit; cursor: pointer; }
+  .mobileControlsHeader { display: flex; justify-content: space-between; align-items: center; color: var(--text); position: sticky; top: -20px; background: var(--surface); padding-block: 10px; z-index: 1; }
+  .mobileControlsHeader button { display: grid; place-items: center; width: 44px; height: 44px; background: transparent; border: 1px solid var(--line); border-radius: 8px; color: inherit; cursor: pointer; }
   .doneButton { display: inline-flex; margin-left: auto; }
-  .controlActions { position: sticky; bottom: -20px; padding-bottom: 14px; background: var(--panel); }
+  .controlActions { position: sticky; bottom: -20px; padding-bottom: 14px; background: var(--surface); }
 }
 @media (max-width: 560px) {
   .root :global(.handout-shell) { width: calc(100% - 24px); }

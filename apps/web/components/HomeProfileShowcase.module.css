@@ -1,24 +1,18 @@
-.showcase { width: 100%; min-width: 0; color: var(--text); }
-.topline { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; color: var(--muted); font-size: 12px; font-weight: 500; }
-.topline a { display: grid; place-items: center; width: 36px; height: 36px; color: var(--text); border-radius: 50%; background: var(--surface); }
-.photoStage { position: relative; display: block; width: 100%; height: clamp(300px,30vw,410px); padding: 0; overflow: hidden; border: 0; border-radius: 16px; background: #0b0c0e; cursor: zoom-in; color: white; }
-.mainPhoto { display: block; width: 100%; height: 100%; object-fit: contain; }
-.expand { display: inline-flex; align-items: center; gap: 8px; position: absolute; right: 14px; bottom: 14px; padding: 10px 12px; background: #101113d9; backdrop-filter: blur(12px); border-radius: 20px; font-size: 11px; }
-.noPhoto { display: grid; place-content: center; justify-items: center; gap: 16px; height: 100%; padding: 24px; color: var(--muted); text-align: center; }
-.photoSelector { display: flex; justify-content: center; gap: 9px; overflow-x: auto; padding: 12px 4px 4px; scrollbar-width: thin; }
-.photoSelector button { flex: 0 0 58px; height: 48px; padding: 3px; border: 0; border-radius: 7px; background: var(--surface); opacity: .55; cursor: pointer; }
-.photoSelector button.selectedPhoto { opacity: 1; box-shadow: 0 0 0 1px var(--text); }
-.photoSelector button:hover { opacity: 1; }
-.photoSelector img { width: 100%; height: 100%; display: block; object-fit: contain; border-radius: 4px; }
-.details { display: flex; align-items: end; justify-content: space-between; gap: 16px; padding: 18px 0 12px; }
-.kicker { font-size: 12px; color: var(--muted); }
-.identity h2 { font-size: 23px; font-weight: 600; letter-spacing: -.03em; line-height: 1.2; margin: 5px 0 8px; font-family: inherit; }
-.identity p { font-size: 12px; line-height: 1.5; margin: 0; color: var(--muted); }
-.contents { display: flex; align-items: end; flex-direction: column; gap: 8px; flex-shrink: 0; padding-bottom: 2px; }
-.contents span { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
-.passportLink { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; font-size: 11px; color: var(--muted); }
-.openLabel { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--text); }
-.showcase a:hover { color: var(--text); }
-.showcase a:focus-visible, .showcase button:focus-visible { outline: 2px solid var(--text); outline-offset: 4px; }
-@media (max-width: 760px) { .photoStage { height: clamp(250px,78vw,400px); } .identity h2 { font-size: 22px; } .details { gap: 12px; } }
-@media (max-width: 360px) { .details { display: block; } .contents { flex-direction: row; margin-top: 12px; } }
+/* A photograph and its caption, with no card or nested media mat. */
+.showcase { width:100%; min-width:0; color:var(--text); }
+.photoStage { display:block; width:100%; height:clamp(320px,34vw,470px); margin:0; padding:0; overflow:hidden; border:0; border-radius:4px; background:transparent; color:var(--text); cursor:zoom-in; }
+.mainPhoto { display:block; width:100%; height:100%; object-fit:contain; }
+.noPhoto { display:grid; place-content:center; justify-items:center; gap:16px; height:100%; padding:24px; color:var(--muted); background:var(--surface); }
+.details { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:20px 0 0; }
+.identity { min-width:0; }
+.kicker { color:var(--muted); font-size:12px; line-height:1.5; }
+.identity h2 { margin:6px 0; font-family:inherit; font-size:24px; font-weight:550; line-height:1.2; letter-spacing:-.025em; }
+.identity h2 a { display:inline-flex; align-items:center; gap:10px; min-height:32px; }
+.identity h2 svg { flex-shrink:0; color:var(--muted); }
+.identity p { margin:0; color:var(--muted); font-size:14px; line-height:1.5; }
+.galleryLink { display:inline-flex; flex-shrink:0; align-items:center; gap:8px; min-height:44px; padding:0 4px; border:0; border-radius:4px; background:transparent; color:var(--muted); font:inherit; font-size:13px; cursor:pointer; }
+.showcase :is(a,button):hover { color:var(--text); }
+.identity h2 a:hover { text-decoration:underline; text-underline-offset:5px; text-decoration-thickness:1px; }
+.showcase :is(a,button):focus-visible { outline:3px solid var(--action); outline-offset:4px; }
+@media(max-width:760px) { .photoStage { height:clamp(240px,82vw,440px); }.details { padding-top:16px; align-items:flex-start; gap:12px; }.identity h2 { font-size:22px; }.identity p { font-size:13px; }.galleryLink { font-size:12px; } }
+@media(max-width:360px) { .details { flex-wrap:wrap; gap:4px; } }

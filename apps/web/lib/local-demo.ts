@@ -1221,14 +1221,14 @@ export function transferFeeAmountLabel(transfer: Pick<DemoTransfer, "feeCents">)
 
 export function transferStatusLabel(transfer: Pick<DemoTransfer, "status" | "feeCents" | "paymentCollected">) {
   if (transfer.status === "accepted") {
-    return "Claim received. Owner approval tools are in beta.";
+    return "Ownership accepted.";
   }
 
   if (transfer.status === "cancelled") {
     return "Transfer cancelled";
   }
 
-  return "Waiting for the next owner to claim this record.";
+  return "Waiting for the next owner to accept this Profile.";
 }
 
 export function transferPaymentInstructions(transfer: Pick<DemoTransfer, "feeCents" | "paymentCollected" | "paymentMethod">) {

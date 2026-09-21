@@ -1,5 +1,6 @@
 "use client";
 
+import workflow from "../../../components/WorkflowWorkspace.module.css";
 import { ArrowLeft, CheckCircle2, FileLock2, ShieldCheck, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
@@ -65,7 +66,7 @@ export default function ServiceReviewPage() {
   }
 
   const providerName = submission?.provider?.publicDisplayName || submission?.provider?.businessName || "Service provider";
-  return <><Nav /><main className="service-review-page"><section className="section"><div className="shell service-review-shell">
+  return <><Nav /><main className={`service-review-page ${workflow.service}`}><section className="section"><div className="shell service-review-shell">
     <Link className="text-link service-back" href="/dashboard"><ArrowLeft size={16} /> Back to Dashboard</Link>
     {!token ? <div className="app-panel"><h1>Owner sign-in required.</h1><p>This review is private and opens only for the current Profile owner.</p><Link className="button" href={`/login?next=${encodeURIComponent(`/service-review/${id}${reviewToken ? `?token=${reviewToken}` : ""}`)}`}>Sign in</Link></div> : !submission ? <div className="app-panel"><h1>Service review</h1><p>{message || "Loading private submission..."}</p></div> : <>
       <div className="service-review-heading"><div><div className="eyebrow">Owner service review</div><h1>{getContentValue(content, "serviceReview.hero.headline")}</h1><p>{getContentValue(content, "serviceReview.hero.body")}</p><p><strong>{submission.title}</strong> / {submission.profileTitle} <span>({submission.qrCode})</span></p></div><div className={`service-status service-status-${submission.status}`}><Wrench /><div><strong>{submission.status.replace(/_/g, " ")}</strong><span>{submission.evidenceCount} private evidence file(s)</span></div></div></div>

@@ -4,6 +4,7 @@ import { Globe2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { DemoInstrument } from "../lib/local-demo";
 import { CollectibleRecordCard } from "./CollectibleRecordCard";
+import { selectHomeFeaturedProfile } from "../lib/home-featured-profile";
 import { HomeProfileShowcase } from "./HomeProfileShowcase";
 
 type InstrumentsResponse = {
@@ -25,9 +26,9 @@ export function LatestPublicRecord({ initialRecord = null, content, presentation
           headers: { "Cache-Control": "no-cache" }
         });
         const payload = (await response.json().catch(() => null)) as InstrumentsResponse | null;
-        const newest = payload?.ok && Array.isArray(payload.instruments) ? payload.instruments[0] || null : null;
+        const newest = payload?.ok && Array.isArray(payload.instruments) ? (presentation === "showcase" ? selectHomeFeaturedProfile(payload.instruments) : payload.instruments[0] || null) : null;
 
-        if (active && (newest || !initialRecord)) setLatest(newest);
+        if (active && payload?.ok && Array.isArray(payload.instruments)) setLatest(newest);
       } catch {
         if (active && !initialRecord) setLatest(null);
       } finally {
@@ -39,7 +40,7 @@ export function LatestPublicRecord({ initialRecord = null, content, presentation
     return () => {
       active = false;
     };
-  }, [initialRecord]);
+  }, [initialRecord, presentation]);
 
   if (!loaded) {
     return <div className="latest-record-card--skeleton" aria-label="Loading latest QRguitar Profile" aria-busy="true" />;

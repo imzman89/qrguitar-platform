@@ -17,6 +17,8 @@ const noStoreHeaders = [
 const privatePageCacheSource = "/:privatePath(account|admin|create|dashboard|edit|handout|login|messages|ownership-claim|reset-password|service-review|service-work|site-editor|transfer)/:path*";
 
 const nextConfig = {
+  // Keep local review output separate from production-format build checks.
+  distDir: process.env.QRGUITAR_LOCAL_REVIEW === "1" ? ".next-review" : process.env.QRGUITAR_LOCAL_REVIEW === "build" ? ".next-review-build" : ".next",
   transpilePackages: ["@qrguitar/shared"],
   poweredByHeader: false,
   allowedDevOrigins: ["127.0.0.1", "localhost"],

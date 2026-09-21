@@ -68,9 +68,16 @@ export function mergeMemberConversationPages(current: MemberConversationSummary[
 export function mergeMemberMessagePages(current: MemberMessage[], incoming: MemberMessage[]) {
   const byId = new Map(current.map((message) => [message.id, message]));
   for (const message of incoming) byId.set(message.id, message);
+  // Date compares timezone-normalized milliseconds; retain PostgreSQL's final
+  // three fractional digits before using the ID to break a true timestamp tie.
+  const subMillisecondPart = (timestamp: string) => {
+    const fraction = /\.(\d{1,6})(?:Z|[+-]\d{2}:\d{2})$/.exec(timestamp)?.[1] || "";
+    return Number(fraction.padEnd(6, "0").slice(3));
+  };
   return [...byId.values()].sort((left, right) => {
     const time = new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
-    return time || left.id.localeCompare(right.id);
+    if (!Number.isFinite(time)) return left.id.localeCompare(right.id);
+    return time || subMillisecondPart(left.createdAt) - subMillisecondPart(right.createdAt) || left.id.localeCompare(right.id);
   });
 }
 

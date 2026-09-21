@@ -20,7 +20,7 @@ import {
   type ServiceHistoryEntry
 } from "../../../lib/local-demo";
 import { formatRecordLocation } from "../../../lib/record-location";
-import { getSupabaseAccessToken } from "../../../lib/supabase-browser";
+import { createBrowserSupabaseClient } from "../../../lib/supabase-browser";
 import { resolveInstrumentPresentation } from "../../../lib/instrument-profile-contract";
 import { getContentValue } from "../../../lib/content-registry";
 import { useSiteContent } from "../../../lib/use-site-content";
@@ -131,6 +131,8 @@ export default function HandoutPage() {
   const [viewportWidth, setViewportWidth] = useState(700);
   const viewportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const loadRevision = useRef(0);
+  const renderedRevision = useRef(-1);
   const canonicalCode = instrument?.qrCode || code;
   const profileUrl = publicProfileUrl(canonicalCode);
 
@@ -165,18 +167,40 @@ export default function HandoutPage() {
 
   useEffect(() => {
     let cancelled = false;
-    const controller = new AbortController();
-    setLoading(true);
-    setMessage("");
-    setInstrument(null);
-    setOwnerAuthorized(false);
-    setPrintScope("public");
-    setSelectedServiceId("");
+    let authResolved = false;
+    let currentActor: string | undefined;
+    let controller: AbortController | undefined;
+    const requestRevision = loadRevision;
+    const visibleRevision = renderedRevision;
 
-    async function loadHandoutProfile() {
+    function invalidatePrivateState() {
+      requestRevision.current++;
+      visibleRevision.current = -1;
+      controller?.abort();
+      setLoading(true);
+      setMessage("");
+      setInstrument(null);
+      setOwnerAuthorized(false);
+      setPrintScope("public");
+      setSelectedServiceId("");
+      setSelectedPhoto("");
+      setPrintTitle(null);
+      setPrintNote("");
+      setPrinting(false);
+      setPrintState("Preparing the selected page.");
+      setMobileControlsOpen(false);
+    }
+    invalidatePrivateState();
+
+    async function loadHandoutProfile(token: string) {
+      const revision = requestRevision.current;
+      const requestController = new AbortController();
+      controller = requestController;
+      const isCurrent = () => !cancelled && requestRevision.current === revision && !requestController.signal.aborted;
       try {
-        const result = await loadHandoutInstrument({ code, readToken: getSupabaseAccessToken, signal: controller.signal });
-        if (cancelled) return;
+        const result = await loadHandoutInstrument({ code, readToken: async () => token, signal: requestController.signal });
+        if (!isCurrent()) return;
+        visibleRevision.current = revision;
         setInstrument(result.instrument);
         setOwnerAuthorized(result.ownerAuthorized);
         if (result.instrument.qrCode && result.instrument.qrCode !== code) {
@@ -184,16 +208,42 @@ export default function HandoutPage() {
           router.replace(`/handout/${encodeURIComponent(result.instrument.qrCode)}${query ? `?${query}` : ""}`);
         }
       } catch (error) {
-        if (!cancelled) setMessage(error instanceof Error ? error.message : "This Profile could not be loaded. Please try again.");
+        if (isCurrent()) setMessage(error instanceof Error ? error.message : "This Profile could not be loaded. Please try again.");
       } finally {
-        if (!cancelled) setLoading(false);
+        if (isCurrent()) setLoading(false);
       }
     }
 
-    void loadHandoutProfile();
+    function applySession(session: { user?: { id?: string }; access_token?: string } | null, force = false) {
+      if (cancelled) return;
+      authResolved = true;
+      window.clearTimeout(authTimeout);
+      const nextActor = session?.user?.id || "";
+      if (currentActor === nextActor && !force) return;
+      currentActor = nextActor;
+      invalidatePrivateState();
+      void loadHandoutProfile(nextActor ? session?.access_token || "" : "");
+    }
+
+    // A failed or unavailable session check must still permit anonymous public printing.
+    const authTimeout = window.setTimeout(() => applySession(null), 2500);
+    let unsubscribe: (() => void) | undefined;
+    try {
+      const supabase = createBrowserSupabaseClient();
+      const { data: listener } = supabase.auth.onAuthStateChange((event, session) => applySession(session, event === "SIGNED_OUT"));
+      unsubscribe = () => listener.subscription.unsubscribe();
+      void supabase.auth.getSession().then(({ data }) => {
+        if (!authResolved) applySession(data.session);
+      }).catch(() => { if (!authResolved) applySession(null); });
+    } catch { applySession(null); }
+
     return () => {
       cancelled = true;
-      controller.abort();
+      requestRevision.current++;
+      visibleRevision.current = -1;
+      controller?.abort();
+      window.clearTimeout(authTimeout);
+      unsubscribe?.();
     };
   }, [code, router, searchParams, loadAttempt]);
 
@@ -261,7 +311,7 @@ export default function HandoutPage() {
   const resolvedPageDimensions = `${geometry.width}in ${geometry.height}in`;
   const previewScale = Math.min(1, Math.max(0.1, (viewportWidth - 32) / (geometry.width * 96))) * zoom / 100;
   const optionKey = JSON.stringify([mode, printSize, orientation, theme, photoUrl, photoFit, printScope, serialDisplay, includePhoto, includeLogo, includeAvailability, includeAttribution, includeSpecifications, includeTimeline, includeUrlLabel, includeScanInstruction, selectedServiceId, includeServiceDetails, printNote, printedTitle]);
-  const readyToPrint = !loading && Boolean(instrument && qrDataUrl) && !qrError && printState === "Ready to print.";
+  const readyToPrint = !loading && renderedRevision.current === loadRevision.current && Boolean(instrument && qrDataUrl) && !qrError && printState === "Ready to print.";
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -276,11 +326,12 @@ export default function HandoutPage() {
     const root = canvasRef.current?.querySelector<HTMLElement>("[data-print-document]");
     setPrintState("Preparing the selected page.");
     if (!root || !instrument || !qrDataUrl) return;
+    const revision = loadRevision.current;
     let active = true;
     let timedOut = false;
     const images = Array.from(root.querySelectorAll("img"));
     function check() {
-      if (!active || !root) return;
+      if (!active || !root || revision !== loadRevision.current) return;
       setPrintState(printReadiness(images, root.scrollHeight > root.clientHeight + 2 || root.scrollWidth > root.clientWidth + 2, timedOut));
     }
     images.forEach((image) => { image.addEventListener("load", check); image.addEventListener("error", check); });
@@ -294,7 +345,7 @@ export default function HandoutPage() {
   }, [instrument, qrDataUrl, optionKey]);
 
   function printSelectedPage() {
-    if (!readyToPrint || printing) return;
+    if (!readyToPrint || printing || renderedRevision.current !== loadRevision.current) return;
     const root = canvasRef.current?.querySelector<HTMLElement>("[data-print-document]");
     if (!root) return;
     const currentReadiness = printReadiness(Array.from(root.querySelectorAll("img")), root.scrollHeight > root.clientHeight + 2 || root.scrollWidth > root.clientWidth + 2);
@@ -417,6 +468,7 @@ export default function HandoutPage() {
             type="button"
             aria-expanded={mobileControlsOpen}
             aria-controls="print-suite-controls"
+            disabled={!instrument || loading}
             onClick={() => setMobileControlsOpen((current) => !current)}
           >
             <SlidersHorizontal size={16} />
@@ -501,29 +553,35 @@ export default function HandoutPage() {
               </aside>
             ) : null}
 
-            <section className={styles.previewStage} data-print-frame aria-label="Print preview stage">
+            <section className={`${styles.previewStage} ${!instrument ? styles.previewStageEmpty : ""}`} data-print-frame aria-label="Print preview stage">
               <div className={`${styles.previewToolbar} no-print`}>
                 <div><strong>{printModeLabel(mode)}</strong><span>{printSizeLabels[printSize]} / {orientation}{readyToPrint ? " / 1 page" : ""}</span></div>
-                <div className={styles.zoomControls} aria-label="Preview zoom">
+                {instrument ? <div className={styles.zoomControls} aria-label="Preview zoom">
                   <button type="button" aria-label="Zoom out" title="Zoom out" disabled={zoom <= 75} onClick={() => setZoom((current) => Math.max(75, current - 25))}><ZoomOut size={17} /></button>
                   <button type="button" aria-label="Fit page" title="Fit page" onClick={() => setZoom(100)}><Maximize size={17} /></button>
                   <output aria-live="polite" aria-label="Preview scale">{Math.round(previewScale * 100)}%</output>
                   <button type="button" aria-label="Zoom in" title="Zoom in" disabled={zoom >= 300} onClick={() => setZoom((current) => Math.min(300, current + 25))}><ZoomIn size={17} /></button>
-                </div>
+                </div> : null}
               </div>
 
-              <div className={`${styles.validation} no-print`} role="status">
+              {instrument ? <div className={`${styles.validation} no-print`} role="status">
                 {readyToPrint ? <CheckCircle2 size={16} /> : <FileText size={16} />}
-                <span>{qrError || (loading ? "Loading the selected Profile." : !instrument ? message : printState)}</span>
-              </div>
+                <span>{qrError || printState}</span>
+              </div> : null}
 
               {isPrivate ? <p className={`${styles.scopeNotice} no-print`}>This Profile is private. The printed QR will not open for customers until you change its visibility.</p> : null}
               {printScope === "owner" ? <p className={`${styles.scopeNotice} no-print`}>Owner copy: may contain information hidden from the public Profile.</p> : null}
               <div className={styles.canvasViewport} data-print-frame ref={viewportRef}>
+                {loading || !instrument ? (
+                  <section className={`${styles.loadStatus} no-print`} role="status" aria-live="polite" aria-atomic="true">
+                    {loading ? <QrCode aria-hidden="true" /> : <FileText aria-hidden="true" />}
+                    <h2>{loading ? "Preparing Print Suite..." : "Print Suite unavailable."}</h2>
+                    <p>{loading ? "Loading the selected Profile." : message || "This Profile could not be loaded. Please try again."}</p>
+                    {!loading ? <button type="button" className={styles.retryButton} onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button> : null}
+                  </section>
+                ) : (
                 <div className={styles.paperSpace} data-print-frame style={{ width: geometry.width * 96 * previewScale, height: geometry.height * 96 * previewScale }}>
                 <div className={styles.pageCanvas} data-print-frame ref={canvasRef} style={{ "--paper-width": `${geometry.width}in`, "--paper-height": `${geometry.height}in`, "--paper-margin": `${geometry.margin}in`, "--print-content-width": `${geometry.contentWidth}in`, "--print-content-height": `${geometry.contentHeight}in`, "--preview-scale": previewScale } as CSSProperties}>
-
-                  {loading ? <section className="handout-status no-print"><QrCode /><h2>Preparing Print Suite...</h2></section> : !instrument ? <section className="handout-status no-print"><FileText /><h2>Print Suite unavailable.</h2><p>{message}</p><button type="button" className="button button-primary no-print" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button></section> : (
                     <PrintDocument
                       mode={mode} size={printSize} orientation={orientation} theme={theme}
                       title={printedTitle} code={canonicalCode} serial={serialDisplay}
@@ -553,10 +611,10 @@ export default function HandoutPage() {
                         provenance: serviceProvenance(selectedService)
                       } : null}
                     />
-                  )}
-                  <p className={styles.printUnavailable}>Print unavailable. Return to QRguitar and resolve the print readiness message before printing.</p>
                 </div>
                 </div>
+                )}
+                <p className={styles.printUnavailable}>Print unavailable. Return to QRguitar and resolve the print readiness message before printing.</p>
               </div>
             </section>
           </div>

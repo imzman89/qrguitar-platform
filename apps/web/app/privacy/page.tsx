@@ -1,3 +1,4 @@
+import styles from "../../components/LegalDocument.module.css";
 import type { Metadata } from "next";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
@@ -42,7 +43,7 @@ export default async function PrivacyPage() {
   return (
     <>
       <Nav />
-      <main>
+      <main className={styles.document}>
         <section className="section">
           <div className="shell legal-page">
             <div className="eyebrow">Privacy</div>

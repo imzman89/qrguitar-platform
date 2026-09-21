@@ -1,0 +1,7 @@
+.identity-card { min-width: 0; color: var(--text); }
+.identity-card-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 18px; font-size: 13px; font-weight: 600; }
+.identity-media-summary { color: var(--muted); font-size: 12px; font-weight: 400; }
+.identity-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px 24px; margin: 0; padding: 0; }
+.identity-cell { min-width: 0; }
+.identity-cell dt { color: var(--muted); font-size: 12px; line-height: 1.5; margin-bottom: 4px; }
+.identity-cell dd { margin: 0; color: var(--text); font-size: 14px; font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }

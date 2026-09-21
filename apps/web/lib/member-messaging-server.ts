@@ -60,9 +60,20 @@ type ConversationCursor = { updatedAt: string; id: string };
 type MessageCursor = { createdAt: string; id: string };
 
 function canonicalTimestamp(value: unknown) {
-  if (typeof value !== "string" || value.length < 20 || value.length > 40) return null;
+  if (typeof value !== "string") return null;
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}:\d{2})$/.exec(value);
+  if (!match || Number(match[2]) > 23 || Number(match[3]) > 59 || Number(match[4]) > 59) return null;
+  const calendarDate = new Date(`${match[1]}T00:00:00.000Z`);
+  if (!Number.isFinite(calendarDate.getTime()) || calendarDate.toISOString().slice(0, 10) !== match[1]) return null;
   const parsed = new Date(value);
-  return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : null;
+  if (!Number.isFinite(parsed.getTime())) return null;
+  const utc = parsed.toISOString();
+  if (!/^\d{4}-/.test(utc)) return null;
+  // PostgreSQL retains microseconds. Date normalizes the timezone but would
+  // truncate the fraction, dropping exact inbox matches and cursor boundaries.
+  let fraction = (match[5] || "").padEnd(3, "0");
+  while (fraction.length > 3 && fraction.endsWith("0")) fraction = fraction.slice(0, -1);
+  return `${utc.slice(0, 19)}.${fraction}Z`;
 }
 
 function canonicalUuid(value: unknown) {

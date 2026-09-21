@@ -22,6 +22,7 @@ import {
   X
 } from "lucide-react";
 import Link from "next/link";
+import styles from "./admin-shell.module.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
@@ -268,22 +269,22 @@ type PendingAdminAction =
     };
 
 const sections: Array<{ id: SectionId; label: string; group: string; icon: typeof Gauge }> = [
-  { id: "overview", label: "Overview", group: "Command", icon: Gauge },
-  { id: "users", label: "Users", group: "Manage", icon: Users },
-  { id: "records", label: "Profiles", group: "Manage", icon: Guitar },
-  { id: "trust", label: "Trust", group: "Review", icon: ShieldCheck },
-  { id: "safety", label: "Safety", group: "Review", icon: TriangleAlert },
+  { id: "overview", label: "Overview", group: "Workspace", icon: Gauge },
+  { id: "users", label: "Users", group: "People & Profiles", icon: Users },
+  { id: "records", label: "Profiles", group: "People & Profiles", icon: Guitar },
+  { id: "trust", label: "Trust", group: "People & Profiles", icon: ShieldCheck },
+  { id: "safety", label: "Safety", group: "People & Profiles", icon: TriangleAlert },
   { id: "transfers", label: "Transfers", group: "Ownership", icon: Boxes },
   { id: "claims", label: "Claims", group: "Ownership", icon: FileCheck2 },
-  { id: "proof", label: "Evidence", group: "Profiles", icon: FileText },
-  { id: "service", label: "Service", group: "Profiles", icon: BookOpenText },
+  { id: "proof", label: "Evidence", group: "People & Profiles", icon: FileText },
+  { id: "service", label: "Service", group: "People & Profiles", icon: BookOpenText },
   { id: "brand-logos", label: "Brand Registry", group: "Platform", icon: ImageIcon },
   { id: "access", label: "Admin Access", group: "Platform", icon: KeyRound },
   { id: "audit", label: "Audit Log", group: "Platform", icon: FileClock },
   { id: "system", label: "System Health", group: "Platform", icon: Activity }
 ];
 
-const sectionGroups = ["Command", "Manage", "Review", "Ownership", "Profiles", "Platform"];
+const sectionGroups = ["Workspace", "People & Profiles", "Ownership", "Platform"];
 
 const overviewLinks: Record<string, { section: SectionId; filter?: string }> = {
   totalUsers: { section: "users" },
@@ -1360,6 +1361,11 @@ export default function AdminPage() {
 
     if (activeSection === "overview") {
       const counts = overview?.counts || {};
+      const primaryMetrics = ["totalUsers", "totalRecords", "publicRecords", "pendingTransfers"];
+      const renderMetric = ([key, value]: [string, number | null]) => {
+        const destination = overviewLinks[key] || { section: "overview" as SectionId };
+        return <button type="button" className="card admin-stat-card" key={key} onClick={() => goToSection(destination.section, destination.filter || "")}><span>{statLabel(key)}</span><strong>{value === null ? "Review" : value}</strong></button>;
+      };
       const needsAttention = [
         { label: "Reported lost", value: counts.lostRecords || 0, section: "safety" as SectionId, filter: "lost" },
         { label: "Reported stolen", value: counts.stolenRecords || 0, section: "safety" as SectionId, filter: "stolen" },
@@ -1369,17 +1375,20 @@ export default function AdminPage() {
       ];
       return (
         <div className="admin-overview-layout">
-          <section className="admin-grid">
-            {Object.entries(counts).map(([key, value]) => {
-              const destination = overviewLinks[key] || { section: "overview" as SectionId };
-              return (
-                <button type="button" className="card admin-stat-card" key={key} onClick={() => goToSection(destination.section, destination.filter || "")}>
-                  <span>{statLabel(key)}</span>
-                  <strong>{value === null ? "Review" : value}</strong>
-                </button>
-              );
-            })}
-          </section>
+          <div className={styles.metricsColumn}>
+            <section className={"admin-grid " + styles.primaryMetrics} aria-label="Platform overview">
+              {Object.entries(counts).filter(([key]) => primaryMetrics.includes(key)).map(renderMetric)}
+            </section>
+            <details className={styles.additionalMetrics}>
+              <summary>All platform metrics</summary>
+              <div className="admin-grid">{Object.entries(counts).filter(([key]) => !primaryMetrics.includes(key)).map(renderMetric)}</div>
+            </details>
+            <nav className={styles.workspaceShortcuts} aria-label="Platform workspaces">
+              <Link href="/admin/site-editor"><BookOpenText size={20} /><span><strong>Content Studio</strong><small>Website content and publishing</small></span><ChevronRight size={16} /></Link>
+              <Link href="/admin/payments"><Boxes size={20} /><span><strong>Payments</strong><small>Orders, receipts, and review</small></span><ChevronRight size={16} /></Link>
+              <Link href="/admin/service-workflow"><FileCheck2 size={20} /><span><strong>Service operations</strong><small>Submissions and evidence</small></span><ChevronRight size={16} /></Link>
+            </nav>
+          </div>
           <section className="card admin-panel-card">
             <div className="eyebrow">Needs attention</div>
             {needsAttention.map((item) => (
@@ -1943,20 +1952,20 @@ export default function AdminPage() {
   return (
     <>
       <Nav />
-      <main className="admin-page">
+      <main className={`admin-page ${styles.admin}`}>
         <div className="admin-command-bar">
-          <div>{adminAuthorized && adminDataReady ? <button ref={navButtonRef} type="button" className="admin-mobile-nav" onClick={() => setNavOpen(true)} aria-label="Open admin navigation" aria-controls="admin-primary-navigation" aria-expanded={navOpen}><Menu size={18} /></button> : null}<div><span>Admin command center</span><strong>{activeSectionMeta.label}</strong></div></div>
-          {adminAuthorized && adminDataReady ? <label className="admin-global-search"><Search size={16} /><input value={adminSearch} onChange={(event) => setAdminSearch(event.target.value)} placeholder="Search users, Profiles, or IDs" /></label> : null}
+          <div>{adminAuthorized && adminDataReady ? <button ref={navButtonRef} type="button" className="admin-mobile-nav" onClick={() => setNavOpen(true)} aria-label="Open admin navigation" aria-controls="admin-primary-navigation" aria-expanded={navOpen}><Menu size={18} /></button> : null}<div><span>QRguitar / Admin</span><strong>{activeSectionMeta.label}</strong></div></div>
+          {adminAuthorized && adminDataReady ? <label className="admin-global-search"><Search size={16} /><input aria-label="Search users, Profiles, or IDs" value={adminSearch} onChange={(event) => setAdminSearch(event.target.value)} placeholder="Search users, Profiles, or IDs" /></label> : null}
           <div className="admin-command-meta"><span>Admin access</span><strong>{adminAuthorized ? overview?.admin?.email || "Authorized admin" : adminAccessState === "unavailable" ? "Temporarily unavailable" : adminAccessState === "checking" ? "Checking" : "Sign in required"}</strong></div>
         </div>
         <div className={adminAuthorized && adminDataReady ? "admin-shell" : "admin-shell is-locked"}>
-          {adminAuthorized && adminDataReady ? <aside ref={sidebarRef} tabIndex={-1} id="admin-primary-navigation" aria-label="Admin navigation" className={navOpen ? "admin-sidebar is-open" : "admin-sidebar"}><header><strong>QRguitar Admin</strong><button type="button" onClick={() => setNavOpen(false)} aria-label="Close admin navigation"><X size={17} /></button></header>{sectionGroups.map((group) => <nav key={group} aria-label={`${group} sections`}><span>{group}</span>{sections.filter((section) => section.group === group).map((section) => { const Icon = section.icon; return <button type="button" className={section.id === activeSection ? "active" : ""} onClick={() => goToSection(section.id)} key={section.id}><Icon size={16} />{section.label}</button>; })}</nav>)}<nav className="admin-sidebar-links" aria-label="Admin workspaces"><span>Workspaces</span><Link href="/admin/site-editor">Site editor</Link><Link href="/admin/service-workflow">Service operations</Link><Link href="/admin/payments">Payments</Link><Link href="/admin/promotions">Promo codes</Link><Link href="/admin/deletion-requests">Deletion requests</Link></nav></aside> : null}
+          {adminAuthorized && adminDataReady ? <aside ref={sidebarRef} tabIndex={-1} id="admin-primary-navigation" aria-label="Admin navigation" className={navOpen ? "admin-sidebar is-open" : "admin-sidebar"}><header><strong>QRguitar Admin</strong><button type="button" onClick={() => setNavOpen(false)} aria-label="Close admin navigation"><X size={17} /></button></header>{sectionGroups.map((group) => <nav key={group} aria-label={`${group} sections`}><span>{group}</span>{sections.filter((section) => section.group === group).map((section) => { const Icon = section.icon; return <button type="button" className={section.id === activeSection ? "active" : ""} onClick={() => goToSection(section.id)} key={section.id}><Icon size={16} />{section.label}</button>; })}</nav>)}<nav className="admin-sidebar-links" aria-label="Admin workspaces"><span>Workspaces</span><Link href="/admin/site-editor">Content Studio</Link><Link href="/admin/service-workflow">Service operations</Link><Link href="/admin/payments">Payments</Link><Link href="/admin/promotions">Promo codes</Link><Link href="/admin/deletion-requests">Deletion requests</Link></nav></aside> : null}
           {adminAuthorized && adminDataReady && navOpen ? <button type="button" className="admin-sidebar-backdrop" onClick={() => setNavOpen(false)} aria-label="Close admin navigation" /> : null}
           <div className="admin-main">
           {!adminAuthorized ? (
             <section className="card admin-panel-card admin-login-card">
               <div className="eyebrow">Admin access</div>
-              <h2>{loading || adminAccessState === "checking" ? "Checking admin access." : adminAccessState === "unavailable" ? "Admin is temporarily unavailable." : "Sign in with an authorized admin account."}</h2>
+              <h1>{loading || adminAccessState === "checking" ? "Checking admin access." : adminAccessState === "unavailable" ? "Admin is temporarily unavailable." : "Sign in with an authorized admin account."}</h1>
               <p>{loading || adminAccessState === "checking" ? "Confirming your session before admin tools load." : adminAccessState === "unavailable" ? "Your session exists, but QRguitar could not verify admin access or load the admin service." : "Admin tools stay hidden until an authorized admin account is signed in."}</p>
               {message ? <p role="alert" className="admin-message">{message}</p> : null}
               {adminAccessState === "unavailable" ? (

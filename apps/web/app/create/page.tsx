@@ -1,5 +1,9 @@
 "use client";
 
+import { OwnerWorkspace } from "../../components/OwnerWorkspace";
+import authStyles from "../../components/AuthForm.module.css";
+import styles from "./create.module.css";
+
 import { uploadProfileFile, dataUrlToProfileFile } from "../../lib/profile-upload-client";
 import { ownerProfileHref } from "../../lib/owner-profile";
 
@@ -540,6 +544,8 @@ export default function CreatePage() {
         : firstField === "customLinks"
           ? document.querySelector<HTMLElement>('[aria-label="Link URL"]')
           : document.getElementById(firstField || "");
+      let disclosure = target?.closest("details");
+      while (disclosure) { disclosure.open = true; disclosure = disclosure.parentElement?.closest("details"); }
       target?.focus();
       target?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 0);
@@ -552,10 +558,10 @@ export default function CreatePage() {
   return authChecked && user ? (
     <>
       <Nav />
-      <main className="section create-page create-wizard-page">
+      <OwnerWorkspace current="create">
         {createdCode ? (
-          <div className="shell create-success-shell">
-            <section className="card create-success-card">
+          <div className={styles.success}>
+            <section className={styles.successContent}>
               <div className="eyebrow">Profile created</div>
               <h1>Your permanent QRguitar Profile is ready.</h1>
               <p>The Profile can keep growing with history, media, documents, service, and ownership while its QRguitar ID and URL stay the same.</p>
@@ -571,14 +577,14 @@ export default function CreatePage() {
             </section>
           </div>
         ) : (
-        <div className="shell">
-          <header className="create-wizard-hero">
+        <div className={styles.create}>
+          <header className={styles.header}>
             <div>
               <div className="eyebrow">Create Profile</div>
               <h1>{getContentValue(content, "create.hero.headline")}</h1>
               <p>{getContentValue(content, "create.hero.body")}</p>
             </div>
-            <div className="permanent-id create-id-preview">
+            <div className={styles.identity}>
               <span>QRguitar ID preview</span>
               <strong>{qrCode}</strong>
               <small>{getContentValue(content, "create.serial.help")}</small>
@@ -586,14 +592,15 @@ export default function CreatePage() {
           </header>
 
 
-          <div className="create-wizard-layout">
-            <form className="card form create-wizard-form" onSubmit={(event) => event.preventDefault()}>
+          <nav className={styles.sectionNav} aria-label="Create Profile sections"><a href="#create-step-one">Instrument</a><a href="#create-step-two">Photos</a><a href="#create-step-three">Ownership</a><a href="#create-step-four">Details</a><a href="#create-step-five">Review</a></nav>
+          <div className={styles.editor}>
+            <form className={styles.form} onSubmit={(event) => event.preventDefault()}>
               <input aria-hidden="true" autoComplete="off" name="company" style={{ display: "none" }} tabIndex={-1} value={honeypot} onChange={(event) => setHoneypot(event.target.value)} />
               <datalist id="qrguitar-known-brands">{establishedInstrumentBrands.map((brand) => <option value={brand} key={brand} />)}</datalist>
 
 
-                <section className="create-step-panel" aria-labelledby="create-step-one">
-                  <div className="form-section-heading"><span className="eyebrow">Step 1</span><h2 id="create-step-one">Instrument</h2><p>{getContentValue(content, "create.identity.body")}</p></div>
+                <section className={styles.section} aria-labelledby="create-step-one">
+                  <div className={styles.sectionHeading}><h2 id="create-step-one">Instrument</h2><p>{getContentValue(content, "create.identity.body")}</p></div>
                   <div className="form-grid">
                     <Field required error={fieldErrors.brand} label="Brand / Make" id="brand" value={form.brand} list="qrguitar-known-brands" placeholder="Start typing a brand" onChange={(value) => updateField("brand", value)} onBlur={(value) => updateField("brand", canonicalInstrumentBrand(value) || value.trim())} />
                     <Field required error={fieldErrors.model} label="Model" id="model" value={form.model} onChange={(value) => updateField("model", value)} />
@@ -609,8 +616,8 @@ export default function CreatePage() {
                 </section>
 
 
-                <section className="create-step-panel" aria-labelledby="create-step-two">
-                  <div className="form-section-heading"><span className="eyebrow">Step 2</span><h2 id="create-step-two">{getContentValue(content, "create.photos.heading")}</h2><p>{getContentValue(content, "create.photos.body")}</p></div>
+                <section className={styles.section} aria-labelledby="create-step-two">
+                  <div className={styles.sectionHeading}><h2 id="create-step-two">{getContentValue(content, "create.photos.heading")}</h2><p>{getContentValue(content, "create.photos.body")}</p></div>
                   <label className="create-photo-drop" htmlFor="profilePhotos">
                     <strong>{getContentValue(content, "create.photo.help")}</strong>
                     <span>Choose photos from your device or use your phone camera. Files can be up to 12MB each.</span>
@@ -621,8 +628,8 @@ export default function CreatePage() {
                 </section>
 
 
-                <section className="create-step-panel" aria-labelledby="create-step-three">
-                  <div className="form-section-heading"><span className="eyebrow">Step 3</span><h2 id="create-step-three">{getContentValue(content, "create.ownership.heading")}</h2><p>{getContentValue(content, "create.ownership.body")}</p></div>
+                <section className={styles.section} aria-labelledby="create-step-three">
+                  <div className={styles.sectionHeading}><h2 id="create-step-three">{getContentValue(content, "create.ownership.heading")}</h2><p>{getContentValue(content, "create.ownership.body")}</p></div>
                   <div className="form-grid">
                     <div className="field">
                       <label htmlFor="ownerStatus">Relationship (optional)</label>
@@ -640,7 +647,7 @@ export default function CreatePage() {
                     <Field label="Seller / store (optional)" id="seller" value={form.seller} onChange={(value) => updateField("seller", value)} />
                     <Field label="Location" id="location" value={form.location} onChange={(value) => updateField("location", value)} placeholder="City, region, country" />
                   </div>
-                  <div className="privacy-toggle create-visibility-control" aria-label="Profile visibility">
+                  <div className={styles.visibility} aria-label="Profile visibility">
                     <div><strong>{form.visibility === "public" ? "Public" : form.visibility === "unlisted" ? "Unlisted" : "Private"}</strong><span>{form.visibility === "public" ? "Listed in the Catalog and available by QR or direct link." : form.visibility === "unlisted" ? "Hidden from the Catalog but available by QR or direct link." : "Available only to the signed-in owner and authorized admin."}</span></div>
                     <label className="field visibility-select" htmlFor="profileVisibility"><span>Visibility</span><select id="profileVisibility" value={form.visibility} onChange={(event) => updateField("visibility", event.target.value)}><option value="public">Public</option><option value="unlisted">Unlisted</option><option value="private">Private</option></select></label>
                   </div>
@@ -652,8 +659,8 @@ export default function CreatePage() {
                 </section>
 
 
-                <section className="create-step-panel" aria-labelledby="create-step-four">
-                  <div className="form-section-heading"><span className="eyebrow">Step 4</span><h2 id="create-step-four">Details</h2><p>{getContentValue(content, "create.details.body")}</p></div>
+                <section className={styles.section} aria-labelledby="create-step-four">
+                  <div className={styles.sectionHeading}><h2 id="create-step-four">Details</h2><p>{getContentValue(content, "create.details.body")}</p></div>
                   <div className="form-grid">
                     <Field label="Display title / nickname" id="name" value={form.name} onChange={(value) => updateField("name", value)} placeholder="Defaults to Brand + Model" />
                     <div className="field"><label htmlFor="instrumentCondition">Condition</label><select id="instrumentCondition" value={form.instrumentCondition} onChange={(event) => updateField("instrumentCondition", event.target.value)}><option value="new">New</option><option value="used">Used</option></select></div>
@@ -666,7 +673,7 @@ export default function CreatePage() {
                     <Field label="Pickups / electronics" id="pickups" value={form.pickups} onChange={(value) => updateField("pickups", value)} />
                   </div>
                   <div className="field custom-wide"><label htmlFor="summary">Profile story</label><textarea id="summary" rows={5} value={form.summary} onChange={(event) => updateField("summary", event.target.value)} placeholder="What makes this instrument useful, interesting, or important?" /></div>
-                  <details className="advanced-panel">
+                  <details className={styles.disclosure}>
                     <summary>Advanced specifications and notes</summary>
                     <div className="field custom-wide"><label htmlFor="specsNotes">Specification notes</label><textarea id="specsNotes" rows={4} value={form.specsNotes} onChange={(event) => updateField("specsNotes", event.target.value)} placeholder="Hardware, wiring, neck carve, fretwire, case details, or other specifications." /></div>
                     <div className="custom-list">
@@ -674,7 +681,7 @@ export default function CreatePage() {
                       <button className="button secondary" type="button" onClick={() => setCustomFields((current) => [...current, { id: `field-${Date.now()}`, label: "", value: "" }])}>Add specification</button>
                     </div>
                   </details>
-                  <details className="advanced-panel">
+                  <details className={styles.disclosure}>
                     <summary>Add known service work</summary>
                     <p className="fine-print">This creates a real Timeline service entry, not a loose specification.</p>
                     <div className="form-grid">
@@ -686,7 +693,7 @@ export default function CreatePage() {
                     <div className="field custom-wide"><label htmlFor="servicePrivateNotes">Private owner notes</label><textarea id="servicePrivateNotes" rows={3} value={form.servicePrivateNotes} onChange={(event) => updateField("servicePrivateNotes", event.target.value)} /></div>
                     <label className="toggle-field"><input type="checkbox" checked={form.serviceIsPublic} onChange={(event) => setForm((current) => ({ ...current, serviceIsPublic: event.target.checked }))} />Show this service entry on the public Timeline</label>
                   </details>
-                  <details className="advanced-panel">
+                  <details className={styles.disclosure}>
                     <summary>Links and supporting documents</summary>
                     <div className="custom-list">
                       {customLinks.map((link) => <div className="custom-row" key={link.id}><input aria-label="Link label" placeholder="Link label" value={link.label} onChange={(event) => setCustomLinks((current) => current.map((item) => item.id === link.id ? { ...item, label: event.target.value } : item))} /><input aria-label="Link URL" placeholder="https://..." value={link.url} onChange={(event) => setCustomLinks((current) => current.map((item) => item.id === link.id ? { ...item, url: event.target.value } : item))} /><button className="button secondary" type="button" onClick={() => setCustomLinks((current) => current.filter((item) => item.id !== link.id))}>Remove</button></div>)}
@@ -700,9 +707,14 @@ export default function CreatePage() {
                 </section>
 
 
-                <section className="create-step-panel" aria-labelledby="create-step-five">
-                  <div className="form-section-heading"><span className="eyebrow">Step 5</span><h2 id="create-step-five">{getContentValue(content, "create.review.heading")}</h2><p>{getContentValue(content, "create.review.body")}</p></div>
-                  <div className="create-review-grid">
+            <details className={styles.preview}>
+              <summary>Preview your Profile</summary>
+              <InstrumentPreview qrCode={qrCode} name={form.name} brand={form.brand} model={form.model} serial={form.serial} year={form.year} owner={form.owner} location={form.location} summary={form.summary} heroImageDataUrl={form.heroImageDataUrl} customFields={previewFields} customLinks={customLinks} />
+            </details>
+
+                <section className={styles.section} aria-labelledby="create-step-five">
+                  <div className={styles.sectionHeading}><h2 id="create-step-five">{getContentValue(content, "create.review.heading")}</h2><p>{getContentValue(content, "create.review.body")}</p></div>
+                  <div className={styles.review}>
                     <div><span>QRguitar ID</span><strong>{qrCode}</strong></div>
                     <div><span>Serial Number</span><strong>{form.serial || "No serial number"}</strong></div>
                     <div><span>Visibility</span><strong>{form.visibility === "public" ? "Public" : form.visibility === "unlisted" ? "Unlisted" : "Private"}</strong></div>
@@ -714,28 +726,25 @@ export default function CreatePage() {
                 </section>
 
               {message ? <div className="form-message" role={fieldErrors && Object.keys(fieldErrors).length ? "alert" : "status"}><strong>{message}</strong>{existingProfileHref || claimHref ? <div className="form-actions">{existingProfileHref ? <Link className="button secondary" href={existingProfileHref}>View existing Profile</Link> : null}{claimHref ? <Link className="button secondary" href={claimHref}>Request ownership</Link> : null}</div> : null}{billingHelp ? <div className="form-actions"><Link className="button secondary" href="/billing" target="_blank" rel="noopener noreferrer">Check Profile credits in a new tab</Link><span>Keep this form open, then return to create your Profile.</span></div> : null}{lastErrorRetryable ? <button className="button secondary" type="button" onClick={() => void createRecordAndRedirect(false)} disabled={savingProfile}>Retry safely</button> : null}</div> : null}
-              <div className="create-wizard-actions">
+              <div className={styles.actions}>
                 <Link className="button secondary" href="/dashboard">Cancel</Link>
                 <button className="button" type="button" onClick={saveDraft} disabled={savingProfile}>{savingProfile ? "Creating Profile..." : getContentValue(content, "create.actions.submit")}</button>
               </div>
             </form>
 
-            <aside className="record-preview create-sticky-preview" aria-label="Live Profile preview">
-              <div className="eyebrow">Live preview</div>
-              <InstrumentPreview qrCode={qrCode} name={form.name} brand={form.brand} model={form.model} serial={form.serial} year={form.year} owner={form.owner} location={form.location} summary={form.summary} heroImageDataUrl={form.heroImageDataUrl} customFields={previewFields} customLinks={customLinks} />
-            </aside>
+
           </div>
         </div>
         )}
-      </main>
+      </OwnerWorkspace>
       <Footer />
     </>
   ) : (
     <>
       <Nav />
-      <main className="section auth-page">
-        <div className="shell create-welcome">
-          <section className="card auth-card">
+      <main className={authStyles.page}>
+        <div className={authStyles.layout}>
+          <section className={authStyles.formPanel}>
             <div className="eyebrow">Create instrument</div>
             <h1>Give your instrument a permanent home.</h1>
             <p>Create QRguitar Profiles from your account so the QR, photos, documents, and ownership stay tied to the right owner.</p>

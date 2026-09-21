@@ -1,4 +1,5 @@
 import Link from "next/link";
+import styles from "./installers.module.css";
 import type { CSSProperties } from "react";
 import { EditorialIcon } from "../../components/EditorialIcon";
 import { Footer } from "../../components/Footer";
@@ -33,7 +34,7 @@ export default async function InstallersPage() {
   return (
     <>
       <Nav />
-      <main className="editorial-composed-page">
+      <main className={`${styles.page} editorial-composed-page`}>
         <section className="section installer-hero" style={sectionStyle("hero")}>
           <div className="shell installer-hero-grid">
             <div>

@@ -8,52 +8,52 @@
   height: 100dvh;
   max-height: none;
   margin: 0;
-  padding: max(8px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));
+  padding: max(8px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
   border: 0;
   border-radius: 0;
-  background: #090a0c;
-  color: #f5f5f7;
+  background: #0b0d0f;
+  color: #f5f5f1;
   overflow: hidden;
   overscroll-behavior: contain;
   color-scheme: dark;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: inherit;
 }
-.viewer[open] { display: grid; grid-template-rows: auto minmax(0,1fr) auto; gap: 16px; }
-.viewer::backdrop { background: #090a0c; }
-.header { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 56px; padding-inline: 8px; }
+.viewer[open] { display: grid; grid-template-rows: auto minmax(0,1fr) auto; gap: 8px; }
+.viewer::backdrop { background: #0b0d0f; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 52px; padding-inline: 12px; }
 .caption { display: flex; align-items: baseline; gap: 20px; min-width: 0; }
-.title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; line-height: 1.4; font-weight: 550; letter-spacing: -.015em; color: #f5f5f7; }
-.counter { flex: none; color: #94979e; font-size: 12px; font-variant-numeric: tabular-nums; }
+.title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; line-height: 1.4; font-weight: 500; letter-spacing: -.015em; color: #f5f5f1; }
+.counter { flex: none; color: #adb4bb; font-size: 13px; font-variant-numeric: tabular-nums; }
 .actions { display: flex; flex: none; gap: 6px; }
-.viewer .control { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px; min-height: 44px; margin: 0; padding: 0; border: 0; border-radius: 50%; color: #f5f5f7; background: #232529b3; box-shadow: none; cursor: pointer; transition: background 140ms ease; }
-.viewer .control:hover { background: #34363d; }
+.viewer .control { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px; min-height: 44px; margin: 0; padding: 0; border: 0; border-radius: 8px; color: #f5f5f1; background: transparent; box-shadow: none; cursor: pointer; transition: background 140ms ease; }
+.viewer .control:hover { background: #23272c; }
 .viewer button:focus-visible { outline: 2px solid #f5f5f7; outline-offset: 4px; }
-.stage { position: relative; min-width: 0; min-height: 0; margin-inline: 60px; }
+.stage { position: relative; min-width: 0; min-height: 0; }
 .loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); padding: 8px 12px; border-radius: 20px; background: #090a0cb3; color: #afb3bb; font-size: 13px; font-weight: 400; white-space: nowrap; pointer-events: none; }
 .viewer .imageButton { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; overflow: hidden; box-shadow: none; cursor: zoom-in; touch-action: pan-y pinch-zoom; }
 .viewer .imageButton.zoomed { cursor: grab; touch-action: none; }
 .viewer .imageButton.zoomed:active { cursor: grabbing; }
 .viewer .photo { display: block; width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain; border: 0; border-radius: 0; pointer-events: none; user-select: none; }
-.viewer .previous,.viewer .next { position: absolute; top: calc(50% - 22px); }
-.viewer .previous { left: -60px; }
-.viewer .next { right: -60px; }
-.filmstrip { display: flex; align-items: center; gap: 9px; justify-self: center; max-width: 100%; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding: 6px; }
+.viewer .previous,.viewer .next { position: absolute; top: calc(50% - 22px); background: #0b0d0fd9; }
+.viewer .previous { left: 8px; }
+.viewer .next { right: 8px; }
+.filmstrip { display: flex; align-items: center; gap: 12px; justify-self: center; max-width: 100%; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding: 6px; }
 .filmstrip::-webkit-scrollbar { display: none; }
-.viewer .thumbnail { display: block; flex: 0 0 54px; width: 54px; height: 54px; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 5px; background: #1a1c20; box-shadow: none; overflow: hidden; opacity: .45; cursor: pointer; transition: opacity 140ms ease; }
+.viewer .thumbnail { display: block; flex: 0 0 54px; width: 54px; height: 54px; min-height: 44px; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; overflow: hidden; opacity: .6; cursor: pointer; transition: opacity 140ms ease; }
 .viewer .thumbnail img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .viewer .thumbnail:hover { opacity: .8; }
 .viewer .thumbnail[aria-current="true"] { opacity: 1; outline: 2px solid #f5f5f7; outline-offset: 3px; }
 .bottomSpace { height: 12px; }
 @media (max-width: 760px) {
   .viewer { padding-inline: max(12px,env(safe-area-inset-left)) max(12px,env(safe-area-inset-right)); }
-  .viewer[open] { gap: 12px; }
+  .viewer[open] { gap: 8px; }
   .header { gap: 12px; padding-inline: 0; }
   .caption { display: grid; gap: 4px; }
-  .title { font-size: 13px; }
-  .counter { font-size: 11px; }
+  .title { font-size: 14px; }
+  .counter { font-size: 12px; }
   .actions { gap: 2px; }
   .stage { margin-inline: 0; }
-  .viewer .previous,.viewer .next { width: 40px; height: 40px; min-height: 40px; top: calc(50% - 20px); background: #101216b8; }
+  .viewer .previous,.viewer .next { width: 44px; height: 44px; min-height: 44px; top: calc(50% - 22px); }
   .viewer .previous { left: 0; }
   .viewer .next { right: 0; }
   .viewer .thumbnail { flex-basis: 46px; width: 46px; height: 46px; }
@@ -61,6 +61,6 @@
 @media (max-height: 480px) and (min-width: 600px) {
   .viewer[open] { gap: 4px; grid-template-rows: 44px minmax(0,1fr) 52px; }
   .header { min-height: 44px; }
-  .viewer .thumbnail { flex-basis: 36px; width: 36px; height: 36px; }
+  .viewer .thumbnail { flex-basis: 44px; width: 44px; height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) { .viewer .control,.viewer .thumbnail { transition: none; } }

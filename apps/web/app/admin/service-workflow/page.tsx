@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Footer } from "../../../components/Footer";
 import { Nav } from "../../../components/Nav";
 import { createBrowserSupabaseClient } from "../../../lib/supabase-browser";
+import styles from "./service-operations.module.css";
 
 type Provider = {
   userId: string;
@@ -172,7 +173,7 @@ export default function AdminServiceWorkflowPage() {
 
   return <>
     <Nav />
-    <main className="section admin-service-page">
+    <main className={`section admin-service-page ${styles.workspace}`}>
       <div className="shell admin-service-shell">
         <Link className="text-link service-back" href="/admin"><ArrowLeft size={16} /> Back to Admin</Link>
         <header className="admin-service-hero">
@@ -180,8 +181,8 @@ export default function AdminServiceWorkflowPage() {
           <div className="admin-service-counts"><span><strong>{phase === "ready" ? providers.length : "—"}</strong> providers</span><span><strong>{phase === "ready" ? submissions.length : "—"}</strong> submissions</span></div>
         </header>
         {phase === "ready" ? <div className="admin-service-filters">
-          <label><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search provider, Profile, or work" /></label>
-          <select value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All statuses</option><option value="draft">Draft</option><option value="submitted">Submitted</option><option value="changes_requested">Changes requested</option><option value="approved">Approved</option><option value="declined">Declined</option><option value="cancelled">Cancelled</option><option value="expired">Expired</option></select>
+          <label><Search size={15} /><input aria-label="Search providers and submissions" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search provider, Profile, or work" /></label>
+          <select aria-label="Submission status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All statuses</option><option value="draft">Draft</option><option value="submitted">Submitted</option><option value="changes_requested">Changes requested</option><option value="approved">Approved</option><option value="declined">Declined</option><option value="cancelled">Cancelled</option><option value="expired">Expired</option></select>
           <button className="button secondary" type="button" disabled={Boolean(busy)} onClick={() => void load()}>Refresh</button>
         </div> : null}
         {phase === "ready" && message ? <div className="admin-message" role="status">{message}</div> : null}

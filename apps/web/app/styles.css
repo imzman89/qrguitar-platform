@@ -1,0 +1,7 @@
+/* Explicit migration layers: scoped component styles take precedence. */
+@layer legacy, product, system, workspace;
+@import "./globals.css";
+@import "./product.css";
+@import "./theme.css";
+@import "./account-interface.css";
+@import "./supporting-interface.css";

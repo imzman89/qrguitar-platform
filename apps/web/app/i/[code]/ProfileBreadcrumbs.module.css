@@ -1,6 +1,6 @@
 .breadcrumbs {
   padding: 0 0 16px;
-  color: rgba(248, 246, 242, .64);
+  color: var(--muted);
   background: transparent;
   font-size: 12px;
   font-weight: 450;
@@ -26,13 +26,13 @@
 }
 
 .breadcrumbs a {
-  color: rgba(248, 246, 242, .72);
+  color: var(--muted-strong);
   text-decoration: none;
 }
 
 .breadcrumbs a:hover,
 .breadcrumbs a:focus-visible {
-  color: var(--gold-2);
+  color: var(--action);
   text-decoration: underline;
   text-underline-offset: 3px;
 }

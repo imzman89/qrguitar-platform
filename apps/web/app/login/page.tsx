@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import styles from "../../components/AuthForm.module.css";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import { clearQrGuitarSessionState, createBrowserSupabaseClient, readSessionStorage, removeSessionStorage, sessionExpiredMessageKey } from "../../lib/supabase-browser";
@@ -32,6 +33,8 @@ export default function LoginPage() {
   const lifetime = useRef({ active: false, epoch: 0, actor: "", revision: 0, known: false, operationRevision: 0 });
   const pending = useRef<AuthOperation | null>(null);
   const initialized = useRef(false);
+  const loginTabRef = useRef<HTMLButtonElement>(null);
+  const registerTabRef = useRef<HTMLButtonElement>(null);
   const [mode, setMode] = useState<LoginMode>("login");
   const [safeNext, setSafeNext] = useState("/dashboard");
   const [name, setName] = useState("");
@@ -130,6 +133,16 @@ export default function LoginPage() {
     const url = new URL(window.location.href);
     url.searchParams.set("mode", nextMode);
     window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+  }
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, tab: "login" | "register") {
+    if (event.altKey || event.ctrlKey || event.metaKey || pending.current) return;
+    const nextMode = event.key === "Home" ? "login" : event.key === "End" ? "register"
+      : event.key === "ArrowLeft" || event.key === "ArrowRight" ? (tab === "login" ? "register" : "login") : null;
+    if (!nextMode) return;
+    event.preventDefault();
+    if (nextMode !== mode) switchMode(nextMode);
+    (nextMode === "login" ? loginTabRef : registerTabRef).current?.focus();
   }
 
   async function submitAccountAction() {
@@ -231,9 +244,9 @@ export default function LoginPage() {
   return (
     <>
       <Nav />
-      <main className="section auth-page">
-        <div className={isSignedIn ? "shell auth-layout is-signed-in" : "shell auth-layout"}>
-          <section className="auth-intro">
+      <main className={styles.page}>
+        <div className={styles.layout}>
+          <header className={styles.heading}>
             <div className="eyebrow">{isSignedIn ? "Account ready" : getContentValue(content, "login.hero.eyebrow")}</div>
             <h1>{isSignedIn ? "Welcome back." : mode === "register" ? "Create your QRguitar account." : mode === "reset" ? "Reset your QRguitar password." : getContentValue(content, "login.hero.headline")}</h1>
             <p>
@@ -245,14 +258,11 @@ export default function LoginPage() {
                   ? "Enter your account email and QRguitar will send a secure password reset link."
                 : getContentValue(content, "login.hero.body")}
             </p>
-          </section>
+          </header>
 
-          <section className="card auth-card">
+          <section className={styles.formPanel}>
             {isSignedIn ? (
               <>
-                <div className="eyebrow">Signed in</div>
-                <h2>Continue where you left off.</h2>
-                <p>Open your collection, manage Profiles, or update account settings.</p>
                 <div className="form-actions">
                   <Link className="button" href="/dashboard">
                     Open dashboard
@@ -264,20 +274,18 @@ export default function LoginPage() {
             ) : (
               <>
                 {mode !== "reset" ? (
-                  <div className="auth-mode-switch" role="tablist" aria-label="Account access">
-                    <button className={mode === "login" ? "active" : ""} type="button" role="tab" aria-selected={mode === "login"} disabled={isWorking} onClick={() => switchMode("login")}>
+                  <div className={styles.modeSwitch} role="tablist" aria-label="Account access">
+                    <button ref={loginTabRef} id="auth-login-tab" className={mode === "login" ? styles.active : undefined} type="button" role="tab" aria-selected={mode === "login"} aria-controls="auth-access-panel" tabIndex={mode === "login" ? 0 : -1} disabled={isWorking} onClick={() => switchMode("login")} onKeyDown={(event) => handleTabKeyDown(event, "login")}>
                       Sign in
                     </button>
-                    <button className={mode === "register" ? "active" : ""} type="button" role="tab" aria-selected={mode === "register"} disabled={isWorking} onClick={() => switchMode("register")}>
+                    <button ref={registerTabRef} id="auth-register-tab" className={mode === "register" ? styles.active : undefined} type="button" role="tab" aria-selected={mode === "register"} aria-controls="auth-access-panel" tabIndex={mode === "register" ? 0 : -1} disabled={isWorking} onClick={() => switchMode("register")} onKeyDown={(event) => handleTabKeyDown(event, "register")}>
                       Create account
                     </button>
                   </div>
                 ) : null}
-                <div className="auth-card-head">
-                  <span>{mode === "register" ? "New account" : mode === "reset" ? "Account recovery" : "Secure access"}</span>
-                  <strong>{mode === "register" ? "Create your account." : mode === "reset" ? "Get a reset link." : "Sign in to continue."}</strong>
-                </div>
 
+
+                <div id="auth-access-panel" role={mode === "reset" ? undefined : "tabpanel"} aria-labelledby={mode === "reset" ? undefined : `auth-${mode}-tab`}>
                 <form onSubmit={(event) => { event.preventDefault(); void submitAccountAction(); }} aria-busy={isWorking}>
                 {mode === "register" ? (
                   <div className="field">
@@ -318,6 +326,7 @@ export default function LoginPage() {
                 </div>
 
                 </form>
+                </div>
                 <div className="auth-card-link-row">
                   {mode === "login" ? (
                     <button className="link-button" type="button" disabled={isWorking} onClick={() => switchMode("reset")}>

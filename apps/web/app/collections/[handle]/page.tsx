@@ -54,8 +54,8 @@ export default async function CollectionPage({ params }: { params: Promise<{ han
   return <>
     <script id="qrguitar-collection-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
     <Nav />
-    <main className="page-shell collection-page">
-      <nav className={styles.navigation} aria-label="Collection navigation"><Link href="/collections"><ArrowLeft size={16} aria-hidden="true" /> All member collections</Link><Link href="/catalog">Browse instrument Profiles</Link></nav>
+    <main className={`${styles.memberPage} page-shell collection-page`}>
+      <nav className={styles.navigation} aria-label="Collection navigation"><Link href="/collections"><ArrowLeft size={16} aria-hidden="true" /> All collections</Link><Link href="/catalog">Catalog</Link></nav>
       <header className={`${styles.memberHero} collection-header`}>
         <div className={styles.memberIdentity}>
           <FallbackImage

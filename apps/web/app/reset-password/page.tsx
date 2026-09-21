@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import styles from "../../components/AuthForm.module.css";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Footer } from "../../components/Footer";
@@ -149,16 +150,16 @@ export default function ResetPasswordPage() {
   return (
     <>
       <Nav />
-      <main className="section auth-page">
-        <div className="shell auth-layout">
-          <section>
+      <main className={styles.page}>
+        <div className={styles.layout}>
+          <header className={styles.heading}>
             <div className="eyebrow">Account recovery</div>
             <h1>{getContentValue(content, "resetPassword.hero.headline")}</h1>
             <p>{getContentValue(content, "resetPassword.hero.body")}</p>
-          </section>
+          </header>
 
-          <section className="card auth-card">
-            <div className="auth-card-head">
+          <section className={styles.formPanel}>
+            <div className={styles.stateHeading}>
               <span>Password reset</span>
               <strong>
                 {!authChecked

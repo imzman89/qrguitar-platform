@@ -1,0 +1,82 @@
+.page { padding: 32px 0 64px; color: var(--text); background: var(--canvas); }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 330px); align-items: start; gap: 32px; width: min(1200px, calc(100% - 64px)); margin-inline: auto; }
+.layout > *, .layout form, .layout section, .layout fieldset, .layout :global(.field), .layout :global(.form-grid) > *, .layout :global(.qr-controls) > * { min-width: 0; }
+.layout > div > h1 { margin: 6px 0 12px; font-size: clamp(28px, 3.3vw, 40px); line-height: 1.1; letter-spacing: -.035em; }
+.layout > div > p { max-width: 640px; margin: 0 0 20px; font-size: 15px; line-height: 1.55; color: var(--muted); }
+.layout p, .layout small, .layout strong, .layout h2, .layout h3 { overflow-wrap: anywhere; }
+.layout :global(.eyebrow) { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: 0; text-transform: none; }
+.layout :global(.permanent-id) { margin: 0 0 24px; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.layout :global(.permanent-id) strong { font-size: 16px; }
+.layout :global(.permanent-id) small { font-size: 12px; font-weight: 400; line-height: 1.55; }
+.layout :global(.privacy-toggle) { display: flex; gap: 24px; margin-bottom: 24px; padding: 0; border: 0; background: transparent; border-radius: 0; }
+.layout :global(.privacy-toggle) > div { min-width: 0; }
+.layout :global(.privacy-toggle) strong { color: var(--text); font-size: 14px; }
+.layout :global(.visibility-field) { flex: 0 0 165px; }
+.layout :global(.editor-section-nav) { max-width: 100%; margin: 16px 0 28px; padding: 0; border: 0; background: transparent; }
+.layout :global(.editor-section-nav) a { display: inline-flex; align-items: center; min-height: 44px; font-size: 12px; font-weight: 600; text-transform: none; }
+.layout :global(.editor-section-select) { border: 0; border-radius: 10px; background: var(--surface-raised); color: var(--muted); font-size: 12px; font-weight: 500; text-transform: none; }
+.layout :global(.editor-section-select) select { color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 7px; padding: 10px; font-weight: 500; }
+.layout :global(.verification-card) { padding: 0 0 28px; margin-bottom: 28px; border: 0; border-bottom: 1px solid var(--line); background: transparent; border-radius: 0; box-shadow: none; }
+.secondarySections { display: grid; gap: 32px; margin-top: 36px; }
+.secondarySections :global(.verification-card) { margin: 0; padding: 0; border: 0; scroll-margin-top: 24px; }
+.safetyNotice { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 24px; padding: 12px 16px; border-left: 3px solid var(--negative); background: var(--surface); color: var(--text); font-size: 14px; line-height: 1.5; }
+.safetyNotice strong { color: var(--negative); }
+.safetyNotice a { display: inline-flex; align-items: center; min-height: 44px; color: var(--text); text-underline-offset: 4px; }
+.safetyNotice a:focus-visible { outline: 2px solid var(--action); outline-offset: 3px; }
+.layout form:global(.form) { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; gap: 28px; }
+.layout :global(.verification-card) h3 { font-size: 18px; margin: 6px 0 10px; }
+.layout :global(.verification-card) p { font-size: 13px; line-height: 1.55; margin: 8px 0; }
+.layout :global(.form-grid), .layout :global(.qr-controls) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.layout :global(.color-field) { grid-template-columns: minmax(0, 1fr); align-content: start; }
+.layout :global(.color-field) > label { grid-column: 1 / -1; }
+.layout :global(.color-field) > div { min-width: 0; grid-template-columns: 44px minmax(0, 1fr); }
+.layout :global(.color-field) input[type="color"] { width: 44px; height: 44px; padding: 4px; }
+.layout :global(.custom-wide) { grid-column: 1 / -1; }
+.layout :global(.field) label, .layout :global(.field) > span, .layout :global(.form-section-heading) > span { font-size: 13px; font-weight: 500; text-transform: none; letter-spacing: 0; }
+.layout :global(.field) input, .layout :global(.field) textarea, .layout :global(.field) select, .layout :global(.custom-row) input { min-width: 0; max-width: 100%; min-height: 46px; padding: 11px 13px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--field-surface,var(--surface)); color: var(--text); font: inherit; font-size: 14px; }
+.layout :global(.toggle-field) { font-size: 13px; font-weight: 500; line-height: 1.6; }
+.layout :global(.toggle-field) span { font-weight: inherit; }
+.layout :global(.field) small, .layout :global(.fine-print) { font-size: 12px; line-height: 1.55; color: var(--muted); }
+.layout :global(.form-section-heading) { margin-top: 8px; padding: 0 0 8px; border: 0; background: transparent; }
+.layout :global(.form-section-heading) h2, .layout :global(.form-section-heading) h3 { font-size: 22px; }
+.layout :global(.qr-customizer), .layout :global(.advanced-panel) { border: 0; background: transparent; border-radius: 0; }
+.layout :global(.qr-customizer) { padding: 12px 0; gap: 20px; }
+.layout :global(.qr-customizer) h3 { font-size: 20px; }
+.layout :global(.qr-customizer) p { font-size: 13px; }
+.layout :global(.advanced-panel) > summary { min-height: 44px; padding: 12px 0; font-size: 14px; text-transform: none; }
+.layout :global(.advanced-panel) :global(.form-grid), .layout :global(.advanced-panel) :global(.custom-wide), .layout :global(.advanced-panel) :global(.custom-list) { padding: 0; }
+.layout :global(.form-actions), .layout :global(.proof-vault-actions) { display: flex; flex-wrap: wrap; gap: 10px; min-width: 0; }
+.layout :global(.button) { min-width: 0; min-height: 44px; max-width: 100%; white-space: normal; overflow-wrap: anywhere; font-size: 13px; text-transform: none; }
+.layout :global(.editor-save-bar) { display: flex; flex-wrap: wrap; gap: 10px; padding: 14px 0; background: var(--canvas); border: 0; }
+.layout :global(.record-preview) { min-width: 0; width: 100%; top: 24px; }
+.layout :global(.instrument-preview) { width: 100%; max-width: 540px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.layout :global(.instrument-preview-photo) { position: relative; display: grid; place-items: center; width: 100%; height: auto; min-height: 0; max-height: 320px; aspect-ratio: 4 / 3; padding: 0; border-radius: 4px; overflow: hidden; background: transparent; }
+.layout :global(.instrument-preview-photo:not(:has(img))) { background: var(--surface); }
+.layout :global(.instrument-preview-photo) img { position: static; display: block; width: 100%; height: 100%; min-height: 0; max-height: 320px; object-fit: contain; }
+.layout :global(.instrument-preview-hero) { display: block; min-height: 0; padding: 20px 0; background: transparent; --text: inherit; --muted: inherit; --muted-strong: inherit; --gold-2: inherit; }
+.layout :global(.instrument-preview-hero) h3 { margin: 10px 0 6px; font-size: 22px; line-height: 1.2; letter-spacing: -.025em; }
+.layout :global(.instrument-preview-hero) p { margin: 0; font-size: 14px; line-height: 1.5; }
+.layout :global(.preview-topline) { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.layout :global(.preview-topline) span, .layout :global(.preview-topline) strong { font-size: 11px; font-weight: 500; text-transform: none; letter-spacing: 0; }
+.layout :global(.preview-identity-grid) { gap: 16px; padding: 0 0 20px; border: 0; }
+.layout :global(.preview-identity-grid) > div { padding: 0; border: 0; }
+.layout :global(.preview-identity-grid) span { font-size: 12px; text-transform: none; letter-spacing: 0; }
+.layout :global(.preview-identity-grid) strong { font-size: 14px; font-weight: 500; }
+.layout :global(.preview-summary) { margin: 0; padding: 0 0 20px; font-size: 14px; line-height: 1.5; }
+.layout :global(.preview-chip-list), .layout :global(.preview-link-list) { padding: 0 0 20px; }
+.layout :global(.preview-chip-list) span, .layout :global(.preview-link-list) span { padding: 0; border: 0; background: transparent; }
+@media (max-width: 1000px) {
+  .layout { grid-template-columns: minmax(0, 1fr); max-width: 760px; gap: 24px; }
+  .layout :global(.record-preview) { position: static; }
+}
+@media (max-width: 760px) {
+  .page { padding: 22px 0 44px; }
+  .layout { width: calc(100% - 36px); }
+  .layout > div > h1 { font-size: 30px; }
+  .layout :global(.form-grid), .layout :global(.qr-controls), .layout :global(.custom-row) { grid-template-columns: minmax(0, 1fr); }
+  .layout :global(.privacy-toggle) { align-items: stretch; flex-direction: column; gap: 12px; }
+  .layout :global(.visibility-field) { flex: none; }
+  .layout :global(.field) input, .layout :global(.field) textarea, .layout :global(.field) select, .layout :global(.custom-row) input, .layout :global(.editor-section-select) select { font-size: 16px; }
+  .layout :global(.qr-customizer) { padding: 8px 0; }
+  .layout :global(.editor-save-bar) { position: static; }
+}

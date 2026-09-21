@@ -1,0 +1,27 @@
+.guide { background:var(--canvas); color:var(--text); }
+.guide > :global(.section) { padding:32px 0; border:0; background:transparent; }
+.guide :global(.product-guide-hero-inner) { display:block; }
+.guide h1 { max-width:26ch; font-family:inherit; font-size:clamp(32px,3.2vw,44px); line-height:1.15; letter-spacing:-.035em; font-weight:550; margin:12px 0 16px; }
+.guide h2 { max-width:30ch; font-family:inherit; font-size:clamp(26px,2.5vw,34px); line-height:1.2; letter-spacing:-.025em; font-weight:550; margin:8px 0 16px; }
+.guide h3 { font-family:inherit; color:var(--text); font-size:19px; line-height:1.3; font-weight:550; margin:0 0 8px; }
+.guide :global(.product-guide-hero) p { max-width:70ch; font-size:17px; line-height:1.65; }
+.guide :global(.product-guide-actions) { display:flex; flex-wrap:wrap; gap:12px; margin:20px 0 0; }
+.guide :global(.product-guide-principles) { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px; padding:24px 0 0; margin-top:24px; border:0; background:transparent; box-shadow:none; }
+.guide :global(.product-guide-principles > div) { display:grid; grid-template-columns:24px 1fr; gap:4px 12px; border:0; padding:0; }
+.guide :global(.product-guide-principles svg) { grid-row:1/3; width:22px; height:22px; color:var(--muted); }.guide :global(.product-guide-principles strong) { font-size:15px; font-weight:550; }.guide :global(.product-guide-principles span) { font-size:14px; line-height:1.6; color:var(--muted); }
+.guide :global(.section-heading) { max-width:none; margin:0 0 24px; text-align:left; }
+.walkthrough { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,.7fr); gap:64px; align-items:start; }
+.guide :global(.product-guide-steps) { display:grid; grid-template-columns:1fr; margin:0; padding:0; list-style:none; gap:28px; border:0; }
+.guide :global(.product-guide-steps li) { display:grid; grid-template-columns:40px minmax(0,1fr); gap:16px; padding:0; border:0; background:transparent; }
+.guide :global(.product-guide-steps li > span) { width:40px; height:40px; display:grid; place-items:center; border:0; border-radius:8px; background:var(--surface); color:var(--action); font-size:14px; font-weight:550; }
+.guide :global(.product-guide-steps p) { margin:0; max-width:60ch; color:var(--muted); font-size:16px; line-height:1.65; }
+.example { min-width:0; background:var(--surface); border-radius:16px; padding:16px; }
+.guide :global(.product-guide-capability-grid) { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:28px; }
+.guide :global(.product-guide-capability-grid article) { padding:0; border:0; background:transparent; }.guide :global(.product-guide-capability-grid article > span) { margin:0 0 12px; background:transparent; color:var(--muted); border:0; }
+.guide :global(.product-guide-split),.guide :global(.product-guide-faq-inner) { display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); gap:64px; }
+.guide :global(.product-guide-visibility) { display:grid; gap:20px; }.guide :global(.product-guide-visibility > div) { border:0; padding:0; background:transparent; }
+.guide :global(.product-guide-ownership-list) { gap:24px; }.guide :global(.product-guide-ownership-list article) { border:0; padding:0; background:transparent; }
+.guide :global(.product-guide-faq-list) { display:grid; gap:8px; }.guide :global(.product-guide-faq-list details) { background:var(--surface); border:0; border-radius:8px; padding:0 20px; }.guide :global(.product-guide-faq-list summary) { min-height:52px; padding:16px 0; font-size:16px; line-height:1.4; font-weight:550; }.guide :global(.product-guide-faq-list p) { font-size:15px; line-height:1.7; padding-bottom:20px; }
+.guide :global(.product-guide-cta-inner) { padding:24px; border:0; border-radius:12px; background:var(--surface); }
+@media(max-width:900px) { .walkthrough { gap:32px; grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr); }.guide :global(.product-guide-split),.guide :global(.product-guide-faq-inner) { gap:32px; }.guide :global(.product-guide-capability-grid) { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:700px) { .guide > :global(.section) { padding:24px 0; }.guide :global(.product-guide-principles) { grid-template-columns:1fr; gap:16px; margin-top:16px; }.walkthrough,.guide :global(.product-guide-split),.guide :global(.product-guide-faq-inner) { grid-template-columns:1fr; gap:28px; }.guide :global(.product-guide-capability-grid) { grid-template-columns:1fr; gap:24px; }.guide :global(.product-guide-steps) { gap:24px; }.guide :global(.product-guide-steps li) { grid-template-columns:36px 1fr; gap:12px; }.example { max-width:480px; }.guide :global(.product-guide-cta-inner) { padding:20px; } }

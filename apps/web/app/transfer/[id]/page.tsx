@@ -1,5 +1,6 @@
 "use client";
 
+import workflow from "../../../components/WorkflowWorkspace.module.css";
 import { BadgeCheck, Copy, LogIn, Repeat2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -183,7 +184,7 @@ export default function TransferClaimPage() {
     return (
       <>
         <Nav />
-        <main className="section auth-page">
+        <main className={`section auth-page ${workflow.transfer}`}>
           <div className="shell auth-layout">
             <section className="card auth-card">
               <div className="eyebrow">Ownership transfer</div>
@@ -201,7 +202,7 @@ export default function TransferClaimPage() {
     return (
       <>
         <Nav />
-        <main className="section auth-page">
+        <main className={`section auth-page ${workflow.transfer}`}>
           <div className="shell auth-layout">
             <section className="card auth-card">
               <div className="eyebrow">Ownership transfer</div>
@@ -224,14 +225,14 @@ export default function TransferClaimPage() {
   return (
     <>
       <Nav />
-      <main className="section auth-page">
+      <main className={`section auth-page ${workflow.transfer}`}>
         <div className="shell transfer-claim-layout">
           <section>
             <div className="eyebrow">Ownership transfer</div>
             <h1>Accept ownership of {transfer.guitarName}.</h1>
             <p>
               {transfer.status === "accepted"
-                ? "This claim has already been accepted. The permanent QR link stays with the instrument."
+                ? "This transfer has already been accepted. The permanent QR link stays with the instrument."
                 : transfer.status === "cancelled"
                   ? "This transfer was cancelled. Ask the current owner for a fresh transfer link."
                   : "Sign in with the recipient email on this transfer to accept ownership. The QRguitar URL will not change."}
@@ -241,7 +242,7 @@ export default function TransferClaimPage() {
                 <Repeat2 />
               </div>
               <div>
-                <span>Record</span>
+                <span>Profile</span>
                 <strong>{transfer.guitarName}</strong>
               </div>
               <div>
@@ -270,7 +271,7 @@ export default function TransferClaimPage() {
                 </Link>
                 <button className="button secondary" type="button" disabled={accepting} onClick={() => void copyProfileLink()}>
                   <Copy size={16} />
-                  Copy Record Link
+                  Copy Profile Link
                 </button>
                 <Link className="button secondary" href="/dashboard">
                   Open Dashboard
@@ -280,7 +281,7 @@ export default function TransferClaimPage() {
               <>
                 <div className="icon"><Repeat2 /></div>
                 <h3>This transfer was cancelled.</h3>
-                <p>The current owner needs to create a new claim link before this instrument can be handed off.</p>
+                <p>The current owner needs to create a new transfer link before this instrument can be handed off.</p>
                 <Link className="button" href={profileHref}>
                   View Profile
                 </Link>
@@ -289,7 +290,7 @@ export default function TransferClaimPage() {
               <>
                 <div className="icon"><LogIn /></div>
                 <h3>Sign in to accept ownership.</h3>
-                <p>Create an account or sign in with the recipient email on this transfer. Then return to this claim link to accept it.</p>
+                <p>Create an account or sign in with the recipient email on this transfer. Then return to this transfer link to accept it.</p>
                 <Link className="button" href={`/login?next=${encodeURIComponent(`/transfer/${transfer.id}`)}`}>
                   Sign in
                 </Link>

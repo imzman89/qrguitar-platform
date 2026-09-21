@@ -152,6 +152,7 @@ function renderService(overrides) {
     if (specifier.endsWith("/Nav")) return { Nav: () => null };
     if (specifier.endsWith("/Footer")) return { Footer: () => null };
     if (specifier.endsWith("/supabase-browser")) return { createBrowserSupabaseClient: () => ({ auth: {} }) };
+    if (specifier.endsWith(".module.css")) return { __esModule: true, default: new Proxy({}, { get: (_, key) => String(key) }) };
     return require(specifier);
   }, module, module.exports);
   return renderToStaticMarkup(React.createElement(module.exports.default));

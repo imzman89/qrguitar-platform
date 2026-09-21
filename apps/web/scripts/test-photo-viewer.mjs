@@ -118,6 +118,24 @@ test("viewer opens chosen photo and keyboard wraps without reopening the modal o
   } finally { f.cleanup(); }
 });
 
+test("adjacent photo preload changes do not reset zoom or repeat for unchanged sources", () => {
+  const f = fixture();
+  try {
+    f.click("Zoom into photo");
+    const preloadCount = f.preloads.length;
+    f.props.images = [...f.props.images]; f.render();
+    assert.match(f.image().props.style.transform, /scale\(2\)/);
+    assert.equal(f.preloads.length, preloadCount);
+    f.props.images = ["/first.jpg", "/replacement.jpg", "/third.jpg"]; f.render();
+    assert.equal(f.preloads.length, preloadCount + 1);
+    assert.equal(f.preloads.at(-1).src, "/replacement.jpg");
+    assert.match(f.image().props.style.transform, /scale\(2\)/);
+    f.key("ArrowRight");
+    assert.equal(f.image().props.src, "/replacement.jpg");
+    assert.match(f.image().props.style.transform, /scale\(1\)/);
+  } finally { f.cleanup(); }
+});
+
 test("modal locks page scrolling, traps Tab, restores original styles and opener focus", () => {
   const f = fixture();
   assert.equal(document.body.style.overflow, "hidden");
