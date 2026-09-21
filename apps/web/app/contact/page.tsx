@@ -47,7 +47,7 @@ export default async function ContactPage() {
           <div className="shell legal-page contact-page">
             <div className="contact-topic-grid">
               {supportTopics.map((topic) => {
-                const separateDestination = topic.ctaUrl && topic.ctaUrl !== "mailto:support@qrguitar.com";
+                const separateDestination = topic.ctaUrl && topic.ctaUrl.split("?")[0].trim().toLowerCase() !== "mailto:support@qrguitar.com";
                 const Topic = separateDestination ? "a" : "article";
                 return <Topic className="contact-topic-card" href={separateDestination ? topic.ctaUrl : undefined} key={topic.id}>
                   <EditorialIcon name={topic.icon} />
