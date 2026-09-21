@@ -28,6 +28,7 @@ const [
   terms,
   catalog,
   card,
+  cardStyles,
   collectibleCard,
   siteEditor,
   migration
@@ -50,6 +51,7 @@ const [
   "app/terms/page.tsx",
   "app/catalog/CatalogClient.tsx",
   "components/CollectibleRecordCard.tsx",
+  "components/CollectibleRecordCard.module.css",
   "lib/collectible-card.ts",
   "app/site-editor/page.tsx",
   "../../supabase/migrations/20260716123000_migrate_legacy_setup_note.sql"
@@ -86,7 +88,14 @@ ok(
     && card.includes("collectible-card-gallery-controls"),
   "Public card carousel behavior missing"
 );
-ok(styles.includes(".collectible-card-serial small") && styles.includes(".collectible-card-serial strong"), "Compact serial styling missing");
+const serialStyles = cardStyles.match(/\.collectible-card-serial small\s*,\s*\.collectible-card-serial strong\s*\{([^}]+)\}/)?.[1] || "";
+ok(
+  card.includes('import styles from "./CollectibleRecordCard.module.css"')
+    && card.includes('className={styles["collectible-card-serial"]}')
+    && /font-size:\s*12px\s*;/.test(serialStyles)
+    && /overflow-wrap:\s*anywhere\s*;/.test(serialStyles),
+  "Compact serial label/value styling or CSS module binding missing"
+);
 ok(
   siteEditor.includes("if (!authorized)")
     && siteEditor.includes('status === "loading" ? "Checking Site Editor access."')
