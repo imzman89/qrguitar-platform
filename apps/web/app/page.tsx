@@ -29,7 +29,7 @@ function publicRecordsWithFastFallback() {
 }
 
 function sanitizePresentationRecord(record: DemoInstrument) {
-  const { saleStatus: _saleStatus, originalityStatus: _originalityStatus, ...presentationRecord } = record;
+  const { saleStatus: _saleStatus, ...presentationRecord } = record;
   return presentationRecord as DemoInstrument;
 }
 

@@ -121,13 +121,15 @@ function compileCollectibleResolver() {
   return module.exports.resolveCollectibleCard;
 }
 
-function renderHomepageShowcase() {
+function renderHomepageShowcase(failedPhotos = []) {
   const module = { exports: {} };
   const code = ts.transpileModule(showcase, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX }
   }).outputText;
   const Icon = () => null;
+  let stateIndex = 0;
   const overrides = {
+    react: { ...React, useState: (initial) => [stateIndex++ === 2 ? failedPhotos : initial, () => {}] },
     "./HomeProfileShowcase.module.css": { __esModule: true, default: new Proxy({}, { get: (_, key) => key }) },
     "lucide-react": { ArrowUpRight: Icon, Camera: Icon },
     "next/link": { __esModule: true, default: ({ children, ...props }) => React.createElement("a", props, children) },
@@ -268,6 +270,28 @@ test("homepage hero and archive reflow into a single column on phones", () => {
   assert.match(homeStyles, /@media\s*\(max-width:760px\)[\s\S]*?\.home :global\(\.hero-grid\)\s*\{[^}]*grid-template-columns:1fr/);
   assert.match(homeStyles, /@media\s*\(max-width:520px\)[\s\S]*?\.home :global\(\.home-archive-rail\)\s*\{[^}]*grid-template-columns:1fr/);
   assert.doesNotMatch(homeStyles, /scroll-snap-type:\s*x mandatory/);
+});
+
+test("homepage photo count and accessible image total agree after a failed source", () => {
+  const html = renderHomepageShowcase(["/lead.jpg"]);
+  assert.match(html, /Test amplifier, photo 1 of 1/);
+  assert.match(html, /View available photos of Test amplifier/);
+  assert.match(html, /1 photo available/);
+  assert.doesNotMatch(html, /2 photos/);
+  const empty = renderHomepageShowcase(["/lead.jpg", "/detail.jpg"]);
+  assert.match(empty, /Photos are currently unavailable/);
+  assert.doesNotMatch(empty, /View available photos/);
+});
+
+test("homepage preserves public originality without adding a sale promotion", () => {
+  const source = ts.createSourceFile("page.tsx", read("app/page.tsx"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const sanitizer = source.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === "sanitizePresentationRecord");
+  assert.ok(sanitizer);
+  const code = ts.transpileModule(sanitizer.getText(source), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+  const present = new Function(code + "; return sanitizePresentationRecord;")();
+  const record = Object.freeze({ qrCode: "QRG-TEST", originalityStatus: "modified", saleStatus: "for_sale", safetyStatus: "stolen" });
+  assert.deepEqual(present(record), { qrCode: "QRG-TEST", originalityStatus: "modified", safetyStatus: "stolen" });
+  assert.equal(record.saleStatus, "for_sale");
 });
 
 test("failed gallery sources are removed without mutating or reordering the remaining photos", () => {

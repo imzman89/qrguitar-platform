@@ -8,4 +8,7 @@
 .document p { margin:12px 0 0; font-size:16px; line-height:1.8; color:var(--muted); overflow-wrap:anywhere; }
 .document a { color:var(--action); text-underline-offset:4px; }.document code { overflow-wrap:anywhere; }
 .document :global(.legal-final-note) { padding:24px; border-radius:12px; background:var(--surface); }
+.technicalDetails { margin-top:20px; }
+.technicalDetails summary { padding:12px 0; min-height:44px; color:var(--text); cursor:pointer; line-height:1.5; }
+.technicalDetails summary:focus-visible { outline:2px solid var(--action); outline-offset:4px; }
 @media(max-width:600px) { .document > section { padding:24px 0 40px; }.document :global(.legal-page) > p { font-size:16px; margin-bottom:20px; }.document :global(.legal-card) { padding-block:20px; }.document h2 { font-size:21px; } }

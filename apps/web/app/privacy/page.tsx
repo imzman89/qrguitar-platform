@@ -67,6 +67,8 @@ export default async function PrivacyPage() {
                   ? "Configured optional analytics or advertising measurement stays off until you choose Accept. Deny keeps it off. A compact Privacy choices control remains available so you can turn optional tracking off at any time. QRguitar stores your consent choice and, after acceptance, up to 128 pseudonymous conversion markers made with a one-way hash in local browser storage to reduce duplicate counts for recent successes across visits and tabs. Denying clears those markers. A marker does not contain the raw account, Profile, transfer, or payment identifier, but it is not anonymous and may be linkable by a party that already knows the source identifier."
                   : "Optional analytics and advertising are not currently configured. If either is added later, it will stay off until you choose Accept. Deny will keep it off, and QRguitar will store only your consent choice in your browser."}
               </p>
+              <details className={styles.technicalDetails}>
+                <summary>Optional analytics: events, identifiers and provider details</summary>
               <p>
                 When optional analytics is enabled and accepted, QRguitar can measure successful public Profile views,
                 registrations, Profile creation, checkout starts, completed credit purchases, and completed ownership
@@ -83,6 +85,7 @@ export default async function PrivacyPage() {
                   ? "After acceptance, QRguitar loads Google Analytics 4 and may set its _ga cookies. QRguitar sends manual page views using coarse categories such as catalog, public Profile, or billing instead of dynamic URLs, query values, page titles, or referrer URLs. Advertising storage, Google signals, and ad personalization remain disabled. Turning tracking off stops new QRguitar dispatch, tells the tag that analytics storage is denied, removes the loaded script, and attempts to remove its first-party cookies. It cannot erase information Google already received."
                   : "Google Analytics 4 is not currently configured. Adding it requires both an approved Measurement ID and the analytics purpose; until then it does not load, expand the browser security policy, or create a Google Analytics consent prompt by itself."}
               </p>
+              </details>
             </div>
             <div className="legal-card legal-final-note">
               <p>{getContentValue(settings.content, "privacy.finalNote")}</p>

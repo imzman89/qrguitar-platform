@@ -29,7 +29,7 @@ export function HomeProfileShowcase({ record }: { record: DemoInstrument }) {
           <h2><Link href={card.profileUrl}>{card.title}<ArrowUpRight size={19} aria-hidden="true" /></Link></h2>
           {card.factLine ? <p>{card.factLine}</p> : null}
         </div>
-        {photos.length ? <button className={styles.galleryLink} type="button" onClick={() => setViewerOpen(true)} aria-label={"View all photos of " + card.title}><Camera size={16} aria-hidden="true" />{card.photoCount} {card.photoCount === 1 ? "photo" : "photos"}</button> : null}
+        {photos.length ? <button className={styles.galleryLink} type="button" onClick={() => setViewerOpen(true)} aria-label={(photos.length < card.photoCount ? "View available photos of " : "View all photos of ") + card.title}><Camera size={16} aria-hidden="true" />{photos.length} {photos.length === 1 ? "photo" : "photos"}{photos.length < card.photoCount ? " available" : ""}</button> : null}
       </div>
       {viewerOpen ? <PhotoViewer images={photos} initialIndex={activePhoto} title={card.title} onClose={() => setViewerOpen(false)} onIndexChange={setSelectedPhoto} onImageError={(photo) => setFailedPhotos((current) => current.includes(photo) ? current : [...current, photo])} /> : null}
     </article>

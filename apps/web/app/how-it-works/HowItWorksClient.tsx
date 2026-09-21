@@ -74,11 +74,11 @@ export function HowItWorksClient({ settings, example = null }: { settings: Edita
                 <div className="eyebrow">HOW IT WORKS</div>
                 <h2>{getContentValue(content, "howItWorks.lifecycle.heading")}</h2>
               </div>
-              <div className={styles.walkthrough}><ol className="product-guide-steps">
+              <div className={styles.walkthrough}><ol className="product-guide-steps" role="list">
                 {blocks("lifecycle").map((item, index) => (
                   <li key={item.id}>
-                    <span>{String(index + 1).padStart(2, "0")}</span>
-                    <div><h3>{item.title}</h3><p>{item.body}</p></div>
+                    <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+                    <div><h3>{item.title}</h3><p>{item.body}</p>{item.id === "how-step-create" ? <p className={styles.serialCaveat}>{getContentValue(content, "howItWorks.lifecycle.serialHelp")}</p> : null}</div>
                   </li>
                 ))}
               </ol>{example ? <aside className={styles.example} aria-label="A real QRguitar Profile"><CollectibleRecordCard record={example} variant="archive" content={settings.content} /></aside> : null}</div>

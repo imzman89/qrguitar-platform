@@ -46,13 +46,15 @@ export default async function ContactPage() {
         <section className="section" style={sectionStyle("categories")}>
           <div className="shell legal-page contact-page">
             <div className="contact-topic-grid">
-              {supportTopics.map((topic) => (
-                <a className="contact-topic-card" href={topic.ctaUrl || "mailto:support@qrguitar.com"} key={topic.id}>
+              {supportTopics.map((topic) => {
+                const separateDestination = topic.ctaUrl && topic.ctaUrl !== "mailto:support@qrguitar.com";
+                const Topic = separateDestination ? "a" : "article";
+                return <Topic className="contact-topic-card" href={separateDestination ? topic.ctaUrl : undefined} key={topic.id}>
                   <EditorialIcon name={topic.icon} />
                   <strong>{topic.title}</strong>
                   <span>{topic.body}</span>
-                </a>
-              ))}
+                </Topic>;
+              })}
             </div>
           </div>
         </section>

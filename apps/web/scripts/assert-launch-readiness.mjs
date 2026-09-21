@@ -66,7 +66,7 @@ ok(robots.includes('.join("\\n")'), "robots newlines missing");
 ok(/"content-type"\s*:\s*"application\/xml; charset=utf-8"/i.test(sitemap), "sitemap content type missing");
 ok(resetPassword.includes("authChecked") && resetPassword.includes('useState("")'), "Reset states conflict");
 ok(!installers.includes("Browse vetted installers by region") && !installers.includes("Directory opening soon"), "Installer page simulates finder");
-ok(howItWorks.includes('<ol className="product-guide-steps">') && styles.includes('.product-guide-steps li::marker { content: ""; }'), "How It Works numbering failed");
+ok(howItWorks.includes('<ol className="product-guide-steps" role="list">') && howItWorks.includes('<span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>') && styles.includes('.product-guide-steps li::marker { content: ""; }'), "How It Works must retain list semantics and hide only decorative numbering");
 for (const [name, source] of [["Contact", contact], ["Privacy", privacy], ["Terms", terms]]) {
   ok(!/serial\/build/i.test(source), `${name} has stale terminology`);
 }
