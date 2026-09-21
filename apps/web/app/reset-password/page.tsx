@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "../../components/CheckoutAwareLink";
 import styles from "../../components/AuthForm.module.css";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -11,6 +11,7 @@ import { getContentValue } from "../../lib/content-registry";
 import { useSiteContent } from "../../lib/use-site-content";
 
 import { safeAuthRedirect } from "../../lib/auth-redirect";
+import { replaceWithCheckoutPolicy } from "../../lib/checkout-navigation";
 
 async function readAuthSession(client: ReturnType<typeof createBrowserSupabaseClient>) {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -136,7 +137,7 @@ export default function ResetPasswordPage() {
       if (after.error) throw after.error;
       if (after.data.session?.user.id !== actor) { applyIdentity(after.data.session?.user.id || ""); return; }
       setPassword(""); setConfirmPassword(""); setIsComplete(true);
-      redirectTimer.current = window.setTimeout(() => { if (current()) router.replace(safeNext); }, 900);
+      redirectTimer.current = window.setTimeout(() => { if (current()) replaceWithCheckoutPolicy("/reset-password", safeNext, router, window.location); }, 900);
     } catch {
       if (current()) setStatus(dispatched
         ? "The password update could not be confirmed. It may already have been saved. Check your connection, then retry or request a fresh reset link."

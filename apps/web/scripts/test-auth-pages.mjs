@@ -22,6 +22,8 @@ function compile(relative, imports, globals) {
   new Function('require', 'module', 'exports', ...Object.keys(globals), code)(name => Object.hasOwn(imports, name) ? imports[name] : name.endsWith('.module.css') ? { __esModule: true, default: new Proxy({}, { get: (_, key) => String(key) }) } : require(name), module, module.exports, ...Object.values(globals));
   return module.exports;
 }
+const checkoutNavigation = compile('lib/checkout-navigation.ts', { './security-headers': compile('lib/security-headers.ts', {}, {}) }, {});
+const authRedirect = compile('lib/auth-redirect.ts', {}, {});
 function find(tree, predicate) {
   if (!tree || typeof tree !== 'object') return;
   if (predicate(tree)) return tree;
@@ -33,7 +35,7 @@ function text(tree) {
   return React.Children.toArray(tree.props?.children).map(text).join(' ');
 }
 function fixture(page, options = {}) {
-  const f = { actor: options.actor ?? (page === 'reset-password' ? 'a' : ''), clears: 0, writes: 0, navigations: [], history: [], calls: [], tracking: [], reads: 0, disposed: false };
+  const f = { actor: options.actor ?? (page === 'reset-password' ? 'a' : ''), clears: 0, writes: 0, navigations: [], documentNavigations: [], history: [], calls: [], tracking: [], reads: 0, disposed: false };
   const states = [], effects = [], listeners = new Set(), timers = new Map();
   let cursor = 0, effectCursor = 0, dirty = true, tree, now = 0, timerId = 0;
   const setTimer = (callback, delay) => { const id = ++timerId; timers.set(id, { at: now + delay, callback }); return id; };
@@ -66,19 +68,22 @@ function fixture(page, options = {}) {
   }
   const router = { replace: href => f.navigations.push(href) };
   const location = new URL('https://www.qrguitar.com/' + page + (options.search || '?next=%2Fdashboard'));
+  location.replace = href => f.documentNavigations.push(href);
   const globals = {
     window: { location, history: { replaceState(_state, _title, href) { f.history.push(href); } }, setTimeout: setTimer, clearTimeout: clearTimer, dispatchEvent() {} },
     setTimeout: setTimer, clearTimeout: clearTimer, CustomEvent: class { constructor(type) { this.type = type; } },
   };
   const imports = {
     react: hooks, 'next/link': { default: 'a', __esModule: true }, 'next/navigation': { useRouter: () => router },
+    '../../components/CheckoutAwareLink': { default: 'a', __esModule: true },
     '../../components/Nav': { Nav: () => null }, '../../components/Footer': { Footer: () => null },
     '../../lib/supabase-browser': {
       createBrowserSupabaseClient: () => { if (options.constructError) throw Error('PRIVATE_CONFIG'); return { auth }; },
       clearQrGuitarSessionState: () => f.clears++, readSessionStorage: () => null, removeSessionStorage() {}, sessionExpiredMessageKey: 'expiry',
     },
     '../../lib/content-registry': { getContentValue: (_content, key) => key }, '../../lib/use-site-content': { useSiteContent: () => ({}) },
-    '../../lib/auth-redirect': { safeAuthRedirect: value => value?.startsWith('/') && !value.startsWith('//') && !value.startsWith('/login') ? value : '/dashboard' },
+    '../../lib/auth-redirect': authRedirect,
+    '../../lib/checkout-navigation': checkoutNavigation,
     '../../lib/optional-tracking-consent': {
       optionalTrackingProductEvents: { registrationCompleted: 'account_registration_completed' },
       dispatchOptionalTrackingProductEvent: async event => { f.tracking.push(event); return true; },
@@ -261,6 +266,17 @@ test('login: registration without a session honestly asks for email confirmation
   assert.match(f.text(), /Check your email to confirm/); assert.equal(f.navigations.length, 0); assert.equal(f.calls[0].values[0].options.emailRedirectTo, 'https://www.qrguitar.com/create');
   assert.deepEqual(f.tracking, [{ name: 'account_registration_completed', properties: { confirmation: 'email_pending' } }]); f.dispose();
 });
+for (const state of ['initial read', 'initial auth event', 'completed sign-in']) test('login: ' + state + ' opens a new billing document with the exact return destination', async () => {
+  const destination = '/billing/paypal/return?orderId=44444444-4444-4444-8444-444444444444#payment';
+  const options = { search: '?next=' + encodeURIComponent(destination), ...(state === 'initial read' ? { actor: 'a' } : state === 'initial auth event' ? { immediateActor: 'a' } : {}) };
+  const f = fixture('login', options); await f.flush();
+  if (state === 'completed sign-in') { f.fill(); f.submit(); await f.flush(); assert.equal(f.count('signInWithPassword'), 1); }
+  assert.deepEqual(f.documentNavigations, [destination]); assert.deepEqual(f.navigations, []); f.dispose();
+});
+test('login: an unsafe external billing return cannot become document navigation', async () => {
+  const f = fixture('login', { search: '?next=' + encodeURIComponent('//untrusted.invalid/billing') }); await f.flush(); f.fill(); f.submit(); await f.flush();
+  assert.deepEqual(f.navigations, ['/dashboard']); assert.deepEqual(f.documentNavigations, []); f.dispose();
+});
 test('login: registration with a confirmed session records the session-ready outcome', async () => {
   const f = fixture('login', { search: '?mode=register&next=%2Fcreate', signUp: async fixtureState => {
     fixtureState.event('a');
@@ -323,6 +339,17 @@ test('reset: account transition clears the success screen and pending redirect',
 test('reset: confirmed update navigates once to the original destination', async () => {
   const f = fixture('reset-password', { search: '?next=%2Faccount' }); await f.flush(); f.fill(); f.submit(); await f.flush(); await f.advance(900);
   assert.deepEqual(f.navigations, ['/account']); assert.equal(f.count('updateUser'), 1); f.dispose();
+});
+test('reset: confirmed update keeps the billing return and loads its document security policy', async () => {
+  const destination = '/billing?orderId=44444444-4444-4444-8444-444444444444#payment';
+  const f = fixture('reset-password', { search: '?next=' + encodeURIComponent(destination) }); await f.flush(); f.fill(); f.submit(); await f.flush();
+  assert.match(f.text(), /Password updated/); assert.deepEqual(f.documentNavigations, []);
+  const continueLink = f.node(node => node.type === 'a' && text(node).trim() === 'Continue'); assert.equal(continueLink.props.href, destination);
+  await f.advance(900); assert.deepEqual(f.documentNavigations, [destination]); assert.deepEqual(f.navigations, []); assert.equal(f.count('updateUser'), 1); f.dispose();
+});
+test('reset: account change still cancels a pending document return to billing', async () => {
+  const f = fixture('reset-password', { search: '?next=%2Fbilling' }); await f.flush(); f.fill(); f.submit(); await f.flush(); f.emit('b'); await f.advance(900);
+  assert.deepEqual(f.documentNavigations, []); assert.deepEqual(f.navigations, []); assert.doesNotMatch(f.text(), /Password updated/); f.dispose();
 });
 test('reset: unmount suppresses late update feedback and navigation', async () => {
   const gate = deferred(), f = fixture('reset-password', { updateUser: () => gate.promise }); await f.flush(); f.fill(); f.submit(); await f.flush(); f.dispose(); const writes = f.writes;

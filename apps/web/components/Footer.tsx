@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "./CheckoutAwareLink";
 import { useEffect, useState } from "react";
 import { BrandLogo } from "./BrandLogo";
 import { defaultSiteSettings, fetchPublishedSiteSettings, type EditableSiteSettings } from "../lib/site-settings";

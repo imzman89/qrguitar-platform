@@ -156,7 +156,7 @@ function renderBilling(state, query = "", choice = { actorId: "", offerKey: "" }
   const compiled = ts.transpileModule(fs.readFileSync(path.join(web, "app/billing/DirectBillingPage.tsx"), "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   new Function("require", "module", "exports", compiled)(specifier => {
     if (specifier === "react") return { ...React, useEffect() {}, useRef: () => ({ current: null }), useState(initial) { const index = states++; return [index === 0 ? state : index === 1 ? choice : typeof initial === "function" ? initial() : initial, () => {}]; } };
-    if (specifier === "next/link") return ({ children, ...props }) => React.createElement("a", props, children);
+    if (specifier === "next/link" || specifier === "../../components/CheckoutAwareLink") return ({ children, ...props }) => React.createElement("a", props, children);
     if (specifier === "next/navigation") return { useSearchParams: () => new URLSearchParams(query) };
     if (specifier.endsWith("/Nav")) return { Nav: () => null };
     if (specifier.endsWith("/Footer")) return { Footer: () => null };

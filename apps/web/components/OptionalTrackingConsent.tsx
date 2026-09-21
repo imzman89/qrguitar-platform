@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "./CheckoutAwareLink";
 import { useEffect, useState } from "react";
 import styles from "./OptionalTrackingConsent.module.css";
 import {

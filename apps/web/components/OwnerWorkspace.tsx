@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "./CheckoutAwareLink";
 import { type ReactNode } from "react";
 import { Boxes, CircleUserRound, CreditCard, MessageCircle, Plus, Wrench } from "lucide-react";
 import styles from "./OwnerWorkspace.module.css";

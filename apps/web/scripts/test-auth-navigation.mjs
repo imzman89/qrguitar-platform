@@ -45,6 +45,7 @@ export function navigationFixture(component, options = {}) {
   const settings = { content: {}, composition: { footer: { sections: [{ id: 'links', blocks: [] }] } } };
   const imports = {
     react: hooks, 'next/link': { default: 'a', __esModule: true }, 'next/navigation': { usePathname: () => '/' },
+    './CheckoutAwareLink': { default: 'a', __esModule: true },
     'lucide-react': { LogOut: () => null, Menu: () => null, UserRound: () => null, X: () => null },
     './BrandLogo': { BrandLogo: () => null }, './Nav.module.css': { default: {}, __esModule: true }, './Footer.module.css': { default: {}, __esModule: true },
     '../lib/supabase-browser': browser, '../lib/use-auth-navigation': hook,

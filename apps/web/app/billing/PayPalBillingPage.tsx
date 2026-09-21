@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "../../components/CheckoutAwareLink";
 import { useSearchParams } from "next/navigation";
 import { ArrowRight, Check, RefreshCw } from "lucide-react";
 import { createElement, Suspense, useEffect, useRef, useState } from "react";

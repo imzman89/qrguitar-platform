@@ -174,7 +174,7 @@ function renderBilling(state, mode = "overview", query = "") {
   const component = { exports: {} };
   new Function("require", "module", "exports", compiled)(specifier => {
     if (specifier === "react") return { ...React, useEffect() {}, useRef: () => ({ current: null }), useState: () => [state, () => {}] };
-    if (specifier === "next/link") return ({ children, ...props }) => React.createElement("a", props, children);
+    if (specifier === "next/link" || specifier === "../../components/CheckoutAwareLink") return ({ children, ...props }) => React.createElement("a", props, children);
     if (specifier === "next/navigation") return { useSearchParams: () => new URLSearchParams(query) };
     if (specifier.endsWith("/Nav")) return { Nav: () => null };
     if (specifier.endsWith("/Footer")) return { Footer: () => null };

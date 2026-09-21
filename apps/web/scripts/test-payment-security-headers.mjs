@@ -10,6 +10,22 @@ import * as indexing from "../lib/search-indexing.ts";
 
 const web = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url), ts = require("typescript");
+function compileCheckout(relative, imports, globals = {}) {
+  const code = ts.transpileModule(fs.readFileSync(path.join(web, relative), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+  const module = { exports: {} };
+  new Function("require", "module", "exports", ...Object.keys(globals), code)(name => Object.hasOwn(imports, name) ? imports[name] : require(name), module, module.exports, ...Object.values(globals));
+  return module.exports;
+}
+const checkout = compileCheckout("lib/checkout-navigation.ts", { "./security-headers": policy });
+function checkoutLink(pathname, props) {
+  const navigations = [];
+  const Component = compileCheckout("components/CheckoutAwareLink.tsx", {
+    "next/link": { __esModule: true, default: "NextLink" },
+    "next/navigation": { usePathname: () => pathname },
+    "../lib/checkout-navigation": checkout
+  }, { window: { location: { assign: href => navigations.push(["assign", href]), replace: href => navigations.push(["replace", href]) } } }).default;
+  return { element: Component(props), navigations };
+}
 const headerMap = values => new Headers(values.map(({ key, value }) => [key, value]));
 function sources(headers, directive) {
   const directives = headers.get("content-security-policy").split(";").map(value => value.trim().split(/\s+/));
@@ -220,4 +236,46 @@ test("ordinary middleware requests do not relax global frame or payment restrict
   assert.equal(response.headers.get("x-frame-options"), null);
   assert.equal(response.headers.get("permissions-policy"), null);
   assert.equal(response.forwardedHeaders.get("x-qrguitar-site-preview"), null);
+});
+
+test("checkout boundary classification keeps prefixes, relative anchors, queries and external destinations distinct", () => {
+  for (const [current, destination] of [["/account", "/billing"], ["/", "/billing/paypal/return?orderId=kept#receipt"], ["/billing", "/account"], ["/billing/paypal/cancel", "/login?next=%2Fbilling"], ["/", "https://www.qrguitar.com/billing"], ["/", "https://qrguitar.com/billing/manual"]]) assert.equal(checkout.crossesCheckoutBoundary(current, destination), true, `${current} -> ${destination}`);
+  for (const [current, destination] of [["/account", "/dashboard"], ["/billing", "/billing/paypal/return?orderId=kept"], ["/billing?orderId=kept", "#receipt"], ["/billing", "?orderId=kept"], ["/billing/paypal/return", "../cancel"], ["/", "/billing-other"], ["/", "/api/billing/paypal/status"], ["/", "https://www.paypal.com/checkoutnow"], ["/", "https://www.qrguitar.com.evil.invalid/billing"], ["/", "mailto:support@qrguitar.com"]]) assert.equal(checkout.crossesCheckoutBoundary(current, destination), false, `${current} -> ${destination}`);
+});
+
+test("real checkout link replaces a blocked ordinary document with the destination payment policy", async () => {
+  const destination = "/billing?orderId=kept#receipt", f = checkoutLink("/account", { href: destination, prefetch: true, children: "Profile credits", className: "unchanged", "aria-label": "Profile credits" });
+  assert.equal(f.element.type, "NextLink"); assert.equal(f.element.props.href, destination); assert.equal(f.element.props.prefetch, false);
+  assert.equal(f.element.props.className, "unchanged"); assert.equal(f.element.props["aria-label"], "Profile credits");
+  let prevented = 0; f.element.props.onNavigate({ preventDefault() { prevented++; } });
+  assert.equal(prevented, 1); assert.deepEqual(f.navigations, [["assign", destination]]);
+  const rules = await nextConfig.headers();
+  assert.equal(permits(configuredHeaders(rules, "/account"), "script-src", "https://www.paypal.com/sdk/js"), false);
+  assert.equal(permits(configuredHeaders(rules, new URL(f.navigations[0][1], "https://www.qrguitar.com").pathname), "script-src", "https://www.paypal.com/sdk/js"), true);
+});
+
+test("real checkout exit loads ordinary restrictive headers and preserves replace-history intent", async () => {
+  const destination = "/account?section=access#credits", f = checkoutLink("/billing", { href: destination, replace: true });
+  let prevented = false; f.element.props.onNavigate({ preventDefault() { prevented = true; } });
+  assert.equal(prevented, true); assert.deepEqual(f.navigations, [["replace", destination]]);
+  const headers = configuredHeaders(await nextConfig.headers(), "/account");
+  assert.equal(permits(headers, "script-src", "https://www.paypal.com/sdk/js"), false); assert.match(headers.get("permissions-policy"), /payment=\(\)/);
+});
+
+test("same-policy links keep Next navigation, prefetch and native target/click behavior", () => {
+  for (const [current, href] of [["/account", "/dashboard"], ["/billing", "/billing/manual"], ["/billing", "#packs"], ["/billing", "?orderId=kept"]]) {
+    const f = checkoutLink(current, { href, prefetch: true }); assert.equal(f.element.props.onNavigate, undefined); assert.equal(f.element.props.prefetch, true); assert.deepEqual(f.navigations, []);
+  }
+  const onClick = () => {}, f = checkoutLink("/create", { href: "/billing", target: "_blank", rel: "noopener noreferrer", onClick });
+  // NextLink owns modifier/new-tab behavior and invokes onNavigate only for its
+  // same-tab client navigations. The wrapper does not intercept native clicks.
+  assert.equal(f.element.props.target, "_blank"); assert.equal(f.element.props.rel, "noopener noreferrer"); assert.equal(f.element.props.onClick, onClick); assert.deepEqual(f.navigations, []);
+});
+
+test("auth completion uses document replacement only when crossing the checkout boundary", () => {
+  const routed = [], replaced = [], router = { replace: href => routed.push(href) }, location = { replace: href => replaced.push(href) };
+  checkout.replaceWithCheckoutPolicy("/login", "/billing/paypal/return?orderId=kept", router, location);
+  checkout.replaceWithCheckoutPolicy("/reset-password", "/billing#packs", router, location);
+  checkout.replaceWithCheckoutPolicy("/login", "/account", router, location);
+  assert.deepEqual(replaced, ["/billing/paypal/return?orderId=kept", "/billing#packs"]); assert.deepEqual(routed, ["/account"]);
 });

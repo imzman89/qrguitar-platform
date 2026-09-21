@@ -205,7 +205,8 @@ async function accountPageUI(f, section = "collection") {
   const ui = runtime({ react: hooks, "next/navigation": { useSearchParams: () => search }, "next/link": ({ children, ...props }) => React.createElement("a", props, children),
     "apps/web/lib/account-settings": { ...load("apps/web/lib/account-settings"), createAccountSettings: () => f.client },
     "apps/web/lib/supabase-browser": {}, "apps/web/lib/use-site-content": { useSiteContent: () => ({}) },
-    "apps/web/components/Nav": { Nav: () => null }, "apps/web/components/Footer": { Footer: () => null }, "apps/web/components/PwaInstall": { PwaInstall: () => null }
+    "apps/web/components/Nav": { Nav: () => null }, "apps/web/components/Footer": { Footer: () => null }, "apps/web/components/PwaInstall": { PwaInstall: () => null },
+    "apps/web/components/CheckoutAwareLink": { __esModule: true, default: ({ children, ...props }) => React.createElement("a", props, children) }
   });
   const Component = ui("apps/web/app/account/page").default().props.children.type;
   const render = () => { cursor = effectCursor = 0; return Component(); };

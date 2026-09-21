@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "./CheckoutAwareLink";
 import { usePathname } from "next/navigation";
 import { LogOut, Menu, MessageCircle, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";

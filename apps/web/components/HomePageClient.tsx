@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "./CheckoutAwareLink";
 import { ArrowRight, Fingerprint, ShieldCheck, RefreshCw } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";

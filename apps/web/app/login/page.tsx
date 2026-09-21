@@ -11,6 +11,7 @@ import { getContentValue } from "../../lib/content-registry";
 import { useSiteContent } from "../../lib/use-site-content";
 
 import { safeAuthRedirect } from "../../lib/auth-redirect";
+import { replaceWithCheckoutPolicy } from "../../lib/checkout-navigation";
 import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "../../lib/optional-tracking-consent";
 
 type LoginMode = "login" | "register" | "reset";
@@ -108,7 +109,7 @@ export default function LoginPage() {
         const initial = !life.known;
         applyIdentity(session?.user.id || "");
         window.dispatchEvent(new CustomEvent("qrguitar:auth"));
-        if (initial && session?.user.id && !pending.current) router.replace(safeAuthRedirect(new URLSearchParams(window.location.search).get("next")));
+        if (initial && session?.user.id && !pending.current) replaceWithCheckoutPolicy("/login", safeAuthRedirect(new URLSearchParams(window.location.search).get("next")), router, window.location);
       });
       unsubscribe = () => data.subscription.unsubscribe();
       const initialRevision = eventRevision;
@@ -119,7 +120,7 @@ export default function LoginPage() {
         if (error) { setStatus("Your sign-in could not be checked. You can try signing in again."); return; }
         const actor = initial.session?.user.id || "";
         applyIdentity(actor);
-        if (actor) router.replace(safeAuthRedirect(new URLSearchParams(window.location.search).get("next")));
+        if (actor) replaceWithCheckoutPolicy("/login", safeAuthRedirect(new URLSearchParams(window.location.search).get("next")), router, window.location);
       }).catch(() => { if (active() && !hadEvent && eventRevision === initialRevision && life.operationRevision === operationRevision) setStatus("Your sign-in could not be checked. You can try signing in again."); });
     } catch { client.current = null; setStatus("Sign-in is temporarily unavailable. Please reload and try again."); }
     return () => { life.active = false; life.epoch++; client.current = null; unsubscribe?.(); };
@@ -207,7 +208,7 @@ export default function LoginPage() {
       if (after.error) throw after.error;
       if (after.data.session?.user.id !== actor) { applyIdentity(after.data.session?.user.id || ""); return; }
       applyIdentity(actor);
-      removeSessionStorage(sessionExpiredMessageKey); router.replace(safeNext);
+      removeSessionStorage(sessionExpiredMessageKey); replaceWithCheckoutPolicy("/login", safeNext, router, window.location);
     } catch {
       if (sameActor(operation) || (signedInActor && signedInBy(operation, signedInActor))) setStatus("The request could not be confirmed. Check your connection and account status before trying again.");
     } finally {
