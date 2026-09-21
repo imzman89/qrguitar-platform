@@ -1,0 +1,77 @@
+.page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+  background: var(--canvas, var(--bg));
+  color: var(--text);
+}
+
+.content {
+  width: min(100%, 520px);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-bottom: 48px;
+}
+
+.logo { width: 140px; height: auto; }
+
+.eyebrow {
+  color: var(--action, var(--gold));
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.content h1 {
+  margin: 12px 0;
+  font-size: clamp(28px, 4vw, 38px);
+  line-height: 1.15;
+}
+
+.content p {
+  color: var(--muted-strong);
+  line-height: 1.6;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.actions a,
+.actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.actions .primary {
+  border-color: var(--action, var(--gold));
+  background: var(--action, var(--gold));
+  color: var(--on-action, var(--ink));
+}
+
+.page :is(a,button):focus-visible { outline: 2px solid var(--action, var(--gold)); outline-offset: 4px; }
+.actions button:disabled { opacity: .65; cursor: wait; }
+
+@media (max-width: 390px) {
+  .actions a,
+  .actions button { width: 100%; }
+}

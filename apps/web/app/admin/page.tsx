@@ -30,6 +30,7 @@ import { defaultSiteSettings, isSafeBrandLogoUrl, mergeSiteSettings, normalizeBr
 import { createBrowserSupabaseClient } from "../../lib/supabase-browser";
 import { ACCOUNT_DELETION_UNAVAILABLE } from "../../lib/admin-account-deletion-status";
 import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "../../lib/optional-tracking-consent";
+import { AdminWorkspaceGate } from "../../components/AdminWorkspaceGate";
 
 type OverviewPayload = {
   ok?: boolean;
@@ -389,7 +390,7 @@ function fileSizeLabel(value?: number | null) {
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default function AdminPage() {
+function AdminWorkspace() {
   const [activeSection, setActiveSection] = useState<SectionId>("overview");
   const [overview, setOverview] = useState<OverviewPayload | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -2082,4 +2083,9 @@ export default function AdminPage() {
       <Footer />
     </>
   );
+}
+
+export default function AdminPage() {
+  const returnPath = typeof window === "undefined" ? "/admin" : `${window.location.pathname}${window.location.search}`;
+  return <AdminWorkspaceGate returnPath={returnPath}><AdminWorkspace /></AdminWorkspaceGate>;
 }

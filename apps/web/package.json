@@ -26,6 +26,7 @@
     "test:final-signed-in-acceptance": "node scripts/assert-final-signed-in-acceptance.mjs",
     "test:content-coverage": "node scripts/assert-content-coverage.mjs",
     "test:admin": "node scripts/assert-admin.mjs",
+    "test:admin-access-gate": "node --test scripts/test-admin-workspace-gate.mjs",
     "test:site-editor": "node scripts/assert-site-editor.mjs",
     "test:core-behavior": "node scripts/test-core-behavior.mjs",
     "test:public-data-reliability": "node scripts/assert-public-data-reliability.mjs",

@@ -255,7 +255,7 @@ function renderAdmin(overrides = {}) {
   }
   visit(parsed);
   const state = { activeSection: "users", loading: false, adminAccessState: "authorized", adminDataReady: true, ...overrides };
-  let index = 0;
+  let index = 0, gateRenders = 0;
   const compilerOptions = { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true };
   const localModules = new Map();
   function loadLocal(filename) {
@@ -271,13 +271,26 @@ function renderAdmin(overrides = {}) {
     if (specifier === "react") return { ...React, useEffect() {}, useState(initial) { const name = names[index++]; assert.ok(name); return [Object.hasOwn(state, name) ? state[name] : typeof initial === "function" ? initial() : initial, () => {}]; } };
     if (specifier.endsWith(".module.css")) return new Proxy({}, { get: (_target, key) => key === "__esModule" ? false : String(key) });
     if (specifier === "next/link") return ({ children, ...props }) => React.createElement("a", props, children);
+    // Gate access transitions have their own hook suite. Render its authorized
+    // child here so the existing real drawer/dialog assertions still exercise
+    // AdminWorkspace rather than stopping at an unopened access boundary.
+    if (specifier === "../../components/AdminWorkspaceGate") return { AdminWorkspaceGate: ({ children, returnPath }) => {
+      gateRenders++;
+      assert.equal(returnPath, "/admin");
+      assert.ok(React.isValidElement(children));
+      assert.equal(children.type.name, "AdminWorkspace");
+      return children;
+    } };
     if (specifier.endsWith("/Nav")) return { Nav: () => null };
     if (specifier.endsWith("/Footer")) return { Footer: () => null };
     if (specifier.endsWith("/supabase-browser")) return { getSupabaseAccessToken: () => Promise.resolve(null) };
     if (specifier.startsWith("../../lib/")) return loadLocal(path.join(web, "lib", specifier.slice("../../lib/".length) + ".ts"));
     return require(specifier);
   }, component, component.exports);
-  return renderToStaticMarkup(React.createElement(component.exports.default));
+  const html = renderToStaticMarkup(React.createElement(component.exports.default));
+  assert.equal(gateRenders, 1, "Admin must retain its access wrapper");
+  assert.equal(index, names.length, "The inner admin workspace must consume every injected state");
+  return html;
 }
 
 const selectedUser = { ...user, role: "owner", accountStatus: "active", recordCount: 0, publicRecordCount: 0, privateRecordCount: 0, deleteEligible: true, deleteDisabledReason: "Stale response claims eligible", createdAt: "", lastSignInAt: "" };

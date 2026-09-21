@@ -73,6 +73,7 @@ import {
 import { settingsChangeReview } from "../../lib/site-editor-review";
 import { clearSitePreviewCookie, openSiteDraftPreview, sitePreviewGeneration, sitePreviewInvalidatedEvent } from "../../lib/site-preview-client";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
+import { AdminWorkspaceGate } from "../../components/AdminWorkspaceGate";
 
 type PreviewDevice = "desktop" | "tablet" | "mobile";
 type PreviewSource = "draft" | "published";
@@ -215,7 +216,7 @@ function validateEditorSettings(settings: EditableSiteSettings, rawBrandLogos: u
   return errors;
 }
 
-export default function SiteEditorPage() {
+function SiteEditorWorkspace() {
   const pathname = usePathname() || "/site-editor";
   const adminEntry = pathname === "/admin/site-editor";
   const editorContinuation = adminEntry ? "/admin/site-editor" : "/site-editor";
@@ -1234,4 +1235,10 @@ export default function SiteEditorPage() {
       </main>
     </>
   );
+}
+
+export default function SiteEditorPage() {
+  const pathname = usePathname() || "/site-editor";
+  const returnPath = typeof window === "undefined" ? pathname : `${window.location.pathname}${window.location.search}`;
+  return <AdminWorkspaceGate returnPath={returnPath}><SiteEditorWorkspace /></AdminWorkspaceGate>;
 }

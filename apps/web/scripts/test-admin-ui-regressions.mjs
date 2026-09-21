@@ -143,19 +143,32 @@ function renderService(overrides) {
     ts.forEachChild(node, visit);
   }
   visit(parsed);
-  let index = 0;
+  let index = 0, gateRenders = 0;
   const state = { providers: [], submissions: [], search: "", status: "all", phase: "loading", busy: "", message: "", ...overrides };
   const module = { exports: {} }, code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   new Function("require", "module", "exports", code)(specifier => {
     if (specifier === "react") return { ...React, useEffect() {}, useState(initial) { const name = names[index++]; return [Object.hasOwn(state, name) ? state[name] : typeof initial === "function" ? initial() : initial, () => {}]; } };
     if (specifier === "next/link") return { __esModule: true, default: ({ children, ...props }) => React.createElement("a", props, children) };
+    // Access transitions are covered by the AdminWorkspaceGate hook suite. This
+    // fixture opens that boundary so these assertions still render the real
+    // inner workspace, including its own service-request failure states.
+    if (specifier === "../../../components/AdminWorkspaceGate") return { AdminWorkspaceGate: ({ children, returnPath }) => {
+      gateRenders++;
+      assert.equal(returnPath, "/admin/service-workflow");
+      assert.ok(React.isValidElement(children));
+      assert.equal(children.type.name, "ServiceWorkflowWorkspace");
+      return children;
+    } };
     if (specifier.endsWith("/Nav")) return { Nav: () => null };
     if (specifier.endsWith("/Footer")) return { Footer: () => null };
     if (specifier.endsWith("/supabase-browser")) return { createBrowserSupabaseClient: () => ({ auth: {} }) };
     if (specifier.endsWith(".module.css")) return { __esModule: true, default: new Proxy({}, { get: (_, key) => String(key) }) };
     return require(specifier);
   }, module, module.exports);
-  return renderToStaticMarkup(React.createElement(module.exports.default));
+  const html = renderToStaticMarkup(React.createElement(module.exports.default));
+  assert.equal(gateRenders, 1, "Service Operations must retain its admin access wrapper");
+  assert.equal(index, names.length, "The inner service workspace must consume every injected state");
+  return html;
 }
 
 test("Service Operations never turns authorization or network failures into empty queues", () => {

@@ -1,5 +1,11 @@
 .root { width: min(820px, calc(100% - 40px)); margin: 32px auto 64px; color: var(--text); }
 .root > a { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted-strong); }
+.adminNav { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-bottom: 28px; }
+.adminNav a, .adminBrand { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted-strong); text-decoration: none; }
+.adminNav .adminBrand, .root > .adminBrand { gap: 12px; color: var(--text); font-weight: 650; }
+.logo { display: block; width: 138px; height: auto; }
+.access { max-width: 560px; padding-top: 24px; }
+.access h1 { margin-top: 24px; }
 .root header { margin-block: 20px 24px; }
 .root h1 { margin: 0 0 14px; font-size: clamp(1.75rem, 4vw, 2.5rem); line-height: 1.2; }
 .root h2 { margin: 0 0 10px; font-size: 1rem; line-height: 1.4; }

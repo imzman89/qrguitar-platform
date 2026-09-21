@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 // Runs actual TSX renders, effects and button handlers. Only browser, Auth and I/O
-// adapters are synthetic; settings normalization and bulk parsing are real modules.
+// adapters and the authorized admin boundary are synthetic; settings normalization
+// and bulk parsing are real modules. Gate access has its own hook tests.
 const localRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const repo = process.env.QRGUITAR_TEST_REPO || localRoot;
 const sourceRoot = process.env.QRGUITAR_COPY_SOURCE_ROOT || localRoot;
@@ -95,7 +96,7 @@ function browser(options) {
   if (!options.noClipboard) navigator.clipboard = { writeText(value) { writes.push(value); return options.clipboard?.(value) ?? Promise.resolve(); } };
   Object.defineProperty(navigator, 'permissions', { get() { throw Error('Clipboard permission queries are forbidden'); } });
   const store = { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) };
-  const window = { innerWidth: 1280, localStorage: store, sessionStorage: store,
+  const window = { innerWidth: 1280, localStorage: store, sessionStorage: store, location: { pathname: options.pathname || '/site-editor', search: '' },
     setTimeout(callback, delay) { const id = ++timer; timers.set(id, { callback, delay }); return id; }, clearTimeout: id => timers.delete(id),
     addEventListener(name, callback) { if (!events.has(name)) events.set(name, new Set()); events.get(name).add(callback); },
     removeEventListener(name, callback) { events.get(name)?.delete(callback); }
@@ -115,6 +116,7 @@ async function editor(t, options = {}) {
   const pending = options.pendingIssue ? { localSnapshot: JSON.stringify(recovered) } : null;
   const EditorMutationError = editorClient.EditorMutationError;
   const jsx = (type, props, key) => ({ type, props, key });
+  const authorizedGate = Symbol('Authorized AdminWorkspaceGate fixture');
   const fetchEditor = async (url, init) => {
     assert.equal(url, '/api/site-editor'); assert.equal(init.method, undefined);
     return options.loadError
@@ -124,6 +126,7 @@ async function editor(t, options = {}) {
   const load = loader({
     react: f.hooks, 'react/jsx-runtime': { jsx, jsxs: jsx }, 'lucide-react': {}, 'next/link': { default: 'Link' }, 'next/navigation': { usePathname: () => options.pathname || '/site-editor' },
     '../../components/Nav': { Nav: 'Nav' }, '../../components/Footer': { Footer: 'Footer' }, '../../components/SiteCompositionEditor': { SiteCompositionEditor: 'SiteCompositionEditor' },
+    '../../components/AdminWorkspaceGate': { AdminWorkspaceGate: authorizedGate },
     '../../lib/content-registry': registry, '../../lib/site-settings': { ...settings, applyThemeSettings() {} },
     '../../lib/site-editor-client': { ...editorClient, EditorMutationError,
       loadSiteEditorState: getAccessToken => editorClient.loadSiteEditorState(getAccessToken, fetchEditor),
@@ -131,7 +134,15 @@ async function editor(t, options = {}) {
     '../../lib/site-preview-client': { clearSitePreviewCookie: async () => {}, openSiteDraftPreview: async () => '/fixture', sitePreviewGeneration: () => generation, sitePreviewInvalidatedEvent: 'fixture-invalidate' },
     '../../lib/supabase-browser': { getSupabaseAccessToken: async () => 'fixture-token', createBrowserSupabaseClient: () => ({ auth: { getSession: async () => ({ data: { session: { user: { id: 'actor-a' }, access_token: 'fixture-token' } } }) } }) }
   }, { window: b.window, document: b.document, navigator: b.navigator, URL: b.URL, HTMLElement: class {}, crypto: { randomUUID: () => 'fixture-request' }, fetch: fetchEditor });
-  f.mount(load('apps/web/app/site-editor/page.tsx').default); await f.flush();
+  const page = load('apps/web/app/site-editor/page.tsx');
+  f.mount(() => {
+    const boundary = page.default();
+    assert.equal(boundary.type, authorizedGate, 'Content Studio must retain its admin access wrapper');
+    assert.equal(boundary.props.returnPath, options.pathname || '/site-editor');
+    const workspace = boundary.props.children;
+    assert.equal(workspace.type.name, 'SiteEditorWorkspace');
+    return workspace.type(workspace.props);
+  }); await f.flush();
   if (!options.loadError) { f.click('Advanced'); f.click('Advanced JSON'); await f.flush(); }
   t.after(() => f.dispose());
   return Object.assign(f, b, { payload, mutations,

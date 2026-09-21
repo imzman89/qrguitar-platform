@@ -2,12 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { BrandLogo } from "./BrandLogo";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../lib/supabase-browser";
+import { useAuthNavigation } from "../lib/use-auth-navigation";
 import { createEditorMutationController, type EditorMutationPayload } from "../lib/site-editor-client";
 import { RECOVERY_COPY_KEY, RECOVERY_COPY_SOURCE, type RecoveryCopyPreflight } from "../lib/site-editor-recovery-copy";
 import styles from "./RecoveryCopyCorrection.module.css";
 
 const endpoint = "/api/site-editor/recovery-copy";
+const loginHref = "/login?next=%2Fsite-editor%2Frecovery-copy";
 const restorationStorageKey = (actorId: string) => `qrguitar.recovery-copy.last:${actorId}`;
 type Controller = ReturnType<typeof createEditorMutationController>;
 
@@ -21,7 +25,10 @@ export function RecoveryCopyReview({ preflight }: { preflight: RecoveryCopyPrefl
 }
 
 export function RecoveryCopyCorrection() {
-  const [actorId, setActorId] = useState("");
+  const router = useRouter();
+  const { logout, signingOut, logoutError } = useAuthNavigation();
+  const [access, setAccess] = useState<"checking" | "signed-out" | "expired" | "denied" | "unavailable" | "authorized">("checking");
+  const [accessAttempt, setAccessAttempt] = useState(0);
   const actor = useRef("");
   const generation = useRef(0);
   const abort = useRef<AbortController | null>(null);
@@ -35,30 +42,39 @@ export function RecoveryCopyCorrection() {
   const [restorationId, setRestorationId] = useState("");
   const [message, setMessage] = useState("Checking your admin session…");
   const cancelRequests = useCallback(() => { generation.current++; abort.current?.abort(); }, []);
+  const hideWorkspace = useCallback((state: "checking" | "signed-out" | "expired" | "denied" | "unavailable") => {
+    cancelRequests(); controller.current = null; setPreflight(null); setRecord(null); setRestorationId("");
+    setBackupReady(false); setReviewed(false); setBusy(false); setPending(false); setAccess(state);
+    if (state === "signed-out") router.replace(loginHref);
+  }, [cancelRequests, router]);
 
   const authorizedFetch = useCallback(async (expectedActor: string, url: string, body?: string) => {
+    const requestGeneration = generation.current;
     const token = await getSupabaseAccessToken();
-    if (!token || actor.current !== expectedActor) throw new Error("Your admin session changed. Sign back into the original account.");
+    if (!token || actor.current !== expectedActor || requestGeneration !== generation.current) {
+      if (!token && actor.current === expectedActor && requestGeneration === generation.current) hideWorkspace("expired");
+      throw new Error("Your admin session changed. Sign back into the original account.");
+    }
     const requestAbort = new AbortController(); abort.current = requestAbort;
     const timer = window.setTimeout(() => requestAbort.abort(), 20000);
     try {
       const response = await fetch(url, { method: body === undefined ? "GET" : "POST", body,
         headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { "Content-Type": "application/json" }) }, cache: "no-store", signal: requestAbort.signal });
-      return { status: response.status, ok: response.ok, payload: await response.json().catch(() => ({})) as EditorMutationPayload };
+      const payload = await response.json().catch(() => ({})) as EditorMutationPayload;
+      if (actor.current === expectedActor && requestGeneration === generation.current && (response.status === 401 || response.status === 403)) hideWorkspace(response.status === 401 ? "expired" : "denied");
+      return { status: response.status, ok: response.ok, payload };
     } finally { window.clearTimeout(timer); if (abort.current === requestAbort) abort.current = null; }
-  }, []);
+  }, [hideWorkspace]);
 
   useEffect(() => {
     let mounted = true, authObserved = false;
     const updateActor = (next: string) => {
       if (!mounted || (next === actor.current && controller.current)) return;
-      cancelRequests(); actor.current = next;
-      controller.current = null; setActorId(next); setPreflight(null); setRecord(null); setRestorationId("");
-      setBackupReady(false); setReviewed(false); setBusy(false); setPending(false);
-      if (!next) { setMessage("Sign in with an authorized admin account to review this correction."); return; }
+      actor.current = next; hideWorkspace(next ? "checking" : "signed-out");
+      if (!next) return;
       let recoveryStorage: Storage;
       try { recoveryStorage = window.sessionStorage; }
-      catch { setMessage("Recovery storage is unavailable. No correction can be sent until storage is available."); return; }
+      catch { hideWorkspace("unavailable"); return; }
       const nextController = createEditorMutationController({ actorId: next, storageScope: "recovery-copy", storage: recoveryStorage,
         uuid: () => crypto.randomUUID(), send: async (body) => {
           const response = await authorizedFetch(next, endpoint, body);
@@ -73,20 +89,27 @@ export function RecoveryCopyCorrection() {
       setMessage(nextController.pending ? "A previous correction needs confirmation. Retry that same request first."
         : nextController.storageProblem ? "Recovery storage is unavailable. Reload before making a change."
         : "Review the authoritative saved introduction before publishing any change.");
+      const attempt = generation.current;
+      void authorizedFetch(next, endpoint).then((response) => {
+        if (!mounted || attempt !== generation.current || controller.current !== nextController) return;
+        const payload = response.payload as { ok?: boolean; preflight?: RecoveryCopyPreflight };
+        if (response.ok && payload.ok === true && payload.preflight?.editorActorId === next) setAccess("authorized");
+        else hideWorkspace("unavailable");
+      }).catch(() => { if (mounted && attempt === generation.current) hideWorkspace("unavailable"); });
     };
     let unsubscribe = () => {};
     try {
       const client = createBrowserSupabaseClient();
       const subscription = client.auth.onAuthStateChange((_event, session) => { authObserved = true; updateActor(session?.user.id || ""); });
       unsubscribe = () => subscription.data.subscription.unsubscribe();
-      void client.auth.getSession().then(({ data }) => { if (!authObserved) updateActor(data.session?.user.id || ""); }).catch(() => { if (!authObserved) updateActor(""); });
-    } catch { updateActor(""); }
+      void client.auth.getSession().then(({ data }) => { if (!authObserved) updateActor(data.session?.user.id || ""); }).catch(() => { if (mounted && !authObserved) hideWorkspace("unavailable"); });
+    } catch { hideWorkspace("unavailable"); }
     return () => { mounted = false; cancelRequests(); controller.current = null; unsubscribe(); };
     // Auth owns the lifecycle; no settings, drafts or business actions run here.
-  }, [authorizedFetch, cancelRequests]);
+  }, [accessAttempt, authorizedFetch, cancelRequests, hideWorkspace]);
 
   async function loadReview(restore?: string) {
-    if (!actor.current || busy || controller.current?.pending) return;
+    if (access !== "authorized" || !actor.current || busy || controller.current?.pending) return;
     const expectedActor = actor.current, attempt = ++generation.current;
     setBusy(true); setPreflight(null); setBackupReady(false); setReviewed(false); setMessage("Reading current published content and draft state…");
     try {
@@ -106,7 +129,7 @@ export function RecoveryCopyCorrection() {
   }
 
   function downloadBackup() {
-    if (!preflight || busy || pending) return;
+    if (access !== "authorized" || !preflight || busy || pending) return;
     try {
       download({ schema: RECOVERY_COPY_SOURCE, origin: window.location.origin, capturedAt: new Date().toISOString(), ...preflight }, `qrguitar-recovery-before-${preflight.publishedVersion}.json`);
       setBackupReady(true); setMessage("Backup download prepared. Confirm you saved it and reviewed the introduction before continuing.");
@@ -115,7 +138,7 @@ export function RecoveryCopyCorrection() {
 
   async function publish(retry = false) {
     const active = controller.current;
-    if (!active || busy || (!retry && (!preflight?.eligible || !backupReady || !reviewed))) return;
+    if (access !== "authorized" || !active || busy || (!retry && (!preflight?.eligible || !backupReady || !reviewed))) return;
     const attempt = generation.current;
     setBusy(true); setMessage(retry ? "Confirming the original request…" : "Publishing only the reviewed introduction…");
     try {
@@ -139,16 +162,28 @@ export function RecoveryCopyCorrection() {
     } finally { if (controller.current === active && attempt === generation.current) setBusy(false); }
   }
 
+  if (access !== "authorized") return <section className={`${styles.root} ${styles.access}`} aria-labelledby="admin-access-title">
+    <Link className={styles.adminBrand} href="/" aria-label="QRguitar home"><BrandLogo className={styles.logo} /></Link>
+    <h1 id="admin-access-title">{access === "checking" ? "Checking admin access" : access === "signed-out" ? "Sign in to continue" : access === "expired" ? "Your session expired" : access === "denied" ? "Admin access required" : "Admin workspace unavailable"}</h1>
+    <p role="status" aria-live="polite">{access === "checking" ? "Confirming your session…" : access === "signed-out" ? "Opening the sign-in page…" : access === "expired" ? logoutError || "Sign out of this expired session, then sign in again to continue." : access === "denied" ? "This account does not have access to this workspace." : "We couldn’t verify access right now. Please try again."}</p>
+    <div className={styles.actions}>
+      {access === "signed-out" ? <Link className="button" href={loginHref}>Sign in</Link> : null}
+      {access === "expired" ? <button type="button" className="button" disabled={signingOut} onClick={() => { void logout().then((signedOut) => { if (signedOut) router.replace(loginHref); }); }}>{signingOut ? "Signing out…" : "Sign out and sign in again"}</button> : null}
+      {access === "unavailable" ? <button type="button" className="button" onClick={() => { setAccess("checking"); setAccessAttempt((value) => value + 1); }}>Retry access check</button> : null}
+      {access === "denied" ? <Link className="button secondary" href="/dashboard">Return to dashboard</Link> : null}
+    </div>
+  </section>;
+
   return <section className={styles.root}>
-    <Link href="/site-editor">Back to Content Studio</Link>
+    <nav className={styles.adminNav} aria-label="Admin workspace"><Link className={styles.adminBrand} href="/admin" aria-label="QRguitar Admin"><BrandLogo className={styles.logo} /><span>Admin</span></Link><Link href="/site-editor">Content Studio</Link></nav>
     <header><p>Content recovery</p><h1>Password-reset introduction</h1><p>Review one saved sentence without importing defaults or publishing a shared draft. Other saved content remains unchanged.</p></header>
     <p className={styles.feedback} role="status" aria-live="polite">{message}</p>
-    {!actorId ? <Link className="button" href="/login?next=%2Fsite-editor%2Frecovery-copy">Sign in</Link> : <div className={styles.actions}>
+    <div className={styles.actions}>
       <button type="button" className="button secondary" disabled={busy || pending} onClick={() => void loadReview()}>Review saved introduction</button>
       {pending ? <button type="button" className="button" disabled={busy} onClick={() => void publish(true)}>Retry the same request</button> : null}
       {restorationId ? <button type="button" className="button secondary" disabled={busy || pending} onClick={() => void loadReview(restorationId)}>Review rollback</button> : null}
       {record ? <button type="button" className="button secondary" disabled={busy} onClick={() => { try { download(record, "qrguitar-recovery-restoration-record.json"); } catch { setMessage("The restoration record could not be downloaded. Retry the download."); } }}>Download restoration record</button> : null}
-    </div>}
+    </div>
     {preflight ? <>
       <RecoveryCopyReview preflight={preflight} />
       <div className={styles.actions}><button type="button" className="button secondary" disabled={busy || pending} onClick={downloadBackup}>Download raw backup</button><a href="/reset-password" target="_blank" rel="noreferrer">Open password-reset page</a></div>

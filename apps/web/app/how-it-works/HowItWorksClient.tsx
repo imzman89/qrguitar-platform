@@ -112,13 +112,13 @@ export function HowItWorksClient({ settings, example = null }: { settings: Edita
               </div>
               <div className="product-guide-visibility">
                 <div><QrCode /><strong>{getContentValue(content, "howItWorks.identity.qrTitle")}</strong><span>{getContentValue(content, "howItWorks.identity.qrBody")}</span></div>
-                <div><FileText /><strong>{getContentValue(content, "howItWorks.identity.serialTitle")}</strong><span>{getContentValue(content, "howItWorks.identity.serialBody")}</span></div>
+                <div><FileText /><strong>{getContentValue(content, "howItWorks.identity.serialTitle")}</strong><span>{getContentValue(content, "howItWorks.identity.serialBody")}</span><small className={styles.serialCaveat}>The QRguitar ID and URL may still include this number even when the field is hidden.</small></div>
               </div>
             </div>
             <div className="shell product-guide-visibility-heading">
               <h2>{getContentValue(content, "howItWorks.privacy.heading")}</h2>
               <p>{getContentValue(content, "howItWorks.privacy.body")}</p>
-              <p className="fine-print">Hiding the Serial Number field does not change the permanent QR ID or URL, which may include that serial. Choose a Private Profile when access must be restricted.</p>
+              <p className="fine-print">Choose a Private Profile when access must be restricted.</p>
             </div>
             <div className="shell product-guide-visibility-grid" aria-label="Profile visibility options">
               {visibility.map((item) => <article key={item.title}><item.icon /><div><strong>{getContentValue(content, item.title)}</strong><span>{getContentValue(content, item.body)}</span></div></article>)}

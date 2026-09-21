@@ -23,7 +23,7 @@ function loader(overrides = {}, globals = {}) {
       if (name.endsWith('.module.css')) return { __esModule: true, default: new Proxy({}, { get: (_target, key) => String(key) }) };
       if (!name.startsWith('.')) return require(name);
       const resolved = path.resolve(path.dirname(file), name);
-      return load(path.relative(repo, resolved) + (path.extname(resolved) ? '' : '.ts'));
+      return load(path.relative(repo, resolved) + (path.extname(resolved) ? '' : fs.existsSync(resolved + '.ts') ? '.ts' : '.tsx'));
     }, module, module.exports, ...Object.values(globals));
     return module.exports;
   }
@@ -91,9 +91,11 @@ let passes = 0;
 async function test(name, fn) { await reset(); await fn(); passes++; console.log('PASS ' + name); }
 const nodes = value => Array.isArray(value) ? value.flatMap(nodes) : value && typeof value === 'object' ? [value, ...nodes(value.props?.children)] : [];
 const text = value => Array.isArray(value) ? value.map(text).join('') : typeof value === 'string' ? value : value && typeof value === 'object' ? text(value.props?.children) : '';
-function uiFixture(storage = new Map(), fetchOverride) {
+function uiFixture(storage = new Map(), fetchOverride, options = {}) {
   let cursor = 0, dirty = true, mounted = true, tree, lateWrites = 0;
-  const slots = [], effects = [], listeners = new Set(), downloads = [], calls = [];
+  const slots = [], effects = [], listeners = new Set(), downloads = [], calls = [], redirects = [], signOutCalls = [];
+  let session = Object.hasOwn(options, 'session') ? options.session : { user: { id: actor } }, clearSessionCalls = 0;
+  const router = { replace: url => redirects.push(url) };
   const same = (a, b) => a && b && a.length === b.length && a.every((value, i) => Object.is(value, b[i]));
   const hooks = {
     useState(initial) { const i = cursor++; slots[i] ??= { value: initial }; return [slots[i].value, next => { if (!mounted) lateWrites++; slots[i].value = typeof next === 'function' ? next(slots[i].value) : next; dirty = true; }]; },
@@ -102,9 +104,13 @@ function uiFixture(storage = new Map(), fetchOverride) {
     useEffect(run, deps) { const i = cursor++; slots[i] ??= {}; if (!same(slots[i].deps, deps)) effects.push(() => { slots[i].cleanup?.(); slots[i].deps = deps; slots[i].cleanup = run(); }); }
   };
   const browserStorage = { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) };
-  const auth = { getSession: async () => ({ data: { session: { user: { id: actor } } } }), onAuthStateChange: fn => { listeners.add(fn); return { data: { subscription: { unsubscribe: () => listeners.delete(fn) } } }; } };
+  const emitSession = next => { session = next ? { user: { id: next } } : null; listeners.forEach(fn => fn(next ? 'SIGNED_IN' : 'SIGNED_OUT', session)); };
+  const auth = { getSession: () => options.sessionRead || Promise.resolve({ data: { session } }), onAuthStateChange: fn => { listeners.add(fn); return { data: { subscription: { unsubscribe: () => listeners.delete(fn) } } }; },
+    async signOut() { signOutCalls.push(true); const result = options.signOut ? await options.signOut() : { error: null }; if (!result.error) emitSession(null); return result; }
+  };
+  const browserAuth = { createBrowserSupabaseClient: () => ({ auth }), getSupabaseAccessToken: async () => 'synthetic-test-session', clearQrGuitarSessionState: () => { clearSessionCalls++; } };
   class BrowserURL extends URL { static createObjectURL(blob) { downloads.push(blob); return 'blob:isolated-backup'; } static revokeObjectURL() {} }
-  const view = loader({ react: hooks, '../lib/supabase-browser': { createBrowserSupabaseClient: () => ({ auth }), getSupabaseAccessToken: async () => 'synthetic-test-session' }, 'next/link': { __esModule: true, default: 'a' } }, {
+  const view = loader({ react: hooks, '../lib/supabase-browser': browserAuth, './supabase-browser': browserAuth, 'next/link': { __esModule: true, default: 'a' }, 'next/navigation': { useRouter: () => router } }, {
     window: { sessionStorage: browserStorage, setTimeout, clearTimeout, location: { origin: 'https://isolated.invalid' } }, URL: BrowserURL, crypto: { randomUUID },
     document: { createElement: () => ({ click() {} }) },
     fetch: async (url, init) => { calls.push({ url, method: init.method, body: init.body }); if (fetchOverride) return fetchOverride(url, init);
@@ -117,8 +123,8 @@ function uiFixture(storage = new Map(), fetchOverride) {
     button(label) { const button = nodes(tree).find(node => node.type === 'button' && text(node).trim() === label); assert.ok(button, 'Expected button ' + label); return button; },
     async click(label) { const button = fixture.button(label); assert.ok(!button.props.disabled, label + ' must be enabled'); button.props.onClick(); fixture.render(); await fixture.flush(); },
     confirm() { const checkbox = nodes(tree).find(node => node.type === 'input' && node.props.type === 'checkbox'); assert.ok(checkbox && !checkbox.props.disabled); checkbox.props.onChange({ target: { checked: true } }); fixture.render(); },
-    emit(next) { listeners.forEach(fn => fn(next ? 'SIGNED_IN' : 'SIGNED_OUT', next ? { user: { id: next } } : null)); fixture.render(); },
-    dispose() { mounted = false; slots.forEach(slot => slot.cleanup?.()); }, downloads, calls, lateWrites: () => lateWrites
+    emit(next) { emitSession(next); fixture.render(); },
+    dispose() { mounted = false; slots.forEach(slot => slot.cleanup?.()); }, downloads, calls, redirects, signOutCalls, clearSessionCalls: () => clearSessionCalls, lateWrites: () => lateWrites
   };
   fixture.render(); return fixture;
 }
@@ -228,19 +234,70 @@ try {
     loseResponse = true; await ui.click('Publish only this introduction'); const original = ui.calls.find(call => call.method === 'POST').body;
     assert.equal(ui.button('Review saved introduction').props.disabled, true); ui.dispose(); const before = await snapshot();
     const reloaded = uiFixture(storage); await reloaded.flush(); await reloaded.click('Retry the same request');
-    assert.equal(reloaded.calls[0].body, original); assert.deepEqual(await snapshot(), before); assert.ok(reloaded.button('Review rollback')); reloaded.dispose();
+    assert.equal(reloaded.calls.find(call => call.method === 'POST').body, original); assert.deepEqual(await snapshot(), before); assert.ok(reloaded.button('Review rollback')); reloaded.dispose();
   });
   await test('Auth invalidation clears the real review and ignores a late request without writes', async () => {
     let finish; const waiting = new Promise(resolve => { finish = resolve; });
     const p = (await get()).body.preflight;
-    const ui = uiFixture(new Map(), () => waiting); await ui.flush();
+    let requests = 0;
+    const ui = uiFixture(new Map(), (url, init) => ++requests === 1 ? route.GET(new Request('https://isolated.invalid' + url, init)) : waiting); await ui.flush();
     ui.button('Review saved introduction').props.onClick(); ui.render(); await ui.flush(); ui.emit(null);
     finish(new Response(JSON.stringify({ ok: true, preflight: p }), { status: 200 })); await ui.flush();
     assert.match(ui.text(), /Sign in/); assert.equal(ui.all().some(node => node.type === 'button' && text(node).includes('Publish only')), false); assert.equal(writes, 0); ui.dispose(); assert.equal(ui.lateWrites(), 0);
   });
   await test('the correction page is private and does not mount normal editor autosave', async () => {
     const page = fs.readFileSync(path.join(repo, 'apps/web/app/site-editor/recovery-copy/page.tsx'), 'utf8');
-    assert.match(page, /index: false/); assert.match(page, /RecoveryCopyCorrection/); assert.doesNotMatch(page, /SiteEditorPage|save_draft/);
+    assert.match(page, /index: false/); assert.match(page, /RecoveryCopyCorrection/); assert.doesNotMatch(page, /SiteEditorPage|save_draft|<Nav|<Footer/);
+  });
+  await test('unsettled browser Auth does not redirect or expose recovery instructions before local session resolves', async () => {
+    let resolve; const sessionRead = new Promise(done => { resolve = done; });
+    const ui = uiFixture(new Map(), undefined, { sessionRead }); await ui.flush();
+    assert.match(ui.text(), /Checking admin access/); assert.doesNotMatch(ui.text(), /Password-reset introduction|Content recovery|shared draft/); assert.equal(ui.calls.length, 0); assert.deepEqual(ui.redirects, []);
+    resolve({ data: { session: { user: { id: actor } } } }); await ui.flush();
+    assert.ok(ui.button('Review saved introduction')); assert.deepEqual(ui.redirects, []); assert.equal(ui.calls.length, 1); assert.equal(writes, 0); ui.dispose();
+  });
+  await test('settled signed-out state redirects to the fixed normal login return destination without technical content', async () => {
+    const ui = uiFixture(new Map(), undefined, { session: null }); await ui.flush();
+    assert.deepEqual(ui.redirects, ['/login?next=%2Fsite-editor%2Frecovery-copy']); assert.equal(ui.calls.length, 0);
+    assert.match(ui.text(), /Sign in to continue/); assert.doesNotMatch(ui.text(), /Password-reset introduction|Content recovery|raw backup|shared draft|Currently saved/); ui.dispose();
+  });
+  await test('signed-in non-admin sees only minimal denial after server authorization rejects access', async () => {
+    denied = 403; const ui = uiFixture(); await ui.flush();
+    assert.match(ui.text(), /Admin access required/); assert.match(ui.text(), /Return to dashboard/); assert.deepEqual(ui.redirects, []);
+    assert.doesNotMatch(ui.text(), /Password-reset introduction|Content recovery|raw backup|shared draft/); assert.equal(ui.all().some(node => node.type === 'button'), false); assert.equal(writes, 0); ui.dispose();
+  });
+  await test('cached expired actor plus API 401 remains gated without bouncing through login', async () => {
+    denied = 401; const ui = uiFixture(); await ui.flush();
+    assert.match(ui.text(), /Your session expired/); assert.ok(ui.button('Sign out and sign in again')); assert.deepEqual(ui.redirects, []); assert.equal(ui.signOutCalls.length, 0);
+    assert.doesNotMatch(ui.text(), /Password-reset introduction|Content recovery|raw backup|Currently saved/); assert.equal(writes, 0); ui.dispose();
+  });
+  await test('expired-session action uses ordinary sign-out, waits while pending and then preserves the fixed login return', async () => {
+    denied = 401; let finish; const waiting = new Promise(resolve => { finish = resolve; });
+    const ui = uiFixture(new Map(), undefined, { signOut: () => waiting }); await ui.flush();
+    ui.button('Sign out and sign in again').props.onClick(); ui.render(); await ui.flush();
+    assert.equal(ui.button('Signing out…').props.disabled, true); assert.equal(ui.signOutCalls.length, 1); assert.deepEqual(ui.redirects, []);
+    finish({ error: null }); await ui.flush();
+    assert.ok(ui.redirects.length > 0); assert.ok(ui.redirects.every(url => url === '/login?next=%2Fsite-editor%2Frecovery-copy')); assert.equal(ui.clearSessionCalls(), 1); assert.match(ui.text(), /Sign in to continue/); assert.equal(writes, 0); ui.dispose();
+  });
+  await test('failed normal sign-out keeps expired access gated with retry feedback and no login redirect', async () => {
+    denied = 401; const ui = uiFixture(new Map(), undefined, { signOut: async () => ({ error: Error('Synthetic sign-out failure') }) }); await ui.flush(); await ui.click('Sign out and sign in again');
+    assert.match(ui.text(), /Your session expired/); assert.match(ui.text(), /Could not sign out\. Please try again\./); assert.equal(ui.button('Sign out and sign in again').props.disabled, false);
+    assert.deepEqual(ui.redirects, []); assert.equal(ui.clearSessionCalls(), 0); assert.equal(ui.signOutCalls.length, 1); assert.equal(writes, 0); ui.dispose();
+  });
+  await test('temporary access failure stays distinct from logout and can retry the normal authorized read', async () => {
+    let fail = true; const ui = uiFixture(new Map(), (url, init) => fail ? Promise.reject(Error('Synthetic read outage')) : route.GET(new Request('https://isolated.invalid' + url, init)));
+    await ui.flush(); assert.match(ui.text(), /Admin workspace unavailable/); assert.deepEqual(ui.redirects, []); assert.doesNotMatch(ui.text(), /Password-reset introduction|raw backup/);
+    fail = false; await ui.click('Retry access check'); assert.ok(ui.button('Review saved introduction')); assert.equal(writes, 0); ui.dispose();
+  });
+  await test('server access revocation clears an already-loaded review instead of leaving technical admin controls visible', async () => {
+    const ui = uiFixture(); await ui.flush(); await ui.click('Review saved introduction'); assert.ok(ui.button('Download raw backup'));
+    denied = 403; await ui.click('Review saved introduction');
+    assert.match(ui.text(), /Admin access required/); assert.doesNotMatch(ui.text(), /Password-reset introduction|Content recovery|raw backup|Publish only/); assert.equal(writes, 0); ui.dispose();
+  });
+  await test('actor changes hide the previous workspace immediately while the new account is checked', async () => {
+    const ui = uiFixture(); await ui.flush(); await ui.click('Review saved introduction');
+    denied = 403; ui.emit(other); assert.match(ui.text(), /Checking admin access/); assert.doesNotMatch(ui.text(), /Password-reset introduction|raw backup/);
+    await ui.flush(); assert.match(ui.text(), /Admin access required/); assert.equal(writes, 0); ui.dispose();
   });
   console.log(`\n${passes} focused recovery-copy checks passed against production functions and disposable PostgreSQL semantics. No live requests.`);
 } finally { await db.close(); }

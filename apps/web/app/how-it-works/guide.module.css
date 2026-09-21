@@ -20,6 +20,7 @@
 .guide :global(.product-guide-capability-grid article) { padding:0; border:0; background:transparent; }.guide :global(.product-guide-capability-grid article > span) { margin:0 0 12px; background:transparent; color:var(--muted); border:0; }
 .guide :global(.product-guide-split),.guide :global(.product-guide-faq-inner) { display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); gap:64px; }
 .guide :global(.product-guide-visibility) { display:grid; gap:20px; }.guide :global(.product-guide-visibility > div) { border:0; padding:0; background:transparent; }
+.serialCaveat { grid-column:2; display:block; margin-top:8px; color:var(--muted); font-size:14px; line-height:1.5; }
 .guide :global(.product-guide-ownership-list) { gap:24px; }.guide :global(.product-guide-ownership-list article) { border:0; padding:0; background:transparent; }
 .guide :global(.product-guide-faq-list) { display:grid; gap:8px; }.guide :global(.product-guide-faq-list details) { background:var(--surface); border:0; border-radius:8px; padding:0 20px; }.guide :global(.product-guide-faq-list summary) { min-height:52px; padding:16px 0; font-size:16px; line-height:1.4; font-weight:550; }.guide :global(.product-guide-faq-list p) { font-size:15px; line-height:1.7; padding-bottom:20px; }
 .guide :global(.product-guide-cta-inner) { padding:24px; border:0; border-radius:12px; background:var(--surface); }

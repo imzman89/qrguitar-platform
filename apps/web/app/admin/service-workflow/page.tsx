@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, FileLock2, Search, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Footer } from "../../../components/Footer";
+import { AdminWorkspaceGate } from "../../../components/AdminWorkspaceGate";
 import { Nav } from "../../../components/Nav";
 import { createBrowserSupabaseClient } from "../../../lib/supabase-browser";
 import styles from "./service-operations.module.css";
@@ -57,6 +58,10 @@ function formatDate(value?: string) {
 }
 
 export default function AdminServiceWorkflowPage() {
+  return <AdminWorkspaceGate returnPath="/admin/service-workflow"><ServiceWorkflowWorkspace /></AdminWorkspaceGate>;
+}
+
+function ServiceWorkflowWorkspace() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [search, setSearch] = useState("");
@@ -178,7 +183,7 @@ export default function AdminServiceWorkflowPage() {
         <Link className="text-link service-back" href="/admin"><ArrowLeft size={16} /> Back to Admin</Link>
         <header className="admin-service-hero">
           <div><div className="eyebrow">Admin service operations</div><h1>Providers and submissions.</h1><p>Review provider status, private evidence metadata, notification state, and the audit trail without approving on an owner&apos;s behalf.</p></div>
-          <div className="admin-service-counts"><span><strong>{phase === "ready" ? providers.length : "—"}</strong> providers</span><span><strong>{phase === "ready" ? submissions.length : "—"}</strong> submissions</span></div>
+          <div className="admin-service-counts"><span><strong>{phase === "ready" ? providers.length : "—"}</strong> {providers.length === 1 ? "provider" : "providers"}</span><span><strong>{phase === "ready" ? submissions.length : "—"}</strong> {submissions.length === 1 ? "submission" : "submissions"}</span></div>
         </header>
         {phase === "ready" ? <div className="admin-service-filters">
           <label><Search size={15} /><input aria-label="Search providers and submissions" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search provider, Profile, or work" /></label>
