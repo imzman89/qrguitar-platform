@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -8,7 +9,7 @@ import { createMemoryDatabase, loadRoutes } from "./security/mock-routes.mjs";
 
 const web = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repo = path.resolve(web, "../..");
-const require = createRequire(path.join(web, "package.json"));
+const require = withUiTextTestContext(createRequire(path.join(web, "package.json")));
 const ts = require("typescript");
 const ID = "11111111-1111-4111-8111-111111111111";
 const ADMIN = "22222222-2222-4222-8222-222222222222";

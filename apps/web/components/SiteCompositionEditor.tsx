@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "./UiTextProvider";
+
 
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { ArrowDown, ArrowUp, ChevronDown, Copy, Eye, EyeOff, GripVertical, Plus, RotateCcw, Trash2 } from "lucide-react";
@@ -44,6 +46,7 @@ function controlId(path: string) {
 }
 
 export function SiteCompositionEditor({ pageKey, sections, errors = {}, onChange }: Props) {
+  const ui = useUiText("components.SiteCompositionEditor");
   const defaults = defaultEditorialComposition[pageKey].sections;
   const [openSectionId, setOpenSectionId] = useState(sections[0]?.id || "");
   const [focusedBlockId, setFocusedBlockId] = useState(sections[0]?.blocks[0]?.id || "");
@@ -189,12 +192,12 @@ export function SiteCompositionEditor({ pageKey, sections, errors = {}, onChange
   }
 
   return (
-    <section className="cms-field-group cms-composition-editor" aria-label={`${editorialPageLabels[pageKey]} section arrangement`}>
+    <section className="cms-field-group cms-composition-editor" aria-label={ui("ui.components.SiteCompositionEditor.4904a0d50cf7", "{{value1}} section arrangement", { value1: editorialPageLabels[pageKey] })}>
       <header>
-        <div><span>Page sections</span><h2>Arrange {editorialPageLabels[pageKey]}</h2></div>
-        <span>{sections.length} sections</span>
+        <div><span>{ui("ui.components.SiteCompositionEditor.783dc516d32b", "Page sections")}</span><h2>{ui("ui.components.SiteCompositionEditor.d557a972ab06", "Arrange")}{" "}{editorialPageLabels[pageKey]}</h2></div>
+        <span>{sections.length}{" "}{ui("ui.components.SiteCompositionEditor.4697ef322d1b", "sections")}</span>
       </header>
-      <p className="cms-section-intro">Choose a section to manage its content. Drag to reorder, or use the arrow controls for precise placement.</p>
+      <p className="cms-section-intro">{ui("ui.components.SiteCompositionEditor.bdb7f34c2678", "Choose a section to manage its content. Drag to reorder, or use the arrow controls for precise placement.")}</p>
       <div className="cms-section-stack">
         {sections.map((section, sectionIndex) => {
           const isOpen = section.id === openSectionId;
@@ -219,8 +222,8 @@ export function SiteCompositionEditor({ pageKey, sections, errors = {}, onChange
                 className="cms-section-drag-handle"
                 draggable={!section.locked}
                 disabled={section.locked}
-                aria-label={`Drag ${section.name || "unnamed section"} to reorder`}
-                title={section.locked ? "This section stays in its required position." : "Drag to reorder. Use the arrow keys or move buttons for keyboard control."}
+                aria-label={ui("ui.components.SiteCompositionEditor.a3405724636d", "Drag {{value1}} to reorder", { value1: section.name || "unnamed section" })}
+                title={section.locked ? ui("ui.components.SiteCompositionEditor.68857f555f0c", "This section stays in its required position.") : ui("ui.components.SiteCompositionEditor.ccd456181b42", "Drag to reorder. Use the arrow keys or move buttons for keyboard control.")}
                 onDragStart={(event) => beginDrag(event, section.id)}
                 onDragEnd={() => { drag.current = null; }}
                 onKeyDown={(event) => moveSectionWithKeyboard(event, sectionIndex)}
@@ -236,22 +239,20 @@ export function SiteCompositionEditor({ pageKey, sections, errors = {}, onChange
                   if (!focusedBlockId && section.blocks[0]) setFocusedBlockId(section.blocks[0].id);
                 }}
               >
-                <span><strong>{section.name || "Unnamed section"}</strong><small>{section.blocks.length ? `${section.blocks.length} content ${section.blocks.length === 1 ? "item" : "items"}` : "Page copy and layout"}</small></span>
-                <span className={section.visible ? "cms-visibility is-visible" : "cms-visibility"}>{section.visible ? "Shown" : "Hidden"}</span>
+                <span><strong>{section.name || ui("ui.components.SiteCompositionEditor.93e9f40bff0d", "Unnamed section")}</strong><small>{section.blocks.length ? ui("ui.components.SiteCompositionEditor.ee38dfaf5c5f", "{{value1}} content {{value2}}", { value1: section.blocks.length, value2: section.blocks.length === 1 ? "item" : "items" }) : ui("ui.components.SiteCompositionEditor.74de83b70ea6", "Page copy and layout")}</small></span>
+                <span className={section.visible ? "cms-visibility is-visible" : "cms-visibility"}>{section.visible ? ui("ui.components.SiteCompositionEditor.6ba2a0e0afd0", "Shown") : ui("ui.components.SiteCompositionEditor.7e6fefff0f0a", "Hidden")}</span>
                 <ChevronDown className={isOpen ? "is-open" : ""} size={17} />
               </button>
               <div className="cms-order-actions">
-                <button type="button" aria-label={`Move ${section.name} up`} disabled={section.locked || sectionIndex === 0 || sections[sectionIndex - 1]?.locked} onClick={() => reorderSection(sectionIndex, sectionIndex - 1)}><ArrowUp size={15} /></button>
-                <button type="button" aria-label={`Move ${section.name} down`} disabled={section.locked || sectionIndex === sections.length - 1 || sections[sectionIndex + 1]?.locked} onClick={() => reorderSection(sectionIndex, sectionIndex + 1)}><ArrowDown size={15} /></button>
-                <button type="button" className="cms-icon-text-control" disabled={section.locked} onClick={() => updateSection(sectionIndex, { visible: !section.visible })}>{section.visible ? <EyeOff size={14} /> : <Eye size={14} />}{section.locked ? "Required" : section.visible ? "Hide" : "Show"}</button>
-                <button type="button" aria-label={`Reset ${section.name}`} onClick={() => resetSection(sectionIndex)}><RotateCcw size={15} /></button>
+                <button type="button" aria-label={ui("ui.components.SiteCompositionEditor.740ebe32a73f", "Move {{value1}} up", { value1: section.name })} disabled={section.locked || sectionIndex === 0 || sections[sectionIndex - 1]?.locked} onClick={() => reorderSection(sectionIndex, sectionIndex - 1)}><ArrowUp size={15} /></button>
+                <button type="button" aria-label={ui("ui.components.SiteCompositionEditor.a1ae739bcef6", "Move {{value1}} down", { value1: section.name })} disabled={section.locked || sectionIndex === sections.length - 1 || sections[sectionIndex + 1]?.locked} onClick={() => reorderSection(sectionIndex, sectionIndex + 1)}><ArrowDown size={15} /></button>
+                <button type="button" className="cms-icon-text-control" disabled={section.locked} onClick={() => updateSection(sectionIndex, { visible: !section.visible })}>{section.visible ? <EyeOff size={14} /> : <Eye size={14} />}{section.locked ? ui("ui.components.SiteCompositionEditor.4850b174b713", "Required") : section.visible ? ui("ui.components.SiteCompositionEditor.ac20a57bfde0", "Hide") : ui("ui.components.SiteCompositionEditor.0df6f1cad36c", "Show")}</button>
+                <button type="button" aria-label={ui("ui.components.SiteCompositionEditor.aeb976353a17", "Reset {{value1}}", { value1: section.name })} onClick={() => resetSection(sectionIndex)}><RotateCcw size={15} /></button>
               </div>
             </div>
 
             {isOpen ? <div className="cms-section-fields">
-              <label className={sectionNameError ? "has-error" : ""} htmlFor={`composition-${pageKey}-${section.id}-name`}>
-                Section name
-                <input
+              <label className={sectionNameError ? "has-error" : ""} htmlFor={`composition-${pageKey}-${section.id}-name`}>{ui("ui.components.SiteCompositionEditor.7c0faddce9a7", "Section name")}<input
                   id={`composition-${pageKey}-${section.id}-name`}
                   value={section.name}
                   maxLength={100}
@@ -266,7 +267,7 @@ export function SiteCompositionEditor({ pageKey, sections, errors = {}, onChange
 
             {isOpen && section.blocks.length ? (
               <div className="cms-block-focus-layout">
-                <div className="cms-block-list" role="list" aria-label={`${section.name} content items`}>
+                <div className="cms-block-list" role="list" aria-label={ui("ui.components.SiteCompositionEditor.f6514d2b3986", "{{value1}} content items", { value1: section.name })}>
                   {section.blocks.map((block, blockIndex) => (
                   <button
                     type="button"
@@ -281,61 +282,51 @@ export function SiteCompositionEditor({ pageKey, sections, errors = {}, onChange
                     onClick={() => setFocusedBlockId(block.id)}
                   >
                     <GripVertical size={15} aria-hidden="true" />
-                    <span><strong>{block.name || "Unnamed item"}</strong><small>{block.title || "Untitled"}</small></span>
-                    <em>{block.visible ? "Shown" : "Hidden"}</em>
+                    <span><strong>{block.name || ui("ui.components.SiteCompositionEditor.c014c64b338c", "Unnamed item")}</strong><small>{block.title || ui("ui.components.SiteCompositionEditor.f59ab8d1331b", "Untitled")}</small></span>
+                    <em>{block.visible ? ui("ui.components.SiteCompositionEditor.6ba2a0e0afd0", "Shown") : ui("ui.components.SiteCompositionEditor.7e6fefff0f0a", "Hidden")}</em>
                   </button>
                 ))}
-                  <button type="button" className="cms-add-block" disabled={section.blocks.length >= 12} onClick={() => addBlock(sectionIndex)}><Plus size={15} /> Add item</button>
+                  <button type="button" className="cms-add-block" disabled={section.blocks.length >= 12} onClick={() => addBlock(sectionIndex)}><Plus size={15} />{" "}{ui("ui.components.SiteCompositionEditor.d1a0b329a72b", "Add item")}</button>
                 </div>
                 {focusedBlock ? (
-                  <section className="cms-focused-block" aria-label={`Edit ${focusedBlock.name || "unnamed item"}`}>
-                    <header><div><span>Selected item</span><h3>{focusedBlock.name || "Unnamed item"}</h3></div><span className={focusedBlock.visible ? "cms-visibility is-visible" : "cms-visibility"}>{focusedBlock.visible ? "Shown" : "Hidden"}</span></header>
+                  <section className="cms-focused-block" aria-label={ui("ui.components.SiteCompositionEditor.4f98de363fa7", "Edit {{value1}}", { value1: focusedBlock.name || "unnamed item" })}>
+                    <header><div><span>{ui("ui.components.SiteCompositionEditor.abb8fd53815a", "Selected item")}</span><h3>{focusedBlock.name || ui("ui.components.SiteCompositionEditor.c014c64b338c", "Unnamed item")}</h3></div><span className={focusedBlock.visible ? "cms-visibility is-visible" : "cms-visibility"}>{focusedBlock.visible ? ui("ui.components.SiteCompositionEditor.6ba2a0e0afd0", "Shown") : ui("ui.components.SiteCompositionEditor.7e6fefff0f0a", "Hidden")}</span></header>
                       <details className="cms-item-actions">
-                        <summary>Item actions</summary>
+                        <summary>{ui("ui.components.SiteCompositionEditor.a145120d719e", "Item actions")}</summary>
                       <div className="cms-block-actions">
-                        <button type="button" disabled={focusedBlockIndex === 0} onClick={() => reorderBlock(sectionIndex, focusedBlockIndex, focusedBlockIndex - 1)}><ArrowUp size={14} /> Move up</button>
-                        <button type="button" disabled={focusedBlockIndex === section.blocks.length - 1} onClick={() => reorderBlock(sectionIndex, focusedBlockIndex, focusedBlockIndex + 1)}><ArrowDown size={14} /> Move down</button>
-                        <button type="button" onClick={() => duplicateBlock(sectionIndex, focusedBlockIndex)}><Copy size={14} /> Duplicate</button>
-                        <button type="button" onClick={() => updateBlock(sectionIndex, focusedBlockIndex, { visible: !focusedBlock.visible })}>{focusedBlock.visible ? <EyeOff size={14} /> : <Eye size={14} />} {focusedBlock.visible ? "Hide" : "Show"}</button>
-                        <button type="button" className="is-danger" disabled={focusedBlock.protected || section.blocks.length <= 1} onClick={() => removeBlock(sectionIndex, focusedBlockIndex)}><Trash2 size={14} /> Remove</button>
+                        <button type="button" disabled={focusedBlockIndex === 0} onClick={() => reorderBlock(sectionIndex, focusedBlockIndex, focusedBlockIndex - 1)}><ArrowUp size={14} />{" "}{ui("ui.components.SiteCompositionEditor.c66feb5eb8f2", "Move up")}</button>
+                        <button type="button" disabled={focusedBlockIndex === section.blocks.length - 1} onClick={() => reorderBlock(sectionIndex, focusedBlockIndex, focusedBlockIndex + 1)}><ArrowDown size={14} />{" "}{ui("ui.components.SiteCompositionEditor.40bb50da160c", "Move down")}</button>
+                        <button type="button" onClick={() => duplicateBlock(sectionIndex, focusedBlockIndex)}><Copy size={14} />{" "}{ui("ui.components.SiteCompositionEditor.02cdaabfca80", "Duplicate")}</button>
+                        <button type="button" onClick={() => updateBlock(sectionIndex, focusedBlockIndex, { visible: !focusedBlock.visible })}>{focusedBlock.visible ? <EyeOff size={14} /> : <Eye size={14} />} {focusedBlock.visible ? ui("ui.components.SiteCompositionEditor.ac20a57bfde0", "Hide") : ui("ui.components.SiteCompositionEditor.0df6f1cad36c", "Show")}</button>
+                        <button type="button" className="is-danger" disabled={focusedBlock.protected || section.blocks.length <= 1} onClick={() => removeBlock(sectionIndex, focusedBlockIndex)}><Trash2 size={14} />{" "}{ui("ui.components.SiteCompositionEditor.c3812fc4acb8", "Remove")}</button>
                       </div>
                       </details>
                       <div className="cms-block-fields">
-                        <label className={focusedError("name") ? "has-error" : ""} htmlFor={controlId(`${focusedBlockPath}.name`)}>
-                          Item name
-                          <input id={controlId(`${focusedBlockPath}.name`)} value={focusedBlock.name} maxLength={80} aria-invalid={Boolean(focusedError("name"))} aria-describedby={focusedError("name") ? validationId(`${focusedBlockPath}.name`) : undefined} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { name: event.target.value })} />
+                        <label className={focusedError("name") ? "has-error" : ""} htmlFor={controlId(`${focusedBlockPath}.name`)}>{ui("ui.components.SiteCompositionEditor.70d5f430ca1e", "Item name")}<input id={controlId(`${focusedBlockPath}.name`)} value={focusedBlock.name} maxLength={80} aria-invalid={Boolean(focusedError("name"))} aria-describedby={focusedError("name") ? validationId(`${focusedBlockPath}.name`) : undefined} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { name: event.target.value })} />
                           {focusedError("name") ? <small id={validationId(`${focusedBlockPath}.name`)} className="cms-validation-error" role="alert">{focusedError("name")}</small> : null}
                         </label>
-                        <label className={focusedError("icon") ? "has-error" : ""} htmlFor={controlId(`${focusedBlockPath}.icon`)}>
-                          Approved icon
-                          <select id={controlId(`${focusedBlockPath}.icon`)} value={focusedBlock.icon || "help"} aria-invalid={Boolean(focusedError("icon"))} aria-describedby={focusedError("icon") ? validationId(`${focusedBlockPath}.icon`) : undefined} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { icon: event.target.value as EditorialBlock["icon"] })}>{editorialIconAllowlist.map((icon) => <option key={icon} value={icon}>{icon}</option>)}</select>
+                        <label className={focusedError("icon") ? "has-error" : ""} htmlFor={controlId(`${focusedBlockPath}.icon`)}>{ui("ui.components.SiteCompositionEditor.b5a829ad13ef", "Approved icon")}<select id={controlId(`${focusedBlockPath}.icon`)} value={focusedBlock.icon || "help"} aria-invalid={Boolean(focusedError("icon"))} aria-describedby={focusedError("icon") ? validationId(`${focusedBlockPath}.icon`) : undefined} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { icon: event.target.value as EditorialBlock["icon"] })}>{editorialIconAllowlist.map((icon) => <option key={icon} value={icon}>{icon}</option>)}</select>
                           {focusedError("icon") ? <small id={validationId(`${focusedBlockPath}.icon`)} className="cms-validation-error" role="alert">{focusedError("icon")}</small> : null}
                         </label>
-                        <label className={`is-wide${focusedError("title") ? " has-error" : ""}`} htmlFor={controlId(`${focusedBlockPath}.title`)}>
-                          Title
-                          <input id={controlId(`${focusedBlockPath}.title`)} value={focusedBlock.title} maxLength={160} aria-invalid={Boolean(focusedError("title"))} aria-describedby={focusedError("title") ? validationId(`${focusedBlockPath}.title`) : undefined} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { title: event.target.value })} />
+                        <label className={`is-wide${focusedError("title") ? " has-error" : ""}`} htmlFor={controlId(`${focusedBlockPath}.title`)}>{ui("ui.components.SiteCompositionEditor.7e8cd2056da7", "Title")}<input id={controlId(`${focusedBlockPath}.title`)} value={focusedBlock.title} maxLength={160} aria-invalid={Boolean(focusedError("title"))} aria-describedby={focusedError("title") ? validationId(`${focusedBlockPath}.title`) : undefined} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { title: event.target.value })} />
                           {focusedError("title") ? <small id={validationId(`${focusedBlockPath}.title`)} className="cms-validation-error" role="alert">{focusedError("title")}</small> : null}
                         </label>
-                        <label className={`is-wide${focusedError("body") ? " has-error" : ""}`} htmlFor={controlId(`${focusedBlockPath}.body`)}>
-                          Supporting copy
-                          <textarea id={controlId(`${focusedBlockPath}.body`)} value={focusedBlock.body} rows={4} maxLength={1000} aria-invalid={Boolean(focusedError("body"))} aria-describedby={focusedError("body") ? validationId(`${focusedBlockPath}.body`) : undefined} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { body: event.target.value })} />
+                        <label className={`is-wide${focusedError("body") ? " has-error" : ""}`} htmlFor={controlId(`${focusedBlockPath}.body`)}>{ui("ui.components.SiteCompositionEditor.f96e28614336", "Supporting copy")}<textarea id={controlId(`${focusedBlockPath}.body`)} value={focusedBlock.body} rows={4} maxLength={1000} aria-invalid={Boolean(focusedError("body"))} aria-describedby={focusedError("body") ? validationId(`${focusedBlockPath}.body`) : undefined} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { body: event.target.value })} />
                           {focusedError("body") ? <small id={validationId(`${focusedBlockPath}.body`)} className="cms-validation-error" role="alert">{focusedError("body")}</small> : null}
                         </label>
-                        {focusedBlock.label !== undefined ? <label className={focusedError("label") ? "has-error" : ""}>Label / price<input value={focusedBlock.label} maxLength={80} aria-invalid={Boolean(focusedError("label"))} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { label: event.target.value })} />{focusedError("label") ? <small className="cms-validation-error" role="alert">{focusedError("label")}</small> : null}</label> : null}
+                        {focusedBlock.label !== undefined ? <label className={focusedError("label") ? "has-error" : ""}>{ui("ui.components.SiteCompositionEditor.f21c1973ea84", "Label / price")}<input value={focusedBlock.label} maxLength={80} aria-invalid={Boolean(focusedError("label"))} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { label: event.target.value })} />{focusedError("label") ? <small className="cms-validation-error" role="alert">{focusedError("label")}</small> : null}</label> : null}
                         {focusedBlock.ctaLabel !== undefined || focusedBlock.ctaUrl !== undefined ? <>
-                          <label className={focusedError("ctaLabel") ? "has-error" : ""}>Button label<input value={focusedBlock.ctaLabel || ""} maxLength={80} aria-invalid={Boolean(focusedError("ctaLabel"))} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { ctaLabel: event.target.value })} />{focusedError("ctaLabel") ? <small className="cms-validation-error" role="alert">{focusedError("ctaLabel")}</small> : null}</label>
-                          <label className={focusedError("ctaUrl") ? "has-error" : ""} htmlFor={controlId(`${focusedBlockPath}.ctaUrl`)}>
-                            CTA URL
-                            <input id={controlId(`${focusedBlockPath}.ctaUrl`)} value={focusedBlock.ctaUrl || ""} maxLength={300} aria-invalid={Boolean(focusedError("ctaUrl"))} aria-describedby={focusedError("ctaUrl") ? validationId(`${focusedBlockPath}.ctaUrl`) : undefined} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { ctaUrl: event.target.value })} />
+                          <label className={focusedError("ctaLabel") ? "has-error" : ""}>{ui("ui.components.SiteCompositionEditor.57a9536e074b", "Button label")}<input value={focusedBlock.ctaLabel || ""} maxLength={80} aria-invalid={Boolean(focusedError("ctaLabel"))} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { ctaLabel: event.target.value })} />{focusedError("ctaLabel") ? <small className="cms-validation-error" role="alert">{focusedError("ctaLabel")}</small> : null}</label>
+                          <label className={focusedError("ctaUrl") ? "has-error" : ""} htmlFor={controlId(`${focusedBlockPath}.ctaUrl`)}>{ui("ui.components.SiteCompositionEditor.594d5f2b982b", "CTA URL")}<input id={controlId(`${focusedBlockPath}.ctaUrl`)} value={focusedBlock.ctaUrl || ""} maxLength={300} aria-invalid={Boolean(focusedError("ctaUrl"))} aria-describedby={focusedError("ctaUrl") ? validationId(`${focusedBlockPath}.ctaUrl`) : undefined} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { ctaUrl: event.target.value })} />
                             {focusedError("ctaUrl") ? <small id={validationId(`${focusedBlockPath}.ctaUrl`)} className="cms-validation-error" role="alert">{focusedError("ctaUrl")}</small> : null}
                           </label>
                         </> : null}
-                        {focusedBlock.items !== undefined ? <label className={`is-wide${focusedError("items") ? " has-error" : ""}`}>List items<textarea value={focusedBlock.items.join("\n")} rows={4} aria-invalid={Boolean(focusedError("items"))} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { items: event.target.value.split("\n").slice(0, 20) })} /><small className={focusedError("items") ? "cms-validation-error" : undefined}>{focusedError("items") || "One item per line."}</small></label> : null}
+                        {focusedBlock.items !== undefined ? <label className={`is-wide${focusedError("items") ? " has-error" : ""}`}>{ui("ui.components.SiteCompositionEditor.7fdd310bf84a", "List items")}<textarea value={focusedBlock.items.join("\n")} rows={4} aria-invalid={Boolean(focusedError("items"))} onChange={(event) => updateBlock(sectionIndex, focusedBlockIndex, { items: event.target.value.split("\n").slice(0, 20) })} /><small className={focusedError("items") ? "cms-validation-error" : undefined}>{focusedError("items") || ui("ui.components.SiteCompositionEditor.9b451cd0021d", "One item per line.")}</small></label> : null}
                       </div>
                   </section>
                 ) : null}
               </div>
-            ) : isOpen ? <p className="cms-section-empty">This section uses the page&apos;s approved layout and copy fields. {section.locked ? "This required section stays visible in its fixed position." : "You can still hide or reorder it."}</p> : null}
+            ) : isOpen ? <p className="cms-section-empty">{ui("ui.components.SiteCompositionEditor.57677897bcd3", "This section uses the page's approved layout and copy fields.")}{" "}{section.locked ? ui("ui.components.SiteCompositionEditor.27b448e5215c", "This required section stays visible in its fixed position.") : ui("ui.components.SiteCompositionEditor.5ce4a28799d5", "You can still hide or reorder it.")}</p> : null}
           </article>
         )})}
       </div>

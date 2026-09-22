@@ -1,3 +1,4 @@
+import { createUiText } from "./ui-text";
 export type WorkspaceType = "player" | "collector" | "shop" | "builder" | "luthier" | "other";
 export const WORKSPACE_OPTIONS: ReadonlyArray<{ value: WorkspaceType; label: string }> = [
   { value: "player", label: "Player / owner" },
@@ -25,7 +26,55 @@ const workspaces: Record<WorkspaceType, Workspace> = {
 };
 
 // Workspace preferences change navigation, never account permissions or verification.
-export function getWorkspace(value: unknown): Workspace {
+export function getWorkspace(value: unknown, content: Record<string, string> = {}): Workspace {
   const key = value === "brand" ? "builder" : String(value || "player");
-  return workspaces[Object.prototype.hasOwnProperty.call(workspaces, key) ? key as WorkspaceType : "player"];
+  const original = workspaces[Object.prototype.hasOwnProperty.call(workspaces, key) ? key as WorkspaceType : "player"];
+  if (!Object.keys(content).some((key) => key.startsWith("ui.workspace."))) return original;
+  const ui = createUiText(content, "workspace");
+  const text = (source: string) => ui(workspaceCopyKeys[source] || "", source);
+  return { ...original, label: text(original.label), title: text(original.title), description: text(original.description), actions: original.actions.map(action => ({ ...action, title: text(action.title), description: text(action.description) })) };
 }
+
+const workspaceCopyKeys: Record<string, string> = {
+  "Player / owner": "ui.workspace.faae0c421967",
+  "Collector": "ui.workspace.9d0081a4f3d6",
+  "Store / retailer": "ui.workspace.679ab74fd398",
+  "Builder / brand": "ui.workspace.106bdb72abe8",
+  "Luthier / repair shop / technician": "ui.workspace.ea10259a47b1",
+  "Other": "ui.workspace.f97e9da0e3b8",
+  "Share your collection": "ui.workspace.a5777b0f3289",
+  "Publish your public Profiles together under one link.": "ui.workspace.26aad0019e12",
+  "Connect your website": "ui.workspace.0d37e112bf12",
+  "Send visitors from your public collection and instrument Profiles to your own website.": "ui.workspace.9f43ad820b48",
+  "Service workbench": "ui.workspace.3f9b5c09e0a6",
+  "Resume saved work, respond to requested changes, and check owner review status.": "ui.workspace.596f15ac8441",
+  "Claim an instrument": "ui.workspace.d66a01126f70",
+  "Claim an instrument you acquired and check your submitted ownership claims.": "ui.workspace.6faf1a23e1e6",
+  "Transfer an instrument": "ui.workspace.cb786dc79eda",
+  "Choose one of your saved Profiles, then open Transfer to prepare its buyer handoff.": "ui.workspace.29dcf61286d4",
+  "Player workspace": "ui.workspace.ac29024c4ca2",
+  "Your instruments, in order.": "ui.workspace.28d82d75f61b",
+  "Keep photos, documents, service history, and ownership together for every instrument.": "ui.workspace.11c503369f69",
+  "Collector workspace": "ui.workspace.a9d6689acf2c",
+  "Keep the story with the instrument.": "ui.workspace.5c78caa4b190",
+  "Organize your collection, preserve its history, and prepare a clear ownership handoff.": "ui.workspace.b5efa61cb710",
+  "Store workspace": "ui.workspace.3d13b890ca59",
+  "Make every instrument buyer-ready.": "ui.workspace.8aa1276d62e7",
+  "Manage inventory Profiles, share your shop website, and handle ownership transfers from one place.": "ui.workspace.15aa16da501a",
+  "Import inventory": "ui.workspace.a1e4fd437a50",
+  "Prepare multiple instrument Profiles from a spreadsheet.": "ui.workspace.b59faa1dfe22",
+  "Builder / brand workspace": "ui.workspace.ee0dff790ddf",
+  "Give every build its own record.": "ui.workspace.ecdd24d6daca",
+  "Document new instruments, connect buyers to your website, and keep the record ready for its next owner.": "ui.workspace.c110fe1e6af2",
+  "Import your builds": "ui.workspace.da4ee2a6e6ca",
+  "Start Profiles for a batch of instruments from a spreadsheet.": "ui.workspace.e3fa8a500176",
+  "Service provider workspace": "ui.workspace.2f5a5daaecd3",
+  "Keep customer work moving.": "ui.workspace.9bd7ecf60866",
+  "Pick up saved drafts, respond to owner feedback, and document completed work without taking ownership.": "ui.workspace.93363fe59878",
+  "Provider network": "ui.workspace.e84ab388534a",
+  "Learn about applying to the manually reviewed provider network.": "ui.workspace.ddf0016f044b",
+  "Instrument workspace": "ui.workspace.5b8d6999d0e7",
+  "Manage your instrument Profiles, public collection, and ownership handoffs.": "ui.workspace.23160d470c3a"
+};
+
+export function workspaceOptionLabel(label: string, content: Record<string, string> = {}) { return createUiText(content, "workspace")(workspaceCopyKeys[label] || "", label); }

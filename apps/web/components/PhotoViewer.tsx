@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "./UiTextProvider";
+
 
 import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -17,6 +19,7 @@ type PhotoViewerProps = {
 
 /** Shared photo experience for Profile pages, cards, and the home showcase. */
 export function PhotoViewer({ images, initialIndex = 0, title, onClose, onImageError, onIndexChange }: PhotoViewerProps) {
+  const ui = useUiText("components.PhotoViewer");
   const [selectedSource, setSelectedSource] = useState(() => images[Math.max(0, Math.min(initialIndex, images.length - 1))]);
   const [failedSources, setFailedSources] = useState<string[]>([]);
   const [loadedSources, setLoadedSources] = useState<string[]>([]);
@@ -137,10 +140,10 @@ export function PhotoViewer({ images, initialIndex = 0, title, onClose, onImageE
           <span className={styles.counter} aria-live="polite" aria-atomic="true">{activeIndex + 1} / {photos.length}</span>
         </div>
         <div className={styles.actions}>
-          <button className={styles.control} type="button" onClick={toggleZoom} aria-label={zoomed ? "Zoom out" : "Zoom in"} aria-pressed={zoomed}>
+          <button className={styles.control} type="button" onClick={toggleZoom} aria-label={zoomed ? ui("ui.components.PhotoViewer.bc7b631a689b", "Zoom out") : ui("ui.components.PhotoViewer.0e47f09a748f", "Zoom in")} aria-pressed={zoomed}>
             {zoomed ? <ZoomOut size={21} /> : <ZoomIn size={21} />}
           </button>
-          <button className={styles.control} type="button" ref={closeRef} onClick={() => callbacksRef.current.onClose()} aria-label="Close photos">
+          <button className={styles.control} type="button" ref={closeRef} onClick={() => callbacksRef.current.onClose()} aria-label={ui("ui.components.PhotoViewer.a076bdea28fd", "Close photos")}>
             <X size={24} />
           </button>
         </div>
@@ -149,7 +152,7 @@ export function PhotoViewer({ images, initialIndex = 0, title, onClose, onImageE
         <button
           className={styles.imageButton + (zoomed ? " " + styles.zoomed : "")}
           type="button"
-          aria-label={zoomed ? "Zoom out of photo" : "Zoom into photo"}
+          aria-label={zoomed ? ui("ui.components.PhotoViewer.d45c880eede6", "Zoom out of photo") : ui("ui.components.PhotoViewer.405d6e9235bb", "Zoom into photo")}
           onClick={() => {
             if (suppressClickRef.current) { suppressClickRef.current = false; return; }
             toggleZoom();
@@ -208,13 +211,13 @@ export function PhotoViewer({ images, initialIndex = 0, title, onClose, onImageE
             onError={() => markImageFailed(activeSource)}
           /> : null}
         </button>
-        {activeSource && !loadedSources.includes(activeSource) ? <span className={styles.loading} role="status">Loading photo…</span> : null}
+        {activeSource && !loadedSources.includes(activeSource) ? <span className={styles.loading} role="status">{ui("ui.components.PhotoViewer.49fba41bc3d1", "Loading photo…")}</span> : null}
         {photos.length > 1 ? <>
-          <button className={styles.control + " " + styles.previous} type="button" onClick={() => movePhoto(-1)} aria-label="Previous photo"><ChevronLeft size={28} /></button>
-          <button className={styles.control + " " + styles.next} type="button" onClick={() => movePhoto(1)} aria-label="Next photo"><ChevronRight size={28} /></button>
+          <button className={styles.control + " " + styles.previous} type="button" onClick={() => movePhoto(-1)} aria-label={ui("ui.components.PhotoViewer.2f55863e032e", "Previous photo")}><ChevronLeft size={28} /></button>
+          <button className={styles.control + " " + styles.next} type="button" onClick={() => movePhoto(1)} aria-label={ui("ui.components.PhotoViewer.894bb2b7ac07", "Next photo")}><ChevronRight size={28} /></button>
         </> : null}
       </div>
-      {photos.length > 1 ? <div className={styles.filmstrip} ref={stripRef} aria-label="Choose a photograph">
+      {photos.length > 1 ? <div className={styles.filmstrip} ref={stripRef} aria-label={ui("ui.components.PhotoViewer.29afaa1f472b", "Choose a photograph")}>
         {photos.map((imageUrl, index) => <button
           className={styles.thumbnail}
           key={imageUrl}

@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -6,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const web = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const require = createRequire(path.join(web, "package.json")), ts = require("typescript");
+const require = withUiTextTestContext(createRequire(path.join(web, "package.json"))), ts = require("typescript");
 const module = { exports: {} };
 new Function("exports", "module", ts.transpileModule(fs.readFileSync(path.join(web, "lib/billing-client.ts"), "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText)(module.exports, module);
 const { createBillingClient, billingCheckoutUrl, billingOrderId } = module.exports;

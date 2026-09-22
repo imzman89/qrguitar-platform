@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "../../components/UiTextProvider";
+
 
 import Link from "next/link";
 import styles from "../../components/AuthForm.module.css";
@@ -27,6 +29,7 @@ async function readAuthSession(client: ReturnType<typeof createBrowserSupabaseCl
 }
 
 export default function LoginPage() {
+  const ui = useUiText("app.login.page");
   const content = useSiteContent();
   const sessionExpiredCopy = getContentValue(content, "login.sessionExpired");
   const router = useRouter();
@@ -248,15 +251,15 @@ export default function LoginPage() {
       <main className={styles.page}>
         <div className={styles.layout}>
           <header className={styles.heading}>
-            <div className="eyebrow">{isSignedIn ? "Account ready" : getContentValue(content, "login.hero.eyebrow")}</div>
-            <h1>{isSignedIn ? "Welcome back." : mode === "register" ? "Create your QRguitar account." : mode === "reset" ? "Reset your QRguitar password." : getContentValue(content, "login.hero.headline")}</h1>
+            <div className="eyebrow">{isSignedIn ? ui("ui.app.login.page.ff66ee6c3c61", "Account ready") : getContentValue(content, "login.hero.eyebrow")}</div>
+            <h1>{isSignedIn ? ui("ui.app.login.page.dfdbca16342f", "Welcome back.") : mode === "register" ? ui("ui.app.login.page.9e373b49e769", "Create your QRguitar account.") : mode === "reset" ? ui("ui.app.login.page.132b49a565d6", "Reset your QRguitar password.") : getContentValue(content, "login.hero.headline")}</h1>
             <p>
               {isSignedIn
-                ? "Your Profiles and owner tools are ready in the dashboard."
+                ? ui("ui.app.login.page.a97312811b00", "Your Profiles and owner tools are ready in the dashboard.")
                 : mode === "register"
-                ? "Create an account so your Profiles, QR links, photos, documents, and ownership tools stay tied to you."
+                ? ui("ui.app.login.page.67f8e71ebeaa", "Create an account so your Profiles, QR links, photos, documents, and ownership tools stay tied to you.")
                 : mode === "reset"
-                  ? "Enter your account email and QRguitar will send a secure password reset link."
+                  ? ui("ui.app.login.page.2fc495cd0ae7", "Enter your account email and QRguitar will send a secure password reset link.")
                 : getContentValue(content, "login.hero.body")}
             </p>
           </header>
@@ -265,23 +268,17 @@ export default function LoginPage() {
             {isSignedIn ? (
               <>
                 <div className="form-actions">
-                  <Link className="button" href="/dashboard">
-                    Open dashboard
-                  </Link>
-                  <Link className="button secondary" href="/account">Account settings</Link>
+                  <Link className="button" href="/dashboard">{ui("ui.app.login.page.803f2313cdf4", "Open dashboard")}</Link>
+                  <Link className="button secondary" href="/account">{ui("ui.app.login.page.a587aa1f4ffc", "Account settings")}</Link>
                 </div>
-                <button className="link-button auth-signout-link" type="button" onClick={logout} disabled={isWorking}>Sign out</button>
+                <button className="link-button auth-signout-link" type="button" onClick={logout} disabled={isWorking}>{ui("ui.app.login.page.48f0d3d397d4", "Sign out")}</button>
               </>
             ) : (
               <>
                 {mode !== "reset" ? (
-                  <div className={styles.modeSwitch} role="tablist" aria-label="Account access">
-                    <button ref={loginTabRef} id="auth-login-tab" className={mode === "login" ? styles.active : undefined} type="button" role="tab" aria-selected={mode === "login"} aria-controls="auth-access-panel" tabIndex={mode === "login" ? 0 : -1} disabled={isWorking} onClick={() => switchMode("login")} onKeyDown={(event) => handleTabKeyDown(event, "login")}>
-                      Sign in
-                    </button>
-                    <button ref={registerTabRef} id="auth-register-tab" className={mode === "register" ? styles.active : undefined} type="button" role="tab" aria-selected={mode === "register"} aria-controls="auth-access-panel" tabIndex={mode === "register" ? 0 : -1} disabled={isWorking} onClick={() => switchMode("register")} onKeyDown={(event) => handleTabKeyDown(event, "register")}>
-                      Create account
-                    </button>
+                  <div className={styles.modeSwitch} role="tablist" aria-label={ui("ui.app.login.page.3386f588f0c2", "Account access")}>
+                    <button ref={loginTabRef} id="auth-login-tab" className={mode === "login" ? styles.active : undefined} type="button" role="tab" aria-selected={mode === "login"} aria-controls="auth-access-panel" tabIndex={mode === "login" ? 0 : -1} disabled={isWorking} onClick={() => switchMode("login")} onKeyDown={(event) => handleTabKeyDown(event, "login")}>{ui("ui.app.login.page.bfd402b2f6f3", "Sign in")}</button>
+                    <button ref={registerTabRef} id="auth-register-tab" className={mode === "register" ? styles.active : undefined} type="button" role="tab" aria-selected={mode === "register"} aria-controls="auth-access-panel" tabIndex={mode === "register" ? 0 : -1} disabled={isWorking} onClick={() => switchMode("register")} onKeyDown={(event) => handleTabKeyDown(event, "register")}>{ui("ui.app.login.page.798ca2ce18bf", "Create account")}</button>
                   </div>
                 ) : null}
 
@@ -290,38 +287,38 @@ export default function LoginPage() {
                 <form onSubmit={(event) => { event.preventDefault(); void submitAccountAction(); }} aria-busy={isWorking}>
                 {mode === "register" ? (
                   <div className="field">
-                    <label htmlFor="name">Display name</label>
-                    <input id="name" name="name" autoComplete="nickname" required value={name} onChange={(event) => setName(event.target.value)} placeholder="Owner, builder, or shop name" />
+                    <label htmlFor="name">{ui("ui.app.login.page.2b7f6a84de91", "Display name")}</label>
+                    <input id="name" name="name" autoComplete="nickname" required value={name} onChange={(event) => setName(event.target.value)} placeholder={ui("ui.app.login.page.d4b8227dbd30", "Owner, builder, or shop name")} />
                   </div>
                 ) : null}
 
                 <div className="field">
-                  <label htmlFor="email">Email</label>
-                  <input id="email" name="email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder="you@example.com" />
+                  <label htmlFor="email">{ui("ui.app.login.page.969ccbd3cf63", "Email")}</label>
+                  <input id="email" name="email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder={ui("ui.app.login.page.53e6cdc30765", "you@example.com")} />
                 </div>
 
                 {mode !== "reset" ? (
                   <div className="field">
-                    <label htmlFor="password">Password</label>
-                    <input id="password" name="password" type="password" required minLength={mode === "register" ? 8 : undefined} aria-describedby={mode === "register" ? "password-hint" : undefined} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "register" ? "new-password" : "current-password"} placeholder={mode === "register" ? "Create a password" : "Enter your password"} />
-                    {mode === "register" ? <p className="fine-print" id="password-hint">Use at least 8 characters.</p> : null}
+                    <label htmlFor="password">{ui("ui.app.login.page.e7cf3ef4f17c", "Password")}</label>
+                    <input id="password" name="password" type="password" required minLength={mode === "register" ? 8 : undefined} aria-describedby={mode === "register" ? "password-hint" : undefined} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "register" ? "new-password" : "current-password"} placeholder={mode === "register" ? ui("ui.app.login.page.4defceba0862", "Create a password") : ui("ui.app.login.page.c06bf9670174", "Enter your password")} />
+                    {mode === "register" ? <p className="fine-print" id="password-hint">{ui("ui.app.login.page.9b15ce9e25e9", "Use at least 8 characters.")}</p> : null}
                   </div>
                 ) : null}
 
                 <div className="form-actions">
                   {mode === "login" ? (
                     <button className="button" type="submit" disabled={isWorking}>
-                      {isWorking ? "Signing in..." : getContentValue(content, "login.actions.submit")}
+                      {isWorking ? ui("ui.app.login.page.1f96f5d016bd", "Signing in...") : getContentValue(content, "login.actions.submit")}
                     </button>
                   ) : null}
                   {mode === "register" ? (
                     <button className="button" type="submit" disabled={isWorking}>
-                      {isWorking ? "Creating account..." : getContentValue(content, "login.actions.create")}
+                      {isWorking ? ui("ui.app.login.page.7dd3701aa3f1", "Creating account...") : getContentValue(content, "login.actions.create")}
                     </button>
                   ) : null}
                   {mode === "reset" ? (
                     <button className="button" type="submit" disabled={isWorking}>
-                      {isWorking ? "Sending..." : "Send reset link"}
+                      {isWorking ? ui("ui.app.login.page.286a3af7348e", "Sending...") : ui("ui.app.login.page.708c5d67ba8e", "Send reset link")}
                     </button>
                   ) : null}
                 </div>
@@ -335,7 +332,7 @@ export default function LoginPage() {
                     </button>
                   ) : null}
                   {mode === "reset" ? (
-                    <button className="link-button" type="button" disabled={isWorking} onClick={() => switchMode("login")}>Back to sign in</button>
+                    <button className="link-button" type="button" disabled={isWorking} onClick={() => switchMode("login")}>{ui("ui.app.login.page.71fe31ccd37c", "Back to sign in")}</button>
                   ) : null}
                 </div>
               </>
@@ -343,7 +340,7 @@ export default function LoginPage() {
 
             {status ? <p className="form-message" role="status" aria-live="polite">{status}</p> : null}
             <p className="fine-print">
-              <Link href="/">Back to homepage</Link>
+              <Link href="/">{ui("ui.app.login.page.cb35f7332137", "Back to homepage")}</Link>
             </p>
           </section>
         </div>

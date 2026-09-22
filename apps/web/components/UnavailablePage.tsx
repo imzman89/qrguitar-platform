@@ -1,3 +1,6 @@
+
+"use client";
+import { useUiText } from "./UiTextProvider";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BrandLogo } from "./BrandLogo";
@@ -12,15 +15,16 @@ type UnavailablePageProps = {
 
 /** A self-contained recovery screen: no account or content requests are needed. */
 export function UnavailablePage({ title, description, children, alert = false }: UnavailablePageProps) {
+  const ui = useUiText("components.UnavailablePage");
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <Link className={styles.brand} href="/" aria-label="QRguitar homepage">
+        <Link className={styles.brand} href="/" aria-label={ui("ui.components.UnavailablePage.33b14c935c51", "QRguitar homepage")}>
           <BrandLogo className={styles.logo} />
         </Link>
-        <nav className={styles.navigation} aria-label="Site navigation">
-          <Link href="/catalog">Catalog</Link>
-          <Link href="/collections">Collections</Link>
+        <nav className={styles.navigation} aria-label={ui("ui.components.UnavailablePage.7b06d0dd6977", "Site navigation")}>
+          <Link href="/catalog">{ui("ui.components.UnavailablePage.3877d14889a9", "Catalog")}</Link>
+          <Link href="/collections">{ui("ui.components.UnavailablePage.9f9feade761d", "Collections")}</Link>
         </nav>
       </header>
       <main className={styles.main}>

@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "./UiTextProvider";
+
 
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
@@ -7,6 +9,7 @@ import { beginQrRender, qrRenderOptions } from "../lib/qr-output";
 import { FallbackImage } from "./FallbackImage";
 
 export function CompactQr({ code, label }: { code: string; label: string }) {
+  const ui = useUiText("components.CompactQr");
   const [rendered, setRendered] = useState({ code: "", url: "", error: "" });
   const source = rendered.code === code ? rendered.url : "";
 
@@ -23,14 +26,14 @@ export function CompactQr({ code, label }: { code: string; label: string }) {
   return source ? (
     <FallbackImage
       src={source}
-      alt={`QR code for ${label}`}
+      alt={ui("ui.components.CompactQr.817fa9875e3c", "QR code for {{value1}}", { value1: label })}
       width={240}
       height={240}
       loading="lazy"
       fetchPriority="low"
       decoding="async"
       referrerPolicy="no-referrer"
-      fallback={<span aria-label="QR preview unavailable; use the Profile link">QR</span>}
+      fallback={<span aria-label={ui("ui.components.CompactQr.e13ef7af75b3", "QR preview unavailable; use the Profile link")}>{ui("ui.components.CompactQr.a439fba430a3", "QR")}</span>}
     />
-  ) : <span aria-label={fallbackLabel}>QR</span>;
+  ) : <span aria-label={fallbackLabel}>{ui("ui.components.CompactQr.a439fba430a3", "QR")}</span>;
 }

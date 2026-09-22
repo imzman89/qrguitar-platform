@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "./UiTextProvider";
+
 
 import { AlertTriangle, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -25,6 +27,7 @@ export function ProfileQuickEdit({ record, onClose, onSaved, isSessionCurrent }:
   onClose: () => void;
   onSaved: (record: DemoInstrument) => void;
 }) {
+  const ui = useUiText("components.ProfileQuickEdit");
   const photos = useMemo(() => getProfilePhotoUrls(record), [record]);
   const [form, setForm] = useState<QuickEditForm>(() => toForm(record, photos));
   const [savedForm, setSavedForm] = useState<QuickEditForm>(() => toForm(record, photos));
@@ -174,10 +177,10 @@ export function ProfileQuickEdit({ record, onClose, onSaved, isSessionCurrent }:
         safetyStatus: form.safetyStatus,
         publicSafetyNote: form.publicSafetyNote
       });
-      setMessage("Profile updated.");
+      setMessage(ui("ui.components.ProfileQuickEdit.3a06720a52cb", "Profile updated."));
     } catch (error) {
       if (!isCurrent()) return;
-      setMessage(error instanceof Error ? error.message : "Could not save Quick Edit changes.");
+      setMessage(error instanceof Error ? error.message : ui("ui.components.ProfileQuickEdit.67524ea94ea8", "Could not save Quick Edit changes."));
     } finally {
       savePending.current = false;
       if (isCurrent()) setSaving(false);
@@ -188,24 +191,24 @@ export function ProfileQuickEdit({ record, onClose, onSaved, isSessionCurrent }:
     <div className="quick-edit-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && close()}>
       <section className="quick-edit-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="quick-edit-title" tabIndex={-1}>
         <header>
-          <div><span className="eyebrow">Quick Edit</span><h2 id="quick-edit-title">{record.name || `${record.brand} ${record.model}`}</h2></div>
-          <button className="icon-button" type="button" onClick={close} aria-label="Close Quick Edit"><X /></button>
+          <div><span className="eyebrow">{ui("ui.components.ProfileQuickEdit.d4e63f569f33", "Quick Edit")}</span><h2 id="quick-edit-title">{record.name || ui("ui.components.ProfileQuickEdit.a9e9f2e46b92", "{{value1}} {{value2}}", { value1: record.brand, value2: record.model })}</h2></div>
+          <button className="icon-button" type="button" onClick={close} aria-label={ui("ui.components.ProfileQuickEdit.4ee3c33fc702", "Close Quick Edit")}><X /></button>
         </header>
         <div className="quick-edit-grid">
-          <label className="field"><span>Profile title</span><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
-          <label className="field"><span>Visibility</span><select value={form.visibility} onChange={(event) => setForm({ ...form, visibility: event.target.value as QuickEditForm["visibility"] })}><option value="public">Public</option><option value="unlisted">Unlisted</option><option value="private">Private</option></select></label>
-          <label className="field"><span>Availability</span><select value={form.saleStatus} onChange={(event) => setForm({ ...form, saleStatus: event.target.value as QuickEditForm["saleStatus"] })}><option value="not_for_sale">Not for sale</option><option value="for_sale">For sale</option></select></label>
-          <label className="field"><span>Condition</span><select value={form.condition} onChange={(event) => setForm({ ...form, condition: event.target.value as QuickEditForm["condition"] })}><option value="used">Used</option><option value="new">New</option></select></label>
-          <label className="field"><span>Location</span><input value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} /></label>
-          <label className="field"><span>Main photo</span><select value={form.heroImageDataUrl} onChange={(event) => setForm({ ...form, heroImageDataUrl: event.target.value })}>{photos.map((photo, index) => <option value={photo} key={photo}>Photo {index + 1}{photo === record.heroImageDataUrl ? " (current)" : ""}</option>)}</select></label>
-          <label className="field quick-edit-wide"><span>Profile story</span><textarea rows={4} value={form.summary} onChange={(event) => setForm({ ...form, summary: event.target.value })} /></label>
-          {record.serial ? <div className="quick-edit-wide"><label className="toggle-field"><input type="checkbox" checked={form.showSerialPublic} onChange={(event) => setForm({ ...form, showSerialPublic: event.target.checked })} /> Show Serial Number on the public Profile</label><p className="fine-print">Hides only the serial field. The permanent QR ID and URL may still include the serial. Use private visibility to restrict access.</p></div> : null}
-          <label className="field"><span>Lost / stolen status</span><select value={form.safetyStatus} onChange={(event) => setForm({ ...form, safetyStatus: event.target.value as QuickEditForm["safetyStatus"] })}><option value="clear">No alert</option><option value="lost">Reported lost</option><option value="stolen">Reported stolen</option><option value="recovered">Recovered</option></select></label>
-          {form.safetyStatus !== "clear" ? <label className="field"><span>Public alert note</span><textarea rows={3} value={form.publicSafetyNote} onChange={(event) => setForm({ ...form, publicSafetyNote: event.target.value })} /></label> : null}
+          <label className="field"><span>{ui("ui.components.ProfileQuickEdit.8d615ba766e1", "Profile title")}</span><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
+          <label className="field"><span>{ui("ui.components.ProfileQuickEdit.7448611d5f93", "Visibility")}</span><select value={form.visibility} onChange={(event) => setForm({ ...form, visibility: event.target.value as QuickEditForm["visibility"] })}><option value="public">{ui("ui.components.ProfileQuickEdit.591935b15b1c", "Public")}</option><option value="unlisted">{ui("ui.components.ProfileQuickEdit.bc96567e77ca", "Unlisted")}</option><option value="private">{ui("ui.components.ProfileQuickEdit.c63eb6720c6e", "Private")}</option></select></label>
+          <label className="field"><span>{ui("ui.components.ProfileQuickEdit.12f67f8539c4", "Availability")}</span><select value={form.saleStatus} onChange={(event) => setForm({ ...form, saleStatus: event.target.value as QuickEditForm["saleStatus"] })}><option value="not_for_sale">{ui("ui.components.ProfileQuickEdit.323d22588945", "Not for sale")}</option><option value="for_sale">{ui("ui.components.ProfileQuickEdit.aedf56fc02b4", "For sale")}</option></select></label>
+          <label className="field"><span>{ui("ui.components.ProfileQuickEdit.39b36d38d6eb", "Condition")}</span><select value={form.condition} onChange={(event) => setForm({ ...form, condition: event.target.value as QuickEditForm["condition"] })}><option value="used">{ui("ui.components.ProfileQuickEdit.ae7d8dfac9ff", "Used")}</option><option value="new">{ui("ui.components.ProfileQuickEdit.18fdd549b2ed", "New")}</option></select></label>
+          <label className="field"><span>{ui("ui.components.ProfileQuickEdit.15b61974b270", "Location")}</span><input value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} /></label>
+          <label className="field"><span>{ui("ui.components.ProfileQuickEdit.14b29400712f", "Main photo")}</span><select value={form.heroImageDataUrl} onChange={(event) => setForm({ ...form, heroImageDataUrl: event.target.value })}>{photos.map((photo, index) => <option value={photo} key={photo}>{ui("ui.components.ProfileQuickEdit.d84eebada93e", "Photo")}{" "}{index + 1}{photo === record.heroImageDataUrl ? ui("ui.components.ProfileQuickEdit.15ed202dfc23", " (current)") : ""}</option>)}</select></label>
+          <label className="field quick-edit-wide"><span>{ui("ui.components.ProfileQuickEdit.ca6f44db47d0", "Profile story")}</span><textarea rows={4} value={form.summary} onChange={(event) => setForm({ ...form, summary: event.target.value })} /></label>
+          {record.serial ? <div className="quick-edit-wide"><label className="toggle-field"><input type="checkbox" checked={form.showSerialPublic} onChange={(event) => setForm({ ...form, showSerialPublic: event.target.checked })} />{" "}{ui("ui.components.ProfileQuickEdit.22765505d8f2", "Show Serial Number on the public Profile")}</label><p className="fine-print">{ui("ui.components.ProfileQuickEdit.b281350e38d8", "Hides only the serial field. The permanent QR ID and URL may still include the serial. Use private visibility to restrict access.")}</p></div> : null}
+          <label className="field"><span>{ui("ui.components.ProfileQuickEdit.32cf4596244a", "Lost / stolen status")}</span><select value={form.safetyStatus} onChange={(event) => setForm({ ...form, safetyStatus: event.target.value as QuickEditForm["safetyStatus"] })}><option value="clear">{ui("ui.components.ProfileQuickEdit.d1af410eb4d0", "No alert")}</option><option value="lost">{ui("ui.components.ProfileQuickEdit.3f1cf9ff5a13", "Reported lost")}</option><option value="stolen">{ui("ui.components.ProfileQuickEdit.f616a2b55136", "Reported stolen")}</option><option value="recovered">{ui("ui.components.ProfileQuickEdit.37ce0a91ee27", "Recovered")}</option></select></label>
+          {form.safetyStatus !== "clear" ? <label className="field"><span>{ui("ui.components.ProfileQuickEdit.5919565fba50", "Public alert note")}</span><textarea rows={3} value={form.publicSafetyNote} onChange={(event) => setForm({ ...form, publicSafetyNote: event.target.value })} /></label> : null}
         </div>
-        <aside className="quick-edit-identity"><AlertTriangle size={16} /><span>QRguitar ID <b>{record.qrCode}</b> and the permanent URL cannot be changed here.</span></aside>
+        <aside className="quick-edit-identity"><AlertTriangle size={16} /><span>{ui("ui.components.ProfileQuickEdit.a6c8f92c19f4", "QRguitar ID")}{" "}<b>{record.qrCode}</b>{" "}{ui("ui.components.ProfileQuickEdit.f8eb11bf748c", "and the permanent URL cannot be changed here.")}</span></aside>
         {message ? <p className="form-message">{message}</p> : null}
-        <footer><button className="button secondary" type="button" onClick={close}>Cancel</button><button className="button" type="button" disabled={saving || !dirty} onClick={() => void save()}>{saving ? "Saving..." : "Save Quick Edit"}</button></footer>
+        <footer><button className="button secondary" type="button" onClick={close}>{ui("ui.components.ProfileQuickEdit.19766ed6ccb2", "Cancel")}</button><button className="button" type="button" disabled={saving || !dirty} onClick={() => void save()}>{saving ? ui("ui.components.ProfileQuickEdit.dc85af8f2b1d", "Saving...") : ui("ui.components.ProfileQuickEdit.c74a565b3fc9", "Save Quick Edit")}</button></footer>
       </section>
     </div>
   );

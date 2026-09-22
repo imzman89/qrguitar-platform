@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -16,10 +17,10 @@ function loader() {
     const code = ts.transpileModule(fs.readFileSync(file, "utf8"), {
       compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX }
     }).outputText;
-    new Function("require", "module", "exports", ...Object.keys(bindings), code)(name => {
+    new Function("require", "module", "exports", ...Object.keys(bindings), code)(withUiTextTestContext(name => {
       if (name in overrides) return overrides[name];
       return name.startsWith(".") ? load(path.resolve(path.dirname(file), name) + ".ts") : require(name);
-    }, module, module.exports, ...Object.values(bindings));
+    }), module, module.exports, ...Object.values(bindings));
     if (!Object.keys(overrides).length) cache.set(file, module.exports);
     return module.exports;
   }

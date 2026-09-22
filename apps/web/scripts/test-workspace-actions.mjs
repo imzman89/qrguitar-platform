@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -13,10 +14,10 @@ function load(relative, imports = {}) {
   const source = fs.readFileSync(path.join(root, relative), "utf8");
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const module = { exports: {} };
-  new Function("require", "module", "exports", code)((name) => Object.hasOwn(imports, name) ? imports[name] : require(name), module, module.exports);
+  new Function("require", "module", "exports", code)(withUiTextTestContext((name) => Object.hasOwn(imports, name) ? imports[name] : require(name)), module, module.exports);
   return module.exports;
 }
-const tools = load("lib/workspace-tools.ts");
+const tools = load("lib/workspace-tools.ts", { "./ui-text": load("lib/ui-text.ts") });
 const { WorkspaceActions } = load("components/WorkspaceActions.tsx", {
   "../lib/workspace-tools": tools,
   "next/link": ({ children, ...props }) => React.createElement("a", props, children),

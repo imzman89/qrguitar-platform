@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "../../components/UiTextProvider";
+
 
 import workflow from "../../components/WorkflowWorkspace.module.css";
 import { ArrowLeft, Check, FileCheck2, Gift, Handshake, PackageCheck, ShieldCheck, Store, Wrench } from "lucide-react";
@@ -41,6 +43,7 @@ function claimStatusLabel(status: string) {
 }
 
 function OwnershipClaimContent() {
+  const ui = useUiText("app.ownership.claim.page");
   const content = useSiteContent();
   const searchParams = useSearchParams();
   const returnPath = claimReturnPath(searchParams);
@@ -149,8 +152,8 @@ function OwnershipClaimContent() {
     if (!files?.length || !current || !lease || evidenceRead.current || current.getState().busy) return;
     const existing = response ? responseEvidence : evidence;
     const selected = Array.from(files);
-    if (existing.length + selected.length > 3) { setMessage("Choose no more than three evidence files in total."); return; }
-    if (existing.reduce((sum, item) => sum + item.bytes, 0) + selected.reduce((sum, item) => sum + item.size, 0) > MAX_CLAIM_EVIDENCE_BYTES) { setMessage("The current secure upload supports up to 3 MB of evidence combined. Choose smaller files and try again."); return; }
+    if (existing.length + selected.length > 3) { setMessage(ui("ui.app.ownership.claim.page.40c5fdba5671", "Choose no more than three evidence files in total.")); return; }
+    if (existing.reduce((sum, item) => sum + item.bytes, 0) + selected.reduce((sum, item) => sum + item.size, 0) > MAX_CLAIM_EVIDENCE_BYTES) { setMessage(ui("ui.app.ownership.claim.page.b389685c17bd", "The current secure upload supports up to 3 MB of evidence combined. Choose smaller files and try again.")); return; }
     const operation = Symbol("read-evidence");
     evidenceRead.current = operation; setEvidenceReading(true); setMessage("");
     try {
@@ -161,7 +164,7 @@ function OwnershipClaimContent() {
       if (!current.isCurrent(lease) || evidenceRead.current !== operation) return;
       if (response) setResponseEvidence([...existing, ...next]); else setEvidence([...existing, ...next]);
     } catch (error) {
-      if (current.isCurrent(lease) && evidenceRead.current === operation) setMessage(error instanceof Error ? error.message : "Could not read the evidence.");
+      if (current.isCurrent(lease) && evidenceRead.current === operation) setMessage(error instanceof Error ? error.message : ui("ui.app.ownership.claim.page.c0650627f361", "Could not read the evidence."));
     } finally {
       if (current.isCurrent(lease) && evidenceRead.current === operation) { evidenceRead.current = null; setEvidenceReading(false); }
     }
@@ -180,9 +183,9 @@ function OwnershipClaimContent() {
       confirmedClaimMutation(kind, payload);
       if (!current.isCurrent(lease)) return;
       onConfirmed(payload);
-      setMessage(typeof payload.message === "string" ? payload.message : kind === "buyer" ? "Ownership accepted." : kind === "evidence" ? "Evidence submitted." : "Ownership request submitted.");
+      setMessage(typeof payload.message === "string" ? payload.message : kind === "buyer" ? ui("ui.app.ownership.claim.page.85595a4753c6", "Ownership accepted.") : kind === "evidence" ? ui("ui.app.ownership.claim.page.65f71b1451b4", "Evidence submitted.") : ui("ui.app.ownership.claim.page.7562713c29a5", "Ownership request submitted."));
     } catch (error) {
-      if (current.isCurrent(lease)) setMessage(error instanceof ClaimRequestError && error.uncertain ? `${error.message} The last request may already be saved. Check your request status or collection before retrying.` : error instanceof Error ? error.message : "Could not complete the request.");
+      if (current.isCurrent(lease)) setMessage(error instanceof ClaimRequestError && error.uncertain ? ui("ui.app.ownership.claim.page.7eef482a4cd9", "{{value1}} The last request may already be saved. Check your request status or collection before retrying.", {value1: error.message}) : error instanceof Error ? error.message : ui("ui.app.ownership.claim.page.2a833d45816f", "Could not complete the request."));
     } finally { current.finishWrite(lease); }
   }
   async function submit() {
@@ -214,25 +217,25 @@ function OwnershipClaimContent() {
       <main className={`section claim-center-page ${workflow.claims}`}>
         <div className="shell">
           <header className="claim-center-hero">
-            <div><div className="eyebrow">Ownership Claim Center</div><h1>{getContentValue(content, "claimCenter.hero.headline")}</h1><p className="lede">{getContentValue(content, "claimCenter.hero.body")}</p></div>
-            <aside><ShieldCheck aria-hidden="true" /><b>Evidence stays private</b><span>Only the current owner and authorized QRguitar reviewers can access submitted files.</span></aside>
+            <div><div className="eyebrow">{ui("ui.app.ownership.claim.page.3915d9578717", "Ownership Claim Center")}</div><h1>{getContentValue(content, "claimCenter.hero.headline")}</h1><p className="lede">{getContentValue(content, "claimCenter.hero.body")}</p></div>
+            <aside><ShieldCheck aria-hidden="true" /><b>{ui("ui.app.ownership.claim.page.15a28c155c61", "Evidence stays private")}</b><span>{ui("ui.app.ownership.claim.page.2d6b2b891a03", "Only the current owner and authorized QRguitar reviewers can access submitted files.")}</span></aside>
           </header>
 
           {signedIn === null ? (
-            <section className="card" aria-live="polite"><p>{authError || "Checking your sign-in session..."}</p>{authError ? <button type="button" className="button secondary" onClick={() => void claimGuard.current?.start()}>Retry sign-in check</button> : null}</section>
+            <section className="card" aria-live="polite"><p>{authError || ui("ui.app.ownership.claim.page.b97f2f9cee97", "Checking your sign-in session...")}</p>{authError ? <button type="button" className="button secondary" onClick={() => void claimGuard.current?.start()}>{ui("ui.app.ownership.claim.page.b72989690e0a", "Retry sign-in check")}</button> : null}</section>
           ) : signedIn === false ? (
-            <section className="card claim-callout"><ShieldCheck aria-hidden="true" /><div><h2>Sign in to continue.</h2><p>Your account keeps the request, evidence, and decision attached to the correct person.</p><Link className="button" href={`/login?next=${encodeURIComponent(returnPath)}`}>Sign in</Link></div></section>
+            <section className="card claim-callout"><ShieldCheck aria-hidden="true" /><div><h2>{ui("ui.app.ownership.claim.page.73c27c81d398", "Sign in to continue.")}</h2><p>{ui("ui.app.ownership.claim.page.26845d88e5fb", "Your account keeps the request, evidence, and decision attached to the correct person.")}</p><Link className="button" href={`/login?next=${encodeURIComponent(returnPath)}`}>{ui("ui.app.ownership.claim.page.bfd402b2f6f3", "Sign in")}</Link></div></section>
           ) : (
             <>
               <div className="claim-load-status">
-                {claimsLoading ? <p role="status">Loading your ownership requests...</p> : null}
+                {claimsLoading ? <p role="status">{ui("ui.app.ownership.claim.page.ae324303eaa6", "Loading your ownership requests...")}</p> : null}
                 {claimsError ? <p role="alert">{claimsError}</p> : null}
                 {message && !complete ? <p className="form-message" role="status">{message}</p> : null}
-                <button type="button" className="button secondary" disabled={busy || evidenceReading || claimsLoading} onClick={() => void reloadClaimsRef.current()}>Refresh request status</button>
+                <button type="button" className="button secondary" disabled={busy || evidenceReading || claimsLoading} onClick={() => void reloadClaimsRef.current()}>{ui("ui.app.ownership.claim.page.6bc7c88e3f4e", "Refresh request status")}</button>
               </div>
               <fieldset disabled={busy || evidenceReading} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
               {!scenario ? (
-              <section className="claim-scenario-grid" id="claim-situations" aria-label="Ownership situations">
+              <section className="claim-scenario-grid" id="claim-situations" aria-label={ui("ui.app.ownership.claim.page.4c17f2a2ba0a", "Ownership situations")}>
                 {scenarios.map((item) => {
                   const Icon = item.icon;
                   return <button className={scenarioId === item.id ? "claim-scenario-card is-active" : "claim-scenario-card"} type="button" key={item.id} aria-pressed={scenarioId === item.id} onClick={() => chooseScenario(item.id)}><Icon aria-hidden="true" /><span><b>{item.title}</b><small>{item.copy}</small></span></button>;
@@ -242,35 +245,35 @@ function OwnershipClaimContent() {
 
               {scenario ? (
                 <section className="claim-workspace" id="claim-workspace">
-                  <header><button type="button" onClick={changeScenario}><ArrowLeft aria-hidden="true" /> Change situation</button><div><span>Selected path</span><h2 id="claim-workspace-heading" tabIndex={-1}>{scenario.title}</h2></div></header>
+                  <header><button type="button" onClick={changeScenario}><ArrowLeft aria-hidden="true" />{" "}{ui("ui.app.ownership.claim.page.b25283ffda7c", "Change situation")}</button><div><span>{ui("ui.app.ownership.claim.page.dade74c3fc37", "Selected path")}</span><h2 id="claim-workspace-heading" tabIndex={-1}>{scenario.title}</h2></div></header>
                   {scenario.preferredTransfer ? (
                     <div className="claim-preferred-path">
                       <Handshake aria-hidden="true" />
-                      <div><h3>The safest path is a seller transfer.</h3><p>The current owner opens the Profile in their Dashboard, chooses <b>Transfer Ownership</b>, and sends a recipient-bound invitation to your account email. The permanent QRguitar ID and history stay unchanged.</p><p className="privacy-note">The public QR code never contains a transfer token and cannot transfer ownership.</p><button className="button secondary" type="button" onClick={() => chooseScenario("no-transfer")}>Seller cannot transfer it</button></div>
+                      <div><h3>{ui("ui.app.ownership.claim.page.ec53472eb9b9", "The safest path is a seller transfer.")}</h3><p>{ui("ui.app.ownership.claim.page.b63a29a66da9", "The current owner opens the Profile in their Dashboard, chooses")}{" "}<b>{ui("ui.app.ownership.claim.page.f49cda3a003c", "Transfer Ownership")}</b>{ui("ui.app.ownership.claim.page.f9590f451be6", ", and sends a recipient-bound invitation to your account email. The permanent QRguitar ID and history stay unchanged.")}</p><p className="privacy-note">{ui("ui.app.ownership.claim.page.fead057ffd73", "The public QR code never contains a transfer token and cannot transfer ownership.")}</p><button className="button secondary" type="button" onClick={() => chooseScenario("no-transfer")}>{ui("ui.app.ownership.claim.page.ec2d3e1e3a9e", "Seller cannot transfer it")}</button></div>
                     </div>
                   ) : complete ? (
-                    <div className="claim-complete" role="status"><FileCheck2 aria-hidden="true" /><div><h3>Request received.</h3><p>{message}</p><Link className="button" href="/dashboard">Return to Dashboard</Link></div></div>
+                    <div className="claim-complete" role="status"><FileCheck2 aria-hidden="true" /><div><h3>{ui("ui.app.ownership.claim.page.2508ed4a8444", "Request received.")}</h3><p>{message}</p><Link className="button" href="/dashboard">{ui("ui.app.ownership.claim.page.16ec0c9189e8", "Return to Dashboard")}</Link></div></div>
                   ) : (
                     <div className="claim-form-layout">
                       {scenario.claimType === "store_purchase" ? (
                         <section className="buyer-code-redeem">
-                          <span className="mini-eyebrow">Private buyer handoff</span>
-                          <h3>Have a code from the shop or builder?</h3>
-                          <p>Sign in with the assigned buyer email if one was specified, then enter the one-time code supplied at checkout or pickup.</p>
-                          <div><input aria-label="Private buyer handoff code" value={buyerCode} onChange={(event) => setBuyerCode(event.target.value.toUpperCase())} autoComplete="one-time-code" placeholder="XXXX-XXXX-XXXX" /><input aria-label="Order reference supplied by the seller" value={buyerOrderReference} onChange={(event) => setBuyerOrderReference(event.target.value)} autoComplete="off" placeholder="Order/reference if supplied" /><button className="button" type="button" disabled={busy || buyerCode.replace(/[^A-Z0-9]/g, "").length !== 12} onClick={() => void redeemBuyerCode()}>{busy ? "Checking..." : "Accept handoff"}</button></div>
-                          <small>A code expires, can be revoked, works once, and never appears in the public QR code or Profile.</small>
+                          <span className="mini-eyebrow">{ui("ui.app.ownership.claim.page.7bce049647c6", "Private buyer handoff")}</span>
+                          <h3>{ui("ui.app.ownership.claim.page.26fa15b6bbdb", "Have a code from the shop or builder?")}</h3>
+                          <p>{ui("ui.app.ownership.claim.page.ec01e30de3c4", "Sign in with the assigned buyer email if one was specified, then enter the one-time code supplied at checkout or pickup.")}</p>
+                          <div><input aria-label={ui("ui.app.ownership.claim.page.ece21dc27db5", "Private buyer handoff code")} value={buyerCode} onChange={(event) => setBuyerCode(event.target.value.toUpperCase())} autoComplete="one-time-code" placeholder={ui("ui.app.ownership.claim.page.12cafdd53605", "XXXX-XXXX-XXXX")} /><input aria-label={ui("ui.app.ownership.claim.page.a53acddde434", "Order reference supplied by the seller")} value={buyerOrderReference} onChange={(event) => setBuyerOrderReference(event.target.value)} autoComplete="off" placeholder={ui("ui.app.ownership.claim.page.eb7a7dd8a26a", "Order/reference if supplied")} /><button className="button" type="button" disabled={busy || buyerCode.replace(/[^A-Z0-9]/g, "").length !== 12} onClick={() => void redeemBuyerCode()}>{busy ? ui("ui.app.ownership.claim.page.2e5f79bb94a8", "Checking...") : ui("ui.app.ownership.claim.page.13e3dc2abccf", "Accept handoff")}</button></div>
+                          <small>{ui("ui.app.ownership.claim.page.e58632ca07e5", "A code expires, can be revoked, works once, and never appears in the public QR code or Profile.")}</small>
                         </section>
                       ) : null}
                       <form className="claim-form" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-                        <label><span>QRguitar ID or exact Serial Number</span><input value={identifier} onChange={(event) => setIdentifier(event.target.value)} autoComplete="off" placeholder="QRG-... or manufacturer serial" /><small>This identifies a Profile only. It does not prove or transfer ownership.</small></label>
-                        {needsChallenge ? <div className="claim-challenge"><span>Private possession challenge</span><strong>{challengeCode}</strong><p>Write this code on paper and include it in the first current photo of the instrument. Do not edit it into an old image.</p></div> : null}
-                        <label><span>How and when did you acquire it?</span><textarea rows={4} maxLength={3000} value={acquisitionDetails} onChange={(event) => setAcquisitionDetails(event.target.value)} placeholder="Approximate date, seller/shop, order reference, and circumstances." /></label>
-                        <label><span>Ownership declaration</span><textarea rows={3} maxLength={1500} value={ownershipDeclaration} onChange={(event) => setOwnershipDeclaration(event.target.value)} placeholder="Confirm that you possess the instrument and that your information is truthful." /></label>
-                        <label><span>Private evidence (1-3 files)</span><input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" multiple onChange={(event) => void addEvidence(event.target.files)} /><small>{needsChallenge ? "First: current challenge photo. Then add a Serial Number photo, receipt, bill of sale, marketplace record, or estate/gift document. Up to three files, 3 MB combined." : "Add a receipt, invoice, identifying photo, or other purchase evidence. Up to three files, 3 MB combined."}</small></label>
-                        {evidence.length ? <ul className="claim-evidence-list">{evidence.map((file, index) => <li key={`${file.name}-${index}`}><Check aria-hidden="true" /><span>{file.name}<small>{file.type.replaceAll("_", " ")}</small></span><button type="button" onClick={() => setEvidence((current) => current.filter((_, itemIndex) => itemIndex !== index))}>Remove</button></li>)}</ul> : null}
-                        <button type="submit" className="button" disabled={busy || signedIn !== true}>{busy ? "Submitting securely..." : "Submit for review"}</button>
+                        <label><span>{ui("ui.app.ownership.claim.page.d8c8569cfb01", "QRguitar ID or exact Serial Number")}</span><input value={identifier} onChange={(event) => setIdentifier(event.target.value)} autoComplete="off" placeholder={ui("ui.app.ownership.claim.page.963c85e412dd", "QRG-... or manufacturer serial")} /><small>{ui("ui.app.ownership.claim.page.48809e2e7600", "This identifies a Profile only. It does not prove or transfer ownership.")}</small></label>
+                        {needsChallenge ? <div className="claim-challenge"><span>{ui("ui.app.ownership.claim.page.d4b4b295ee14", "Private possession challenge")}</span><strong>{challengeCode}</strong><p>{ui("ui.app.ownership.claim.page.5e5f3a9509ad", "Write this code on paper and include it in the first current photo of the instrument. Do not edit it into an old image.")}</p></div> : null}
+                        <label><span>{ui("ui.app.ownership.claim.page.c36a3c33bac5", "How and when did you acquire it?")}</span><textarea rows={4} maxLength={3000} value={acquisitionDetails} onChange={(event) => setAcquisitionDetails(event.target.value)} placeholder={ui("ui.app.ownership.claim.page.66029f39ee81", "Approximate date, seller/shop, order reference, and circumstances.")} /></label>
+                        <label><span>{ui("ui.app.ownership.claim.page.9cf11b231a0a", "Ownership declaration")}</span><textarea rows={3} maxLength={1500} value={ownershipDeclaration} onChange={(event) => setOwnershipDeclaration(event.target.value)} placeholder={ui("ui.app.ownership.claim.page.edbab83e946f", "Confirm that you possess the instrument and that your information is truthful.")} /></label>
+                        <label><span>{ui("ui.app.ownership.claim.page.cabb6cb580cc", "Private evidence (1-3 files)")}</span><input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" multiple onChange={(event) => void addEvidence(event.target.files)} /><small>{needsChallenge ? ui("ui.app.ownership.claim.page.88342316aa22", "First: current challenge photo. Then add a Serial Number photo, receipt, bill of sale, marketplace record, or estate/gift document. Up to three files, 3 MB combined.") : ui("ui.app.ownership.claim.page.29cc371cad01", "Add a receipt, invoice, identifying photo, or other purchase evidence. Up to three files, 3 MB combined.")}</small></label>
+                        {evidence.length ? <ul className="claim-evidence-list">{evidence.map((file, index) => <li key={`${file.name}-${index}`}><Check aria-hidden="true" /><span>{file.name}<small>{file.type.replaceAll("_", " ")}</small></span><button type="button" onClick={() => setEvidence((current) => current.filter((_, itemIndex) => itemIndex !== index))}>{ui("ui.app.ownership.claim.page.c3812fc4acb8", "Remove")}</button></li>)}</ul> : null}
+                        <button type="submit" className="button" disabled={busy || signedIn !== true}>{busy ? ui("ui.app.ownership.claim.page.09e3fad17544", "Submitting securely...") : ui("ui.app.ownership.claim.page.40447e4493fb", "Submit for review")}</button>
                       </form>
-                      <aside className="claim-evidence-guide"><span>What happens next</span><ol><li><b>Submitted</b><small>Your files remain private.</small></li><li><b>Owner response</b><small>The current owner may approve or dispute.</small></li><li><b>QRguitar review</b><small>Unresolved claims require administrator review.</small></li><li><b>Decision</b><small>Approval preserves the same Profile ID, URL, and protected history.</small></li></ol></aside>
+                      <aside className="claim-evidence-guide"><span>{ui("ui.app.ownership.claim.page.8f9b77e6e0b4", "What happens next")}</span><ol><li><b>{ui("ui.app.ownership.claim.page.64900440a8c9", "Submitted")}</b><small>{ui("ui.app.ownership.claim.page.3584f595aa34", "Your files remain private.")}</small></li><li><b>{ui("ui.app.ownership.claim.page.9b5d252d528e", "Owner response")}</b><small>{ui("ui.app.ownership.claim.page.0cbc7ff0a4e3", "The current owner may approve or dispute.")}</small></li><li><b>{ui("ui.app.ownership.claim.page.23e8381bc011", "QRguitar review")}</b><small>{ui("ui.app.ownership.claim.page.60789e933c1d", "Unresolved claims require administrator review.")}</small></li><li><b>{ui("ui.app.ownership.claim.page.640ae4baf960", "Decision")}</b><small>{ui("ui.app.ownership.claim.page.24f68feae8fe", "Approval preserves the same Profile ID, URL, and protected history.")}</small></li></ol></aside>
                     </div>
                   )}
                 </section>
@@ -278,27 +281,27 @@ function OwnershipClaimContent() {
 
               {claims.length ? (
                 <section className="claim-status-section">
-                  <div className="section-head"><div><div className="eyebrow">Your requests</div><h2>Claim status</h2></div></div>
+                  <div className="section-head"><div><div className="eyebrow">{ui("ui.app.ownership.claim.page.4c64a2a1c581", "Your requests")}</div><h2>{ui("ui.app.ownership.claim.page.54403cae6653", "Claim status")}</h2></div></div>
                   <div className="claim-status-list">
                     {claims.slice(0, 6).map((claim) => (
                       <article key={claim.id}>
                         <div>
                           <span>{claimStatusLabel(claim.status)}</span>
                           <h3>{claim.profileTitle}</h3>
-                          <small>{claim.qrCode || "Private Profile"} · {claim.evidenceCount} evidence file{claim.evidenceCount === 1 ? "" : "s"}</small>
+                          <small>{claim.qrCode || ui("ui.app.ownership.claim.page.0e2a9633188b", "Private Profile")} · {claim.evidenceCount}{" "}{ui("ui.app.ownership.claim.page.21ea0f42e3ae", "evidence file")}{claim.evidenceCount === 1 ? "" : ui("ui.app.ownership.claim.page.043a718774c5", "s")}</small>
                           {claim.status === "awaiting_claimant" ? (
                             <div className="claim-response">
-                              <p><b>QRguitar needs more information.</b>{claim.adminReviewNote ? ` ${claim.adminReviewNote}` : " Add the requested private evidence below."}</p>
+                              <p><b>{ui("ui.app.ownership.claim.page.e9672027cf43", "QRguitar needs more information.")}</b>{claim.adminReviewNote ? ui("ui.app.ownership.claim.page.7130515d99f1", " {{value1}}", { value1: claim.adminReviewNote }) : ui("ui.app.ownership.claim.page.aa618133af62", " Add the requested private evidence below.")}</p>
                               {responseClaimId === claim.id ? (
                                 <>
-                                  <label>Requested evidence (up to three files, 3 MB combined)<input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" multiple onChange={(event) => void addResponseEvidence(event.target.files)} /></label>
-                                  {responseEvidence.length ? <small>{responseEvidence.length} file{responseEvidence.length === 1 ? "" : "s"} ready</small> : null}
+                                  <label>{ui("ui.app.ownership.claim.page.339a31e91a30", "Requested evidence (up to three files, 3 MB combined)")}<input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" multiple onChange={(event) => void addResponseEvidence(event.target.files)} /></label>
+                                  {responseEvidence.length ? <small>{responseEvidence.length}{" "}{ui("ui.app.ownership.claim.page.3b9c358f36f0", "file")}{responseEvidence.length === 1 ? "" : ui("ui.app.ownership.claim.page.043a718774c5", "s")}{" "}{ui("ui.app.ownership.claim.page.b24d6d33736e", "ready")}</small> : null}
                                   <div>
-                                    <button className="button" type="button" disabled={busy || !responseEvidence.length} onClick={() => void resubmitEvidence(claim.id)}>{busy ? "Submitting..." : "Submit evidence"}</button>
-                                    <button className="button secondary" type="button" onClick={() => { setResponseClaimId(""); setResponseEvidence([]); }}>Cancel</button>
+                                    <button className="button" type="button" disabled={busy || !responseEvidence.length} onClick={() => void resubmitEvidence(claim.id)}>{busy ? ui("ui.app.ownership.claim.page.64115d5b9c79", "Submitting...") : ui("ui.app.ownership.claim.page.91e287e5015e", "Submit evidence")}</button>
+                                    <button className="button secondary" type="button" onClick={() => { setResponseClaimId(""); setResponseEvidence([]); }}>{ui("ui.app.ownership.claim.page.19766ed6ccb2", "Cancel")}</button>
                                   </div>
                                 </>
-                              ) : <button className="button secondary" type="button" onClick={() => { setResponseClaimId(claim.id); setResponseEvidence([]); setMessage(""); }}>Add requested evidence</button>}
+                              ) : <button className="button secondary" type="button" onClick={() => { setResponseClaimId(claim.id); setResponseEvidence([]); setMessage(""); }}>{ui("ui.app.ownership.claim.page.ee26147672a3", "Add requested evidence")}</button>}
                             </div>
                           ) : null}
                         </div>
@@ -319,8 +322,9 @@ function OwnershipClaimContent() {
 }
 
 export default function OwnershipClaimPage() {
+  const ui = useUiText("app.ownership.claim.page");
   return (
-    <Suspense fallback={<main className={`section claim-center-page ${workflow.claims}`}><div className="shell"><section className="card claim-callout"><div><h1>Opening Ownership Claim Center.</h1><p>Loading your secure ownership options.</p></div></section></div></main>}>
+    <Suspense fallback={<main className={`section claim-center-page ${workflow.claims}`}><div className="shell"><section className="card claim-callout"><div><h1>{ui("ui.app.ownership.claim.page.6109a1ebd28d", "Opening Ownership Claim Center.")}</h1><p>{ui("ui.app.ownership.claim.page.9f66e1c15c7c", "Loading your secure ownership options.")}</p></div></section></div></main>}>
       <OwnershipClaimContent />
     </Suspense>
   );

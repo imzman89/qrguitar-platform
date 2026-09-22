@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "./UiTextProvider";
+
 
 import Link from "next/link";
 import { Send } from "lucide-react";
@@ -6,6 +8,7 @@ import { useEffect, useState } from "react";
 import { getSupabaseAccessToken } from "../lib/supabase-browser";
 
 export function CollectionInquiryForm({ handle, publicName, profiles }: { handle: string; publicName: string; profiles: Array<{ code: string; title: string }> }) {
+  const ui = useUiText("components.CollectionInquiryForm");
   const [message, setMessage] = useState("");
   const [profileCode, setProfileCode] = useState("");
   const [status, setStatus] = useState("");
@@ -53,14 +56,14 @@ export function CollectionInquiryForm({ handle, publicName, profiles }: { handle
   return (
     <section className="collection-inquiry" aria-labelledby="collection-inquiry-title">
       <div>
-        <div className="eyebrow">Member message</div>
-        <h2 id="collection-inquiry-title">Message {publicName}</h2>
-        <p>Ask about an instrument, availability, service, or a possible transfer. QRguitar relays the message while both email addresses stay private.</p>
+        <div className="eyebrow">{ui("ui.components.CollectionInquiryForm.f5b9e421b518", "Member message")}</div>
+        <h2 id="collection-inquiry-title">{ui("ui.components.CollectionInquiryForm.2f77668a9dfb", "Message")}{" "}{publicName}</h2>
+        <p>{ui("ui.components.CollectionInquiryForm.06e017302739", "Ask about an instrument, availability, service, or a possible transfer. QRguitar relays the message while both email addresses stay private.")}</p>
       </div>
       <div className="collection-inquiry-form">
-        {profiles.length ? <label><span>Profile (optional)</span><select value={profileCode} onChange={(event) => setProfileCode(event.target.value)}><option value="">General collection inquiry</option>{profiles.map((profile) => <option value={profile.code} key={profile.code}>{profile.title}</option>)}</select></label> : null}
-        <label><span>Message</span><textarea rows={4} value={message} onChange={(event) => setMessage(event.target.value)} maxLength={1200} placeholder="What would you like the owner, shop, or brand to know?" /></label>
-        <div className="collection-inquiry-actions"><button className="button" type="button" onClick={() => void sendInquiry()} disabled={sending}><Send size={15} /> {sending ? "Sending..." : "Send private inquiry"}</button>{signedIn === false ? <Link className="text-link" href={`/login?next=${encodeURIComponent(`/collections/${handle}`)}`}>Sign in</Link> : null}</div>
+        {profiles.length ? <label><span>{ui("ui.components.CollectionInquiryForm.427244f38501", "Profile (optional)")}</span><select value={profileCode} onChange={(event) => setProfileCode(event.target.value)}><option value="">{ui("ui.components.CollectionInquiryForm.36f42bae0bbf", "General collection inquiry")}</option>{profiles.map((profile) => <option value={profile.code} key={profile.code}>{profile.title}</option>)}</select></label> : null}
+        <label><span>{ui("ui.components.CollectionInquiryForm.2f77668a9dfb", "Message")}</span><textarea rows={4} value={message} onChange={(event) => setMessage(event.target.value)} maxLength={1200} placeholder={ui("ui.components.CollectionInquiryForm.97c4c42ae818", "What would you like the owner, shop, or brand to know?")} /></label>
+        <div className="collection-inquiry-actions"><button className="button" type="button" onClick={() => void sendInquiry()} disabled={sending}><Send size={15} /> {sending ? ui("ui.components.CollectionInquiryForm.286a3af7348e", "Sending...") : ui("ui.components.CollectionInquiryForm.214ca7c74602", "Send private inquiry")}</button>{signedIn === false ? <Link className="text-link" href={`/login?next=${encodeURIComponent(`/collections/${handle}`)}`}>{ui("ui.components.CollectionInquiryForm.bfd402b2f6f3", "Sign in")}</Link> : null}</div>
         {status ? <p className="form-message" role="status">{status}</p> : null}
       </div>
     </section>

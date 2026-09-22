@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "./UiTextProvider";
+
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
@@ -19,6 +21,7 @@ export function AdminWorkspaceGateView({ phase, returnPath, onRetry, onSignOut, 
   logoutError?: string;
   children: ReactNode;
 }) {
+  const ui = useUiText("components.AdminWorkspaceGate");
   if (phase === "ready") return <>{children}</>;
   const title = phase === "checking" ? "Checking access" : phase === "signed-out" ? "Sign in to continue"
     : phase === "expired" ? "Your session expired" : phase === "denied" ? "Admin access required" : "Admin is temporarily unavailable";
@@ -29,16 +32,16 @@ export function AdminWorkspaceGateView({ phase, returnPath, onRetry, onSignOut, 
     : "We could not verify access right now. Try again in a moment.";
   return <main className={styles.page}>
     <div className={styles.content}>
-      <Link className={styles.brand} href="/" aria-label="QRguitar homepage"><BrandLogo className={styles.logo} /></Link>
-      <div className={styles.eyebrow}>Admin workspace</div>
+      <Link className={styles.brand} href="/" aria-label={ui("ui.components.AdminWorkspaceGate.33b14c935c51", "QRguitar homepage")}><BrandLogo className={styles.logo} /></Link>
+      <div className={styles.eyebrow}>{ui("ui.components.AdminWorkspaceGate.1300ecbecd41", "Admin workspace")}</div>
       <h1>{title}</h1>
       <p role={phase === "unavailable" ? "alert" : "status"}>{detail}</p>
       {logoutError ? <p role="alert">{logoutError}</p> : null}
       {phase !== "checking" ? <div className={styles.actions}>
-        {phase === "signed-out" ? <Link className={styles.primary} href={`/login?next=${encodeURIComponent(returnPath)}`}>Sign in</Link> : null}
-        {phase === "expired" ? <button type="button" className={styles.primary} disabled={signingOut} onClick={onSignOut}>{signingOut ? "Signing out…" : "Sign out and sign in again"}</button> : null}
-        {phase === "unavailable" ? <button type="button" className={styles.primary} onClick={onRetry}>Try again</button> : null}
-        <Link href={phase === "denied" ? "/dashboard" : "/"}>{phase === "denied" ? "Return to dashboard" : "Back to QRguitar"}</Link>
+        {phase === "signed-out" ? <Link className={styles.primary} href={`/login?next=${encodeURIComponent(returnPath)}`}>{ui("ui.components.AdminWorkspaceGate.bfd402b2f6f3", "Sign in")}</Link> : null}
+        {phase === "expired" ? <button type="button" className={styles.primary} disabled={signingOut} onClick={onSignOut}>{signingOut ? ui("ui.components.AdminWorkspaceGate.08c6bd357b7d", "Signing out…") : ui("ui.components.AdminWorkspaceGate.897c73053d5d", "Sign out and sign in again")}</button> : null}
+        {phase === "unavailable" ? <button type="button" className={styles.primary} onClick={onRetry}>{ui("ui.components.AdminWorkspaceGate.d8b8392e2c54", "Try again")}</button> : null}
+        <Link href={phase === "denied" ? "/dashboard" : "/"}>{phase === "denied" ? ui("ui.components.AdminWorkspaceGate.1bb548bc8507", "Return to dashboard") : ui("ui.components.AdminWorkspaceGate.723e1c99cb42", "Back to QRguitar")}</Link>
       </div> : null}
     </div>
   </main>;

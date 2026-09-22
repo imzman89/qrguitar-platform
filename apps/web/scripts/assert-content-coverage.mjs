@@ -77,7 +77,7 @@ for (const blockId of ["how-step-create", "how-feature-identity", "how-role-play
 for (const marker of ["contentRegistry", "Draft", "Published", "Revision history", "Advanced JSON"]) {
   if (!siteEditor.includes(marker)) throw new Error(`Content Studio is missing ${marker}.`);
 }
-if (!siteEditor.includes("cms-tree-search") || !siteEditor.includes('aria-label={`Search ${selected.page} content`}')) {
+if (!siteEditor.includes("cms-tree-search") || !siteEditor.includes('"Search {{value1}} content", { value1: selected.page }') || !siteEditor.includes('Find text across all pages')) {
   throw new Error("Content Studio is missing its page-scoped accessible content search.");
 }
 for (const key of [
@@ -101,7 +101,7 @@ for (const marker of ["loadPublishedSiteSettings", "renderRegisteredTemplateValu
   if (!runtimeFiles.includes(marker)) throw new Error(`Managed content runtime is missing ${marker}.`);
 }
 
-const unresolvedMatch = registry.match(/unresolved:\s*(\d+)/);
-if (!unresolvedMatch || Number(unresolvedMatch[1]) !== 0) throw new Error("Content coverage manifest contains unresolved strings.");
+if (registry.includes("unresolved: 0")) throw new Error("Coverage must not claim an unmeasured zero-unresolved count.");
+if (!registry.includes("...uiTextEntries.map") || !runtimeFiles.includes('createUiText(')) throw new Error("Additional interface text is not connected to the existing registry/runtime.");
 
-console.log(`Content coverage assertions passed (${keys.length} stable keys).`);
+console.log(`Content coverage assertions passed (${keys.length} established keys plus connected interface registry; detailed bindings checked by test:ui-copy).`);

@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -6,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const web = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const require = createRequire(path.join(web, "package.json"));
+const require = withUiTextTestContext(createRequire(path.join(web, "package.json")));
 const ts = require("typescript");
 const nodes = value => Array.isArray(value) ? value.flatMap(nodes) : value && typeof value === "object" ? [value, ...nodes(value.props?.children)] : [];
 const text = value => Array.isArray(value) ? value.map(text).join("") : typeof value === "string" || typeof value === "number" ? String(value) : value && typeof value === "object" ? text(value.props?.children) : "";
@@ -268,5 +269,5 @@ test("deleted promo cards retain Activity and redact a missing operator identity
   checkbox.props.onChange({ target: { checked: true } }); page.render();
   assert.equal(page.button("Activity").props["aria-label"], "View activity for ALPHA");
   const source = fs.readFileSync(path.join(web, "app/admin/promotions/PromoCodesPage.tsx"), "utf8");
-  assert.match(source, /operatorEmail \|\| "Deleted admin"/); assert.match(source, /aria-label={`View activity for \$\{promotion\.code\}`}/);
+  assert.match(source, /operatorEmail \|\| ui\("[^"]+", "Deleted admin"\)/); assert.match(source, /aria-label=\{ui\("[^"]+", "View activity for \{\{value1\}\}", \{ value1: promotion\.code \}\)\}/);
 });

@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "../ui-text-test-context.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -19,12 +20,12 @@ function runtime(overrides = {}) {
     const source = fs.readFileSync(fs.existsSync(path.join(overlay, filename)) ? path.join(overlay, filename) : path.join(repo, filename), "utf8");
     const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
     const module = { exports: {} }; cache.set(relative, module);
-    const localRequire = (specifier) => {
+    const localRequire = withUiTextTestContext((specifier) => {
       if (Object.hasOwn(overrides, specifier)) return overrides[specifier];
       if (specifier.endsWith(".module.css")) return { __esModule: true, default: new Proxy({}, { get: (_, key) => String(key) }) };
       if (specifier.startsWith("@/")) return load("apps/web/" + specifier.slice(2));
       return specifier.startsWith(".") ? load(path.posix.normalize(path.posix.join(path.posix.dirname(relative), specifier))) : require(specifier);
-    };
+    });
     new Function("require", "exports", "module", code)(localRequire, module.exports, module); return module.exports;
   }
   return load;

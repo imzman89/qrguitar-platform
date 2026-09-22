@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "./UiTextProvider";
+
 
 import {
   ArrowLeft,
@@ -94,6 +96,7 @@ function MemberAvatar({ name, src }: { name: string; src: string }) {
 }
 
 export function MessagesClient({ conversationId = "" }: { conversationId?: string }) {
+  const ui = useUiText("components.MessagesClient");
   const [phase, setPhase] = useState<Phase>("loading");
   const [conversations, setConversations] = useState<MemberConversationSummary[]>([]);
   const [conversationCursor, setConversationCursor] = useState<string | null>(null);
@@ -229,9 +232,9 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
   function chooseFiles(selected: FileList | null) {
     setNotice("");
     const next = [...files, ...Array.from(selected || [])];
-    if (next.length > MEMBER_MEDIA_COUNT_LIMIT) return setNotice("A message can include up to four photos or videos.");
+    if (next.length > MEMBER_MEDIA_COUNT_LIMIT) return setNotice(ui("ui.components.MessagesClient.050263ed6fbc", "A message can include up to four photos or videos."));
     const invalid = next.find((file) => !(MEMBER_MEDIA_TYPES as readonly string[]).includes(file.type) || file.size < 1 || file.size > MEMBER_MEDIA_LIMIT);
-    if (invalid) return setNotice(`${invalid.name} is not a supported image or video under 15 MB.`);
+    if (invalid) return setNotice(ui("ui.components.MessagesClient.9c3b38b4c727", "{{value1}} is not a supported image or video under 15 MB.", {value1: invalid.name}));
     setFiles(next);
   }
 
@@ -243,7 +246,7 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
   async function sendMessage() {
     if (!conversationId || sending) return;
     const cleanDraft = draft.trim();
-    if (!cleanDraft && !files.length) return setNotice("Write a message or attach a photo or video.");
+    if (!cleanDraft && !files.length) return setNotice(ui("ui.components.MessagesClient.082e906c9e36", "Write a message or attach a photo or video."));
     const attempt = pendingSend.current || { operationId: crypto.randomUUID(), message: cleanDraft, files: [...files], uploaded: false };
     pendingSend.current = attempt;
     setSending(true);
@@ -277,13 +280,13 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
       setUncertainSend(false);
       setDraft("");
       setFiles([]);
-      setNotice("Message sent.");
+      setNotice(ui("ui.components.MessagesClient.a3d34439a016", "Message sent."));
       await loadThread(false);
     } catch (reason) {
       const failure = reason instanceof MessageRequestError ? reason : new MessageRequestError("The send could not be confirmed.", 0, true);
       if (failure.uncertain) {
         setUncertainSend(true);
-        setError(`${failure.message} Retry will use the same protected send operation.`);
+        setError(ui("ui.components.MessagesClient.83f2c9bb85e1", "{{value1}} Retry will use the same protected send operation.", {value1: failure.message}));
       } else {
         await discardPending(attempt);
         pendingSend.current = null;
@@ -294,16 +297,16 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
   }
 
   const signinHref = `/login?next=${encodeURIComponent(conversationId ? `/messages/${conversationId}` : "/messages")}`;
-  if (phase === "loading") return <MessageState icon={<LoaderCircle className={styles.spin} />} title="Opening Messages" copy="Loading your private conversations." />;
-  if (phase === "signed-out") return <MessageState icon={<MessageCircle />} title="Sign in to Messages" copy="Private conversations are available to signed-in QRguitar members." action={<Link className="button" href={signinHref}>Sign in</Link>} />;
-  if (phase === "error" && !thread && !conversations.length) return <MessageState icon={<RefreshCw />} title="Messages are unavailable" copy={error} action={<button className="button" type="button" onClick={() => conversationId ? void loadThread() : void loadInbox()}>Try again</button>} />;
+  if (phase === "loading") return <MessageState icon={<LoaderCircle className={styles.spin} />} title={ui("ui.components.MessagesClient.a690f84ddf9a", "Opening Messages")} copy={ui("ui.components.MessagesClient.f2bb009c8d53", "Loading your private conversations.")} />;
+  if (phase === "signed-out") return <MessageState icon={<MessageCircle />} title={ui("ui.components.MessagesClient.239303a784f1", "Sign in to Messages")} copy={ui("ui.components.MessagesClient.71bf7347acaa", "Private conversations are available to signed-in QRguitar members.")} action={<Link className="button" href={signinHref}>{ui("ui.components.MessagesClient.bfd402b2f6f3", "Sign in")}</Link>} />;
+  if (phase === "error" && !thread && !conversations.length) return <MessageState icon={<RefreshCw />} title={ui("ui.components.MessagesClient.5326173134ea", "Messages are unavailable")} copy={error} action={<button className="button" type="button" onClick={() => conversationId ? void loadThread() : void loadInbox()}>{ui("ui.components.MessagesClient.d8b8392e2c54", "Try again")}</button>} />;
 
   if (!conversationId) {
     return (
       <section className={styles.workspace} aria-labelledby="messages-title">
         <header className={styles.inboxHeader}>
-          <div><span className="eyebrow">Private member conversations</span><h1 id="messages-title">Messages</h1><p>{"Connect with owners, stores, brands, builders, and repair professionals without exposing either member's email address. Conversation history stays available to both members."}</p></div>
-          <Link className="button secondary" href="/collections"><UserRound size={16} /> Find members</Link>
+          <div><span className="eyebrow">{ui("ui.components.MessagesClient.3ec615683303", "Private member conversations")}</span><h1 id="messages-title">{ui("ui.components.MessagesClient.04d7b4833927", "Messages")}</h1><p>{ui("ui.components.MessagesClient.a7aa5fa1de11", "Connect with owners, stores, brands, builders, and repair professionals without exposing either member's email address. Conversation history stays available to both members.")}</p></div>
+          <Link className="button secondary" href="/collections"><UserRound size={16} />{" "}{ui("ui.components.MessagesClient.249635fe58a8", "Find members")}</Link>
         </header>
         {error ? <p className={styles.error} role="alert">{error}</p> : null}
         <div className={styles.inboxList}>
@@ -311,16 +314,16 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
             <Link className={`${styles.conversationCard} ${conversation.unread ? styles.unread : ""}`} href={`/messages/${conversation.id}`} key={conversation.id}>
               <MemberAvatar name={conversation.member.publicName} src={conversation.member.avatarUrl} />
               <div className={styles.conversationBody}>
-                <div className={styles.conversationTopline}><strong>{conversation.member.publicName}</strong><time>{conversation.lastMessage ? formatTime(conversation.lastMessage.createdAt) : "New"}</time></div>
-                <span>{memberRole(conversation.member.accountType)}{conversation.member.location ? ` / ${conversation.member.location}` : ""}</span>
-                {conversation.contextProfile ? <small>About {conversation.contextProfile.title}</small> : null}
-                <p>{conversation.lastMessage ? `${conversation.lastMessage.sentByMe ? "You: " : ""}${conversation.lastMessage.body}` : "Start the conversation."}</p>
+                <div className={styles.conversationTopline}><strong>{conversation.member.publicName}</strong><time>{conversation.lastMessage ? formatTime(conversation.lastMessage.createdAt) : ui("ui.components.MessagesClient.18fdd549b2ed", "New")}</time></div>
+                <span>{memberRole(conversation.member.accountType)}{conversation.member.location ? ui("ui.components.MessagesClient.799272298625", " / {{value1}}", { value1: conversation.member.location }) : ""}</span>
+                {conversation.contextProfile ? <small>{ui("ui.components.MessagesClient.4efca0d10c5f", "About")}{" "}{conversation.contextProfile.title}</small> : null}
+                <p>{conversation.lastMessage ? ui("ui.components.MessagesClient.ae6ed6c2b574", "{{value1}}{{value2}}", { value1: conversation.lastMessage.sentByMe ? "You: " : "", value2: conversation.lastMessage.body }) : ui("ui.components.MessagesClient.8c031eb3ebd3", "Start the conversation.")}</p>
               </div>
-              {conversation.unread ? <i aria-label="Unread message" /> : null}
+              {conversation.unread ? <i aria-label={ui("ui.components.MessagesClient.9021d87e3048", "Unread message")} /> : null}
             </Link>
-          )) : <MessageState compact icon={<Inbox />} title="Your inbox is ready" copy="Open a member page or public QRguitar Profile to start a private conversation." action={<Link className="button" href="/collections">Browse member collections</Link>} />}
+          )) : <MessageState compact icon={<Inbox />} title={ui("ui.components.MessagesClient.4c6806ae9de5", "Your inbox is ready")} copy={ui("ui.components.MessagesClient.482ca0d75627", "Open a member page or public QRguitar Profile to start a private conversation.")} action={<Link className="button" href="/collections">{ui("ui.components.MessagesClient.1fbba5113528", "Browse member collections")}</Link>} />}
         </div>
-        {conversationCursor ? <div className={styles.paginationRow}><button className="button secondary" type="button" disabled={loadingMoreConversations} onClick={() => void loadMoreConversations()}>{loadingMoreConversations ? "Loading…" : "Load older conversations"}</button></div> : null}
+        {conversationCursor ? <div className={styles.paginationRow}><button className="button secondary" type="button" disabled={loadingMoreConversations} onClick={() => void loadMoreConversations()}>{loadingMoreConversations ? ui("ui.components.MessagesClient.ba3bbbe10d8b", "Loading…") : ui("ui.components.MessagesClient.cc4b4d7fdcea", "Load older conversations")}</button></div> : null}
       </section>
     );
   }
@@ -330,22 +333,22 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
   return (
     <section className={styles.workspace} aria-labelledby="thread-title">
       <header className={styles.threadHeader}>
-        <Link className={styles.backLink} href="/messages"><ArrowLeft size={17} /> Messages</Link>
-        <div className={styles.threadIdentity}><MemberAvatar name={thread.member.publicName} src={thread.member.avatarUrl} /><div><h1 id="thread-title">{thread.member.publicName}</h1><p>{memberRole(thread.member.accountType)}{thread.member.location ? ` / ${thread.member.location}` : ""}</p></div></div>
+        <Link className={styles.backLink} href="/messages"><ArrowLeft size={17} />{" "}{ui("ui.components.MessagesClient.04d7b4833927", "Messages")}</Link>
+        <div className={styles.threadIdentity}><MemberAvatar name={thread.member.publicName} src={thread.member.avatarUrl} /><div><h1 id="thread-title">{thread.member.publicName}</h1><p>{memberRole(thread.member.accountType)}{thread.member.location ? ui("ui.components.MessagesClient.799272298625", " / {{value1}}", { value1: thread.member.location }) : ""}</p></div></div>
         <span className={`${styles.connection} ${connection === "Live" ? styles.live : ""}`}><i /> {connection}</span>
       </header>
       <div className={styles.threadGrid}>
         <div className={styles.threadPanel}>
-          {thread.hasOlderMessages ? <div className={styles.historyNote}><button type="button" disabled={loadingOlderMessages} onClick={() => void loadOlderMessages()}>{loadingOlderMessages ? "Loading earlier messages…" : "Load earlier messages"}</button></div> : null}
+          {thread.hasOlderMessages ? <div className={styles.historyNote}><button type="button" disabled={loadingOlderMessages} onClick={() => void loadOlderMessages()}>{loadingOlderMessages ? ui("ui.components.MessagesClient.b8507b92eee1", "Loading earlier messages…") : ui("ui.components.MessagesClient.33fd46b9e779", "Load earlier messages")}</button></div> : null}
           <div ref={messageList} className={styles.messageList} aria-live="polite">
-            {!thread.messages.length ? <div className={styles.threadEmpty}><MessageCircle /><strong>Start the conversation</strong><p>Ask a focused question about the Profile, availability, service, or a potential transfer.</p></div> : null}
+            {!thread.messages.length ? <div className={styles.threadEmpty}><MessageCircle /><strong>{ui("ui.components.MessagesClient.e5e09a778387", "Start the conversation")}</strong><p>{ui("ui.components.MessagesClient.fb2b2f0b47af", "Ask a focused question about the Profile, availability, service, or a potential transfer.")}</p></div> : null}
             {thread.messages.map((message) => (
               <article className={`${styles.message} ${message.sentByMe ? styles.mine : styles.theirs}`} key={message.id}>
                 {message.body ? <p>{message.body}</p> : null}
                 {message.attachments.length ? <div className={styles.mediaGrid}>{message.attachments.map((attachment) => attachment.mimeType.startsWith("image/") ? (
-                  <a href={attachment.signedUrl} target="_blank" rel="noopener noreferrer" key={attachment.id} aria-label={`Open ${attachment.fileName}`}><img src={attachment.signedUrl} alt={attachment.fileName} loading="lazy" /></a>
+                  <a href={attachment.signedUrl} target="_blank" rel="noopener noreferrer" key={attachment.id} aria-label={ui("ui.components.MessagesClient.839d6deea6a7", "Open {{value1}}", { value1: attachment.fileName })}><img src={attachment.signedUrl} alt={attachment.fileName} loading="lazy" /></a>
                 ) : (
-                  <video controls preload="metadata" key={attachment.id}><source src={attachment.signedUrl} type={attachment.mimeType} />Your browser cannot play this video.</video>
+                  <video controls preload="metadata" key={attachment.id}><source src={attachment.signedUrl} type={attachment.mimeType} />{ui("ui.components.MessagesClient.cf3948a413e9", "Your browser cannot play this video.")}</video>
                 ))}</div> : null}
                 <footer><time dateTime={message.createdAt}>{formatTime(message.createdAt)}</time></footer>
               </article>
@@ -353,28 +356,28 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
             <div ref={messageEnd} />
           </div>
           <div className={styles.composer}>
-              <label htmlFor="member-message-draft">Message</label>
-              <textarea id="member-message-draft" rows={3} maxLength={4000} value={draft} disabled={lockComposer} onChange={(event) => setDraft(event.target.value)} placeholder={`Message ${thread.member.publicName}`} />
-              {files.length ? <ul className={styles.fileList}>{files.map((file, index) => <li key={`${file.name}-${file.lastModified}-${index}`}><FileImage size={15} /><span><strong>{file.name}</strong><small>{fileSize(file.size)}</small></span><button type="button" disabled={lockComposer} title={`Remove ${file.name}`} onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={15} /></button></li>)}</ul> : null}
+              <label htmlFor="member-message-draft">{ui("ui.components.MessagesClient.2f77668a9dfb", "Message")}</label>
+              <textarea id="member-message-draft" rows={3} maxLength={4000} value={draft} disabled={lockComposer} onChange={(event) => setDraft(event.target.value)} placeholder={ui("ui.components.MessagesClient.577c10d6f210", "Message {{value1}}", { value1: thread.member.publicName })} />
+              {files.length ? <ul className={styles.fileList}>{files.map((file, index) => <li key={`${file.name}-${file.lastModified}-${index}`}><FileImage size={15} /><span><strong>{file.name}</strong><small>{fileSize(file.size)}</small></span><button type="button" disabled={lockComposer} title={ui("ui.components.MessagesClient.d2f6b9b77710", "Remove {{value1}}", { value1: file.name })} onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={15} /></button></li>)}</ul> : null}
               <div className={styles.composerActions}>
-                <label className={styles.attachButton}><ImagePlus size={17} /><span>Add media</span><input type="file" multiple accept={MEMBER_MEDIA_TYPES.join(",")} disabled={lockComposer || files.length >= 4} onChange={(event) => { chooseFiles(event.target.files); event.currentTarget.value = ""; }} /></label>
+                <label className={styles.attachButton}><ImagePlus size={17} /><span>{ui("ui.components.MessagesClient.d5d5d266ceab", "Add media")}</span><input type="file" multiple accept={MEMBER_MEDIA_TYPES.join(",")} disabled={lockComposer || files.length >= 4} onChange={(event) => { chooseFiles(event.target.files); event.currentTarget.value = ""; }} /></label>
                 <span>{draft.length}/4000</span>
-                <button className="button" type="button" disabled={sending} onClick={() => void sendMessage()}>{sending ? <LoaderCircle className={styles.spin} size={16} /> : <Send size={16} />}{sending ? "Sending..." : uncertainSend ? "Retry send" : "Send"}</button>
+                <button className="button" type="button" disabled={sending} onClick={() => void sendMessage()}>{sending ? <LoaderCircle className={styles.spin} size={16} /> : <Send size={16} />}{sending ? ui("ui.components.MessagesClient.286a3af7348e", "Sending...") : uncertainSend ? ui("ui.components.MessagesClient.6bc12f1358f6", "Retry send") : ui("ui.components.MessagesClient.f6f4688ff23d", "Send")}</button>
               </div>
           </div>
           {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
           {error ? <p className={styles.error} role="alert">{error}</p> : null}
         </div>
-        <aside className={styles.memberPanel} aria-label="Member and conversation details">
+        <aside className={styles.memberPanel} aria-label={ui("ui.components.MessagesClient.9e9c59e21685", "Member and conversation details")}>
           <div className={styles.memberSummary}><MemberAvatar name={thread.member.publicName} src={thread.member.avatarUrl} /><div><strong>{thread.member.publicName}</strong><span>{memberRole(thread.member.accountType)}</span></div></div>
           {thread.member.bio ? <p>{thread.member.bio}</p> : null}
           <div className={styles.memberLinks}>
-            {thread.member.handle ? <Link href={`/collections/${thread.member.handle}`}><UserRound size={15} /> View member page</Link> : null}
-            {thread.member.websiteUrl ? <a href={thread.member.websiteUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={15} /> Visit website</a> : null}
+            {thread.member.handle ? <Link href={`/collections/${thread.member.handle}`}><UserRound size={15} />{" "}{ui("ui.components.MessagesClient.1d8bddb65817", "View member page")}</Link> : null}
+            {thread.member.websiteUrl ? <a href={thread.member.websiteUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={15} />{" "}{ui("ui.components.MessagesClient.15bf74726c6b", "Visit website")}</a> : null}
             {thread.contextProfile ? <Link href={thread.contextProfile.href}><ShieldCheck size={15} /> {thread.contextProfile.title}</Link> : null}
           </div>
           <div className={styles.threadControls}>
-            <a href={`mailto:support@qrguitar.com?subject=${encodeURIComponent("QRguitar message safety concern")}&body=${encodeURIComponent(`Conversation ID: ${conversationId}\n\nPlease describe the message, concern, and approximate time. Do not include passwords, payment-card numbers, or unrelated personal documents.`)}`}><Flag size={15} /> Report a safety concern</a>
+            <a href={`mailto:support@qrguitar.com?subject=${encodeURIComponent("QRguitar message safety concern")}&body=${encodeURIComponent(`Conversation ID: ${conversationId}\n\nPlease describe the message, concern, and approximate time. Do not include passwords, payment-card numbers, or unrelated personal documents.`)}`}><Flag size={15} />{" "}{ui("ui.components.MessagesClient.980b3fdfd32e", "Report a safety concern")}</a>
           </div>
         </aside>
       </div>

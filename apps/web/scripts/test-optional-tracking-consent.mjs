@@ -400,12 +400,12 @@ test("the UI contract stays compact, accessible, balanced, and hidden without ex
   const privacy = fs.readFileSync(path.join(webRoot, "app/privacy/page.tsx"), "utf8");
   assert.match(component, /!hasConfiguredOptionalTrackingProvider\(\) \|\| !consent/);
   assert.match(component, /role="dialog"/);
-  assert.match(component, /aria-label="Optional tracking choices"/);
-  assert.match(component, />Accept<\/button>/);
-  assert.match(component, /"Deny" : "Keep off"/);
+  assert.match(component, /aria-label=\{ui\("ui\.components\.OptionalTrackingConsent\.[^"]+", "Optional tracking choices"\)\}/);
+  assert.match(component, /onClick=\{\(\) => choose\("accepted"\)\}>\{ui\("[^"]+", "Accept"\)\}<\/button>/);
+  assert.match(component, /consent.status === "pending" \? ui\("[^"]+", "Deny"\) : ui\("[^"]+", "Keep off"\)/);
   assert.match(component, /href="\/privacy"/);
-  assert.match(component, /aria-label="Privacy choices"/);
-  assert.match(component, /onClick=\{\(\) => choose\("denied"\)\}>Turn off/);
+  assert.match(component, /aria-label=\{ui\("ui\.components\.OptionalTrackingConsent\.[^"]+", "Privacy choices"\)\}/);
+  assert.match(component, /onClick=\{\(\) => choose\("denied"\)\}>\{ui\("[^"]+", "Turn off"\)\}/);
   assert.match(component, /saveOptionalTrackingConsentForReload\(\)[\s\S]*window\.location\.reload\(\)/);
   assert.match(component, /setManaging\(false\);\s*setStorageError\(true\)/);
   assert.match(component, /className=\{styles\.statusOnly\} role="status"/);

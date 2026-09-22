@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -7,12 +8,14 @@ import test from 'node:test';
 const hereRoot = path.resolve(import.meta.dirname, '../../..');
 const repo = path.resolve(process.argv.find(arg => arg.startsWith('--repo='))?.slice(7) || hereRoot);
 const sourceRoot = path.resolve(process.argv.find(arg => arg.startsWith('--source-root='))?.slice(14) || hereRoot);
-const require = createRequire(path.join(repo, 'package.json'));
+const require = withUiTextTestContext(createRequire(path.join(repo, 'package.json')));
+const { useUiText } = require("UiTextProvider");
 const ts = require('typescript'), React = require('react');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
 const transfer = { id: 'transfer-a', status: 'sent', guitarQrCode: 'QRG-A', claimPath: '/transfer/transfer-a', toEmail: 'buyer@example.invalid' };
 function component(file, name, env) {
+  env = { useUiText, ...env };
   const source = fs.readFileSync(path.join(sourceRoot, 'apps/web', file), 'utf8');
   const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const declaration = ast.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === name);
@@ -144,7 +147,7 @@ function acceptanceHandlers(copy, fetch) {
   function visit(node) { if (ts.isFunctionDeclaration(node) && ['acceptTransfer', 'copyProfileLink'].includes(node.name?.text)) selected.push(node.getText(ast)); ts.forEachChild(node, visit); }
   visit(ast); assert.equal(selected.length, 2);
   const state = { message: '', accepting: false, transfer: { ...transfer }, permanentPath: '', loadError: false, tracking: [] };
-  const env = { transfer: state.transfer, accepting: false, authRevision: { current: 1 }, feedbackRevision: { current: 0 }, acceptMutation: { current: null },
+  const env = { ui: useUiText("app.transfer.id.page"), transfer: state.transfer, accepting: false, authRevision: { current: 1 }, feedbackRevision: { current: 0 }, acceptMutation: { current: null },
     window: { navigator: { clipboard: { writeText: copy } }, location: { origin: 'https://www.qrguitar.com' } }, profileHref: '/i/QRG-A', getSupabaseAccessToken: async () => 'synthetic-token', fetch,
     optionalTrackingProductEvents: { ownershipTransferCompleted: 'ownership_transfer_completed' },
     dispatchOptionalTrackingProductEvent: async event => { state.tracking.push(event); return true; } };

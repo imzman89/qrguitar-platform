@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "../../../components/UiTextProvider";
+
 
 import { ownerProfileHref } from "../../../lib/owner-profile";
 
@@ -88,6 +90,7 @@ function Badge({ children, tone = "neutral", icon }: { children: ReactNode; tone
 }
 
 export default function HandoutPage() {
+  const ui = useUiText("app.handout.code.page");
   const params = useParams<{ code: string }>();
   const content = useSiteContent();
   const code = String(params.code || "").trim().toUpperCase();
@@ -208,7 +211,7 @@ export default function HandoutPage() {
           router.replace(`/handout/${encodeURIComponent(result.instrument.qrCode)}${query ? `?${query}` : ""}`);
         }
       } catch (error) {
-        if (isCurrent()) setMessage(error instanceof Error ? error.message : "This Profile could not be loaded. Please try again.");
+        if (isCurrent()) setMessage(error instanceof Error ? error.message : ui("ui.app.handout.code.page.5cf97593870f", "This Profile could not be loaded. Please try again."));
       } finally {
         if (isCurrent()) setLoading(false);
       }
@@ -418,17 +421,17 @@ export default function HandoutPage() {
       <div className={styles.badges}>
         {instrument.showVerificationBadge !== false ? (
           <Badge tone={verification === "verified" ? "verified" : "neutral"} icon={<ShieldCheck size={12} />}>
-            {verification === "verified" ? "Verified by QRguitar" : "Unverified"}
+            {verification === "verified" ? ui("ui.app.handout.code.page.d8d9a98cd0e8", "Verified by QRguitar") : ui("ui.app.handout.code.page.33c8e8de41c3", "Unverified")}
           </Badge>
         ) : null}
         {instrument.showAuthenticityBadge !== false ? (
           <Badge tone={authenticity === "confirmed" ? "auth" : "neutral"} icon={<ShieldCheck size={12} />}>
-            {authenticity === "confirmed" ? "Authenticity Confirmed" : "Authenticity Unconfirmed"}
+            {authenticity === "confirmed" ? ui("ui.app.handout.code.page.eb95c24a9590", "Authenticity Confirmed") : ui("ui.app.handout.code.page.a54f9b625886", "Authenticity Unconfirmed")}
           </Badge>
         ) : null}
         {safety ? (
           <Badge tone="safety" icon={<Siren size={12} />}>
-            {safety === "lost" ? "Reported Lost" : safety === "stolen" ? "Reported Stolen" : "Recovered"}
+            {safety === "lost" ? ui("ui.app.handout.code.page.299f098db192", "Reported Lost") : safety === "stolen" ? ui("ui.app.handout.code.page.44d0eeb2a64d", "Reported Stolen") : ui("ui.app.handout.code.page.37ce0a91ee27", "Recovered")}
           </Badge>
         ) : null}
       </div>
@@ -437,28 +440,24 @@ export default function HandoutPage() {
 
   return (
     <>
-      <style>{`@media print { @page { size: ${resolvedPageDimensions}; margin: ${geometry.margin}in; } }`}</style>
+      <style>{ui("ui.app.handout.code.page.edca82c0915c", "@media print { @page { size: {{value1}}; margin: {{value2}}in; } }", { value1: resolvedPageDimensions, value2: geometry.margin })}</style>
       <div className={`no-print ${styles.screenChrome}`}><Nav /></div>
       <main className={`section handout-page ${styles.root}`} data-print-page-size={printSize}>
         <div className="shell handout-shell" data-print-ready={readyToPrint} data-print-mode={mode} data-print-size={printSize} data-print-orientation={orientation} data-print-theme={theme}>
           <div className="print-kit-toolbar no-print">
             <div>
               <Link className="print-kit-back-link" href="/dashboard">
-                <ArrowLeft size={15} />
-                Dashboard
-              </Link>
-              <div className="eyebrow">QR and print</div>
+                <ArrowLeft size={15} />{ui("ui.app.handout.code.page.67b696468610", "Dashboard")}</Link>
+              <div className="eyebrow">{ui("ui.app.handout.code.page.3eed152bf351", "QR and print")}</div>
               <h1>{getContentValue(content, "printWorkspace.title")}</h1>
               <p>{getContentValue(content, "printWorkspace.body")}</p>
             </div>
             <div className="print-kit-toolbar-actions">
               <Link className="button secondary" href={instrument ? ownerProfileHref(instrument) : "/dashboard"} target="_blank">
-                <ExternalLink size={16} />
-                Open Profile
-              </Link>
+                <ExternalLink size={16} />{ui("ui.app.handout.code.page.f9d77f6cb2f2", "Open Profile")}</Link>
               <button className="button" type="button" onClick={printSelectedPage} disabled={!readyToPrint || printing}>
                 <Printer size={16} />
-                {printing ? "Opening print..." : "Print " + printModeLabel(mode)}
+                {printing ? ui("ui.app.handout.code.page.ab31856edf15", "Opening print...") : "Print " + printModeLabel(mode)}
               </button>
             </div>
           </div>
@@ -472,21 +471,21 @@ export default function HandoutPage() {
             onClick={() => setMobileControlsOpen((current) => !current)}
           >
             <SlidersHorizontal size={16} />
-            {mobileControlsOpen ? "Close print options" : "Print options"}
+            {mobileControlsOpen ? ui("ui.app.handout.code.page.f14f3c9238ed", "Close print options") : ui("ui.app.handout.code.page.45e209da028e", "Print options")}
           </button>
 
-          {mobileControlsOpen ? <button type="button" className={`${styles.mobileControlsBackdrop} no-print`} aria-label="Close print options" onClick={() => setMobileControlsOpen(false)} /> : null}
+          {mobileControlsOpen ? <button type="button" className={`${styles.mobileControlsBackdrop} no-print`} aria-label={ui("ui.app.handout.code.page.f14f3c9238ed", "Close print options")} onClick={() => setMobileControlsOpen(false)} /> : null}
 
           <div className={styles.workspace} data-print-frame>
             {instrument ? (
-              <aside className={`${styles.controlRail} ${mobileControlsOpen ? styles.controlRailOpen : ""} no-print`} id="print-suite-controls" aria-label="Print Suite controls" role={mobileControlsOpen ? "dialog" : undefined} aria-modal={mobileControlsOpen || undefined}>
+              <aside className={`${styles.controlRail} ${mobileControlsOpen ? styles.controlRailOpen : ""} no-print`} id="print-suite-controls" aria-label={ui("ui.app.handout.code.page.16ac699a5f21", "Print Suite controls")} role={mobileControlsOpen ? "dialog" : undefined} aria-modal={mobileControlsOpen || undefined}>
                 <div className={styles.mobileControlsHeader}>
-                  <strong>Print options</strong>
-                  <button type="button" aria-label="Close print options" onClick={() => setMobileControlsOpen(false)}><X size={17} /></button>
+                  <strong>{ui("ui.app.handout.code.page.45e209da028e", "Print options")}</strong>
+                  <button type="button" aria-label={ui("ui.app.handout.code.page.f14f3c9238ed", "Close print options")} onClick={() => setMobileControlsOpen(false)}><X size={17} /></button>
                 </div>
                 <div className={styles.controlSection}>
-                  <span className={styles.controlLabel}>Format</span>
-                  <div className={styles.formatList} role="group" aria-label="Print format">
+                  <span className={styles.controlLabel}>{ui("ui.app.handout.code.page.2f343666aaa8", "Format")}</span>
+                  <div className={styles.formatList} role="group" aria-label={ui("ui.app.handout.code.page.2b60a18bae15", "Print format")}>
                     {availableModes.map((key) => (
                       <button
                         key={key}
@@ -503,64 +502,64 @@ export default function HandoutPage() {
                 </div>
 
                 <div className={styles.controlGrid}>
-                  {activeFormat.sizes.length > 1 ? <label>Paper<select value={printSize} onChange={(event) => setPrintSize(event.target.value as PrintSize)}>{activeFormat.sizes.map((size) => <option value={size} key={size}>{printSizeLabels[size]}</option>)}</select></label> : null}
-                  {activeFormat.orientations.length > 1 ? <label>Orientation<select value={orientation} onChange={(event) => setOrientation(event.target.value as PrintOrientation)}>{activeFormat.orientations.map((value) => <option value={value} key={value}>{value === "portrait" ? "Portrait" : "Landscape"}</option>)}</select></label> : null}
+                  {activeFormat.sizes.length > 1 ? <label>{ui("ui.app.handout.code.page.35045eff549e", "Paper")}<select value={printSize} onChange={(event) => setPrintSize(event.target.value as PrintSize)}>{activeFormat.sizes.map((size) => <option value={size} key={size}>{printSizeLabels[size]}</option>)}</select></label> : null}
+                  {activeFormat.orientations.length > 1 ? <label>{ui("ui.app.handout.code.page.e3d11242200f", "Orientation")}<select value={orientation} onChange={(event) => setOrientation(event.target.value as PrintOrientation)}>{activeFormat.orientations.map((value) => <option value={value} key={value}>{value === "portrait" ? ui("ui.app.handout.code.page.f71094c30160", "Portrait") : ui("ui.app.handout.code.page.e658d3ae034a", "Landscape")}</option>)}</select></label> : null}
                 </div>
 
                 {ownerAuthorized ? (
                   <fieldset className={styles.controlSection}>
-                    <legend className={styles.controlLabel}>Copy type</legend>
-                    <label className={styles.choice}><input type="radio" name="print-scope" checked={printScope === "public"} onChange={() => setPrintScope("public")} /><span><strong>Public-safe copy</strong><small>Includes only information allowed on the public Profile.</small></span></label>
-                    <label className={styles.choice}><input type="radio" name="print-scope" checked={printScope === "owner"} onChange={() => setPrintScope("owner")} /><span><strong>Owner copy</strong><small>May include a hidden Serial Number. Do not share this copy if it contains private information.</small></span></label>
+                    <legend className={styles.controlLabel}>{ui("ui.app.handout.code.page.2b4946ae1386", "Copy type")}</legend>
+                    <label className={styles.choice}><input type="radio" name="print-scope" checked={printScope === "public"} onChange={() => setPrintScope("public")} /><span><strong>{ui("ui.app.handout.code.page.ef50a2af62ff", "Public-safe copy")}</strong><small>{ui("ui.app.handout.code.page.51a370754ef7", "Includes only information allowed on the public Profile.")}</small></span></label>
+                    <label className={styles.choice}><input type="radio" name="print-scope" checked={printScope === "owner"} onChange={() => setPrintScope("owner")} /><span><strong>{ui("ui.app.handout.code.page.9732ac52e538", "Owner copy")}</strong><small>{ui("ui.app.handout.code.page.5c027d45a7ce", "May include a hidden Serial Number. Do not share this copy if it contains private information.")}</small></span></label>
                   </fieldset>
                 ) : null}
 
-                {mode === "service" ? <label className={styles.controlSection}><span className={styles.controlLabel}>Service Entry</span><select value={selectedService?.id || ""} onChange={(event) => setSelectedServiceId(event.target.value)}>{printableServiceEntries.map((entry) => <option value={entry.id} key={entry.id}>{formatServiceDate(entry)} - {entry.title}</option>)}</select></label> : null}
+                {mode === "service" ? <label className={styles.controlSection}><span className={styles.controlLabel}>{ui("ui.app.handout.code.page.cd06117a4a90", "Service Entry")}</span><select value={selectedService?.id || ""} onChange={(event) => setSelectedServiceId(event.target.value)}>{printableServiceEntries.map((entry) => <option value={entry.id} key={entry.id}>{formatServiceDate(entry)} - {entry.title}</option>)}</select></label> : null}
 
                 <fieldset className={styles.controlSection}>
-                  <legend className={styles.controlLabel}>Fields</legend>
+                  <legend className={styles.controlLabel}>{ui("ui.app.handout.code.page.616f48c1db19", "Fields")}</legend>
                   <div className={styles.toggleGrid}>
-                    <label><input type="checkbox" checked={includeLogo} onChange={(event) => setIncludeLogo(event.target.checked)} /> Logo</label>
-                    {activeFormat.photo && photoUrl ? <label><input type="checkbox" checked={includePhoto} onChange={(event) => setIncludePhoto(event.target.checked)} /> Photograph</label> : null}
-                    {presentation?.serialNumber ? <label><input type="checkbox" checked={includeSerial} onChange={(event) => setIncludeSerial(event.target.checked)} /> Serial Number</label> : null}
-                    {activeFormat.availability && saleStatus ? <label><input type="checkbox" checked={includeAvailability} onChange={(event) => setIncludeAvailability(event.target.checked)} /> Availability</label> : null}
-                    {activeFormat.attribution && instrument.publicCollection?.publicName ? <label><input type="checkbox" checked={includeAttribution} onChange={(event) => setIncludeAttribution(event.target.checked)} /> Attribution</label> : null}
-                    {activeFormat.specifications && printableSpecs.length ? <label><input type="checkbox" checked={includeSpecifications} onChange={(event) => setIncludeSpecifications(event.target.checked)} /> Specifications</label> : null}
-                    {activeFormat.timeline && timelineEntries.length ? <label><input type="checkbox" checked={includeTimeline} onChange={(event) => setIncludeTimeline(event.target.checked)} /> Timeline summary</label> : null}
+                    <label><input type="checkbox" checked={includeLogo} onChange={(event) => setIncludeLogo(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.d707dc2f1936", "Logo")}</label>
+                    {activeFormat.photo && photoUrl ? <label><input type="checkbox" checked={includePhoto} onChange={(event) => setIncludePhoto(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.bb1de9720797", "Photograph")}</label> : null}
+                    {presentation?.serialNumber ? <label><input type="checkbox" checked={includeSerial} onChange={(event) => setIncludeSerial(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.14b1b3c5b151", "Serial Number")}</label> : null}
+                    {activeFormat.availability && saleStatus ? <label><input type="checkbox" checked={includeAvailability} onChange={(event) => setIncludeAvailability(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.12f67f8539c4", "Availability")}</label> : null}
+                    {activeFormat.attribution && instrument.publicCollection?.publicName ? <label><input type="checkbox" checked={includeAttribution} onChange={(event) => setIncludeAttribution(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.a902dcce0886", "Attribution")}</label> : null}
+                    {activeFormat.specifications && printableSpecs.length ? <label><input type="checkbox" checked={includeSpecifications} onChange={(event) => setIncludeSpecifications(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.015b4e0a76e5", "Specifications")}</label> : null}
+                    {activeFormat.timeline && timelineEntries.length ? <label><input type="checkbox" checked={includeTimeline} onChange={(event) => setIncludeTimeline(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.a7a952cb15e6", "Timeline summary")}</label> : null}
                   </div>
                 </fieldset>
 
                 {activeFormat.photo && includePhoto && galleryImages.length ? <div className={styles.controlGrid}>
-                  {galleryImages.length > 1 ? <label>Photograph<select value={photoUrl} onChange={(event) => setSelectedPhoto(event.target.value)}>{galleryImages.map((url, index) => <option value={url} key={url}>{index === 0 ? "Main photograph" : `Photograph ${index + 1}`}</option>)}</select></label> : null}
-                  <label>Photo framing<select value={photoFit} onChange={(event) => setPhotoFit(event.target.value as "contain" | "cover")}><option value="contain">Show whole photo</option><option value="cover">Fill photo area</option></select></label>
+                  {galleryImages.length > 1 ? <label>{ui("ui.app.handout.code.page.bb1de9720797", "Photograph")}<select value={photoUrl} onChange={(event) => setSelectedPhoto(event.target.value)}>{galleryImages.map((url, index) => <option value={url} key={url}>{index === 0 ? ui("ui.app.handout.code.page.7cbea1608d56", "Main photograph") : ui("ui.app.handout.code.page.db641bc07db6", "Photograph {{value1}}", { value1: index + 1 })}</option>)}</select></label> : null}
+                  <label>{ui("ui.app.handout.code.page.a27757d6372e", "Photo framing")}<select value={photoFit} onChange={(event) => setPhotoFit(event.target.value as "contain" | "cover")}><option value="contain">{ui("ui.app.handout.code.page.732c51dcff54", "Show whole photo")}</option><option value="cover">{ui("ui.app.handout.code.page.33d0dc3a81a2", "Fill photo area")}</option></select></label>
                 </div> : null}
-                {mode === "service" ? <label className={styles.choice}><input type="checkbox" checked={includeServiceDetails} onChange={(event) => setIncludeServiceDetails(event.target.checked)} /> Full service details</label> : null}
-                <label className={styles.controlSection}><span className={styles.controlLabel}>Title on this printout</span><input type="text" maxLength={120} value={printTitle ?? title} onChange={(event) => setPrintTitle(event.target.value)} /></label>
-                {mode !== "label" ? <label className={styles.controlSection}><span className={styles.controlLabel}>Note on this printout</span><textarea rows={3} maxLength={240} value={printNote} placeholder="Care advice, collection details or a message for the recipient" onChange={(event) => setPrintNote(event.target.value)} /><small>{printNote.length}/240</small></label> : null}
+                {mode === "service" ? <label className={styles.choice}><input type="checkbox" checked={includeServiceDetails} onChange={(event) => setIncludeServiceDetails(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.b7a17f6da566", "Full service details")}</label> : null}
+                <label className={styles.controlSection}><span className={styles.controlLabel}>{ui("ui.app.handout.code.page.eaea51b2ef4f", "Title on this printout")}</span><input type="text" maxLength={120} value={printTitle ?? title} onChange={(event) => setPrintTitle(event.target.value)} /></label>
+                {mode !== "label" ? <label className={styles.controlSection}><span className={styles.controlLabel}>{ui("ui.app.handout.code.page.e100b01df2b6", "Note on this printout")}</span><textarea rows={3} maxLength={240} value={printNote} placeholder={ui("ui.app.handout.code.page.2faf4e50e727", "Care advice, collection details or a message for the recipient")} onChange={(event) => setPrintNote(event.target.value)} /><small>{printNote.length}/240</small></label> : null}
 
                 <fieldset className={styles.controlSection}>
-                  <legend className={styles.controlLabel}>QR</legend>
+                  <legend className={styles.controlLabel}>{ui("ui.app.handout.code.page.a439fba430a3", "QR")}</legend>
                   <div className={styles.toggleGrid}>
-                    <label><input type="checkbox" checked={includeUrlLabel} onChange={(event) => setIncludeUrlLabel(event.target.checked)} /> URL label</label>
-                    <label><input type="checkbox" checked={includeScanInstruction} onChange={(event) => setIncludeScanInstruction(event.target.checked)} /> Scan instruction</label>
+                    <label><input type="checkbox" checked={includeUrlLabel} onChange={(event) => setIncludeUrlLabel(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.b36c5aceb02f", "URL label")}</label>
+                    <label><input type="checkbox" checked={includeScanInstruction} onChange={(event) => setIncludeScanInstruction(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.eaf0a0e32cc3", "Scan instruction")}</label>
                   </div>
                 </fieldset>
 
                 <div className={styles.controlActions}>
                   <button type="button" className={styles.resetButton} onClick={resetPrintOptions}><RotateCcw size={14} /> {getContentValue(content, "printWorkspace.reset")}</button>
-                  <button type="button" className={styles.doneButton} onClick={() => setMobileControlsOpen(false)}>Done</button>
+                  <button type="button" className={styles.doneButton} onClick={() => setMobileControlsOpen(false)}>{ui("ui.app.handout.code.page.11a6767d5674", "Done")}</button>
                 </div>
               </aside>
             ) : null}
 
-            <section className={`${styles.previewStage} ${!instrument ? styles.previewStageEmpty : ""}`} data-print-frame aria-label="Print preview stage">
+            <section className={`${styles.previewStage} ${!instrument ? styles.previewStageEmpty : ""}`} data-print-frame aria-label={ui("ui.app.handout.code.page.d0f8e8312681", "Print preview stage")}>
               <div className={`${styles.previewToolbar} no-print`}>
-                <div><strong>{printModeLabel(mode)}</strong><span>{printSizeLabels[printSize]} / {orientation}{readyToPrint ? " / 1 page" : ""}</span></div>
-                {instrument ? <div className={styles.zoomControls} aria-label="Preview zoom">
-                  <button type="button" aria-label="Zoom out" title="Zoom out" disabled={zoom <= 75} onClick={() => setZoom((current) => Math.max(75, current - 25))}><ZoomOut size={17} /></button>
-                  <button type="button" aria-label="Fit page" title="Fit page" onClick={() => setZoom(100)}><Maximize size={17} /></button>
-                  <output aria-live="polite" aria-label="Preview scale">{Math.round(previewScale * 100)}%</output>
-                  <button type="button" aria-label="Zoom in" title="Zoom in" disabled={zoom >= 300} onClick={() => setZoom((current) => Math.min(300, current + 25))}><ZoomIn size={17} /></button>
+                <div><strong>{printModeLabel(mode)}</strong><span>{printSizeLabels[printSize]} / {orientation}{readyToPrint ? ui("ui.app.handout.code.page.3fb0090fff7a", " / 1 page") : ""}</span></div>
+                {instrument ? <div className={styles.zoomControls} aria-label={ui("ui.app.handout.code.page.317ab210624d", "Preview zoom")}>
+                  <button type="button" aria-label={ui("ui.app.handout.code.page.bc7b631a689b", "Zoom out")} title={ui("ui.app.handout.code.page.bc7b631a689b", "Zoom out")} disabled={zoom <= 75} onClick={() => setZoom((current) => Math.max(75, current - 25))}><ZoomOut size={17} /></button>
+                  <button type="button" aria-label={ui("ui.app.handout.code.page.3626161a4685", "Fit page")} title={ui("ui.app.handout.code.page.3626161a4685", "Fit page")} onClick={() => setZoom(100)}><Maximize size={17} /></button>
+                  <output aria-live="polite" aria-label={ui("ui.app.handout.code.page.aeffe78362f7", "Preview scale")}>{Math.round(previewScale * 100)}%</output>
+                  <button type="button" aria-label={ui("ui.app.handout.code.page.0e47f09a748f", "Zoom in")} title={ui("ui.app.handout.code.page.0e47f09a748f", "Zoom in")} disabled={zoom >= 300} onClick={() => setZoom((current) => Math.min(300, current + 25))}><ZoomIn size={17} /></button>
                 </div> : null}
               </div>
 
@@ -569,15 +568,15 @@ export default function HandoutPage() {
                 <span>{qrError || printState}</span>
               </div> : null}
 
-              {isPrivate ? <p className={`${styles.scopeNotice} no-print`}>This Profile is private. The printed QR will not open for customers until you change its visibility.</p> : null}
-              {printScope === "owner" ? <p className={`${styles.scopeNotice} no-print`}>Owner copy: may contain information hidden from the public Profile.</p> : null}
+              {isPrivate ? <p className={`${styles.scopeNotice} no-print`}>{ui("ui.app.handout.code.page.9db2256ef43c", "This Profile is private. The printed QR will not open for customers until you change its visibility.")}</p> : null}
+              {printScope === "owner" ? <p className={`${styles.scopeNotice} no-print`}>{ui("ui.app.handout.code.page.35e225fbf65f", "Owner copy: may contain information hidden from the public Profile.")}</p> : null}
               <div className={styles.canvasViewport} data-print-frame ref={viewportRef}>
                 {loading || !instrument ? (
                   <section className={`${styles.loadStatus} no-print`} role="status" aria-live="polite" aria-atomic="true">
                     {loading ? <QrCode aria-hidden="true" /> : <FileText aria-hidden="true" />}
-                    <h2>{loading ? "Preparing Print Suite..." : "Print Suite unavailable."}</h2>
-                    <p>{loading ? "Loading the selected Profile." : message || "This Profile could not be loaded. Please try again."}</p>
-                    {!loading ? <button type="button" className={styles.retryButton} onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button> : null}
+                    <h2>{loading ? ui("ui.app.handout.code.page.d1e2cf07f226", "Preparing Print Suite...") : ui("ui.app.handout.code.page.a8e29add002d", "Print Suite unavailable.")}</h2>
+                    <p>{loading ? ui("ui.app.handout.code.page.2ce160648f07", "Loading the selected Profile.") : message || ui("ui.app.handout.code.page.5cf97593870f", "This Profile could not be loaded. Please try again.")}</p>
+                    {!loading ? <button type="button" className={styles.retryButton} onClick={() => setLoadAttempt((attempt) => attempt + 1)}>{ui("ui.app.handout.code.page.d8b8392e2c54", "Try again")}</button> : null}
                   </section>
                 ) : (
                 <div className={styles.paperSpace} data-print-frame style={{ width: geometry.width * 96 * previewScale, height: geometry.height * 96 * previewScale }}>
@@ -614,7 +613,7 @@ export default function HandoutPage() {
                 </div>
                 </div>
                 )}
-                <p className={styles.printUnavailable}>Print unavailable. Return to QRguitar and resolve the print readiness message before printing.</p>
+                <p className={styles.printUnavailable}>{ui("ui.app.handout.code.page.2b25a25a833f", "Print unavailable. Return to QRguitar and resolve the print readiness message before printing.")}</p>
               </div>
             </section>
           </div>

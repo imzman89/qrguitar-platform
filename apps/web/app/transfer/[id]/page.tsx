@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "../../../components/UiTextProvider";
+
 
 import workflow from "../../../components/WorkflowWorkspace.module.css";
 import { BadgeCheck, Copy, LogIn, Repeat2, ShieldCheck } from "lucide-react";
@@ -20,6 +22,7 @@ type TransferPayload = {
 };
 
 export default function TransferClaimPage() {
+  const ui = useUiText("app.transfer.id.page");
   const params = useParams<{ id: string }>();
   const transferId = String(params.id || "");
   const [transfer, setTransfer] = useState<DemoTransfer | null>(null);
@@ -69,7 +72,7 @@ export default function TransferClaimPage() {
       const timer = setTimeout(() => {
         requestController.abort();
         if (!cancelled && request === generation) {
-          setLoadError(true); setMessage("Loading this transfer took too long. Try again."); setLoading(false);
+          setLoadError(true); setMessage(ui("ui.app.transfer.id.page.fdee411bbf65", "Loading this transfer took too long. Try again.")); setLoading(false);
         }
       }, 20000);
       setLoading(true); setLoadError(false); setRequiresAccess(false);
@@ -81,13 +84,13 @@ export default function TransferClaimPage() {
         const payload = await response.json().catch(() => null) as TransferPayload | null;
         if (cancelled || request !== generation || requestController.signal.aborted) return;
         if (response.ok && payload?.requiresSignIn) {
-          setRequiresAccess(true); setMessage("Use the recipient account or the current owner account to view this handoff.");
+          setRequiresAccess(true); setMessage(ui("ui.app.transfer.id.page.68c903e92912", "Use the recipient account or the current owner account to view this handoff."));
         } else if (!response.ok || !payload?.ok || !payload.transfer) {
-          setMessage(payload?.message || "We could not load this transfer."); setLoadError(response.status >= 500 || response.ok);
+          setMessage(payload?.message || ui("ui.app.transfer.id.page.34e5b6deb1c9", "We could not load this transfer.")); setLoadError(response.status >= 500 || response.ok);
         } else { setTransfer(payload.transfer); setMessage(""); }
       } catch {
         if (!cancelled && request === generation && !requestController.signal.aborted) {
-          setLoadError(true); setMessage("We could not load this transfer. Check your connection and try again.");
+          setLoadError(true); setMessage(ui("ui.app.transfer.id.page.66e1da988511", "We could not load this transfer. Check your connection and try again."));
         }
       } finally {
         clearTimeout(timer);
@@ -139,7 +142,7 @@ export default function TransferClaimPage() {
       if (authRevision.current !== revision) return;
 
       if (!response.ok || !payload?.ok || !payload.transfer) {
-        if (feedbackRevision.current === feedback) setMessage(payload?.message || "Could not accept this transfer.");
+        if (feedbackRevision.current === feedback) setMessage(payload?.message || ui("ui.app.transfer.id.page.d311b7c2186b", "Could not accept this transfer."));
         return;
       }
 
@@ -151,11 +154,11 @@ export default function TransferClaimPage() {
           properties: { method: "email_link" }
         }, { dedupeKey: payload.transfer.id });
       }
-      if (feedbackRevision.current === feedback) setMessage(payload.message || "Ownership accepted. The permanent QRguitar URL stayed the same.");
+      if (feedbackRevision.current === feedback) setMessage(payload.message || ui("ui.app.transfer.id.page.60ae02829abd", "Ownership accepted. The permanent QRguitar URL stayed the same."));
     } catch {
       if (authRevision.current !== revision) return;
       setLoadError(true);
-      if (feedbackRevision.current === feedback) setMessage("We could not confirm the transfer. Reload its status before trying again.");
+      if (feedbackRevision.current === feedback) setMessage(ui("ui.app.transfer.id.page.dbf639836efe", "We could not confirm the transfer. Reload its status before trying again."));
     } finally {
       if (acceptMutation.current === mutation) acceptMutation.current = null;
       if (authRevision.current === revision) setAccepting(false);
@@ -174,9 +177,9 @@ export default function TransferClaimPage() {
     try {
       if (!window.navigator.clipboard) throw new Error("Clipboard unavailable");
       await window.navigator.clipboard.writeText(`${window.location.origin}${profileHref}`);
-      if (current()) setMessage("Profile link copied.");
+      if (current()) setMessage(ui("ui.app.transfer.id.page.3a1b86ed2e8b", "Profile link copied."));
     } catch {
-      if (current()) setMessage("Could not copy the link. Open the Profile and copy its address from your browser.");
+      if (current()) setMessage(ui("ui.app.transfer.id.page.6f055fbdab66", "Could not copy the link. Open the Profile and copy its address from your browser."));
     }
   }
 
@@ -187,9 +190,9 @@ export default function TransferClaimPage() {
         <main className={`section auth-page ${workflow.transfer}`}>
           <div className="shell auth-layout">
             <section className="card auth-card">
-              <div className="eyebrow">Ownership transfer</div>
-              <h1>Checking claim link.</h1>
-              <p>Loading this ownership transfer now.</p>
+              <div className="eyebrow">{ui("ui.app.transfer.id.page.cbfa6a5b513b", "Ownership transfer")}</div>
+              <h1>{ui("ui.app.transfer.id.page.779107766b60", "Checking claim link.")}</h1>
+              <p>{ui("ui.app.transfer.id.page.b9077ab4b6f2", "Loading this ownership transfer now.")}</p>
             </section>
           </div>
         </main>
@@ -205,14 +208,12 @@ export default function TransferClaimPage() {
         <main className={`section auth-page ${workflow.transfer}`}>
           <div className="shell auth-layout">
             <section className="card auth-card">
-              <div className="eyebrow">Ownership transfer</div>
-              <h1>{loadError ? "Unable to load this transfer" : requiresAccess ? "Sign in with the recipient account" : "This transfer is unavailable"}</h1>
-              <p>{loadError ? "Your instrument and transfer have not been changed by this check." : "Check the link and the account you are signed in to, or ask the current owner for help."}</p>
-              {loadError ? <button type="button" className="button" onClick={() => setLoadAttempt(value => value + 1)}>Try again</button> : null}
-              {!signedIn ? <Link className="button" href={"/login?next=" + encodeURIComponent("/transfer/" + transferId)}>Sign in</Link> : null}
-              <Link className="button" href="/dashboard">
-                Go to Dashboard
-              </Link>
+              <div className="eyebrow">{ui("ui.app.transfer.id.page.cbfa6a5b513b", "Ownership transfer")}</div>
+              <h1>{loadError ? ui("ui.app.transfer.id.page.64384260ddf0", "Unable to load this transfer") : requiresAccess ? ui("ui.app.transfer.id.page.06ca975631d1", "Sign in with the recipient account") : ui("ui.app.transfer.id.page.ba00298cf2c9", "This transfer is unavailable")}</h1>
+              <p>{loadError ? ui("ui.app.transfer.id.page.42c72206d5cf", "Your instrument and transfer have not been changed by this check.") : ui("ui.app.transfer.id.page.227180c6db35", "Check the link and the account you are signed in to, or ask the current owner for help.")}</p>
+              {loadError ? <button type="button" className="button" onClick={() => setLoadAttempt(value => value + 1)}>{ui("ui.app.transfer.id.page.d8b8392e2c54", "Try again")}</button> : null}
+              {!signedIn ? <Link className="button" href={"/login?next=" + encodeURIComponent("/transfer/" + transferId)}>{ui("ui.app.transfer.id.page.bfd402b2f6f3", "Sign in")}</Link> : null}
+              <Link className="button" href="/dashboard">{ui("ui.app.transfer.id.page.73aefc65d247", "Go to Dashboard")}</Link>
               {message ? <p className="form-message">{message}</p> : null}
             </section>
           </div>
@@ -228,35 +229,35 @@ export default function TransferClaimPage() {
       <main className={`section auth-page ${workflow.transfer}`}>
         <div className="shell transfer-claim-layout">
           <section>
-            <div className="eyebrow">Ownership transfer</div>
-            <h1>Accept ownership of {transfer.guitarName}.</h1>
+            <div className="eyebrow">{ui("ui.app.transfer.id.page.cbfa6a5b513b", "Ownership transfer")}</div>
+            <h1>{ui("ui.app.transfer.id.page.a8c70c41dc7c", "Accept ownership of")}{" "}{transfer.guitarName}.</h1>
             <p>
               {transfer.status === "accepted"
-                ? "This transfer has already been accepted. The permanent QR link stays with the instrument."
+                ? ui("ui.app.transfer.id.page.2ff08141880b", "This transfer has already been accepted. The permanent QR link stays with the instrument.")
                 : transfer.status === "cancelled"
-                  ? "This transfer was cancelled. Ask the current owner for a fresh transfer link."
-                  : "Sign in with the recipient email on this transfer to accept ownership. The QRguitar URL will not change."}
+                  ? ui("ui.app.transfer.id.page.907670850268", "This transfer was cancelled. Ask the current owner for a fresh transfer link.")
+                  : ui("ui.app.transfer.id.page.723adcd00002", "Sign in with the recipient email on this transfer to accept ownership. The QRguitar URL will not change.")}
             </p>
             <div className="transfer-summary card">
               <div className="icon">
                 <Repeat2 />
               </div>
               <div>
-                <span>Profile</span>
+                <span>{ui("ui.app.transfer.id.page.d696a35bdd18", "Profile")}</span>
                 <strong>{transfer.guitarName}</strong>
               </div>
               <div>
-                <span>QRguitar ID</span>
+                <span>{ui("ui.app.transfer.id.page.a6c8f92c19f4", "QRguitar ID")}</span>
                 <strong>{transfer.guitarQrCode}</strong>
               </div>
               <div>
-                <span>Status</span>
+                <span>{ui("ui.app.transfer.id.page.920e413c7d41", "Status")}</span>
                 <strong>{transferStatusLabel(transfer)}</strong>
               </div>
             </div>
             <div className="claim-assurance">
-              <span><ShieldCheck size={18} /> Permanent QR link stays the same</span>
-              <span><BadgeCheck size={18} /> Recipient must be signed in</span>
+              <span><ShieldCheck size={18} />{" "}{ui("ui.app.transfer.id.page.63fab8557311", "Permanent QR link stays the same")}</span>
+              <span><BadgeCheck size={18} />{" "}{ui("ui.app.transfer.id.page.8e8a07a66720", "Recipient must be signed in")}</span>
             </div>
           </section>
 
@@ -264,55 +265,41 @@ export default function TransferClaimPage() {
             {transfer.status === "accepted" ? (
               <>
                 <div className="icon"><BadgeCheck /></div>
-                <h3>Ownership accepted.</h3>
-                <p>This Profile now belongs to the accepting account and keeps the same permanent QRguitar link.</p>
-                <Link className="button" href={"/dashboard/profile/" + encodeURIComponent(transfer.guitarQrCode)}>
-                  View Profile
-                </Link>
+                <h3>{ui("ui.app.transfer.id.page.85595a4753c6", "Ownership accepted.")}</h3>
+                <p>{ui("ui.app.transfer.id.page.ca9a513b8ad6", "This Profile now belongs to the accepting account and keeps the same permanent QRguitar link.")}</p>
+                <Link className="button" href={"/dashboard/profile/" + encodeURIComponent(transfer.guitarQrCode)}>{ui("ui.app.transfer.id.page.41a634bed373", "View Profile")}</Link>
                 <button className="button secondary" type="button" disabled={accepting} onClick={() => void copyProfileLink()}>
-                  <Copy size={16} />
-                  Copy Profile Link
-                </button>
-                <Link className="button secondary" href="/dashboard">
-                  Open Dashboard
-                </Link>
+                  <Copy size={16} />{ui("ui.app.transfer.id.page.8b812d5b9e9b", "Copy Profile Link")}</button>
+                <Link className="button secondary" href="/dashboard">{ui("ui.app.transfer.id.page.f6a3dab2fa61", "Open Dashboard")}</Link>
               </>
             ) : transfer.status === "cancelled" ? (
               <>
                 <div className="icon"><Repeat2 /></div>
-                <h3>This transfer was cancelled.</h3>
-                <p>The current owner needs to create a new transfer link before this instrument can be handed off.</p>
-                <Link className="button" href={profileHref}>
-                  View Profile
-                </Link>
+                <h3>{ui("ui.app.transfer.id.page.8b1575320b31", "This transfer was cancelled.")}</h3>
+                <p>{ui("ui.app.transfer.id.page.02adc8f89c56", "The current owner needs to create a new transfer link before this instrument can be handed off.")}</p>
+                <Link className="button" href={profileHref}>{ui("ui.app.transfer.id.page.41a634bed373", "View Profile")}</Link>
               </>
             ) : !signedIn ? (
               <>
                 <div className="icon"><LogIn /></div>
-                <h3>Sign in to accept ownership.</h3>
-                <p>Create an account or sign in with the recipient email on this transfer. Then return to this transfer link to accept it.</p>
-                <Link className="button" href={`/login?next=${encodeURIComponent(`/transfer/${transfer.id}`)}`}>
-                  Sign in
-                </Link>
-                <Link className="button secondary" href={`/login?mode=register&next=${encodeURIComponent(`/transfer/${transfer.id}`)}`}>
-                  Create account
-                </Link>
+                <h3>{ui("ui.app.transfer.id.page.0da9392c3f27", "Sign in to accept ownership.")}</h3>
+                <p>{ui("ui.app.transfer.id.page.33706bc1fbce", "Create an account or sign in with the recipient email on this transfer. Then return to this transfer link to accept it.")}</p>
+                <Link className="button" href={`/login?next=${encodeURIComponent(`/transfer/${transfer.id}`)}`}>{ui("ui.app.transfer.id.page.bfd402b2f6f3", "Sign in")}</Link>
+                <Link className="button secondary" href={`/login?mode=register&next=${encodeURIComponent(`/transfer/${transfer.id}`)}`}>{ui("ui.app.transfer.id.page.798ca2ce18bf", "Create account")}</Link>
               </>
             ) : (
               <>
                 <div className="icon"><LogIn /></div>
-                <h3>Ready to accept.</h3>
-                <p>Accepting transfers ownership of this QRguitar Profile to your signed-in account. The permanent QR URL stays unchanged.</p>
+                <h3>{ui("ui.app.transfer.id.page.730cc4aa8fa6", "Ready to accept.")}</h3>
+                <p>{ui("ui.app.transfer.id.page.cf41c2f3aef3", "Accepting transfers ownership of this QRguitar Profile to your signed-in account. The permanent QR URL stays unchanged.")}</p>
                 <button className="button" type="button" onClick={() => void acceptTransfer()} disabled={accepting}>
-                  {accepting ? "Accepting..." : "Accept Ownership"}
+                  {accepting ? ui("ui.app.transfer.id.page.31409c77894f", "Accepting...") : ui("ui.app.transfer.id.page.8441cefbd0ef", "Accept Ownership")}
                 </button>
-                <Link className="button secondary" href={profileHref}>
-                  Preview Profile First
-                </Link>
+                <Link className="button secondary" href={profileHref}>{ui("ui.app.transfer.id.page.d52572393b42", "Preview Profile First")}</Link>
               </>
             )}
             {message ? <p className="form-message" role="status">{message}</p> : null}
-            {loadError ? <button type="button" className="button secondary" onClick={() => setLoadAttempt(value => value + 1)}>Reload transfer status</button> : null}
+            {loadError ? <button type="button" className="button secondary" onClick={() => setLoadAttempt(value => value + 1)}>{ui("ui.app.transfer.id.page.a5e2e77428e7", "Reload transfer status")}</button> : null}
           </section>
         </div>
       </main>

@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "../ui-text-test-context.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -7,7 +8,7 @@ import test from "node:test";
 
 const testRoot = path.dirname(fileURLToPath(import.meta.url)), repo = path.resolve(process.argv[2] || path.join(testRoot, "../../../..")), here = path.join(repo, "apps/web/lib/account-deletion");
 assert.ok(fs.existsSync(path.join(repo, "apps/web/package.json")), "Supply the canonical repository path for existing TypeScript/React dependencies.");
-const require = createRequire(path.join(repo, "apps/web/package.json")), ts = require("typescript"), React = require("react"), { renderToStaticMarkup } = require("react-dom/server");
+const require = withUiTextTestContext(createRequire(path.join(repo, "apps/web/package.json"))), ts = require("typescript"), React = require("react"), { renderToStaticMarkup } = require("react-dom/server");
 const compile = filename => ts.transpileModule(fs.readFileSync(path.join(here, filename), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
 function clientModule() { const module = { exports: {} }; new Function("module", "exports", compile("deletion-intake-client.ts"))(module, module.exports); return module.exports; }
 const A = "10000000-0000-4000-8000-000000000001", B = "20000000-0000-4000-8000-000000000002";

@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "../../../components/UiTextProvider";
+
 
 import {
   ArrowLeft,
@@ -55,6 +57,7 @@ type ProfileTab = "overview" | "specs" | "timeline" | "service" | "ownership" | 
 const PROFILE_FETCH_TIMEOUT_MS = 28000;
 
 export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview = false }: { code: string; initialInstrument: DemoInstrument | null; ownerPreview?: boolean }) {
+  const ui = useUiText("app.i.code.ProfileClient");
   const searchParams = useSearchParams();
   const router = useRouter();
   const [stored, setStored] = useState<DemoInstrument | null>(initialInstrument);
@@ -507,9 +510,9 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
     return (
       <main className={styles["scan-profile"]}>
         <section className={styles["scan-shell"]}>
-          <section className={styles["scan-tab-panel"]} aria-label="Loading profile">
-            <h2>Loading instrument profile</h2>
-            <p>Checking the Profile now.</p>
+          <section className={styles["scan-tab-panel"]} aria-label={ui("ui.app.i.code.ProfileClient.3535ababfaeb", "Loading profile")}>
+            <h2>{ui("ui.app.i.code.ProfileClient.d7e30b9a3297", "Loading instrument profile")}</h2>
+            <p>{ui("ui.app.i.code.ProfileClient.dca536847bc1", "Checking the Profile now.")}</p>
           </section>
         </section>
       </main>
@@ -520,13 +523,13 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
     return (
       <main className={styles["scan-profile"]}>
         <section className={styles["scan-shell"]}>
-          <section className={styles["scan-tab-panel"]} aria-label={profileLoadError ? "Profile unavailable" : "Profile not found"}>
-            <h2>{profileLoadError ? "Profile temporarily unavailable" : "Instrument profile not found"}</h2>
-            <p>{profileLoadError ? "We could not load this Profile. Please try again." : "This QRguitar Profile has not been published."}</p>
-            {profileLoadError ? <button type="button" className="button" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button> : null}
+          <section className={styles["scan-tab-panel"]} aria-label={profileLoadError ? ui("ui.app.i.code.ProfileClient.158e5a22a48c", "Profile unavailable") : ui("ui.app.i.code.ProfileClient.999930725d06", "Profile not found")}>
+            <h2>{profileLoadError ? ui("ui.app.i.code.ProfileClient.6dc65e966b93", "Profile temporarily unavailable") : ui("ui.app.i.code.ProfileClient.6cbb97fa27b9", "Instrument profile not found")}</h2>
+            <p>{profileLoadError ? ui("ui.app.i.code.ProfileClient.7014d09f16ad", "We could not load this Profile. Please try again.") : ui("ui.app.i.code.ProfileClient.752375372cfd", "This QRguitar Profile has not been published.")}</p>
+            {profileLoadError ? <button type="button" className="button" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>{ui("ui.app.i.code.ProfileClient.d8b8392e2c54", "Try again")}</button> : null}
             <div className={styles["scan-actions"]}>
-              <Action icon={<Home />} label="Go to homepage" onClick={() => router.push("/")} />
-              <Action icon={<Download />} label="Browse catalog" onClick={() => router.push("/catalog")} />
+              <Action icon={<Home />} label={ui("ui.app.i.code.ProfileClient.c022da0f1a15", "Go to homepage")} onClick={() => router.push("/")} />
+              <Action icon={<Download />} label={ui("ui.app.i.code.ProfileClient.4d05dc6da837", "Browse catalog")} onClick={() => router.push("/catalog")} />
             </div>
           </section>
         </section>
@@ -626,16 +629,16 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
   return (
     <main className={styles["scan-profile"]}>
       <section className={styles["scan-shell"]}>
-        {ownerPreview && instrument ? <div className={styles["profile-refresh-notice"]} role="status"><p><strong>Owner preview.</strong> {instrument.visibility === "private" ? "This Profile is private. Visitors cannot open its QR link." : "You are viewing this Profile from your account."}</p><Link className="button secondary" href={"/edit/" + encodeURIComponent(instrument.qrCode)}>Edit Profile</Link><Link href="/dashboard">Back to collection</Link></div> : null}
+        {ownerPreview && instrument ? <div className={styles["profile-refresh-notice"]} role="status"><p><strong>{ui("ui.app.i.code.ProfileClient.cca6a9866dcc", "Owner preview.")}</strong> {instrument.visibility === "private" ? ui("ui.app.i.code.ProfileClient.b1eaa5bd6fae", "This Profile is private. Visitors cannot open its QR link.") : ui("ui.app.i.code.ProfileClient.43c30bfc7680", "You are viewing this Profile from your account.")}</p><Link className="button secondary" href={"/edit/" + encodeURIComponent(instrument.qrCode)}>{ui("ui.app.i.code.ProfileClient.fec2ac0f4cf1", "Edit Profile")}</Link><Link href="/dashboard">{ui("ui.app.i.code.ProfileClient.4466f3a00b0b", "Back to collection")}</Link></div> : null}
         {profileLoadError ? (
           <div className={styles["profile-refresh-notice"]} role="status">
-            <p>This is the last loaded Profile. We could not check for updates.</p>
-            <button type="button" className="button secondary" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button>
+            <p>{ui("ui.app.i.code.ProfileClient.6e8c3c83d96f", "This is the last loaded Profile. We could not check for updates.")}</p>
+            <button type="button" className="button secondary" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>{ui("ui.app.i.code.ProfileClient.d8b8392e2c54", "Try again")}</button>
           </div>
         ) : null}
         <ProfileBreadcrumbs current={instrumentDisplayName(instrument)} />
         <div className={styles["scan-topbar"]}>
-          <button type="button" aria-label="Back to homepage" onClick={() => router.push("/")}>
+          <button type="button" aria-label={ui("ui.app.i.code.ProfileClient.cb35f7332137", "Back to homepage")} onClick={() => router.push("/")}>
             <ArrowLeft size={24} />
           </button>
           <BrandLogo className={styles["scan-brand"]} />
@@ -657,15 +660,15 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
               className={styles["profile-hero-badges"]}
               ownerCollection={instrument.publicCollection}
             />
-            {instrument.publicCollection ? <div className={styles["profile-member-actions"]}><SellerWebsiteLink {...instrument.publicCollection} />{instrument.publicCollection.allowMessages ? <MemberMessageLink className={styles["profile-message-link"]} handle={instrument.publicCollection.handle} profileCode={instrument.qrCode} label={`Message ${instrument.publicCollection.publicName}`} /> : null}</div> : null}
+            {instrument.publicCollection ? <div className={styles["profile-member-actions"]}><SellerWebsiteLink {...instrument.publicCollection} />{instrument.publicCollection.allowMessages ? <MemberMessageLink className={styles["profile-message-link"]} handle={instrument.publicCollection.handle} profileCode={instrument.qrCode} label={ui("ui.app.i.code.ProfileClient.577c10d6f210", "Message {{value1}}", { value1: instrument.publicCollection.publicName })} /> : null}</div> : null}
 
         {safetyStatus === "lost" || safetyStatus === "stolen" ? (
-          <section className={styles["scan-safety-alert"]} aria-label={`Reported ${safetyStatus}`}>
-            <strong>{safetyStatus === "lost" ? "Reported Lost" : "Reported Stolen"}</strong>
+          <section className={styles["scan-safety-alert"]} aria-label={ui("ui.app.i.code.ProfileClient.88e9f0875799", "Reported {{value1}}", { value1: safetyStatus })}>
+            <strong>{safetyStatus === "lost" ? ui("ui.app.i.code.ProfileClient.299f098db192", "Reported Lost") : ui("ui.app.i.code.ProfileClient.44d0eeb2a64d", "Reported Stolen")}</strong>
             <p>
               {safetyStatus === "lost"
-                ? "This instrument has been marked lost by the current owner."
-                : "This instrument has been marked stolen by the current owner."}
+                ? ui("ui.app.i.code.ProfileClient.911804584a25", "This instrument has been marked lost by the current owner.")
+                : ui("ui.app.i.code.ProfileClient.f724a4ca52d7", "This instrument has been marked stolen by the current owner.")}
             </p>
             {isDistinctSafetyNote(instrument.publicSafetyNote, safetyStatus) ? <p>{instrument.publicSafetyNote}</p> : null}
           </section>
@@ -709,7 +712,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                   }
                 }}
                 disabled={!galleryImages.length}
-                aria-label={galleryImages.length ? `Open ${instrumentDisplayName(instrument)} photo ${mediaIndex + 1} in fullscreen` : undefined}
+                aria-label={galleryImages.length ? ui("ui.app.i.code.ProfileClient.816663403268", "Open {{value1}} photo {{value2}} in fullscreen", { value1: instrumentDisplayName(instrument), value2: mediaIndex + 1 }) : undefined}
               >
                 {galleryImages[mediaIndex] ? (
                   <img
@@ -717,7 +720,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                     src={publicMediaVariantUrl(galleryImages[mediaIndex], 1200)}
                     srcSet={publicMediaVariantSrcSet(galleryImages[mediaIndex])}
                     sizes="(max-width: 540px) calc(100vw - 32px), (max-width: 760px) calc(100vw - 40px), (max-width: 900px) 720px, 684px"
-                    alt={`${instrumentDisplayName(instrument)} photo ${mediaIndex + 1} of ${galleryImages.length}`}
+                    alt={ui("ui.app.i.code.ProfileClient.c6bd3192c759", "{{value1}} photo {{value2}} of {{value3}}", { value1: instrumentDisplayName(instrument), value2: mediaIndex + 1, value3: galleryImages.length })}
                     loading="eager"
                     fetchPriority="high"
                     decoding="async"
@@ -727,7 +730,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                     onError={() => markGalleryImageFailed(galleryImages[mediaIndex])}
                   />
                 ) : (
-                  <div className={styles["scan-hero-empty"]}>{allGalleryImages.length ? "Photos are currently unavailable" : "No main photo yet"}</div>
+                  <div className={styles["scan-hero-empty"]}>{allGalleryImages.length ? ui("ui.app.i.code.ProfileClient.44cebddc8ad6", "Photos are currently unavailable") : ui("ui.app.i.code.ProfileClient.c58a02ccbadd", "No main photo yet")}</div>
                 )}
               </button>
               {galleryImages.length ? (
@@ -752,7 +755,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
               <div
                 className={styles["scan-hero-thumbnails"]}
                 ref={heroThumbnailRailRef}
-                aria-label="Choose a photograph"
+                aria-label={ui("ui.app.i.code.ProfileClient.29afaa1f472b", "Choose a photograph")}
                 onWheel={(event) => {
                   if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
                   event.currentTarget.scrollLeft += event.deltaX;
@@ -805,7 +808,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                       }
                       setMediaIndex(index);
                     }}
-                    aria-label={`Show photo ${index + 1} of ${galleryImages.length}`}
+                    aria-label={ui("ui.app.i.code.ProfileClient.06b590801f02", "Show photo {{value1}} of {{value2}}", { value1: index + 1, value2: galleryImages.length })}
                     aria-current={index === mediaIndex ? "true" : undefined}
                     key={`${imageUrl}-${index}`}
                   >
@@ -835,7 +838,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
               ].filter(Boolean).join(" / ")}
             >
               {trustItems.length ? (
-                <div className={styles["profile-trust-summary"]} aria-label="Trust review">
+                <div className={styles["profile-trust-summary"]} aria-label={ui("ui.app.i.code.ProfileClient.66e1c9549fde", "Trust review")}>
                   {trustItems.map((item) => (
                     <details key={item.label}>
                       <summary><ShieldCheck size={15} /> {item.label}</summary>
@@ -847,16 +850,16 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
               <div className={styles["scan-qr"]}>
                 <ProfileQr code={instrument.qrCode} />
                 <div>
-                  <strong>Scan to view</strong>
-                  <span>{shareUrl ? shareUrl.replace(/^https?:\/\//, "") : `qrguitar.com/i/${instrument.qrCode.toLowerCase()}`}</span>
+                  <strong>{ui("ui.app.i.code.ProfileClient.5139e0f92e71", "Scan to view")}</strong>
+                  <span>{shareUrl ? shareUrl.replace(/^https?:\/\//, "") : ui("ui.app.i.code.ProfileClient.58a595439cb9", "qrguitar.com/i/{{value1}}", { value1: instrument.qrCode.toLowerCase() })}</span>
                 </div>
                 <button className="button secondary" type="button" onClick={copyProfileUrl}>
                   <Copy size={14} />
-                  {copyStatus === "copied" ? "Copied" : "Copy URL"}
+                  {copyStatus === "copied" ? ui("ui.app.i.code.ProfileClient.8d525e5f158b", "Copied") : ui("ui.app.i.code.ProfileClient.b26d1037f1c2", "Copy URL")}
                 </button>
               </div>
               {shareNotice === "failed" ? (
-                <small className={styles["scan-copy-notice"]}>Copy failed. You can copy the URL from your browser bar.</small>
+                <small className={styles["scan-copy-notice"]}>{ui("ui.app.i.code.ProfileClient.0854b0c9c202", "Copy failed. You can copy the URL from your browser bar.")}</small>
               ) : null}
             </ProfileIdentity>
           </div>
@@ -867,11 +870,11 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
 
 
         {canEdit ? (
-        <section className={styles["scan-actions"]} aria-label="Owner profile actions">
+        <section className={styles["scan-actions"]} aria-label={ui("ui.app.i.code.ProfileClient.bfeb7617d7e2", "Owner profile actions")}>
           {canEdit ? (
             <Action
               icon={<SlidersHorizontal />}
-              label="Edit Profile"
+              label={ui("ui.app.i.code.ProfileClient.fec2ac0f4cf1", "Edit Profile")}
               onClick={() => {
                 router.push(`/edit/${instrument.qrCode}`);
               }}
@@ -880,7 +883,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
           {canEdit ? (
             <Action
               icon={<Repeat2 />}
-              label="Ownership Tools"
+              label={ui("ui.app.i.code.ProfileClient.7812959f873a", "Ownership Tools")}
               active={activeTab === "ownership"}
               onClick={() => {
                 router.push("/dashboard");
@@ -891,10 +894,10 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
         ) : null}
 
         {canSubmitService ? (
-          <section className={styles["scan-actions"]} aria-label="Service provider actions">
+          <section className={styles["scan-actions"]} aria-label={ui("ui.app.i.code.ProfileClient.302d0d418ff4", "Service provider actions")}>
             <Action
               icon={<Wrench />}
-              label="Submit service record"
+              label={ui("ui.app.i.code.ProfileClient.5686ec9fdd1b", "Submit service record")}
               onClick={() => router.push(`/service-work/${instrument.qrCode}`)}
             />
           </section>
@@ -905,28 +908,28 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
             <div>
               {actionNotice === "transfer" ? (
                 <>
-                  <span className={styles["scan-action-icon"]}><Share2 size={16} /> Ownership tools are in beta</span>
-                  <p>Contact support@qrguitar.com if you need help with an ownership change.</p>
+                  <span className={styles["scan-action-icon"]}><Share2 size={16} />{" "}{ui("ui.app.i.code.ProfileClient.2fb69e84e91b", "Ownership tools are in beta")}</span>
+                  <p>{ui("ui.app.i.code.ProfileClient.498bfd464638", "Contact support@qrguitar.com if you need help with an ownership change.")}</p>
                 </>
               ) : null}
               {actionNotice === "documents" ? (
                 <>
-                  <span className={styles["scan-action-icon"]}><FileText size={16} /> Documents</span>
-                  <p>Public files appear here for buyers and shops. The owner controls which files stay private and which are public.</p>
+                  <span className={styles["scan-action-icon"]}><FileText size={16} />{" "}{ui("ui.app.i.code.ProfileClient.b4e929d8bcfe", "Documents")}</span>
+                  <p>{ui("ui.app.i.code.ProfileClient.4e3f0c54b7af", "Public files appear here for buyers and shops. The owner controls which files stay private and which are public.")}</p>
                 </>
               ) : null}
               {actionNotice === "owner" ? (
                 <>
-                  <span className={styles["scan-action-icon"]}><ShieldCheck size={16} /> Owner/admin access required</span>
-                  <p>Only the owner or admin can edit this profile. Sign in as the profile owner to make changes.</p>
+                  <span className={styles["scan-action-icon"]}><ShieldCheck size={16} />{" "}{ui("ui.app.i.code.ProfileClient.dff577c32828", "Owner/admin access required")}</span>
+                  <p>{ui("ui.app.i.code.ProfileClient.953a22d40e63", "Only the owner or admin can edit this profile. Sign in as the profile owner to make changes.")}</p>
                 </>
               ) : null}
             </div>
-            <button className="button secondary" type="button" onClick={() => setActionNotice(null)}><X size={14} />Close</button>
+            <button className="button secondary" type="button" onClick={() => setActionNotice(null)}><X size={14} />{ui("ui.app.i.code.ProfileClient.7d9eb7acb13e", "Close")}</button>
           </section>
         ) : null}
 
-        <nav className={styles["scan-tabs"]} aria-label="Instrument profile sections" role="tablist">
+        <nav className={styles["scan-tabs"]} aria-label={ui("ui.app.i.code.ProfileClient.4d2046641397", "Instrument profile sections")} role="tablist">
           {visibleTabs.map((tab) => (
             <button
               className={activeTab === tab.id ? styles.active : undefined}
@@ -977,10 +980,10 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
 
         {!canEdit ? (
           <details className={styles["profile-claim-entry"]}>
-            <summary>Ownership &amp; transfers</summary>
+            <summary>{ui("ui.app.i.code.ProfileClient.3d1e7e38e23c", "Ownership & transfers")}</summary>
             <div>
-              <p>Scanning this QR code opens the Profile. It never changes ownership. Ask the current owner for a transfer, or start a private request if they cannot send one.</p>
-              <Link href={`/ownership-claim?code=${encodeURIComponent(instrument.qrCode)}`}>Start ownership request <ArrowRight size={14} aria-hidden="true" /></Link>
+              <p>{ui("ui.app.i.code.ProfileClient.b5c3490dde3a", "Scanning this QR code opens the Profile. It never changes ownership. Ask the current owner for a transfer, or start a private request if they cannot send one.")}</p>
+              <Link href={`/ownership-claim?code=${encodeURIComponent(instrument.qrCode)}`}>{ui("ui.app.i.code.ProfileClient.21f95b4c7342", "Start ownership request")}{" "}<ArrowRight size={14} aria-hidden="true" /></Link>
             </div>
           </details>
         ) : null}
@@ -1049,6 +1052,7 @@ function ProfilePanel({
   timelineEvents: ServiceHistoryEntry[];
   serviceEntries: ServiceHistoryEntry[];
 }) {
+  const ui = useUiText("app.i.code.ProfileClient");
   const profileTypeLabel = String(instrument.instrumentType || "").trim() || "Profile";
 
   if (activeTab === "specs") {
@@ -1056,7 +1060,7 @@ function ProfilePanel({
 
     return (
       <section className={styles["scan-tab-panel"]}>
-        <PanelHeader icon={<SlidersHorizontal />} label="Profile details" title={detailsHeading} />
+        <PanelHeader icon={<SlidersHorizontal />} label={ui("ui.app.i.code.ProfileClient.73949bb1bdba", "Profile details")} title={detailsHeading} />
         <div className={styles["profile-data-grid"]}>
           {visibleSpecs.map((spec) => (
             <span key={spec.label}><strong>{spec.label}</strong>{spec.value}</span>
@@ -1079,7 +1083,7 @@ function ProfilePanel({
 
     return (
       <section className={styles["scan-tab-panel"]}>
-        <PanelHeader icon={<Clock3 />} label="Timeline" title="Events recorded for this instrument." />
+        <PanelHeader icon={<Clock3 />} label={ui("ui.app.i.code.ProfileClient.9dcff98e275f", "Timeline")} title={ui("ui.app.i.code.ProfileClient.1d88855f0d95", "Events recorded for this instrument.")} />
         <div className={styles["timeline-list"]}>
           {publicTimelineEvents.map((entry) => (
             <TimelineItem
@@ -1092,24 +1096,24 @@ function ProfilePanel({
           {latestTransfer ? (
             <TimelineItem
               date={transferDate || "Pending"}
-              title="Ownership transfer started"
+              title={ui("ui.app.i.code.ProfileClient.15f1e13d5beb", "Ownership transfer started")}
               copy={
                 latestTransfer.status === "accepted"
-                  ? `Ownership was accepted by ${latestTransfer.toName || latestTransfer.toEmail}.`
-                  : `An ownership-change claim was started for ${latestTransfer.toName || latestTransfer.toEmail}.`
+                  ? ui("ui.app.i.code.ProfileClient.4f060ab480e4", "Ownership was accepted by {{value1}}.", {value1: latestTransfer.toName || latestTransfer.toEmail})
+                  : ui("ui.app.i.code.ProfileClient.047c40a15875", "An ownership-change claim was started for {{value1}}.", {value1: latestTransfer.toName || latestTransfer.toEmail})
               }
             />
           ) : null}
           {ownershipTransferCount > 0 && !latestTransfer ? (
             <TimelineItem
               date="Recorded"
-              title={`${ownershipTransferCount} ownership transfer${ownershipTransferCount === 1 ? "" : "s"} recorded`}
-              copy="QRguitar keeps the permanent profile with the instrument while prior-owner details stay private."
+              title={ui("ui.app.i.code.ProfileClient.e4db7ca95800", "{{value1}} ownership transfer{{value2}} recorded", { value1: ownershipTransferCount, value2: ownershipTransferCount === 1 ? "" : "s" })}
+              copy={ui("ui.app.i.code.ProfileClient.514cf9382473", "QRguitar keeps the permanent profile with the instrument while prior-owner details stay private.")}
             />
           ) : null}
           <div className={styles["timeline-origin-marker"]}>
             <Clock3 aria-hidden="true" />
-            <span><strong>Profile created</strong>{createdDate}</span>
+            <span><strong>{ui("ui.app.i.code.ProfileClient.9bb4a8d57a82", "Profile created")}</strong>{createdDate}</span>
           </div>
         </div>
       </section>
@@ -1119,7 +1123,7 @@ function ProfilePanel({
   if (activeTab === "service") {
     return (
       <section className={styles["scan-tab-panel"]}>
-        <PanelHeader icon={<Wrench />} label="Service" title="Owner-approved work connected to this instrument." />
+        <PanelHeader icon={<Wrench />} label={ui("ui.app.i.code.ProfileClient.d677190e0a99", "Service")} title={ui("ui.app.i.code.ProfileClient.0da8a8f6f90b", "Owner-approved work connected to this instrument.")} />
         <div className={styles["timeline-list"]}>
           {serviceEntries.map((entry) => (
             <TimelineItem
@@ -1138,15 +1142,15 @@ function ProfilePanel({
     const ownershipTransferCount = Math.max(0, Number(instrument.ownershipTransferCount || 0));
     return (
       <section className={styles["scan-tab-panel"]}>
-        <PanelHeader icon={<Repeat2 />} label="Ownership" title="Brand, retailer, owner, and future buyer stay connected around the same instrument." />
+        <PanelHeader icon={<Repeat2 />} label={ui("ui.app.i.code.ProfileClient.c7d3acc826a8", "Ownership")} title={ui("ui.app.i.code.ProfileClient.db60bbe2c7c2", "Brand, retailer, owner, and future buyer stay connected around the same instrument.")} />
         <div className={styles["ownership-grid"]}>
-          <span><strong>Current owner</strong>{instrument.owner || "Unclaimed"}</span>
-          {instrument.builder ? <span><strong>Builder</strong>{instrument.builder}</span> : null}
-          <span><strong>Recorded transfers</strong>{ownershipTransferCount || "None yet"}</span>
-          <span><strong>Visibility</strong>{instrument.visibility === "private" ? "Private profile" : instrument.visibility === "unlisted" ? "Unlisted profile" : "Public profile"}</span>
+          <span><strong>{ui("ui.app.i.code.ProfileClient.0abf1fda3294", "Current owner")}</strong>{instrument.owner || ui("ui.app.i.code.ProfileClient.f59c5e15fc31", "Unclaimed")}</span>
+          {instrument.builder ? <span><strong>{ui("ui.app.i.code.ProfileClient.090940e73258", "Builder")}</strong>{instrument.builder}</span> : null}
+          <span><strong>{ui("ui.app.i.code.ProfileClient.8dc96386f9b0", "Recorded transfers")}</strong>{ownershipTransferCount || ui("ui.app.i.code.ProfileClient.adb85cf22bfc", "None yet")}</span>
+          <span><strong>{ui("ui.app.i.code.ProfileClient.7448611d5f93", "Visibility")}</strong>{instrument.visibility === "private" ? ui("ui.app.i.code.ProfileClient.5a024309a381", "Private profile") : instrument.visibility === "unlisted" ? ui("ui.app.i.code.ProfileClient.81c09a46b1f6", "Unlisted profile") : ui("ui.app.i.code.ProfileClient.eaad68e1f8c0", "Public profile")}</span>
                 </div>
                 <EmptyPanel
-                  title="Ownership transfer"
+                  title={ui("ui.app.i.code.ProfileClient.cbfa6a5b513b", "Ownership transfer")}
                   copy={transferMessage}
                 />
       </section>
@@ -1156,7 +1160,7 @@ function ProfilePanel({
   if (activeTab === "media") {
     return (
       <section className={styles["scan-tab-panel"]}>
-        <PanelHeader icon={<ImageIcon />} label="Media" title="Public video, audio, and external media connected to this instrument." />
+        <PanelHeader icon={<ImageIcon />} label={ui("ui.app.i.code.ProfileClient.d357175cfe89", "Media")} title={ui("ui.app.i.code.ProfileClient.4a0da7d0535d", "Public video, audio, and external media connected to this instrument.")} />
         <div className={styles["external-media-grid"]}>
           {externalMedia.map((item) => {
             const embedUrl = externalMediaEmbedUrl(item);
@@ -1174,7 +1178,7 @@ function ProfilePanel({
                 <div>
                   <strong>{item.title}</strong>
                   {item.caption ? <p>{item.caption}</p> : null}
-                  {!embedUrl ? <a href={item.canonicalUrl} target="_blank" rel="ugc nofollow noopener noreferrer">Open media</a> : null}
+                  {!embedUrl ? <a href={item.canonicalUrl} target="_blank" rel="ugc nofollow noopener noreferrer">{ui("ui.app.i.code.ProfileClient.de81e912dbeb", "Open media")}</a> : null}
                 </div>
               </article>
             );
@@ -1189,7 +1193,7 @@ function ProfilePanel({
 
     return (
       <section className={styles["scan-tab-panel"]}>
-        <PanelHeader icon={<MessageCircle />} label="Repairs" title="A repair bench can see what happened before and add what happened today." />
+        <PanelHeader icon={<MessageCircle />} label={ui("ui.app.i.code.ProfileClient.1c007c29d3af", "Repairs")} title={ui("ui.app.i.code.ProfileClient.001451c63c8c", "A repair bench can see what happened before and add what happened today.")} />
         {serviceNotes.length ? (
           <div className={styles["profile-data-grid"]}>
             {serviceNotes.map((spec) => (
@@ -1198,8 +1202,8 @@ function ProfilePanel({
           </div>
         ) : (
           <EmptyPanel
-            title="No repair history posted yet."
-            copy="Setup work, repairs, fretwork, electronics changes, and inspection notes can be added here as the instrument is serviced."
+            title={ui("ui.app.i.code.ProfileClient.566ade929299", "No repair history posted yet.")}
+            copy={ui("ui.app.i.code.ProfileClient.5c36266ae13b", "Setup work, repairs, fretwork, electronics changes, and inspection notes can be added here as the instrument is serviced.")}
           />
         )}
       </section>
@@ -1211,7 +1215,7 @@ function ProfilePanel({
     const isPrivateListing = instrument.visibility === "private";
     return (
       <section className={styles["scan-tab-panel"]}>
-        <PanelHeader icon={<FileText />} label="Documents" title="The important paperwork follows the instrument." />
+        <PanelHeader icon={<FileText />} label={ui("ui.app.i.code.ProfileClient.b4e929d8bcfe", "Documents")} title={ui("ui.app.i.code.ProfileClient.38e61654fdf9", "The important paperwork follows the instrument.")} />
         {hasVisibleDocuments ? (
           <div className={styles["document-list"]}>
             {documentFiles.map((file, index) => (
@@ -1230,13 +1234,13 @@ function ProfilePanel({
           </div>
         ) : isPrivateListing ? (
           <div className={styles["media-placeholder-grid"]}>
-            <span>No documents uploaded yet.</span>
-            <span>Private listings keep paperwork with the owner until it is shared.</span>
+            <span>{ui("ui.app.i.code.ProfileClient.01b015444dd4", "No documents uploaded yet.")}</span>
+            <span>{ui("ui.app.i.code.ProfileClient.9fd08e514569", "Private listings keep paperwork with the owner until it is shared.")}</span>
           </div>
         ) : (
           <div className={styles["media-placeholder-grid"]}>
-            <span>No public documents yet.</span>
-            <span>Owners can mark certificates, receipts, or spec sheets as public later.</span>
+            <span>{ui("ui.app.i.code.ProfileClient.8b6dfe7e7f62", "No public documents yet.")}</span>
+            <span>{ui("ui.app.i.code.ProfileClient.8f8758e7e505", "Owners can mark certificates, receipts, or spec sheets as public later.")}</span>
           </div>
         )}
       </section>
@@ -1248,7 +1252,7 @@ function ProfilePanel({
       <div>
         {meaningfulProfileSummary(instrument.summary) ? (
           <>
-            <h2>About this {profileTypeLabel.toLowerCase()}</h2>
+            <h2>{ui("ui.app.i.code.ProfileClient.191c6a87f0f4", "About this")}{" "}{profileTypeLabel.toLowerCase()}</h2>
             <p>{meaningfulProfileSummary(instrument.summary)}</p>
           </>
         ) : null}
@@ -1271,14 +1275,14 @@ function ProfilePanel({
         <div className={styles["maker-signature"]}>
           <FallbackImage
             src={officialBrandLogoUrl}
-            alt={`${instrument.brand} official logo`}
+            alt={ui("ui.app.i.code.ProfileClient.5e3a5d0c73e9", "{{value1}} official logo", { value1: instrument.brand })}
             loading="lazy"
             fetchPriority="low"
             decoding="async"
             width={520}
             height={120}
             referrerPolicy="no-referrer"
-            fallback={<span>Brand</span>}
+            fallback={<span>{ui("ui.app.i.code.ProfileClient.090ed4316f1d", "Brand")}</span>}
           />
           <strong>{instrument.brand}</strong>
         </div>
@@ -1323,10 +1327,11 @@ function TimelineItem({ date, title, copy }: { date: string; title: string; copy
 }
 
 function EmptyPanel({ title, copy }: { title: string; copy: string }) {
+  const ui = useUiText("app.i.code.ProfileClient");
   return (
     <div className={styles["collaboration-thread"] + " " + styles["compact"]}>
       <div className={styles["panel-header"]}>
-        <span><MessageCircle size={18} /> Profile note</span>
+        <span><MessageCircle size={18} />{" "}{ui("ui.app.i.code.ProfileClient.c5a2adb04f18", "Profile note")}</span>
         <h2>{title}</h2>
       </div>
       <p>{copy}</p>
@@ -1335,8 +1340,9 @@ function EmptyPanel({ title, copy }: { title: string; copy: string }) {
 }
 
 function ProfileQr({ code }: { code: string }) {
+  const ui = useUiText("app.i.code.ProfileClient");
   return (
-    <div className={styles["qr-placeholder"]} aria-label={`QR code for ${code}`}>
+    <div className={styles["qr-placeholder"]} aria-label={ui("ui.app.i.code.ProfileClient.817fa9875e3c", "QR code for {{value1}}", { value1: code })}>
       <CompactQr code={code} label={code} />
     </div>
   );
@@ -1426,6 +1432,7 @@ function Meta({ label, value }: { label: string; value: string }) {
 }
 
 function Action({ icon, label, active, disabled, onClick }: { icon: ReactNode; label: string; active?: boolean; disabled?: boolean; onClick: () => void }) {
+  const ui = useUiText("app.i.code.ProfileClient");
   return (
     <button
       className={[styles["profile-action"], active ? styles.active : undefined].filter(Boolean).join(" ")}
@@ -1433,7 +1440,7 @@ function Action({ icon, label, active, disabled, onClick }: { icon: ReactNode; l
       disabled={Boolean(disabled)}
       onClick={onClick}
       aria-disabled={disabled || false}
-      title={disabled ? `${label} is owner/admin only` : undefined}
+      title={disabled ? ui("ui.app.i.code.ProfileClient.20f8b80ba07c", "{{value1}} is owner/admin only", { value1: label }) : undefined}
     >
       {icon}
       <span>{label}</span>
@@ -1442,6 +1449,7 @@ function Action({ icon, label, active, disabled, onClick }: { icon: ReactNode; l
 }
 
 function DocumentItem({ title, copy, onView, href }: { title: string; copy: string; onView?: () => void; href?: string }) {
+  const ui = useUiText("app.i.code.ProfileClient");
   return (
     <article className={styles["document-item"]}>
       <FileText size={22} />
@@ -1450,12 +1458,10 @@ function DocumentItem({ title, copy, onView, href }: { title: string; copy: stri
         <p>{copy}</p>
       </div>
       {href ? (
-        <a href={href} target="_blank" rel="noreferrer" className="button secondary">
-          View
-        </a>
+        <a href={href} target="_blank" rel="noreferrer" className="button secondary">{ui("ui.app.i.code.ProfileClient.dcc839a4015c", "View")}</a>
       ) : (
         <button type="button" onClick={() => onView?.()} disabled={!onView} className={!onView ? "disabled" : undefined}>
-          {onView ? "View" : "Unavailable"}
+          {onView ? ui("ui.app.i.code.ProfileClient.dcc839a4015c", "View") : ui("ui.app.i.code.ProfileClient.ca1844969742", "Unavailable")}
         </button>
       )}
     </article>

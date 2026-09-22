@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "../../components/UiTextProvider";
+
 
 import { OwnerWorkspace } from "../../components/OwnerWorkspace";
 import authStyles from "../../components/AuthForm.module.css";
@@ -53,6 +55,7 @@ function mergeDashboardRecords(records: DemoInstrument[]) {
 }
 
 function DashboardInstrumentThumb({ sources, title }: { sources: string[]; title: string }) {
+  const ui = useUiText("app.dashboard.page");
   const imageSources = useMemo(
     () => Array.from(new Set(sources.map((source) => String(source || "").trim()).filter(Boolean))),
     [sources]
@@ -93,13 +96,14 @@ function DashboardInstrumentThumb({ sources, title }: { sources: string[]; title
           }}
         />
       ) : (
-        <span>{title.slice(0, 2).toUpperCase() || "QR"}</span>
+        <span>{title.slice(0, 2).toUpperCase() || ui("ui.app.dashboard.page.a439fba430a3", "QR")}</span>
       )}
     </div>
   );
 }
 
 export default function DashboardPage() {
+  const ui = useUiText("app.dashboard.page");
   const content = useSiteContent();
   const [user, setUser] = useState<DemoUser | null>(null);
   const [instruments, setInstruments] = useState<DemoInstrument[]>([]);
@@ -122,7 +126,7 @@ export default function DashboardPage() {
   const [quickEditRecord, setQuickEditRecord] = useState<DemoInstrument | null>(null);
   const [collectionHandle, setCollectionHandle] = useState("");
   const [collectionAccountType, setCollectionAccountType] = useState("");
-  const workspace = getWorkspace(collectionAccountType);
+  const workspace = getWorkspace(collectionAccountType, content);
   const [actionRecord, setActionRecord] = useState<DemoInstrument | null>(null);
   const [actionTrigger, setActionTrigger] = useState<HTMLElement | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -337,7 +341,7 @@ export default function DashboardPage() {
     }
   }
 
-  if (!authChecked) return <><Nav /><main className={authStyles.page}><div className={authStyles.layout}><section className={authStyles.formPanel}><div className="eyebrow">Your collection</div><h1>Opening your dashboard…</h1><p role="status">Checking your account.</p></section></div></main><Footer /></>;
+  if (!authChecked) return <><Nav /><main className={authStyles.page}><div className={authStyles.layout}><section className={authStyles.formPanel}><div className="eyebrow">{ui("ui.app.dashboard.page.9b28be3dc6ed", "Your collection")}</div><h1>{ui("ui.app.dashboard.page.8dcf9115336c", "Opening your dashboard…")}</h1><p role="status">{ui("ui.app.dashboard.page.daf79b219dc5", "Checking your account.")}</p></section></div></main><Footer /></>;
 
   if (!user) {
     return (
@@ -347,24 +351,18 @@ export default function DashboardPage() {
           <div className={authStyles.layout}>
             <section className={authStyles.formPanel}>
               <div className="dashboard-signin-icon"><ShieldCheck size={24} /></div>
-              <div className="eyebrow">Dashboard</div>
-              <h2>Sign in to manage your QRguitar Profiles.</h2>
+              <div className="eyebrow">{ui("ui.app.dashboard.page.67b696468610", "Dashboard")}</div>
+              <h2>{ui("ui.app.dashboard.page.16b87f28c419", "Sign in to manage your QRguitar Profiles.")}</h2>
               <p>{dashboardCopy.subtitle}</p>
               <div className="dashboard-signin-points">
-                <span>Private inventory</span>
-                <span>QR downloads</span>
-                <span>Photos and documents</span>
+                <span>{ui("ui.app.dashboard.page.81321b8462a6", "Private inventory")}</span>
+                <span>{ui("ui.app.dashboard.page.f0f8d70e904e", "QR downloads")}</span>
+                <span>{ui("ui.app.dashboard.page.eba6da9f51a2", "Photos and documents")}</span>
               </div>
               <div className="form-actions">
-                <Link className="button" href={`/login?next=${encodeURIComponent("/dashboard")}`}>
-                  Sign in
-                </Link>
-                <Link className="button secondary" href={`/login?mode=register&next=${encodeURIComponent("/dashboard")}`}>
-                  Create account
-                </Link>
-                <Link className="button secondary" href="/catalog">
-                  Browse catalog
-                </Link>
+                <Link className="button" href={`/login?next=${encodeURIComponent("/dashboard")}`}>{ui("ui.app.dashboard.page.bfd402b2f6f3", "Sign in")}</Link>
+                <Link className="button secondary" href={`/login?mode=register&next=${encodeURIComponent("/dashboard")}`}>{ui("ui.app.dashboard.page.798ca2ce18bf", "Create account")}</Link>
+                <Link className="button secondary" href="/catalog">{ui("ui.app.dashboard.page.4d05dc6da837", "Browse catalog")}</Link>
               </div>
             </section>
           </div>
@@ -386,16 +384,16 @@ export default function DashboardPage() {
               <p>{collectionAccountType ? workspace.description : getContentValue(content, "dashboard.hero.body")}</p>
             </div>
             <div className={styles.headerActions}>
-              {collectionAccountType === "luthier" ? <Link className="button" href="/dashboard/service"><Wrench size={16} /> Open service workbench</Link> : <Link className="button" href="/create">{getContentValue(content, "dashboard.actions.create")}</Link>}
-              {collectionAccountType === "shop" || collectionAccountType === "builder" ? <Link className="button secondary" href="/dashboard/import"><FileSpreadsheet size={16} /> {getContentValue(content, "dashboard.actions.bulk")}</Link> : <Link className="button secondary" href={collectionAccountType === "luthier" ? "/create" : "/account?section=collection"}>{collectionAccountType === "luthier" ? "Add your own instrument" : "Set up public collection"}</Link>}
+              {collectionAccountType === "luthier" ? <Link className="button" href="/dashboard/service"><Wrench size={16} />{" "}{ui("ui.app.dashboard.page.61669a91a83b", "Open service workbench")}</Link> : <Link className="button" href="/create">{getContentValue(content, "dashboard.actions.create")}</Link>}
+              {collectionAccountType === "shop" || collectionAccountType === "builder" ? <Link className="button secondary" href="/dashboard/import"><FileSpreadsheet size={16} /> {getContentValue(content, "dashboard.actions.bulk")}</Link> : <Link className="button secondary" href={collectionAccountType === "luthier" ? "/create" : "/account?section=collection"}>{collectionAccountType === "luthier" ? ui("ui.app.dashboard.page.3880eee7e45c", "Add your own instrument") : ui("ui.app.dashboard.page.e4ecedd588e1", "Set up public collection")}</Link>}
             </div>
           </div>
 
           {dashboardMessage ? <div className="admin-message" role="status">{dashboardMessage}</div> : null}
-          {recordsError ? <div className="profile-refresh-notice" role="alert"><p>{recordsError} {recordsLoaded ? "Previously loaded Profiles are shown below." : "Your collection is not yet loaded."}</p><button type="button" className="button secondary" onClick={refreshInstruments}>Try again</button></div> : null}
+          {recordsError ? <div className="profile-refresh-notice" role="alert"><p>{recordsError} {recordsLoaded ? ui("ui.app.dashboard.page.6fe48008e091", "Previously loaded Profiles are shown below.") : ui("ui.app.dashboard.page.65dc6018f43f", "Your collection is not yet loaded.")}</p><button type="button" className="button secondary" onClick={refreshInstruments}>{ui("ui.app.dashboard.page.d8b8392e2c54", "Try again")}</button></div> : null}
 
           <div className={styles.collectionControls}>
-          <div className={styles.filters} aria-label="Collection overview">
+          <div className={styles.filters} aria-label={ui("ui.app.dashboard.page.c4e6f5e2cc0b", "Collection overview")}>
             {stats.map((stat) => (
               <button
                 className={activeFilter === stat.filter ? styles.filterActive : undefined}
@@ -413,7 +411,7 @@ export default function DashboardPage() {
           </div>
           <label className={styles.search}>
             <Search size={17} aria-hidden="true" />
-            <input type="search" aria-label="Search your collection" placeholder="Search your collection" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
+            <input type="search" aria-label={ui("ui.app.dashboard.page.61d5a3e9beca", "Search your collection")} placeholder={ui("ui.app.dashboard.page.61d5a3e9beca", "Search your collection")} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
           </label>
           </div>
           <section className={styles.instrumentTable} id="saved-profiles">
@@ -426,11 +424,11 @@ export default function DashboardPage() {
             <div className={styles.instrumentList}>
               {loadingRecords ? (
                 <div className="card auth-card">
-                  <h3>Loading your Profiles...</h3>
-                  <p>Pulling your saved Profiles now.</p>
+                  <h3>{ui("ui.app.dashboard.page.139a32beaa54", "Loading your Profiles...")}</h3>
+                  <p>{ui("ui.app.dashboard.page.b4694d08f7e0", "Pulling your saved Profiles now.")}</p>
                 </div>
               ) : !recordsLoaded && recordsError ? (
-                <div className="card auth-card"><h3>Collection unavailable</h3><p>Use Try again above to reload your Profiles.</p></div>
+                <div className="card auth-card"><h3>{ui("ui.app.dashboard.page.1561734f82a6", "Collection unavailable")}</h3><p>{ui("ui.app.dashboard.page.5d4de079afd4", "Use Try again above to reload your Profiles.")}</p></div>
               ) : displayedInstruments.length ? (
                 displayedInstruments.map((instrument) => {
                   const totalDocs = instrument.documentFiles?.length || 0;
@@ -444,8 +442,8 @@ export default function DashboardPage() {
                   const profileNumber = profileNumbers.get(instrument.qrCode) || 1;
 
                   return (
-                    <article className={styles.instrumentRow} key={instrument.qrCode} aria-label={`Collection profile ${profileNumber}: ${title}`}>
-                      <Link className={styles.instrumentBodyLink} href={ownerProfileHref(instrument)} aria-label={`${getContentValue(content, "dashboard.card.open")}: ${title}`}>
+                    <article className={styles.instrumentRow} key={instrument.qrCode} aria-label={ui("ui.app.dashboard.page.c9a11cf01443", "Collection profile {{value1}}: {{value2}}", { value1: profileNumber, value2: title })}>
+                      <Link className={styles.instrumentBodyLink} href={ownerProfileHref(instrument)} aria-label={ui("ui.app.dashboard.page.ca7577d56ebc", "{{value1}}: {{value2}}", { value1: getContentValue(content, "dashboard.card.open"), value2: title })}>
                         <DashboardInstrumentThumb sources={imageSources} title={title} />
                         <div className={styles.instrumentDetails}>
                           <div className={styles.instrumentInfo}>
@@ -454,30 +452,30 @@ export default function DashboardPage() {
                             <ProfileStatusBadges record={instrument} includeCondition={false} />
                           </div>
                           <div className={styles.instrumentMeta}>
-                            {imageSources.length ? <span>{imageSources.length} {imageSources.length === 1 ? "photo" : "photos"}</span> : null}
-                            {serviceEntries.length ? <span>{serviceEntries.length} service {serviceEntries.length === 1 ? "entry" : "entries"}</span> : null}
-                            {totalDocs ? <span>{publicDocs} public {publicDocs === 1 ? "document" : "documents"}{hiddenDocs ? `, ${hiddenDocs} private` : ""}</span> : null}
-                            <span>{instrument.visibility === "private" ? "Private" : instrument.visibility === "unlisted" ? "Unlisted" : "Public"}</span>
+                            {imageSources.length ? <span>{imageSources.length} {imageSources.length === 1 ? ui("ui.app.dashboard.page.55c64d0fcd6f", "photo") : ui("ui.app.dashboard.page.84a6dae49cf0", "photos")}</span> : null}
+                            {serviceEntries.length ? <span>{serviceEntries.length}{" "}{ui("ui.app.dashboard.page.9df6b026a8c6", "service")}{" "}{serviceEntries.length === 1 ? ui("ui.app.dashboard.page.923fe53966c6", "entry") : ui("ui.app.dashboard.page.87d05cd08817", "entries")}</span> : null}
+                            {totalDocs ? <span>{publicDocs}{" "}{ui("ui.app.dashboard.page.efa1f375d761", "public")}{" "}{publicDocs === 1 ? ui("ui.app.dashboard.page.43cc23fa52b8", "document") : ui("ui.app.dashboard.page.9b16b44d0e0a", "documents")}{hiddenDocs ? ui("ui.app.dashboard.page.1bef30db15b5", ", {{value1}} private", { value1: hiddenDocs }) : ""}</span> : null}
+                            <span>{instrument.visibility === "private" ? ui("ui.app.dashboard.page.c63eb6720c6e", "Private") : instrument.visibility === "unlisted" ? ui("ui.app.dashboard.page.bc96567e77ca", "Unlisted") : ui("ui.app.dashboard.page.591935b15b1c", "Public")}</span>
                           </div>
                           <div className={styles.recordIdentity}>
                             <div className={styles.compactQr}><CompactQr code={instrument.qrCode} label={title} /></div>
-                            <div className={styles.dashboardIdentity} aria-label="Profile identity">
-                              <span><b>QRguitar ID</b> {instrument.qrCode}</span>
-                              <span><b>Serial Number</b> {instrument.serial || "No serial number"}</span>
+                            <div className={styles.dashboardIdentity} aria-label={ui("ui.app.dashboard.page.9b7e3e571ecb", "Profile identity")}>
+                              <span><b>{ui("ui.app.dashboard.page.a6c8f92c19f4", "QRguitar ID")}</b> {instrument.qrCode}</span>
+                              <span><b>{ui("ui.app.dashboard.page.14b1b3c5b151", "Serial Number")}</b> {instrument.serial || ui("ui.app.dashboard.page.8ca6af960b9f", "No serial number")}</span>
                             </div>
                           </div>
                         </div>
                       </Link>
-                      <aside className={styles.qrActionColumn} aria-label={`Actions for ${title}`}>
+                      <aside className={styles.qrActionColumn} aria-label={ui("ui.app.dashboard.page.34e14d665e15", "Actions for {{value1}}", { value1: title })}>
                         <div className={styles.primaryActions}>
                           <Link className="button secondary" href={`/edit/${instrument.qrCode}`}>{getContentValue(content, "dashboard.card.edit")}</Link>
-                          <button className="button secondary" type="button" onClick={() => setQuickEditRecord(instrument)}>Quick Edit</button>
+                          <button className="button secondary" type="button" onClick={() => setQuickEditRecord(instrument)}>{ui("ui.app.dashboard.page.d4e63f569f33", "Quick Edit")}</button>
                         </div>
                         <button
                           className={styles.moreButton}
                           type="button"
                           aria-haspopup="dialog"
-                          aria-label={`${getContentValue(content, "dashboard.card.more")} for ${title}`}
+                          aria-label={ui("ui.app.dashboard.page.53e5110624dd", "{{value1}} for {{value2}}", { value1: getContentValue(content, "dashboard.card.more"), value2: title })}
                           title={getContentValue(content, "dashboard.card.more")}
                           onClick={(event) => {
                             setActionTrigger(event.currentTarget);
@@ -490,10 +488,10 @@ export default function DashboardPage() {
                 })
               ) : (
                 <div className="card auth-card">
-                  <h3>{instruments.length ? "No matching Profiles." : dashboardCopy.emptyCollectionTitle}</h3>
-                  <p>{instruments.length ? "Try a different search or visibility filter." : dashboardCopy.emptyCollectionBody}</p>
+                  <h3>{instruments.length ? ui("ui.app.dashboard.page.197f9e60605d", "No matching Profiles.") : dashboardCopy.emptyCollectionTitle}</h3>
+                  <p>{instruments.length ? ui("ui.app.dashboard.page.9f7551ac4715", "Try a different search or visibility filter.") : dashboardCopy.emptyCollectionBody}</p>
                   {instruments.length ? (
-                    <button className="button" type="button" onClick={() => { setActiveFilter("all"); setSearchQuery(""); }}>Show All Profiles</button>
+                    <button className="button" type="button" onClick={() => { setActiveFilter("all"); setSearchQuery(""); }}>{ui("ui.app.dashboard.page.8157452810db", "Show All Profiles")}</button>
                   ) : (
                     <Link className="button" href="/create">{dashboardCopy.firstRecordCtaLabel}</Link>
                   )}
@@ -501,28 +499,28 @@ export default function DashboardPage() {
               )}
             </div>
           </section>
-          <section className={styles.toolsArea} aria-label="Ownership and workspace tools">
-          <nav className={styles.toolLinks} aria-label="Owner tools">
-            <button type="button" onClick={focusServiceRequests}><Wrench size={15} /> Service review <span>{recordsLoaded ? pendingServiceRequests : "—"}</span></button>
-            <Link href="/ownership-claim">Ownership claims</Link>
-            <a href="#ownership-transfers">Ownership transfers <span>{recordsLoaded ? pendingTransfers : "—"}</span></a>
-            <Link href="/account?section=collection" title="Publish your public Profiles together and control member inquiries"><UsersRound size={15} /> Collection &amp; inquiries <span>{collectionHandle ? "Live" : "Set up"}</span></Link>
+          <section className={styles.toolsArea} aria-label={ui("ui.app.dashboard.page.4dc38afcfa8e", "Ownership and workspace tools")}>
+          <nav className={styles.toolLinks} aria-label={ui("ui.app.dashboard.page.832fd327544b", "Owner tools")}>
+            <button type="button" onClick={focusServiceRequests}><Wrench size={15} />{" "}{ui("ui.app.dashboard.page.aefc059cfcc0", "Service review")}{" "}<span>{recordsLoaded ? pendingServiceRequests : "—"}</span></button>
+            <Link href="/ownership-claim">{ui("ui.app.dashboard.page.1d5aee2be8a0", "Ownership claims")}</Link>
+            <a href="#ownership-transfers">{ui("ui.app.dashboard.page.48920b5ab551", "Ownership transfers")}{" "}<span>{recordsLoaded ? pendingTransfers : "—"}</span></a>
+            <Link href="/account?section=collection" title={ui("ui.app.dashboard.page.073f22d50013", "Publish your public Profiles together and control member inquiries")}><UsersRound size={15} />{" "}{ui("ui.app.dashboard.page.2c8274b24de5", "Collection & inquiries")}{" "}<span>{collectionHandle ? ui("ui.app.dashboard.page.b64ac05f17e6", "Live") : ui("ui.app.dashboard.page.4da10f1fbb17", "Set up")}</span></Link>
           </nav>
-          <div className={styles.trustSummary} aria-label="Trust summary">
-            <span><b>{recordsLoaded ? verifiedRecords : "—"}</b> Verified</span>
-            <span><b>{recordsLoaded ? authenticityConfirmedRecords : "—"}</b> Authenticity Confirmed</span>
-            {activeFilter !== "all" ? <button type="button" onClick={() => setActiveFilter("all")}>Clear filter</button> : null}
+          <div className={styles.trustSummary} aria-label={ui("ui.app.dashboard.page.9aab2ecb991d", "Trust summary")}>
+            <span><b>{recordsLoaded ? verifiedRecords : "—"}</b>{" "}{ui("ui.app.dashboard.page.4f7838402f37", "Verified")}</span>
+            <span><b>{recordsLoaded ? authenticityConfirmedRecords : "—"}</b>{" "}{ui("ui.app.dashboard.page.eb95c24a9590", "Authenticity Confirmed")}</span>
+            {activeFilter !== "all" ? <button type="button" onClick={() => setActiveFilter("all")}>{ui("ui.app.dashboard.page.ba59e2d4a5e3", "Clear filter")}</button> : null}
           </div>
 
           {serviceRequests.length ? (
             <section className="card service-request-inbox" id="service-requests" aria-labelledby="service-requests-title">
               <div className="service-request-inbox__header">
                 <div>
-                  <div className="eyebrow"><Wrench aria-hidden="true" /> Service</div>
-                  <h3 id="service-requests-title">Service requests</h3>
-                  <p>Review provider-submitted work before it is added to the Profile.</p>
+                  <div className="eyebrow"><Wrench aria-hidden="true" />{" "}{ui("ui.app.dashboard.page.d677190e0a99", "Service")}</div>
+                  <h3 id="service-requests-title">{ui("ui.app.dashboard.page.f97efc02c5d2", "Service requests")}</h3>
+                  <p>{ui("ui.app.dashboard.page.b2df16574d8f", "Review provider-submitted work before it is added to the Profile.")}</p>
                 </div>
-                <span>{pendingServiceRequests} awaiting review</span>
+                <span>{pendingServiceRequests}{" "}{ui("ui.app.dashboard.page.0f503c13fb6a", "awaiting review")}</span>
               </div>
               <div className="service-request-list">
                 {serviceRequests.slice(0, 8).map((request) => {
@@ -532,10 +530,10 @@ export default function DashboardPage() {
                       <div>
                         <span className={`service-status service-status--${request.status}`}>{serviceRequestStatusLabel(request.status)}</span>
                         <h4>{request.title || request.serviceType}</h4>
-                        <p>{request.profileTitle || request.qrCode} · {providerName}{request.serviceDate ? ` · ${request.serviceDate}` : ""}</p>
-                        <small>{request.evidenceCount} private evidence file{request.evidenceCount === 1 ? "" : "s"}</small>
+                        <p>{request.profileTitle || request.qrCode} · {providerName}{request.serviceDate ? ui("ui.app.dashboard.page.25b1fe3f0719", " · {{value1}}", { value1: request.serviceDate }) : ""}</p>
+                        <small>{request.evidenceCount}{" "}{ui("ui.app.dashboard.page.af263b67ec8c", "private evidence file")}{request.evidenceCount === 1 ? "" : ui("ui.app.dashboard.page.043a718774c5", "s")}</small>
                       </div>
-                      <Link className="button secondary" href={`/service-review/${request.id}`}>Review service</Link>
+                      <Link className="button secondary" href={`/service-review/${request.id}`}>{ui("ui.app.dashboard.page.f3bfa948a110", "Review service")}</Link>
                     </article>
                   );
                 })}
@@ -544,13 +542,13 @@ export default function DashboardPage() {
           ) : null}
 
           <details className={styles.transfers} id="ownership-transfers">
-            <summary>Ownership transfers <span>{recordsLoaded ? pendingTransfers : "—"} pending</span></summary>
-            <p>To send an instrument to a new owner, open its More menu below and choose Transfer Ownership. The instrument keeps its QRguitar ID, QR link, and history.</p>
+            <summary>{ui("ui.app.dashboard.page.48920b5ab551", "Ownership transfers")}{" "}<span>{recordsLoaded ? pendingTransfers : "—"}{" "}{ui("ui.app.dashboard.page.62a2fed3d6e0", "pending")}</span></summary>
+            <p>{ui("ui.app.dashboard.page.29f32c3200b7", "To send an instrument to a new owner, open its More menu below and choose Transfer Ownership. The instrument keeps its QRguitar ID, QR link, and history.")}</p>
             {transfers.filter((transfer) => transfer.status === "sent" && instrumentCodes.has(transfer.guitarQrCode.toUpperCase())).map((transfer) => {
               const record = instruments.find((instrument) => instrument.qrCode.toUpperCase() === transfer.guitarQrCode.toUpperCase());
               return record ? <div className="dashboard-transfer-row" key={transfer.id}>
                 <span><strong>{dashboardRecordTitle(record)}</strong><small>{transferStatusLabel(transfer)}</small></span>
-                <button className="button secondary" type="button" onClick={(event) => { setActionTrigger(event.currentTarget); setActionRecord(record); }}>Manage transfer</button>
+                <button className="button secondary" type="button" onClick={(event) => { setActionTrigger(event.currentTarget); setActionRecord(record); }}>{ui("ui.app.dashboard.page.80751a738167", "Manage transfer")}</button>
               </div> : null;
             })}
           </details>
@@ -564,30 +562,30 @@ export default function DashboardPage() {
         <ActionDrawer eyebrow="Profile actions" title={dashboardRecordTitle(actionRecord)} returnFocusTo={actionTrigger} onClose={() => setActionRecord(null)}>
           <div className={styles.drawerIdentity}>
             <DashboardInstrumentThumb sources={getProfilePhotoUrls(actionRecord)} title={dashboardRecordTitle(actionRecord)} />
-            <div><b>{actionRecord.qrCode}</b><span>{actionRecord.serial ? `Serial Number ${actionRecord.serial}` : "No Serial Number"}</span></div>
+            <div><b>{actionRecord.qrCode}</b><span>{actionRecord.serial ? ui("ui.app.dashboard.page.78b42b116d41", "Serial Number {{value1}}", { value1: actionRecord.serial }) : ui("ui.app.dashboard.page.0006179f0706", "No Serial Number")}</span></div>
           </div>
           <div className={styles.drawerSections}>
             <section>
-              <b>QR, print &amp; sharing</b>
+              <b>{ui("ui.app.dashboard.page.9af3e044122c", "QR, print & sharing")}</b>
               <QrDownload code={actionRecord.qrCode} label={dashboardRecordTitle(actionRecord)} qrStyle={actionRecord.qrStyle} showPrintHandout={false} onStyleChange={(qrStyle) => { setInstruments((current) => current.map((item) => item.qrCode === actionRecord.qrCode ? { ...item, qrStyle } : item)); setActionRecord((current) => current ? { ...current, qrStyle } : current); }} />
-              <Link href={`/handout/${actionRecord.qrCode}`}><Printer size={15} /> Open Print Suite</Link>
+              <Link href={`/handout/${actionRecord.qrCode}`}><Printer size={15} />{" "}{ui("ui.app.dashboard.page.5ee3796350c7", "Open Print Suite")}</Link>
               <RecordShareButton className={styles.dashboardShare} code={actionRecord.qrCode} title={dashboardRecordTitle(actionRecord)} showLabel />
             </section>
             <section>
-              <b>History &amp; files</b>
-              <Link href={`/edit/${actionRecord.qrCode}#timeline`}><BookOpenText size={15} /> Timeline event</Link>
-              <Link href={`/edit/${actionRecord.qrCode}#service`}><Wrench size={15} /> Service entry</Link>
-              <Link href={`/edit/${actionRecord.qrCode}#media`}><ImagePlus size={15} /> Photos &amp; media</Link>
-              <Link href={`/edit/${actionRecord.qrCode}#documents`}><FileText size={15} /> Documents</Link>
+              <b>{ui("ui.app.dashboard.page.de8413ab464c", "History & files")}</b>
+              <Link href={`/edit/${actionRecord.qrCode}#timeline`}><BookOpenText size={15} />{" "}{ui("ui.app.dashboard.page.b4d8cb7570b7", "Timeline event")}</Link>
+              <Link href={`/edit/${actionRecord.qrCode}#service`}><Wrench size={15} />{" "}{ui("ui.app.dashboard.page.ef49d7a68372", "Service entry")}</Link>
+              <Link href={`/edit/${actionRecord.qrCode}#media`}><ImagePlus size={15} />{" "}{ui("ui.app.dashboard.page.f8e0207ec66e", "Photos & media")}</Link>
+              <Link href={`/edit/${actionRecord.qrCode}#documents`}><FileText size={15} />{" "}{ui("ui.app.dashboard.page.b4e929d8bcfe", "Documents")}</Link>
             </section>
             <section>
-              <b>Privacy &amp; safety</b>
-              {actionRecord.serial ? <p className="fine-print">Hiding the serial field does not change the permanent QR ID or URL, which may contain the serial. Use private visibility to restrict access.</p> : null}
-              {actionRecord.serial ? <button type="button" disabled={visibilityPendingCodes.includes(actionRecord.qrCode)} aria-busy={visibilityPendingCodes.includes(actionRecord.qrCode)} onClick={() => void updateSerialVisibility(actionRecord, !actionRecord.showSerialPublic)}><EyeOff size={15} /> {actionRecord.showSerialPublic ? "Hide Serial Number" : "Show Serial Number"}</button> : null}
-              <Link href={`/edit/${actionRecord.qrCode}#privacy-safety`}><ShieldCheck size={15} /> Visibility &amp; safety</Link>
+              <b>{ui("ui.app.dashboard.page.3538d701131e", "Privacy & safety")}</b>
+              {actionRecord.serial ? <p className="fine-print">{ui("ui.app.dashboard.page.e5d3af1efed5", "Hiding the serial field does not change the permanent QR ID or URL, which may contain the serial. Use private visibility to restrict access.")}</p> : null}
+              {actionRecord.serial ? <button type="button" disabled={visibilityPendingCodes.includes(actionRecord.qrCode)} aria-busy={visibilityPendingCodes.includes(actionRecord.qrCode)} onClick={() => void updateSerialVisibility(actionRecord, !actionRecord.showSerialPublic)}><EyeOff size={15} /> {actionRecord.showSerialPublic ? ui("ui.app.dashboard.page.c43c36e3acf6", "Hide Serial Number") : ui("ui.app.dashboard.page.7e8e1732f6a0", "Show Serial Number")}</button> : null}
+              <Link href={`/edit/${actionRecord.qrCode}#privacy-safety`}><ShieldCheck size={15} />{" "}{ui("ui.app.dashboard.page.91d623e6ce72", "Visibility & safety")}</Link>
             </section>
             <TransferPanel className={styles.transferPanel} bodyClassName={styles.transferPanelBody} instrument={actionRecord} user={user} isSessionCurrent={() => accountRevision.current === renderedAccountRevision} allowBuyerCode={collectionAccountType === "shop" || collectionAccountType === "builder"} latestTransfer={latestTransferForInstrument(transfers, actionRecord.qrCode)} onTransferCreated={(transfer) => { if (sessionEmail.current === user?.email) setTransfers((current) => [transfer, ...current.filter((item) => item.id !== transfer.id)]); }} onTransferChanged={refreshInstruments} />
-            <section className={styles.drawerDanger}><b>Danger zone</b><button className={styles.dangerAction} type="button" onClick={() => void removeFromCollection(actionRecord)}>{getContentValue(content, "dashboard.card.remove")}</button></section>
+            <section className={styles.drawerDanger}><b>{ui("ui.app.dashboard.page.fd8b8dae4421", "Danger zone")}</b><button className={styles.dangerAction} type="button" onClick={() => void removeFromCollection(actionRecord)}>{getContentValue(content, "dashboard.card.remove")}</button></section>
           </div>
         </ActionDrawer>
       ) : null}
@@ -617,6 +615,7 @@ function TransferPanel({
   onTransferCreated: (transfer: DemoTransfer) => void;
   onTransferChanged: () => void;
 }) {
+  const ui = useUiText("app.dashboard.page");
   const [toName, setToName] = useState("");
   const [toEmail, setToEmail] = useState("");
   const [message, setMessage] = useState("");
@@ -794,81 +793,73 @@ function TransferPanel({
   return (
     <details className={className} data-pending={hasPendingTransfer ? "true" : "false"}>
       <summary>
-        <span>Transfer Ownership<small>Start a secure handoff to the next owner.</small></span>
+        <span>{ui("ui.app.dashboard.page.f49cda3a003c", "Transfer Ownership")}<small>{ui("ui.app.dashboard.page.169f2da401df", "Start a secure handoff to the next owner.")}</small></span>
         {transferStatus ? <strong>{transferStatus}</strong> : null}
       </summary>
       <div className={bodyClassName}>
         <div className="transfer-copy">
-          <span className="mini-eyebrow">Ownership handoff</span>
-          <strong>{handoffMode === "buyer_code" ? "Prepare a private code for an in-person buyer." : "Email a claim link to the next owner."}</strong>
-          <p>{handoffMode === "buyer_code" ? "Use this at checkout or pickup. The code expires, works once, and can be bound to the buyer's email." : "The recipient signs in with the email below, opens the claim link, and accepts the same permanent QRguitar Profile."}</p>
+          <span className="mini-eyebrow">{ui("ui.app.dashboard.page.5f74589ff706", "Ownership handoff")}</span>
+          <strong>{handoffMode === "buyer_code" ? ui("ui.app.dashboard.page.5989eea16b52", "Prepare a private code for an in-person buyer.") : ui("ui.app.dashboard.page.a55829ebe2f6", "Email a claim link to the next owner.")}</strong>
+          <p>{handoffMode === "buyer_code" ? ui("ui.app.dashboard.page.605c3c2813aa", "Use this at checkout or pickup. The code expires, works once, and can be bound to the buyer's email.") : ui("ui.app.dashboard.page.4060ac58871b", "The recipient signs in with the email below, opens the claim link, and accepts the same permanent QRguitar Profile.")}</p>
         </div>
         <div className="transfer-form">
           {allowBuyerCode && !hasPendingTransfer ? (
-            <div className="transfer-mode" role="group" aria-label="Handoff method">
-              <button type="button" aria-pressed={handoffMode === "email"} onClick={() => { setHandoffMode("email"); setBuyerCode(""); }}>Email invitation</button>
-              <button type="button" aria-pressed={handoffMode === "buyer_code"} onClick={() => { setHandoffMode("buyer_code"); setBuyerCode(""); }}>Private buyer code</button>
+            <div className="transfer-mode" role="group" aria-label={ui("ui.app.dashboard.page.84650f6c3f73", "Handoff method")}>
+              <button type="button" aria-pressed={handoffMode === "email"} onClick={() => { setHandoffMode("email"); setBuyerCode(""); }}>{ui("ui.app.dashboard.page.91c5b0010aa1", "Email invitation")}</button>
+              <button type="button" aria-pressed={handoffMode === "buyer_code"} onClick={() => { setHandoffMode("buyer_code"); setBuyerCode(""); }}>{ui("ui.app.dashboard.page.c0bba41e5ae5", "Private buyer code")}</button>
             </div>
           ) : null}
-          <label>
-            New owner name
-            <input
+          <label>{ui("ui.app.dashboard.page.db2f662af00b", "New owner name")}<input
               value={toName}
               onChange={(event) => setToName(event.target.value)}
               disabled={hasPendingTransfer}
-              placeholder="New owner name"
+              placeholder={ui("ui.app.dashboard.page.db2f662af00b", "New owner name")}
             />
           </label>
           <label>
-            {handoffMode === "buyer_code" ? "Buyer email (optional, recommended)" : "New owner email"}
+            {handoffMode === "buyer_code" ? ui("ui.app.dashboard.page.f15b921cee8c", "Buyer email (optional, recommended)") : ui("ui.app.dashboard.page.1a188a2a4288", "New owner email")}
             <input
               type="email"
               value={toEmail}
               onChange={(event) => setToEmail(event.target.value)}
               disabled={hasPendingTransfer}
-              placeholder="new-owner@example.com"
+              placeholder={ui("ui.app.dashboard.page.4680d9cb3265", "new-owner@example.com")}
             />
           </label>
           {handoffMode === "buyer_code" && !hasPendingTransfer ? (
             <>
-              <label>
-                Order or receipt reference (optional)
-                <input value={orderReference} onChange={(event) => setOrderReference(event.target.value)} placeholder="Order 1048 or receipt 6812" />
-                <small>If entered, the buyer must match it. QRguitar stores only a one-way check.</small>
+              <label>{ui("ui.app.dashboard.page.7a388472fdd9", "Order or receipt reference (optional)")}<input value={orderReference} onChange={(event) => setOrderReference(event.target.value)} placeholder={ui("ui.app.dashboard.page.db963ae6d517", "Order 1048 or receipt 6812")} />
+                <small>{ui("ui.app.dashboard.page.0907f3c17b11", "If entered, the buyer must match it. QRguitar stores only a one-way check.")}</small>
               </label>
-              <label>
-                Code expires
-                <select value={expiresInDays} onChange={(event) => setExpiresInDays(event.target.value)}>
-                  <option value="1">After 24 hours</option><option value="3">After 3 days</option><option value="7">After 7 days</option><option value="14">After 14 days</option><option value="30">After 30 days</option>
+              <label>{ui("ui.app.dashboard.page.40a35cf6c6bf", "Code expires")}<select value={expiresInDays} onChange={(event) => setExpiresInDays(event.target.value)}>
+                  <option value="1">{ui("ui.app.dashboard.page.f64edb0fb007", "After 24 hours")}</option><option value="3">{ui("ui.app.dashboard.page.21b6268b43ba", "After 3 days")}</option><option value="7">{ui("ui.app.dashboard.page.a166017f5868", "After 7 days")}</option><option value="14">{ui("ui.app.dashboard.page.646cf904ed78", "After 14 days")}</option><option value="30">{ui("ui.app.dashboard.page.16e515568d66", "After 30 days")}</option>
                 </select>
               </label>
             </>
           ) : null}
           {hasPendingTransfer ? (
             <div className="transfer-actions">
-              {!latestTransfer?.handoffPrepared ? <button className="button secondary" type="button" disabled={saving} onClick={() => void copyClaimLink()}><Copy size={16} />Copy Claim Link</button> : null}
-              {latestTransfer?.handoffPrepared && latestTransfer.toEmail ? <button className="button secondary" type="button" onClick={() => void resendBuyerInvitation()} disabled={saving}><Mail size={16} />Resend Sign-in Email</button> : null}
+              {!latestTransfer?.handoffPrepared ? <button className="button secondary" type="button" disabled={saving} onClick={() => void copyClaimLink()}><Copy size={16} />{ui("ui.app.dashboard.page.222e0344a18c", "Copy Claim Link")}</button> : null}
+              {latestTransfer?.handoffPrepared && latestTransfer.toEmail ? <button className="button secondary" type="button" onClick={() => void resendBuyerInvitation()} disabled={saving}><Mail size={16} />{ui("ui.app.dashboard.page.1e11da231ca3", "Resend Sign-in Email")}</button> : null}
               {latestTransfer ? (
                 <button
                   className="button secondary"
                   type="button"
                   onClick={() => void cancelTransfer()}
                   disabled={saving}
-                >
-                  Cancel Transfer
-                </button>
+                >{ui("ui.app.dashboard.page.dc5324346ff0", "Cancel Transfer")}</button>
               ) : null}
             </div>
           ) : (
             <button className="button" type="button" onClick={() => void createTransfer()} disabled={saving}>
               {handoffMode === "email" ? <Mail size={16} /> : <Copy size={16} />}
-              {saving ? "Preparing..." : handoffMode === "email" ? "Send Transfer Email" : "Prepare for Buyer"}
+              {saving ? ui("ui.app.dashboard.page.74a6b5348c06", "Preparing...") : handoffMode === "email" ? ui("ui.app.dashboard.page.a94ebe414853", "Send Transfer Email") : ui("ui.app.dashboard.page.fc3fb992308f", "Prepare for Buyer")}
             </button>
           )}
           {buyerCode ? (
             <div className="buyer-code-box" role="status">
-              <span>Copy this code now</span><strong>{buyerCode}</strong><small>It is shown once. {orderReference ? "Give the buyer the matching order or receipt reference too. " : ""}Cancelling the handoff revokes it.</small>
-              <button className="button secondary" type="button" disabled={saving} onClick={() => void copyBuyerCode()}><Copy size={16} /> Copy Buyer Code</button>
+              <span>{ui("ui.app.dashboard.page.7cb698b4afcc", "Copy this code now")}</span><strong>{buyerCode}</strong><small>{ui("ui.app.dashboard.page.a2502e17f908", "It is shown once.")}{" "}{orderReference ? ui("ui.app.dashboard.page.417ce1bcc824", "Give the buyer the matching order or receipt reference too. ") : ""}{ui("ui.app.dashboard.page.b9b0a3e8738f", "Cancelling the handoff revokes it.")}</small>
+              <button className="button secondary" type="button" disabled={saving} onClick={() => void copyBuyerCode()}><Copy size={16} />{" "}{ui("ui.app.dashboard.page.7e554bec7cf4", "Copy Buyer Code")}</button>
             </div>
           ) : null}
         </div>
@@ -876,29 +867,25 @@ function TransferPanel({
           <div className="claim-link-box">
             <span>
               {latestTransfer.status === "accepted"
-                ? "Claim received"
+                ? ui("ui.app.dashboard.page.e393c52d89bf", "Claim received")
                 : latestTransfer.status === "cancelled"
-                  ? "Transfer cancelled"
-                  : latestTransfer.handoffPrepared ? "Private buyer handoff prepared" : "Claim link created"}
+                  ? ui("ui.app.dashboard.page.b6321ee9a4a7", "Transfer cancelled")
+                  : latestTransfer.handoffPrepared ? ui("ui.app.dashboard.page.17b626d63a07", "Private buyer handoff prepared") : ui("ui.app.dashboard.page.5d2356016d09", "Claim link created")}
             </span>
-            <strong>{[latestTransfer.toName, latestTransfer.toEmail].filter(Boolean).join(" - ") || "Recipient not email-bound"}</strong>
-            {latestTransfer.handoffPrepared ? <small>{latestTransfer.expiresAt ? `Expires ${new Date(latestTransfer.expiresAt).toLocaleString()}. ` : ""}The private code is never stored in readable form. Revoke and prepare a new handoff if it was not copied.</small> : <code>{visibleClaimUrl}</code>}
+            <strong>{[latestTransfer.toName, latestTransfer.toEmail].filter(Boolean).join(" - ") || ui("ui.app.dashboard.page.b90f83fb529f", "Recipient not email-bound")}</strong>
+            {latestTransfer.handoffPrepared ? <small>{latestTransfer.expiresAt ? ui("ui.app.dashboard.page.c6d4108974a1", "Expires {{value1}}. ", { value1: new Date(latestTransfer.expiresAt).toLocaleString() }) : ""}{ui("ui.app.dashboard.page.53f58d61b305", "The private code is never stored in readable form. Revoke and prepare a new handoff if it was not copied.")}</small> : <code>{visibleClaimUrl}</code>}
             {latestTransfer.status === "sent" && !latestTransfer.handoffPrepared ? (
               <button className="button secondary" type="button" disabled={saving} onClick={() => void copyClaimLink()}>
-                <Copy size={16} />
-                Copy Claim Link
-              </button>
+                <Copy size={16} />{ui("ui.app.dashboard.page.222e0344a18c", "Copy Claim Link")}</button>
             ) : null}
           </div>
         ) : lastCreatedClaimUrl ? (
           <div className="claim-link-box">
-            <span>Pending transfer</span>
+            <span>{ui("ui.app.dashboard.page.18ed36f2100f", "Pending transfer")}</span>
             <strong>{toName} - {toEmail}</strong>
             <code>{lastCreatedClaimUrl}</code>
             <button className="button secondary" type="button" onClick={() => void copyClaimLink()}>
-              <Copy size={16} />
-              Copy Claim Link
-            </button>
+              <Copy size={16} />{ui("ui.app.dashboard.page.222e0344a18c", "Copy Claim Link")}</button>
           </div>
         ) : null}
         {message ? <p className="form-message">{message}</p> : null}

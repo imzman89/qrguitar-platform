@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "../../components/UiTextProvider";
+
 
 import { matchesCatalogQuery } from "../../lib/catalog-search";
 
@@ -20,6 +22,7 @@ import { catalogFilterUrl, defaultCatalogFilters, readCatalogFilters, type Catal
 import styles from "./CatalogClient.module.css";
 
 export function CatalogClient({ initialRecords, content }: { initialRecords: DemoInstrument[]; content: Record<string, string>; composition: EditorialComposition["catalog"] }) {
+  const ui = useUiText("app.catalog.CatalogClient");
   const [records, setRecords] = useState<DemoInstrument[]>(dedupeByCodeAndDate(initialRecords));
   const [hasLoadedRecords, setHasLoadedRecords] = useState(initialRecords.length > 0);
   const [filters, setFilters] = useState<CatalogFilters>({ ...defaultCatalogFilters });
@@ -225,14 +228,12 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
             </div>
             <div className={styles["catalog-hero-actions"]}>
               <Link className="button" href="/create">{getContentValue(content, "catalog.actions.create")}</Link>
-              <Link className="text-link" href="/collections">Browse member collections</Link>
+              <Link className="text-link" href="/collections">{ui("ui.app.catalog.CatalogClient.1fbba5113528", "Browse member collections")}</Link>
             </div>
           </div>
 
-          <section className={styles["catalog-filters"]} aria-label="Catalog filters">
-            <label className={styles["catalog-search"]}>
-              Search
-              <span>
+          <section className={styles["catalog-filters"]} aria-label={ui("ui.app.catalog.CatalogClient.10d44ee84f0d", "Catalog filters")}>
+            <label className={styles["catalog-search"]}>{ui("ui.app.catalog.CatalogClient.49c266baaaa7", "Search")}<span>
                 <Search size={16} />
                 <input
                   value={query}
@@ -255,59 +256,55 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
                   className={styles["catalog-exact-search"]}
                   onClick={() => void searchExactSerial()}
                   disabled={serialLookupBusy}
-                  aria-label="Find exact serial"
-                  title="Find exact serial"
+                  aria-label={ui("ui.app.catalog.CatalogClient.0e626c38e0fe", "Find exact serial")}
+                  title={ui("ui.app.catalog.CatalogClient.0e626c38e0fe", "Find exact serial")}
                 >
                   <Search size={16} />
                 </button>
               </span>
             </label>
-            <label>
-              Brand
-              <select value={brand} onChange={(event) => updateFilters({ brand: event.target.value })}>
+            <label>{ui("ui.app.catalog.CatalogClient.090ed4316f1d", "Brand")}<select value={brand} onChange={(event) => updateFilters({ brand: event.target.value })}>
                 {brands.map((item) => <option key={item}>{item}</option>)}
               </select>
             </label>
-            <label>
-              Sort
-              <select value={sortMode} onChange={(event) => updateFilters({ sortMode: event.target.value as typeof sortMode })}>
-                <option>Newest</option>
-                <option>Oldest</option>
-                <option>Title</option>
-                <option>Year</option>
+            <label>{ui("ui.app.catalog.CatalogClient.bec69036aa27", "Sort")}<select value={sortMode} onChange={(event) => updateFilters({ sortMode: event.target.value as typeof sortMode })}>
+                <option value="Newest">{ui("ui.app.catalog.CatalogClient.d15efa178cf6", "Newest")}</option>
+                <option value="Oldest">{ui("ui.app.catalog.CatalogClient.505dc450753e", "Oldest")}</option>
+                <option value="Title">{ui("ui.app.catalog.CatalogClient.7e8cd2056da7", "Title")}</option>
+                <option value="Year">{ui("ui.app.catalog.CatalogClient.89f6832560de", "Year")}</option>
               </select>
             </label>
           </section>
 
           {hasAdvancedFilters ? (
             <details className={styles["catalog-more-filters"]}>
-              <summary><SlidersHorizontal size={15} /> Filters{activeFilters.length ? <span>{activeFilters.length}</span> : null}</summary>
+              <summary><SlidersHorizontal size={15} />{" "}{ui("ui.app.catalog.CatalogClient.546ebb8eb993", "Filters")}{activeFilters.length ? <span>{activeFilters.length}</span> : null}</summary>
               <div className={styles["catalog-filter-grid"]}>
-                {availableFilters.availability ? <label>Availability<select value={availability} onChange={(event) => updateFilters({ availability: event.target.value })}><option>All availability</option><option>For Sale</option><option>Not for Sale</option></select></label> : null}
-                {availableFilters.condition ? <label>Condition<select value={condition} onChange={(event) => updateFilters({ condition: event.target.value })}><option>All conditions</option><option>New</option><option>Used</option></select></label> : null}
-                {availableFilters.trust ? <label>Trust<select value={trust} onChange={(event) => updateFilters({ trust: event.target.value })}><option>All trust statuses</option><option>Verified</option><option>Unverified</option></select></label> : null}
-                {availableFilters.authenticity ? <label>Authenticity<select value={authenticity} onChange={(event) => updateFilters({ authenticity: event.target.value })}><option>All authenticity statuses</option><option>Authenticity Confirmed</option><option>Authenticity Unconfirmed</option></select></label> : null}
-                {availableFilters.originality ? <label>Originality<select value={originality} onChange={(event) => updateFilters({ originality: event.target.value })}><option>All originality statuses</option><option>All Original</option><option>Modified</option></select></label> : null}
-                {availableFilters.safety ? <label>Safety<select value={safety} onChange={(event) => updateFilters({ safety: event.target.value })}><option>All safety statuses</option><option>Safety Alert</option></select></label> : null}
-                {availableFilters.service ? <label>Service History<select value={service} onChange={(event) => updateFilters({ service: event.target.value })}><option>All service histories</option><option>Has Service History</option></select></label> : null}
+                {availableFilters.availability ? <label>{ui("ui.app.catalog.CatalogClient.12f67f8539c4", "Availability")}<select value={availability} onChange={(event) => updateFilters({ availability: event.target.value })}><option value="All availability">{ui("ui.app.catalog.CatalogClient.2ac0f50706fa", "All availability")}</option><option value="For Sale">{ui("ui.app.catalog.CatalogClient.1a83dec1476e", "For Sale")}</option><option value="Not for Sale">{ui("ui.app.catalog.CatalogClient.e063cbea64ad", "Not for Sale")}</option></select></label> : null}
+                {availableFilters.condition ? <label>{ui("ui.app.catalog.CatalogClient.39b36d38d6eb", "Condition")}<select value={condition} onChange={(event) => updateFilters({ condition: event.target.value })}><option value="All conditions">{ui("ui.app.catalog.CatalogClient.7c403b64e552", "All conditions")}</option><option value="New">{ui("ui.app.catalog.CatalogClient.18fdd549b2ed", "New")}</option><option value="Used">{ui("ui.app.catalog.CatalogClient.ae7d8dfac9ff", "Used")}</option></select></label> : null}
+                {availableFilters.trust ? <label>{ui("ui.app.catalog.CatalogClient.ade9248e0132", "Trust")}<select value={trust} onChange={(event) => updateFilters({ trust: event.target.value })}><option value="All trust statuses">{ui("ui.app.catalog.CatalogClient.27667eed8c6f", "All trust statuses")}</option><option value="Verified">{ui("ui.app.catalog.CatalogClient.4f7838402f37", "Verified")}</option><option value="Unverified">{ui("ui.app.catalog.CatalogClient.33c8e8de41c3", "Unverified")}</option></select></label> : null}
+                {availableFilters.authenticity ? <label>{ui("ui.app.catalog.CatalogClient.4f531ef9e6ae", "Authenticity")}<select value={authenticity} onChange={(event) => updateFilters({ authenticity: event.target.value })}><option value="All authenticity statuses">{ui("ui.app.catalog.CatalogClient.868c29e856d3", "All authenticity statuses")}</option><option value="Authenticity Confirmed">{ui("ui.app.catalog.CatalogClient.eb95c24a9590", "Authenticity Confirmed")}</option><option value="Authenticity Unconfirmed">{ui("ui.app.catalog.CatalogClient.a54f9b625886", "Authenticity Unconfirmed")}</option></select></label> : null}
+                {availableFilters.originality ? <label>{ui("ui.app.catalog.CatalogClient.faafda16cc4c", "Originality")}<select value={originality} onChange={(event) => updateFilters({ originality: event.target.value })}><option value="All originality statuses">{ui("ui.app.catalog.CatalogClient.ad110c7da01e", "All originality statuses")}</option><option value="All Original">{ui("ui.app.catalog.CatalogClient.8894d64075bf", "All Original")}</option><option value="Modified">{ui("ui.app.catalog.CatalogClient.e8ce5dcaf408", "Modified")}</option></select></label> : null}
+                {availableFilters.safety ? <label>{ui("ui.app.catalog.CatalogClient.726d11bd5b23", "Safety")}<select value={safety} onChange={(event) => updateFilters({ safety: event.target.value })}><option value="All safety statuses">{ui("ui.app.catalog.CatalogClient.47303c7f8431", "All safety statuses")}</option><option value="Safety Alert">{ui("ui.app.catalog.CatalogClient.ebcc11e6a438", "Safety Alert")}</option></select></label> : null}
+                {availableFilters.service ? <label>{ui("ui.app.catalog.CatalogClient.8b0adc9c9815", "Service History")}<select value={service} onChange={(event) => updateFilters({ service: event.target.value })}><option value="All service histories">{ui("ui.app.catalog.CatalogClient.30a6538fc556", "All service histories")}</option><option value="Has Service History">{ui("ui.app.catalog.CatalogClient.021890177ff6", "Has Service History")}</option></select></label> : null}
               </div>
             </details>
           ) : null}
 
           {activeFilters.length ? (
-            <div className={styles["catalog-active-filters"]} aria-label="Active filters">
-              {activeFilters.map((key) => <button key={key} type="button" onClick={() => updateFilters({ [key]: defaultCatalogFilters[key] })} aria-label={`Remove ${filterLabels[key]} filter: ${filters[key]}`}><span>{filterLabels[key]}: {filters[key]}</span><X size={12} aria-hidden="true" /></button>)}
+            <div className={styles["catalog-active-filters"]} aria-label={ui("ui.app.catalog.CatalogClient.213a9822c38a", "Active filters")}>
+              {activeFilters.map((key) => <button key={key} type="button" onClick={() => updateFilters({ [key]: defaultCatalogFilters[key] })} aria-label={ui("ui.app.catalog.CatalogClient.b6b852bd01cc", "Remove {{value1}} filter: {{value2}}", { value1: filterLabels[key], value2: filters[key] })}><span>{filterLabels[key]}: {filters[key]}</span><X size={12} aria-hidden="true" /></button>)}
             </div>
           ) : null}
 
           {serialLookupMessage ? (
             <div className={styles["catalog-lookup-result"]} role="status">
               <span>{serialLookupMessage}</span>
-              {showOwnershipClaim ? <Link className="button secondary" href="/ownership-claim">Start ownership claim</Link> : null}
+              {showOwnershipClaim ? <Link className="button secondary" href="/ownership-claim">{ui("ui.app.catalog.CatalogClient.ac3e01b95dc6", "Start ownership claim")}</Link> : null}
             </div>
           ) : null}
 
-          <section className={styles["catalog-summary"]} aria-label="Catalog discovery highlights">
+          <section className={styles["catalog-summary"]} aria-label={ui("ui.app.catalog.CatalogClient.435a56a2ed07", "Catalog discovery highlights")}>
             <div className={styles["catalog-toolbar"]} aria-live="polite">
               <p><strong>{formatResultLabel(
                 getContentValue(content, hasFilterOrSearch ? "catalog.results.filtered" : "catalog.results.all"),
@@ -326,12 +323,12 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
             </div>
           </section>
 
-          <section className={styles["catalog-grid"]} aria-label="QRguitar Profiles">
+          <section className={styles["catalog-grid"]} aria-label={ui("ui.app.catalog.CatalogClient.8ecdd04d045f", "QRguitar Profiles")}>
             {!hasLoadedRecords ? (
               <div className={styles["catalog-empty"]}>
-                <div className={styles["eyebrow"]}>Loading QRguitar Profiles</div>
-                <h2>Opening the catalog.</h2>
-                <p>Fetching the latest QRguitar Profiles now.</p>
+                <div className={styles["eyebrow"]}>{ui("ui.app.catalog.CatalogClient.92e7dcc9f7b7", "Loading QRguitar Profiles")}</div>
+                <h2>{ui("ui.app.catalog.CatalogClient.46d89b1c639e", "Opening the catalog.")}</h2>
+                <p>{ui("ui.app.catalog.CatalogClient.9235ded50850", "Fetching the latest QRguitar Profiles now.")}</p>
               </div>
             ) : visibleRecords.length ? (
               visibleRecords.map((record, index) => (
@@ -345,7 +342,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
               ))
             ) : (
               <div className={styles["catalog-empty"]}>
-                <div className={styles["eyebrow"]}>No profiles found</div>
+                <div className={styles["eyebrow"]}>{ui("ui.app.catalog.CatalogClient.5aeec66681b7", "No profiles found")}</div>
                 <h2>{getContentValue(content, "catalog.empty.title")}</h2>
                 <p>{getContentValue(content, "catalog.empty.body")}</p>
               </div>

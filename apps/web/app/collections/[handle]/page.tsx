@@ -1,3 +1,5 @@
+
+import { createUiText } from "../../../lib/ui-text";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -44,6 +46,7 @@ export async function generateMetadata({ params }: { params: Promise<{ handle: s
 }
 
 export default async function CollectionPage({ params }: { params: Promise<{ handle: string }> }) {
+  const ui = createUiText((await loadPublishedSiteSettings()).content, "app.collections.handle.page");
   const { handle } = await params;
   const result = await loadCollection(handle);
   if (!result) notFound();
@@ -55,12 +58,12 @@ export default async function CollectionPage({ params }: { params: Promise<{ han
     <script id="qrguitar-collection-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
     <Nav />
     <main className={`${styles.memberPage} page-shell collection-page`}>
-      <nav className={styles.navigation} aria-label="Collection navigation"><Link href="/collections"><ArrowLeft size={16} aria-hidden="true" /> All collections</Link><Link href="/catalog">Catalog</Link></nav>
+      <nav className={styles.navigation} aria-label={ui("ui.app.collections.handle.page.66439497b045", "Collection navigation")}><Link href="/collections"><ArrowLeft size={16} aria-hidden="true" />{" "}{ui("ui.app.collections.handle.page.16a2d21226eb", "All collections")}</Link><Link href="/catalog">{ui("ui.app.collections.handle.page.3877d14889a9", "Catalog")}</Link></nav>
       <header className={`${styles.memberHero} collection-header`}>
         <div className={styles.memberIdentity}>
           <FallbackImage
             src={settings.avatarUrl}
-            alt={`${settings.publicName} avatar`}
+            alt={ui("ui.app.collections.handle.page.9524ba4375b5", "{{value1}} avatar", { value1: settings.publicName })}
             width={112}
             height={112}
             loading="eager"
@@ -69,12 +72,12 @@ export default async function CollectionPage({ params }: { params: Promise<{ han
             referrerPolicy="no-referrer"
             fallback={<div className="collection-avatar" aria-hidden="true">{settings.publicName.slice(0, 1).toUpperCase()}</div>}
           />
-          <div><span className="eyebrow">QRguitar member</span><h1>{settings.publicName}</h1><p className="collection-role">{role}{settings.location ? ` / ${settings.location}` : ""}</p>{settings.bio ? <p className={styles.memberBio}>{settings.bio}</p> : <p className={styles.memberBio}>{"Explore this member's public QRguitar Profiles."}</p>}</div>
+          <div><span className="eyebrow">{ui("ui.app.collections.handle.page.f28aefd26929", "QRguitar member")}</span><h1>{settings.publicName}</h1><p className="collection-role">{role}{settings.location ? ui("ui.app.collections.handle.page.799272298625", " / {{value1}}", { value1: settings.location }) : ""}</p>{settings.bio ? <p className={styles.memberBio}>{settings.bio}</p> : <p className={styles.memberBio}>{ui("ui.app.collections.handle.page.bb23eaeeafa6", "Explore this member's public QRguitar Profiles.")}</p>}</div>
         </div>
         <div className={styles.memberActions}>
-          <strong className="collection-count">{records.length}<small>Public {records.length === 1 ? "Profile" : "Profiles"}</small></strong>
+          <strong className="collection-count">{records.length}<small>{ui("ui.app.collections.handle.page.591935b15b1c", "Public")}{" "}{records.length === 1 ? ui("ui.app.collections.handle.page.d696a35bdd18", "Profile") : ui("ui.app.collections.handle.page.535e52e4a261", "Profiles")}</small></strong>
           <div className={styles.actionRow}>
-            {settings.allowMessages ? <MemberMessageLink handle={settings.handle} label={`Message ${settings.publicName}`} /> : null}
+            {settings.allowMessages ? <MemberMessageLink handle={settings.handle} label={ui("ui.app.collections.handle.page.577c10d6f210", "Message {{value1}}", { value1: settings.publicName })} /> : null}
             <SellerWebsiteLink {...settings} />
           </div>
         </div>

@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -12,6 +13,7 @@ const proposal=fs.existsSync(path.join(scriptRoot,'regions/handoutLoadEffect.tsx
 const overlay=proposal ? createRequire(import.meta.url)(path.join(scriptRoot,'overlay.cjs')).buildOverlay(root,ts,scriptRoot) : new Map();
 const read=file=>overlay.get(file) ?? fs.readFileSync(path.join(root,file),'utf8');
 const compile=(source,bindings={})=>{
+  bindings={ui:withUiTextTestContext(()=>{throw new Error("Unexpected module");})("UiTextProvider").useUiText("app.handout.code.page"),...bindings};
   const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.React}}).outputText;
   const module={exports:{}};
   new Function('require','module','exports',...Object.keys(bindings),compiled)(name=>{throw new Error(`Unexpected import ${name}`);},module,module.exports,...Object.values(bindings));
@@ -63,7 +65,7 @@ const visit=node=>{
   if(ts.isCallExpression(node)&&node.expression.getText(pageAst)==='useEffect'&&node.getText(pageAst).includes('async function loadHandoutProfile')) effect=node.arguments[0];
   if(ts.isFunctionDeclaration(node)&&node.name?.getText(pageAst)==='printSelectedPage') printAction=node;
   if(ts.isJsxElement(node)&&node.openingElement.attributes.properties.some(p=>ts.isJsxAttribute(p)&&p.name.getText(pageAst)==='ref'&&p.initializer?.expression?.getText(pageAst)==='viewportRef')) viewport=node;
-  if(ts.isJsxElement(node)&&node.openingElement.tagName.getText(pageAst)==='button'&&node.children.some(child=>ts.isJsxText(child)&&child.text.trim()==='Try again')) {
+  if(ts.isJsxElement(node)&&node.openingElement.tagName.getText(pageAst)==='button'&&node.children.some(child=>(ts.isJsxText(child)&&child.text.trim()==='Try again')||(ts.isJsxExpression(child)&&ts.isCallExpression(child.expression)&&child.expression.expression.getText(pageAst)==='ui'&&ts.isStringLiteral(child.expression.arguments[1])&&child.expression.arguments[1].text==='Try again'))) {
     const attr=node.openingElement.attributes.properties.find(p=>ts.isJsxAttribute(p)&&p.name.getText(pageAst)==='onClick');retry=attr?.initializer?.expression;
   }
   ts.forEachChild(node,visit);

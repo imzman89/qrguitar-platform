@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -5,7 +6,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-const web = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."), repo = path.resolve(web, "../.."), require = createRequire(path.join(repo, "package.json")), ts = require("typescript"), modules = new Map();
+const web = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."), repo = path.resolve(web, "../.."), require = withUiTextTestContext(createRequire(path.join(repo, "package.json"))), ts = require("typescript"), modules = new Map();
 function load(name) {
   if (modules.has(name)) return modules.get(name);
   const filename = path.join(web, "lib", name + ".ts"), js = ts.transpileModule(fs.readFileSync(filename, "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;

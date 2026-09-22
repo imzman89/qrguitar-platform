@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "./UiTextProvider";
+
 
 import { Download, X } from "lucide-react";
 import QRCode from "qrcode";
@@ -28,6 +30,7 @@ const qrPresets: Array<{ label: string; style: Pick<QrStyle, "foreground" | "bac
 ];
 
 export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHandout = true }: QrDownloadProps) {
+  const ui = useUiText("components.QrDownload");
   const [rendered, setRendered] = useState({ key: "", url: "", error: "" });
   const [retry, setRetry] = useState(0);
   const [style, setStyle] = useState<QrStyle>(qrStyle ?? defaultQrStyle);
@@ -119,10 +122,10 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHando
               setIsLightboxOpen(true);
             }
           }}
-          aria-label="Open large QR preview"
+          aria-label={ui("ui.components.QrDownload.9500f9846391", "Open large QR preview")}
           disabled={!dataUrl}
         >
-          {dataUrl ? <img src={dataUrl} alt="" /> : <span>QR</span>}
+          {dataUrl ? <img src={dataUrl} alt="" /> : <span>{ui("ui.components.QrDownload.a439fba430a3", "QR")}</span>}
         </button>
         <div>
           <strong>{code}</strong>
@@ -132,91 +135,79 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHando
 
       <div className="qr-primary-actions">
         {dataUrl ? (
-          <a className="button secondary qr-download-button" href={dataUrl} download={`qrguitar-${code}.png`}>
-            Download
-          </a>
+          <a className="button secondary qr-download-button" href={dataUrl} download={`qrguitar-${code}.png`}>{ui("ui.components.QrDownload.d6eafe823591", "Download")}</a>
         ) : (
           <button className="button secondary qr-download-button" type="button" disabled>
-            {renderError ? "Download unavailable" : "Preparing"}
+            {renderError ? ui("ui.components.QrDownload.2f180e49010d", "Download unavailable") : ui("ui.components.QrDownload.cf1aa6cc5951", "Preparing")}
           </button>
         )}
         <button className="button secondary qr-edit-button" type="button" onClick={() => setIsEditing((current) => !current)}>
-          {isEditing ? "Close" : "Customize QR"}
+          {isEditing ? ui("ui.components.QrDownload.7d9eb7acb13e", "Close") : ui("ui.components.QrDownload.c6e3168391a9", "Customize QR")}
         </button>
         {showPrintHandout ? (
-          <a className="button secondary qr-handout-button" href={`/handout/${encodeURIComponent(code)}`} target="_blank" rel="noreferrer">
-            Open Print Suite
-          </a>
+          <a className="button secondary qr-handout-button" href={`/handout/${encodeURIComponent(code)}`} target="_blank" rel="noreferrer">{ui("ui.components.QrDownload.5ee3796350c7", "Open Print Suite")}</a>
         ) : null}
       </div>
 
-      {renderError ? <p className="form-message" role="alert">{renderError} {!colorError ? <button className="link-button" type="button" onClick={() => setRetry(value => value + 1)}>Try again</button> : null}</p> : null}
+      {renderError ? <p className="form-message" role="alert">{renderError} {!colorError ? <button className="link-button" type="button" onClick={() => setRetry(value => value + 1)}>{ui("ui.components.QrDownload.d8b8392e2c54", "Try again")}</button> : null}</p> : null}
 
       {isEditing ? (
         <div className="qr-editor-panel">
-          <div className="qr-preset-row" aria-label="QR appearance presets">
+          <div className="qr-preset-row" aria-label={ui("ui.components.QrDownload.f99f7962fd39", "QR appearance presets")}>
             {qrPresets.map((preset) => {
               const isActive = isQrStyleMatch(preset.style, style);
               return (
                 <button
                   className={`qr-preset ${isActive ? "selected" : ""}`}
                   type="button"
-                  key={preset.label}
+                  key={(preset.label === "White" ? ui("ui.components.QrDownload.3495e757855a", "White") : preset.label === "Transparent" ? ui("ui.components.QrDownload.aac7e89fcd0e", "Transparent") : preset.label === "Orange" ? ui("ui.components.QrDownload.78e7771b8b46", "Orange") : preset.label === "Print" ? ui("ui.components.QrDownload.df0fe79898ef", "Print") : preset.label)}
                   aria-pressed={isActive}
                   onClick={() => updateStyle(preset.style)}
                 >
-                  <strong>{preset.label}</strong>
+                  <strong>{(preset.label === "White" ? ui("ui.components.QrDownload.3495e757855a", "White") : preset.label === "Transparent" ? ui("ui.components.QrDownload.aac7e89fcd0e", "Transparent") : preset.label === "Orange" ? ui("ui.components.QrDownload.78e7771b8b46", "Orange") : preset.label === "Print" ? ui("ui.components.QrDownload.df0fe79898ef", "Print") : preset.label)}</strong>
                   <span>{preset.helper}</span>
                 </button>
               );
             })}
           </div>
-          <div className="qr-mini-controls" aria-label="Custom QR colors">
-            <label>
-              QR Color
-              <input
+          <div className="qr-mini-controls" aria-label={ui("ui.components.QrDownload.2b8182617f0e", "Custom QR colors")}>
+            <label>{ui("ui.components.QrDownload.40c995a68029", "QR Color")}<input
                 type="color"
                 value={style.foreground}
                 onChange={(event) => updateStyle({ foreground: event.target.value })}
-                aria-label="QR module color"
+                aria-label={ui("ui.components.QrDownload.526957d2b9d2", "QR module color")}
               />
             </label>
             {!isTransparent ? (
-              <label>
-                Background
-                <input
+              <label>{ui("ui.components.QrDownload.ea2b8a878841", "Background")}<input
                   type="color"
                   value={style.background}
                   onChange={(event) => updateStyle({ background: event.target.value })}
-                  aria-label="QR background color"
+                  aria-label={ui("ui.components.QrDownload.c99579c0abce", "QR background color")}
                 />
               </label>
             ) : null}
           </div>
           {!isTransparent ? (
             <>
-              <label className="qr-label-control">
-                QR label text
-                <textarea
+              <label className="qr-label-control">{ui("ui.components.QrDownload.2d306eb2cde0", "QR label text")}<textarea
                   rows={2}
                   value={labelInput}
                   maxLength={140}
                   onChange={(event) => handleLabelChange(event.target.value)}
                   placeholder={fallbackLabelText}
                 />
-                <p className="qr-helper-text">This text appears under the QR when label is enabled.</p>
+                <p className="qr-helper-text">{ui("ui.components.QrDownload.fdb5e68a9e01", "This text appears under the QR when label is enabled.")}</p>
               </label>
               <label className="qr-toggle">
                 <input
                   type="checkbox"
                   checked={style.includeLabel}
                   onChange={(event) => updateStyle({ includeLabel: event.target.checked })}
-                />
-                Include instrument label under QR
-              </label>
+                />{ui("ui.components.QrDownload.a050ee1a54b4", "Include instrument label under QR")}</label>
             </>
           ) : (
-            <p className="qr-note">Transparent export contains only the QR. Place it on a plain, contrasting background and keep the clear margin around every edge.</p>
+            <p className="qr-note">{ui("ui.components.QrDownload.6ddae7c01069", "Transparent export contains only the QR. Place it on a plain, contrasting background and keep the clear margin around every edge.")}</p>
           )}
         </div>
       ) : null}
@@ -226,7 +217,7 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHando
           ref={previewRef}
           className="media-overlay-backdrop"
           style={{ margin: 0, width: "100vw", maxWidth: "none", height: "100dvh", maxHeight: "none", border: 0, color: "inherit" }}
-          aria-label="QR preview"
+          aria-label={ui("ui.components.QrDownload.3310d3f61e2a", "QR preview")}
           onClick={(event) => { if (event.target === event.currentTarget) setIsLightboxOpen(false); }}
           onCancel={(event) => { event.preventDefault(); event.stopPropagation(); setIsLightboxOpen(false); }}
           onKeyDown={(event) => {
@@ -250,22 +241,20 @@ export function QrDownload({ code, label, qrStyle, onStyleChange, showPrintHando
         >
           <div className="media-overlay-content qr-lightbox" onClick={(event) => event.stopPropagation()}>
             <div className="qr-lightbox-header">
-              <strong>QR Preview</strong>
-              <button ref={previewCloseRef} className="media-overlay-close qr-lightbox-close" type="button" onClick={() => setIsLightboxOpen(false)} aria-label="Close QR preview">
+              <strong>{ui("ui.components.QrDownload.6a108d03b4ca", "QR Preview")}</strong>
+              <button ref={previewCloseRef} className="media-overlay-close qr-lightbox-close" type="button" onClick={() => setIsLightboxOpen(false)} aria-label={ui("ui.components.QrDownload.9aa176d79653", "Close QR preview")}>
                 <X size={14} />
-                <span>Close</span>
+                <span>{ui("ui.components.QrDownload.7d9eb7acb13e", "Close")}</span>
               </button>
             </div>
             <div className="qr-lightbox-body">
               <div className={`qr-lightbox-frame ${isTransparent ? "transparent" : ""}`}>
-                <img className="qr-lightbox-image" src={dataUrl} alt="QR code preview" />
+                <img className="qr-lightbox-image" src={dataUrl} alt={ui("ui.components.QrDownload.c8a21e7587a0", "QR code preview")} />
               </div>
             </div>
             <div className="qr-lightbox-footer">
               <a className="button qr-lightbox-download" href={dataUrl} download={`qrguitar-${code}.png`}>
-                <Download size={15} />
-                Download PNG
-              </a>
+                <Download size={15} />{ui("ui.components.QrDownload.c61867c5855b", "Download PNG")}</a>
             </div>
           </div>
         </dialog>

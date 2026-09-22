@@ -1,3 +1,5 @@
+
+import { createUiText } from "../../lib/ui-text";
 import styles from "../../components/LegalDocument.module.css";
 import type { Metadata } from "next";
 import { Footer } from "../../components/Footer";
@@ -11,6 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function TermsPage() {
+  const ui = createUiText((await loadPublishedSiteSettings()).content, "app.terms.page");
   const settings = await loadPublishedSiteSettings();
   const sections = [
     {
@@ -45,7 +48,7 @@ export default async function TermsPage() {
       <main className={styles.document}>
         <section className="section">
           <div className="shell legal-page">
-            <div className="eyebrow">Terms</div>
+            <div className="eyebrow">{ui("ui.app.terms.page.ede548996483", "Terms")}</div>
             <h1>{getContentValue(settings.content, "terms.hero.headline")}</h1>
             <p>{getContentValue(settings.content, "terms.hero.intro")}</p>
             {sections.map((section) => (

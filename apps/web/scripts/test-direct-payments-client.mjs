@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -5,7 +6,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-const web = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."), require = createRequire(path.join(web, "package.json")), ts = require("typescript");
+const web = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."), require = withUiTextTestContext(createRequire(path.join(web, "package.json"))), ts = require("typescript");
 const clientModule = { exports: {} };
 new Function("exports", "module", ts.transpileModule(fs.readFileSync(path.join(web, "lib/direct-payments-client.ts"), "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText)(clientModule.exports, clientModule);
 const { createDirectPaymentsClient, createAdminPaymentsClient, directPaymentUrl, initialDirectPaymentsState } = clientModule.exports;

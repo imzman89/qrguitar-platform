@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "../../components/UiTextProvider";
+
 
 import Link from "../../components/CheckoutAwareLink";
 import { useMemo, useState } from "react";
@@ -25,6 +27,7 @@ import type { DemoInstrument } from "../../lib/local-demo";
 import styles from "./guide.module.css";
 
 export function HowItWorksClient({ settings, example = null }: { settings: EditableSiteSettings; example?: DemoInstrument | null }) {
+  const ui = useUiText("app.how.it.works.HowItWorksClient");
   const [activeAudience, setActiveAudience] = useState(0);
   const content = settings.content;
   const sections = resolveVisibleEditorialSections(settings, "howItWorks");
@@ -58,8 +61,8 @@ export function HowItWorksClient({ settings, example = null }: { settings: Edita
                 <h1>{getContentValue(content, "howItWorks.hero.headline")}</h1>
                 <p>{getContentValue(content, "howItWorks.hero.body")}</p>
                 <div className="product-guide-actions">
-                  <Link className="button" href="/create">Create a Profile <ArrowRight size={16} /></Link>
-                  <Link className="button secondary" href="/catalog">Explore the Catalog</Link>
+                  <Link className="button" href="/create">{ui("ui.app.how.it.works.HowItWorksClient.8088497eb587", "Create a Profile")}{" "}<ArrowRight size={16} /></Link>
+                  <Link className="button secondary" href="/catalog">{ui("ui.app.how.it.works.HowItWorksClient.004ca2d8b070", "Explore the Catalog")}</Link>
                 </div>
               </div>
 
@@ -71,7 +74,7 @@ export function HowItWorksClient({ settings, example = null }: { settings: Edita
           <section className="section product-guide-flow" style={sectionStyle("lifecycle")}>
             <div className="shell">
               <div className="section-heading centered-heading">
-                <div className="eyebrow">HOW IT WORKS</div>
+                <div className="eyebrow">{ui("ui.app.how.it.works.HowItWorksClient.6a4cc4c27d2f", "HOW IT WORKS")}</div>
                 <h2>{getContentValue(content, "howItWorks.lifecycle.heading")}</h2>
               </div>
               <div className={styles.walkthrough}><ol className="product-guide-steps" role="list">
@@ -81,7 +84,7 @@ export function HowItWorksClient({ settings, example = null }: { settings: Edita
                     <div><h3>{item.title}</h3><p>{item.body}</p>{item.id === "how-step-create" ? <p className={styles.serialCaveat}>{getContentValue(content, "howItWorks.lifecycle.serialHelp")}</p> : null}</div>
                   </li>
                 ))}
-              </ol>{example ? <aside className={styles.example} aria-label="A real QRguitar Profile"><CollectibleRecordCard record={example} variant="archive" content={settings.content} /></aside> : null}</div>
+              </ol>{example ? <aside className={styles.example} aria-label={ui("ui.app.how.it.works.HowItWorksClient.9238fe0c58c9", "A real QRguitar Profile")}><CollectibleRecordCard record={example} variant="archive" content={settings.content} /></aside> : null}</div>
             </div>
           </section>
         ) : null}
@@ -90,7 +93,7 @@ export function HowItWorksClient({ settings, example = null }: { settings: Edita
           <section className="section product-guide-uses" id="profile-capabilities" style={sectionStyle("features")}>
             <div className="shell">
               <div className="section-heading centered-heading">
-                <div className="eyebrow">PROFILE CONTENT</div>
+                <div className="eyebrow">{ui("ui.app.how.it.works.HowItWorksClient.b11d90f41a06", "PROFILE CONTENT")}</div>
                 <h2>{getContentValue(content, "howItWorks.features.heading")}</h2>
               </div>
               <div className="product-guide-use-grid product-guide-capability-grid">
@@ -106,21 +109,21 @@ export function HowItWorksClient({ settings, example = null }: { settings: Edita
           <section className="section product-guide-identity" id="identity-privacy" style={sectionStyle("identity")}>
             <div className="shell product-guide-split">
               <div>
-                <div className="eyebrow">IDENTITY & PRIVACY</div>
+                <div className="eyebrow">{ui("ui.app.how.it.works.HowItWorksClient.eb8d26a4476d", "IDENTITY & PRIVACY")}</div>
                 <h2>{getContentValue(content, "howItWorks.identity.heading")}</h2>
                 <p>{getContentValue(content, "howItWorks.identity.body")}</p>
               </div>
               <div className="product-guide-visibility">
                 <div><QrCode /><strong>{getContentValue(content, "howItWorks.identity.qrTitle")}</strong><span>{getContentValue(content, "howItWorks.identity.qrBody")}</span></div>
-                <div><FileText /><strong>{getContentValue(content, "howItWorks.identity.serialTitle")}</strong><span>{getContentValue(content, "howItWorks.identity.serialBody")}</span><small className={styles.serialCaveat}>The QRguitar ID and URL may still include this number even when the field is hidden.</small></div>
+                <div><FileText /><strong>{getContentValue(content, "howItWorks.identity.serialTitle")}</strong><span>{getContentValue(content, "howItWorks.identity.serialBody")}</span><small className={styles.serialCaveat}>{ui("ui.app.how.it.works.HowItWorksClient.ab496be499d5", "The QRguitar ID and URL may still include this number even when the field is hidden.")}</small></div>
               </div>
             </div>
             <div className="shell product-guide-visibility-heading">
               <h2>{getContentValue(content, "howItWorks.privacy.heading")}</h2>
               <p>{getContentValue(content, "howItWorks.privacy.body")}</p>
-              <p className="fine-print">Choose a Private Profile when access must be restricted.</p>
+              <p className="fine-print">{ui("ui.app.how.it.works.HowItWorksClient.378ea29c1ca1", "Choose a Private Profile when access must be restricted.")}</p>
             </div>
-            <div className="shell product-guide-visibility-grid" aria-label="Profile visibility options">
+            <div className="shell product-guide-visibility-grid" aria-label={ui("ui.app.how.it.works.HowItWorksClient.d843ddab8d76", "Profile visibility options")}>
               {visibility.map((item) => <article key={item.title}><item.icon /><div><strong>{getContentValue(content, item.title)}</strong><span>{getContentValue(content, item.body)}</span></div></article>)}
             </div>
           </section>
@@ -130,10 +133,10 @@ export function HowItWorksClient({ settings, example = null }: { settings: Edita
           <section className="section product-guide-ownership" id="service-providers" style={sectionStyle("service")}>
             <div className="shell product-guide-ownership-layout">
               <div className="section-heading">
-                <div className="eyebrow">OWNERSHIP</div>
+                <div className="eyebrow">{ui("ui.app.how.it.works.HowItWorksClient.4acc8a696c56", "OWNERSHIP")}</div>
                 <h2>{getContentValue(content, "howItWorks.ownership.heading")}</h2>
                 <p>{getContentValue(content, "howItWorks.ownership.body")}</p>
-                <Link className="text-link" href="/ownership-claim">Open Claim Center</Link>
+                <Link className="text-link" href="/ownership-claim">{ui("ui.app.how.it.works.HowItWorksClient.c682490365e0", "Open Claim Center")}</Link>
               </div>
               <div className="product-guide-ownership-list">
                 {ownership.map((item) => <article key={item.title}><item.icon /><div><h3>{getContentValue(content, item.title)}</h3><p>{getContentValue(content, item.body)}</p></div></article>)}
@@ -145,9 +148,9 @@ export function HowItWorksClient({ settings, example = null }: { settings: Edita
         {visibleSectionIds.has("roles") ? (
           <section className="section product-guide-uses product-guide-audiences" id="who-it-is-for" style={sectionStyle("roles")}>
             <div className="shell">
-              <div className="section-heading centered-heading"><div className="eyebrow">FOR THE INSTRUMENT COMMUNITY</div><h2>{getContentValue(content, "howItWorks.roles.heading")}</h2></div>
+              <div className="section-heading centered-heading"><div className="eyebrow">{ui("ui.app.how.it.works.HowItWorksClient.10f89fbc4f6e", "FOR THE INSTRUMENT COMMUNITY")}</div><h2>{getContentValue(content, "howItWorks.roles.heading")}</h2></div>
               <div className="product-guide-role-switcher">
-                <div className="product-guide-role-tabs" role="tablist" aria-label="Choose your role">
+                <div className="product-guide-role-tabs" role="tablist" aria-label={ui("ui.app.how.it.works.HowItWorksClient.6cda88bdf5a8", "Choose your role")}>
                   {roleBlocks.map((item, index) => <button className={index === activeAudience ? "is-active" : ""} type="button" role="tab" id={`guide-audience-${index}`} aria-controls="guide-audience-panel" tabIndex={index === activeAudience ? 0 : -1} aria-selected={index === activeAudience} key={item.id} onClick={() => setActiveAudience(index)} onKeyDown={(event) => {
                     const target = event.key === "ArrowRight" ? (index + 1) % roleBlocks.length : event.key === "ArrowLeft" ? (index - 1 + roleBlocks.length) % roleBlocks.length : event.key === "Home" ? 0 : event.key === "End" ? roleBlocks.length - 1 : null;
                     if (target === null) return;
@@ -159,7 +162,7 @@ export function HowItWorksClient({ settings, example = null }: { settings: Edita
                   <article className="product-guide-role-panel" role="tabpanel" id="guide-audience-panel" aria-labelledby={`guide-audience-${activeAudience}`}>
                     <span>{String(activeAudience + 1).padStart(2, "0")}</span>
                     <div><h3>{selectedAudience.title}</h3><p>{selectedAudience.body}</p></div>
-                    <Link className="button secondary" href={selectedAudience.ctaUrl || "/create"}>{selectedAudience.ctaLabel || "Create a Profile"}</Link>
+                    <Link className="button secondary" href={selectedAudience.ctaUrl || "/create"}>{selectedAudience.ctaLabel || ui("ui.app.how.it.works.HowItWorksClient.8088497eb587", "Create a Profile")}</Link>
                   </article>
                 ) : null}
               </div>
@@ -170,7 +173,7 @@ export function HowItWorksClient({ settings, example = null }: { settings: Edita
         {visibleSectionIds.has("faq") ? (
           <section className="section product-guide-faq" style={sectionStyle("faq")}>
             <div className="shell product-guide-faq-inner">
-              <div><div className="eyebrow">BEFORE YOU START</div><h2>{getContentValue(content, "howItWorks.faq.heading")}</h2></div>
+              <div><div className="eyebrow">{ui("ui.app.how.it.works.HowItWorksClient.0e7f56b89a7f", "BEFORE YOU START")}</div><h2>{getContentValue(content, "howItWorks.faq.heading")}</h2></div>
               <div className="product-guide-faq-list">
                 {blocks("faq").map((item) => <details key={item.id}><summary>{item.title}</summary><p>{item.body}</p></details>)}
               </div>
@@ -181,8 +184,8 @@ export function HowItWorksClient({ settings, example = null }: { settings: Edita
         {visibleSectionIds.has("finalCta") ? (
           <section className="section product-guide-cta" style={sectionStyle("finalCta")}>
             <div className="shell product-guide-cta-inner">
-              <div><div className="eyebrow">START WITH ONE INSTRUMENT</div><h2>{getContentValue(content, "howItWorks.finalCta.headline")}</h2><p>{getContentValue(content, "howItWorks.finalCta.body")}</p></div>
-              <Link className="button" href="/create">Create a Profile <ArrowRight size={16} /></Link>
+              <div><div className="eyebrow">{ui("ui.app.how.it.works.HowItWorksClient.2d735641fa51", "START WITH ONE INSTRUMENT")}</div><h2>{getContentValue(content, "howItWorks.finalCta.headline")}</h2><p>{getContentValue(content, "howItWorks.finalCta.body")}</p></div>
+              <Link className="button" href="/create">{ui("ui.app.how.it.works.HowItWorksClient.8088497eb587", "Create a Profile")}{" "}<ArrowRight size={16} /></Link>
             </div>
           </section>
         ) : null}

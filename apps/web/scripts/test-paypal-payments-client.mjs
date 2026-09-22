@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -5,7 +6,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-const web = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."), require = createRequire(path.join(web, "package.json")), ts = require("typescript"), modules = new Map();
+const web = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."), require = withUiTextTestContext(createRequire(path.join(web, "package.json"))), ts = require("typescript"), modules = new Map();
 function load(name) { if (modules.has(name)) return modules.get(name); const module = { exports: {} }; const compiled = ts.transpileModule(fs.readFileSync(path.join(web, `lib/${name}.ts`), "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText; new Function("require", "exports", "module", compiled)(specifier => specifier.startsWith("./") ? load(specifier.slice(2)) : require(specifier), module.exports, module); modules.set(name, module.exports); return module.exports; }
 const client = load("paypal-payments-client"), tracking = load("optional-tracking-consent"), sdkModule = load("paypal-browser-sdk"), appleModule = load("paypal-apple-pay");
 const A = "11111111-1111-4111-8111-111111111111", B = "22222222-2222-4222-8222-222222222222", ID = "33333333-3333-4333-8333-333333333333", ORDER = "44444444-4444-4444-8444-444444444444", ID2 = "55555555-5555-4555-8555-555555555555", PAYPAL = "5O190127TN364715T";

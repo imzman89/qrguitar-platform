@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "./UiTextProvider";
+
 
 import { X } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -13,6 +15,7 @@ type ActionDrawerProps = {
 };
 
 export function ActionDrawer({ children, eyebrow, onClose, returnFocusTo, title }: ActionDrawerProps) {
+  const ui = useUiText("components.ActionDrawer");
   const [mounted, setMounted] = useState(false);
   const panelRef = useRef<HTMLElement>(null);
 
@@ -66,14 +69,14 @@ export function ActionDrawer({ children, eyebrow, onClose, returnFocusTo, title 
   if (!mounted) return null;
   return createPortal(
     <div className="action-drawer-layer" role="presentation">
-      <button className="action-drawer-backdrop" type="button" aria-label="Close profile actions" onClick={onClose} />
+      <button className="action-drawer-backdrop" type="button" aria-label={ui("ui.components.ActionDrawer.1c1587ee93e7", "Close profile actions")} onClick={onClose} />
       <aside className="action-drawer" ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="action-drawer-title" tabIndex={-1}>
         <header className="action-drawer-header">
           <div>
             {eyebrow ? <span>{eyebrow}</span> : null}
             <h2 id="action-drawer-title">{title}</h2>
           </div>
-          <button className="icon-button" type="button" aria-label="Close profile actions" onClick={onClose}><X aria-hidden="true" /></button>
+          <button className="icon-button" type="button" aria-label={ui("ui.components.ActionDrawer.1c1587ee93e7", "Close profile actions")} onClick={onClose}><X aria-hidden="true" /></button>
         </header>
         <div className="action-drawer-scroll">{children}</div>
       </aside>

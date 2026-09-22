@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "./UiTextProvider";
+
 
 import { Globe2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -13,6 +15,7 @@ type InstrumentsResponse = {
 };
 
 export function LatestPublicRecord({ initialRecord = null, content, presentation = "card" }: { initialRecord?: DemoInstrument | null; content?: Record<string, string>; presentation?: "card" | "showcase" }) {
+  const ui = useUiText("components.LatestPublicRecord");
   const [latest, setLatest] = useState<DemoInstrument | null>(initialRecord);
   const [loaded, setLoaded] = useState(Boolean(initialRecord));
 
@@ -43,14 +46,14 @@ export function LatestPublicRecord({ initialRecord = null, content, presentation
   }, [initialRecord, presentation]);
 
   if (!loaded) {
-    return <div className="latest-record-card--skeleton" aria-label="Loading latest QRguitar Profile" aria-busy="true" />;
+    return <div className="latest-record-card--skeleton" aria-label={ui("ui.components.LatestPublicRecord.feef6ffa93b4", "Loading latest QRguitar Profile")} aria-busy="true" />;
   }
 
   if (!latest) {
     return (
-      <article className="latest-record-message" aria-label="Latest QRguitar Profile">
+      <article className="latest-record-message" aria-label={ui("ui.components.LatestPublicRecord.b4a345555f15", "Latest QRguitar Profile")}>
         <Globe2 size={14} />
-        <span>No public Profiles yet.</span>
+        <span>{ui("ui.components.LatestPublicRecord.bf94b5d71589", "No public Profiles yet.")}</span>
       </article>
     );
   }

@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -6,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-const require = createRequire(import.meta.url), ts = require("typescript"), React = require("react");
+const require = withUiTextTestContext(createRequire(import.meta.url)), ts = require("typescript"), React = require("react");
 function compile(relative, bindings, overrides = {}) {
   const module = { exports: {} };
   const source = fs.readFileSync(path.join(root, "apps/web", relative), "utf8");

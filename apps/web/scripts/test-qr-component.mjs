@@ -1,9 +1,10 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import test from "node:test";
 
-const require = createRequire(import.meta.url), ts = require("typescript");
+const require = withUiTextTestContext(createRequire(import.meta.url)), ts = require("typescript");
 function compile(file, imports = {}) {
   const module = { exports: {} };
   const source = fs.readFileSync(new URL(`../${file}`, import.meta.url), "utf8");

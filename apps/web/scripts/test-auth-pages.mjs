@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,7 +9,7 @@ import test from 'node:test';
 const args = process.argv.slice(2), option = name => args[args.indexOf(name) + 1];
 const repo = path.resolve(args.includes('--repo') ? option('--repo') : path.join(path.dirname(fileURLToPath(import.meta.url)), '../../..'));
 const source = path.resolve(args.includes('--source') ? option('--source') : repo);
-const require = createRequire(path.join(repo, 'apps/web/package.json'));
+const require = withUiTextTestContext(createRequire(path.join(repo, 'apps/web/package.json')));
 const ts = require('typescript'), React = require('react');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };

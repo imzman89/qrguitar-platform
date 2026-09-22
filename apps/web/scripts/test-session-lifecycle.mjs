@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -5,7 +6,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-const require = createRequire(import.meta.url), ts = require("typescript");
+const require = withUiTextTestContext(createRequire(import.meta.url)), ts = require("typescript");
 const web = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const hour = 60 * 60 * 1000, day = 24 * hour;
 const startedKey = "qrguitar.sessionStartedAt", activityKey = "qrguitar.lastActivityAt", identityKey = "qrguitar.sessionIdentity";

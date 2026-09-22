@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "../ui-text-test-context.mjs";
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,7 +10,7 @@ const repo=path.resolve(process.argv[2]||process.env.QRGUITAR_REPO||inferred);
 const overlay=path.resolve(process.argv[3]||inferred);
 const req=createRequire(path.join(repo,'apps/web/package.json')),ts=req('typescript');
 function file(relative){return fs.readFileSync(path.join(fs.existsSync(path.join(overlay,relative))?overlay:repo,relative),'utf8');}
-function compile(source,modules={},extras={}){const module={exports:{}};vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module,exports:module.exports,require:id=>{if(id in modules)return modules[id];throw Error('Unexpected import '+id);},URL,Request,Response,Headers,AbortController,AbortSignal,setTimeout,clearTimeout,Buffer,CustomEvent:class{constructor(type){this.type=type;}},...extras});return module.exports;}
+function compile(source,modules={},extras={}){const module={exports:{}};vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module,exports:module.exports,require:id=>{if(id in modules)return modules[id];throw Error('Unexpected import '+id);},URL,Request,Response,Headers,AbortController,AbortSignal,setTimeout,clearTimeout,Buffer,CustomEvent:class{constructor(type){this.type=type;}},ui:withUiTextTestContext(()=>{throw new Error("Unexpected module");})("UiTextProvider").useUiText("app.site.editor.page"),...extras});return module.exports;}
 function load(relative,modules={},extras={}){return compile(file(relative),modules,extras);}
 const actor='10000000-0000-4000-8000-000000000001',other='10000000-0000-4000-8000-000000000002';
 const preview=load('apps/web/lib/site-preview.ts',{'node:crypto':req('node:crypto')},{process:{env:{QRGUITAR_PREVIEW_SECRET:'synthetic-preview-key'}}});

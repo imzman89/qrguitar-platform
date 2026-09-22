@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "../../components/UiTextProvider";
+
 
 import Link from "../../components/CheckoutAwareLink";
 import styles from "../../components/AuthForm.module.css";
@@ -23,6 +25,7 @@ async function readAuthSession(client: ReturnType<typeof createBrowserSupabaseCl
 }
 
 export default function ResetPasswordPage() {
+  const ui = useUiText("app.reset.password.page");
   const content = useSiteContent();
   const router = useRouter();
   const client = useRef<ReturnType<typeof createBrowserSupabaseClient> | null>(null);
@@ -154,37 +157,37 @@ export default function ResetPasswordPage() {
       <main className={styles.page}>
         <div className={styles.layout}>
           <header className={styles.heading}>
-            <div className="eyebrow">Account recovery</div>
+            <div className="eyebrow">{ui("ui.app.reset.password.page.2b291cd5cd2f", "Account recovery")}</div>
             <h1>{getContentValue(content, "resetPassword.hero.headline")}</h1>
             <p>{getContentValue(content, "resetPassword.hero.body")}</p>
           </header>
 
           <section className={styles.formPanel}>
             <div className={styles.stateHeading}>
-              <span>Password reset</span>
+              <span>{ui("ui.app.reset.password.page.359f68acb9b4", "Password reset")}</span>
               <strong>
                 {!authChecked
-                  ? "Checking reset link."
+                  ? ui("ui.app.reset.password.page.efbe5ce1a727", "Checking reset link.")
                   : authError
-                    ? "Sign-in check unavailable."
+                    ? ui("ui.app.reset.password.page.60a5fa2747a0", "Sign-in check unavailable.")
                   : isComplete
-                    ? "Password updated."
+                    ? ui("ui.app.reset.password.page.df01ff0dd6ed", "Password updated.")
                     : hasSession
-                      ? "Enter a new password."
+                      ? ui("ui.app.reset.password.page.7aa2cb96c3c9", "Enter a new password.")
                       : hasRecoveryLink
-                        ? "Reset link invalid or expired."
-                        : "Reset link required."}
+                        ? ui("ui.app.reset.password.page.25747699557d", "Reset link invalid or expired.")
+                        : ui("ui.app.reset.password.page.4f057eac4b08", "Reset link required.")}
               </strong>
             </div>
 
-            {!authChecked ? <p className="form-message">Validating your secure link.</p> : null}
+            {!authChecked ? <p className="form-message">{ui("ui.app.reset.password.page.302e28e1e830", "Validating your secure link.")}</p> : null}
 
-            {authChecked && authError ? <div><p className="form-message error-message" role="alert">{status}</p><button className="button" type="button" disabled={isWorking} onClick={() => setAuthAttempt(value => value + 1)}>Try again</button></div> : null}
+            {authChecked && authError ? <div><p className="form-message error-message" role="alert">{status}</p><button className="button" type="button" disabled={isWorking} onClick={() => setAuthAttempt(value => value + 1)}>{ui("ui.app.reset.password.page.d8b8392e2c54", "Try again")}</button></div> : null}
 
             {authChecked && !authError && isComplete ? (
               <>
-                <p className="form-message">Your new password is saved. Taking you back to QRguitar.</p>
-                <Link className="button" href={safeNext}>Continue</Link>
+                <p className="form-message">{ui("ui.app.reset.password.page.a1d84018af6f", "Your new password is saved. Taking you back to QRguitar.")}</p>
+                <Link className="button" href={safeNext}>{ui("ui.app.reset.password.page.31fbef162594", "Continue")}</Link>
               </>
             ) : null}
 
@@ -192,44 +195,44 @@ export default function ResetPasswordPage() {
               <>
                 <p className="form-message">
                   {hasRecoveryLink
-                    ? "This reset link is no longer valid. Request a fresh password reset email."
-                    : "Open the password reset link from your email to continue."}
+                    ? ui("ui.app.reset.password.page.d070b9194f76", "This reset link is no longer valid. Request a fresh password reset email.")
+                    : ui("ui.app.reset.password.page.58b2c6c10c7f", "Open the password reset link from your email to continue.")}
                 </p>
-                <Link className="button" href={`/login?mode=reset&next=${encodeURIComponent(safeNext)}`}>Request a new reset link</Link>
+                <Link className="button" href={`/login?mode=reset&next=${encodeURIComponent(safeNext)}`}>{ui("ui.app.reset.password.page.6ff84c62212a", "Request a new reset link")}</Link>
               </>
             ) : null}
 
             {authChecked && !authError && !isComplete && hasSession ? (
               <>
                 <div className="field">
-                  <label htmlFor="password">New password</label>
+                  <label htmlFor="password">{ui("ui.app.reset.password.page.3dd9df4441fb", "New password")}</label>
                   <input
                     id="password"
                     type="password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     autoComplete="new-password"
-                    placeholder="At least 8 characters"
+                    placeholder={ui("ui.app.reset.password.page.977f3b2676a9", "At least 8 characters")}
                   />
                 </div>
 
                 <div className="field">
-                  <label htmlFor="confirmPassword">Confirm password</label>
+                  <label htmlFor="confirmPassword">{ui("ui.app.reset.password.page.5ac265f396a2", "Confirm password")}</label>
                   <input
                     id="confirmPassword"
                     type="password"
                     value={confirmPassword}
                     onChange={(event) => setConfirmPassword(event.target.value)}
                     autoComplete="new-password"
-                    placeholder="Re-enter new password"
+                    placeholder={ui("ui.app.reset.password.page.6bf1430d8550", "Re-enter new password")}
                   />
                 </div>
 
                 <div className="form-actions">
                   <button className="button" type="button" onClick={savePassword} disabled={isWorking}>
-                    {isWorking ? "Saving..." : "Save new password"}
+                    {isWorking ? ui("ui.app.reset.password.page.dc85af8f2b1d", "Saving...") : ui("ui.app.reset.password.page.1a145dd7125d", "Save new password")}
                   </button>
-                  <Link className="button secondary" href={`/login?next=${encodeURIComponent(safeNext)}`}>Back to sign in</Link>
+                  <Link className="button secondary" href={`/login?next=${encodeURIComponent(safeNext)}`}>{ui("ui.app.reset.password.page.71fe31ccd37c", "Back to sign in")}</Link>
                 </div>
               </>
             ) : null}

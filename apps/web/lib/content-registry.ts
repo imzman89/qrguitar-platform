@@ -1,3 +1,6 @@
+import { uiTextEntries } from "./ui-text-registry";
+import { protectedUiTextKeys } from "./ui-text-protection";
+
 export type ContentFieldType = "text" | "textarea" | "email" | "url" | "select";
 
 export const seoIndexingValues = [
@@ -501,7 +504,14 @@ const seoRegistry: ContentRegistryEntry[] = [
 ];
 
 export const contentRegistry: ContentRegistryEntry[] = Array.from(
-  new Map([...coreContentRegistry, ...completionRegistry, ...emailRegistry, ...seoRegistry].map((entry) => [entry.key, entry])).values()
+  new Map([...coreContentRegistry, ...completionRegistry, ...emailRegistry, ...seoRegistry, ...uiTextEntries.map((entry) => field(
+    entry.key, entry.area as ContentArea, entry.page, entry.section,
+    entry.text.length > 85 ? `${entry.text.slice(0, 82)}…` : entry.text,
+    entry.text,
+    { maxLength: Math.max(240, entry.text.length * 3), allowedVariables: Array.from(entry.text.matchAll(/\{\{([a-zA-Z0-9_]+)\}\}/g), (match) => match[1]),
+      classification: protectedUiTextKeys.has(entry.key) ? "security-locked" : "editable-standard",
+      help: "Site interface wording. Values in {{braces}} come from the application; keep those placeholders. This does not edit anyone’s saved Profile or account data." }
+  ))].map((entry) => [entry.key, entry])).values()
 );
 
 export type ContentCoverageEntry = {
@@ -525,7 +535,7 @@ export const contentCoverageSummary = {
   securityLocked: contentRegistry.filter((entry) => entry.classification === "security-locked").length,
   dataDerived: contentRegistry.filter((entry) => entry.classification === "data-derived").length,
   browserPlatform: contentRegistry.filter((entry) => entry.classification === "browser-platform").length,
-  unresolved: 0
+  connectedUiFields: uiTextEntries.length
 };
 
 export const contentRegistryByKey = new Map(contentRegistry.map((entry) => [entry.key, entry]));
@@ -677,6 +687,21 @@ export function validateContentValues(value: Record<string, string>) {
     if (entry.allowedVariables) {
       const invalid = validateVariables(candidate, entry.allowedVariables);
       if (invalid) errors[entry.key] = `Variable {{${invalid}}} is not allowed in this template.`;
+      if (entry.key.startsWith("ui.")) {
+        const missing = entry.allowedVariables.find((variable) => !candidate.includes(`{{${variable}}}`));
+        if (missing) errors[entry.key] = `Keep the {{${missing}}} placeholder so the current application value remains visible.`;
+      }
+    }
+  }
+  return errors;
+}
+
+export function validateProtectedContentValues(candidate: Record<string, string>, published: Record<string, string>) {
+  const errors: Record<string, string> = {};
+  for (const entry of contentRegistry) {
+    if (!["security-locked", "data-derived", "browser-platform"].includes(entry.classification)) continue;
+    if (getContentValue(candidate, entry.key) !== getContentValue(published, entry.key)) {
+      errors[entry.key] = "This protected wording cannot be changed in Content Studio.";
     }
   }
   return errors;

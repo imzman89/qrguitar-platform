@@ -29,7 +29,10 @@ const seo = loadTypeScript("lib/seo.ts", {
     instrumentDisplayName: record => record.name || [record.brand, record.model].filter(Boolean).join(" ") || record.qrCode
   }
 });
-const contentRegistry = loadTypeScript("lib/content-registry.ts");
+const contentRegistry = loadTypeScript("lib/content-registry.ts", {
+  "./ui-text-registry": loadTypeScript("lib/ui-text-registry.ts"),
+  "./ui-text-protection": loadTypeScript("lib/ui-text-protection.ts")
+});
 const indexing = loadTypeScript("lib/search-indexing.ts");
 
 test("canonical metadata and discovery files always use the www production origin", async () => {
@@ -294,8 +297,8 @@ test("installer snippets and Profile breadcrumbs describe the rendered experienc
 
   const breadcrumbs = fs.readFileSync(path.join(webRoot, "app/i/[code]/ProfileBreadcrumbs.tsx"), "utf8");
   const profile = fs.readFileSync(path.join(webRoot, "app/i/[code]/ProfileClient.tsx"), "utf8");
-  assert.match(breadcrumbs, /<Link href="\/">Home<\/Link>/);
-  assert.match(breadcrumbs, /<Link href="\/catalog">Catalog<\/Link>/);
+  assert.match(breadcrumbs, /<Link href="\/">\{ui\("[^"]+", "Home"\)\}<\/Link>/);
+  assert.match(breadcrumbs, /<Link href="\/catalog">\{ui\("[^"]+", "Catalog"\)\}<\/Link>/);
   assert.match(breadcrumbs, /aria-current="page"/);
   assert.match(profile, /<ProfileBreadcrumbs current=\{instrumentDisplayName\(instrument\)\} \/>/);
 });

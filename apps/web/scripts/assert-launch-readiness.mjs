@@ -98,8 +98,8 @@ ok(
 );
 ok(
   siteEditor.includes("if (!authorized)")
-    && siteEditor.includes('status === "loading" ? "Checking Site Editor access."')
-    && siteEditor.includes('initialLoadFailure === "unavailable" ? "Site Editor is temporarily unavailable." : "Admin access required."'),
+    && /status === "loading" \? ui\("ui\.app\.site\.editor\.page\.[^"]+", "Checking Site Editor access\."\)/.test(siteEditor)
+    && /initialLoadFailure === "unavailable" \? ui\("[^"]+", "Site Editor is temporarily unavailable\."\) : ui\("[^"]+", "Admin access required\."\)/.test(siteEditor),
   "Site Editor access gate must distinguish loading, unavailable, and unauthorized states"
 );
 ok(migration.includes("migration:QRG-05068283:setup-2026-06-20") && migration.includes("date '2026-06-20'") && migration.includes("Properly setup on 6/20/2026"), "Canonical setup migration lost source/date/text");

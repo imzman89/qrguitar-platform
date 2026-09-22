@@ -1,3 +1,6 @@
+
+"use client";
+import { useUiText } from "../../../components/UiTextProvider";
 import type { ReactNode } from "react";
 import { BrandLogo } from "../../../components/BrandLogo";
 import type { PrintMode, PrintOrientation, PrintSize } from "../../../lib/print-layout";
@@ -36,21 +39,22 @@ function Facts({ facts }: { facts: Fact[] }) {
 }
 
 export function PrintDocument(props: Props) {
+  const ui = useUiText("app.handout.code.PrintDocument");
   const { mode, title, code, serial, photo, profileUrl, service } = props;
-  const qr = <img className={styles.qr} src={props.qrDataUrl || undefined} alt={`QR code linking to ${profileUrl}`} />;
+  const qr = <img className={styles.qr} src={props.qrDataUrl || undefined} alt={ui("ui.app.handout.code.PrintDocument.94272b2b86d2", "QR code linking to {{value1}}", { value1: profileUrl })} />;
   const brand = props.includeLogo ? <span className={styles.brandPlate}><BrandLogo className={styles.logo} appearance={props.theme === "light" ? "paper" : "dark"} /></span> : <span />;
   const photograph = photo ? <div className={styles.photograph}><img src={photo} alt={title} style={{ objectFit: props.photoFit }} loading="eager" decoding="sync" /></div> : null;
   const identity: Fact[] = [["QRguitar ID", code], ...(serial ? [["Serial Number", serial] as Fact] : [])];
   const profileScan = <section className={styles.profileScan}>
     {qr}
     <div className={styles.profileScanCopy}>
-      <span className={styles.sectionLabel}>Permanent QRguitar Profile</span>
-      {props.includeInstruction ? <><h3>{props.scanInstruction}</h3><p>View Profile details, photographs, specifications and history.</p></> : null}
+      <span className={styles.sectionLabel}>{ui("ui.app.handout.code.PrintDocument.1081dbe09b14", "Permanent QRguitar Profile")}</span>
+      {props.includeInstruction ? <><h3>{props.scanInstruction}</h3><p>{ui("ui.app.handout.code.PrintDocument.bddbc8638f57", "View Profile details, photographs, specifications and history.")}</p></> : null}
       {props.includeUrl ? <span className={styles.profileUrl}>{profileUrl}</span> : null}
     </div>
   </section>;
   const serviceScan = <section className={`${styles.scan} ${styles.serviceScan}`}>
-    {qr}<div><span className={styles.sectionLabel}>Permanent service history</span>{props.includeInstruction ? <><h3>Open the complete QRguitar Profile</h3><p>Review photographs, specifications and approved service history.</p></> : null}{props.includeUrl ? <span>{profileUrl}</span> : null}</div>
+    {qr}<div><span className={styles.sectionLabel}>{ui("ui.app.handout.code.PrintDocument.7232f916051f", "Permanent service history")}</span>{props.includeInstruction ? <><h3>{ui("ui.app.handout.code.PrintDocument.0498504da58e", "Open the complete QRguitar Profile")}</h3><p>{ui("ui.app.handout.code.PrintDocument.1236999f1bfb", "Review photographs, specifications and approved service history.")}</p></> : null}{props.includeUrl ? <span>{profileUrl}</span> : null}</div>
   </section>;
 
   return <article
@@ -61,57 +65,57 @@ export function PrintDocument(props: Props) {
     data-orientation={props.orientation}
     data-theme={props.theme}
     className={styles.document}
-    aria-label={`Printable ${mode === "handout" ? "customer handout" : mode === "service" ? "service summary" : mode === "hangtag" ? "display card" : "QR label"} for ${title}`}
+    aria-label={ui("ui.app.handout.code.PrintDocument.ebda169628a4", "Printable {{value1}} for {{value2}}", { value1: mode === "handout" ? "customer handout" : mode === "service" ? "service summary" : mode === "hangtag" ? "display card" : "QR label", value2: title })}
   >
     {mode === "label" ? <div className={styles.label}>
-      <div className={styles.labelQr}>{qr}{props.includeInstruction ? <span>Scan Profile</span> : null}</div>
-      <div className={styles.labelInfo}>{brand}<h2>{title}</h2><strong>{code}</strong>{serial ? <p>Serial Number: {serial}</p> : null}{props.includeUrl ? <span>{profileUrl}</span> : null}</div>
+      <div className={styles.labelQr}>{qr}{props.includeInstruction ? <span>{ui("ui.app.handout.code.PrintDocument.8db3ef5c5d2f", "Scan Profile")}</span> : null}</div>
+      <div className={styles.labelInfo}>{brand}<h2>{title}</h2><strong>{code}</strong>{serial ? <p>{ui("ui.app.handout.code.PrintDocument.1631e4a6b7d7", "Serial Number:")}{" "}{serial}</p> : null}{props.includeUrl ? <span>{profileUrl}</span> : null}</div>
     </div> : mode === "hangtag" ? <div className={styles.tag}>
       <header className={styles.tagHeader}>{brand}<strong>{code}</strong></header>
       {photograph ? <div className={styles.tagPhoto}>{photograph}</div> : null}
-      <section className={styles.tagIdentity}><span className={styles.sectionLabel}>QRguitar Profile</span><h2>{title}</h2><p>{props.facts.join(" / ")}</p>{props.badges}</section>
-      <section className={styles.tagMeta}><Facts facts={[...identity, ...props.details].slice(0, 6)} /><div className={styles.tagQr}>{qr}{props.includeInstruction ? <span>Scan Profile</span> : null}</div></section>
+      <section className={styles.tagIdentity}><span className={styles.sectionLabel}>{ui("ui.app.handout.code.PrintDocument.4538b821a0d6", "QRguitar Profile")}</span><h2>{title}</h2><p>{props.facts.join(" / ")}</p>{props.badges}</section>
+      <section className={styles.tagMeta}><Facts facts={[...identity, ...props.details].slice(0, 6)} /><div className={styles.tagQr}>{qr}{props.includeInstruction ? <span>{ui("ui.app.handout.code.PrintDocument.8db3ef5c5d2f", "Scan Profile")}</span> : null}</div></section>
       {props.note ? <p className={styles.tagNote}>{props.note}</p> : null}
-      <footer className={styles.tagFooter}>{props.includeUrl ? <span>{profileUrl}</span> : null}<span>qrguitar.com</span></footer>
+      <footer className={styles.tagFooter}>{props.includeUrl ? <span>{profileUrl}</span> : null}<span>{ui("ui.app.handout.code.PrintDocument.1a719f6a72dd", "qrguitar.com")}</span></footer>
     </div> : <div className={`${styles.sheet} ${mode === "service" ? styles.serviceSheet : ""}`}>
       <header className={`${styles.header} ${mode === "handout" ? styles.profileHeader : styles.serviceHeader}`}>
         {brand}
-        {mode === "handout" ? <div className={styles.documentMeta}><span>QRguitar Profile</span><strong>Permanent identity</strong></div> : <div className={styles.documentMeta}><span>Service history</span><strong>Service Summary</strong></div>}
+        {mode === "handout" ? <div className={styles.documentMeta}><span>{ui("ui.app.handout.code.PrintDocument.4538b821a0d6", "QRguitar Profile")}</span><strong>{ui("ui.app.handout.code.PrintDocument.c01d92587bd7", "Permanent identity")}</strong></div> : <div className={styles.documentMeta}><span>{ui("ui.app.handout.code.PrintDocument.a734981c99b6", "Service history")}</span><strong>{ui("ui.app.handout.code.PrintDocument.ce86d91e272a", "Service Summary")}</strong></div>}
       </header>
       <section className={mode === "service" ? styles.serviceIdentity : styles.identity}>
         {mode === "service" ? photograph : null}
-        <div>{mode === "handout" ? <span className={styles.identityEyebrow}>Registered Profile</span> : <span className={styles.identityEyebrow}>Profile</span>}<h2>{title}</h2><p className={styles.primaryFacts}>{props.facts.join(" / ")}</p>{props.badges}{mode === "service" ? <Facts facts={[...identity, ...props.details]} /> : null}</div>
+        <div>{mode === "handout" ? <span className={styles.identityEyebrow}>{ui("ui.app.handout.code.PrintDocument.3ec29e5e7860", "Registered Profile")}</span> : <span className={styles.identityEyebrow}>{ui("ui.app.handout.code.PrintDocument.d696a35bdd18", "Profile")}</span>}<h2>{title}</h2><p className={styles.primaryFacts}>{props.facts.join(" / ")}</p>{props.badges}{mode === "service" ? <Facts facts={[...identity, ...props.details]} /> : null}</div>
       </section>
       {mode === "handout" ? <div className={styles.profileBody} data-has-photo={Boolean(photo)}>
         {photograph ? <div className={styles.profilePhoto}>{photograph}</div> : null}
         <aside className={styles.profileDetails}>
-          <section className={styles.profileIdentity} aria-label="Profile identity">
-            <span className={styles.sectionLabel}>QRguitar ID</span>
+          <section className={styles.profileIdentity} aria-label={ui("ui.app.handout.code.PrintDocument.9b7e3e571ecb", "Profile identity")}>
+            <span className={styles.sectionLabel}>{ui("ui.app.handout.code.PrintDocument.a6c8f92c19f4", "QRguitar ID")}</span>
             <strong>{code}</strong>
-            {serial ? <div><span>Serial Number</span><b>{serial}</b></div> : null}
+            {serial ? <div><span>{ui("ui.app.handout.code.PrintDocument.14b1b3c5b151", "Serial Number")}</span><b>{serial}</b></div> : null}
           </section>
-          {props.details.length ? <section className={styles.detailGroup} aria-label="Profile details"><h3>Profile details</h3><Facts facts={props.details} /></section> : null}
-          {props.specifications.length ? <section className={`${styles.specifications} ${styles.detailGroup}`} aria-label="Profile specifications"><h3>Specifications</h3><Facts facts={props.specifications} /></section> : null}
+          {props.details.length ? <section className={styles.detailGroup} aria-label={ui("ui.app.handout.code.PrintDocument.73949bb1bdba", "Profile details")}><h3>{ui("ui.app.handout.code.PrintDocument.73949bb1bdba", "Profile details")}</h3><Facts facts={props.details} /></section> : null}
+          {props.specifications.length ? <section className={`${styles.specifications} ${styles.detailGroup}`} aria-label={ui("ui.app.handout.code.PrintDocument.b70ec7c6b4ce", "Profile specifications")}><h3>{ui("ui.app.handout.code.PrintDocument.015b4e0a76e5", "Specifications")}</h3><Facts facts={props.specifications} /></section> : null}
         </aside>
       </div> : null}
       {mode === "handout" ? profileScan : null}
       {mode === "service" && service ? <section className={styles.service}>
         <header><div><span>{service.category}</span><h3>{service.title}</h3></div><time>{service.date}</time></header>
-        <section className={styles.serviceWork} aria-label="Work performed">
-          <span>Work performed</span>
-          {service.description ? <p>{service.description}</p> : <p>Recorded service event.</p>}
+        <section className={styles.serviceWork} aria-label={ui("ui.app.handout.code.PrintDocument.a303b38a9485", "Work performed")}>
+          <span>{ui("ui.app.handout.code.PrintDocument.a303b38a9485", "Work performed")}</span>
+          {service.description ? <p>{service.description}</p> : <p>{ui("ui.app.handout.code.PrintDocument.f29bf8bd83f2", "Recorded service event.")}</p>}
           <Facts facts={service.details} />
         </section>
-        <section className={styles.serviceNotes} aria-label="Service notes">
-          <span>Technician / shop notes</span>
+        <section className={styles.serviceNotes} aria-label={ui("ui.app.handout.code.PrintDocument.3929e139c666", "Service notes")}>
+          <span>{ui("ui.app.handout.code.PrintDocument.19a60e95bdbe", "Technician / shop notes")}</span>
           {props.note ? <p>{props.note}</p> : <div className={styles.noteLines} aria-hidden="true"><i /><i /><i /><i /></div>}
         </section>
-        <div className={styles.provenance}><span>Record provenance</span><p>{service.provenance}</p></div>
+        <div className={styles.provenance}><span>{ui("ui.app.handout.code.PrintDocument.6a0e15d298c4", "Record provenance")}</span><p>{service.provenance}</p></div>
       </section> : null}
-      {props.timeline.length ? <section className={styles.timeline} aria-label="Recent history"><h3>Recent history</h3>{props.timeline.map((entry, index) => <p key={index}>{entry}</p>)}</section> : null}
+      {props.timeline.length ? <section className={styles.timeline} aria-label={ui("ui.app.handout.code.PrintDocument.aba8db7131dc", "Recent history")}><h3>{ui("ui.app.handout.code.PrintDocument.aba8db7131dc", "Recent history")}</h3>{props.timeline.map((entry, index) => <p key={index}>{entry}</p>)}</section> : null}
       {mode === "service" ? serviceScan : null}
       {props.note && mode !== "service" ? <section className={styles.note}><p>{props.note}</p></section> : null}
-      <footer className={styles.sheetFooter}><span>{mode === "service" ? "Private evidence and internal notes are not included." : "Keep this sheet with the gear."}</span><span>qrguitar.com</span></footer>
+      <footer className={styles.sheetFooter}><span>{mode === "service" ? ui("ui.app.handout.code.PrintDocument.abd1353daca2", "Private evidence and internal notes are not included.") : ui("ui.app.handout.code.PrintDocument.6af5e1108227", "Keep this sheet with the gear.")}</span><span>{ui("ui.app.handout.code.PrintDocument.1a719f6a72dd", "qrguitar.com")}</span></footer>
     </div>}
   </article>;
 }

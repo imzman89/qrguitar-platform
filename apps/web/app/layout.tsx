@@ -10,6 +10,8 @@ import { GoogleAnalyticsRuntime } from "../components/GoogleAnalyticsRuntime";
 import { buildOrganizationJsonLd } from "../lib/seo";
 import { buildManagedSiteMetadata } from "../lib/site-metadata";
 import { loadSiteSettingsRequest } from "../lib/site-settings-server";
+import { UiTextProvider } from "../components/UiTextProvider";
+import { defaultContentValues } from "../lib/content-registry";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
@@ -42,6 +44,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   return (
     <html lang="en" style={themeStyle}>
       <body data-product-theme="paper">
+        <UiTextProvider content={Object.fromEntries(Object.entries(publishedSettings.content).filter(([key, value]) => key.startsWith("ui.") && value !== defaultContentValues[key]))}>
         {loadedSettings.source === "draft" ? (
           <div className="site-draft-preview-banner" role="status" aria-label="Draft preview is active">
             <strong>Draft preview</strong>
@@ -59,6 +62,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         />
         <PwaRuntime>{children}</PwaRuntime>
         <OptionalTrackingConsent />
+        </UiTextProvider>
       </body>
     </html>
   );

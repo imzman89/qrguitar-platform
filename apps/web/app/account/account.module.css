@@ -19,7 +19,7 @@
 .identity h2 { margin: 0 0 4px; font-size: 1.5rem; font-weight: 600; }
 .identity p { margin: 0; color: var(--muted); font-size: .875rem; overflow-wrap: anywhere; }
 .identity small { display: block; margin-top: 4px; color: var(--muted); font-size: .75rem; text-transform: capitalize; }
-.metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 20px; padding-block: 8px; }
+.metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; padding-block: 8px; }
 .metrics div { display: grid; gap: 4px; }
 .metrics strong { color: var(--text); font-size: 1.5rem; font-weight: 550; letter-spacing: -.03em; }
 .metrics span { color: var(--muted); font-size: .75rem; }
@@ -38,18 +38,27 @@
 .panel :global(.field) { display: grid; gap: 7px; min-width: 0; }
 .panel :global(.form-grid) { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 22px; }
 .panel :global(.custom-wide) { grid-column: 1 / -1; }
+.panel :global(.field) { align-content: start; }
+.preferenceGroup { display: grid; gap: 6px; }
+.panel .preferenceGroup :global(.toggle-field) { align-items: center; min-height: 44px; }
+.panel .preferenceGroup :global(.toggle-field) input { margin-top: 0; }
 .panel :global(.field label), .panel :global(.field > span) { color: var(--text); font-size: .8125rem; font-weight: 500; }
 .panel :global(.field-note) { margin: 0; color: var(--muted); font-size: .75rem; line-height: 1.6; }
 .panel :global(.field) :is(input,textarea,select) { width: 100%; min-height: 46px; border: 1px solid var(--border-strong); border-radius: 8px; padding: 11px 13px; font: inherit; font-size: .875rem; color: var(--text); background: var(--field-surface,var(--surface)); }
 .panel :global(.toggle-field) { display: flex; align-items: flex-start; gap: 10px; font-size: .875rem; line-height: 1.6; }
 .panel :global(.toggle-field) input { flex-shrink: 0; width: 17px; height: 17px; margin-top: 4px; accent-color: var(--action); }
 .panel :global(.form-actions) { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; padding: 0; }
+.mobileSectionNav { display: none; }
+.urlPreview { display: block; overflow-wrap: anywhere; color: var(--muted); font-size: .8125rem; line-height: 1.5; }
 @media(max-width: 900px) { .metrics { gap: 16px; } }
 @media(max-width: 600px) {
   .account, .settings { gap: 22px; }
-  .sectionNav { margin-inline: -2px; }
+  .sectionNav { display: none; }
+  .mobileSectionNav { display: grid; gap: 8px; color: var(--muted); font-size: .8125rem; }
+  .mobileSectionNav select { min-height: 46px; width: 100%; padding: 10px 12px; background: var(--field-surface,var(--surface)); color: var(--text); border: 1px solid var(--border-strong); border-radius: 8px; font: inherit; font-size: 1rem; }
+  .mobileSectionNav select:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
   .sectionNav button { min-height: 44px; padding-inline: 12px; }
-  .metrics { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+  .metrics { grid-template-columns: minmax(0,1fr); gap: 14px; }
   .metrics > div { display: flex; align-items: baseline; gap: 8px; }
   .metrics strong { font-size: 1.25rem; }
   .overviewRows > div { align-items: flex-start; flex-direction: column; gap: 12px; padding: 20px 0; }

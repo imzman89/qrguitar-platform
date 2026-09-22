@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -6,7 +7,7 @@ import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import test from 'node:test';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
-const require=process.env.QRGUITAR_SOURCE_ROOT?createRequire(path.join(process.env.QRGUITAR_SOURCE_ROOT,'package.json')):createRequire(import.meta.url);
+const require=withUiTextTestContext(process.env.QRGUITAR_SOURCE_ROOT?createRequire(path.join(process.env.QRGUITAR_SOURCE_ROOT,'package.json')):createRequire(import.meta.url));
 const ts=require('typescript');
 const read=file=>fs.readFileSync(path.join(root,'apps/web',file),'utf8');
 function compile(source,bindings={},imports={}) {

@@ -1,3 +1,6 @@
+
+"use client";
+import { useUiText } from "./UiTextProvider";
 import Link from "./CheckoutAwareLink";
 import { type ReactNode } from "react";
 import { Boxes, CircleUserRound, CreditCard, MessageCircle, Plus, Wrench } from "lucide-react";
@@ -15,20 +18,21 @@ const destinations = [
 
 /** Layout only. Pages retain their authentication, permissions, and mutation state. */
 export function OwnerWorkspace({ current, children }: OwnerWorkspaceProps) {
+  const ui = useUiText("components.OwnerWorkspace");
   const links = destinations.map(({ key, href, label, icon: Icon }) => (
     <Link key={key} href={href} aria-current={current === key ? "page" : undefined}>
-      <Icon size={17} aria-hidden="true" /><span>{label}</span>
+      <Icon size={17} aria-hidden="true" /><span>{(label === "My collection" ? ui("ui.components.OwnerWorkspace.9346fd1d6596", "My collection") : label === "Create Profile" ? ui("ui.components.OwnerWorkspace.bb758aff6f87", "Create Profile") : label === "Messages" ? ui("ui.components.OwnerWorkspace.04d7b4833927", "Messages") : label === "Service work" ? ui("ui.components.OwnerWorkspace.59c347b7f7a7", "Service work") : label === "Profile credits" ? ui("ui.components.OwnerWorkspace.96bc5cd7d154", "Profile credits") : label === "Account" ? ui("ui.components.OwnerWorkspace.7e1b0d5641f2", "Account") : label)}</span>
     </Link>
   ));
   return <main className={styles.workspace}>
     <div className={styles.layout}>
       <aside className={styles.rail}>
-        <nav className={styles.desktopNav} aria-label="Your workspace">{links}</nav>
+        <nav className={styles.desktopNav} aria-label={ui("ui.components.OwnerWorkspace.4d0260e6c3e7", "Your workspace")}>{links}</nav>
         <details className={styles.mobileNav}>
-          <summary>Your workspace</summary>
-          <nav aria-label="Your workspace">{links}</nav>
+          <summary>{ui("ui.components.OwnerWorkspace.4d0260e6c3e7", "Your workspace")}</summary>
+          <nav aria-label={ui("ui.components.OwnerWorkspace.4d0260e6c3e7", "Your workspace")}>{links}</nav>
         </details>
-        <Link className={styles.explore} href="/catalog">Explore the Catalog <span aria-hidden="true">↗</span></Link>
+        <Link className={styles.explore} href="/catalog">{ui("ui.components.OwnerWorkspace.004ca2d8b070", "Explore the Catalog")}{" "}<span aria-hidden="true">↗</span></Link>
       </aside>
       <div className={styles.content}>{children}</div>
     </div>

@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "./UiTextProvider";
+
 
 import { Share2 } from "lucide-react";
 import type { MouseEvent } from "react";
@@ -16,6 +18,7 @@ type RecordShareButtonProps = {
 let pendingShareOperation: symbol | null = null;
 
 export function RecordShareButton({ code, title, className = "", showLabel = false }: RecordShareButtonProps) {
+  const ui = useUiText("components.RecordShareButton");
   const [status, setStatus] = useState<"idle" | "shared" | "copied" | "ready">("idle");
   const revision = useRef(0);
   const active = useRef(true);
@@ -77,13 +80,13 @@ export function RecordShareButton({ code, title, className = "", showLabel = fal
 
   return (
     <span className={`record-share-wrap ${className}`.trim()}>
-      <button className="record-share-button" type="button" aria-label="Share Profile" onClick={shareRecord}>
+      <button className="record-share-button" type="button" aria-label={ui("ui.components.RecordShareButton.51c51629c471", "Share Profile")} onClick={shareRecord}>
         <Share2 size={15} />
-        {showLabel ? <span>Share Profile</span> : null}
+        {showLabel ? <span>{ui("ui.components.RecordShareButton.51c51629c471", "Share Profile")}</span> : null}
       </button>
       {status !== "idle" ? (
         <span className="record-share-feedback" role="status">
-          {status === "copied" ? "Link copied" : status === "shared" ? "Share opened" : <a href={url}>Open link</a>}
+          {status === "copied" ? ui("ui.components.RecordShareButton.d12860c21e78", "Link copied") : status === "shared" ? ui("ui.components.RecordShareButton.19a4ee88b7e3", "Share opened") : <a href={url}>{ui("ui.components.RecordShareButton.aab63f85c7f1", "Open link")}</a>}
         </span>
       ) : null}
     </span>

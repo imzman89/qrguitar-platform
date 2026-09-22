@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -6,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const overlayRoot = process.argv.includes("--source") ? path.resolve(process.argv[process.argv.indexOf("--source") + 1]) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const root = process.argv.includes("--repo") ? path.resolve(process.argv[process.argv.indexOf("--repo") + 1]) : overlayRoot;
 const require = createRequire(path.join(root, "package.json"));
+const { useUiText } = withUiTextTestContext(require)("UiTextProvider");
 const ts = require("typescript");
 function loadTs(relative) {
   const local = relative.replaceAll("\\", "/") === "lib/service-evidence-upload.ts" && process.argv.includes("--protocol") ? path.resolve(process.argv[process.argv.indexOf("--protocol") + 1]) : path.join(overlayRoot, relative);
@@ -457,8 +459,8 @@ function routeHarness() {
     window, (data, _unused, url) => { window.history.state = data; addressUrl = new URL(url, addressUrl).href; }, url => { routerUrl = new URL(url, routerUrl).href; }
   );
   const routeJs = ts.transpileModule(routeComponent, { compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React } }).outputText;
-  const route = new Function("React", "ServiceWorkEditor", "useParams", "useSearchParams", routeJs + "\nreturn ServiceWorkRoute;")(
-    { createElement: (type, props) => ({ type, props }) }, () => null, () => ({ code: "QRG-TEST" }), () => new URL(routerUrl).searchParams
+  const route = new Function("React", "ServiceWorkEditor", "useParams", "useSearchParams", "useUiText", routeJs + "\nreturn ServiceWorkRoute;")(
+    { createElement: (type, props) => ({ type, props }) }, () => null, () => ({ code: "QRG-TEST" }), () => new URL(routerUrl).searchParams, useUiText
   );
   return {
     route,
@@ -626,7 +628,7 @@ function renderEditor(status, removalId = "", phase = "ready", patch = {}, disca
   const values = [{ ...initialWorkbenchState(), phase, actorId: "11111111-1111-4111-8111-111111111111", submission, provider: providerFor("11111111-1111-4111-8111-111111111111"), form: { ...emptyServiceForm(), ...submission }, evidence: [evidenceFor("invoice-one")], evidenceRecovery: { phase: "confirmed", revision: "0", attempt: null, pendingCount: 0, canPrepare: true, error: "" }, ...patch }, "invoice", removalId, discardId];
   let index = 0, refIndex = 0;
   const empty = () => null;
-  const env = { React, useState: () => [values[index++], () => {}], useRef: () => ({ current: refIndex++ === 0 ? options.controller || null : null }), useEffect() {}, useSiteContent: () => ({}), initialWorkbenchState, categories: ["Setup"], getContentValue: (_, key) => key, serviceResumePath,
+  const env = { useUiText, React, useState: () => [values[index++], () => {}], useRef: () => ({ current: refIndex++ === 0 ? options.controller || null : null }), useEffect() {}, useSiteContent: () => ({}), initialWorkbenchState, categories: ["Setup"], getContentValue: (_, key) => key, serviceResumePath,
     Nav: empty, Footer: empty, ArrowLeft: empty, CheckCircle2: empty, FileLock2: empty, Upload: empty,
     Link: ({ children, ...props }) => React.createElement("a", props, children), styles: new Proxy({}, { get: (_, name) => name }), workflow: new Proxy({}, { get: (_, name) => name }) };
   const code = ts.transpileModule(editorComponent, { compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React } }).outputText;

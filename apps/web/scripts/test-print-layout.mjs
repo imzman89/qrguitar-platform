@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,11 +15,11 @@ function compile(file) {
   const source = fs.readFileSync(path.join(web, file), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const module = { exports: {} };
-  new Function('require', 'module', 'exports', compiled)(name => {
+  new Function('require', 'module', 'exports', compiled)(withUiTextTestContext(name => {
     if (name.endsWith('.module.css')) return new Proxy({}, { get: (_, key) => key === '__esModule' ? false : String(key) });
     if (name.startsWith('.')) return compile(path.relative(web, path.resolve(web, path.dirname(file), `${name}.tsx`)));
     return require(name);
-  }, module, module.exports);
+  }), module, module.exports);
   return module.exports;
 }
 const { printGeometry, normalizePrintOptions, printFormats, printDetailFacts, printReadiness } = compile('lib/print-layout.ts');

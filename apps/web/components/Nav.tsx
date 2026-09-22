@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "./UiTextProvider";
+
 
 import Link from "./CheckoutAwareLink";
 import { usePathname } from "next/navigation";
@@ -11,6 +13,7 @@ import { getContentValue } from "../lib/content-registry";
 import styles from "./Nav.module.css";
 
 export function Nav() {
+  const ui = useUiText("components.Nav");
   const pathname = usePathname();
   const { signedIn: isSignedIn, signingOut, logoutError, logout: signOut, clearLogoutError } = useAuthNavigation();
   const [isOpen, setIsOpen] = useState(false);
@@ -68,7 +71,7 @@ export function Nav() {
   const navigation = [
     ...(isSignedIn ? [{ href: "/dashboard", label: getContentValue(content, "global.navigation.dashboard") }] : []),
     { href: "/catalog", label: getContentValue(content, "global.navigation.catalog") },
-    { href: "/collections", label: "Collections" },
+    { href: "/collections", label: ui("ui.components.Nav.collections", "Collections") },
     { href: "/how-it-works", label: getContentValue(content, "global.navigation.howItWorks") },
     { href: "/create", label: getContentValue(content, "global.navigation.create"), primary: true }
   ];
@@ -81,14 +84,14 @@ export function Nav() {
       }
     }}>
       <div className={`shell ${styles.inner}`}>
-        <Link className={styles.brand} href="/" aria-label="QRguitar homepage">
+        <Link className={styles.brand} href="/" aria-label={ui("ui.components.Nav.33b14c935c51", "QRguitar homepage")}>
           <BrandLogo className={styles.logo} />
         </Link>
         <button ref={toggleRef} className={styles.toggle} type="button" onClick={() => setIsOpen((open) => !open)}
-          aria-expanded={isOpen} aria-controls="primary-navigation" aria-label={isOpen ? "Close navigation" : "Open navigation"}>
+          aria-expanded={isOpen} aria-controls="primary-navigation" aria-label={isOpen ? ui("ui.components.Nav.99904db30de4", "Close navigation") : ui("ui.components.Nav.0ed77fd2619b", "Open navigation")}>
           {isOpen ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
         </button>
-        <nav className={`${styles.links} ${isOpen ? styles.open : ""}`} id="primary-navigation" aria-label="Primary navigation">
+        <nav className={`${styles.links} ${isOpen ? styles.open : ""}`} id="primary-navigation" aria-label={ui("ui.components.Nav.e1bfe7eccc45", "Primary navigation")}>
           {navigation.map((item) => (
             <Link key={item.href} href={item.href} className={item.primary ? styles.primary : undefined}
               aria-current={pathname === item.href || pathname.startsWith(`${item.href}/`) ? "page" : undefined}
@@ -96,19 +99,19 @@ export function Nav() {
           ))}
           {isSignedIn ? (
             <div className={styles.account}>
-              <button ref={accountRef} className={styles.accountButton} type="button" aria-label="Account menu"
+              <button ref={accountRef} className={styles.accountButton} type="button" aria-label={ui("ui.components.Nav.7fb5995bca43", "Account menu")}
                 aria-expanded={accountMenuOpen} aria-controls="account-navigation"
                 onClick={() => { setAccountMenuOpen((open) => !open); clearLogoutError(); }}>
-                <UserRound size={18} aria-hidden="true" /><span>Account</span>
+                <UserRound size={18} aria-hidden="true" /><span>{ui("ui.components.Nav.7e1b0d5641f2", "Account")}</span>
               </button>
               {accountMenuOpen ? <div className={styles.dropdown} id="account-navigation">
-                <Link href="/messages" onClick={() => { setIsOpen(false); setAccountMenuOpen(false); }}><MessageCircle size={16} aria-hidden="true" /> Messages</Link>
-                <Link href="/account" onClick={() => { setIsOpen(false); setAccountMenuOpen(false); }}>Account settings</Link>
-                <button type="button" disabled={signingOut} onClick={() => void logout()}><LogOut size={16} aria-hidden="true" /> {signingOut ? "Signing out..." : "Sign out"}</button>
+                <Link href="/messages" onClick={() => { setIsOpen(false); setAccountMenuOpen(false); }}><MessageCircle size={16} aria-hidden="true" />{" "}{ui("ui.components.Nav.04d7b4833927", "Messages")}</Link>
+                <Link href="/account" onClick={() => { setIsOpen(false); setAccountMenuOpen(false); }}>{ui("ui.components.Nav.a587aa1f4ffc", "Account settings")}</Link>
+                <button type="button" disabled={signingOut} onClick={() => void logout()}><LogOut size={16} aria-hidden="true" /> {signingOut ? ui("ui.components.Nav.0436231679a0", "Signing out...") : ui("ui.components.Nav.48f0d3d397d4", "Sign out")}</button>
                 {logoutError ? <p role="alert">{logoutError}</p> : null}
               </div> : null}
             </div>
-          ) : <Link href="/login" onClick={() => setIsOpen(false)}>Sign in</Link>}
+          ) : <Link href="/login" onClick={() => setIsOpen(false)}>{ui("ui.components.Nav.bfd402b2f6f3", "Sign in")}</Link>}
         </nav>
       </div>
       {!isSignedIn && logoutError ? <div className="shell"><p className={styles.sessionNotice} role="alert">{logoutError}</p></div> : null}

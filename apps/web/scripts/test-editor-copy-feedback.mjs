@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -25,14 +26,14 @@ function loader(imports = {}, bindings = {}) {
     const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: {
       target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX
     } }).outputText;
-    new Function('require', 'module', 'exports', ...Object.keys(bindings), code)(name => {
+    new Function('require', 'module', 'exports', ...Object.keys(bindings), code)(withUiTextTestContext(name => {
       if (Object.hasOwn(imports, name)) return imports[name];
       if (name.endsWith('.module.css')) return { __esModule: true, default: new Proxy({}, { get: (_target, key) => String(key) }) };
       if (!name.startsWith('.')) return require(name);
       const absolute = path.resolve(path.dirname(file), name);
       const relativeName = path.relative(file.startsWith(path.resolve(sourceRoot) + path.sep) ? sourceRoot : repo, absolute);
       return load(relativeName + (path.extname(relativeName) ? '' : '.ts'));
-    }, module, module.exports, ...Object.values(bindings));
+    }), module, module.exports, ...Object.values(bindings));
     return module.exports;
   }
   return load;

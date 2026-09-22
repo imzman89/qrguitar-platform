@@ -2,7 +2,7 @@ import { mapEditorState, editorFailure, finishEditorCommit, type RawEditorState 
 import { revalidatePath, unstable_noStore as noStore } from "next/cache";
 import { NextResponse } from "next/server";
 import { getAdminContext, readAdminEmailList } from "../../../lib/admin-auth";
-import { validateContentValues } from "../../../lib/content-registry";
+import { validateContentValues, validateProtectedContentValues } from "../../../lib/content-registry";
 import { mergeSiteSettings, publishedSiteSettingsKey, validateBrandLogoEntries, validateEditorialComposition, validateSiteThemeContrast, type EditableSiteSettings } from "../../../lib/site-settings";
 import { createServerSupabaseClientWithTimeout } from "../../../lib/supabase-server";
 
@@ -154,6 +154,17 @@ export async function PUT(request: Request) {
   if (settings) {
     const errors = validateSettings(settings, rawSettings, action === "publish");
     if (Object.keys(errors).length) return json({ ok: false, uncertain: false, message: "Fix the highlighted content before saving.", errors }, { status: 400 });
+    let currentState: Awaited<ReturnType<typeof loadState>>;
+    try { currentState = await loadState(supabase); }
+    catch { return json({ ok: false, uncertain: false, message: "Could not verify protected content. Retry when your connection is available." }, { status: 503 }); }
+    // Stale requests and idempotent retries must reach the atomic RPC, which owns
+    // version conflicts and receipt replay. Matching versions permit this preflight.
+    if (body.expectedPublishedVersion === currentState.publishedVersion && body.expectedDraftVersion === currentState.draftVersion) {
+      const protectedErrors = validateProtectedContentValues(settings.content, currentState.published.content);
+      if (Object.keys(protectedErrors).length) {
+        return json({ ok: false, uncertain: false, message: "Protected content cannot be changed.", errors: protectedErrors }, { status: 400 });
+      }
+    }
   }
   try {
     const mutation = await supabase.rpc("mutate_site_editor", {

@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -17,8 +18,8 @@ function compile(file, imports = {}, cache = new Map()) {
   const source = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
-  new Function('require', 'module', 'exports', source)(name =>
-    Object.hasOwn(imports, name) ? imports[name] : compile(path.resolve(path.dirname(file), name + '.ts'), imports, cache),
+  new Function('require', 'module', 'exports', source)(withUiTextTestContext(name =>
+    Object.hasOwn(imports, name) ? imports[name] : compile(path.resolve(path.dirname(file), name + '.ts'), imports, cache)),
   module, module.exports);
   return module.exports;
 }

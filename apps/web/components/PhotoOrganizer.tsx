@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "./UiTextProvider";
+
 
 import { ChevronLeft, ChevronRight, GripVertical, Star, Trash2 } from "lucide-react";
 import { useRef, useState, type DragEvent, type PointerEvent } from "react";
@@ -28,6 +30,7 @@ export function PhotoOrganizer({
   statusByImage = {},
   maxPhotos = 20
 }: PhotoOrganizerProps) {
+  const ui = useUiText("components.PhotoOrganizer");
   const dragIndex = useRef<number | null>(null);
   const pointerIndex = useRef<number | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
@@ -60,17 +63,17 @@ export function PhotoOrganizer({
   if (!images.length) {
     return (
       <div className="photo-organizer empty">
-        <strong>No photos added</strong>
-        <span>Add a clear full-instrument photo first, then detail, serial, condition, and case photos.</span>
+        <strong>{ui("ui.components.PhotoOrganizer.d7c54b3b1ce7", "No photos added")}</strong>
+        <span>{ui("ui.components.PhotoOrganizer.a73e7c9c2caf", "Add a clear full-instrument photo first, then detail, serial, condition, and case photos.")}</span>
       </div>
     );
   }
 
   return (
-    <section className="photo-organizer" aria-label="Profile photo organizer">
+    <section className="photo-organizer" aria-label={ui("ui.components.PhotoOrganizer.4d0e02a0fca6", "Profile photo organizer")}>
       <div className="photo-organizer-header">
-        <div><strong>{images.length}/{maxPhotos} photos</strong><span>Drag to reorder. The starred photo leads the Profile and Catalog card.</span></div>
-        <span className="photo-organizer-key"><Star size={13} aria-hidden="true" /> Main photo</span>
+        <div><strong>{images.length}/{maxPhotos}{" "}{ui("ui.components.PhotoOrganizer.84a6dae49cf0", "photos")}</strong><span>{ui("ui.components.PhotoOrganizer.6ab8e2b748a8", "Drag to reorder. The starred photo leads the Profile and Catalog card.")}</span></div>
+        <span className="photo-organizer-key"><Star size={13} aria-hidden="true" />{" "}{ui("ui.components.PhotoOrganizer.14b29400712f", "Main photo")}</span>
       </div>
       <div className="photo-organizer-grid">
         {images.map((imageUrl, index) => {
@@ -93,7 +96,7 @@ export function PhotoOrganizer({
             >
               <img
                 src={imageUrl}
-                alt={`Instrument photo ${index + 1}`}
+                alt={ui("ui.components.PhotoOrganizer.f04fbba80f5f", "Instrument photo {{value1}}", { value1: index + 1 })}
                 loading="lazy"
                 fetchPriority="low"
                 decoding="async"
@@ -102,13 +105,13 @@ export function PhotoOrganizer({
                 referrerPolicy="no-referrer"
               />
               <span className="photo-organizer-number">{String(index + 1).padStart(2, "0")}</span>
-              {isMain ? <span className="photo-organizer-main">Main</span> : null}
+              {isMain ? <span className="photo-organizer-main">{ui("ui.components.PhotoOrganizer.eb814be3ca3b", "Main")}</span> : null}
               <div className="photo-organizer-controls">
                 <button
                   className="photo-drag-handle"
                   type="button"
-                  aria-label={`Drag photo ${index + 1} to reorder`}
-                  title="Drag to reorder"
+                  aria-label={ui("ui.components.PhotoOrganizer.829f729dbe1d", "Drag photo {{value1}} to reorder", { value1: index + 1 })}
+                  title={ui("ui.components.PhotoOrganizer.ef86a0ed9287", "Drag to reorder")}
                   onPointerDown={(event) => {
                     if (event.pointerType === "mouse") return;
                     pointerIndex.current = index;
@@ -128,8 +131,8 @@ export function PhotoOrganizer({
                 <button
                   className={isMain ? "is-active" : ""}
                   type="button"
-                  aria-label={isMain ? `Photo ${index + 1} is the main photo` : `Set photo ${index + 1} as main`}
-                  title={isMain ? "Main photo" : "Set as main"}
+                  aria-label={isMain ? ui("ui.components.PhotoOrganizer.daaaffa5d6f6", "Photo {{value1}} is the main photo", { value1: index + 1 }) : ui("ui.components.PhotoOrganizer.3fa930326917", "Set photo {{value1}} as main", { value1: index + 1 })}
+                  title={isMain ? ui("ui.components.PhotoOrganizer.14b29400712f", "Main photo") : ui("ui.components.PhotoOrganizer.d35820958872", "Set as main")}
                   onClick={() => { onSelectMain(imageUrl); setAnnouncement(`Photo ${index + 1} set as main.`); }}
                 >
                   <Star size={15} fill={isMain ? "currentColor" : "none"} aria-hidden="true" />
@@ -137,8 +140,8 @@ export function PhotoOrganizer({
                 <button
                   className="is-danger"
                   type="button"
-                  aria-label={`Remove photo ${index + 1}`}
-                  title="Remove photo"
+                  aria-label={ui("ui.components.PhotoOrganizer.83b5debd0495", "Remove photo {{value1}}", { value1: index + 1 })}
+                  title={ui("ui.components.PhotoOrganizer.f46512ab2099", "Remove photo")}
                   onClick={() => { onRemove(imageUrl); setAnnouncement(`Photo ${index + 1} removed.`); }}
                 >
                   <Trash2 size={15} aria-hidden="true" />
@@ -146,15 +149,15 @@ export function PhotoOrganizer({
               </div>
               {status?.state && status.state !== "ready" ? (
                 <div className={`photo-organizer-status is-${status.state}`} role={status.state === "error" ? "alert" : undefined}>
-                  <span>{status.state === "uploading" ? `Uploading ${Math.max(1, Math.round(status.progress || 1))}%` : status.state === "uploaded" ? "Uploaded" : status.message || "Upload failed"}</span>
+                  <span>{status.state === "uploading" ? ui("ui.components.PhotoOrganizer.2ad1142c1f1c", "Uploading {{value1}}%", { value1: Math.max(1, Math.round(status.progress || 1)) }) : status.state === "uploaded" ? ui("ui.components.PhotoOrganizer.3cc3767e7032", "Uploaded") : status.message || ui("ui.components.PhotoOrganizer.6efc5d27f30b", "Upload failed")}</span>
                   {status.state === "uploading" ? <i style={{ width: `${Math.max(2, status.progress || 2)}%` }} /> : null}
                 </div>
               ) : null}
               <details className="photo-organizer-menu">
-                <summary aria-label={`More options for photo ${index + 1}`}>More</summary>
+                <summary aria-label={ui("ui.components.PhotoOrganizer.c7dbb502bdce", "More options for photo {{value1}}", { value1: index + 1 })}>{ui("ui.components.PhotoOrganizer.d47d7cb0e4f8", "More")}</summary>
                 <div>
-                  <button type="button" disabled={index === 0} onClick={() => movePhoto(index, index - 1)}><ChevronLeft size={14} /> Move earlier</button>
-                  <button type="button" disabled={index === images.length - 1} onClick={() => movePhoto(index, index + 1)}>Move later <ChevronRight size={14} /></button>
+                  <button type="button" disabled={index === 0} onClick={() => movePhoto(index, index - 1)}><ChevronLeft size={14} />{" "}{ui("ui.components.PhotoOrganizer.736612d4d0a9", "Move earlier")}</button>
+                  <button type="button" disabled={index === images.length - 1} onClick={() => movePhoto(index, index + 1)}>{ui("ui.components.PhotoOrganizer.d6e856081ebe", "Move later")}{" "}<ChevronRight size={14} /></button>
                 </div>
               </details>
             </article>

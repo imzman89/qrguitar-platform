@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "../../../components/UiTextProvider";
+
 
 import { ownerProfileHref } from "../../../lib/owner-profile";
 import { dataUrlToProfileFile, uploadProfileFile } from "../../../lib/profile-upload-client";
@@ -128,6 +130,7 @@ const emptyServiceForm = {
 const emptyMediaForm = { url: "", title: "", caption: "", isPublic: true };
 
 export default function EditInstrumentPage() {
+  const ui = useUiText("app.edit.code.page");
   const content = useSiteContent();
   const params = useParams<{ code: string }>();
   const router = useRouter();
@@ -273,12 +276,12 @@ export default function EditInstrumentPage() {
 
         if (!cancelled) {
           setForbidden(response.status === 403 || response.status === 404);
-          setMessage(payload?.message || "This Profile was not found for your account.");
+          setMessage(payload?.message || ui("ui.app.edit.code.page.2f0a4b105931", "This Profile was not found for your account."));
           setReady(true);
         }
       } catch {
         if (!cancelled) {
-          setMessage("Could not load this Profile. Check your connection and try again.");
+          setMessage(ui("ui.app.edit.code.page.e58b3c4b0eeb", "Could not load this Profile. Check your connection and try again."));
           setReady(true);
         }
       }
@@ -320,7 +323,7 @@ export default function EditInstrumentPage() {
   async function addExternalMedia() {
     if (!original) return;
     if (!mediaForm.url.trim() || !mediaForm.title.trim()) {
-      setMessage("Media URL and title are required.");
+      setMessage(ui("ui.app.edit.code.page.8c23311d31e4", "Media URL and title are required."));
       return;
     }
     setSavingMedia(true);
@@ -334,12 +337,12 @@ export default function EditInstrumentPage() {
       });
       const payload = await response.json().catch(() => null) as { ok?: boolean; mediaItem?: ExternalMediaItem; message?: string } | null;
       if (!response.ok || !payload?.ok || !payload.mediaItem) {
-        setMessage(payload?.message || "Could not add media.");
+        setMessage(payload?.message || ui("ui.app.edit.code.page.a60687ec3498", "Could not add media."));
         return;
       }
       setExternalMedia((current) => [...current, payload.mediaItem as ExternalMediaItem]);
       setMediaForm(emptyMediaForm);
-      setMessage(payload.message || "Media added.");
+      setMessage(payload.message || ui("ui.app.edit.code.page.39e3cbd0722a", "Media added."));
     } finally {
       setSavingMedia(false);
     }
@@ -356,11 +359,11 @@ export default function EditInstrumentPage() {
       });
       const payload = await response.json().catch(() => null) as { ok?: boolean; message?: string } | null;
       if (!response.ok || !payload?.ok) {
-        setMessage(payload?.message || "Could not remove media.");
+        setMessage(payload?.message || ui("ui.app.edit.code.page.d09487f73f3b", "Could not remove media."));
         return;
       }
       setExternalMedia((current) => current.filter((entry) => entry.id !== item.id));
-      setMessage("Media removed.");
+      setMessage(ui("ui.app.edit.code.page.90fb34ab44a1", "Media removed."));
     } finally {
       setSavingMedia(false);
     }
@@ -379,11 +382,11 @@ export default function EditInstrumentPage() {
       });
       const payload = await response.json().catch(() => null) as { ok?: boolean; mediaItem?: ExternalMediaItem; message?: string } | null;
       if (!response.ok || !payload?.ok || !payload.mediaItem) {
-        setMessage(payload?.message || "Could not update media.");
+        setMessage(payload?.message || ui("ui.app.edit.code.page.94de5baedf39", "Could not update media."));
         return;
       }
       setExternalMedia((current) => current.map((entry) => entry.id === item.id ? payload.mediaItem as ExternalMediaItem : entry).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)));
-      setMessage(payload.message || "Media updated.");
+      setMessage(payload.message || ui("ui.app.edit.code.page.50e60486b114", "Media updated."));
     } finally {
       setSavingMedia(false);
     }
@@ -476,7 +479,7 @@ export default function EditInstrumentPage() {
     }
 
     if (!serviceForm.title.trim()) {
-      setMessage("Service entry title is required.");
+      setMessage(ui("ui.app.edit.code.page.89cd6d97aa20", "Service entry title is required."));
       return;
     }
 
@@ -498,7 +501,7 @@ export default function EditInstrumentPage() {
         | null;
 
       if (!response.ok || !payload?.ok || !payload.serviceEvent) {
-        setMessage(payload?.message || "Could not save service entry.");
+        setMessage(payload?.message || ui("ui.app.edit.code.page.5f2daa5a67f7", "Could not save service entry."));
         return;
       }
 
@@ -507,7 +510,7 @@ export default function EditInstrumentPage() {
         return sortServiceEvents(next);
       });
       resetServiceForm();
-      setMessage(payload.message || "Service entry saved. The permanent QRguitar URL stayed the same.");
+      setMessage(payload.message || ui("ui.app.edit.code.page.6cb9aa0fcb13", "Service entry saved. The permanent QRguitar URL stayed the same."));
     } finally {
       setSavingService(false);
     }
@@ -529,7 +532,7 @@ export default function EditInstrumentPage() {
       const payload = (await response.json().catch(() => null)) as { ok?: boolean; message?: string } | null;
 
       if (!response.ok || !payload?.ok) {
-        setMessage(payload?.message || "Could not delete service entry.");
+        setMessage(payload?.message || ui("ui.app.edit.code.page.a858c19c2e1d", "Could not delete service entry."));
         return;
       }
 
@@ -537,7 +540,7 @@ export default function EditInstrumentPage() {
       if (editingServiceId === entry.id) {
         resetServiceForm();
       }
-      setMessage(payload.message || "Service entry deleted.");
+      setMessage(payload.message || ui("ui.app.edit.code.page.fef49344ff0b", "Service entry deleted."));
     } finally {
       setSavingService(false);
     }
@@ -569,7 +572,7 @@ export default function EditInstrumentPage() {
       setForm((formCurrent) => ({ ...formCurrent, heroImageDataUrl: formCurrent.heroImageDataUrl || next[0] || "" }));
       return next;
     });
-    setMessage(`${dataUrls.length} photo${dataUrls.length === 1 ? "" : "s"} added. Choose any photo as the main image.${validation.message ? ` ${validation.message}` : ""}`);
+    setMessage(ui("ui.app.edit.code.page.004308492583", "{{value1}} photo{{value2}} added. Choose any photo as the main image.{{value3}}", {value1: dataUrls.length, value2: dataUrls.length === 1 ? "" : "s", value3: validation.message ? ` ${validation.message}` : ""}));
   }
 
   async function addDocuments(files: FileList | null) {
@@ -605,7 +608,7 @@ export default function EditInstrumentPage() {
     );
 
     setDocuments((current) => [...current, ...nextDocs].slice(0, 10));
-    setMessage(`${nextDocs.length} document${nextDocs.length === 1 ? "" : "s"} added.${validation.message ? ` ${validation.message}` : ""}`);
+    setMessage(ui("ui.app.edit.code.page.fb7a2f840893", "{{value1}} document{{value2}} added.{{value3}}", {value1: nextDocs.length, value2: nextDocs.length === 1 ? "" : "s", value3: validation.message ? ` ${validation.message}` : ""}));
   }
 
   function selectMainPhoto(imageUrl: string) {
@@ -790,14 +793,14 @@ export default function EditInstrumentPage() {
       typeof window !== "undefined" &&
       isRepeatedBrowserSubmission(`qrguitar.lastEditSubmission.${code}`, createSubmissionFingerprint(form), window)
     ) {
-      setMessage("That looks like a repeated submission. Wait a few seconds and try again.");
+      setMessage(ui("ui.app.edit.code.page.49e43361459d", "That looks like a repeated submission. Wait a few seconds and try again."));
       return;
     }
 
     const instrument = buildInstrument();
 
     if (!instrument) {
-      setMessage("This guitar cannot be edited because it was not found.");
+      setMessage(ui("ui.app.edit.code.page.02131b53c6b7", "This guitar cannot be edited because it was not found."));
       return;
     }
 
@@ -806,7 +809,7 @@ export default function EditInstrumentPage() {
 
     try {
       if (!form.heroImageDataUrl && !galleryImages.length) {
-        setMessage("Every QRguitar Profile needs at least one photo.");
+        setMessage(ui("ui.app.edit.code.page.cd1a49c2c343", "Every QRguitar Profile needs at least one photo."));
         return;
       }
 
@@ -867,20 +870,20 @@ export default function EditInstrumentPage() {
       const payload = (await response.json().catch(() => null)) as { ok?: boolean; qrCode?: string; permanentPath?: string; message?: string } | null;
 
       if (!response.ok || !payload?.ok) {
-        setMessage(`Profile details failed: ${payload?.message || "Could not save the Profile."}`);
+        setMessage(ui("ui.app.edit.code.page.d0c04254acb6", "Profile details failed: {{value1}}", {value1: payload?.message || "Could not save the Profile."}));
         return;
       }
 
       const savedQrCode = payload.qrCode || original?.qrCode || code;
       const trustResult = await saveVerificationSettings(token || "", savedQrCode);
       if (!trustResult.ok) {
-        setMessage(`Trust settings failed: ${trustResult.message}`);
+        setMessage(ui("ui.app.edit.code.page.b60a79b1ba9d", "Trust settings failed: {{value1}}", {value1: trustResult.message}));
         return;
       }
 
       const safetyResult = await saveSafetySettings(token || "", savedQrCode);
       if (!safetyResult.ok) {
-        setMessage(`Safety status failed: ${safetyResult.message}`);
+        setMessage(ui("ui.app.edit.code.page.dd99fa7bf17d", "Safety status failed: {{value1}}", {value1: safetyResult.message}));
         return;
       }
 
@@ -929,13 +932,13 @@ export default function EditInstrumentPage() {
 
       setOriginal(savedInstrument);
       setMessage(savedQrCode !== (original?.qrCode || code)
-        ? `Saved as ${savedQrCode}. Previous QR links still open this profile.`
-        : "Saved.");
+        ? ui("ui.app.edit.code.page.7dbbf757ae78", "Saved as {{value1}}. Previous QR links still open this profile.", {value1: savedQrCode})
+        : ui("ui.app.edit.code.page.fca046ccd586", "Saved."));
       if (savedQrCode !== code) {
         router.replace(`/edit/${savedQrCode}`);
       }
     } catch (error) {
-      setMessage(`Profile details failed: ${error instanceof Error ? error.message : "Check your connection and file sizes, then try again."}`);
+      setMessage(ui("ui.app.edit.code.page.d0c04254acb6", "Profile details failed: {{value1}}", {value1: error instanceof Error ? error.message : "Check your connection and file sizes, then try again."}));
     } finally {
       setRecordSaveAction(null);
     }
@@ -1063,63 +1066,63 @@ export default function EditInstrumentPage() {
       <main className={`${styles.page} section create-page`}>
         <div className={`${styles.layout} shell create-layout`}>
           <div>
-            <div className="eyebrow">Edit Profile</div>
+            <div className="eyebrow">{ui("ui.app.edit.code.page.fec2ac0f4cf1", "Edit Profile")}</div>
             <h1>{getContentValue(content, "edit.hero.headline")}</h1>
             <p>{getContentValue(content, "edit.hero.body")}</p>
             {original.safetyStatus === "lost" || original.safetyStatus === "stolen" ? (
               <div className={styles.safetyNotice}>
                 <strong>{safetyStatusLabel(original.safetyStatus)}</strong>
-                <span>This Profile has an active safety alert.</span>
-                <a href="#privacy-safety">Review safety status</a>
+                <span>{ui("ui.app.edit.code.page.44a43c5ad757", "This Profile has an active safety alert.")}</span>
+                <a href="#privacy-safety">{ui("ui.app.edit.code.page.48d5a8281410", "Review safety status")}</a>
               </div>
             ) : null}
               <div className="permanent-id">
-                <span>QRguitar ID</span>
+                <span>{ui("ui.app.edit.code.page.a6c8f92c19f4", "QRguitar ID")}</span>
                 <strong>{qrCodeFromSerial(form.serial) || original?.qrCode || code}</strong>
-                <small>When a Serial Number exists, the QRguitar ID uses the format QRG-SERIAL. Previous QR links remain active after approved corrections.</small>
+                <small>{ui("ui.app.edit.code.page.379e7e78d21e", "When a Serial Number exists, the QRguitar ID uses the format QRG-SERIAL. Previous QR links remain active after approved corrections.")}</small>
               </div>
-              <div className="privacy-toggle" aria-label="Profile visibility">
+              <div className="privacy-toggle" aria-label={ui("ui.app.edit.code.page.1c47f10cc99e", "Profile visibility")}>
                 <div>
                   <strong>
                     {form.visibility === "public"
-                      ? "Public catalog"
+                      ? ui("ui.app.edit.code.page.c6e88acaaf6f", "Public catalog")
                       : form.visibility === "unlisted"
-                        ? "Unlisted direct link"
-                        : "Private owner only"}
+                        ? ui("ui.app.edit.code.page.b94392a1943c", "Unlisted direct link")
+                        : ui("ui.app.edit.code.page.d666dd40b98c", "Private owner only")}
                   </strong>
                   <span>
                     {form.visibility === "public"
-                      ? "Shows on the live homepage feed and catalog."
+                      ? ui("ui.app.edit.code.page.c1acbedb643a", "Shows on the live homepage feed and catalog.")
                       : form.visibility === "unlisted"
-                        ? "Hidden from browsing, but anyone with the permanent link can view it."
-                        : "Hidden from public browsing and direct public access."}
+                        ? ui("ui.app.edit.code.page.2bfd63b89729", "Hidden from browsing, but anyone with the permanent link can view it.")
+                        : ui("ui.app.edit.code.page.44692a3804f6", "Hidden from public browsing and direct public access.")}
                   </span>
                 </div>
                 <label className="field visibility-field">
-                  <span>Visibility</span>
+                  <span>{ui("ui.app.edit.code.page.7448611d5f93", "Visibility")}</span>
                   <select value={form.visibility} onChange={(event) => updateField("visibility", event.target.value)}>
-                    <option value="public">Public</option>
-                    <option value="private">Private</option>
-                    <option value="unlisted">Unlisted</option>
+                    <option value="public">{ui("ui.app.edit.code.page.591935b15b1c", "Public")}</option>
+                    <option value="private">{ui("ui.app.edit.code.page.c63eb6720c6e", "Private")}</option>
+                    <option value="unlisted">{ui("ui.app.edit.code.page.bc96567e77ca", "Unlisted")}</option>
                   </select>
                 </label>
               </div>
-              <nav className="editor-section-nav" aria-label="Edit Profile sections">
-                <a aria-current={activeEditorSection === "identity" ? "location" : undefined} href="#identity">Identity</a>
-                <a aria-current={activeEditorSection === "photos" ? "location" : undefined} href="#photos">Photos</a>
-                <a aria-current={activeEditorSection === "details" ? "location" : undefined} href="#details">Details</a>
-                <a aria-current={activeEditorSection === "timeline" ? "location" : undefined} href="#timeline">Timeline &amp; Ownership</a>
-                <a aria-current={activeEditorSection === "service" ? "location" : undefined} href="#service">Service</a>
-                <a aria-current={activeEditorSection === "media" ? "location" : undefined} href="#media">Media</a>
-                <a aria-current={activeEditorSection === "documents" ? "location" : undefined} href="#documents">Documents</a>
-                <a aria-current={activeEditorSection === "trust-verification" ? "location" : undefined} href="#trust-verification">Trust</a>
-                <a aria-current={activeEditorSection === "privacy-safety" ? "location" : undefined} href="#privacy-safety">Privacy &amp; Safety</a>
-                <a aria-current={activeEditorSection === "qr-print" ? "location" : undefined} href="#qr-print">QR &amp; Print</a>
+              <nav className="editor-section-nav" aria-label={ui("ui.app.edit.code.page.bf60214d782d", "Edit Profile sections")}>
+                <a aria-current={activeEditorSection === "identity" ? "location" : undefined} href="#identity">{ui("ui.app.edit.code.page.999f23fcd7be", "Identity")}</a>
+                <a aria-current={activeEditorSection === "photos" ? "location" : undefined} href="#photos">{ui("ui.app.edit.code.page.5e3147ab51e0", "Photos")}</a>
+                <a aria-current={activeEditorSection === "details" ? "location" : undefined} href="#details">{ui("ui.app.edit.code.page.45989de49fb7", "Details")}</a>
+                <a aria-current={activeEditorSection === "timeline" ? "location" : undefined} href="#timeline">{ui("ui.app.edit.code.page.23099ed0a502", "Timeline & Ownership")}</a>
+                <a aria-current={activeEditorSection === "service" ? "location" : undefined} href="#service">{ui("ui.app.edit.code.page.d677190e0a99", "Service")}</a>
+                <a aria-current={activeEditorSection === "media" ? "location" : undefined} href="#media">{ui("ui.app.edit.code.page.d357175cfe89", "Media")}</a>
+                <a aria-current={activeEditorSection === "documents" ? "location" : undefined} href="#documents">{ui("ui.app.edit.code.page.b4e929d8bcfe", "Documents")}</a>
+                <a aria-current={activeEditorSection === "trust-verification" ? "location" : undefined} href="#trust-verification">{ui("ui.app.edit.code.page.ade9248e0132", "Trust")}</a>
+                <a aria-current={activeEditorSection === "privacy-safety" ? "location" : undefined} href="#privacy-safety">{ui("ui.app.edit.code.page.f096950eacff", "Privacy & Safety")}</a>
+                <a aria-current={activeEditorSection === "qr-print" ? "location" : undefined} href="#qr-print">{ui("ui.app.edit.code.page.347d28dfa602", "QR & Print")}</a>
               </nav>
               <label className="editor-section-select">
-                <span>Current section</span>
+                <span>{ui("ui.app.edit.code.page.b9920fd79715", "Current section")}</span>
                 <select
-                  aria-label="Edit Profile section"
+                  aria-label={ui("ui.app.edit.code.page.c5a754da6b5d", "Edit Profile section")}
                   value={activeEditorSection}
                   onChange={(event) => {
                     const section = event.target.value;
@@ -1128,16 +1131,16 @@ export default function EditInstrumentPage() {
                     document.getElementById(section)?.scrollIntoView({ behavior: "smooth", block: "start" });
                   }}
                 >
-                  <option value="identity">Identity</option>
-                  <option value="photos">Photos</option>
-                  <option value="details">Details</option>
-                  <option value="timeline">Timeline &amp; Ownership</option>
-                  <option value="service">Service</option>
-                  <option value="media">Media</option>
-                  <option value="documents">Documents</option>
-                  <option value="trust-verification">Trust</option>
-                  <option value="privacy-safety">Privacy &amp; Safety</option>
-                  <option value="qr-print">QR &amp; Print</option>
+                  <option value="identity">{ui("ui.app.edit.code.page.999f23fcd7be", "Identity")}</option>
+                  <option value="photos">{ui("ui.app.edit.code.page.5e3147ab51e0", "Photos")}</option>
+                  <option value="details">{ui("ui.app.edit.code.page.45989de49fb7", "Details")}</option>
+                  <option value="timeline">{ui("ui.app.edit.code.page.23099ed0a502", "Timeline & Ownership")}</option>
+                  <option value="service">{ui("ui.app.edit.code.page.d677190e0a99", "Service")}</option>
+                  <option value="media">{ui("ui.app.edit.code.page.d357175cfe89", "Media")}</option>
+                  <option value="documents">{ui("ui.app.edit.code.page.b4e929d8bcfe", "Documents")}</option>
+                  <option value="trust-verification">{ui("ui.app.edit.code.page.ade9248e0132", "Trust")}</option>
+                  <option value="privacy-safety">{ui("ui.app.edit.code.page.f096950eacff", "Privacy & Safety")}</option>
+                  <option value="qr-print">{ui("ui.app.edit.code.page.347d28dfa602", "QR & Print")}</option>
                 </select>
               </label>
             <form className="card form" id="identity">
@@ -1151,64 +1154,64 @@ export default function EditInstrumentPage() {
                 onChange={(event) => setHoneypot(event.target.value)}
               />
               <div className="form-section-heading">
-                <span className="eyebrow">Core identity</span>
-                <p>Make/model/serial are the main identity. Add anything else only when it helps the profile.</p>
+                <span className="eyebrow">{ui("ui.app.edit.code.page.7708c49ad0e2", "Core identity")}</span>
+                <p>{ui("ui.app.edit.code.page.ff958113cf77", "Make/model/serial are the main identity. Add anything else only when it helps the profile.")}</p>
               </div>
               <div className="form-grid" id="details">
                 <Field
-                  label="Make / brand"
+                  label={ui("ui.app.edit.code.page.df417ce45d01", "Make / brand")}
                   id="brand"
                   value={form.brand}
                   list="qrguitar-known-brands"
-                  placeholder="Start typing a brand"
+                  placeholder={ui("ui.app.edit.code.page.dbb3572478eb", "Start typing a brand")}
                   onChange={(value) => updateField("brand", value)}
                   onBlur={(value) => updateField("brand", canonicalInstrumentBrand(value) || value.trim())}
                 />
-                <Field label="Model" id="model" value={form.model} onChange={(value) => updateField("model", value)} />
-                <Field label="Serial Number" id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} />
-                <Field label="Year" id="year" value={form.year} onChange={(value) => updateField("year", value)} />
+                <Field label={ui("ui.app.edit.code.page.5e2c614c23f0", "Model")} id="model" value={form.model} onChange={(value) => updateField("model", value)} />
+                <Field label={ui("ui.app.edit.code.page.14b1b3c5b151", "Serial Number")} id="serial" value={form.serial} onChange={(value) => updateField("serial", value)} />
+                <Field label={ui("ui.app.edit.code.page.89f6832560de", "Year")} id="year" value={form.year} onChange={(value) => updateField("year", value)} />
                 <CategoryField
-                  label="Type / category"
+                  label={ui("ui.app.edit.code.page.d974d8298159", "Type / category")}
                   id="instrumentType"
                   value={form.instrumentType}
                   options={categoryOptions}
                   onChange={(value) => updateField("instrumentType", value)}
                 />
                 <div className="field">
-                  <label htmlFor="instrumentCondition">Condition / status</label>
+                  <label htmlFor="instrumentCondition">{ui("ui.app.edit.code.page.9228c34bf053", "Condition / status")}</label>
                   <select
                     id="instrumentCondition"
                     value={form.instrumentCondition}
                     onChange={(event) => updateField("instrumentCondition", event.target.value)}
                     required
                   >
-                    <option value="new">New</option>
-                    <option value="used">Used</option>
+                    <option value="new">{ui("ui.app.edit.code.page.18fdd549b2ed", "New")}</option>
+                    <option value="used">{ui("ui.app.edit.code.page.ae7d8dfac9ff", "Used")}</option>
                   </select>
                 </div>
                 <div className="field">
-                  <label htmlFor="saleStatus">Availability</label>
+                  <label htmlFor="saleStatus">{ui("ui.app.edit.code.page.12f67f8539c4", "Availability")}</label>
                   <select
                     id="saleStatus"
                     value={form.saleStatus}
                     onChange={(event) => updateField("saleStatus", event.target.value)}
                     required
                   >
-                    <option value="not_for_sale">Not for Sale</option>
-                    <option value="for_sale">For Sale</option>
+                    <option value="not_for_sale">{ui("ui.app.edit.code.page.e063cbea64ad", "Not for Sale")}</option>
+                    <option value="for_sale">{ui("ui.app.edit.code.page.1a83dec1476e", "For Sale")}</option>
                   </select>
                 </div>
                 <div className="field">
-                  <label htmlFor="originalityStatus">Originality</label>
+                  <label htmlFor="originalityStatus">{ui("ui.app.edit.code.page.faafda16cc4c", "Originality")}</label>
                   <select
                     id="originalityStatus"
                     value={form.originalityStatus}
                     onChange={(event) => updateField("originalityStatus", event.target.value)}
                     required
                   >
-                    <option value="unknown">Not Specified</option>
-                    <option value="all_original">All Original</option>
-                    <option value="modified">Modified</option>
+                    <option value="unknown">{ui("ui.app.edit.code.page.2604d337dc13", "Not Specified")}</option>
+                    <option value="all_original">{ui("ui.app.edit.code.page.8894d64075bf", "All Original")}</option>
+                    <option value="modified">{ui("ui.app.edit.code.page.e8ce5dcaf408", "Modified")}</option>
                   </select>
                 </div>
               </div>
@@ -1227,33 +1230,25 @@ export default function EditInstrumentPage() {
                         serial: event.target.checked ? "" : current.serial
                       }))
                     }
-                  />
-                  This instrument does not use a Serial Number
-                </label>
+                  />{ui("ui.app.edit.code.page.bc2663d3963d", "This instrument does not use a Serial Number")}</label>
                 <label className="toggle-field">
-                  <input type="checkbox" checked={showSerialPublic} onChange={(event) => setShowSerialPublic(event.target.checked)} />
-                  Show Serial Number on public Profile
-                </label>
+                  <input type="checkbox" checked={showSerialPublic} onChange={(event) => setShowSerialPublic(event.target.checked)} />{ui("ui.app.edit.code.page.6456778444bd", "Show Serial Number on public Profile")}</label>
               </div>
-              <p className="fine-print">
-                This hides only the Serial Number field. The permanent QR ID and URL may still include the serial. Choose a private Profile to restrict access. No-serial records require QRguitar approval before verification or authenticity confirmation.
-              </p>
-              <p className="fine-print">
-                Originality is an owner-stated modification status for search and disclosure. It is not QRguitar authentication or verification.
-              </p>
+              <p className="fine-print">{ui("ui.app.edit.code.page.a8782c988bf8", "This hides only the Serial Number field. The permanent QR ID and URL may still include the serial. Choose a private Profile to restrict access. No-serial records require QRguitar approval before verification or authenticity confirmation.")}</p>
+              <p className="fine-print">{ui("ui.app.edit.code.page.50cccc48b0dc", "Originality is an owner-stated modification status for search and disclosure. It is not QRguitar authentication or verification.")}</p>
               <details className="advanced-panel">
-                <summary>Add Profile Basics</summary>
+                <summary>{ui("ui.app.edit.code.page.7c2e45c2972e", "Add Profile Basics")}</summary>
                 <div className="form-grid">
-                  <Field label="Display title / nickname" id="name" value={form.name} onChange={(value) => updateField("name", value)} />
-                  <Field label="Builder (optional)" id="builder" value={form.builder} onChange={(value) => updateField("builder", value)} />
-                  <Field label="Finish" id="finish" value={form.finish} onChange={(value) => updateField("finish", value)} />
-                  <Field label="Weight" id="weight" value={form.weight} onChange={(value) => updateField("weight", value)} />
-                  <Field label="Owner display" id="owner" value={form.owner} onChange={(value) => updateField("owner", value)} />
-                  <Field label="Owner status" id="ownerStatus" value={form.ownerStatus} onChange={(value) => updateField("ownerStatus", value)} />
-                  <Field label="Location" id="location" value={form.location} onChange={(value) => updateField("location", value)} />
+                  <Field label={ui("ui.app.edit.code.page.e69702d5925c", "Display title / nickname")} id="name" value={form.name} onChange={(value) => updateField("name", value)} />
+                  <Field label={ui("ui.app.edit.code.page.cf846c3fbd33", "Builder (optional)")} id="builder" value={form.builder} onChange={(value) => updateField("builder", value)} />
+                  <Field label={ui("ui.app.edit.code.page.a6c7a84baa67", "Finish")} id="finish" value={form.finish} onChange={(value) => updateField("finish", value)} />
+                  <Field label={ui("ui.app.edit.code.page.81d27ef6d503", "Weight")} id="weight" value={form.weight} onChange={(value) => updateField("weight", value)} />
+                  <Field label={ui("ui.app.edit.code.page.a896221d5946", "Owner display")} id="owner" value={form.owner} onChange={(value) => updateField("owner", value)} />
+                  <Field label={ui("ui.app.edit.code.page.74d91b61ae60", "Owner status")} id="ownerStatus" value={form.ownerStatus} onChange={(value) => updateField("ownerStatus", value)} />
+                  <Field label={ui("ui.app.edit.code.page.15b61974b270", "Location")} id="location" value={form.location} onChange={(value) => updateField("location", value)} />
                 </div>
                 <div className="field custom-wide">
-                  <label htmlFor="summary">Public story</label>
+                  <label htmlFor="summary">{ui("ui.app.edit.code.page.7b364544e11f", "Public story")}</label>
                   <textarea
                     id="summary"
                     name="summary"
@@ -1263,7 +1258,7 @@ export default function EditInstrumentPage() {
                   />
                 </div>
                 <div className="field custom-wide">
-                  <label htmlFor="specsNotes">Specs notes</label>
+                  <label htmlFor="specsNotes">{ui("ui.app.edit.code.page.9dea0cff2a8f", "Specs notes")}</label>
                   <textarea
                     id="specsNotes"
                     rows={4}
@@ -1272,7 +1267,7 @@ export default function EditInstrumentPage() {
                   />
                 </div>
                 <div className="field custom-wide">
-                  <label htmlFor="serviceNotes">Service notes</label>
+                  <label htmlFor="serviceNotes">{ui("ui.app.edit.code.page.3929e139c666", "Service notes")}</label>
                   <textarea
                     id="serviceNotes"
                     rows={4}
@@ -1282,13 +1277,13 @@ export default function EditInstrumentPage() {
                 </div>
               </details>
               <details className="advanced-panel" open>
-                <summary>Add Any Details</summary>
+                <summary>{ui("ui.app.edit.code.page.814602d348e0", "Add Any Details")}</summary>
                 <div className="custom-list">
                   {customFields.map((field) => (
                     <div className="custom-row" key={field.id}>
                       <input
-                        aria-label="Field label"
-                        placeholder="Field label, e.g. Builder"
+                        aria-label={ui("ui.app.edit.code.page.8f5e3a6a7a8a", "Field label")}
+                        placeholder={ui("ui.app.edit.code.page.c401f87933bd", "Field label, e.g. Builder")}
                         value={field.label}
                         onChange={(event) =>
                           setCustomFields((current) =>
@@ -1297,8 +1292,8 @@ export default function EditInstrumentPage() {
                         }
                       />
                       <input
-                        aria-label="Field value"
-                        placeholder="Value"
+                        aria-label={ui("ui.app.edit.code.page.ca3653fa9b78", "Field value")}
+                        placeholder={ui("ui.app.edit.code.page.8e37953d23da", "Value")}
                         value={field.value}
                         onChange={(event) =>
                           setCustomFields((current) =>
@@ -1306,24 +1301,20 @@ export default function EditInstrumentPage() {
                           )
                         }
                       />
-                      <button className="button secondary" type="button" onClick={() => setCustomFields((current) => current.filter((item) => item.id !== field.id))}>
-                        Remove
-                      </button>
+                      <button className="button secondary" type="button" onClick={() => setCustomFields((current) => current.filter((item) => item.id !== field.id))}>{ui("ui.app.edit.code.page.c3812fc4acb8", "Remove")}</button>
                     </div>
                   ))}
-                  <button className="button secondary" type="button" onClick={() => setCustomFields((current) => [...current, { id: `field-${Date.now()}`, label: "", value: "" }])}>
-                    Add Detail
-                  </button>
+                  <button className="button secondary" type="button" onClick={() => setCustomFields((current) => [...current, { id: `field-${Date.now()}`, label: "", value: "" }])}>{ui("ui.app.edit.code.page.d9e3cfc7246e", "Add Detail")}</button>
                 </div>
               </details>
               <details className="advanced-panel" open>
-                <summary>Add Website or Social Links</summary>
+                <summary>{ui("ui.app.edit.code.page.5482252391a3", "Add Website or Social Links")}</summary>
                 <div className="custom-list">
                   {customLinks.map((link) => (
                     <div className="custom-row" key={link.id}>
                       <input
-                        aria-label="Link label"
-                        placeholder="Label, e.g. Instagram"
+                        aria-label={ui("ui.app.edit.code.page.acaa9ea6688f", "Link label")}
+                        placeholder={ui("ui.app.edit.code.page.02234b0f736c", "Label, e.g. Instagram")}
                         value={link.label}
                         onChange={(event) =>
                           setCustomLinks((current) =>
@@ -1332,7 +1323,7 @@ export default function EditInstrumentPage() {
                         }
                       />
                       <input
-                        aria-label="Link URL"
+                        aria-label={ui("ui.app.edit.code.page.9dfd0b9f8f42", "Link URL")}
                         placeholder="https://..."
                         value={link.url}
                         onChange={(event) =>
@@ -1341,18 +1332,14 @@ export default function EditInstrumentPage() {
                           )
                         }
                       />
-                      <button className="button secondary" type="button" onClick={() => setCustomLinks((current) => current.filter((item) => item.id !== link.id))}>
-                        Remove
-                      </button>
+                      <button className="button secondary" type="button" onClick={() => setCustomLinks((current) => current.filter((item) => item.id !== link.id))}>{ui("ui.app.edit.code.page.c3812fc4acb8", "Remove")}</button>
                     </div>
                   ))}
-                  <button className="button secondary" type="button" onClick={() => setCustomLinks((current) => [...current, { id: `link-${Date.now()}`, label: "", url: "" }])}>
-                    Add Link
-                  </button>
+                  <button className="button secondary" type="button" onClick={() => setCustomLinks((current) => [...current, { id: `link-${Date.now()}`, label: "", url: "" }])}>{ui("ui.app.edit.code.page.b8c42654c8ce", "Add Link")}</button>
                 </div>
               </details>
               <div className="field photo-field">
-                <label htmlFor="profilePhotos">Profile photos</label>
+                <label htmlFor="profilePhotos">{ui("ui.app.edit.code.page.215ed206acf2", "Profile photos")}</label>
                 <input
                   id="profilePhotos"
                   name="profilePhotos"
@@ -1361,10 +1348,10 @@ export default function EditInstrumentPage() {
                   multiple
                   onChange={(event) => void addProfilePhotos(event.target.files)}
                 />
-                <span>Upload up to 20 photos, 12MB each. Pick one as the main image for dashboard cards, catalog listings, and the public profile hero.</span>
+                <span>{ui("ui.app.edit.code.page.d7aea5f0f7db", "Upload up to 20 photos, 12MB each. Pick one as the main image for dashboard cards, catalog listings, and the public profile hero.")}</span>
               </div>
               <div className="field photo-field" id="documents">
-                <label htmlFor="profileDocuments">Documents</label>
+                <label htmlFor="profileDocuments">{ui("ui.app.edit.code.page.b4e929d8bcfe", "Documents")}</label>
                 <input
                   id="profileDocuments"
                   name="profileDocuments"
@@ -1373,26 +1360,26 @@ export default function EditInstrumentPage() {
                   multiple
                   onChange={(event) => void addDocuments(event.target.files)}
                 />
-                <span>Store receipts, invoices, build sheets, service slips, appraisal notes, and authenticity evidence with the QRguitar Profile. Up to 10 files, 12MB each.</span>
+                <span>{ui("ui.app.edit.code.page.aaa80d91c45c", "Store receipts, invoices, build sheets, service slips, appraisal notes, and authenticity evidence with the QRguitar Profile. Up to 10 files, 12MB each.")}</span>
               </div>
               {documents.length ? (
-                <section className="photo-manager proof-vault" aria-label="Proof Vault document manager">
+                <section className="photo-manager proof-vault" aria-label={ui("ui.app.edit.code.page.fe07a483e3c2", "Proof Vault document manager")}>
                   <div className="photo-manager-header">
-                    <strong>Documents</strong>
-                    <span>{documents.length}/10 files. Private documents can support QRguitar verification and authenticity review during beta.</span>
+                    <strong>{ui("ui.app.edit.code.page.b4e929d8bcfe", "Documents")}</strong>
+                    <span>{documents.length}{ui("ui.app.edit.code.page.61008da8ad24", "/10 files. Private documents can support QRguitar verification and authenticity review during beta.")}</span>
                   </div>
                   <div className="proof-vault-list">
                     {documents.map((document) => (
                       <div className="proof-vault-item" key={document.id}>
                         <div className="proof-vault-item-header">
-                          <strong>{document.name || "Untitled document"}</strong>
+                          <strong>{document.name || ui("ui.app.edit.code.page.9f6d7cb28b64", "Untitled document")}</strong>
                           <span className={document.visibility === "public" ? "status-pill verified-pill" : "status-pill neutral-pill"}>
-                            {document.uploadState === "uploading" ? "Uploading" : document.uploadState === "error" ? "Upload failed" : document.visibility === "public" ? "Public" : "Private"}
+                            {document.uploadState === "uploading" ? ui("ui.app.edit.code.page.8b898ca34ce7", "Uploading") : document.uploadState === "error" ? ui("ui.app.edit.code.page.6efc5d27f30b", "Upload failed") : document.visibility === "public" ? ui("ui.app.edit.code.page.591935b15b1c", "Public") : ui("ui.app.edit.code.page.c63eb6720c6e", "Private")}
                           </span>
                         </div>
                         <div className="form-grid compact">
                           <div className="field">
-                            <label htmlFor={`${document.id}-title`}>Title</label>
+                            <label htmlFor={`${document.id}-title`}>{ui("ui.app.edit.code.page.7e8cd2056da7", "Title")}</label>
                             <input
                               id={`${document.id}-title`}
                               value={document.name}
@@ -1402,7 +1389,7 @@ export default function EditInstrumentPage() {
                             />
                           </div>
                           <div className="field">
-                            <label htmlFor={`${document.id}-type`}>Document type</label>
+                            <label htmlFor={`${document.id}-type`}>{ui("ui.app.edit.code.page.5b81f70d59bd", "Document type")}</label>
                             <select
                               id={`${document.id}-type`}
                               value={document.documentType}
@@ -1416,20 +1403,20 @@ export default function EditInstrumentPage() {
                         </div>
                         <div className="form-grid compact">
                           <div className="field">
-                            <label htmlFor={`${document.id}-issuer`}>Issuer or source</label>
-                            <input id={`${document.id}-issuer`} value={document.issuerSource} onChange={(event) => setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, issuerSource: event.target.value } : item))} placeholder="Dealer, shop, builder, or owner" />
+                            <label htmlFor={`${document.id}-issuer`}>{ui("ui.app.edit.code.page.1d0e10a4efff", "Issuer or source")}</label>
+                            <input id={`${document.id}-issuer`} value={document.issuerSource} onChange={(event) => setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, issuerSource: event.target.value } : item))} placeholder={ui("ui.app.edit.code.page.de02d7e9d9ed", "Dealer, shop, builder, or owner")} />
                           </div>
                           <div className="field">
-                            <label htmlFor={`${document.id}-date`}>Document date</label>
+                            <label htmlFor={`${document.id}-date`}>{ui("ui.app.edit.code.page.331b273e05e4", "Document date")}</label>
                             <input id={`${document.id}-date`} type="date" value={document.documentDate} onChange={(event) => setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, documentDate: event.target.value } : item))} />
                           </div>
                         </div>
                         <div className="field">
-                          <label htmlFor={`${document.id}-description`}>Description</label>
-                          <textarea id={`${document.id}-description`} value={document.description} onChange={(event) => setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, description: event.target.value } : item))} placeholder="What this document establishes or contains." />
+                          <label htmlFor={`${document.id}-description`}>{ui("ui.app.edit.code.page.526e0087cc3f", "Description")}</label>
+                          <textarea id={`${document.id}-description`} value={document.description} onChange={(event) => setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, description: event.target.value } : item))} placeholder={ui("ui.app.edit.code.page.fe239cf0a2cf", "What this document establishes or contains.")} />
                         </div>
                         <div className="field">
-                          <label htmlFor={`${document.id}-timeline`}>Related Timeline entry</label>
+                          <label htmlFor={`${document.id}-timeline`}>{ui("ui.app.edit.code.page.2a750061dd1a", "Related Timeline entry")}</label>
                           <select
                             id={`${document.id}-timeline`}
                             value={document.relatedTimelineEventId}
@@ -1441,32 +1428,32 @@ export default function EditInstrumentPage() {
                                 : item));
                             }}
                           >
-                            <option value="">Not linked</option>
+                            <option value="">{ui("ui.app.edit.code.page.1e31d9596d67", "Not linked")}</option>
                             {(original?.timelineEvents || serviceEvents).map((entry) => (
                               <option value={entry.id} key={entry.id}>{entry.title}</option>
                             ))}
                           </select>
                         </div>
                         <div className="field">
-                          <label htmlFor={`${document.id}-public-description`}>Public description</label>
+                          <label htmlFor={`${document.id}-public-description`}>{ui("ui.app.edit.code.page.05a15f069975", "Public description")}</label>
                           <textarea
                             id={`${document.id}-public-description`}
                             value={document.publicDescription}
                             onChange={(event) =>
                               setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, publicDescription: event.target.value } : item))
                             }
-                            placeholder="Optional public context if this document is shared."
+                            placeholder={ui("ui.app.edit.code.page.75652484cfdf", "Optional public context if this document is shared.")}
                           />
                         </div>
                         <div className="field">
-                          <label htmlFor={`${document.id}-private-notes`}>Private notes</label>
+                          <label htmlFor={`${document.id}-private-notes`}>{ui("ui.app.edit.code.page.72ff78fb2fd5", "Private notes")}</label>
                           <textarea
                             id={`${document.id}-private-notes`}
                             value={document.privateNotes}
                             onChange={(event) =>
                               setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, privateNotes: event.target.value } : item))
                             }
-                            placeholder="Owner-only document notes. Never shown on the public Profile."
+                            placeholder={ui("ui.app.edit.code.page.7f4f8adde79a", "Owner-only document notes. Never shown on the public Profile.")}
                           />
                         </div>
                         <div className="proof-vault-actions">
@@ -1483,17 +1470,13 @@ export default function EditInstrumentPage() {
                               )
                             }
                           >
-                            {document.visibility === "public" ? "Make Private" : "Make Public"}
+                            {document.visibility === "public" ? ui("ui.app.edit.code.page.ffab73178509", "Make Private") : ui("ui.app.edit.code.page.24139936d627", "Make Public")}
                           </button>
                           {document.dataUrl ? (
-                            <a className="button secondary" href={document.dataUrl} target="_blank" rel="noreferrer">
-                              Open
-                            </a>
+                            <a className="button secondary" href={document.dataUrl} target="_blank" rel="noreferrer">{ui("ui.app.edit.code.page.ed077f3d8125", "Open")}</a>
                           ) : null}
                           {document.uploadMessage ? <span className="fine-print">{document.uploadMessage}</span> : null}
-                          <button className="button secondary" type="button" onClick={() => removeDocument(document)}>
-                            Remove
-                          </button>
+                          <button className="button secondary" type="button" onClick={() => removeDocument(document)}>{ui("ui.app.edit.code.page.c3812fc4acb8", "Remove")}</button>
                         </div>
                       </div>
                     ))}
@@ -1510,71 +1493,69 @@ export default function EditInstrumentPage() {
                   statusByImage={photoUploads}
                 />
               </div>
-              <section className="qr-customizer" id="media" aria-label="External media">
+              <section className="qr-customizer" id="media" aria-label={ui("ui.app.edit.code.page.3e3ac8296196", "External media")}>
                 <div>
-                  <span className="eyebrow">Media links</span>
-                  <h3>Add Video or Audio</h3>
-                  <p>Add a YouTube, Vimeo, SoundCloud, Bandcamp, or other safe HTTPS media link. QRguitar never accepts custom embed code.</p>
+                  <span className="eyebrow">{ui("ui.app.edit.code.page.dc600f6490d8", "Media links")}</span>
+                  <h3>{ui("ui.app.edit.code.page.55444bb1a4b8", "Add Video or Audio")}</h3>
+                  <p>{ui("ui.app.edit.code.page.b2620027b28f", "Add a YouTube, Vimeo, SoundCloud, Bandcamp, or other safe HTTPS media link. QRguitar never accepts custom embed code.")}</p>
                 </div>
                 <div className="qr-controls">
                   <div className="field custom-wide">
-                    <label htmlFor="externalMediaUrl">Media URL</label>
+                    <label htmlFor="externalMediaUrl">{ui("ui.app.edit.code.page.a56a654b3cce", "Media URL")}</label>
                     <input id="externalMediaUrl" type="url" value={mediaForm.url} onChange={(event) => setMediaForm((current) => ({ ...current, url: event.target.value }))} placeholder="https://..." />
                   </div>
                   <div className="field">
-                    <label htmlFor="externalMediaTitle">Title</label>
-                    <input id="externalMediaTitle" value={mediaForm.title} onChange={(event) => setMediaForm((current) => ({ ...current, title: event.target.value }))} placeholder="Clean demo" />
+                    <label htmlFor="externalMediaTitle">{ui("ui.app.edit.code.page.7e8cd2056da7", "Title")}</label>
+                    <input id="externalMediaTitle" value={mediaForm.title} onChange={(event) => setMediaForm((current) => ({ ...current, title: event.target.value }))} placeholder={ui("ui.app.edit.code.page.b72cc3763093", "Clean demo")} />
                   </div>
                   <div className="field custom-wide">
-                    <label htmlFor="externalMediaCaption">Caption</label>
+                    <label htmlFor="externalMediaCaption">{ui("ui.app.edit.code.page.87d296ec9489", "Caption")}</label>
                     <textarea id="externalMediaCaption" rows={2} value={mediaForm.caption} onChange={(event) => setMediaForm((current) => ({ ...current, caption: event.target.value }))} />
                   </div>
                   <label className="toggle-field">
-                    <input type="checkbox" checked={mediaForm.isPublic} onChange={(event) => setMediaForm((current) => ({ ...current, isPublic: event.target.checked }))} />
-                    Show this media on the QRguitar Profile
-                  </label>
+                    <input type="checkbox" checked={mediaForm.isPublic} onChange={(event) => setMediaForm((current) => ({ ...current, isPublic: event.target.checked }))} />{ui("ui.app.edit.code.page.1b163a070bcb", "Show this media on the QRguitar Profile")}</label>
                   <button className="button" type="button" onClick={() => void addExternalMedia()} disabled={savingMedia}>
-                    {savingMedia ? "Saving..." : "Add Media"}
+                    {savingMedia ? ui("ui.app.edit.code.page.dc85af8f2b1d", "Saving...") : ui("ui.app.edit.code.page.a078fb55c65a", "Add Media")}
                   </button>
                 </div>
                 {externalMedia.length ? (
                   <div className="timeline-list">
                     {externalMedia.map((item, index) => (
                       <article className="timeline-item" key={item.id}>
-                        <span>{item.provider} / {item.isPublic ? "Public" : "Private"}</span>
+                        <span>{item.provider} / {item.isPublic ? ui("ui.app.edit.code.page.591935b15b1c", "Public") : ui("ui.app.edit.code.page.c63eb6720c6e", "Private")}</span>
                         <h3>{item.title}</h3>
                         {item.caption ? <p>{item.caption}</p> : null}
-                        <a href={item.canonicalUrl} target="_blank" rel="noreferrer">Preview link</a>
+                        <a href={item.canonicalUrl} target="_blank" rel="noreferrer">{ui("ui.app.edit.code.page.50f38c2c40b0", "Preview link")}</a>
                         <div className="form-actions">
-                          <button className="button secondary" type="button" onClick={() => void updateExternalMedia(item, { isPublic: !item.isPublic })} disabled={savingMedia}>{item.isPublic ? "Make Private" : "Show Publicly"}</button>
-                          <button className="button secondary" type="button" onClick={() => void moveExternalMedia(item, -1)} disabled={savingMedia || index === 0} aria-label={`Move ${item.title} up`}>Move Up</button>
-                          <button className="button secondary" type="button" onClick={() => void moveExternalMedia(item, 1)} disabled={savingMedia || index === externalMedia.length - 1} aria-label={`Move ${item.title} down`}>Move Down</button>
-                          <button className="button secondary" type="button" onClick={() => void removeExternalMedia(item)} disabled={savingMedia}>Remove</button>
+                          <button className="button secondary" type="button" onClick={() => void updateExternalMedia(item, { isPublic: !item.isPublic })} disabled={savingMedia}>{item.isPublic ? ui("ui.app.edit.code.page.ffab73178509", "Make Private") : ui("ui.app.edit.code.page.7bcb38b3067a", "Show Publicly")}</button>
+                          <button className="button secondary" type="button" onClick={() => void moveExternalMedia(item, -1)} disabled={savingMedia || index === 0} aria-label={ui("ui.app.edit.code.page.740ebe32a73f", "Move {{value1}} up", { value1: item.title })}>{ui("ui.app.edit.code.page.1359626e7b69", "Move Up")}</button>
+                          <button className="button secondary" type="button" onClick={() => void moveExternalMedia(item, 1)} disabled={savingMedia || index === externalMedia.length - 1} aria-label={ui("ui.app.edit.code.page.a1ae739bcef6", "Move {{value1}} down", { value1: item.title })}>{ui("ui.app.edit.code.page.b58330ac2505", "Move Down")}</button>
+                          <button className="button secondary" type="button" onClick={() => void removeExternalMedia(item)} disabled={savingMedia}>{ui("ui.app.edit.code.page.c3812fc4acb8", "Remove")}</button>
                         </div>
                       </article>
                     ))}
                   </div>
                 ) : null}
               </section>
-              <section className="qr-customizer" id="timeline" aria-label="Timeline and service history">
+              <section className="qr-customizer" id="timeline" aria-label={ui("ui.app.edit.code.page.92777e2212a7", "Timeline and service history")}>
                 <div>
-                  <span className="eyebrow">Instrument history</span>
-                  <h3 id="service">Timeline &amp; Service History</h3>
-                  <p>Add the history you know - purchases, ownership, service, modifications, restoration, and important milestones.</p>
+                  <span className="eyebrow">{ui("ui.app.edit.code.page.08e02c90e8fa", "Instrument history")}</span>
+                  <h3 id="service">{ui("ui.app.edit.code.page.480686c56fb4", "Timeline & Service History")}</h3>
+                  <p>{ui("ui.app.edit.code.page.bb53b6bbcc71", "Add the history you know - purchases, ownership, service, modifications, restoration, and important milestones.")}</p>
                 </div>
                 <div className="qr-controls">
                   <div className="field">
-                    <label htmlFor="servicePrecision">Date precision</label>
+                    <label htmlFor="servicePrecision">{ui("ui.app.edit.code.page.1ac020fb3ee0", "Date precision")}</label>
                     <select id="servicePrecision" value={serviceForm.datePrecision} onChange={(event) => updateServiceField("datePrecision", event.target.value)}>
-                      <option value="day">Exact day</option>
-                      <option value="month">Month and year</option>
-                      <option value="year">Year only</option>
-                      <option value="unknown">Unknown date</option>
+                      <option value="day">{ui("ui.app.edit.code.page.0bbaffa5aa37", "Exact day")}</option>
+                      <option value="month">{ui("ui.app.edit.code.page.6d6c35d44e7c", "Month and year")}</option>
+                      <option value="year">{ui("ui.app.edit.code.page.676258d2226f", "Year only")}</option>
+                      <option value="unknown">{ui("ui.app.edit.code.page.ad224bb89c8a", "Unknown date")}</option>
                     </select>
                   </div>
                   {serviceForm.datePrecision !== "unknown" ? (
                     <div className="field">
-                      <label htmlFor="serviceDate">Date</label>
+                      <label htmlFor="serviceDate">{ui("ui.app.edit.code.page.99c40ab40592", "Date")}</label>
                       <input
                         id="serviceDate"
                         type={serviceForm.datePrecision === "year" ? "number" : serviceForm.datePrecision === "month" ? "month" : "date"}
@@ -1586,64 +1567,60 @@ export default function EditInstrumentPage() {
                     </div>
                   ) : null}
                   <div className="field">
-                    <label htmlFor="serviceType">Category</label>
+                    <label htmlFor="serviceType">{ui("ui.app.edit.code.page.292c06f0045a", "Category")}</label>
                     <select id="serviceType" value={serviceForm.category} onChange={(event) => updateServiceField("category", event.target.value)}>
                       {serviceEventTypes.map((type) => <option value={type} key={type}>{type}</option>)}
                     </select>
                   </div>
                   <div className="field">
-                    <label htmlFor="serviceTitle">Title</label>
-                    <input id="serviceTitle" value={serviceForm.title} onChange={(event) => updateServiceField("title", event.target.value)} placeholder="Setup, repair, inspection..." />
+                    <label htmlFor="serviceTitle">{ui("ui.app.edit.code.page.7e8cd2056da7", "Title")}</label>
+                    <input id="serviceTitle" value={serviceForm.title} onChange={(event) => updateServiceField("title", event.target.value)} placeholder={ui("ui.app.edit.code.page.b7019e901e94", "Setup, repair, inspection...")} />
                   </div>
                   <div className="field">
-                    <label htmlFor="serviceShop">Shop/tech/business name</label>
+                    <label htmlFor="serviceShop">{ui("ui.app.edit.code.page.b77903e21e3a", "Shop/tech/business name")}</label>
                     <input id="serviceShop" value={serviceForm.shopName} onChange={(event) => updateServiceField("shopName", event.target.value)} />
                   </div>
                   <div className="field">
-                    <label htmlFor="serviceLocation">Location</label>
+                    <label htmlFor="serviceLocation">{ui("ui.app.edit.code.page.15b61974b270", "Location")}</label>
                     <input id="serviceLocation" value={serviceForm.location} onChange={(event) => updateServiceField("location", event.target.value)} />
                   </div>
                   <div className="field">
-                    <label htmlFor="servicePerformedBy">Who performed this work?</label>
+                    <label htmlFor="servicePerformedBy">{ui("ui.app.edit.code.page.3baa01e20a22", "Who performed this work?")}</label>
                     <select id="servicePerformedBy" value={serviceForm.whoPerformed} onChange={(event) => updateServiceField("whoPerformed", event.target.value)}>
-                      <option value="unknown">Not specified</option>
-                      <option value="self">Owner / self</option>
-                      <option value="shop">Shop or technician</option>
+                      <option value="unknown">{ui("ui.app.edit.code.page.dc12bec5d71f", "Not specified")}</option>
+                      <option value="self">{ui("ui.app.edit.code.page.118de3932441", "Owner / self")}</option>
+                      <option value="shop">{ui("ui.app.edit.code.page.1fbc3028ac4f", "Shop or technician")}</option>
                     </select>
-                    <small>Owner-entered history is labeled Owner-reported. Provider verification is controlled separately.</small>
+                    <small>{ui("ui.app.edit.code.page.6995609bcfca", "Owner-entered history is labeled Owner-reported. Provider verification is controlled separately.")}</small>
                   </div>
                   <div className="field">
-                    <label htmlFor="serviceWorkOrder">Work-order reference</label>
+                    <label htmlFor="serviceWorkOrder">{ui("ui.app.edit.code.page.1c784546c251", "Work-order reference")}</label>
                     <input id="serviceWorkOrder" value={serviceForm.workOrderReference} onChange={(event) => updateServiceField("workOrderReference", event.target.value)} />
                   </div>
                   <div className="field custom-wide">
-                    <label htmlFor="serviceParts">Parts installed</label>
+                    <label htmlFor="serviceParts">{ui("ui.app.edit.code.page.023fdc1bf85e", "Parts installed")}</label>
                     <textarea id="serviceParts" rows={2} value={serviceForm.partsInstalled} onChange={(event) => updateServiceField("partsInstalled", event.target.value)} />
                   </div>
                   <div className="field custom-wide">
-                    <label htmlFor="serviceMeasurements">Setup measurements</label>
+                    <label htmlFor="serviceMeasurements">{ui("ui.app.edit.code.page.4821049b4d8b", "Setup measurements")}</label>
                     <textarea id="serviceMeasurements" rows={2} value={serviceForm.setupMeasurements} onChange={(event) => updateServiceField("setupMeasurements", event.target.value)} />
                   </div>
                   <div className="field custom-wide">
-                    <label htmlFor="servicePublicDescription">Public description</label>
+                    <label htmlFor="servicePublicDescription">{ui("ui.app.edit.code.page.05a15f069975", "Public description")}</label>
                     <textarea id="servicePublicDescription" rows={3} value={serviceForm.publicDescription} onChange={(event) => updateServiceField("publicDescription", event.target.value)} />
                   </div>
                   <div className="field custom-wide">
-                    <label htmlFor="servicePrivateNotes">Private notes</label>
+                    <label htmlFor="servicePrivateNotes">{ui("ui.app.edit.code.page.72ff78fb2fd5", "Private notes")}</label>
                     <textarea id="servicePrivateNotes" rows={3} value={serviceForm.privateNotes} onChange={(event) => updateServiceField("privateNotes", event.target.value)} />
                   </div>
                   <label className="toggle-field">
-                    <input type="checkbox" checked={serviceForm.isPublic} onChange={(event) => updateServiceField("isPublic", event.target.checked)} />
-                    Show this service entry on the QRguitar Profile
-                  </label>
+                    <input type="checkbox" checked={serviceForm.isPublic} onChange={(event) => updateServiceField("isPublic", event.target.checked)} />{ui("ui.app.edit.code.page.0b8658a6a0c1", "Show this service entry on the QRguitar Profile")}</label>
                   <div className="form-actions">
                     <button className="button" type="button" onClick={() => void saveServiceEntry()} disabled={savingService}>
-                      {savingService ? "Saving..." : editingServiceId ? "Update Timeline Entry" : "Add Timeline Entry"}
+                      {savingService ? ui("ui.app.edit.code.page.dc85af8f2b1d", "Saving...") : editingServiceId ? ui("ui.app.edit.code.page.c1fa1a200083", "Update Timeline Entry") : ui("ui.app.edit.code.page.d9cf5b8885ab", "Add Timeline Entry")}
                     </button>
                     {editingServiceId ? (
-                      <button className="button secondary" type="button" onClick={resetServiceForm}>
-                        Cancel Edit
-                      </button>
+                      <button className="button secondary" type="button" onClick={resetServiceForm}>{ui("ui.app.edit.code.page.fddcfdf8d5f4", "Cancel Edit")}</button>
                     ) : null}
                   </div>
                 </div>
@@ -1655,156 +1632,148 @@ export default function EditInstrumentPage() {
                   </div>
                 ) : (
                   <div className="photo-manager empty">
-                    <strong>No timeline entries yet</strong>
-                    <span>Add known ownership, purchases, service, repairs, modifications, restoration, and milestones.</span>
+                    <strong>{ui("ui.app.edit.code.page.e4c12bc75682", "No timeline entries yet")}</strong>
+                    <span>{ui("ui.app.edit.code.page.e3fe0f1dad4c", "Add known ownership, purchases, service, repairs, modifications, restoration, and milestones.")}</span>
                   </div>
                 )}
               </section>
-              <section className="qr-customizer" id="qr-print" aria-label="QR code customization">
+              <section className="qr-customizer" id="qr-print" aria-label={ui("ui.app.edit.code.page.5604505e7254", "QR code customization")}>
                 <div>
-                  <span className="eyebrow">QR appearance</span>
-                  <h3>Customize QR Appearance</h3>
-                  <p>Customize the code customers download.</p>
-                  <p className="fine-print">Keep strong contrast so the QR remains scannable on stickers, hang tags, plates, and certificates.</p>
+                  <span className="eyebrow">{ui("ui.app.edit.code.page.29ea42609e75", "QR appearance")}</span>
+                  <h3>{ui("ui.app.edit.code.page.1863981d2631", "Customize QR Appearance")}</h3>
+                  <p>{ui("ui.app.edit.code.page.6a3fe397be58", "Customize the code customers download.")}</p>
+                  <p className="fine-print">{ui("ui.app.edit.code.page.639563ea399f", "Keep strong contrast so the QR remains scannable on stickers, hang tags, plates, and certificates.")}</p>
                 </div>
                 <div className="qr-controls">
-                  <ColorField label="QR color" value={qrStyle.foreground} onChange={(value) => updateQrStyle("foreground", value)} />
-                  <ColorField label="Background" value={qrStyle.background} onChange={(value) => updateQrStyle("background", value)} />
+                  <ColorField label={ui("ui.app.edit.code.page.7c1b8917efdc", "QR color")} value={qrStyle.foreground} onChange={(value) => updateQrStyle("foreground", value)} />
+                  <ColorField label={ui("ui.app.edit.code.page.ea2b8a878841", "Background")} value={qrStyle.background} onChange={(value) => updateQrStyle("background", value)} />
                   <div className="field">
-                    <label htmlFor="qrLabel">Label</label>
+                    <label htmlFor="qrLabel">{ui("ui.app.edit.code.page.0e66373f45dc", "Label")}</label>
                     <input id="qrLabel" value={qrStyle.labelText} onChange={(event) => updateQrStyle("labelText", event.target.value)} />
                   </div>
                   <div className="field">
-                    <label htmlFor="qrShape">Style</label>
+                    <label htmlFor="qrShape">{ui("ui.app.edit.code.page.7e744141b40e", "Style")}</label>
                     <select id="qrShape" value={qrStyle.shape} onChange={(event) => updateQrStyle("shape", event.target.value)}>
-                      <option value="classic">Classic print</option>
-                      <option value="soft">Soft premium</option>
+                      <option value="classic">{ui("ui.app.edit.code.page.3e9c8175439b", "Classic print")}</option>
+                      <option value="soft">{ui("ui.app.edit.code.page.e6296a9d0a3b", "Soft premium")}</option>
                     </select>
                   </div>
                   <label className="toggle-field">
-                    <input type="checkbox" checked={qrStyle.includeLabel} onChange={(event) => updateQrStyle("includeLabel", event.target.checked)} />
-                    Include label on downloaded QR
-                  </label>
+                    <input type="checkbox" checked={qrStyle.includeLabel} onChange={(event) => updateQrStyle("includeLabel", event.target.checked)} />{ui("ui.app.edit.code.page.affe6276c345", "Include label on downloaded QR")}</label>
                 </div>
               </section>
             </form>
             <div className={styles.secondarySections}>
-              <section className="card verification-card" id="trust-verification" aria-label="Trust and verification">
+              <section className="card verification-card" id="trust-verification" aria-label={ui("ui.app.edit.code.page.3dc74ca2612b", "Trust and verification")}>
                 <div>
-                  <span className="eyebrow">Trust & Verification</span>
-                  <h3>{verificationStatus === "verified" ? "Verified by QRguitar" : "Unverified"}</h3>
+                  <span className="eyebrow">{ui("ui.app.edit.code.page.5f500bb66024", "Trust & Verification")}</span>
+                  <h3>{verificationStatus === "verified" ? ui("ui.app.edit.code.page.d8d9a98cd0e8", "Verified by QRguitar") : ui("ui.app.edit.code.page.33c8e8de41c3", "Unverified")}</h3>
                   <p>
                     {verificationStatus === "verified"
-                      ? "This Profile is verified by QRguitar."
-                      : "Verified Profiles are available with paid QRguitar verification. Paid verification is handled manually during beta."}
+                      ? ui("ui.app.edit.code.page.df6ad347b1a1", "This Profile is verified by QRguitar.")
+                      : ui("ui.app.edit.code.page.d7b92d4468d9", "Verified Profiles are available with paid QRguitar verification. Paid verification is handled manually during beta.")}
                   </p>
                   <p>
                     {authenticityStatus === "confirmed"
-                      ? "Authenticity confirmed by QRguitar from available evidence."
-                      : "Authenticity confirmation is available as a paid review feature. Paid verification and authenticity review are handled manually during beta."}
+                      ? ui("ui.app.edit.code.page.ec2f3a7e401c", "Authenticity confirmed by QRguitar from available evidence.")
+                      : ui("ui.app.edit.code.page.9572b2a7a2c2", "Authenticity confirmation is available as a paid review feature. Paid verification and authenticity review are handled manually during beta.")}
                   </p>
                 </div>
                 <div className="form-grid">
                   {canManageVerification ? (
                     <>
                     <div className="form-section-heading custom-wide">
-                      <span className="eyebrow">Admin Trust Controls</span>
-                      <p>Set binary trust badges and notes. These changes save through the main Save Changes button.</p>
+                      <span className="eyebrow">{ui("ui.app.edit.code.page.b58c42dbfcd4", "Admin Trust Controls")}</span>
+                      <p>{ui("ui.app.edit.code.page.fff509a567cd", "Set binary trust badges and notes. These changes save through the main Save Changes button.")}</p>
                     </div>
                     <div className="field">
-                      <label htmlFor="verificationStatus">Admin verification status</label>
+                      <label htmlFor="verificationStatus">{ui("ui.app.edit.code.page.d949c0cb61f0", "Admin verification status")}</label>
                       <select
                         id="verificationStatus"
                         value={verificationStatus}
                         onChange={(event) => setVerificationStatus(event.target.value === "verified" ? "verified" : "unverified")}
                       >
-                        <option value="unverified">Unverified</option>
-                        <option value="verified">Verified</option>
+                        <option value="unverified">{ui("ui.app.edit.code.page.33c8e8de41c3", "Unverified")}</option>
+                        <option value="verified">{ui("ui.app.edit.code.page.4f7838402f37", "Verified")}</option>
                       </select>
                     </div>
                     <div className="field">
-                      <label htmlFor="authenticityStatus">Admin authenticity status</label>
+                      <label htmlFor="authenticityStatus">{ui("ui.app.edit.code.page.75e0ca128662", "Admin authenticity status")}</label>
                       <select
                         id="authenticityStatus"
                         value={authenticityStatus}
                         onChange={(event) => setAuthenticityStatus(event.target.value === "confirmed" ? "confirmed" : "unconfirmed")}
                       >
-                        <option value="unconfirmed">Authenticity Unconfirmed</option>
-                        <option value="confirmed">Authenticity Confirmed</option>
+                        <option value="unconfirmed">{ui("ui.app.edit.code.page.a54f9b625886", "Authenticity Unconfirmed")}</option>
+                        <option value="confirmed">{ui("ui.app.edit.code.page.eb95c24a9590", "Authenticity Confirmed")}</option>
                       </select>
                     </div>
                     <label className="toggle-field custom-wide">
-                      <input type="checkbox" checked={serialExceptionApproved} onChange={(event) => setSerialExceptionApproved(event.target.checked)} />
-                      Approve verification/authenticity exception for a no-serial brand, retailer, or build
-                    </label>
+                      <input type="checkbox" checked={serialExceptionApproved} onChange={(event) => setSerialExceptionApproved(event.target.checked)} />{ui("ui.app.edit.code.page.cfac951791e6", "Approve verification/authenticity exception for a no-serial brand, retailer, or build")}</label>
                     <div className="field custom-wide">
-                      <label htmlFor="internalVerificationNote">Internal verification note</label>
+                      <label htmlFor="internalVerificationNote">{ui("ui.app.edit.code.page.f4a130abf8de", "Internal verification note")}</label>
                       <textarea id="internalVerificationNote" rows={3} value={internalVerificationNote} onChange={(event) => setInternalVerificationNote(event.target.value)} />
                     </div>
                     <div className="field custom-wide">
-                      <label htmlFor="publicVerificationNote">Public verification note</label>
+                      <label htmlFor="publicVerificationNote">{ui("ui.app.edit.code.page.118e1524b882", "Public verification note")}</label>
                       <textarea id="publicVerificationNote" rows={3} value={publicVerificationNote} onChange={(event) => setPublicVerificationNote(event.target.value)} />
                     </div>
                     <div className="field custom-wide">
-                      <label htmlFor="internalAuthenticityNote">Internal authenticity note</label>
+                      <label htmlFor="internalAuthenticityNote">{ui("ui.app.edit.code.page.010edcad212d", "Internal authenticity note")}</label>
                       <textarea id="internalAuthenticityNote" rows={3} value={internalAuthenticityNote} onChange={(event) => setInternalAuthenticityNote(event.target.value)} />
                     </div>
                     <div className="field custom-wide">
-                      <label htmlFor="publicAuthenticityNote">Public authenticity note</label>
+                      <label htmlFor="publicAuthenticityNote">{ui("ui.app.edit.code.page.42af0e4ee0c2", "Public authenticity note")}</label>
                       <textarea id="publicAuthenticityNote" rows={3} value={publicAuthenticityNote} onChange={(event) => setPublicAuthenticityNote(event.target.value)} />
                     </div>
                     </>
                   ) : null}
                   <label className="toggle-field">
-                    <input type="checkbox" checked={showVerificationBadge} onChange={(event) => setShowVerificationBadge(event.target.checked)} />
-                    Show verification badge publicly
-                  </label>
+                    <input type="checkbox" checked={showVerificationBadge} onChange={(event) => setShowVerificationBadge(event.target.checked)} />{ui("ui.app.edit.code.page.ebb5eff4953a", "Show verification badge publicly")}</label>
                   <label className="toggle-field">
-                    <input type="checkbox" checked={showAuthenticityBadge} onChange={(event) => setShowAuthenticityBadge(event.target.checked)} />
-                    Show authenticity status publicly
-                  </label>
-                  {authenticityStatus === "confirmed" && !showAuthenticityBadge ? <p className="field-note custom-wide">Authenticity is confirmed, but the public badge is currently hidden. Turn this on and use Save Changes to publish it.</p> : null}
+                    <input type="checkbox" checked={showAuthenticityBadge} onChange={(event) => setShowAuthenticityBadge(event.target.checked)} />{ui("ui.app.edit.code.page.a678af9b1c0a", "Show authenticity status publicly")}</label>
+                  {authenticityStatus === "confirmed" && !showAuthenticityBadge ? <p className="field-note custom-wide">{ui("ui.app.edit.code.page.51e39f20046d", "Authenticity is confirmed, but the public badge is currently hidden. Turn this on and use Save Changes to publish it.")}</p> : null}
                 </div>
               </section>
-              <section className="card verification-card" id="privacy-safety" aria-label="Lost or stolen alert">
+              <section className="card verification-card" id="privacy-safety" aria-label={ui("ui.app.edit.code.page.852068b96459", "Lost or stolen alert")}>
                 <div>
-                  <span className="eyebrow">Lost / Stolen Alert</span>
+                  <span className="eyebrow">{ui("ui.app.edit.code.page.d4607c4f0b10", "Lost / Stolen Alert")}</span>
                   <h3>{safetyStatusLabel(safetyStatus)}</h3>
-                  <p>Mark a record lost or stolen so anyone who scans the QR can see the alert.</p>
+                  <p>{ui("ui.app.edit.code.page.cd3177a2e0e4", "Mark a record lost or stolen so anyone who scans the QR can see the alert.")}</p>
                 </div>
                 <div className="form-grid">
                   <div className="field">
-                    <label htmlFor="safetyStatus">Current status</label>
+                    <label htmlFor="safetyStatus">{ui("ui.app.edit.code.page.2f5d50add626", "Current status")}</label>
                     <select
                       id="safetyStatus"
                       value={safetyStatus}
                       onChange={(event) => setSafetyStatus(event.target.value === "lost" || event.target.value === "stolen" || event.target.value === "recovered" ? event.target.value : "clear")}
                     >
-                      <option value="clear">No Alert</option>
-                      <option value="lost">Reported Lost</option>
-                      <option value="stolen">Reported Stolen</option>
-                      <option value="recovered">Recovered</option>
+                      <option value="clear">{ui("ui.app.edit.code.page.3b1c46e7fb2b", "No Alert")}</option>
+                      <option value="lost">{ui("ui.app.edit.code.page.299f098db192", "Reported Lost")}</option>
+                      <option value="stolen">{ui("ui.app.edit.code.page.44d0eeb2a64d", "Reported Stolen")}</option>
+                      <option value="recovered">{ui("ui.app.edit.code.page.37ce0a91ee27", "Recovered")}</option>
                     </select>
                   </div>
                   {safetyStatus === "clear" ? (
                     <div className="field custom-wide">
-                      <label>No public safety alert</label>
-                      <span className="fine-print">No public safety alert is shown while status is No Alert.</span>
+                      <label>{ui("ui.app.edit.code.page.2f02e4974dd6", "No public safety alert")}</label>
+                      <span className="fine-print">{ui("ui.app.edit.code.page.44c111b254e9", "No public safety alert is shown while status is No Alert.")}</span>
                     </div>
                   ) : (
                     <div className="field custom-wide">
-                      <label htmlFor="publicSafetyNote">Public safety note</label>
+                      <label htmlFor="publicSafetyNote">{ui("ui.app.edit.code.page.804f3c9e9556", "Public safety note")}</label>
                       <textarea
                         id="publicSafetyNote"
                         rows={3}
                         value={publicSafetyNote}
                         onChange={(event) => setPublicSafetyNote(event.target.value)}
-                        placeholder={safetyStatus === "lost" ? "Reported Lost: This instrument has been marked lost by the current owner." : safetyStatus === "stolen" ? "Reported Stolen: This instrument has been marked stolen by the current owner." : "Recovered status note."}
+                        placeholder={safetyStatus === "lost" ? ui("ui.app.edit.code.page.3b9415ed93f2", "Reported Lost: This instrument has been marked lost by the current owner.") : safetyStatus === "stolen" ? ui("ui.app.edit.code.page.893a5b5361ad", "Reported Stolen: This instrument has been marked stolen by the current owner.") : ui("ui.app.edit.code.page.e9aac867db4e", "Recovered status note.")}
                       />
                     </div>
                   )}
                   <div className="field custom-wide">
-                    <label htmlFor="safetyNote">Private/internal note</label>
+                    <label htmlFor="safetyNote">{ui("ui.app.edit.code.page.5816362f2633", "Private/internal note")}</label>
                     <textarea
                       id="safetyNote"
                       rows={3}
@@ -1818,16 +1787,14 @@ export default function EditInstrumentPage() {
               {message ? <p className="form-message">{message}</p> : null}
               <div className="form-actions editor-save-bar">
                 <button className="button" type="button" onClick={() => void saveChanges(false)} disabled={savingRecord || savingSafety} aria-busy={recordSaveAction === "save"}>
-                  {recordSaveAction === "save" ? "Saving changes..." : getContentValue(content, "edit.actions.save")}
+                  {recordSaveAction === "save" ? ui("ui.app.edit.code.page.86c6e0d74cc9", "Saving changes...") : getContentValue(content, "edit.actions.save")}
                 </button>
                 <button className="button secondary" type="button" onClick={() => void saveChanges(true)} disabled={savingRecord || savingSafety} aria-busy={recordSaveAction === "view"}>
                   {recordSaveAction === "view"
-                    ? form.visibility === "public" ? "Saving and opening..." : "Saving and returning..."
-                    : form.visibility === "public" ? getContentValue(content, "edit.actions.saveView") : "Save and Return to Dashboard"}
+                    ? form.visibility === "public" ? ui("ui.app.edit.code.page.caae18bd705d", "Saving and opening...") : ui("ui.app.edit.code.page.4a87047e033b", "Saving and returning...")
+                    : form.visibility === "public" ? getContentValue(content, "edit.actions.saveView") : ui("ui.app.edit.code.page.3c53caf4d68d", "Save and Return to Dashboard")}
                 </button>
-                <Link className="button secondary" href="/dashboard">
-                  Back to Dashboard
-                </Link>
+                <Link className="button secondary" href="/dashboard">{ui("ui.app.edit.code.page.97ba1d394fab", "Back to Dashboard")}</Link>
               </div>
 
           </div>
@@ -1864,23 +1831,19 @@ export default function EditInstrumentPage() {
       <main className="section auth-page">
         <div className="shell">
           <section className="card auth-card">
-            <div className="eyebrow">Edit instrument</div>
-            <h2>{!ready ? "Checking account..." : forbidden ? "Owner access required." : "Sign in to edit this Profile."}</h2>
+            <div className="eyebrow">{ui("ui.app.edit.code.page.3cbc146d86cb", "Edit instrument")}</div>
+            <h2>{!ready ? ui("ui.app.edit.code.page.4e0d5600059d", "Checking account...") : forbidden ? ui("ui.app.edit.code.page.3d8a710de98a", "Owner access required.") : ui("ui.app.edit.code.page.b2a4948798a5", "Sign in to edit this Profile.")}</h2>
             <p>
               {!ready
-                ? "Checking your Supabase session now."
+                ? ui("ui.app.edit.code.page.4e2bce183e1c", "Checking your Supabase session now.")
                 : forbidden
-                  ? message || "Only the profile owner can edit this profile."
-                  : message || "Sign in with the account that owns this QRguitar Profile."}
+                  ? message || ui("ui.app.edit.code.page.c2321cba55d7", "Only the profile owner can edit this profile.")
+                  : message || ui("ui.app.edit.code.page.4bfdf5db3c0d", "Sign in with the account that owns this QRguitar Profile.")}
             </p>
             {!ready ? null : forbidden ? (
-              <Link className="button" href="/dashboard">
-                Back to Dashboard
-              </Link>
+              <Link className="button" href="/dashboard">{ui("ui.app.edit.code.page.97ba1d394fab", "Back to Dashboard")}</Link>
             ) : (
-              <Link className="button" href={`/login?next=${encodeURIComponent(`/edit/${code}`)}`}>
-                Sign in
-              </Link>
+              <Link className="button" href={`/login?next=${encodeURIComponent(`/edit/${code}`)}`}>{ui("ui.app.edit.code.page.bfd402b2f6f3", "Sign in")}</Link>
             )}
           </section>
         </div>
@@ -1891,12 +1854,13 @@ export default function EditInstrumentPage() {
 }
 
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const ui = useUiText("app.edit.code.page");
   return (
     <div className="field color-field">
       <label>{label}</label>
       <div>
         <input type="color" value={value} onChange={(event) => onChange(event.target.value)} aria-label={label} />
-        <input value={value} onChange={(event) => onChange(event.target.value)} aria-label={`${label} hex value`} />
+        <input value={value} onChange={(event) => onChange(event.target.value)} aria-label={ui("ui.app.edit.code.page.14a999b1f8b0", "{{value1}} hex value", { value1: label })} />
       </div>
     </div>
   );
@@ -2097,6 +2061,7 @@ function CategoryField({
   options: string[];
   onChange: (value: string) => void;
 }) {
+  const ui = useUiText("app.edit.code.page");
   const cleanedValue = value.trim();
   const hasCustomValue = cleanedValue && !options.some((option) => option.toLowerCase() === cleanedValue.toLowerCase());
 
@@ -2104,7 +2069,7 @@ function CategoryField({
     <div className="field">
       <label htmlFor={id}>{label}</label>
       <select id={id} name={id} value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">Select category</option>
+        <option value="">{ui("ui.app.edit.code.page.e26788c57413", "Select category")}</option>
         {hasCustomValue ? <option value={cleanedValue}>{cleanedValue}</option> : null}
         {options.map((option) => (
           <option value={option} key={option}>

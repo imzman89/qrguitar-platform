@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import fs from "node:fs";
@@ -53,7 +54,7 @@ function runtime(http, overrides = {}) {
     }).outputText;
     const module = { exports: {} };
     cache.set(absolute, module);
-    const localRequire = (specifier) => {
+    const localRequire = withUiTextTestContext((specifier) => {
       if (specifier === "node:https") return https;
       if (specifier === "next/cache") return { unstable_noStore() {} };
       if (specifier.endsWith("/supabase-server") || specifier === "./supabase-server") {
@@ -65,7 +66,7 @@ function runtime(http, overrides = {}) {
         fs.existsSync(target + extension) || (overlay && fs.existsSync(path.join(overlay, path.relative(repo, target + extension)))))
         ?? "";
       return load(path.relative(repo, target + suffix).split(path.sep).join("/"));
-    };
+    });
     const wrapper = vm.runInNewContext("(function(require,module,exports){\n" + transpiled + "\n})", {
       URL, Buffer, Response, console, setTimeout, clearTimeout,
       process: { env: { NEXT_PUBLIC_SUPABASE_ANON_KEY: "mock-anon", SUPABASE_SERVICE_ROLE_KEY: "mock-service", NEXT_PUBLIC_SITE_URL: "https://www.qrguitar.com" } }

@@ -1,4 +1,6 @@
 ﻿"use client";
+import { useUiText } from "./UiTextProvider";
+
 
 import { Bot, Send, Tag, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -32,6 +34,7 @@ function enrichFollowUpQuestion(question: string, previousUserQuestion?: string)
 }
 
 export function QRGuitarBotPopup() {
+  const ui = useUiText("components.QRGuitarBotPopup");
   const pathname = usePathname();
   const hideOnRoute = pathname?.startsWith("/login") || pathname?.startsWith("/create") || pathname?.startsWith("/bot");
   const [isOpen, setIsOpen] = useState(false);
@@ -171,26 +174,26 @@ export function QRGuitarBotPopup() {
         aria-controls="qrguitar-bot-panel"
       >
         <Bot size={16} />
-        <span>QRguitar Bot</span>
+        <span>{ui("ui.components.QRGuitarBotPopup.bb8b9d85ff91", "QRguitar Bot")}</span>
       </button>
 
       {isOpen ? (
-        <section className="qrguitar-bot-panel" id="qrguitar-bot-panel" aria-label="QRguitar Bot panel">
+        <section className="qrguitar-bot-panel" id="qrguitar-bot-panel" aria-label={ui("ui.components.QRGuitarBotPopup.96c74b17d1a5", "QRguitar Bot panel")}>
           <header className="qrguitar-bot-header">
             <div>
-              <span>QRguitar Bot</span>
+              <span>{ui("ui.components.QRGuitarBotPopup.bb8b9d85ff91", "QRguitar Bot")}</span>
               <strong>
                 {instrument
-                  ? `${instrument.name || instrument.brand || "Instrument"}`
-                  : "The Guitar Expert and Assistant"}
+                  ? ui("ui.components.QRGuitarBotPopup.3f43a26121a6", "{{value1}}", { value1: instrument.name || instrument.brand || "Instrument" })
+                  : ui("ui.components.QRGuitarBotPopup.618a357c2013", "The Guitar Expert and Assistant")}
               </strong>
             </div>
-            <button type="button" className="bot-close" onClick={() => setIsOpen(false)} aria-label="Close bot">
+            <button type="button" className="bot-close" onClick={() => setIsOpen(false)} aria-label={ui("ui.components.QRGuitarBotPopup.6c0d836deacd", "Close bot")}>
               <X size={14} />
             </button>
           </header>
 
-          <div className="qrguitar-bot-quick-actions" role="group" aria-label="Quick actions">
+          <div className="qrguitar-bot-quick-actions" role="group" aria-label={ui("ui.components.QRGuitarBotPopup.1810407f5ab7", "Quick actions")}>
             {quickActionsForPopup.map(({ label, prompt }) => (
               <button
                 type="button"
@@ -211,14 +214,14 @@ export function QRGuitarBotPopup() {
           <div className="qrguitar-bot-chat-window" aria-live="polite" ref={chatWindowRef}>
             {messages.map((message, index) => (
               <article className={`qrguitar-chat-message ${message.role}`} key={`${message.role}-${index}`}>
-                <span>{message.role === "assistant" ? "QRguitar Bot" : "You"}</span>
+                <span>{message.role === "assistant" ? ui("ui.components.QRGuitarBotPopup.bb8b9d85ff91", "QRguitar Bot") : ui("ui.components.QRGuitarBotPopup.08b041935798", "You")}</span>
                 <p>{message.copy}</p>
               </article>
             ))}
             {isThinking ? (
               <article className="qrguitar-chat-message assistant is-thinking">
-                <span>QRguitar Bot</span>
-                <p>Working on it...</p>
+                <span>{ui("ui.components.QRGuitarBotPopup.bb8b9d85ff91", "QRguitar Bot")}</span>
+                <p>{ui("ui.components.QRGuitarBotPopup.47a853b9f140", "Working on it...")}</p>
               </article>
             ) : null}
           </div>
@@ -230,18 +233,18 @@ export function QRGuitarBotPopup() {
               void askBot();
             }}
           >
-            <label className="sr-only" htmlFor="qrguitar-bot-input">Ask QRguitar Bot</label>
+            <label className="sr-only" htmlFor="qrguitar-bot-input">{ui("ui.components.QRGuitarBotPopup.9b75d531cca3", "Ask QRguitar Bot")}</label>
             <input
               id="qrguitar-bot-input"
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder={instrument ? `Ask about ${instrument.brand || "this"} record...` : "Ask a guitar, serial, setup, price, or record question"}
+              placeholder={instrument ? ui("ui.components.QRGuitarBotPopup.533d3c40018a", "Ask about {{value1}} record...", { value1: instrument.brand || "this" }) : ui("ui.components.QRGuitarBotPopup.c45085ed2eb2", "Ask a guitar, serial, setup, price, or record question")}
               autoComplete="off"
               disabled={isThinking}
             />
               <button className="button bot-ask-button" type="submit" disabled={isThinking || !input.trim()}>
                 <Send size={14} />
-                <span>{isThinking ? "..." : "Ask"}</span>
+                <span>{isThinking ? "..." : ui("ui.components.QRGuitarBotPopup.b8c209cdead6", "Ask")}</span>
               </button>
             </form>
         </section>

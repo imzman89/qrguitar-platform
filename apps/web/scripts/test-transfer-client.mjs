@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -16,6 +17,7 @@ function visit(n) {
 }
 visit(ast);
 function compile(code, env, returned) {
+  env = { ui: withUiTextTestContext(() => { throw new Error("Unexpected module"); })("UiTextProvider").useUiText("app.transfer.id.page"), ...env };
   const js = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
   return new Function(...Object.keys(env), js + "\nreturn " + returned)(...Object.values(env));
 }

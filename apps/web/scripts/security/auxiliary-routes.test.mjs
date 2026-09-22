@@ -144,7 +144,7 @@ await test("public exact serial match remains discoverable",async()=>{
 await test("catalog offers the same ownership-claim path for every no-public-match result",async()=>{
   const source=fs.readFileSync(path.join(repo,"apps/web/app/catalog/CatalogClient.tsx"),"utf8");
   assert.match(source,/setShowOwnershipClaim\(payload\.match === "none"\)/);
-  assert.match(source,/showOwnershipClaim \? <Link className="button secondary" href="\/ownership-claim">Start ownership claim<\/Link>/);
+  assert.match(source,/showOwnershipClaim \? <Link className="button secondary" href="\/ownership-claim">\{ui\("ui\.app\.catalog\.CatalogClient\.[^"]+", "Start ownership claim"\)\}<\/Link>/);
   assert.doesNotMatch(source,/protectedSerialMatch|match\?: "public" \| "protected"/);
 });
 console.log(passes+" mocked auxiliary API tests passed.");

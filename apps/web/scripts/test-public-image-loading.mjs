@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -6,7 +7,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-const require = createRequire(import.meta.url);
+const require = withUiTextTestContext(createRequire(import.meta.url));
 const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
 const ts = require("typescript");
@@ -306,10 +307,25 @@ test("failed gallery sources are removed without mutating or reordering the rema
 });
 
 test("public Profile reserves LCP priority for visible full-size photos and defers every thumbnail", () => {
+  const imageWithKey = (source, key) => {
+    const ast = ts.createSourceFile("image.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    let found;
+    function visit(node) {
+      if ((ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) && node.tagName.getText(ast) === "img") {
+        const attributes = Object.fromEntries(node.attributes.properties.filter(ts.isJsxAttribute).map(attribute => [attribute.name.getText(ast), attribute.initializer?.getText(ast)]));
+        if (attributes.key === `{${key}}`) found = attributes;
+      }
+      ts.forEachChild(node, visit);
+    }
+    visit(ast); assert.ok(found, `Expected image keyed by ${key}`); return found;
+  };
+  const lead = imageWithKey(profile, "galleryImages[mediaIndex]");
+  for (const [name, expected] of Object.entries({ loading: '"eager"', fetchPriority: '"high"', width: '{1200}', height: '{900}', referrerPolicy: '"no-referrer"' })) assert.equal(lead[name], expected);
+  assert.match(lead.onError, /markGalleryImageFailed/);
+  const enlarged = imageWithKey(photoViewer, "activeSource");
+  for (const [name, expected] of Object.entries({ loading: '"eager"', fetchPriority: '"high"', width: '{1600}', height: '{1200}' })) assert.equal(enlarged[name], expected);
   assert.match(profile, /filterAvailableImageSources\(allGalleryImages, failedGalleryImages\)/);
-  assert.match(profile, /key=\{galleryImages\[mediaIndex\]\}[\s\S]{0,500}loading="eager"[\s\S]{0,120}fetchPriority="high"[\s\S]{0,160}width=\{1200\}[\s\S]{0,80}height=\{900\}[\s\S]{0,120}referrerPolicy="no-referrer"[\s\S]{0,150}markGalleryImageFailed/);
   assert.match(profile, /width=\{168\}[\s\S]{0,80}height=\{126\}[\s\S]{0,120}referrerPolicy="no-referrer"[\s\S]{0,140}markGalleryImageFailed\(imageUrl\)/);
-  assert.match(photoViewer, /key=\{activeSource\}[\s\S]{0,500}loading="eager"[\s\S]{0,120}fetchPriority="high"[\s\S]{0,160}width=\{1600\}[\s\S]{0,80}height=\{1200\}/);
   assert.match(photoViewer, /width=\{112\}[\s\S]{0,50}height=\{112\}[\s\S]{0,100}referrerPolicy="no-referrer"[\s\S]{0,100}markImageFailed\(imageUrl\)/);
   assert.ok(((profile + photoViewer).match(/loading="lazy"[\s\S]{0,100}fetchPriority="low"/g) || []).length >= 3);
   assert.match(profile, /image\.fetchPriority = "low";[\s\S]{0,80}image\.referrerPolicy = "no-referrer";/);

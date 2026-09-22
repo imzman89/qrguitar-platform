@@ -1,3 +1,4 @@
+import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -45,13 +46,13 @@ function fixture(options = {}) {
     const filename = [relative + ".ts", relative + ".tsx", relative].find((file) => fs.existsSync(path.join(repo, file)));
     const code = ts.transpileModule(fs.readFileSync(path.join(repo, filename), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
     const module = { exports: {} }; cache.set(relative, module);
-    const localRequire = (specifier) => {
+    const localRequire = withUiTextTestContext((specifier) => {
       if (specifier === "react") return hooks;
       if (specifier === "next/link") return ({ children, href, ...props }) => React.createElement("a", { href, ...props }, children);
       if (specifier === "next/navigation") return { notFound() { throw new Error("NOT_FOUND"); } };
       if (!specifier.startsWith(".")) return require(specifier);
       return load(path.posix.normalize(path.posix.join(path.posix.dirname(relative), specifier)));
-    };
+    });
     new Function("require", "module", "exports", code)(localRequire, module, module.exports);
     return module.exports;
   }

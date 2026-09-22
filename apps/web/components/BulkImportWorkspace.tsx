@@ -1,4 +1,6 @@
 "use client";
+import { useUiText } from "./UiTextProvider";
+
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -7,6 +9,7 @@ import { observeSessionIdentity } from "../lib/session-identity";
 import { BulkProfileImport } from "./BulkProfileImport";
 
 export function BulkImportWorkspace() {
+  const ui = useUiText("components.BulkImportWorkspace");
   // null is the initial check; an empty identity is signed out. Count transitions
   // so a batched A → signed-out/B → A still disposes A's earlier controller.
   const [identity, setIdentity] = useState<{ actorId: string | null; generation: number }>({ actorId: null, generation: 0 });
@@ -24,11 +27,11 @@ export function BulkImportWorkspace() {
   }, []);
 
   if (actorId === null) {
-    return <section className="auth-state-card" aria-live="polite"><span className="eyebrow">Bulk Import</span><h1>Opening your inventory workspace...</h1></section>;
+    return <section className="auth-state-card" aria-live="polite"><span className="eyebrow">{ui("ui.components.BulkImportWorkspace.01916f7252b9", "Bulk Import")}</span><h1>{ui("ui.components.BulkImportWorkspace.1c7215c1acc2", "Opening your inventory workspace...")}</h1></section>;
   }
 
   if (!actorId) {
-    return <section className="auth-state-card"><span className="eyebrow">Owner tools</span><h1>Sign in to import inventory.</h1><p>Bulk Import creates private QRguitar Profiles inside your owner workspace.</p><Link className="button" href="/login?next=/dashboard/import">Sign in</Link></section>;
+    return <section className="auth-state-card"><span className="eyebrow">{ui("ui.components.BulkImportWorkspace.832fd327544b", "Owner tools")}</span><h1>{ui("ui.components.BulkImportWorkspace.96812e83690f", "Sign in to import inventory.")}</h1><p>{ui("ui.components.BulkImportWorkspace.897a89da498c", "Bulk Import creates private QRguitar Profiles inside your owner workspace.")}</p><Link className="button" href="/login?next=/dashboard/import">{ui("ui.components.BulkImportWorkspace.bfd402b2f6f3", "Sign in")}</Link></section>;
   }
 
   return <BulkProfileImport key={`${actorId}:${identity.generation}`} />;
