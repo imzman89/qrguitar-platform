@@ -797,6 +797,17 @@ function TransferPanel({
         {transferStatus ? <strong>{transferStatus}</strong> : null}
       </summary>
       <div className={bodyClassName}>
+        <p className="field-note" role="status">
+          {!latestTransfer
+            ? ui("ui.app.dashboard.page.noHandoff", "No handoff started. Choose a method below when you are ready.")
+            : latestTransfer.status === "accepted"
+              ? ui("ui.app.dashboard.page.handoffCompleted", "Handoff completed. The next owner accepted the Profile.")
+              : latestTransfer.status === "cancelled"
+                ? ui("ui.app.dashboard.page.handoffCancelled", "Handoff cancelled. Start a new transfer if needed.")
+                : latestTransfer.handoffPrepared
+                  ? ui("ui.app.dashboard.page.buyerActionRequired", "Give the private buyer code to the recipient. You remain the owner until they accept.")
+                  : ui("ui.app.dashboard.page.recipientActionRequired", "Recipient action required. The next owner must sign in and accept the Profile. You remain the owner until then.")}
+        </p>
         <div className="transfer-copy">
           <span className="mini-eyebrow">{ui("ui.app.dashboard.page.5f74589ff706", "Ownership handoff")}</span>
           <strong>{handoffMode === "buyer_code" ? ui("ui.app.dashboard.page.5989eea16b52", "Prepare a private code for an in-person buyer.") : ui("ui.app.dashboard.page.a55829ebe2f6", "Email a claim link to the next owner.")}</strong>

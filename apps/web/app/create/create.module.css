@@ -69,6 +69,9 @@
 .successContent p { margin: 0; max-width: 65ch; color: var(--muted); font-size: .9375rem; line-height: 1.65; }
 .successContent :global(.create-success-id) { border: 0; padding: 20px; background: var(--surface); border-radius: 12px; }
 .successContent :global(.create-success-actions) { display: flex; flex-wrap: wrap; gap: 10px; }
+.moreSuccessActions { border-top: 1px solid var(--line); padding-top: 12px; }
+.moreSuccessActions summary { width: fit-content; min-height: 44px; padding: 11px 0; color: var(--muted); cursor: pointer; }
+.moreSuccessActions[open] :global(.create-success-actions) { margin-top: 12px; }
 @media(max-width: 1050px) { .header { flex-direction: column; gap: 18px; } .identity { max-width: none; min-width: 0; } .identity small { max-width: 70ch; } }
 @media(max-width: 600px) {
   .create { gap: 24px; } .form { gap: 32px; } .section { gap: 18px; }

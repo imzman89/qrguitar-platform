@@ -1,5 +1,10 @@
 // Stable site-authored presentation entries. Existing CMS keys remain unchanged.
 export const uiTextEntries: Array<{ key: string; scope: string; text: string; area: string; page: string; section: string; source: string }> = [
+  { key: "ui.app.dashboard.page.noHandoff", scope: "app.dashboard.page", text: "No handoff started. Choose a method below when you are ready.", area: "Product", page: "Dashboard", section: "Page text", source: "app/dashboard/page.tsx" },
+  { key: "ui.app.dashboard.page.handoffCompleted", scope: "app.dashboard.page", text: "Handoff completed. The next owner accepted the Profile.", area: "Product", page: "Dashboard", section: "Page text", source: "app/dashboard/page.tsx" },
+  { key: "ui.app.dashboard.page.handoffCancelled", scope: "app.dashboard.page", text: "Handoff cancelled. Start a new transfer if needed.", area: "Product", page: "Dashboard", section: "Page text", source: "app/dashboard/page.tsx" },
+  { key: "ui.app.dashboard.page.buyerActionRequired", scope: "app.dashboard.page", text: "Give the private buyer code to the recipient. You remain the owner until they accept.", area: "Product", page: "Dashboard", section: "Page text", source: "app/dashboard/page.tsx" },
+  { key: "ui.app.dashboard.page.recipientActionRequired", scope: "app.dashboard.page", text: "Recipient action required. The next owner must sign in and accept the Profile. You remain the owner until then.", area: "Product", page: "Dashboard", section: "Page text", source: "app/dashboard/page.tsx" },
   {
     "key": "ui.workspace.faae0c421967",
     "scope": "workspace",
@@ -11200,6 +11205,15 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.create.page.41a634bed373",
     "scope": "app.create.page",
     "text": "View Profile",
+    "page": "Create Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/create/page.tsx"
+  },
+  {
+    "key": "ui.app.create.page.moreAfterCreate",
+    "scope": "app.create.page",
+    "text": "Add more to this Profile",
     "page": "Create Profile",
     "area": "Product",
     "section": "Page text",

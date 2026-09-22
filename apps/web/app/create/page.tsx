@@ -571,12 +571,17 @@ export default function CreatePage() {
               <div className="create-success-id"><span>{ui("ui.app.create.page.a6c8f92c19f4", "QRguitar ID")}</span><strong>{createdCode}</strong></div>
               <div className="create-success-actions">
                 <Link className="button" href={ownerProfileHref({ qrCode: createdCode, visibility: form.visibility as "public" | "private" })}>{ui("ui.app.create.page.41a634bed373", "View Profile")}</Link>
-                <Link className="button secondary" href={`/edit/${createdCode}?section=timeline`}>{ui("ui.app.create.page.c36438fa50cf", "Add History")}</Link>
-                <Link className="button secondary" href={`/edit/${createdCode}?section=media`}>{ui("ui.app.create.page.a078fb55c65a", "Add Media")}</Link>
-                <Link className="button secondary" href={`/edit/${createdCode}?section=documents`}>{ui("ui.app.create.page.764f7a87c4b2", "Add Documents")}</Link>
                 <Link className="button secondary" href={`/handout/${createdCode}`}>{ui("ui.app.create.page.5ee3796350c7", "Open Print Suite")}</Link>
-                <Link className="button secondary" href="/dashboard">{ui("ui.app.create.page.97ba1d394fab", "Back to Dashboard")}</Link>
               </div>
+              <details className={styles.moreSuccessActions}>
+                <summary>{ui("ui.app.create.page.moreAfterCreate", "Add more to this Profile")}</summary>
+                <div className="create-success-actions">
+                  <Link className="button secondary" href={`/edit/${createdCode}?section=timeline`}>{ui("ui.app.create.page.c36438fa50cf", "Add History")}</Link>
+                  <Link className="button secondary" href={`/edit/${createdCode}?section=media`}>{ui("ui.app.create.page.a078fb55c65a", "Add Media")}</Link>
+                  <Link className="button secondary" href={`/edit/${createdCode}?section=documents`}>{ui("ui.app.create.page.764f7a87c4b2", "Add Documents")}</Link>
+                  <Link className="button secondary" href="/dashboard">{ui("ui.app.create.page.97ba1d394fab", "Back to Dashboard")}</Link>
+                </div>
+              </details>
             </section>
           </div>
         ) : (
