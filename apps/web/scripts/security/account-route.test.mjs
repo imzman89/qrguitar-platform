@@ -31,7 +31,7 @@ await test("exact count includes more than the REST row cap and excludes removed
   const response = await f.routes.GET(new Request("https://test.invalid/api/account"));
   assert.equal(response.status, 200);
   assert.match(response.headers.get("cache-control"), /no-store/);
-  assert.deepEqual((await response.json()).account.stats, { records: 3306, publicRecords: 1102, privateRecords: 1102, unlistedRecords: 1102, recordsWithPhotos: 1653 });
+  assert.deepEqual((await response.json()).account.stats, { records: 3306, publicRecords: 1102, privateRecords: 1102, unlistedRecords: 1102 });
   for (const query of f.db.calls.filter((item) => item.table === "guitars")) assert.deepEqual(JSON.parse(JSON.stringify(query.selectOptions)), { count: "exact", head: true });
 });
 for (const table of ["profiles", "site_content"]) await test(table + " read errors are not an empty/default account", async () => {
@@ -39,7 +39,7 @@ for (const table of ["profiles", "site_content"]) await test(table + " read erro
   const response = await f.routes.GET(new Request("https://test.invalid/api/account"));
   assert.equal(response.status, 503); assert.equal((await response.json()).account, undefined);
 });
-for (const failedIndex of [0, 1, 2, 3, 4]) await test("record count " + failedIndex + " read error is surfaced", async () => {
+for (const failedIndex of [0, 1, 2, 3]) await test("record count " + failedIndex + " read error is surfaced", async () => {
   let countIndex = 0;
   const f = fixture({ before(query) { if (query.table === "guitars" && countIndex++ === failedIndex) return { data: null, count: null, error: { message: "synthetic outage" } }; } });
   assert.equal((await f.routes.GET(new Request("https://test.invalid/api/account"))).status, 503);

@@ -34,7 +34,7 @@ const load = runtime();
 const { createAccountSettings, savedCollectionHref, accountReturnPath } = load("apps/web/lib/account-settings");
 const { defaultPublicCollectionSettings } = load("apps/web/lib/public-collections");
 const sessionFor = (id) => id ? { access_token: `token-${id}`, user: { id, email: `${id}@example.test` } } : null;
-const accountFor = (id) => ({ email: `${id}@example.test`, displayName: `Owner ${id}`, role: "owner", plan: "free", accountStatus: "active", settingsVersion: 0, publicCollection: { ...defaultPublicCollectionSettings, enabled: true, handle: `${id}-saved`, publicName: `Collection ${id}` }, stats: { records: 3, publicRecords: 1, privateRecords: 1, unlistedRecords: 1, recordsWithPhotos: 2 } });
+const accountFor = (id) => ({ email: `${id}@example.test`, displayName: `Owner ${id}`, role: "owner", plan: "free", accountStatus: "active", settingsVersion: 0, publicCollection: { ...defaultPublicCollectionSettings, enabled: true, handle: `${id}-saved`, publicName: `Collection ${id}` }, stats: { records: 3, publicRecords: 1, privateRecords: 1, unlistedRecords: 1 } });
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 async function until(predicate) { for (let index = 0; index < 100; index++) { if (predicate()) return; await new Promise((resolve) => setTimeout(resolve, 1)); } assert.ok(predicate(), "condition did not settle"); }

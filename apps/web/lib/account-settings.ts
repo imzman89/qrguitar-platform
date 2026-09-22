@@ -10,7 +10,7 @@ export type AccountAuth = {
 export type AccountSnapshot = {
   email: string; displayName: string; role: string; plan: string; accountStatus: string; settingsVersion: number;
   publicCollection: PublicCollectionSettings;
-  stats: { records: number; publicRecords: number; privateRecords: number; unlistedRecords: number; recordsWithPhotos: number };
+  stats: { records: number; publicRecords: number; privateRecords: number; unlistedRecords: number };
 };
 export type AccountDraft = { displayName: string; publicCollection: PublicCollectionSettings };
 export type AccountSettingsState = {
@@ -39,7 +39,7 @@ function readAccount(value: unknown, email: string): AccountSnapshot {
   const row = object(value), stats = object(row.stats);
   if (["email", "displayName", "role", "plan", "accountStatus"].some((key) => typeof row[key] !== "string") || String(row.email).toLowerCase() !== email.toLowerCase()
     || !Number.isSafeInteger(row.settingsVersion) || Number(row.settingsVersion) < 0
-    || ["records", "publicRecords", "privateRecords", "unlistedRecords", "recordsWithPhotos"].some((key) => !Number.isSafeInteger(stats[key]) || Number(stats[key]) < 0)) throw new Error("Could not confirm account details. Please reload your account.");
+    || ["records", "publicRecords", "privateRecords", "unlistedRecords"].some((key) => !Number.isSafeInteger(stats[key]) || Number(stats[key]) < 0)) throw new Error("Could not confirm account details. Please reload your account.");
   return { ...(row as AccountSnapshot), publicCollection: readCollection(row.publicCollection), stats: stats as AccountSnapshot["stats"] };
 }
 class StaleAccount extends Error {}

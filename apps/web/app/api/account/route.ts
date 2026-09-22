@@ -38,17 +38,17 @@ export async function GET(request: Request) {
     // version, which would otherwise permit a stale overwrite on the next save.
     const profile = await supabase.from("profiles").select("display_name,role,plan,account_status,account_settings_version").eq("id", auth.user.id)
       .maybeSingle<{ display_name?: string | null; role?: string | null; plan?: string | null; account_status?: string | null; account_settings_version?: number }>();
-    const [collection, total, publicCount, privateCount, unlistedCount, photos] = await Promise.all([
+    const [collection, total, publicCount, privateCount, unlistedCount] = await Promise.all([
       supabase.from("site_content").select("content_value").eq("content_key", publicCollectionOwnerKey(auth.user.id))
         .maybeSingle<{ content_value?: Partial<PublicCollectionSettings> }>(),
       records(), records().eq("visibility", "public"), records().eq("visibility", "private"),
-      records().eq("visibility", "unlisted"), records().not("hero_image_path", "is", null).neq("hero_image_path", "")
+      records().eq("visibility", "unlisted")
     ]);
     const current = await supabase.from("profiles").select("account_settings_version").eq("id", auth.user.id)
       .maybeSingle<{ account_settings_version?: number }>();
     const settingsVersion = profile.data ? profile.data.account_settings_version : 0;
     const currentVersion = current.data ? current.data.account_settings_version : 0;
-    const counts = [total, publicCount, privateCount, unlistedCount, photos];
+    const counts = [total, publicCount, privateCount, unlistedCount];
     if (profile.error || current.error || collection.error || !Number.isSafeInteger(settingsVersion) || Number(settingsVersion) < 0 || currentVersion !== settingsVersion
       || counts.some((result) => result.error || result.count == null || !Number.isSafeInteger(result.count))) {
       return json({ ok: false, message: "Could not load account. Please try again." }, { status: 503 });
@@ -63,7 +63,7 @@ export async function GET(request: Request) {
         settingsVersion,
         publicCollection: cleanPublicCollection(collection.data?.content_value || defaultPublicCollectionSettings),
         stats: { records: total.count, publicRecords: publicCount.count, privateRecords: privateCount.count,
-          unlistedRecords: unlistedCount.count, recordsWithPhotos: photos.count }
+          unlistedRecords: unlistedCount.count }
       }
     });
   } catch {

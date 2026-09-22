@@ -52,7 +52,7 @@ function AccountSettingsPage() {
   const role = state.account?.role || "";
   const plan = state.account?.plan || "";
   const accountStatus = state.account?.accountStatus || "";
-  const stats = state.account?.stats || { records: 0, publicRecords: 0, privateRecords: 0, unlistedRecords: 0, recordsWithPhotos: 0 };
+  const stats = state.account?.stats || { records: 0, publicRecords: 0, privateRecords: 0, unlistedRecords: 0 };
   const status = state.message;
   const isWorking = Boolean(state.busy);
   const publishedHref = savedCollectionHref(state.account);
