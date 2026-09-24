@@ -90,7 +90,7 @@ const coreContentRegistry: ContentRegistryEntry[] = [
   field("home.hero.primaryCta", "Marketing", "Homepage", "Hero", "Primary action", "Create a Profile", { maxLength: 40, previewPath: "/" }),
   field("home.hero.secondaryCta", "Marketing", "Homepage", "Hero", "Secondary action", "Explore the Catalog", { maxLength: 50, previewPath: "/" }),
   field("home.hero.viewProfile", "Marketing", "Homepage", "Hero", "Real Profile action", "View a real Profile", { maxLength: 50, previewPath: "/" }),
-  field("home.hero.accessNote", "Marketing", "Homepage", "Hero", "Access note", "25 free Profiles · No subscription", { maxLength: 100, previewPath: "/" }),
+  field("home.hero.accessNote", "Marketing", "Homepage", "Hero", "Access note", "5 free Profiles · No subscription", { maxLength: 100, previewPath: "/" }),
   field("home.lifecycle.eyebrow", "Marketing", "Homepage", "How it works", "Eyebrow", "HOW IT WORKS", { maxLength: 60, previewPath: "/" }),
   field("home.lifecycle.headline", "Marketing", "Homepage", "How it works", "Section headline", "Create it once. Keep it current.", { maxLength: 130, previewPath: "/" }),
   field("home.lifecycle.body", "Marketing", "Homepage", "How it works", "Section body", "Start with the instrument. Add the history as it happens.", { maxLength: 320, previewPath: "/" }),
@@ -101,9 +101,9 @@ const coreContentRegistry: ContentRegistryEntry[] = [
   field("home.roles.eyebrow", "Marketing", "Homepage", "Who uses QRguitar", "Eyebrow", "WHO USES QRGUITAR", { maxLength: 60, previewPath: "/" }),
   field("home.roles.headline", "Marketing", "Homepage", "Who uses QRguitar", "Headline", "One system. Different jobs.", { maxLength: 100, previewPath: "/" }),
   field("home.roles.body", "Marketing", "Homepage", "Who uses QRguitar", "Optional body", "", { maxLength: 220, required: false, previewPath: "/" }),
-  field("home.pricing.eyebrow", "Marketing", "Homepage", "Public beta", "Eyebrow", "PUBLIC BETA", { maxLength: 60, previewPath: "/" }),
-  field("home.pricing.headline", "Marketing", "Homepage", "Public beta", "Pricing headline", "Start free. Get help when you need it.", { maxLength: 100, previewPath: "/" }),
-  field("home.pricing.body", "Marketing", "Homepage", "Public beta", "Optional body", "", { maxLength: 260, required: false, previewPath: "/" }),
+  field("home.pricing.eyebrow", "Marketing", "Homepage", "Access", "Eyebrow", "PROFILE ACCESS", { maxLength: 60, previewPath: "/" }),
+  field("home.pricing.headline", "Marketing", "Homepage", "Access", "Pricing headline", "Start free. Get help when you need it.", { maxLength: 100, previewPath: "/" }),
+  field("home.pricing.body", "Marketing", "Homepage", "Access", "Optional body", "", { maxLength: 260, required: false, previewPath: "/" }),
   field("home.pricing.creditsTitle", "Marketing", "Homepage", "Access", "Additional credits heading", "More room, when you need it.", { maxLength: 100, previewPath: "/#pricing" }),
   field("home.pricing.creditsBody", "Marketing", "Homepage", "Access", "Additional credits explanation", "Additional permanent Profile credits are available separately from assisted setup services. Ownership transfers are free.", { maxLength: 320, previewPath: "/#pricing" }),
   field("home.pricing.creditsCta", "Marketing", "Homepage", "Access", "Additional credits action", "View Profile credits", { maxLength: 50, previewPath: "/#pricing" }),
@@ -223,7 +223,7 @@ const coreContentRegistry: ContentRegistryEntry[] = [
 ];
 
 const completionRegistry: ContentRegistryEntry[] = [
-  field("global.announcement.text", "Global", "Announcement", "Banner", "Announcement text", "Free QRguitar Profiles are available during public beta.", { maxLength: 160, previewPath: "/" }),
+  field("global.announcement.text", "Global", "Announcement", "Banner", "Announcement text", "Start with five free QRguitar Profiles.", { maxLength: 160, previewPath: "/" }),
   field("global.announcement.cta", "Global", "Announcement", "Banner", "Action label", "Learn how it works", { maxLength: 40, previewPath: "/how-it-works" }),
   field("global.shared.loadingBody", "Global", "Shared CTAs and states", "Loading", "Loading message", "Loading QRguitar…", { maxLength: 90 }),
   field("global.shared.successBody", "Global", "Shared CTAs and states", "Success", "Success message", "Your changes were saved.", { maxLength: 120 }),
@@ -236,9 +236,9 @@ const completionRegistry: ContentRegistryEntry[] = [
   field("home.lifecycle.step2.body", "Marketing", "Homepage", "How it works", "Step two body", "Service, documents, media, safety, and ownership history.", { maxLength: 180, previewPath: "/" }),
   field("home.lifecycle.step3.title", "Marketing", "Homepage", "How it works", "Step three title", "Carry Forward", { maxLength: 70, previewPath: "/" }),
   field("home.lifecycle.step3.body", "Marketing", "Homepage", "How it works", "Step three body", "Transfer the same Profile when the instrument changes hands.", { maxLength: 180, previewPath: "/" }),
-  field("pricing.beta.title", "Marketing", "Pricing", "Public beta", "Plan title", "For owners and collectors", { maxLength: 70, previewPath: "/" }),
-  field("pricing.beta.price", "Marketing", "Pricing", "Public beta", "Price", "$0 during public beta", { maxLength: 30, previewPath: "/" }),
-  field("pricing.beta.body", "Marketing", "Pricing", "Public beta", "Description", "Create up to 25 Profiles with photos, specifications, privacy controls, history, and downloadable QR codes.", { maxLength: 220, previewPath: "/" }),
+  field("pricing.beta.title", "Marketing", "Pricing", "Access", "Plan title", "For owners and collectors", { maxLength: 70, previewPath: "/" }),
+  field("pricing.beta.price", "Marketing", "Pricing", "Access", "Price", "Free", { maxLength: 30, previewPath: "/" }),
+  field("pricing.beta.body", "Marketing", "Pricing", "Access", "Description", "Create up to 5 Profiles with photos, specifications, privacy controls, history, and downloadable QR codes.", { maxLength: 220, previewPath: "/" }),
   field("pricing.commercial.title", "Marketing", "Pricing", "Commercial", "Plan title", "For shops, builders & brands", { maxLength: 80, previewPath: "/" }),
   field("pricing.commercial.price", "Marketing", "Pricing", "Commercial", "Price", "From $99", { maxLength: 30, previewPath: "/" }),
   field("pricing.commercial.body", "Marketing", "Pricing", "Commercial", "Description", "Need help with bulk setup, QR hardware, verification, or a commercial rollout? We'll help you get started.", { maxLength: 240, previewPath: "/" }),
@@ -401,19 +401,19 @@ const completionRegistry: ContentRegistryEntry[] = [
   field("privacy.sections.payments.heading", "Support & Legal", "Privacy", "Payments", "Heading", "Payments", { maxLength: 100, previewPath: "/privacy" }),
   field("privacy.sections.payments.body", "Support & Legal", "Privacy", "Payments", "Body", "PayPal processes checkout payment details under its own privacy statement. QRguitar does not receive or store card numbers or Apple Pay tokens. QRguitar keeps the account, order, pack, amount, provider transaction identifiers, payment status, and review history needed to add Profile credits, recover interrupted payments, prevent duplicate fulfillment, and handle refunds or disputes.", { maxLength: 700, previewPath: "/privacy" }),
   field("privacy.finalNote", "Support & Legal", "Privacy", "Safety", "Final note", "Do not upload passwords, payment-card numbers, private reset links, unrelated personal documents, or files you do not have the right to store.", { maxLength: 360, previewPath: "/privacy" }),
-  field("terms.hero.intro", "Support & Legal", "Terms", "Header", "Introduction", "QRguitar is currently in public beta. These terms explain the basic rules for creating, managing, sharing, and transferring QRguitar Profiles.", { maxLength: 500, previewPath: "/terms" }),
+  field("terms.hero.intro", "Support & Legal", "Terms", "Header", "Introduction", "These terms explain the basic rules for creating, managing, sharing, and transferring QRguitar Profiles.", { maxLength: 500, previewPath: "/terms" }),
   field("terms.sections.content.heading", "Support & Legal", "Terms", "Content", "Heading", "Your content", { maxLength: 100, previewPath: "/terms" }),
   field("terms.sections.content.body", "Support & Legal", "Terms", "Content", "Body", "Keep account access secure and provide accurate Serial Number and instrument information. Upload only media and documents you are authorized to use. You keep responsibility for the content you add.", { maxLength: 700, previewPath: "/terms" }),
   field("terms.sections.ids.heading", "Support & Legal", "Terms", "Identity", "Heading", "QRguitar IDs and Profile URLs", { maxLength: 100, previewPath: "/terms" }),
   field("terms.sections.ids.body", "Support & Legal", "Terms", "Identity", "Body", "QRguitar IDs and Profile URLs are designed to remain associated with the instrument as Profile details change. Availability can still depend on third-party networks, browsers, storage, and hosting services.", { maxLength: 700, previewPath: "/terms" }),
   field("terms.sections.verification.heading", "Support & Legal", "Terms", "Verification", "Heading", "Verification and authenticity", { maxLength: 100, previewPath: "/terms" }),
-  field("terms.sections.verification.body", "Support & Legal", "Terms", "Verification", "Body", "Verification and authenticity review reflect the evidence available at the time. They are not an appraisal, insurance guarantee, guarantee of condition, or guarantee against undisclosed changes.", { maxLength: 700, previewPath: "/terms" }),
+  field("terms.sections.verification.body", "Support & Legal", "Terms", "Verification", "Body", "QRguitar may verify a Profile after reviewing its details at no charge. Authenticity confirmation is a separate paid staff review; it is never automatic with a free Profile. Both reflect only the evidence available at the time and are not an appraisal, insurance guarantee, guarantee of condition, or guarantee against undisclosed changes.", { maxLength: 700, previewPath: "/terms" }),
   field("terms.sections.ownership.heading", "Support & Legal", "Terms", "Safety and ownership", "Heading", "Safety and ownership", { maxLength: 100, previewPath: "/terms" }),
   field("terms.sections.ownership.body", "Support & Legal", "Terms", "Safety and ownership", "Body", "Lost or stolen reports must be truthful. Ownership transfers and claims must be submitted by authorized people. QRguitar tools do not replace legal title, receipts, or independent due diligence. Abuse, fraud, impersonation, or infringing uploads may result in account restrictions.", { maxLength: 700, previewPath: "/terms" }),
-  field("terms.sections.beta.heading", "Support & Legal", "Terms", "Beta", "Heading", "Beta and paid services", { maxLength: 100, previewPath: "/terms" }),
-  field("terms.sections.beta.body", "Support & Legal", "Terms", "Beta", "Body", "QRguitar is in public beta. Features, limits, and paid services may change. No checkout or payment flow is live unless it is clearly presented inside the product when you use it.", { maxLength: 700, previewPath: "/terms" }),
+  field("terms.sections.beta.heading", "Support & Legal", "Terms", "Access", "Heading", "Access and paid services", { maxLength: 100, previewPath: "/terms" }),
+  field("terms.sections.beta.body", "Support & Legal", "Terms", "Access", "Body", "Features, limits, and paid services may change. No checkout or payment flow is live unless it is clearly presented inside the product when you use it.", { maxLength: 700, previewPath: "/terms" }),
   field("terms.sections.payments.heading", "Support & Legal", "Terms", "Payments", "Heading", "Profile credits and payments", { maxLength: 100, previewPath: "/terms" }),
-  field("terms.sections.payments.body", "Support & Legal", "Terms", "Payments", "Body", "Ordinary accounts include 25 free owned Profiles. Any additional Profile-credit pack shown at checkout is a one-time purchase in U.S. dollars, not a subscription. Unused purchased credits do not expire and Profile transfers are free. PayPal processes the payment. A refund, reversal, or dispute may place related paid credits under review; contact support for payment help and any refund request.", { maxLength: 700, previewPath: "/terms" }),
+  field("terms.sections.payments.body", "Support & Legal", "Terms", "Payments", "Body", "Ordinary accounts include 5 free owned Profiles. Any additional Profile-credit pack shown at checkout is a one-time purchase in U.S. dollars, not a subscription. Unused purchased credits do not expire and Profile transfers are free. PayPal processes the payment. A refund, reversal, or dispute may place related paid credits under review; contact support for payment help and any refund request.", { maxLength: 700, previewPath: "/terms" }),
   field("terms.sections.support.heading", "Support & Legal", "Terms", "Support", "Heading", "Support", { maxLength: 100, previewPath: "/terms" }),
   field("terms.sections.support.body", "Support & Legal", "Terms", "Support", "Body", "Questions about these terms can be sent to support@qrguitar.com.", { maxLength: 300, previewPath: "/terms" })
 ];
@@ -553,13 +553,27 @@ const legacyContentDefaults: Record<string, string[]> = {
   "home.hero.body": ["Create a permanent QRguitar Profile with photos, specifications, service history, ownership records, and a QR code that stays with the instrument."],
   "home.hero.primaryCta": ["Create Profile"],
   "home.hero.secondaryCta": ["Browse QRguitar Profiles"],
+  "home.pricing.eyebrow": ["PUBLIC BETA"],
+  "pricing.beta.price": ["$0 during public beta"],
+  "pricing.beta.body": ["Create up to 25 Profiles during public beta without a hard paywall."],
+  "global.announcement.text": ["Free QRguitar Profiles are available during public beta."],
+  "terms.hero.intro": ["QRguitar is currently in public beta. These terms explain the basic rules for creating, managing, sharing, and transferring QRguitar Profiles."],
+  "terms.sections.verification.body": ["Verification and authenticity review reflect the evidence available at the time. They are not an appraisal, insurance guarantee, guarantee of condition, or guarantee against undisclosed changes."],
+  "terms.sections.beta.heading": ["Beta and paid services"],
+  "terms.sections.beta.body": ["QRguitar is in public beta. Features, limits, and paid services may change. No checkout or payment flow is live unless it is clearly presented inside the product when you use it."],
+  "ui.app.edit.code.page.d7b92d4468d9": ["Verified Profiles are available with paid QRguitar verification. Paid verification is handled manually during beta."],
+  "ui.app.edit.code.page.9572b2a7a2c2": ["Authenticity confirmation is available as a paid review feature. Paid verification and authenticity review are handled manually during beta."],
+  "ui.app.edit.code.page.61008da8ad24": ["/10 files. Private documents can support QRguitar verification and authenticity review during beta."],
+  "ui.app.i.code.ProfileClient.2fb69e84e91b": ["Ownership tools are in beta"],
+  "ui.app.installers.page.f6d3c70532d2": ["Applications are reviewed manually during beta. QRguitar connects approved shops and owners manually, and applying never publishes your business automatically."],
+  "ui.app.account.page.e16273f1c0f6": ["Required account and ownership notices cannot be disabled during public beta."],
   "home.roles.body": ["Choose the view that matches how you work with instruments."],
   "home.lifecycle.headline": ["Start with the instrument. Build the history over time."],
   "home.lifecycle.body": ["Add the facts you know today, then keep photos, service, documents, and ownership connected as the instrument changes hands."],
   "home.pricing.headline": ["Free Profiles during public beta."],
   "home.pricing.body": [
     "Create and maintain QRguitar Profiles without a hard paywall while the registry grows. Paid help is available separately.",
-    "Create Profiles during public beta, or ask QRguitar for hands-on commercial setup."
+    "Start with five free Profiles, or ask QRguitar for hands-on commercial setup."
   ],
   "home.finalCta.headline": ["Give the next instrument a permanent place to live."],
   "home.finalCta.body": ["Create a Profile in minutes and keep improving it for years."],
@@ -638,6 +652,14 @@ export const contentAreas: ContentArea[] = [
   "SEO"
 ];
 
+function isPreviousFreeAllowanceDefault(entry: ContentRegistryEntry, value: string) {
+  // Only migrate an exact old default. Distinct editorial overrides remain editable.
+  const previous = entry.defaultValue
+    .replace(/\b5 free (?=(?:owned )?Profiles\b)/gi, "25 free ")
+    .replace(/\bup to 5(?= (?:owned )?Profiles\b)/gi, "up to 25")
+    .replace(/\bfirst 5(?= (?:owned )?Profiles\b)/gi, "first 25");
+  return previous !== entry.defaultValue && value === previous;
+}
 export function mergeContentValues(value?: Record<string, unknown> | null) {
   const merged = { ...defaultContentValues };
   for (const entry of contentRegistry) {
@@ -645,7 +667,7 @@ export function mergeContentValues(value?: Record<string, unknown> | null) {
     if (typeof candidate !== "string") continue;
     const clean = candidate.replace(/\u0000/g, "").slice(0, entry.maxLength);
     if (entry.required && !clean.trim()) continue;
-    merged[entry.key] = legacyContentDefaults[entry.key]?.includes(clean) ? entry.defaultValue : clean;
+    merged[entry.key] = legacyContentDefaults[entry.key]?.includes(clean) || isPreviousFreeAllowanceDefault(entry, clean) ? entry.defaultValue : clean;
   }
   return merged;
 }
@@ -713,7 +735,7 @@ export function getContentValue(values: Record<string, string> | undefined, key:
   if (typeof value !== "string") return entry?.defaultValue ?? "";
 
   const clean = value.replace(/\u0000/g, "").slice(0, entry?.maxLength || value.length);
-  return legacyContentDefaults[key]?.includes(clean.trim()) ? entry?.defaultValue ?? clean : clean;
+  return entry && (legacyContentDefaults[key]?.includes(clean.trim()) || isPreviousFreeAllowanceDefault(entry, clean.trim())) ? entry.defaultValue : clean;
 }
 
 export function contentPagesForArea(area: ContentArea) {

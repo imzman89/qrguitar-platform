@@ -292,8 +292,9 @@ function PricingCard({
   href?: string;
 }) {
   const normalizedName = name.trim().toLowerCase();
-  const resolvedCta = cta || (normalizedName === "free public beta" ? "Create Free Profile" : "Contact QRguitar");
-  const resolvedHref = href || (normalizedName === "free public beta"
+  const freePlan = primary || normalizedName === "for owners and collectors" || normalizedName === "free public beta";
+  const resolvedCta = cta || (freePlan ? "Create a Profile" : "Contact QRguitar");
+  const resolvedHref = href || (freePlan
       ? "/create"
       : `mailto:support@qrguitar.com?subject=${encodeURIComponent(`QRguitar ${name}`)}`);
 

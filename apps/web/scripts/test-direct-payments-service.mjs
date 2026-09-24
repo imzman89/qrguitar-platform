@@ -87,8 +87,8 @@ try {
     assert.equal(profileBillingEnvironment({ QRGUITAR_BILLING_ENVIRONMENT: 'test', QRGUITAR_BILLING_TEST_DATABASE_URL: url }, url), 'test');
     assert.equal(profileBillingEnvironment({ QRGUITAR_BILLING_ENVIRONMENT: 'live', STRIPE_ENVIRONMENT: 'test' }, url), null);
   });
-  await check('current database balance exposes twenty-five free Profiles', async () => {
-    const value = await service.status(OWNER); assert.equal(value.freeLimit, 25); assert.equal(value.freeRemaining, 25); assert.equal(value.offers.length, 3);
+  await check('current database balance exposes five free Profiles', async () => {
+    const value = await service.status(OWNER); assert.equal(value.freeLimit, 5); assert.equal(value.freeRemaining, 5); assert.equal(value.offers.length, 3);
   });
   await check('tampered amount and client-supplied receiving identity are rejected', async () => {
     for (const field of ['amount', 'recipient', 'ownerId', 'environment']) await rejects(service.checkout(OWNER, { offerKey: 'profile_10', method: 'venmo', requestId: randomUUID(), [field]: 1 }), 'invalid_payment');

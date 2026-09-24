@@ -42,9 +42,9 @@ const entries: KnowledgeEntry[] = [
     topic: "pricing",
     triggers: ["cost", "price", "pricing", "plan", "free", "beta", "paid help"],
     answer:
-      "QRguitar includes 25 free owned Profiles with photos, specs, documents, visibility settings, and QR downloads. Additional permanent Profile credits are US$12 for 1, US$50 for 10, or US$99 for 25 when purchases are available. Unused purchased credits never expire. Ownership transfers are free. Existing Profiles stay available when the free allowance changes; only a new Profile beyond the allowance needs a credit. A payment does not grant verification or business privileges. Check Profile credits in your account for the current payment options, or contact support for commercial setup.",
+      "QRguitar includes 5 free owned Profiles with photos, specs, documents, visibility settings, and QR downloads. Additional permanent Profile credits are US$12 for 1, US$50 for 10, or US$99 for 25 when purchases are available. Unused purchased credits never expire. Ownership transfers are free. Existing Profiles stay available when the free allowance changes; only a new Profile beyond the allowance needs a credit. A payment does not grant verification or business privileges. Check Profile credits in your account for the current payment options, or contact support for commercial setup.",
     evidence: ["QRguitar launch pricing model"],
-    nextSteps: ["Create a free beta record to test the system.", "Email support@qrguitar.com for commercial setup, verification help, QR installs, hardware, or builder/shop onboarding."]
+    nextSteps: ["Create a free Profile to get started.", "Email support@qrguitar.com for commercial setup, verification help, QR installs, hardware, or builder/shop onboarding."]
   },
   {
     topic: "create",
@@ -132,7 +132,7 @@ const entries: KnowledgeEntry[] = [
     answer:
       "Cranston Guitars is part of the QRguitar world as a local shop context in Cranston, Rhode Island. For shop-specific help, contact support@qrguitar.com or use the profile/shop links when they are available.",
     evidence: ["QRguitar local shop context"],
-    nextSteps: ["Use QRguitar Profiles for shop inventory, service notes, and owner-transfer support while the tools are in beta.", `Email ${supportEmail} for direct support.`]
+    nextSteps: ["Use QRguitar Profiles for shop inventory, service notes, and owner-transfer support.", `Email ${supportEmail} for direct support.`]
   },
   {
     topic: "proper-passive",

@@ -1,6 +1,6 @@
 # QRguitar release candidate — September 2026
 
-This candidate improves the existing Next.js/Vercel/Supabase application. It is a public-beta web application with an installable web experience. Paid Checkout and native App Store releases are not active.
+This candidate improves the existing Next.js/Vercel/Supabase application. It includes an installable web experience. Native App Store releases are not active. Check configured payment providers before claiming checkout availability.
 
 ## Release prerequisites
 
@@ -191,7 +191,7 @@ The PGlite tests execute real PostgreSQL routines, constraints and rollback beha
 
 ## Product and operational limits
 
-The public offer remains up to 25 beta Profiles. Stored business/enterprise access and explicit launch allowlists retain their existing exception. Purchase labels do not grant verification. No credits are consumed while payment processing is inactive.
+The public offer includes five free owned Profiles. Stored business/enterprise access and explicit launch allowlists retain their existing exception. Profile verification may be performed manually at no charge; authenticity confirmation is a separate paid staff review. Purchase labels do not grant either status. No credits are consumed while payment processing is inactive.
 
 Stripe requires a finalized commercial entitlement contract, provider access, hosted Checkout/Portal, verified idempotent webhook fulfillment, transactional allowances and refund/reconciliation rules before activation. Price labels or success redirects alone must never grant paid access.
 
@@ -204,3 +204,14 @@ Site Editor receipts intentionally remain durable for uncertain retries. Private
 No code review or test suite guarantees a financial valuation or proves the absence of every defect.
 
 Deployment references: [Vercel staged production deployments](https://vercel.com/docs/cli/deploying-from-cli), [Vercel curl protection handling](https://vercel.com/docs/cli/curl), and [promotion](https://vercel.com/docs/cli/promote). CLI argument syntax was also checked against installed 59.15.1 help.
+
+## Five-free policy cutover (September 23)
+
+The current production database reports readiness `2026-09-17.13`. This policy change requires the exact `20260923120000_five_free_profiles.sql` and `20260923121000_release_readiness.sql` migrations before promoting an application that expects `2026-09-23.1`. It does not rewrite existing Profiles or paid-credit history. The paid 25-credit purchase pack remains a separate product.
+
+1. Stage the committed application with `npm run push:live -- --stage-only`; record the existing live deployment and its aliases first. The staged candidate may show an unhealthy readiness response until the coordinated database cutover.
+2. Check the published database still reports `.13`, inspect any in-flight checkout/create operations, and quiesce writes during cutover. Confirm the two reviewed migration files are the only schema changes. Apply them as one atomic transaction, removing only their outer `begin`/`commit` wrappers when combining them. Require `qrguitar_release_readiness()` to return `.1` and all 14 checks true before resuming writes.
+3. Run `npm run release:database` and `npm run push:live -- --promote-staged`. This promotes the exact staged SHA only after the backend and staged deployment probes pass. Verify the public offer, Terms, account balance and a read-only existing Profile. Do not create production test records or charge a customer for verification.
+4. If cutover fails before commit, the transaction rolls back to `.13`; leave the old deployment serving and investigate. After commit, never promote the old application against the new allowance without restoring the old database functions and `.13` readiness. The guarded `20260919100000_twenty_five_free_profiles.sql` can reverse the function change only while there are no paid-credit consumptions; apply the previous `.13` readiness contract in the same coordinated rollback. If that precondition is false, fix forward instead of silently restoring the old allowance.
+
+Saved Content Studio text from the previous offer is mapped for known old defaults and allowance phrases. The paid 25-credit pack is excluded from those allowance replacements. The editor remains available for custom copy; a later editorial publish can persist the new wording without a direct database content edit.

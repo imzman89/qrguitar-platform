@@ -909,7 +909,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
             <div>
               {actionNotice === "transfer" ? (
                 <>
-                  <span className={styles["scan-action-icon"]}><Share2 size={16} />{" "}{ui("ui.app.i.code.ProfileClient.2fb69e84e91b", "Ownership tools are in beta")}</span>
+                  <span className={styles["scan-action-icon"]}><Share2 size={16} />{" "}{ui("ui.app.i.code.ProfileClient.2fb69e84e91b", "Ownership tools")}</span>
                   <p>{ui("ui.app.i.code.ProfileClient.498bfd464638", "Contact support@qrguitar.com if you need help with an ownership change.")}</p>
                 </>
               ) : null}

@@ -12,8 +12,8 @@ const module = { exports: {} };
 new Function("exports", "module", ts.transpileModule(fs.readFileSync(path.join(web, "lib/billing-client.ts"), "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText)(module.exports, module);
 const { createBillingClient, billingCheckoutUrl, billingOrderId } = module.exports;
 const ID = "11111111-1111-4111-8111-111111111111", ID2 = "22222222-2222-4222-8222-222222222222", ORDER = "33333333-3333-4333-8333-333333333333", OTHER = "44444444-4444-4444-8444-444444444444";
-const offers = [{ key: "profile_1", amount: 1200, credits: 1 }, { key: "profile_10", amount: 5000, credits: 10 }, { key: "profile_25", amount: 9900, credits: 25 }].map(row => ({ ...row, version: 1, currency: "usd", permanent: true, freeAllowance: 25 }));
-const snapshot = (patch = {}) => ({ environment: "live", freeLimit: 25, freeRemaining: 23, paidGranted: 10, paidConsumed: 2, paidRemaining: 8, paidAvailable: 8, hold: false, commercialExempt: false, ownedProfiles: 2, unresolvedOrder: null, order: null, ...patch });
+const offers = [{ key: "profile_1", amount: 1200, credits: 1 }, { key: "profile_10", amount: 5000, credits: 10 }, { key: "profile_25", amount: 9900, credits: 25 }].map(row => ({ ...row, version: 1, currency: "usd", permanent: true, freeAllowance: 5 }));
+const snapshot = (patch = {}) => ({ environment: "live", freeLimit: 5, freeRemaining: 3, paidGranted: 10, paidConsumed: 2, paidRemaining: 8, paidAvailable: 8, hold: false, commercialExempt: false, ownedProfiles: 2, unresolvedOrder: null, order: null, ...patch });
 const session = id => id ? { access_token: `token-${id}`, user: { id } } : null;
 const json = value => Response.json({ ok: true, ...value });
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
@@ -60,7 +60,7 @@ test("invalid ledger arithmetic fails closed rather than displaying credits", as
   const f = fixture(t, { status: snapshot({ paidAvailable: 9 }) }); await f.ready(); assert.equal(f.client.getState().phase, "error"); assert.equal(f.client.getState().snapshot, null); await f.client.checkout("profile_1"); assert.equal(f.posts().length, 0);
 });
 test("hold preserves free balance and disables all purchases", async t => {
-  const f = fixture(t, { status: snapshot({ hold: true, paidAvailable: 0 }) }); await f.ready(); await f.client.checkout("profile_1"); assert.equal(f.client.getState().snapshot.freeRemaining, 23); assert.equal(f.posts().length, 0);
+  const f = fixture(t, { status: snapshot({ hold: true, paidAvailable: 0 }) }); await f.ready(); await f.client.checkout("profile_1"); assert.equal(f.client.getState().snapshot.freeRemaining, 3); assert.equal(f.posts().length, 0);
 });
 test("commercial exemption avoids an unnecessary purchase", async t => {
   const f = fixture(t, { status: snapshot({ commercialExempt: true }) }); await f.ready(); await f.client.checkout("profile_1"); assert.equal(f.posts().length, 0);
@@ -150,7 +150,7 @@ test("dispose cancels polling, auth subscription, and late publication", async t
 test("prototype properties cannot masquerade as offers or persisted intents", async t => {
   for (const key of ["__proto__", "constructor", "toString"]) {
     const stored = new Map([["qrguitar:billing-intent:a", JSON.stringify({ requestId: ID, offerKey: key, orderId: "" })]]);
-    const f = fixture(t, { stored, offers: [{ key, version: 1, currency: "usd", permanent: true, freeAllowance: 25 }] });
+    const f = fixture(t, { stored, offers: [{ key, version: 1, currency: "usd", permanent: true, freeAllowance: 5 }] });
     await f.ready(); assert.equal(f.client.getState().intent, null); assert.equal(f.client.getState().offers.length, 0); await f.client.checkout(key); assert.equal(f.posts().length, 0);
   }
 });

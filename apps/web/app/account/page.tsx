@@ -259,7 +259,7 @@ function AccountSettingsPage() {
                 <div><span>{ui("ui.app.account.page.1efeceaedae0", "Delivery email")}</span><strong>{email}</strong></div>
                 <div><span>{ui("ui.app.account.page.c9aae06952ae", "Required notices")}</span><strong>{ui("ui.app.account.page.92c1cdfdf4cb", "Enabled")}</strong></div>
               </div>
-              <p className="field-note">{ui("ui.app.account.page.e16273f1c0f6", "Required account and ownership notices cannot be disabled during public beta.")}</p>
+              <p className="field-note">{ui("ui.app.account.page.e16273f1c0f6", "Required account and ownership notices stay visible.")}</p>
             </section> : null}
 
             {activeSection === "provider" ? <section className={styles.panel}>

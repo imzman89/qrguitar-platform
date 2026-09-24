@@ -14,7 +14,7 @@ activate purchases, create a Stripe account, or charge a customer.
 
 The approved packs are one-time USD purchases: 1 credit for $12, 10 for $50, and
 25 for $99. Unused purchased credits do not expire. Each successful new Profile
-uses one credit when the owner's 25 free owned-Profile allowance is full.
+uses one credit when the owner's 5 free owned-Profile allowance is full.
 Transfers are free and do not restore a previously consumed credit. Failed or
 replayed creates consume no extra credits. The existing protected business and
 enterprise plan exceptions remain; choosing a workspace type does not grant an

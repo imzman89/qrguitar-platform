@@ -18,7 +18,7 @@ export function directPaymentUrl(method: string, value: unknown): string {
 }
 function readOffer(value: unknown): DirectOffer {
   const row = record(value), spec = typeof row.key === "string" && Object.hasOwn(packs, row.key) ? packs[row.key] : null;
-  if (!spec || row.currency !== "usd" || row.amount !== spec[0] || row.credits !== spec[1] || row.version !== 1 || row.permanent !== true || row.freeAllowance !== 25) throw new Error("The Profile pack could not be verified. Refresh to try again.");
+  if (!spec || row.currency !== "usd" || row.amount !== spec[0] || row.credits !== spec[1] || row.version !== 1 || row.permanent !== true || row.freeAllowance !== 5) throw new Error("The Profile pack could not be verified. Refresh to try again.");
   return row as DirectOffer;
 }
 export function readDirectOrder(value: unknown, ownerId?: string, requestedOrder?: string): DirectOrder {
@@ -35,16 +35,16 @@ export function readDirectOrder(value: unknown, ownerId?: string, requestedOrder
   return { ...row, offer } as DirectOrder;
 }
 export type DirectSnapshot = {
-  environment: "live" | "test"; freeLimit: 25; freeRemaining: number; paidGranted: number; paidConsumed: number;
+  environment: "live" | "test"; freeLimit: 5; freeRemaining: number; paidGranted: number; paidConsumed: number;
   paidRemaining: number; paidAvailable: number; ownedProfiles: number; hold: boolean; commercialExempt: boolean;
   enabled: boolean; methods: DirectMethod[]; offers: DirectOffer[]; approvalMessage: string;
   directOrder: DirectOrder | null; pendingOrder: DirectOrder | null;
 };
 function readSnapshot(value: unknown, ownerId: string, requestedOrder: string): DirectSnapshot {
   const row = record(value);
-  if (!["live", "test"].includes(String(row.environment)) || row.freeLimit !== 25
+  if (!["live", "test"].includes(String(row.environment)) || row.freeLimit !== 5
     || ["freeRemaining", "paidGranted", "paidConsumed", "paidRemaining", "paidAvailable", "ownedProfiles"].some(key => !Number.isSafeInteger(row[key]) || Number(row[key]) < 0)
-    || Number(row.freeRemaining) > 25 || row.paidRemaining !== Number(row.paidGranted) - Number(row.paidConsumed)
+    || Number(row.freeRemaining) > 5 || row.paidRemaining !== Number(row.paidGranted) - Number(row.paidConsumed)
     || typeof row.hold !== "boolean" || typeof row.commercialExempt !== "boolean" || row.paidAvailable !== (row.hold ? 0 : row.paidRemaining)
     || typeof row.enabled !== "boolean" || !Array.isArray(row.methods) || !Array.isArray(row.offers) || typeof row.approvalMessage !== "string") throw new Error("Your Profile balance could not be verified. Refresh to try again.");
   const methods = row.methods.map(value => { const method = record(value); if (!isMethod(method.key) || typeof method.label !== "string" || !method.label.trim()) throw new Error("Payment methods could not be verified."); return method as DirectMethod; });

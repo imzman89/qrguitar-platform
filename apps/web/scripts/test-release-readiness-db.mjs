@@ -16,6 +16,7 @@ assert.equal(manifest.memberMessagingAccountDeletionSourceSha256,migrationSha('s
 assert.equal(manifest.memberMessagingDurableHistorySourceSha256,migrationSha('supabase/migrations/20260918182000_durable_member_message_history.sql'));
 assert.equal(manifest.twentyFiveFreeProfilesSourceSha256,migrationSha('supabase/migrations/20260919100000_twenty_five_free_profiles.sql'));
 assert.equal(manifest.memberMessagingPaginationSourceSha256,migrationSha('supabase/migrations/20260919101000_member_messaging_pagination.sql'));
+assert.equal(manifest.fiveFreeProfilesSourceSha256,migrationSha('supabase/migrations/20260923120000_five_free_profiles.sql'));
 assert.deepEqual(manifest.memberMessagingPaginationIndexes,[
   {table:'member_conversations',name:'member_conversations_user_a_updated_page',definition:'CREATE INDEX member_conversations_user_a_updated_page ON public.member_conversations USING btree (user_a, updated_at DESC, id DESC)',unique:false},
   {table:'member_conversations',name:'member_conversations_user_b_updated_page',definition:'CREATE INDEX member_conversations_user_b_updated_page ON public.member_conversations USING btree (user_b, updated_at DESC, id DESC)',unique:false}
@@ -31,15 +32,15 @@ const db=new PGlite();await installRepositorySchema(db,repo,overlay?'20260917190
 if(overlay)for(const file of fs.readdirSync(path.join(source,'supabase/migrations')).filter(file=>file.endsWith('.sql')&&file>='20260917190000').sort())await db.exec(fs.readFileSync(path.join(source,'supabase/migrations',file),'utf8').replaceAll('\r\n','\n'));await db.exec("insert into storage.buckets(id,name,public)values('instrument-media','instrument-media',false),('instrument-documents','instrument-documents',false),('service-evidence','service-evidence',false) on conflict(id)do update set public=false;");
 const ready=async()=> (await db.query('select public.qrguitar_release_readiness() result')).rows[0].result;
 let passed=0;async function test(name,fn){await db.exec('begin');try{await fn();console.log('PASS '+name);passed++;}finally{await db.exec('rollback');}}
-function assertShape(result){assert.deepEqual(Object.keys(result).sort(),['checks','ready','releaseVersion']);assert.equal(result.releaseVersion,'2026-09-17.13');assert.equal(typeof result.ready,'boolean');assert.deepEqual(result.checks.map(c=>c.name),manifest.checks);assert.equal(new Set(result.checks.map(c=>c.name)).size,manifest.checks.length);for(const check of result.checks){assert.deepEqual(Object.keys(check).sort(),['name','ok']);assert.equal(typeof check.ok,'boolean');}}
+function assertShape(result){assert.deepEqual(Object.keys(result).sort(),['checks','ready','releaseVersion']);assert.equal(result.releaseVersion,'2026-09-23.1');assert.equal(typeof result.ready,'boolean');assert.deepEqual(result.checks.map(c=>c.name),manifest.checks);assert.equal(new Set(result.checks.map(c=>c.name)).size,manifest.checks.length);for(const check of result.checks){assert.deepEqual(Object.keys(check).sort(),['name','ok']);assert.equal(typeof check.ok,'boolean');}}
 async function expectFalse(name){const result=await ready();assertShape(result);assert.equal(result.ready,false);assert.equal(result.checks.find(c=>c.name===name)?.ok,false);}
 await test('complete schema returns exact version and all14 checks true',async()=>{const result=await ready();assertShape(result);assert.equal(result.ready,true,JSON.stringify(result));assert.equal(result.checks.length,14);assert.ok(result.checks.every(c=>c.ok));});
-await test('readiness pins the 25-free database contract',async()=>{
+await test('readiness pins the five-free database contract',async()=>{
  const owner='10000000-0000-4000-8000-000000000025';
  const status=(await db.query("select billing_account_status($1,'live') result",[owner])).rows[0].result;
- assert.equal(status.freeLimit,25);assert.equal(status.freeRemaining,25);
+ assert.equal(status.freeLimit,5);assert.equal(status.freeRemaining,5);
  const credited=(await db.query("select pg_get_functiondef('public.create_instrument_profile_credited(uuid,text,text,jsonb,boolean,text,text)'::regprocedure) definition")).rows[0].definition;
- assert.match(credited,/>=25/);assert.doesNotMatch(credited,/>=5(?:\D|$)/);
+ assert.match(credited,/>=5/);assert.doesNotMatch(credited,/>=25(?:\D|$)/);
 });
 for(const item of manifest.memberMessagingPaginationIndexes)await test('missing '+item.name+' fails stable inbox pagination readiness',async()=>{
  await db.exec('drop index public.'+item.name);await expectFalse('receipt_constraints');

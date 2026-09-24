@@ -46,7 +46,7 @@ await test('every direct table and helper is private; only explicit RPCs are ser
 for(const method of ['venmo','cashapp','zelle','paypal'])for(const [pack,amount,credits] of [['profile_1',1200,1],['profile_10',5000,10],['profile_25',9900,25]])await test(method+' '+pack+' derives approved permanent pack from key',async()=>{
   const o=await reserve(owner,method,randomUUID(),pack);assert.deepEqual(o.offer,{key:pack,version:1,currency:'usd',amount,credits});
   assert.equal(o.provider,method);assert.equal(o.status,'open');assert.equal(o.verification,null);
-  assert.equal((await status()).account.paidGranted,0);assert.equal((await status()).account.freeLimit,25);
+  assert.equal((await status()).account.paidGranted,0);assert.equal((await status()).account.freeLimit,5);
 });
 await test('malformed receiver, unsupported provider/pack and wrong DB environment fail closed',async()=>{
   for(const account of [{...recipient,accountKey:''},{...recipient,paymentUrl:'javascript:alert(1)'},{...recipient,address:null,paymentUrl:null},{...recipient,extra:true}])await reject(()=>reserve(owner,'venmo',randomUUID(),'profile_1',account),'22023');
@@ -137,25 +137,25 @@ await test('refund before verification binds original receipt and keeps eventual
   await reject(()=>reserve(),'PT409');await reject(()=>close(o),'PT409');
 });
 await test('refund/dispute holds use existing audited resolution and do not erase consumed history',async()=>{
-  await owned(25);const o=await reserve(owner,'venmo',randomUUID(),'profile_10');await verify(o);await create(await profile());
+  await owned(5);const o=await reserve(owner,'venmo',randomUUID(),'profile_10');await verify(o);await create(await profile());
   const before=await snapshot(),id=randomUUID();await review(o,'refund',id);const after=await snapshot();assert.deepEqual(after.uses,before.uses);assert.deepEqual(after.guitars,before.guitars);
   assert.equal((await status()).account.paidRemaining,9);assert.equal((await status()).account.paidAvailable,0);
   await rpc('billing_resolve_review',[owner,'live','direct:review:'+id,admin,randomUUID(),'release','Reviewed and resolved original payment issue.']);
   assert.equal((await status()).account.paidAvailable,9);await review(o,'refund',id);assert.equal((await status()).account.hold,false);
 });
-await test('25th Profile is free; 26th consumes one credit; successful create replay never spends twice',async()=>{
-  await owned(24);await verify(await reserve());await create(await profile());assert.equal((await status()).account.paidConsumed,0);
+await test('5th Profile is free; 6th consumes one credit; successful create replay never spends twice',async()=>{
+  await owned(4);await verify(await reserve());await create(await profile());assert.equal((await status()).account.paidConsumed,0);
   const f=await profile(),result=await create(f);assert.equal((await status()).account.paidConsumed,1);assert.equal((await create(f)).qrCode,result.qrCode);
   assert.equal((await create({...f,key:'create-'+randomUUID()})).qrCode,result.qrCode);assert.equal((await status()).account.paidConsumed,1);
   const exhausted=await profile(),before=await snapshot();await reject(()=>create(exhausted),'QG001');assert.deepEqual(await snapshot(),before);
 });
 await test('owners at the free allowance keep every Profile but need credit for the next create',async()=>{
-  await owned(25);const f=await profile(),before=await snapshot();await reject(()=>create(f),'QG001');assert.deepEqual(await snapshot(),before);
-  assert.equal((await status()).account.ownedProfiles,25);assert.equal((await status()).account.freeRemaining,0);
-  await verify(await reserve());await create(f);assert.equal((await status()).account.ownedProfiles,26);
+  await owned(5);const f=await profile(),before=await snapshot();await reject(()=>create(f),'QG001');assert.deepEqual(await snapshot(),before);
+  assert.equal((await status()).account.ownedProfiles,5);assert.equal((await status()).account.freeRemaining,0);
+  await verify(await reserve());await create(f);assert.equal((await status()).account.ownedProfiles,6);
 });
 await test('ownership transfer never spends or restores a purchased credit',async()=>{
-  await owned(25);await verify(await reserve());const created=await create(await profile());
+  await owned(5);await verify(await reserve());const created=await create(await profile());
   await db.query('update guitars set owner_id=$2 where qr_code=$1',[created.qrCode,other]);
   assert.equal((await status()).account.paidConsumed,1);assert.equal((await status(other)).account.paidConsumed,0);assert.equal((await status(other)).account.paidGranted,0);
 });

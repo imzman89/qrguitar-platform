@@ -23,7 +23,7 @@ Keep aggregate counts and minutes, without raw serials, private documents, claim
 | Repeat paid purchases and support minutes | Verified billing ledger and support log | Unit economics |
 | Restored data and media opened successfully | Isolated restore exercise | Durability of permanent records |
 
-Separate credits, assisted services, provider fees, hardware/shipping, onboarding labor, and a storage/support provision when calculating package margin. The 25 free owned Profiles and free transfers are current promises; measure credit use before changing future offers. One-time purchases are not recurring revenue.
+Separate credits, assisted services, provider fees, hardware/shipping, onboarding labor, and a storage/support provision when calculating package margin. The 5 free owned Profiles and free transfers are current promises; measure credit use before changing future offers. One-time purchases are not recurring revenue.
 
 ## Data and media recovery gate
 

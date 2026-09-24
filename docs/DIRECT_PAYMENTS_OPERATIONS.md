@@ -18,7 +18,7 @@ Adding code, configuring links, or applying migrations does not charge anyone.
 
 ## Product contract
 
-Every ordinary account has room for 25 free owned Profiles. The fixed USD packs
+Every ordinary account has room for 5 free owned Profiles. The fixed USD packs
 are `profile_1`: $12 for 1 credit; `profile_10`: $50 for 10; and `profile_25`:
 $99 for 25. Unused purchased credits never expire. A new Profile uses one credit
 when the free allowance is full. Ownership transfers are free and do not restore

@@ -11,9 +11,9 @@ const clientModule = { exports: {} };
 new Function("exports", "module", ts.transpileModule(fs.readFileSync(path.join(web, "lib/direct-payments-client.ts"), "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText)(clientModule.exports, clientModule);
 const { createDirectPaymentsClient, createAdminPaymentsClient, directPaymentUrl, initialDirectPaymentsState } = clientModule.exports;
 const A = "11111111-1111-4111-8111-111111111111", B = "22222222-2222-4222-8222-222222222222", ID = "33333333-3333-4333-8333-333333333333", ORDER = "44444444-4444-4444-8444-444444444444", ID2 = "55555555-5555-4555-8555-555555555555";
-const offers = [{ key: "profile_1", amount: 1200, credits: 1 }, { key: "profile_10", amount: 5000, credits: 10 }, { key: "profile_25", amount: 9900, credits: 25 }].map(value => ({ ...value, version: 1, currency: "usd", permanent: true, freeAllowance: 25 }));
+const offers = [{ key: "profile_1", amount: 1200, credits: 1 }, { key: "profile_10", amount: 5000, credits: 10 }, { key: "profile_25", amount: 9900, credits: 25 }].map(value => ({ ...value, version: 1, currency: "usd", permanent: true, freeAllowance: 5 }));
 const order = (patch = {}) => ({ orderId: ORDER, ownerId: A, requestId: ID, offerKey: "profile_10", method: "venmo", status: "awaiting_payment", reference: "QRG-123456789", offer: offers[1], recipient: { accountKey: "qrguitar-business", displayName: "QRguitar", paymentUrl: "https://venmo.com/u/qrguitar-business", address: null }, createdAt: "2026-09-18T12:00:00.000Z", payerReference: null, ...patch });
-const snapshot = (patch = {}) => ({ environment: "live", freeLimit: 25, freeRemaining: 23, paidGranted: 10, paidConsumed: 2, paidRemaining: 8, paidAvailable: 8, ownedProfiles: 2, hold: false, commercialExempt: false, enabled: true, methods: [{ key: "venmo", label: "Venmo" }, { key: "cashapp", label: "Cash App" }], offers, approvalMessage: "We manually verify received payments.", directOrder: null, pendingOrder: null, ...patch });
+const snapshot = (patch = {}) => ({ environment: "live", freeLimit: 5, freeRemaining: 3, paidGranted: 10, paidConsumed: 2, paidRemaining: 8, paidAvailable: 8, ownedProfiles: 2, hold: false, commercialExempt: false, enabled: true, methods: [{ key: "venmo", label: "Venmo" }, { key: "cashapp", label: "Cash App" }], offers, approvalMessage: "We manually verify received payments.", directOrder: null, pendingOrder: null, ...patch });
 const json = value => Response.json({ ok: true, ...value }), session = id => id ? { access_token: `token-${id}`, user: { id } } : null;
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { resolve, promise }; };
 const tick = () => new Promise(resolve => setImmediate(resolve));
@@ -46,11 +46,11 @@ test("provider links reject lookalikes, personal schemes, credentials and explic
   assert.equal(directPaymentUrl("applepay", "https://apple.com/pay"), "");
 });
 test("signed-out accounts make no payment requests", async t => { const f = fixture(t, { session: null }); await f.ready(); await f.client.checkout("profile_10", "venmo"); assert.equal(f.calls.length, 0); assert.equal(f.client.getState().phase, "signed-out"); });
-test("verified free allowance and balances load without writing", async t => { const f = fixture(t); await f.ready(); assert.equal(f.client.getState().snapshot.freeLimit, 25); assert.equal(f.client.getState().snapshot.paidAvailable, 8); assert.equal(f.posts().length, 0); assert.equal(f.calls[0].init.cache, "no-store"); });
+test("verified free allowance and balances load without writing", async t => { const f = fixture(t); await f.ready(); assert.equal(f.client.getState().snapshot.freeLimit, 5); assert.equal(f.client.getState().snapshot.paidAvailable, 8); assert.equal(f.posts().length, 0); assert.equal(f.calls[0].init.cache, "no-store"); });
 test("disabled, held, exempt and unconfigured accounts cannot open a new payment", async t => {
   for (const patch of [{ enabled: false }, { methods: [] }, { hold: true, paidAvailable: 0 }, { commercialExempt: true }]) { const f = fixture(t, { status: snapshot(patch) }); await f.ready(); await f.client.checkout("profile_10", "venmo"); assert.equal(f.posts().length, 0); }
 });
-test("tampered balance and price fail closed", async t => { for (const patch of [{ freeLimit: 24 }, { paidAvailable: 999 }, { offers: [{ ...offers[0], amount: 1 }] }]) { const f = fixture(t, { status: snapshot(patch) }); await f.ready(); assert.equal(f.client.getState().phase, "error"); assert.equal(f.client.getState().snapshot, null); } });
+test("tampered balance and price fail closed", async t => { for (const patch of [{ freeLimit: 4 }, { paidAvailable: 999 }, { offers: [{ ...offers[0], amount: 1 }] }]) { const f = fixture(t, { status: snapshot(patch) }); await f.ready(); assert.equal(f.client.getState().phase, "error"); assert.equal(f.client.getState().snapshot, null); } });
 test("double tap creates one saved order with the exact approved pack", async t => {
   const f = fixture(t); await f.ready(); await Promise.all([f.client.checkout("profile_10", "venmo"), f.client.checkout("profile_10", "venmo")]);
   assert.equal(f.posts().length, 1); assert.deepEqual(JSON.parse(f.posts()[0].init.body), { requestId: ID, offerKey: "profile_10", method: "venmo" }); assert.equal(f.client.getState().snapshot.directOrder.status, "awaiting_payment"); assert.equal(f.client.getState().snapshot.paidAvailable, 8);
@@ -170,7 +170,7 @@ function renderBilling(state, query = "", choice = { actorId: "", offerKey: "" }
 }
 const ready = patch => ({ ...initialDirectPaymentsState(), phase: "ready", actorId: A, snapshot: snapshot(), ...patch });
 test("real payer UI puts free capacity first and collapses optional packs", () => {
-  const html = renderBilling(ready()); assert.match(html, /first 25 Profiles are free/); assert.match(html, /continue without buying a pack/); assert.match(html, /Create a Profile/); assert.match(html, /<details class="packDisclosure">/); assert.doesNotMatch(html, /Most popular|subscription plan|Stripe|Apple Pay/);
+  const html = renderBilling(ready()); assert.match(html, /first 5 Profiles are free/); assert.match(html, /continue without buying a pack/); assert.match(html, /Create a Profile/); assert.match(html, /<details class="packDisclosure">/); assert.doesNotMatch(html, /Most popular|subscription plan|Stripe|Apple Pay/);
 });
 test("pack totals and unit prices are explicit with no unsupported popularity claim", () => {
   const html = renderBilling(ready({ snapshot: snapshot({ freeRemaining: 0, paidGranted: 0, paidConsumed: 0, paidRemaining: 0, paidAvailable: 0 }) }));

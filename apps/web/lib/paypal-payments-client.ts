@@ -46,7 +46,7 @@ export const initialPayPalPaymentsState = (): PayPalPaymentsState => ({ phase: "
 function readOffer(value: unknown): DirectOffer {
   const row = record(value), spec = typeof row.key === "string" && Object.hasOwn(packs, row.key) ? packs[row.key] : null;
   if (!spec || !Number.isSafeInteger(row.amount) || Number(row.amount) < 30 || Number(row.amount) > spec[0]
-    || row.credits !== spec[1] || row.currency !== "usd" || row.version !== 1 || row.permanent !== true || row.freeAllowance !== 25)
+    || row.credits !== spec[1] || row.currency !== "usd" || row.version !== 1 || row.permanent !== true || row.freeAllowance !== 5)
     throw new Error("The selected Profile pack could not be verified. Refresh to try again.");
   if (row.promotion == null) {
     if (row.amount !== spec[0] || row.listAmount !== undefined) throw new Error("The selected Profile pack could not be verified. Refresh to try again.");
@@ -75,9 +75,9 @@ function readOrder(value: unknown, ownerId: string, requestedOrder = ""): PayPal
 }
 function readSnapshot(value: unknown, ownerId: string, requestedOrder: string): PayPalSnapshot {
   const row = record(value);
-  if (!["test", "live"].includes(String(row.environment)) || row.freeLimit !== 25 || row.currency !== "USD"
+  if (!["test", "live"].includes(String(row.environment)) || row.freeLimit !== 5 || row.currency !== "USD"
     || ["freeRemaining", "paidGranted", "paidConsumed", "paidRemaining", "paidAvailable", "ownedProfiles"].some(key => !Number.isSafeInteger(row[key]) || Number(row[key]) < 0)
-    || Number(row.freeRemaining) > 25 || row.paidRemaining !== Number(row.paidGranted) - Number(row.paidConsumed)
+    || Number(row.freeRemaining) > 5 || row.paidRemaining !== Number(row.paidGranted) - Number(row.paidConsumed)
     || typeof row.hold !== "boolean" || typeof row.commercialExempt !== "boolean" || row.paidAvailable !== (row.hold ? 0 : row.paidRemaining)
     || typeof row.enabled !== "boolean" || typeof row.applePayEnabled !== "boolean" || !Array.isArray(row.offers) || typeof row.merchantName !== "string" || !row.merchantName.trim()
     || (row.clientId !== null && (typeof row.clientId !== "string" || !/^[A-Za-z0-9_-]{10,256}$/.test(row.clientId)))

@@ -49,7 +49,7 @@ export default async function InstallersPage() {
                   {getContentValue(content, "installers.actions.apply")}
                 </Link>
               </div>
-              <p className="installer-beta-note">{ui("ui.app.installers.page.f6d3c70532d2", "Applications are reviewed manually during beta. QRguitar connects approved shops and owners manually, and applying never publishes your business automatically.")}</p>
+              <p className="installer-beta-note">{ui("ui.app.installers.page.f6d3c70532d2", "Applications are reviewed manually. QRguitar connects approved shops and owners manually, and applying never publishes your business automatically.")}</p>
             </div>
             <div className="installer-feature-card">
               <div className="eyebrow">{ui("ui.app.installers.page.213ee4bccc52", "For working professionals")}</div>

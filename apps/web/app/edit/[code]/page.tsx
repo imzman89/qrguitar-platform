@@ -1366,7 +1366,7 @@ export default function EditInstrumentPage() {
                 <section className="photo-manager proof-vault" aria-label={ui("ui.app.edit.code.page.fe07a483e3c2", "Proof Vault document manager")}>
                   <div className="photo-manager-header">
                     <strong>{ui("ui.app.edit.code.page.b4e929d8bcfe", "Documents")}</strong>
-                    <span>{documents.length}{ui("ui.app.edit.code.page.61008da8ad24", "/10 files. Private documents can support QRguitar verification and authenticity review during beta.")}</span>
+                    <span>{documents.length}{ui("ui.app.edit.code.page.61008da8ad24", "/10 files. Private documents can support QRguitar verification and authenticity review.")}</span>
                   </div>
                   <div className="proof-vault-list">
                     {documents.map((document) => (
@@ -1671,12 +1671,12 @@ export default function EditInstrumentPage() {
                   <p>
                     {verificationStatus === "verified"
                       ? ui("ui.app.edit.code.page.df6ad347b1a1", "This Profile is verified by QRguitar.")
-                      : ui("ui.app.edit.code.page.d7b92d4468d9", "Verified Profiles are available with paid QRguitar verification. Paid verification is handled manually during beta.")}
+                      : ui("ui.app.edit.code.page.d7b92d4468d9", "After you add a Profile, QRguitar may verify its details at no charge when the information is sufficient. Verification does not confirm authenticity.")}
                   </p>
                   <p>
                     {authenticityStatus === "confirmed"
                       ? ui("ui.app.edit.code.page.ec2f3a7e401c", "Authenticity confirmed by QRguitar from available evidence.")
-                      : ui("ui.app.edit.code.page.9572b2a7a2c2", "Authenticity confirmation is available as a paid review feature. Paid verification and authenticity review are handled manually during beta.")}
+                      : ui("ui.app.edit.code.page.9572b2a7a2c2", "Authenticity confirmation is a separate paid review handled by QRguitar staff. A free Profile is not automatically authenticity confirmed.")}
                   </p>
                 </div>
                 <div className="form-grid">

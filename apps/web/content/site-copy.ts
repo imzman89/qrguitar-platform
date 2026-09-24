@@ -142,7 +142,7 @@ export const siteCopy = {
       {
         icon: BarChart3,
         title: "Resale and transfer",
-        copy: "When the instrument sells, keep the sale notes and record history ready. Owner-change tools are in beta with support available."
+        copy: "When the instrument sells, keep the sale notes and record history ready. Use the ownership tools to hand the same Profile to its next owner."
       }
     ],
     cta: "See QRguitar Profiles"
@@ -152,11 +152,11 @@ export const siteCopy = {
     appTitle: "Commercial tools are opening by request.",
     appBody:
       "For builders, retailers, repair shops, and brands that need more than a few codes and a spreadsheet.",
-    steps: ["Bulk record creation", "Staff and inventory tools", "Warranty, catalog, and owner-transfer tools in beta"],
+    steps: ["Bulk record creation", "Staff and inventory tools", "Warranty, catalog, and owner-transfer tools"],
     eyebrow: "For businesses",
     headline: "When the records become part of how the shop runs.",
     body:
-      "Commercial tools are opening carefully because shops and brands need more: staff access, inventory views, warranty profiles, catalog pages, imports, owner-transfer support in beta, and help getting set up.",
+      "Commercial tools are opening carefully because shops and brands need more: staff access, inventory views, warranty profiles, catalog pages, imports, owner-transfer support, and help getting set up.",
     cards: [
       {
         icon: Database,
@@ -175,23 +175,23 @@ export const siteCopy = {
       },
       {
         icon: BarChart3,
-        title: "Owner-transfer beta",
-        copy: "Prepare the record for the buyer at sale, keep your brand attached to the instrument, and use QRguitar support for manual help while ownership tools are in beta."
+        title: "Owner transfers",
+        copy: "Prepare the record for the buyer at sale, keep your brand attached to the instrument, and use QRguitar support for manual help when a handoff needs extra help."
       }
     ],
     cta: "Start a Commercial Plan"
   },
   pricing: {
-    eyebrow: "PUBLIC BETA",
+    eyebrow: "PROFILE ACCESS",
     headline: "Start free. Get help when you need it.",
     body: "",
     plans: [
       {
         name: "For owners and collectors",
-        price: "$0 during public beta",
-        copy: "Create up to 25 Profiles with photos, specifications, privacy controls, history, and downloadable QR codes.",
+        price: "Free",
+        copy: "Create up to 5 Profiles with photos, specifications, privacy controls, history, and downloadable QR codes.",
         features: [
-          "25 free Profiles",
+          "5 free Profiles",
           "Public, Unlisted, or Private",
           "Downloadable QR codes",
           "Service and ownership history"
@@ -211,7 +211,7 @@ export const siteCopy = {
     ],
     enterpriseTitle: "Commercial setup by request",
     enterpriseBody:
-      "Create QRguitar Profiles for free during beta. Paid help is handled manually by request."
+      "Start with five free Profiles. Assisted setup is available by request."
   },
   preview: {
     specsIcon: Layers3,

@@ -5,7 +5,7 @@ export type FieldVisibility = "public" | "private" | "transfer_only";
 export type PlanTier = "single" | "pack_10" | "pack_25" | "bulk_50" | "business" | "enterprise";
 
 /** Standard owned-Profile allowance; the server ledger enforces paid capacity. */
-export const FREE_PROFILE_ALLOWANCE = 25;
+export const FREE_PROFILE_ALLOWANCE = 5;
 
 export type GuitarProfile = {
   id: string;

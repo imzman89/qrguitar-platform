@@ -1025,7 +1025,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.account.page.e16273f1c0f6",
     "scope": "app.account.page",
-    "text": "Required account and ownership notices cannot be disabled during public beta.",
+    "text": "Required account and ownership notices stay visible.",
     "page": "Account",
     "area": "Product",
     "section": "Page text",
@@ -7343,7 +7343,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.billing.BillingPage.838cbded16d1",
     "scope": "app.billing.BillingPage",
-    "text": "Your first 25 Profiles are free. Add permanent Profile credits when your collection grows. Ownership transfers stay free.",
+    "text": "Your first 5 Profiles are free. Add permanent Profile credits when your collection grows. Ownership transfers stay free.",
     "page": "Profile credits",
     "area": "Product",
     "section": "Page text",
@@ -7379,7 +7379,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.billing.BillingPage.d52f04fe6cb2",
     "scope": "app.billing.BillingPage",
-    "text": "Your collection starts with 25 free Profiles.",
+    "text": "Your collection starts with 5 free Profiles.",
     "page": "Profile credits",
     "area": "Product",
     "section": "Page text",
@@ -8072,7 +8072,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.billing.DirectBillingPage.49f78ed770a3",
     "scope": "app.billing.DirectBillingPage",
-    "text": "Your first 25 Profiles are free.",
+    "text": "Your first 5 Profiles are free.",
     "page": "Profile credits",
     "area": "Product",
     "section": "Page text",
@@ -8135,7 +8135,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.billing.DirectBillingPage.90d34fccfab3",
     "scope": "app.billing.DirectBillingPage",
-    "text": "Start with your 25 free Profiles.",
+    "text": "Start with your 5 free Profiles.",
     "page": "Profile credits",
     "area": "Product",
     "section": "Page text",
@@ -9314,7 +9314,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.billing.PayPalBillingPage.8d419aec5796",
     "scope": "app.billing.PayPalBillingPage",
-    "text": "25 free Profiles. More when you need them.",
+    "text": "5 free Profiles. More when you need them.",
     "page": "Profile credits",
     "area": "Product",
     "section": "Page text",
@@ -9341,7 +9341,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.billing.PayPalBillingPage.49f78ed770a3",
     "scope": "app.billing.PayPalBillingPage",
-    "text": "Your first 25 Profiles are free.",
+    "text": "Your first 5 Profiles are free.",
     "page": "Profile credits",
     "area": "Product",
     "section": "Page text",
@@ -9926,7 +9926,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.billing.PayPalBillingPage.fcf8710aef5c",
     "scope": "app.billing.PayPalBillingPage",
-    "text": "Each credit creates one additional Profile after your 25 free Profiles. Unused paid credits never expire.",
+    "text": "Each credit creates one additional Profile after your 5 free Profiles. Unused paid credits never expire.",
     "page": "Profile credits",
     "area": "Product",
     "section": "Page text",
@@ -15011,7 +15011,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.edit.code.page.61008da8ad24",
     "scope": "app.edit.code.page",
-    "text": "/10 files. Private documents can support QRguitar verification and authenticity review during beta.",
+    "text": "/10 files. Private documents can support QRguitar verification and authenticity review.",
     "page": "Edit Profile",
     "area": "Product",
     "section": "Page text",
@@ -15731,7 +15731,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.edit.code.page.d7b92d4468d9",
     "scope": "app.edit.code.page",
-    "text": "Verified Profiles are available with paid QRguitar verification. Paid verification is handled manually during beta.",
+    "text": "After you add a Profile, QRguitar may verify its details at no charge when the information is sufficient. Verification does not confirm authenticity.",
     "page": "Edit Profile",
     "area": "Product",
     "section": "Page text",
@@ -15749,7 +15749,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.edit.code.page.9572b2a7a2c2",
     "scope": "app.edit.code.page",
-    "text": "Authenticity confirmation is available as a paid review feature. Paid verification and authenticity review are handled manually during beta.",
+    "text": "Authenticity confirmation is a separate paid review handled by QRguitar staff. A free Profile is not automatically authenticity confirmed.",
     "page": "Edit Profile",
     "area": "Product",
     "section": "Page text",
@@ -17603,7 +17603,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.i.code.ProfileClient.2fb69e84e91b",
     "scope": "app.i.code.ProfileClient",
-    "text": "Ownership tools are in beta",
+    "text": "Ownership tools",
     "page": "Public Profile",
     "area": "Product",
     "section": "Page text",
@@ -18089,7 +18089,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.installers.page.f6d3c70532d2",
     "scope": "app.installers.page",
-    "text": "Applications are reviewed manually during beta. QRguitar connects approved shops and owners manually, and applying never publishes your business automatically.",
+    "text": "Applications are reviewed manually. QRguitar connects approved shops and owners manually, and applying never publishes your business automatically.",
     "page": "Installers",
     "area": "Marketing",
     "section": "Page text",

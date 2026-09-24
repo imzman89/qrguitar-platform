@@ -1,5 +1,5 @@
 {
-  "releaseVersion": "2026-09-17.13",
+  "releaseVersion": "2026-09-23.1",
   "checks": [
     "catalog_readable",
     "required_functions",
@@ -1472,7 +1472,7 @@
     },
     {
       "signature": "public.billing_account_status(uuid,text)",
-      "source_hash": "8fe3ffd119cc37557a0330adbb04361d639b83408eabe79bb62e8d3241ac13fe",
+      "source_hash": "ca9f60157646772574877f75e9df0e0ce3574737d6ca346a502a1516f2586bdf",
       "arguments": "p_owner_id uuid, p_environment text",
       "result": "jsonb",
       "definer": true,
@@ -2209,7 +2209,7 @@
     },
     {
       "signature": "public.create_instrument_profile_credited(uuid,text,text,jsonb,boolean,text,text)",
-      "source_hash": "26cf85566613051178cb58d5676cb5b254d21acd81ff6ace549bef40bb86c211",
+      "source_hash": "6db8d676342d537aa2232554892d7920f05338df6a8220106eba2e684afde790",
       "arguments": "p_owner_id uuid, p_idempotency_key text, p_upload_id text, p_payload jsonb, p_launch_testing_access boolean, p_owner_display_name text, p_billing_environment text",
       "result": "jsonb",
       "definer": true,
@@ -10287,5 +10287,6 @@
       "definition": "CREATE INDEX member_conversations_user_b_updated_page ON public.member_conversations USING btree (user_b, updated_at DESC, id DESC)",
       "unique": false
     }
-  ]
+  ],
+  "fiveFreeProfilesSourceSha256": "54645cd8d9994a574f390bcc358aa1ba51cdd1017b12f87bea565dd2247b498f"
 }

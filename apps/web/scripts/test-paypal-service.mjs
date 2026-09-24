@@ -19,10 +19,10 @@ const { createPayPalService } = load("paypal-service");
 const OWNER = randomUUID(), OTHER = randomUUID(), REQUEST = randomUUID(), ORDER = randomUUID(), ORDER2 = randomUUID();
 const PAYPAL = "5O190127TN364715T", CAPTURE = "7X12345678901234A", CAPTURE2 = "8Y12345678901234B", MERCHANT = "ABCDEFGHIJKLM";
 const offer = { key: "profile_1", version: 1, currency: "usd", amount: 1200, credits: 1 };
-const publicOffer = { ...offer, permanent: true, freeAllowance: 25 };
+const publicOffer = { ...offer, permanent: true, freeAllowance: 5 };
 const raw = (overrides = {}) => ({ orderId: ORDER, ownerId: OWNER, environment: "test", requestKey: REQUEST, status: "open", offer,
   provider: "paypal", merchantId: MERCHANT, paypalOrderId: PAYPAL, captureId: null, hold: false, createdAt: new Date().toISOString(), ...overrides });
-const account = (overrides = {}) => ({ environment: "test", createEnvironment: "test", freeLimit: 25, ownedProfiles: 25, freeRemaining: 0,
+const account = (overrides = {}) => ({ environment: "test", createEnvironment: "test", freeLimit: 5, ownedProfiles: 25, freeRemaining: 0,
   paidGranted: 0, paidConsumed: 0, paidRemaining: 0, paidAvailable: 0, commercialExempt: false, hold: false, unresolvedOrder: null, ...overrides });
 const unit = (overrides = {}) => ({ reference_id: ORDER, custom_id: ORDER, invoice_id: `QRG-${ORDER}`, payee: { merchant_id: MERCHANT },
   amount: { currency_code: "USD", value: "12.00" }, ...overrides });
