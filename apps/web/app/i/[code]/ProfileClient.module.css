@@ -134,3 +134,5 @@
   .document-item :global(.button) { grid-column: 2; justify-self: start; }
 }
 @media (prefers-reduced-motion: reduce) { .scan-hero-thumbnails { scroll-behavior: auto; } }
+
+.scan-hero-media[data-shape="wide"] { height: auto; min-height: 0; aspect-ratio: 4 / 3; }

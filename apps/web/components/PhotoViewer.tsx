@@ -212,12 +212,11 @@ export function PhotoViewer({ images, initialIndex = 0, title, onClose, onImageE
           /> : null}
         </button>
         {activeSource && !loadedSources.includes(activeSource) ? <span className={styles.loading} role="status">{ui("ui.components.PhotoViewer.49fba41bc3d1", "Loading photo…")}</span> : null}
-        {photos.length > 1 ? <>
-          <button className={styles.control + " " + styles.previous} type="button" onClick={() => movePhoto(-1)} aria-label={ui("ui.components.PhotoViewer.2f55863e032e", "Previous photo")}><ChevronLeft size={28} /></button>
-          <button className={styles.control + " " + styles.next} type="button" onClick={() => movePhoto(1)} aria-label={ui("ui.components.PhotoViewer.894bb2b7ac07", "Next photo")}><ChevronRight size={28} /></button>
-        </> : null}
+
       </div>
-      {photos.length > 1 ? <div className={styles.filmstrip} ref={stripRef} aria-label={ui("ui.components.PhotoViewer.29afaa1f472b", "Choose a photograph")}>
+      {photos.length > 1 ? <div className={styles.galleryNavigation}>
+          <button className={styles.control} type="button" onClick={() => movePhoto(-1)} aria-label={ui("ui.components.PhotoViewer.2f55863e032e", "Previous photo")}><ChevronLeft size={28} /></button>
+        <div className={styles.filmstrip} ref={stripRef} aria-label={ui("ui.components.PhotoViewer.29afaa1f472b", "Choose a photograph")}>
         {photos.map((imageUrl, index) => <button
           className={styles.thumbnail}
           key={imageUrl}
@@ -228,6 +227,8 @@ export function PhotoViewer({ images, initialIndex = 0, title, onClose, onImageE
         >
           <img src={publicMediaVariantUrl(imageUrl, 160)} alt="" loading="lazy" fetchPriority="low" decoding="async" width={112} height={112} referrerPolicy="no-referrer" onError={() => markImageFailed(imageUrl)} />
         </button>)}
+        </div>
+          <button className={styles.control} type="button" onClick={() => movePhoto(1)} aria-label={ui("ui.components.PhotoViewer.894bb2b7ac07", "Next photo")}><ChevronRight size={28} /></button>
       </div> : <div className={styles.bottomSpace} />}
     </dialog>
   );

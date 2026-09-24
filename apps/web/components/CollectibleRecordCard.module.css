@@ -12,12 +12,15 @@
 .collectible-card-topline { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; gap: 6px; z-index: 2; pointer-events: none; }
 .collectible-card-eyebrow, .collectible-card-age { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 20px; background: var(--surface-raised); color: var(--muted-strong); font-size: 11px; white-space: nowrap; }
 
-.collectible-card-image-count { display: inline-flex; align-items: center; gap: 6px; position: absolute; bottom: 12px; left: 12px; padding: 7px 9px; border-radius: 4px; background: #0b0d0fe8; color: var(--text); font-size: 11px; line-height: 1.3; pointer-events: none; z-index: 2; }
-.collectible-card-gallery-controls { display: flex; gap: 6px; position: absolute; bottom: 10px; right: 10px; z-index: 3; }
-.collectible-card-gallery-controls button { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 6px; color: var(--text); background: #0b0d0fe8; cursor: pointer; }
-.collectible-card-share { position: absolute; top: 10px; right: 10px; z-index: 3; }
-.collectible-card-share :global(.record-share-button) { display: grid; place-items: center; width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 6px; color: var(--text); background: #0b0d0fe8; }
-.collectible-card-content { display: flex; flex: 1; flex-direction: column; gap: 10px; min-width: 0; padding: 17px 2px 0; cursor: pointer; }
+.collectible-card-media-toolbar { display: flex; align-items: center; gap: 4px; min-height: 44px; margin-top: 4px; }
+.collectible-card-image-count { display: inline-flex; align-items: center; gap: 7px; margin-right: auto; color: var(--muted); font-size: 12px; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.collectible-card-gallery-controls { display: flex; gap: 2px; margin-left: auto; }
+.collectible-card-gallery-controls button { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 8px; color: var(--muted-strong); background: transparent; cursor: pointer; }
+.collectible-card-share { margin-left: auto; }
+.collectible-card-gallery-controls + .collectible-card-share { margin-left: 4px; }
+.collectible-card-share :global(.record-share-button) { display: grid; place-items: center; width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 8px; color: var(--muted-strong); background: transparent; }
+.collectible-card-gallery-controls button:hover, .collectible-card-share :global(.record-share-button):hover { background: var(--surface); color: var(--text); }
+.collectible-card-content { display: flex; flex: 1; flex-direction: column; gap: 10px; min-width: 0; padding: 8px 2px 0; cursor: pointer; }
 .collectible-card-profile-link { display: block; color: inherit; text-decoration: none; }
 .collectible-card-type { color: var(--muted); font-size: 12px; line-height: 1.5; }
 .collectible-card-profile-link h3 { margin: 5px 0 6px; color: var(--text); font-family: inherit; font-size: 21px; line-height: 1.2; font-weight: 600; letter-spacing: -.025em; overflow-wrap: anywhere; }

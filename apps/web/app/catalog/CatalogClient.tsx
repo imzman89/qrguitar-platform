@@ -227,7 +227,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
               <p>{getContentValue(content, "catalog.hero.body")}</p>
             </div>
             <div className={styles["catalog-hero-actions"]}>
-              <Link className="button" href="/create">{getContentValue(content, "catalog.actions.create")}</Link>
+              <Link className="button secondary" href="/create">{getContentValue(content, "catalog.actions.create")}</Link>
               <Link className="text-link" href="/collections">{ui("ui.app.catalog.CatalogClient.1fbba5113528", "Browse member collections")}</Link>
             </div>
           </div>
@@ -276,6 +276,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
             </label>
           </section>
 
+          <div className={styles["catalog-refinements"]}>
           {hasAdvancedFilters ? (
             <details className={styles["catalog-more-filters"]}>
               <summary><SlidersHorizontal size={15} />{" "}{ui("ui.app.catalog.CatalogClient.546ebb8eb993", "Filters")}{activeFilters.length ? <span>{activeFilters.length}</span> : null}</summary>
@@ -289,19 +290,6 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
                 {availableFilters.service ? <label>{ui("ui.app.catalog.CatalogClient.8b0adc9c9815", "Service History")}<select value={service} onChange={(event) => updateFilters({ service: event.target.value })}><option value="All service histories">{ui("ui.app.catalog.CatalogClient.30a6538fc556", "All service histories")}</option><option value="Has Service History">{ui("ui.app.catalog.CatalogClient.021890177ff6", "Has Service History")}</option></select></label> : null}
               </div>
             </details>
-          ) : null}
-
-          {activeFilters.length ? (
-            <div className={styles["catalog-active-filters"]} aria-label={ui("ui.app.catalog.CatalogClient.213a9822c38a", "Active filters")}>
-              {activeFilters.map((key) => <button key={key} type="button" onClick={() => updateFilters({ [key]: defaultCatalogFilters[key] })} aria-label={ui("ui.app.catalog.CatalogClient.b6b852bd01cc", "Remove {{value1}} filter: {{value2}}", { value1: filterLabels[key], value2: filters[key] })}><span>{filterLabels[key]}: {filters[key]}</span><X size={12} aria-hidden="true" /></button>)}
-            </div>
-          ) : null}
-
-          {serialLookupMessage ? (
-            <div className={styles["catalog-lookup-result"]} role="status">
-              <span>{serialLookupMessage}</span>
-              {showOwnershipClaim ? <Link className="button secondary" href="/ownership-claim">{ui("ui.app.catalog.CatalogClient.ac3e01b95dc6", "Start ownership claim")}</Link> : null}
-            </div>
           ) : null}
 
           <section className={styles["catalog-summary"]} aria-label={ui("ui.app.catalog.CatalogClient.435a56a2ed07", "Catalog discovery highlights")}>
@@ -322,6 +310,22 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
               ) : null}
             </div>
           </section>
+          </div>
+
+          {activeFilters.length ? (
+            <div className={styles["catalog-active-filters"]} aria-label={ui("ui.app.catalog.CatalogClient.213a9822c38a", "Active filters")}>
+              {activeFilters.map((key) => <button key={key} type="button" onClick={() => updateFilters({ [key]: defaultCatalogFilters[key] })} aria-label={ui("ui.app.catalog.CatalogClient.b6b852bd01cc", "Remove {{value1}} filter: {{value2}}", { value1: filterLabels[key], value2: filters[key] })}><span>{filterLabels[key]}: {filters[key]}</span><X size={12} aria-hidden="true" /></button>)}
+            </div>
+          ) : null}
+
+          {serialLookupMessage ? (
+            <div className={styles["catalog-lookup-result"]} role="status">
+              <span>{serialLookupMessage}</span>
+              {showOwnershipClaim ? <Link className="button secondary" href="/ownership-claim">{ui("ui.app.catalog.CatalogClient.ac3e01b95dc6", "Start ownership claim")}</Link> : null}
+            </div>
+          ) : null}
+
+
 
           <section className={styles["catalog-grid"]} aria-label={ui("ui.app.catalog.CatalogClient.8ecdd04d045f", "QRguitar Profiles")}>
             {!hasLoadedRecords ? (

@@ -33,7 +33,7 @@ export default async function CollectionsDirectoryPage() {
 
         <header className="collection-directory-hero"><div><div className="eyebrow">{ui("ui.app.collections.page.2595f0c366bf", "Member collections")}</div><h1>{ui("ui.app.collections.page.9fa7b03bfc1e", "Meet the people behind the instruments.")}</h1><p>{ui("ui.app.collections.page.f34365151941", "Explore public collections from players, collectors, stores, builders, brands, and repair shops. Open a collection to view that member’s public instrument Profiles.")}</p></div>{collections.length ? <Link className="button" href="/account?section=collection">{ui("ui.app.collections.page.82a7887fd1d5", "Set up your collection")}</Link> : null}</header>
         <CollectionsDirectoryClient collections={collections} />
-        <nav className={styles.navigation} aria-label={ui("ui.app.collections.page.aa8729a8a143", "Explore QRguitar")}><Link href="/catalog">{ui("ui.app.collections.page.f507fb6c23a7", "Browse instrument Profiles")}</Link><Link href="/account?section=collection">{ui("ui.app.collections.page.5ca6750bbc16", "Your collection settings")}</Link></nav>
+        {collections.length ? <nav className={styles.navigation} aria-label={ui("ui.app.collections.page.aa8729a8a143", "Explore QRguitar")}><Link href="/catalog">{ui("ui.app.collections.page.f507fb6c23a7", "Browse instrument Profiles")}</Link><Link href="/account?section=collection">{ui("ui.app.collections.page.5ca6750bbc16", "Your collection settings")}</Link></nav> : null}
       </div>
     </main>
     <Footer />

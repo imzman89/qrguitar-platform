@@ -681,6 +681,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
             <div className={styles["scan-hero-media-frame"]}>
               <button
                 className={styles["scan-hero-media"]}
+                data-shape={["Amplifier", "Pedal"].includes(instrument.instrumentType || "") ? "wide" : undefined}
                 type="button"
                 onClick={() => {
                   if (heroDidSwipeRef.current) { heroDidSwipeRef.current = false; return; }

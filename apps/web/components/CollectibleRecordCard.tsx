@@ -206,6 +206,9 @@ export function CollectibleRecordCard({
               {eyebrow ? <span className={styles["collectible-card-eyebrow"]}><Globe2 size={13} /> {eyebrow}</span> : null}
               {createdLabel ? <span className={styles["collectible-card-age"]}>{createdLabel}</span> : null}
             </div>
+        </div>
+
+        <div className={styles["collectible-card-media-toolbar"]}>
             {card.photoCount > 1 ? <span className={styles["collectible-card-image-count"]}><Camera size={12} aria-hidden="true" /> {showGalleryControls ? `${activeImageIndex + 1}/${card.photoCount}` : `${card.photoCount} photos`}</span> : null}
 
           {showGalleryControls ? (
@@ -218,6 +221,7 @@ export function CollectibleRecordCard({
               </button>
             </div>
           ) : null}
+          <RecordShareButton className={styles["collectible-card-share"]} code={card.code} title={card.title} />
         </div>
 
         <div className={styles["collectible-card-content"]} onClick={handleContentClick}>
@@ -252,7 +256,6 @@ export function CollectibleRecordCard({
       </div>
 
       {viewerOpen ? <PhotoViewer images={card.images} initialIndex={activeImageIndex} title={card.title} onClose={() => setViewerOpen(false)} /> : null}
-      <RecordShareButton className={styles["collectible-card-share"]} code={card.code} title={card.title} />
       {showSecondaryAction ? (
         <Link className={styles["collectible-card-secondary-link"]} href={secondaryHref}>
           {secondaryLabel}

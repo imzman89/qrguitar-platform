@@ -3,7 +3,7 @@ import { useUiText } from "./UiTextProvider";
 
 
 import Link from "./CheckoutAwareLink";
-import { ArrowRight, Fingerprint, ShieldCheck, RefreshCw } from "lucide-react";
+import { ArrowRight, Check, Fingerprint, ShieldCheck, RefreshCw } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { CollectibleRecordCard } from "./CollectibleRecordCard";
@@ -235,9 +235,9 @@ export function HomePageClient({
         <div className="shell">
           <div className="section-header"><div className="eyebrow">{copy.pricing.eyebrow}</div><h2>{copy.pricing.headline}</h2>{copy.pricing.body ? <p>{copy.pricing.body}</p> : null}</div>
           <div className="pricing-grid">
-            {sectionBlocks("pricing").map((plan) => <PricingCard key={plan.id} name={plan.title} price={plan.label || ""} copy={plan.body} features={plan.items || []} cta={plan.ctaLabel} href={plan.ctaUrl} />)}
+            {sectionBlocks("pricing").map((plan) => <PricingCard key={plan.id} primary={plan.id === "home-price-beta"} name={plan.title} price={plan.label || ""} copy={plan.body} features={plan.items || []} cta={plan.ctaLabel} href={plan.ctaUrl} />)}
           </div>
-          <div className={styles.creditNote}><div><h3>{getContentValue(settings?.content || {}, "home.pricing.creditsTitle")}</h3><p>{getContentValue(settings?.content || {}, "home.pricing.creditsBody")}</p></div><Link className="button secondary" href="/billing">{getContentValue(settings?.content || {}, "home.pricing.creditsCta")}</Link></div>
+          <div className={styles.creditNote}><div><h3>{getContentValue(settings?.content || {}, "home.pricing.creditsTitle")}</h3><p>{getContentValue(settings?.content || {}, "home.pricing.creditsBody")}</p></div><Link className={styles.creditLink} href="/billing">{getContentValue(settings?.content || {}, "home.pricing.creditsCta")}<ArrowRight size={16} aria-hidden="true" /></Link></div>
         </div>
       </section>
     ),
@@ -273,6 +273,7 @@ function Card({ icon, title, copy }: { icon: ReactNode; title: string; copy: str
 }
 
 function PricingCard({
+  primary = false,
   name,
   price,
   copy,
@@ -281,6 +282,7 @@ function PricingCard({
   cta,
   href
 }: {
+  primary?: boolean;
   name: string;
   price: string;
   copy: string;
@@ -296,18 +298,18 @@ function PricingCard({
       : `mailto:support@qrguitar.com?subject=${encodeURIComponent(`QRguitar ${name}`)}`);
 
   return (
-    <article className={badge ? "price-card featured" : "price-card"}>
+    <article className={badge ? "price-card featured" : "price-card"} data-emphasis={primary ? "primary" : "secondary"}>
       {badge ? <div className="plan-badge">{badge}</div> : null}
       <h3>{name}</h3>
       <div className="price">{price}</div>
       <p>{copy}</p>
       <ul>
         {features.map((feature) => (
-          <li key={feature}>{feature}</li>
+          <li key={feature}><Check size={16} aria-hidden="true" /><span>{feature}</span></li>
         ))}
       </ul>
-      <Link className="button" href={resolvedHref}>
-        {resolvedCta}
+      <Link className={primary ? "button" : "button secondary"} href={resolvedHref}>
+        {resolvedCta}<ArrowRight size={16} aria-hidden="true" />
       </Link>
     </article>
   );
