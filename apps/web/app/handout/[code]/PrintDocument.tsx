@@ -34,8 +34,8 @@ type Props = {
   service: Service | null;
 };
 
-function Facts({ facts }: { facts: Fact[] }) {
-  return facts.length ? <dl className={styles.facts}>{facts.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl> : null;
+function Facts({ facts, expandLong = false }: { facts: Fact[]; expandLong?: boolean }) {
+  return facts.length ? <dl className={styles.facts}>{facts.map(([label, value]) => <div key={label} className={expandLong && value.length > 72 ? styles.longFact : undefined}><dt>{label}</dt><dd>{value}</dd></div>)}</dl> : null;
 }
 
 export function PrintDocument(props: Props) {
@@ -51,6 +51,7 @@ export function PrintDocument(props: Props) {
       <span className={styles.sectionLabel}>{ui("ui.app.handout.code.PrintDocument.1081dbe09b14", "Permanent QRguitar Profile")}</span>
       {props.includeInstruction ? <><h3>{props.scanInstruction}</h3><p>{ui("ui.app.handout.code.PrintDocument.bddbc8638f57", "View Profile details, photographs, specifications and history.")}</p></> : null}
       {props.includeUrl ? <span className={styles.profileUrl}>{profileUrl}</span> : null}
+      {props.includeInstruction ? <p className={styles.buyerGuidance}>{ui("ui.app.handout.code.PrintDocument.buyerRequest", "New owner? Scan, then choose Start ownership request on the Profile.")}</p> : null}
     </div>
   </section>;
   const serviceScan = <section className={`${styles.scan} ${styles.serviceScan}`}>
@@ -95,9 +96,9 @@ export function PrintDocument(props: Props) {
             {serial ? <div><span>{ui("ui.app.handout.code.PrintDocument.14b1b3c5b151", "Serial Number")}</span><b>{serial}</b></div> : null}
           </section>
           {props.details.length ? <section className={styles.detailGroup} aria-label={ui("ui.app.handout.code.PrintDocument.73949bb1bdba", "Profile details")}><h3>{ui("ui.app.handout.code.PrintDocument.73949bb1bdba", "Profile details")}</h3><Facts facts={props.details} /></section> : null}
-          {props.specifications.length ? <section className={`${styles.specifications} ${styles.detailGroup}`} aria-label={ui("ui.app.handout.code.PrintDocument.b70ec7c6b4ce", "Profile specifications")}><h3>{ui("ui.app.handout.code.PrintDocument.015b4e0a76e5", "Specifications")}</h3><Facts facts={props.specifications} /></section> : null}
         </aside>
       </div> : null}
+      {mode === "handout" && props.specifications.length ? <section className={`${styles.profileSpecifications} ${styles.detailGroup}`} aria-label={ui("ui.app.handout.code.PrintDocument.b70ec7c6b4ce", "Profile specifications")}><h3>{ui("ui.app.handout.code.PrintDocument.015b4e0a76e5", "Specifications")}</h3><Facts facts={props.specifications} expandLong /></section> : null}
       {mode === "handout" ? profileScan : null}
       {mode === "service" && service ? <section className={styles.service}>
         <header><div><span>{service.category}</span><h3>{service.title}</h3></div><time>{service.date}</time></header>

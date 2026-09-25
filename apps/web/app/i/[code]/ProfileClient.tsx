@@ -862,6 +862,10 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
               {shareNotice === "failed" ? (
                 <small className={styles["scan-copy-notice"]}>{ui("ui.app.i.code.ProfileClient.0854b0c9c202", "Copy failed. You can copy the URL from your browser bar.")}</small>
               ) : null}
+              {!canEdit ? <div className={styles["profile-claim-entry"]}>
+                <Link href={"/ownership-claim?code=" + encodeURIComponent(instrument.qrCode)}>{ui("ui.app.i.code.ProfileClient.21f95b4c7342", "Start ownership request")} <ArrowRight size={14} aria-hidden="true" /></Link>
+                <p>{ui("ui.app.i.code.ProfileClient.b5c3490dde3a", "Scanning this QR code opens the Profile. It never changes ownership. Ask the current owner for a transfer, or start a private request if they cannot send one.")}</p>
+              </div> : null}
             </ProfileIdentity>
           </div>
         </section>
@@ -978,16 +982,6 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
           timelineEvents={timelineEvents}
           serviceEntries={presentation?.serviceEntries || []}
         />
-
-        {!canEdit ? (
-          <details className={styles["profile-claim-entry"]}>
-            <summary>{ui("ui.app.i.code.ProfileClient.3d1e7e38e23c", "Ownership & transfers")}</summary>
-            <div>
-              <p>{ui("ui.app.i.code.ProfileClient.b5c3490dde3a", "Scanning this QR code opens the Profile. It never changes ownership. Ask the current owner for a transfer, or start a private request if they cannot send one.")}</p>
-              <Link href={`/ownership-claim?code=${encodeURIComponent(instrument.qrCode)}`}>{ui("ui.app.i.code.ProfileClient.21f95b4c7342", "Start ownership request")}{" "}<ArrowRight size={14} aria-hidden="true" /></Link>
-            </div>
-          </details>
-        ) : null}
 
         {activeMedia ? (
           <PhotoViewer

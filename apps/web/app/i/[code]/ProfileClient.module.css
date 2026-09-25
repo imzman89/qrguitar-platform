@@ -94,10 +94,9 @@
 .external-media-card p { color: var(--muted); font-size: 13px; }
 .media-placeholder-grid, .collaboration-thread { color: var(--muted); font-size: 14px; line-height: 1.65; }
 .media-placeholder-grid span { display: block; }
-.profile-claim-entry { max-width: 700px; margin-top: 10px; color: var(--muted); font-size: 13px; line-height: 1.65; }
-.profile-claim-entry summary { width: fit-content; min-height: 44px; padding-block: 10px; cursor: pointer; color: var(--muted-strong); }
-.profile-claim-entry p { margin: 4px 0 12px; }
-.profile-claim-entry a { display: inline-flex; align-items: center; gap: 8px; color: var(--text); }
+.profile-claim-entry { margin-top: 12px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.profile-claim-entry p { margin: 3px 0 0; }
+.profile-claim-entry a { display: inline-flex; min-height: 44px; align-items: center; gap: 8px; color: var(--text); font-size: 13px; font-weight: 600; }
 .scan-profile :is(button,a,summary):focus-visible { outline: 2px solid var(--action); outline-offset: 4px; }
 @media (max-width: 900px) {
   .scan-shell { width: min(720px,calc(100% - 40px)); }

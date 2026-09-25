@@ -1,5 +1,6 @@
 // Stable site-authored presentation entries. Existing CMS keys remain unchanged.
 export const uiTextEntries: Array<{ key: string; scope: string; text: string; area: string; page: string; section: string; source: string }> = [
+  { key: "ui.app.handout.code.PrintDocument.buyerRequest", scope: "app.handout.code.PrintDocument", text: "New owner? Scan, then choose Start ownership request on the Profile.", area: "Product", page: "Print Workspace", section: "Page text", source: "app/handout/[code]/PrintDocument.tsx" },
   { key: "ui.app.dashboard.page.noHandoff", scope: "app.dashboard.page", text: "No handoff started. Choose a method below when you are ready.", area: "Product", page: "Dashboard", section: "Page text", source: "app/dashboard/page.tsx" },
   { key: "ui.app.dashboard.page.handoffCompleted", scope: "app.dashboard.page", text: "Handoff completed. The next owner accepted the Profile.", area: "Product", page: "Dashboard", section: "Page text", source: "app/dashboard/page.tsx" },
   { key: "ui.app.dashboard.page.handoffCancelled", scope: "app.dashboard.page", text: "Handoff cancelled. Start a new transfer if needed.", area: "Product", page: "Dashboard", section: "Page text", source: "app/dashboard/page.tsx" },
@@ -17670,15 +17671,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "page": "Public Profile",
     "area": "Product",
     "section": "Accessibility",
-    "source": "app/i/[code]/ProfileClient.tsx"
-  },
-  {
-    "key": "ui.app.i.code.ProfileClient.3d1e7e38e23c",
-    "scope": "app.i.code.ProfileClient",
-    "text": "Ownership & transfers",
-    "page": "Public Profile",
-    "area": "Product",
-    "section": "Page text",
     "source": "app/i/[code]/ProfileClient.tsx"
   },
   {

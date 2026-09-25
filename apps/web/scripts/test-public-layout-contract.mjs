@@ -83,10 +83,11 @@ test("confirmed trust explanations appear once and saved badge visibility remain
   assert.doesNotMatch(render({ showVerificationBadge: false, showAuthenticityBadge: false }), /Verified by QRguitar|Authenticity Confirmed/);
 });
 
-test("ownership help follows record content as a closed disclosure and owner-only actions stay absent", () => {
+test("buyer ownership request stays visible beside the QR before record details while owner actions stay absent", () => {
   const html = render();
-  assert.ok(html.indexOf('class="profile-claim-entry"') > html.indexOf("Original cabinet with documented service."));
-  assert.match(html, /<details class="profile-claim-entry">/);
+  assert.ok(html.indexOf('class="profile-claim-entry"') > html.indexOf('class="scan-qr"'));
+  assert.ok(html.indexOf('class="profile-claim-entry"') < html.indexOf("Original cabinet with documented service."));
+  assert.match(html, /<div class="profile-claim-entry">/);
   assert.match(html, /ownership-claim\?code=QRG-LAYOUT/);
   assert.doesNotMatch(html, /Owner profile actions|Edit Profile|Ownership Tools/);
 });
