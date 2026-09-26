@@ -1,10 +1,12 @@
 # QRguitar Platform
 
-QRguitar public beta: permanent digital records for guitars, amps, pedals, builders, shops, collectors, and future owners.
+QRguitar: permanent instrument Profiles for guitars, amps, pedals, builders, shops, collectors, and future owners.
+
+For a practical walkthrough, use [customer review and safe testing](docs/CUSTOMER_REVIEW.md). Website wording is covered by the [Content Studio owner guide](docs/CONTENT_STUDIO_OWNER_GUIDE.md) and [field map](docs/content-studio-map.json).
 
 For customer pilots, operating measures, and the data-and-media recovery gate, use the [operating pilot checklist](docs/OPERATING_PILOT.md).
 
-Standard accounts include 25 free owned Profiles. Additional nonexpiring Profile
+Standard accounts include 5 free owned Profiles. Additional nonexpiring Profile
 credits are US$12/1, US$50/10, or US$99/25 when purchases are enabled. Transfers
 are free. Existing Profiles stay available and never consume credits retroactively
 when the allowance changes. Separately approved business exceptions remain intact.
@@ -17,7 +19,7 @@ when the allowance changes. Separately approved business exceptions remain intac
 - Public instrument catalog and profile pages
 - Authenticated dashboard, create flow, and edit flow
 - QR-friendly URLs like `/i/QRG-E985125`
-- Floating QRguitar Bot helper with local fallback logic
+- Owner-approved service history, ownership handoff, collections, messaging, and Content Studio
 
 ## Free Stack
 
@@ -34,11 +36,11 @@ isolated tests, and the separate Apple Pay activation requirements. The retained
 [/billing/manual workflow](docs/DIRECT_PAYMENTS_OPERATIONS.md) supports earlier
 direct-link payments and their receipt review.
 
-## Quick Start
+## Development setup (isolated services only)
 
 1. Install Node.js 24.
-2. Create a free Supabase project.
-3. Run the launch SQL in Supabase SQL Editor.
+2. Select an explicitly approved disposable Supabase environment with synthetic accounts and captured email.
+3. Follow the existing environment setup and migration history. Never run historical SQL against production as a setup shortcut.
 4. Copy `apps/web/.env.example` to `apps/web/.env.local`.
 5. Add your Supabase project URL, anon key, and service role key.
 6. Install dependencies:
@@ -61,11 +63,11 @@ http://127.0.0.1:3003
 
 ## Production release
 
-Read [the release runbook](docs/RELEASE_2026_09.md) before deploying. This release requires coordinated database migrations; a new application build by itself is insufficient.
+Read [the release runbook](docs/RELEASE_2026_09.md) before deploying. The current production contract is `2026-09-23.1`. A compatible frontend release requires a passing read-only readiness check; it does not require replaying migrations. Schema changes need their own reviewed authorization.
 
 A source-only Netlify Free adapter is documented in [docs/NETLIFY_FREE_DEPLOYMENT.md](docs/NETLIFY_FREE_DEPLOYMENT.md). It adds no account, deploy, secret, domain, or DNS change and remains fail-closed until the 6 MB request and 60-second function compatibility checks pass.
 
-After management access is current, the release migrations are applied, and the reviewed changes are committed:
+After management access is current, the existing database passes the required readiness contract, and the reviewed changes are committed:
 
 ```bash
 npm run push:live
@@ -74,6 +76,8 @@ npm run push:live
 This command requires Node.js 24, a clean committed tree, and the existing QRguitar Vercel project link. It runs the production build, typecheck, launch assertions, behavior suite, web dependency audit, and a service-only database readiness check before staging. It uploads an immutable commit, verifies the staged production deployment against its actual database, then promotes it and checks the live commit identity and public web-app resources. A failed check stops the command; a failure after Vercel deployment requires inspecting the live deployment.
 
 `npm run deploy:web` and `push-live.cmd` use this same guarded command. Credentials stay in the server environment or ignored local environment file; the launcher does not rewrite them or put service keys into CLI arguments.
+
+A localhost frontend is not automatically a test environment. Before saving, inspect its actual Auth, database, Storage, email, and payment destinations. Never use production service credentials for disposable testing. The default port below is a launcher default, not proof that it is the currently running review origin.
 
 ## Local review on Windows
 

@@ -2,7 +2,21 @@
 
 This candidate improves the existing Next.js/Vercel/Supabase application. It includes an installable web experience. Native App Store releases are not active. Check configured payment providers before claiming checkout availability.
 
-## Release prerequisites
+## Current compatible release workflow — September 26
+
+Production was independently verified at commit `ea717cfe93ec47d952b21d2cf43b040167052f44`, deployment `dpl_6cfdxTkK5P4utE86PqnSVAe2RTW4`, with readiness `2026-09-23.1` and all 14 checks. These are a recorded baseline, not a substitute for checking live identity before the next release.
+
+1. Read the current acceptance record and inspect `git status`, `git rev-parse HEAD`, `/api/build-info` and `/api/health`. Preserve unrelated work and record the live rollback deployment.
+2. Verify the exact candidate in an isolated environment. Real Auth, database, Storage and captured email must all be disposable; a localhost URL alone does not establish isolation. Keep live payment effects disabled and production workflow inspection read-only.
+3. Use Node 24 and the committed lockfile. In a checkout reusing dependencies, include the web workspace dependency directory: the web app resolves TypeScript 5.9.3, while the root can resolve a different version. Do not repair a fixture failure by changing assertions to fit the wrong dependency layout.
+4. Run final checks against frozen source. Use a separate build directory/checkout from an active development server. Commit only reviewed changes, then push the authorized branch using the normal remote.
+5. From a clean checkout with the existing Vercel project link and privately supplied server environment, run `npm run push:live`. This runs the existing full guard, read-only database readiness, immutable staging, staged verification, promotion and live identity verification. No database migrations are part of a compatible UI release.
+6. Verify the live SHA/deployment plus affected public and permitted authenticated screens. Record missing sessions or physical-device evidence accurately. Do not create public QA Profiles, send real test messages, alter ownership or submit payments for a smoke test.
+7. If a material regression occurs and the schema/content contracts are unchanged, promote the exact previously recorded compatible Vercel deployment using the existing authenticated CLI and verify its SHA and health again. A recorded rollback command is a procedure, not proof that a rollback was executed.
+
+The sections below preserve historical schema-cutover instructions. They are **not** instructions to rerun migrations, freeze production traffic or change firewall rules for every frontend release. The current contract lives in `apps/web/lib/release-readiness.ts`; verify live state before any separately authorized schema work.
+
+## Historical schema-cutover prerequisites
 
 Use Node.js 24 with Git and tar available on PATH, and the committed lockfile (`npm ci`). The application is linked to the existing QRguitar Vercel project, with root directory `apps/web`. Keep its Supabase service key in the server environment and ignored `apps/web/.env.local`; never add it to source control, screenshots, deployment arguments, or public environment variables.
 
@@ -12,7 +26,7 @@ Verify the existing baseline schema before applying new migrations. This reposit
 
 Take an appropriate database backup and record the currently deployed revision. Schedule a coordinated release window and quiesce write traffic while the database and application contracts change. The old transfer overload is intentionally revoked; old Site Editor clients must reload. Private storage and direct-client policy changes also require the compatible server readers and public-file proxy. Do not leave the old application serving writes against a partially upgraded schema.
 
-## New migration order
+## Historical migration order (September 18 contract)
 
 Apply the reviewed candidate migrations in this order after their historical prerequisites:
 
@@ -205,9 +219,9 @@ No code review or test suite guarantees a financial valuation or proves the abse
 
 Deployment references: [Vercel staged production deployments](https://vercel.com/docs/cli/deploying-from-cli), [Vercel curl protection handling](https://vercel.com/docs/cli/curl), and [promotion](https://vercel.com/docs/cli/promote). CLI argument syntax was also checked against installed 59.15.1 help.
 
-## Five-free policy cutover (September 23)
+## Historical five-free policy cutover (September 23)
 
-The current production database reports readiness `2026-09-17.13`. This policy change requires the exact `20260923120000_five_free_profiles.sql` and `20260923121000_release_readiness.sql` migrations before promoting an application that expects `2026-09-23.1`. It does not rewrite existing Profiles or paid-credit history. The paid 25-credit purchase pack remains a separate product.
+Before the September 23 cutover, the baseline reported readiness `2026-09-17.13`. That completed policy transition required the exact `20260923120000_five_free_profiles.sql` and `20260923121000_release_readiness.sql` migrations before promoting an application that expects `2026-09-23.1`. It does not rewrite existing Profiles or paid-credit history. The paid 25-credit purchase pack remains a separate product.
 
 1. Stage the committed application with `npm run push:live -- --stage-only`; record the existing live deployment and its aliases first. The staged candidate may show an unhealthy readiness response until the coordinated database cutover.
 2. Check the published database still reports `.13`, inspect any in-flight checkout/create operations, and quiesce writes during cutover. Confirm the two reviewed migration files are the only schema changes. Apply them as one atomic transaction, removing only their outer `begin`/`commit` wrappers when combining them. Require `qrguitar_release_readiness()` to return `.1` and all 14 checks true before resuming writes.

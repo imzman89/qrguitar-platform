@@ -22,7 +22,9 @@ exception. The authoritative owned count includes retained owner-linked records.
 The five-Profile allowance applies to future creation only: existing Profiles are
 preserved, and adopting the limit does not consume purchased credits retroactively.
 
-## Deployment and configuration
+## Historical billing schema and current configuration
+
+For current releases, use `2026-09-23.1` from `apps/web/lib/release-readiness.ts` and the current workflow in [the release runbook](RELEASE_2026_09.md). A compatible frontend release does not replay these historical migrations or activate payments.
 
 The billing migrations are `20260917190000_billing_credits.sql` and
 `20260917191000_release_readiness.sql`. The current release also requires
@@ -34,8 +36,8 @@ The billing migrations are `20260917190000_billing_credits.sql` and
 `20260917220500_site_editor_helper_permissions.sql` and
 `20260917221000_release_readiness.sql`, followed by
 `20260918120000_direct_business_payments.sql` and
-`20260918121000_release_readiness.sql`, in that order. This candidate's required readiness
-version is **2026-09-17.7**; the historical `.3`, `.4`, `.5`, and `.6` migrations are intermediate
+`20260918121000_release_readiness.sql`, in that order. This historical billing stage used readiness
+version **2026-09-17.7**; the historical `.3`, `.4`, `.5`, and `.6` migrations are intermediate
 contracts. The active contract checks the private ledger, intake and evidence-upload schema,
 exact function implementations, grants, constraints, and LIVE database boundary.
 Do not edit old migrations or bypass fingerprint checks. Coordinate schema and
