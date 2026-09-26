@@ -50,6 +50,11 @@ import {
   type ContentRegistryEntry
 } from "../../lib/content-registry";
 import {
+  createEmailTemplateSetupExport,
+  emailTemplateDeliveryBoundary,
+  emailTemplatePrefixFromKeys
+} from "../../lib/email-template-boundary";
+import {
   applyThemeSettings,
   defaultSiteSettings,
   isSafeBrandLogoUrl,
@@ -732,6 +737,22 @@ function SiteEditorWorkspace() {
     setMessage(ui("ui.app.site.editor.page.9a80291326a6", "Brand logo added to the draft."));
   }
 
+  function downloadEmailSetupExport() {
+    if (selected.area !== "Emails" || !activeSectionEntries.length) return;
+    const fields = Object.fromEntries(activeSectionEntries.map((entry) => [entry.key, settings.content[entry.key] ?? entry.defaultValue]));
+    const templatePrefix = emailTemplatePrefixFromKeys(Object.keys(fields));
+    const bundle = createEmailTemplateSetupExport(templatePrefix, fields);
+    const url = URL.createObjectURL(new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `qrguitar-${templatePrefix.replace(/[^a-z0-9]+/gi, "-")}-setup.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setEmailTestFeedback({
+      tone: "success",
+      message: ui("ui.app.site.editor.page.emailSetupExportDownloaded", "Template setup export downloaded.")
+    });
+  }
   async function sendEmailTest() {
     setEmailSending(true);
     setEmailTestFeedback({ tone: "pending", message: "Sending a safe test to the authenticated admin…" });
@@ -748,7 +769,7 @@ function SiteEditorWorkspace() {
       });
       const payload = (await response.json().catch(() => ({}))) as { message?: string };
       if (!response.ok) throw new Error(payload.message || "Test email failed.");
-      setEmailTestFeedback({ tone: "success", message: payload.message || "Test email sent to the authenticated admin." });
+      setEmailTestFeedback({ tone: "success", message: payload.message || "Test email accepted by the provider for the authenticated admin." });
     } catch (error) {
       setEmailTestFeedback({ tone: "error", message: error instanceof Error ? error.message : "Test email failed." });
     } finally {
@@ -933,13 +954,20 @@ function SiteEditorWorkspace() {
   const emailBody = activeSectionEntries.find((entry) => entry.key.endsWith(".body"));
   const emailCta = activeSectionEntries.find((entry) => entry.key.endsWith(".cta"));
   const emailFooter = activeSectionEntries.find((entry) => entry.key.endsWith(".footer"));
+  const emailTemplatePrefix = emailTemplatePrefixFromKeys(activeSectionEntries.map((entry) => entry.key));
+  const emailDeliveryBoundary = emailTemplateDeliveryBoundary(emailTemplatePrefix);
+  const emailDeliveryLabel = emailDeliveryBoundary.kind === "application"
+    ? ui("ui.app.site.editor.page.emailApplicationDelivery", "Application delivery · Brevo")
+    : emailDeliveryBoundary.kind === "provider"
+      ? ui("ui.app.site.editor.page.emailProviderDelivery", "Provider delivery · Supabase Auth")
+      : ui("ui.app.site.editor.page.emailPreviewOnly", "Design preview · no production trigger");
   const emailEditor = (
     <div className="cms-fields">
       {standardEditor}
       <section className="cms-field-group cms-email-studio">
         <header><div><span>{ui("ui.app.site.editor.page.eeb51b63cf49", "Safe preview")}</span><h2>{activeSectionName ? ui("ui.app.site.editor.page.f199529a30df", "{{value1}} email", { value1: activeSectionName }) : ui("ui.app.site.editor.page.92f2897724bf", "Email preview")}</h2></div><Send size={20} /></header>
         <p className="cms-section-intro">{ui("ui.app.site.editor.page.bbad0a028b19", "Whitelisted variables are replaced with sample values here. Previewing never sends an email or exposes a real token.")}</p>
-        <p className="cms-section-intro">{ui("ui.app.site.editor.page.emailDeliveryBoundary", "Service-submission templates are used by configured application delivery. Other templates are preview/test only; authentication-provider templates are configured separately.")}</p>
+        <p className="cms-section-intro"><strong>{emailDeliveryLabel}.</strong>{" "}{ui("ui.app.site.editor.page.emailDeliveryBoundary", "Only Service / Submitted is sent by the application. Supabase owns password-reset and transfer sign-in delivery; the remaining templates are design previews with no production trigger.")}</p>
         <div className="cms-email-preview">
           <div className="cms-email-envelope">
             <span>{ui("ui.app.site.editor.page.68971283841a", "Subject")}</span>
@@ -960,10 +988,16 @@ function SiteEditorWorkspace() {
           </div>
         </div>
         <div className="cms-email-actions">
-          <button type="button" className="button secondary" onClick={() => void sendEmailTest()} disabled={emailSending}>
-            <Send size={16} /> {emailSending ? ui("ui.app.site.editor.page.afdb2a6b3534", "Sending test…") : ui("ui.app.site.editor.page.4e19e53db870", "Send test to my admin email")}
-          </button>
-          <small>{ui("ui.app.site.editor.page.8ddb6a61231c", "The recipient is fixed to the authenticated admin account. Addresses cannot be entered here.")}</small>
+          {emailDeliveryBoundary.canSendApplicationTest ? <>
+            <button type="button" className="button secondary" onClick={() => void sendEmailTest()} disabled={emailSending}>
+              <Send size={16} /> {emailSending ? ui("ui.app.site.editor.page.afdb2a6b3534", "Sending test…") : ui("ui.app.site.editor.page.4e19e53db870", "Send test to my admin email")}
+            </button>
+            <small>{ui("ui.app.site.editor.page.8ddb6a61231c", "The recipient is fixed to the authenticated admin account. Addresses cannot be entered here.")}</small>
+          </> : <>
+            <button type="button" className="button secondary" onClick={downloadEmailSetupExport}>
+              <Code2 size={16} /> {ui("ui.app.site.editor.page.downloadEmailSetupExport", "Download setup export")}
+            </button>
+          </>}
         </div>
         {emailTestFeedback ? <p className={`form-message is-${emailTestFeedback.tone}`} role={emailTestFeedback.tone === "error" ? "alert" : "status"} aria-live="polite">{emailTestFeedback.message}</p> : null}
       </section>

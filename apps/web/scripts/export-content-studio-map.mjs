@@ -109,11 +109,23 @@ function bindingFor(entry) {
     sourceFiles: ["lib/transactional-email.ts"],
     note: "Rendered by the application service-submitted email path."
   };
+  if (entry.key.startsWith("email.security.passwordReset.")) return {
+    kind: "provider-auth-email",
+    status: "provider-owned-export-artifact",
+    sourceFiles: ["docs/provider-email-templates/supabase-recovery.html"],
+    note: "Supabase Auth owns recovery delivery. Content Studio is a review reference; the install artifact preserves the provider placeholder."
+  };
+  if (entry.key.startsWith("email.ownership.transferInvitation.")) return {
+    kind: "provider-auth-email",
+    status: "provider-owned-export-artifact",
+    sourceFiles: ["docs/provider-email-templates/supabase-magic-link.html"],
+    note: "Supabase Auth owns transfer sign-in delivery. Content Studio is a review reference; the provider cannot consume the profile-specific CMS variables."
+  };
   if (entry.key.startsWith("email.")) return {
     kind: "transactional-email",
     status: "editor-preview-only",
     sourceFiles: [],
-    note: "Editable and test-previewable, but no application delivery renderer is bound in this source tree."
+    note: "Editable design preview only; no application or provider delivery trigger is bound."
   };
   if (entry.key.startsWith("seo.")) return {
     kind: "seo-metadata",
@@ -176,8 +188,9 @@ const document = {
   },
   emailBoundary: {
     applicationRendererBoundPrefix: "email.service.submitted.",
+    providerOwnedPrefixes: ["email.security.passwordReset.", "email.ownership.transferInvitation."],
     allOtherEmailTemplates: "editor-preview-only",
-    authProviderTemplates: "documented proposals only; Content Studio does not configure the authentication provider"
+    authProviderTemplates: "reviewed install artifacts; Content Studio does not configure or synchronize the authentication provider"
   },
   previewBoundary: "Representative routes prove routing and draft/published rendering only. Conditional, record-specific, and session-return states require a real permitted record or state and are never fabricated.",
   counts,

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="supported-color-schemes" content="dark">
+  <title>Sign in to QRguitar</title>
+  <style>
+    html, body { margin: 0 !important; padding: 0 !important; width: 100% !important; background: #090d0f !important; }
+    table { border-collapse: collapse !important; border-spacing: 0 !important; }
+    .frame { width: 100% !important; max-width: 640px; min-width: 0 !important; table-layout: fixed; }
+    .pad { padding: 38px 24px 32px; }
+    .card { padding: 32px; }
+    .wrap { overflow-wrap: anywhere; word-break: break-word; }
+    @media only screen and (max-width: 560px) {
+      .pad { padding: 22px 12px 24px !important; }
+      .card { padding: 24px 18px !important; }
+      .heading { font-size: 27px !important; line-height: 1.16 !important; }
+      .button { display: block !important; text-align: center !important; }
+    }
+  </style>
+</head>
+<body>
+  <div style="display:none!important;max-height:0;max-width:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all;">Your private QRguitar sign-in link is ready.&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;background:#090d0f;">
+    <tr>
+      <td align="center" style="width:100%;max-width:100%;">
+        <table role="presentation" class="frame" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:640px;table-layout:fixed;">
+          <tr>
+            <td class="pad" style="padding:38px 24px 32px;font-family:Arial,Helvetica,sans-serif;color:#fffaf0;">
+              <div class="wrap" style="font-size:27px;line-height:1;font-weight:800;letter-spacing:-0.8px;margin:0 0 28px;"><span style="color:#f59e0b;">QR</span>guitar</div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;background:#151b1f;border:1px solid #39434a;border-radius:10px;">
+                <tr>
+                  <td class="card wrap" style="padding:32px;overflow-wrap:anywhere;word-break:break-word;">
+                    <p style="margin:0 0 11px;color:#f59e0b;font-size:12px;line-height:1.35;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;">Private sign-in link</p>
+                    <h1 class="heading wrap" style="margin:0 0 17px;color:#fffaf0;font-size:31px;line-height:1.18;font-weight:800;overflow-wrap:anywhere;word-break:break-word;">Continue securely to QRguitar</h1>
+                    <p class="wrap" style="margin:0;color:#dce1e3;font-size:16px;line-height:1.65;overflow-wrap:anywhere;word-break:break-word;">This private link signs you in so you can continue with your QRguitar account or an ownership transfer.</p>
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 24px;">
+                      <tr>
+                        <td bgcolor="#f59e0b" style="border-radius:7px;">
+                          <a class="button wrap" href="{{ .ConfirmationURL }}" style="display:inline-block;padding:14px 21px;color:#111416;background:#f59e0b;border:1px solid #f59e0b;border-radius:7px;font-size:15px;line-height:1.2;font-weight:800;text-decoration:none;overflow-wrap:anywhere;word-break:break-word;">Sign in to QRguitar</a>
+                        </td>
+                      </tr>
+                    </table>
+                    <p class="wrap" style="margin:0 0 18px;color:#aeb8bd;font-size:13px;line-height:1.58;overflow-wrap:anywhere;word-break:break-word;">If you were not expecting this email, ignore it. Do not forward or share this private sign-in link.</p>
+                    <p class="wrap" style="margin:0;color:#89959b;font-size:12px;line-height:1.55;overflow-wrap:anywhere;word-break:break-word;">If the button does not work, copy and paste this link into your browser:<br><a href="{{ .ConfirmationURL }}" style="color:#f7b84b;text-decoration:underline;overflow-wrap:anywhere;word-break:break-word;">{{ .ConfirmationURL }}</a></p>
+                  </td>
+                </tr>
+              </table>
+              <p class="wrap" style="margin:20px 0 0;color:#89959b;font-size:12px;line-height:1.55;text-align:center;overflow-wrap:anywhere;word-break:break-word;">QRguitar · Permanent instrument identity and history</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

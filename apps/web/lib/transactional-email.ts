@@ -1,12 +1,120 @@
 import { contentRegistryByKey, getContentValue, validateVariables } from "./content-registry";
+import { renderBrandedTransactionalEmail, type TransactionalEmailDocument } from "./transactional-email-renderer";
 import { loadPublishedSiteSettings } from "./site-settings-server";
 
-type EmailResult = { ok: boolean; status: "sent" | "failed"; message: string; providerMessageId?: string };
+export type EmailResult = {
+  ok: boolean;
+  status: "sent" | "failed";
+  outcome: "accepted" | "rejected" | "unknown";
+  message: string;
+  providerMessageId?: string;
+  retryable?: boolean;
+  retryAfterSeconds?: number;
+};
+
+type DeliveryOptions = {
+  fetcher?: typeof fetch;
+  timeoutMs?: number;
+  idempotencyKey?: string;
+  signal?: AbortSignal;
+  successMessage: string;
+  failureMessage: string;
+};
+
+const BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email";
+const DEFAULT_DELIVERY_TIMEOUT_MS = 10_000;
+
+function cleanEmailAddress(value: string) {
+  const address = String(value || "").replace(/^.*<([^>]+)>.*$/, "$1").trim();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address) ? address : "";
+}
 
 function senderAddress() {
-  return String(process.env.SMTP_FROM || process.env.EMAIL_FROM || "noreply@qrguitar.com")
-    .replace(/^.*<([^>]+)>.*$/, "$1")
-    .trim();
+  return cleanEmailAddress(process.env.SMTP_FROM || process.env.EMAIL_FROM || "");
+}
+
+function replyAddress() {
+  return cleanEmailAddress(process.env.SMTP_REPLY_TO || "support@qrguitar.com");
+}
+
+function approvedApplicationOrigins() {
+  return [process.env.NEXT_PUBLIC_SITE_URL || "", "https://www.qrguitar.com", "https://qrguitar.com"];
+}
+
+function retryAfterSeconds(response: Response) {
+  const value = response.headers.get("retry-after");
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds);
+  const date = Date.parse(value);
+  if (!Number.isFinite(date)) return undefined;
+  return Math.max(0, Math.ceil((date - Date.now()) / 1000));
+}
+
+export async function deliverBrevoEmail(
+  to: string,
+  document: TransactionalEmailDocument,
+  options: DeliveryOptions
+): Promise<EmailResult> {
+  const apiKey = String(process.env.BREVO_API_KEY || "").trim();
+  if (!apiKey) return { ok: false, status: "failed", outcome: "rejected", message: "Brevo delivery is not configured for application messages." };
+
+  const recipient = cleanEmailAddress(to);
+  const sender = senderAddress();
+  const replyTo = replyAddress();
+  if (!recipient || !sender || !replyTo) {
+    return { ok: false, status: "failed", outcome: "rejected", message: "Email delivery configuration is invalid." };
+  }
+  const idempotencyKey = String(options.idempotencyKey || "").trim();
+  if (idempotencyKey && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idempotencyKey)) {
+    return { ok: false, status: "failed", outcome: "rejected", message: "Email delivery idempotency key is invalid." };
+  }
+
+  const controller = new AbortController();
+  const abortFromCaller = () => controller.abort();
+  if (options.signal?.aborted) controller.abort();
+  else options.signal?.addEventListener("abort", abortFromCaller, { once: true });
+  const timer = setTimeout(() => controller.abort(), Math.max(1, options.timeoutMs || DEFAULT_DELIVERY_TIMEOUT_MS));
+  try {
+    const response = await (options.fetcher || fetch)(BREVO_ENDPOINT, {
+      method: "POST",
+      headers: { "api-key": apiKey, "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        sender: { name: "QRguitar", email: sender },
+        replyTo: { email: replyTo },
+        to: [{ email: recipient }],
+        subject: document.subject,
+        htmlContent: document.htmlContent,
+        textContent: document.textContent,
+        ...(idempotencyKey ? { headers: { idempotencyKey } } : {})
+      }),
+      cache: "no-store",
+      redirect: "error",
+      signal: controller.signal
+    });
+    const payload = await response.json().catch(() => ({})) as { messageId?: string };
+    if (!response.ok) {
+      const retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+      return {
+        ok: false,
+        status: "failed",
+        outcome: "rejected",
+        message: `${options.failureMessage} (${response.status}).`,
+        retryable,
+        retryAfterSeconds: retryable ? retryAfterSeconds(response) : undefined
+      };
+    }
+    if (!payload.messageId) {
+      return { ok: false, status: "failed", outcome: "unknown", message: `${options.failureMessage} (provider receipt missing).`, retryable: false };
+    }
+    return { ok: true, status: "sent", outcome: "accepted", message: options.successMessage, providerMessageId: payload.messageId };
+  } catch (error) {
+    const suffix = error instanceof Error && error.name === "AbortError" ? " (delivery timed out)" : "";
+    return { ok: false, status: "failed", outcome: "unknown", message: `${options.failureMessage}${suffix}.`, retryable: false };
+  } finally {
+    clearTimeout(timer);
+    options.signal?.removeEventListener("abort", abortFromCaller);
+  }
 }
 
 export async function sendAdminTemplateTestEmail(input: {
@@ -16,45 +124,32 @@ export async function sendAdminTemplateTestEmail(input: {
   heading: string;
   body: string;
   ctaLabel?: string;
+  ctaUrl: string;
   footer?: string;
 }): Promise<EmailResult> {
-  const apiKey = String(process.env.BREVO_API_KEY || "").trim();
-  if (!apiKey) {
-    return { ok: false, status: "failed", message: "Brevo delivery is not configured for application messages." };
-  }
-
-  const safeSubject = input.subject.replace(/[\r\n]+/g, " ").trim().slice(0, 160);
-  const safePreheader = escapeHtml(String(input.preheader || "QRguitar Content Studio test").slice(0, 200));
-  const safeHeading = escapeHtml(input.heading.slice(0, 140));
-  const safeBody = escapeHtml(input.body.slice(0, 1600)).replace(/\n/g, "<br>");
-  const safeCta = escapeHtml(String(input.ctaLabel || "Open QRguitar").slice(0, 80));
-  const safeFooter = escapeHtml(String(input.footer || "This test was sent from the QRguitar Content Studio.").slice(0, 300));
-  if (!safeSubject || !safeHeading || !safeBody) {
-    return { ok: false, status: "failed", message: "Subject, heading, and body are required for a test email." };
-  }
-
-  const htmlContent = `<!doctype html><html><head><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"><title>${escapeHtml(safeSubject)}</title></head><body style="margin:0;background:#091013;color:#f7f3e8;font-family:Arial,sans-serif"><div style="display:none;max-height:0;overflow:hidden;opacity:0">${safePreheader}</div><div style="max-width:620px;margin:0 auto;padding:36px 22px"><div style="font-size:26px;font-weight:800;margin-bottom:28px">QR<span style="color:#f59e0b">guitar</span></div><div style="background:#121b20;border:1px solid #2d383d;border-radius:8px;padding:28px"><p style="margin:0 0 10px;color:#f59e0b;font-size:12px;font-weight:800;text-transform:uppercase">Content Studio test</p><h1 style="margin:0 0 16px;font-size:28px">${safeHeading}</h1><p style="line-height:1.6;color:#d7dcde">${safeBody}</p><p style="margin:26px 0"><span style="display:inline-block;background:#f7f1df;color:#091013;font-weight:800;padding:14px 20px;border-radius:6px">${safeCta}</span></p><p style="font-size:12px;color:#9da8ad">${safeFooter}</p></div><p style="font-size:12px;color:#7f898d;margin-top:20px">Test recipient: authenticated QRguitar administrator.</p></div></body></html>`;
-
+  let document: TransactionalEmailDocument;
   try {
-    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: { "api-key": apiKey, "content-type": "application/json", accept: "application/json" },
-      body: JSON.stringify({
-        sender: { name: "QRguitar", email: senderAddress() },
-        replyTo: { email: String(process.env.SMTP_REPLY_TO || "support@qrguitar.com") },
-        to: [{ email: input.to }],
-        subject: `[TEST] ${safeSubject}`,
-        htmlContent
-      })
+    document = renderBrandedTransactionalEmail({
+      subject: `[TEST] ${input.subject}`,
+      preheader: input.preheader || "QRguitar Content Studio test",
+      eyebrow: "Content Studio delivery test",
+      heading: input.heading,
+      body: input.body,
+      ctaLabel: input.ctaLabel || "Open QRguitar",
+      ctaUrl: input.ctaUrl,
+      notice: "This message tests the application-rendered service-review family. It does not prove inbox placement or configure provider-owned authentication templates.",
+      footer: input.footer || "QRguitar · Permanent instrument identity and history",
+      allowedCtaOrigins: approvedApplicationOrigins(),
+      testRecipientNote: "Test recipient: authenticated QRguitar administrator."
     });
-    const payload = await response.json().catch(() => ({})) as { messageId?: string };
-    if (!response.ok) {
-      return { ok: false, status: "failed", message: `Brevo rejected the test email (${response.status}).` };
-    }
-    return { ok: true, status: "sent", message: "Test email sent to the authenticated admin.", providerMessageId: payload.messageId };
   } catch {
-    return { ok: false, status: "failed", message: "The test email could not be delivered." };
+    return { ok: false, status: "failed", outcome: "rejected", message: "The test email contains an invalid or unsafe field." };
   }
+
+  return deliverBrevoEmail(input.to, document, {
+    successMessage: "Application-rendered test email accepted by the email provider for the authenticated admin.",
+    failureMessage: "The application-rendered test email was not accepted by the email provider"
+  });
 }
 
 export async function sendServiceReviewEmail(input: {
@@ -62,12 +157,9 @@ export async function sendServiceReviewEmail(input: {
   profileTitle: string;
   providerName: string;
   reviewUrl: string;
+  idempotencyKey?: string;
+  signal?: AbortSignal;
 }): Promise<EmailResult> {
-  const apiKey = String(process.env.BREVO_API_KEY || "").trim();
-  if (!apiKey) {
-    return { ok: false, status: "failed", message: "Owner notification created, but email delivery is not configured for application messages." };
-  }
-
   const settings = await loadPublishedSiteSettings();
   const variables = {
     profile_title: input.profileTitle,
@@ -76,77 +168,35 @@ export async function sendServiceReviewEmail(input: {
     review_url: input.reviewUrl
   };
   const render = (suffix: string) => renderRegisteredTemplateValue(settings.content, `email.service.submitted.${suffix}`, variables);
-  const subject = render("subject").replace(/[\r\n]+/g, " ").trim().slice(0, 160);
-  const safePreheader = escapeHtml(render("preheader"));
-  const safeHeading = escapeHtml(render("heading"));
-  const safeBody = escapeHtml(render("body")).replace(/\n/g, "<br>");
-  const safeCta = escapeHtml(render("cta"));
-  const safeFooter = escapeHtml(render("footer"));
-  const safeUrl = escapeHtml(input.reviewUrl);
-  const htmlContent = `<!doctype html><html><head><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"><title>${escapeHtml(subject)}</title></head><body style="margin:0;background:#091013;color:#f7f3e8;font-family:Arial,sans-serif"><div style="display:none;max-height:0;overflow:hidden;opacity:0">${safePreheader}</div><div style="max-width:620px;margin:0 auto;padding:36px 22px"><div style="font-size:26px;font-weight:800;margin-bottom:28px">QR<span style="color:#f59e0b">guitar</span></div><div style="background:#121b20;border:1px solid #2d383d;border-radius:8px;padding:28px"><p style="margin:0 0 10px;color:#f59e0b;font-size:12px;font-weight:800;text-transform:uppercase">Private owner review</p><h1 style="margin:0 0 16px;font-size:28px">${safeHeading}</h1><p style="line-height:1.6;color:#d7dcde">${safeBody}</p><p style="margin:26px 0"><a href="${safeUrl}" style="display:inline-block;background:#f7f1df;color:#091013;text-decoration:none;font-weight:800;padding:14px 20px;border-radius:6px">${safeCta}</a></p><p style="font-size:13px;line-height:1.5;color:#9da8ad">Nothing becomes part of the public Profile until you approve it. Supporting evidence stays private and is not attached to this email. This link expires in 14 days and still requires the authorized owner account.</p></div><p style="font-size:12px;color:#7f898d;margin-top:20px">${safeFooter}</p></div></body></html>`;
 
+  let document: TransactionalEmailDocument;
   try {
-    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: { "api-key": apiKey, "content-type": "application/json", accept: "application/json" },
-      body: JSON.stringify({
-        sender: { name: "QRguitar", email: senderAddress() },
-        replyTo: { email: String(process.env.SMTP_REPLY_TO || "support@qrguitar.com") },
-        to: [{ email: input.to }],
-        subject,
-        htmlContent
-      })
+    document = renderBrandedTransactionalEmail({
+      subject: render("subject"),
+      preheader: render("preheader"),
+      eyebrow: "Private owner review",
+      heading: render("heading"),
+      body: render("body"),
+      ctaLabel: render("cta"),
+      ctaUrl: input.reviewUrl,
+      notice: "Nothing becomes part of the public Profile until you approve it. Supporting evidence stays private and is not attached to this email. This request expires 14 days after submission; resending does not extend that deadline. The link still requires the authorized owner account.",
+      footer: render("footer"),
+      allowedCtaOrigins: approvedApplicationOrigins()
     });
-    const payload = await response.json().catch(() => ({})) as { messageId?: string; message?: string };
-    if (!response.ok) {
-      return { ok: false, status: "failed", message: `Owner notification created, but email delivery failed (${response.status}).` };
-    }
-    return { ok: true, status: "sent", message: "Owner notification and review email sent.", providerMessageId: payload.messageId };
   } catch {
-    return { ok: false, status: "failed", message: "Owner notification created, but email delivery failed." };
-  }
-}
-
-export async function sendCollectionInquiryEmail(input: {
-  to: string;
-  collectionName: string;
-  senderName: string;
-  senderEmail: string;
-  message: string;
-  profileContext?: string;
-}): Promise<EmailResult> {
-  const apiKey = String(process.env.BREVO_API_KEY || "").trim();
-  if (!apiKey) {
-    return { ok: false, status: "failed", message: "Member inquiries are temporarily unavailable." };
+    return { ok: false, status: "failed", outcome: "rejected", message: "Owner notification created, but the email template or review link is invalid." };
   }
 
-  const subject = `QRguitar inquiry for ${String(input.collectionName || "your collection").replace(/[\r\n]+/g, " ").slice(0, 80)}`;
-  const safeCollection = escapeHtml(input.collectionName.slice(0, 80));
-  const safeSender = escapeHtml(input.senderName.slice(0, 80));
-  const safeMessage = escapeHtml(input.message.slice(0, 1200)).replace(/\n/g, "<br>");
-  const safeContext = escapeHtml(String(input.profileContext || "").slice(0, 160));
-  const htmlContent = `<!doctype html><html><head><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"><title>${escapeHtml(subject)}</title></head><body style="margin:0;background:#080d0f;color:#f6f2e8;font-family:Arial,sans-serif"><div style="max-width:620px;margin:0 auto;padding:36px 22px"><div style="font-size:26px;font-weight:800;margin-bottom:28px">QR<span style="color:#f59e0b">guitar</span></div><div style="background:#12191c;border:1px solid #293438;border-radius:8px;padding:28px"><p style="margin:0 0 10px;color:#f59e0b;font-size:12px;font-weight:800;text-transform:uppercase">Private member inquiry</p><h1 style="margin:0 0 16px;font-size:26px">A member contacted ${safeCollection}.</h1>${safeContext ? `<p style="margin:0 0 18px;color:#9fa9ad;font-size:13px">About: ${safeContext}</p>` : ""}<p style="margin:0 0 8px;color:#f6f2e8;font-weight:700">${safeSender} wrote:</p><p style="margin:0;line-height:1.65;color:#d8dddf">${safeMessage}</p><p style="margin:24px 0 0;color:#9fa9ad;font-size:12px;line-height:1.55">Reply to this email to continue the conversation. QRguitar did not expose your email address on the public collection page.</p></div><p style="font-size:12px;color:#7f898d;margin-top:20px">You received this because private inquiries are enabled for your QRguitar collection.</p></div></body></html>`;
-
-  try {
-    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: { "api-key": apiKey, "content-type": "application/json", accept: "application/json" },
-      body: JSON.stringify({
-        sender: { name: "QRguitar", email: senderAddress() },
-        replyTo: { email: input.senderEmail, name: input.senderName },
-        to: [{ email: input.to }],
-        subject,
-        htmlContent
-      })
-    });
-    const payload = await response.json().catch(() => ({})) as { messageId?: string };
-    if (!response.ok) {
-      return { ok: false, status: "failed", message: "The inquiry could not be delivered. Try again later." };
-    }
-    return { ok: true, status: "sent", message: "Inquiry sent privately.", providerMessageId: payload.messageId };
-  } catch {
-    return { ok: false, status: "failed", message: "The inquiry could not be delivered. Try again later." };
+  const result = await deliverBrevoEmail(input.to, document, {
+    successMessage: "Owner notification created; review email accepted by the email provider.",
+    failureMessage: "Owner notification created, but email provider acceptance was not confirmed",
+    idempotencyKey: input.idempotencyKey,
+    signal: input.signal
+  });
+  if (!result.ok && result.message === "Brevo delivery is not configured for application messages.") {
+    return { ...result, message: "Owner notification created, but email delivery is not configured for application messages." };
   }
+  return result;
 }
 
 function renderRegisteredTemplateValue(content: Record<string, string>, key: string, variables: Record<string, string>) {
@@ -156,8 +206,4 @@ function renderRegisteredTemplateValue(content: Record<string, string>, key: str
   const invalid = validateVariables(value, entry.allowedVariables || []);
   if (invalid) throw new Error(`Email template contains an unapproved variable: ${invalid}`);
   return value.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_match, name: string) => variables[name] || "");
-}
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] || character);
 }

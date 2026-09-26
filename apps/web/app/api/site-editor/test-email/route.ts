@@ -51,6 +51,9 @@ export async function POST(request: Request) {
     || fieldKeys.some((key) => !key.startsWith(`${templatePrefix}.`))) {
     return json({ ok: false, message: "Choose one complete email template before sending a test." }, 400);
   }
+  if (templatePrefix !== "email.service.submitted") {
+    return json({ ok: false, message: "This template is not bound to application delivery. Export it for its owning provider or keep it as a preview-only design." }, 409);
+  }
   const values: Record<string, string> = {};
   for (const [key, rawValue] of Object.entries(fields)) {
     const entry = contentRegistryByKey.get(key);
@@ -76,6 +79,7 @@ export async function POST(request: Request) {
     heading,
     body: messageBody,
     ctaLabel: find(".cta", "Open QRguitar"),
+    ctaUrl: SAMPLE_VALUES.review_url,
     footer: find(".footer")
   });
 
@@ -88,7 +92,7 @@ export async function POST(request: Request) {
       targetType: "email_template",
       targetId: templatePrefix,
       reason: "Authenticated Content Studio test",
-      metadata: { status: result.status }
+      metadata: { status: result.status, outcome: result.outcome, providerMessageId: result.providerMessageId || null, deliveryOwner: "application-brevo" }
     });
   }
 

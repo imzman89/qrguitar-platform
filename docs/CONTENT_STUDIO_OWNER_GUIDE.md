@@ -52,9 +52,9 @@ Variables such as `{{profile_title}}` are application values. Keep every registe
 
 ## Email boundary
 
-Only the `email.service.submitted.*` family is bound to an application transactional-email renderer in this source tree.
+Only the `email.service.submitted.*` family is bound to application delivery. It can send a safe test only to the authenticated administrator when Brevo is configured.
 
-The other registered email families can be edited and test-previewed in Content Studio, but they are not evidence of application delivery. In particular, Content Studio does not configure Supabase Auth or any external provider template. Provider configuration and delivery verification are separate operational work.
+Supabase Auth owns password-recovery and transfer sign-in delivery. Their related Content Studio families are review references, not synchronized provider configuration; use the reviewed artifacts in `docs/provider-email-templates/` through the controlled provider change process. The other sixteen registered families are design previews with no production trigger. Content Studio offers a setup export for these non-application families and does not claim to send them.
 
 ## Reading the content map
 
@@ -74,7 +74,8 @@ Binding statuses are intentionally conservative:
 - `registry-family-binding`: a typed family resolver supplies the value.
 - `registered-awaiting-source-integration`: a coordinated key is reserved but its route change is on another integration branch.
 - `registry-only-review-required`: no exact non-editor literal was found. Verify dynamic binding or retire the control before claiming it renders.
-- `editor-preview-only`: the template is not bound to application delivery.
+- `provider-owned-export-artifact`: Supabase Auth owns delivery and a reviewed install artifact exists; Content Studio remains a review reference.
+- `editor-preview-only`: the template has no production delivery trigger.
 
 Regenerate the map after registry or UI-copy changes:
 
