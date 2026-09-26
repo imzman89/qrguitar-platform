@@ -11,7 +11,12 @@ export function StartConversation({ handle, profileCode }: { handle: string; pro
   const ui = useUiText("components.StartConversation");
   const router = useRouter();
   const [attempt, setAttempt] = useState(0);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<{ kind: "" | "sessionChanged" | "timeout" | "failed" | "unconfirmed" | "server"; message?: string }>({ kind: "" });
+  const errorMessage = error.kind === "sessionChanged" ? ui("ui.components.StartConversation.sessionChanged", "Your sign-in session changed. Try again to continue with your current account.")
+    : error.kind === "timeout" ? ui("ui.components.StartConversation.openingTimedOut", "Opening the conversation timed out. Check your connection and try again.")
+    : error.kind === "failed" ? ui("ui.components.StartConversation.c2ad2f8a287b", "The conversation could not be opened.")
+    : error.kind === "unconfirmed" ? ui("ui.components.StartConversation.openRetryFailure", "The conversation could not be opened. Please try again.")
+    : error.kind === "server" ? error.message : "";
 
   useEffect(() => {
     let active = true, current = true;
@@ -19,14 +24,13 @@ export function StartConversation({ handle, profileCode }: { handle: string; pro
     let unsubscribe: (() => void) | undefined;
     const controller = new AbortController();
     const next = `/messages/new?member=${encodeURIComponent(handle)}${profileCode ? `&profile=${encodeURIComponent(profileCode)}` : ""}`;
-    const sessionChanged = "Your sign-in session changed. Try again to continue with your current account.";
-    setError("");
+    setError({ kind: "" });
 
-    function stop(message: string) {
+    function stop(kind: "sessionChanged" | "timeout") {
       if (!active || !current) return;
       current = false;
       controller.abort();
-      setError(message);
+      setError({ kind });
     }
     function check() {
       if (!active || !current) throw new Error("Conversation request is no longer current.");
@@ -41,7 +45,7 @@ export function StartConversation({ handle, profileCode }: { handle: string; pro
         })]);
       } finally { controller.signal.removeEventListener("abort", onAbort); }
     }
-    const timer = setTimeout(() => stop("Opening the conversation timed out. Check your connection and try again."), 15000);
+    const timer = setTimeout(() => stop("timeout"), 15000);
 
     void (async () => {
       try {
@@ -49,7 +53,7 @@ export function StartConversation({ handle, profileCode }: { handle: string; pro
         const subscription = auth.onAuthStateChange((_event, session) => {
           if (!active || !current) return;
           const nextActor = session?.user.id || "";
-          if (actor !== undefined && actor !== nextActor) stop(sessionChanged);
+          if (actor !== undefined && actor !== nextActor) stop("sessionChanged");
           else actor = nextActor;
         });
         unsubscribe = () => subscription.data.subscription.unsubscribe();
@@ -59,7 +63,7 @@ export function StartConversation({ handle, profileCode }: { handle: string; pro
           if (result.error) throw new Error("Could not check your sign-in session. Check your connection and try again.");
           const session = result.data.session;
           const nextActor = session?.user.id || "";
-          if (actor !== undefined && actor !== nextActor) { stop(sessionChanged); check(); }
+          if (actor !== undefined && actor !== nextActor) { stop("sessionChanged"); check(); }
           actor = nextActor;
           return session;
         }
@@ -80,12 +84,12 @@ export function StartConversation({ handle, profileCode }: { handle: string; pro
         await readSession();
         check();
         if (!response.ok || payload?.ok !== true || typeof payload.conversationId !== "string" || !/^[a-zA-Z0-9_-]+$/.test(payload.conversationId)) {
-          setError(typeof payload?.message === "string" ? payload.message : "The conversation could not be opened. Please try again.");
+          setError(typeof payload?.message === "string" && payload.message.trim() ? { kind: "server", message: payload.message } : { kind: "unconfirmed" });
           return;
         }
         router.replace(`/messages/${encodeURIComponent(payload.conversationId)}`);
       } catch {
-        if (active && current) setError("The conversation could not be opened.");
+        if (active && current) setError({ kind: "failed" });
       } finally { clearTimeout(timer); }
     })();
 
@@ -99,9 +103,9 @@ export function StartConversation({ handle, profileCode }: { handle: string; pro
   }, [handle, profileCode, router, attempt]);
 
   return <div className={styles.state}>
-    {error ? <MessageCircle /> : <LoaderCircle className={styles.spin} />}
-    <h1>{error ? ui("ui.components.StartConversation.6117bce566e1", "Conversation unavailable") : ui("ui.components.StartConversation.2a8b850dadd9", "Opening conversation")}</h1>
-    <p role="status">{error === "The conversation could not be opened." ? ui("ui.components.StartConversation.c2ad2f8a287b", "The conversation could not be opened.") : error || ui("ui.components.StartConversation.33b411810f73", "Creating a private QRguitar conversation.")}</p>
-    {error ? <><button className="button" type="button" onClick={() => setAttempt(value => value + 1)}>{ui("ui.components.StartConversation.retryConversation", "Try again")}</button><Link className="text-link" href={`/collections/${encodeURIComponent(handle)}`}>{ui("ui.components.StartConversation.30f0846e225a", "Return to member page")}</Link><Link className="text-link" href="/messages">{ui("ui.components.StartConversation.7ff385329889", "Open Messages")}</Link></> : null}
+    {error.kind ? <MessageCircle /> : <LoaderCircle className={styles.spin} />}
+    <h1>{error.kind ? ui("ui.components.StartConversation.6117bce566e1", "Conversation unavailable") : ui("ui.components.StartConversation.2a8b850dadd9", "Opening conversation")}</h1>
+    <p role="status">{errorMessage || ui("ui.components.StartConversation.33b411810f73", "Creating a private QRguitar conversation.")}</p>
+    {error.kind ? <><button className="button" type="button" onClick={() => setAttempt(value => value + 1)}>{ui("ui.components.StartConversation.retryConversation", "Try again")}</button><Link className="text-link" href={`/collections/${encodeURIComponent(handle)}`}>{ui("ui.components.StartConversation.30f0846e225a", "Return to member page")}</Link><Link className="text-link" href="/messages">{ui("ui.components.StartConversation.7ff385329889", "Open Messages")}</Link></> : null}
   </div>;
 }

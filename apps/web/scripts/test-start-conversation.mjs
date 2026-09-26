@@ -34,7 +34,7 @@ function fixture(options = {}) {
     useEffect(run, deps) { const i = ec++, old = effects[i]; if (!old || deps.some((v, j) => !Object.is(v, old.deps[j]))) effects[i] = { run, deps, cleanup: old?.cleanup, pending: true }; }
   };
   const C = load('components/StartConversation.tsx', 'StartConversation', {
-    ...hooks, useUiText: require('UiTextProvider').useUiText, useRouter: () => router, createBrowserSupabaseClient: client,
+    ...hooks, useUiText: scope => { const original = require('UiTextProvider').useUiText(scope); return (key, ...args) => f.copy?.[key] ?? original(key, ...args); }, useRouter: () => router, createBrowserSupabaseClient: client,
     getSupabaseAccessToken: load('lib/supabase-browser.ts', 'getSupabaseAccessToken', { createBrowserSupabaseClient: client }),
     styles: { state: 'state', spin: 'spin' }, Link: 'a', MessageCircle: () => null, LoaderCircle: () => null,
     setTimeout: (fn, ms) => { const id = ++tid; timers.set(id, { fn, ms }); return id; }, clearTimeout: id => timers.delete(id),
@@ -94,6 +94,17 @@ for (const reply of [() => { throw Error('network'); }, () => new Response('inva
 });
 await test('same-tick repeated retry starts only one new operation', async () => {
   const f = fixture({ constructError: true }); await tick(); const button = nodes(f.render()).find(n => n.type === 'button'); f.constructError = false; button.props.onClick(); button.props.onClick(); f.render(); await tick(); assert.equal(f.requests.length, 1); assert.deepEqual(f.redirects, ['/messages/conversation-a']); f.unmount();
+});
+await test('CMS update while pending neither restarts nor duplicates POST', async () => {
+  const g = deferred(), f = fixture({ reply: () => g.promise }); await tick(); f.copy = { 'ui.components.StartConversation.2a8b850dadd9': 'Localized opening' }; assert.match(f.text(), /Localized opening/); assert.equal(f.requests.length, 1); g.resolve(Response.json({ ok: true, conversationId: 'conversation-a' })); await tick(); assert.deepEqual(f.redirects, ['/messages/conversation-a']); assert.equal(f.requests.length, 1); f.unmount();
+});
+for (const kind of ['sessionChanged', 'openingTimedOut', 'openRetryFailure', 'c2ad2f8a287b']) await test(kind + ' error copy updates without restarting action', async () => {
+  const f = fixture(kind === 'c2ad2f8a287b' ? { constructError: true } : { reply: () => kind === 'openRetryFailure' ? Response.json({ ok: false }) : new Promise(() => {}) }); await tick();
+  if (kind === 'sessionChanged') f.change('b');
+  if (kind === 'openingTimedOut') { f.timeout(); await tick(); }
+  const count = f.requests.length;
+  f.copy = { ['ui.components.StartConversation.' + kind]: 'Localized failure', 'ui.components.StartConversation.retryConversation': 'Localized retry' };
+  assert.match(f.text(), /Localized failure/); assert.match(f.text(), /Localized retry/); await tick(); assert.equal(f.requests.length, count); assert.deepEqual(f.redirects, []); f.unmount();
 });
 assert.equal(unhandled.length, 0, 'No component promise may be unhandled');
 console.log(JSON.stringify({ passed, failed, unhandledRejections: unhandled.length }));
