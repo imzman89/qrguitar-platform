@@ -52,6 +52,48 @@ test("owner list exposes its private review evidence and excludes unrelated clai
   assert.equal(response.status, 200); assert.match(response.headers.get("cache-control"), /no-store/);
   const body = await response.json(); assert.deepEqual(body.claims.map((item) => item.id), ["claim-one"]); assert.equal(body.claims[0].evidenceCount, 1); assert.equal(body.claims[0].evidence.length, 1);
 });
+for (const status of ["awaiting_claimant", "awaiting_owner", "admin_review", "approved", "denied", "cancelled", "expired", "unknown"]) {
+  for (const actor of ["claimant", "owner", "admin"]) test(`GET canWithdraw is server-derived for ${actor} / ${status}`, async () => {
+    const user = actor === "claimant" ? claimant : actor === "owner" ? owner : { id: "reviewer", email: "reviewer@example.invalid" };
+    const f = fixture({ user, adminSource: actor === "admin" ? "role" : "none" });
+    f.tables.ownership_claims[0].status = status;
+    const response = await f.route.GET(request()); assert.equal(response.status, 200);
+    const { claims } = await response.json(); assert.equal(claims.length, 1);
+    assert.equal(claims[0].canWithdraw, actor === "claimant" && ["awaiting_claimant", "awaiting_owner", "admin_review"].includes(status));
+    assert.equal(claims[0].claimant_user_id, undefined); assert.equal(claims[0].claimantUserId, undefined);
+    assert.equal(claims[0].current_owner_id, undefined); assert.equal(f.writes().length, 0);
+  });
+}
+test("claimant who is also admin retains claimant-only withdrawal eligibility", async () => {
+  const f = fixture({ user: claimant, adminSource: "role" });
+  const body = await (await f.route.GET(request())).json(); assert.equal(body.claims[0].canWithdraw, true);
+});
+test("unrelated non-admin sees no claim or withdrawal eligibility", async () => {
+  const f = fixture({ user: { id: "stranger", email: "stranger@example.invalid" } });
+  assert.deepEqual((await (await f.route.GET(request())).json()).claims, []); assert.equal(f.writes().length, 0);
+});
+test("POST receipt includes claimant withdrawal eligibility without exposing claimant identity", async () => {
+  const f = fixture({ user: claimant, fresh: true });
+  const response = await f.route.POST(request("POST", claimBody())); assert.equal(response.status, 201);
+  const { claim } = await response.json(); assert.equal(claim.canWithdraw, true); assert.equal(claim.claimant_user_id, undefined);
+});
+for (const actor of ["owner", "admin"]) test(`PATCH cancel still denies ${actor} even with forged eligibility`, async () => {
+  const f = fixture({ user: actor === "owner" ? owner : { id: "reviewer", email: "reviewer@example.invalid" }, adminSource: actor === "admin" ? "role" : "none" });
+  const response = await f.route.PATCH(request("PATCH", { id: "claim-one", action: "cancel", canWithdraw: true }));
+  assert.equal(response.status, 403); assert.equal(f.writes().length, 0); assert.equal(f.tables.ownership_claims[0].status, "awaiting_owner");
+});
+test("claimant cancellation closes request without changing Profile or evidence; closed replay stays conflict", async () => {
+  const f = fixture({ user: claimant });
+  const before = JSON.stringify({ guitars: f.tables.guitars, evidence: f.tables.ownership_claim_evidence });
+  assert.equal((await f.route.PATCH(request("PATCH", { id: "claim-one", action: "cancel" }))).status, 200);
+  assert.equal(f.tables.ownership_claims[0].status, "cancelled");
+  assert.equal(JSON.stringify({ guitars: f.tables.guitars, evidence: f.tables.ownership_claim_evidence }), before);
+  assert.equal((await (await f.route.GET(request())).json()).claims[0].canWithdraw, false);
+  const writes = f.writes().length;
+  assert.equal((await f.route.PATCH(request("PATCH", { id: "claim-one", action: "cancel" }))).status, 409);
+  assert.equal(f.writes().length, writes);
+});
+
 for (const table of ["guitars", "ownership_claim_evidence"]) test(`${table} read failure is not missing metadata or zero evidence`, async () => {
   const f = fixture({ hooks: { before(query) { if (query.table === table) return { data: null, error: { message: "Synthetic read failure" } }; } } });
   const response = await f.route.GET(request()); assert.equal(response.status, 503); assert.equal((await response.json()).claims, undefined);

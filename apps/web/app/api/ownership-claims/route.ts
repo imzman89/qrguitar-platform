@@ -123,12 +123,14 @@ function safeClaim(
   guitar?: GuitarRow | null,
   evidenceCount = 0,
   evidence: Array<{ id: string; type: string; fileName: string; note: string; url: string; createdAt: string }> = [],
-  includeAdminNote = false
+  includeAdminNote = false,
+  viewerId = ""
 ) {
   return {
     id: claim.id,
     claimType: claim.claim_type,
     status: claim.status,
+    canWithdraw: Boolean(viewerId) && claim.claimant_user_id === viewerId && ["awaiting_claimant", "awaiting_owner", "admin_review"].includes(claim.status),
     guitarId: claim.guitar_id,
     qrCode: guitar?.qr_code || "",
     profileTitle: guitar?.name || [guitar?.brand, guitar?.model].filter(Boolean).join(" ") || "QRguitar Profile",
@@ -199,7 +201,8 @@ export async function GET(request: Request) {
       guitars.get(claim.guitar_id),
       evidenceCounts.get(claim.id) || 0,
       safeEvidenceByClaim.get(claim.id) || [],
-      admin.ok || claim.claimant_user_id === auth.user?.id
+      admin.ok || claim.claimant_user_id === auth.user?.id,
+      auth.user?.id || ""
     ))
   });
 }
@@ -300,7 +303,7 @@ export async function POST(request: Request) {
       metadata: { evidence_count: evidence.length, claim_type: claimType, possession_challenge: claimType === "legacy_review" ? challengeCode : null }
     });
 
-    return json({ ok: true, message: guitar.owner_id ? "Ownership request sent to the current owner for review." : "Ownership request sent for QRguitar review.", claim: safeClaim(claim, guitar, evidence.length) }, 201);
+    return json({ ok: true, message: guitar.owner_id ? "Ownership request sent to the current owner for review." : "Ownership request sent for QRguitar review.", claim: safeClaim(claim, guitar, evidence.length, [], false, auth.user.id) }, 201);
   } catch (error) {
     return json({ ok: false, message: error instanceof Error ? error.message : "Could not create the ownership request." }, 500);
   }
