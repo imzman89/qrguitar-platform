@@ -1,0 +1,54 @@
+# Transactional notification disposition
+
+This is the operator view of production behavior. Content Studio registration is not a trigger. The Account → Notifications page currently says security, transfer, claim, and service-review notices are emailed when action is required, but that statement is broader than runtime delivery.
+
+## Implemented delivery
+
+| Event | Disposition | Trigger and recipient | Current UX / operating note |
+| --- | --- | --- | --- |
+| Signup confirmation | Implemented provider | `supabase.auth.signUp`; Supabase Auth emails the address being registered. | User follows the provider confirmation link. QRguitar must not duplicate it. |
+| Password reset | Implemented provider | Login or Account security calls `resetPasswordForEmail`; Supabase Auth emails the signed-in or entered account address. | Reset page consumes the recovery link. Provider template is authoritative. |
+| Transfer invitation / resend | Implemented provider | A committed email-bound transfer, or explicit resend, calls `signInWithOtp`; Supabase Auth emails `transfer.to_email`. | Recipient signs in and returns to the transfer claim route. Resend must not create another transfer. |
+| Service work submitted or revised for owner review | Implemented application | Committed `submit`, `revise`, or explicit `retry_email`; current owner is reloaded and verified immediately before Brevo submission. | Owner gets the authenticated `/service-review/{id}` link; an in-app owner-review notification is also recorded. Provider acceptance is not inbox delivery. |
+| Content Studio service-template test | Implemented application, operator-only | Authenticated administrator explicitly tests `email.service.submitted`; recipient is that administrator. | It validates renderer/transport only. All other families export or preview and cannot send tests. |
+| Payment receipt | Implemented provider | Successful PayPal capture under PayPal's buyer/payment flow; recipient and receipt policy are PayPal-owned. | QRguitar shows durable order/credit status in Billing. Do not send a duplicate QRguitar receipt. |
+
+## Intended but not connected
+
+These registered families describe a useful action or high-value state change, but no application/provider send is connected today.
+
+| Family / event | Disposition | Exact trigger and recipient if implemented | Current UX and blocker |
+| --- | --- | --- | --- |
+| `email.claim.ownerReview` | Needed but not connected | After an ownership claim commits in `awaiting_owner`; email the revalidated current owner. | Claim exists in the ownership-request UI only. Needs recipient revalidation, durable dispatch semantics, and a non-secret authenticated claim URL. |
+| `email.claim.moreInfo` | Needed but not connected | After admin `request_information` commits; email the claimant. | Claimant sees `awaiting_claimant` and the note after opening claims. Needs a committed-event dispatch path and safe retry policy. |
+| `email.claim.approved`, `.declined`, `.expired` | Needed but not connected | After the corresponding claim state transition commits; email the claimant. | Status/event history is visible in-app. Needs one canonical outcome event per committed transition and a decision on whether current owner also receives an outcome. |
+| `email.service.revisionRequested` | Needed but not connected | After an owner requests changes; email the provider responsible for the submission. | Provider sees status in the service workbench. Needs an authoritative provider address lookup and committed-event dispatch. |
+| `email.service.resubmitted` | Needed but not connected, replacement decision required | On committed revise/resubmit; recipient is the current owner. | Runtime already sends the generic submitted family on `revise`. Connecting this family without replacing that send would duplicate mail; product must choose generic versus distinct copy. |
+| `email.service.approved`, `.declined`, `.cancelled` | Needed but not connected | After the corresponding committed owner/provider transition; email the other workflow participant. | Both parties can inspect workbench status. Needs explicit recipient rules and one send per committed transition. |
+| `email.ownership.transferAccepted`, `.transferCancelled` | Needed but not connected | After atomic transfer acceptance or cancellation; acceptance goes to prior owner, cancellation to the assigned recipient when still valid. | Transfer pages show current status. Needs post-commit event identity and recipient/address-retention rules. |
+| Account deletion completed | Needed but not connected; no registered family | Immediately before or as Auth identity deletion is finalized; email the account address captured under an approved retention rule. | Request, blockers, quiescence, and cancellation are visible in Account → Privacy while access exists. Completion removes sign-in, so in-app status alone is insufficient. Needs legal/product copy, address retention authority, and durable pre-deletion dispatch. |
+
+## Intentionally in-app
+
+| Event | Disposition | Trigger / recipient | Current UX |
+| --- | --- | --- | --- |
+| Member message received/replied | Intentionally in-app | `send_member_message`; the other conversation participant. | Durable QRguitar Messages holds the conversation and media while both email addresses stay private. There is no email preference or mail trigger. |
+| Account deletion requested/cancelled/blocked | Intentionally in-app until completion | User submit/cancel or fulfillment blocker changes; the requesting account. | Account → Privacy shows the request reference, status, blockers, recovery, and refresh controls. The completion exception is listed above. |
+| Payment pending/review/refund/dispute state | Intentionally in-app for QRguitar status; provider mail remains provider-owned | Verified PayPal capture/webhook/reconciliation events; signed-in purchaser. | Billing shows saved payment, fulfilled credits, review holds, and recovery. PayPal owns buyer payment notices; QRguitar should not duplicate them. |
+| Claim submission confirmation and claimant withdrawal | Intentionally in-app | The claimant's own committed action. | The API returns confirmation and the claims UI/event history shows state. Counterparty/action-required claim events remain gaps above. |
+
+## Undefined; do not connect without a decision
+
+| Family / event | Disposition | Missing definition |
+| --- | --- | --- |
+| `email.ownership.storeHandoff` | Not needed/undefined today | No distinct production event exists beyond the transfer workflow. Define whether this replaces the normal transfer invitation for verified stores before adding a send. |
+| `email.notification.lostStolen` | Not needed/undefined today | No recipient policy is defined: the owner usually performs the safety-status change, and no watcher/subscriber model exists. Define the authoritative event and audience first. |
+| `email.security.accountNotice` | Not needed/undefined as one generic family | “Account notice” does not identify a security event. Split explicit events—such as email-address change, lock, or admin restriction—with recipient and anti-abuse rules before implementation. Password recovery is already provider-owned. |
+| Collection inquiry email | Not needed | The endpoint is retired with HTTP 410; members use durable QRguitar Messages. The legacy sender was removed. |
+
+## Remaining operator decisions
+
+1. Reconcile Account → Notifications copy with reality: either implement the action-required claim/service/transfer rows above or narrow the promise. There is currently no user-selectable email preference; the UI labels these notices “Required” and “Enabled.”
+2. Choose a durable post-commit dispatch model before connecting more application email. Do not send inside a transaction or infer success from a lost response; do not rely on the unverified optional Brevo idempotency field.
+3. Define recipient revalidation and safe authenticated destinations per event. Never place evidence, ownership tokens, payment identifiers, or deletion secrets in email.
+4. Decide account-deletion completion timing and lawful address retention before Auth deletion. This is the only identified event for which in-app-only status becomes unavailable by design.
