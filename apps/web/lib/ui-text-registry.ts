@@ -1,5 +1,6 @@
 // Stable site-authored presentation entries. Existing CMS keys remain unchanged.
 export const uiTextEntries: Array<{ key: string; scope: string; text: string; area: string; page: string; section: string; source: string }> = [
+  { key: "ui.components.StartConversation.retryConversation", scope: "components.StartConversation", text: "Try again", area: "Product", page: "Member Messaging", section: "Session status", source: "components/StartConversation.tsx" },
   { key: "ui.components.Nav.checkingSignIn", scope: "components.Nav", text: "Checking sign-in...", area: "Product", page: "Shared Navigation", section: "Session status", source: "components/Nav.tsx" },
   { key: "ui.components.Nav.retrySignIn", scope: "components.Nav", text: "Retry sign-in check", area: "Product", page: "Shared Navigation", section: "Session status", source: "components/Nav.tsx" },
   { key: "ui.components.Nav.signInCheckFailure", scope: "components.Nav", text: "Your sign-in could not be checked. Retry without signing in again.", area: "Product", page: "Shared Navigation", section: "Session status", source: "components/Nav.tsx" },

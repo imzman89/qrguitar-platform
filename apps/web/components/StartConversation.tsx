@@ -102,6 +102,6 @@ export function StartConversation({ handle, profileCode }: { handle: string; pro
     {error ? <MessageCircle /> : <LoaderCircle className={styles.spin} />}
     <h1>{error ? ui("ui.components.StartConversation.6117bce566e1", "Conversation unavailable") : ui("ui.components.StartConversation.2a8b850dadd9", "Opening conversation")}</h1>
     <p role="status">{error || ui("ui.components.StartConversation.33b411810f73", "Creating a private QRguitar conversation.")}</p>
-    {error ? <><button className="button" type="button" onClick={() => setAttempt(value => value + 1)}>Try again</button><Link className="text-link" href={`/collections/${encodeURIComponent(handle)}`}>{ui("ui.components.StartConversation.30f0846e225a", "Return to member page")}</Link></> : null}
+    {error ? <><button className="button" type="button" onClick={() => setAttempt(value => value + 1)}>{ui("ui.components.StartConversation.retryConversation", "Try again")}</button><Link className="text-link" href={`/collections/${encodeURIComponent(handle)}`}>{ui("ui.components.StartConversation.30f0846e225a", "Return to member page")}</Link></> : null}
   </div>;
 }
