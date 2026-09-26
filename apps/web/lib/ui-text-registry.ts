@@ -16814,15 +16814,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/handout/[code]/PrintDocument.tsx"
   },
   {
-    "key": "ui.app.handout.code.PrintDocument.c01d92587bd7",
-    "scope": "app.handout.code.PrintDocument",
-    "text": "Permanent identity",
-    "page": "Print Workspace",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/handout/[code]/PrintDocument.tsx"
-  },
-  {
     "key": "ui.app.handout.code.PrintDocument.a734981c99b6",
     "scope": "app.handout.code.PrintDocument",
     "text": "Service history",
