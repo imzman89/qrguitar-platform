@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { assertAccountCanWrite, getAdminContext, logAdminAuditEvent } from "../../../lib/admin-auth";
 import { createServerSupabaseClient, getAuthenticatedUser } from "../../../lib/supabase-server";
 import { sendServiceReviewEmail } from "../../../lib/transactional-email";
+import { serviceEmailDeliveryView } from "../../../lib/service-email-status";
 import {
   ACTIVE_SERVICE_STATUSES,
   cleanServiceCategory,
@@ -79,7 +80,14 @@ async function serializeSubmissions(supabase: Supabase, rows: ServiceSubmissionR
   for (const row of evidence.data || []) evidenceCounts.set(row.submission_id, (evidenceCounts.get(row.submission_id) || 0) + 1);
   const activityMap = new Map<string, ActivityRow[]>();
   for (const row of activities.data || []) activityMap.set(row.submission_id, [...(activityMap.get(row.submission_id) || []), row as ActivityRow]);
-  return rows.map((row) => mapServiceSubmission(row, { guitar: guitarMap.get(row.guitar_id), provider: providerMap.get(row.provider_user_id), evidenceCount: evidenceCounts.get(row.id), activity: activityMap.get(row.id), includePrivate: true }));
+  const queuedIds = rows.filter(row => row.email_dispatch_mode === "outbox").map(row => row.id);
+  const delivery = queuedIds.length ? await supabase.rpc("service_email_statuses", { p_submission_ids: queuedIds }) : { data: {}, error: null };
+  if (delivery.error) throw new Error("Current email delivery status is unavailable.");
+  return rows.map((row) => {
+    const mapped = mapServiceSubmission(row, { guitar: guitarMap.get(row.guitar_id), provider: providerMap.get(row.provider_user_id), evidenceCount: evidenceCounts.get(row.id), activity: activityMap.get(row.id), includePrivate: true });
+    if (row.email_dispatch_mode !== "outbox") return mapped;
+    return { ...mapped, ...serviceEmailDeliveryView(delivery.data?.[row.id]) };
+  });
 }
 
 async function sendOwnerReview(supabase: Supabase, submission: ServiceSubmissionRow, guitar: ServiceGuitarRow, provider: ServiceProviderProfileRow | null) {
@@ -299,7 +307,12 @@ export async function PATCH(request: Request) {
       let message = action === "save_draft" ? "Private service draft saved." : "Service work submitted for owner approval.";
       let emailOutcome: string | undefined;
       let emailRetryable: boolean | undefined;
-      if (action !== "save_draft") {
+      if (action !== "save_draft" && updated.data.email_dispatch_mode === "outbox") {
+        // The committed row receipt comes from the same transaction as capture and notification.
+        emailOutcome = "queued";
+        emailRetryable = false;
+        message += " The owner notification is saved and the review email is queued.";
+      } else if (action !== "save_draft") {
         const providerProfile = await loadProviderProfile(supabase, auth.user.id).catch(() => null);
         const notification = await addNotification(supabase, id, submission.owner_user_id, "owner_review", `${providerProfile?.public_display_name || "A service provider"} submitted service work for ${serviceTitle(guitar)}.`).catch(() => ({ error: true }));
         const email = await sendOwnerReview(supabase, updated.data, guitar, providerProfile);
@@ -355,6 +368,14 @@ export async function PATCH(request: Request) {
     if (action === "retry_email") {
       if (!provider && !admin) return json({ ok: false, message: "Only the provider or QRguitar admin can retry this email." }, 403);
       if (submission.status !== "submitted") return json({ ok: false, message: "Only a submitted request can send an owner review email." }, 409);
+      if (submission.email_dispatch_mode === "outbox") {
+        const status = await supabase.rpc("service_email_submission_status", { p_submission_id: id });
+        if (status.error || !status.data) return json({ ok: false, message: "Email delivery status is unavailable. No new email was sent." }, 503);
+        if (status.data.canRetry !== true) return json({ ok: false, message: "This email cannot be retried automatically. An unknown outcome requires administrator review." }, 409);
+        const retried = await supabase.rpc("retry_service_email_intent", { p_intent_id: status.data.id, p_actor_id: auth.user.id, p_admin: admin });
+        if (retried.error || retried.data !== true) return json({ ok: false, message: "The delivery changed or is no longer eligible. No new email was sent." }, 409);
+        return json({ ok: true, emailOutcome: "queued", retryable: false, message: "The review email is queued for retry." });
+      }
       const result = await sendOwnerReview(supabase, submission, guitar, await loadProviderProfile(supabase, submission.provider_user_id));
       return json({ ok: result.ok, emailOutcome: result.outcome, retryable: result.retryable, message: result.message }, result.ok ? 200 : 502);
     }

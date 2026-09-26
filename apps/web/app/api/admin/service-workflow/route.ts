@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminContext, logAdminAuditEvent } from "../../../../lib/admin-auth";
 import { createServerSupabaseClient } from "../../../../lib/supabase-server";
+import { serviceEmailDeliveryView } from "../../../../lib/service-email-status";
 import { cleanServiceText, mapProviderProfile, serviceMigrationMessage, serviceMigrationMissing, type ServiceProviderProfileRow, type ServiceSubmissionRow } from "../../../../lib/service-workflow";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +41,9 @@ export async function GET(request: Request) {
   for (const row of evidenceRows) evidenceMap.set(row.submission_id, [...(evidenceMap.get(row.submission_id) || []), row]);
   const activityMap = new Map<string, unknown[]>();
   for (const row of activities.data || []) activityMap.set(row.submission_id, [...(activityMap.get(row.submission_id) || []), row]);
+  const queuedIds = ((submissions.data || []) as ServiceSubmissionRow[]).filter(row => row.email_dispatch_mode === "outbox").map(row => row.id);
+  const delivery = queuedIds.length ? await supabase.rpc("service_email_statuses", { p_submission_ids: queuedIds }) : { data: {}, error: null };
+  if (delivery.error) return json({ ok: false, message: "Current email delivery status is unavailable." }, 503);
   const serialized = ((submissions.data || []) as ServiceSubmissionRow[]).map((row) => {
     const guitar = guitarMap.get(row.guitar_id);
     const provider = providerMap.get(row.provider_user_id);
@@ -60,6 +64,7 @@ export async function GET(request: Request) {
       activity: activityMap.get(row.id) || [],
       emailDeliveryStatus: row.email_delivery_status,
       emailDeliveryMessage: row.email_delivery_message || "",
+      ...(row.email_dispatch_mode === "outbox" ? serviceEmailDeliveryView(delivery.data?.[row.id]) : {}),
       resultingServiceEventId: row.resulting_service_event_id || "",
       submittedAt: row.submitted_at || "",
       updatedAt: row.updated_at

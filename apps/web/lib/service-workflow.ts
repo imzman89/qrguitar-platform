@@ -67,6 +67,7 @@ export type ServiceSubmissionRow = {
   resulting_service_event_id: string | null;
   resulting_timeline_event_id: string | null;
   email_delivery_status: "not_attempted" | "sent" | "failed";
+  email_dispatch_mode?: "inline" | "outbox";
   email_delivery_message: string | null;
   created_at: string;
   updated_at: string;

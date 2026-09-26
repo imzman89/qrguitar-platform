@@ -16,7 +16,7 @@ export type ServiceEmailOutboxStore = {
 };
 const uuid = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
-/** Proposal only: no route or scheduler imports this worker until reviewed DB cutover. */
+/** Bounded transport worker; runtime and database dispatch gates default to disabled. */
 export function createServiceEmailOutboxWorker(deps: {
   store: ServiceEmailOutboxStore;
   send(input: ServiceEmailDispatch & { reviewUrl: string; idempotencyKey: string }, signal: AbortSignal): Promise<ServiceEmailOutcome>;

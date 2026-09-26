@@ -22,6 +22,8 @@ function fixture(options={}) {
     serviceTitle:g=>g.name,addActivity:async(...args)=>{h.activities.push(args);return {error:h.activityError?Error('private activity failure'):null};},
     sendServiceReviewEmail:async input=>{h.sent.push(input);if(h.send) return h.send();return {ok:true,status:'sent',outcome:'accepted',message:'Provider accepted',providerMessageId:'provider-id'};},
     process:{env:{NEXT_PUBLIC_SITE_URL:'http://127.0.0.1:55440'}}};
+  h.rpcs=[];h.notifications=0;
+  supabase.rpc=async(name,args)=>{h.rpcs.push({name,args});return {data:name==='service_email_submission_status'?{id:'intent-a',canRetry:h.canRetry===true}:true,error:h.rpcError?Error('Private database failure'):null};};
   const sender=new Function(...Object.keys(env),js+'\nreturn sendOwnerReview;')(...Object.values(env));
   h.run=()=>sender(supabase,submission,guitar,{public_display_name:'Synthetic provider'});
   h.patch=async(body)=>{
@@ -30,7 +32,7 @@ function fixture(options={}) {
     const routeEnv={...env,createServerSupabaseClient:()=>supabase,getAuthenticatedUser:async()=>({user:h.anonymous?null:{id:h.actor||'provider-a'}}),assertAccountCanWrite:async()=>({ok:true}),
       isAdmin:async()=>false,cleanServiceText:v=>String(v||''),cleanServiceDate:v=>v,cleanServiceCategory:v=>v,cleanServiceVisibility:v=>v,
       loadProviderProfile:async()=>({public_display_name:'Synthetic provider'}),sendOwnerReview:sender,
-      addNotification:async()=>({error:h.notificationError?Error('private notification error'):null}),serializeSubmissions:async(_db,rows)=>rows,
+      addNotification:async()=>{h.notifications++;return {error:h.notificationError?Error('private notification error'):null};},serializeSubmissions:async(_db,rows)=>rows,
       json:(data,status=200)=>({data,status}),errorResponse:(message,status=500)=>({data:{ok:false,message},status})};
     const run=new Function(...Object.keys(routeEnv),routeJs+'\nreturn PATCH;')(...Object.values(routeEnv));
     return run({json:async()=>body});
@@ -54,4 +56,8 @@ for(const patch of [{anonymous:true},{actor:'other-a'},{actor:'owner-a'}])await 
 await test('committed submit truthfully reports notification and activity failures',async()=>{const h=fixture({notificationError:true,activityError:true});h.fresh.status='draft';h.submission.status='draft';const r=await h.patch({id:'submission-a',action:'submit',serviceDate:'2026-09-26',title:'Setup',workPerformed:'Setup completed'});assert.equal(r.data.ok,true);assert.equal(r.data.committed,true);assert.equal(h.sent.length,1);assert.match(r.data.message,/in-app owner notification could not be confirmed/);assert.match(r.data.message,/activity entry could not be confirmed/);});
 await test('successful submit sends once and retains committed 14-day expiry',async()=>{const h=fixture();h.fresh.status='draft';h.submission.status='draft';const before=Date.now(),r=await h.patch({id:'submission-a',action:'submit',serviceDate:'2026-09-26',title:'Setup',workPerformed:'Setup completed'});assert.equal(r.data.emailOutcome,'accepted');assert.equal(h.sent.length,1);const expiry=Date.parse(h.fresh.expires_at);assert.ok(expiry>=before+14*86400000&&expiry<=Date.now()+14*86400000);assert.equal(h.db.filter(c=>'expires_at' in(c.value||{})).length,1);});
 await test('submit after ownership change creates no notification or email',async()=>{const h=fixture();h.fresh.status='draft';h.currentGuitar.owner_id='owner-b';const r=await h.patch({id:'submission-a',action:'submit',serviceDate:'2026-09-26',title:'Setup',workPerformed:'Setup completed'});assert.equal(r.status,409);assert.equal(h.sent.length,0);assert.equal(h.db.length,0);});
+await test('atomic outbox receipt skips inline send and duplicate notification',async()=>{const h=fixture();h.fresh.status='draft';h.fresh.email_dispatch_mode='outbox';const r=await h.patch({id:'submission-a',action:'submit',serviceDate:'2026-09-26',title:'Setup',workPerformed:'Done'});assert.equal(r.data.ok,true);assert.equal(r.data.emailOutcome,'queued');assert.equal(h.sent.length,0);assert.equal(h.notifications,0);});
+await test('durable retry queues an eligible intent without calling transport',async()=>{const h=fixture({canRetry:true});h.fresh.email_dispatch_mode='outbox';const r=await h.patch({id:'submission-a',action:'retry_email'});assert.equal(r.status,200);assert.equal(r.data.emailOutcome,'queued');assert.equal(h.sent.length,0);assert.equal(h.rpcs.length,2);assert.equal(h.rpcs[1].args.p_actor_id,'provider-a');});
+await test('durable unknown has no automatic retry or legacy fallback',async()=>{const h=fixture();h.fresh.email_dispatch_mode='outbox';const r=await h.patch({id:'submission-a',action:'retry_email'});assert.equal(r.status,409);assert.equal(h.sent.length,0);assert.equal(h.rpcs.length,1);});
+await test('outbox RPC failure never falls back to inline sending',async()=>{const h=fixture({rpcError:true});h.fresh.email_dispatch_mode='outbox';const r=await h.patch({id:'submission-a',action:'retry_email'});assert.equal(r.status,503);assert.equal(h.sent.length,0);});
 console.log(JSON.stringify({passed,failed}));if(failed)process.exitCode=1;

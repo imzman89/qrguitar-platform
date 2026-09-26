@@ -1,0 +1,21 @@
+.section { margin-block: 24px 36px; padding-block: 24px; border-block: 1px solid var(--line); font-size: 14px; color: var(--text); letter-spacing: 0; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.header h2 { margin: 0; font-family: inherit; font-size: 20px; font-weight: 600; line-height: 1.3; letter-spacing: 0; }
+.pages { display: flex; gap: 12px; margin-top: 16px; }
+.pages button { min-height: 44px; padding: 10px 16px; }
+.header button { width: 44px; height: 44px; display: grid; place-items: center; }
+.section button, .form select, .form textarea, .form input { border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--text); font-family: inherit; font-size: 14px; }
+.section p { line-height: 1.5; }
+.metrics { display: flex; flex-wrap: wrap; gap: 16px 32px; margin-block: 20px; }
+.metrics dt { color: var(--muted); font-size: 12px; }
+.metrics dd { margin: 4px 0 0; font-size: 22px; font-variant-numeric: tabular-nums; }
+.delivery { border-top: 1px solid var(--line); padding-block: 8px; overflow-wrap: anywhere; }
+.delivery summary { min-height: 44px; cursor: pointer; padding-block: 10px; text-transform: capitalize; }
+.delivery summary span { display: inline-block; margin-left: 12px; color: var(--muted); font-size: 12px; }
+.form { display: grid; gap: 14px; max-width: 560px; margin-block: 20px; }
+.form label { display: grid; gap: 8px; min-width: 0; }
+.form select, .form textarea, .form input { width: 100%; min-width: 0; min-height: 44px; padding: 10px; font-size: 16px; }
+.form textarea { min-height: 88px; resize: vertical; }
+.form button { justify-self: start; min-height: 44px; padding: 10px 16px; }
+.section :is(button, select, textarea, input, summary):focus-visible { outline: 2px solid var(--action); outline-offset: 3px; }
+.section button:disabled { opacity: .6; cursor: wait; }

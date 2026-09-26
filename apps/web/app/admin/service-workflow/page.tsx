@@ -7,6 +7,7 @@ import { ArrowLeft, FileLock2, Search, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Footer } from "../../../components/Footer";
 import { AdminWorkspaceGate } from "../../../components/AdminWorkspaceGate";
+import { ServiceEmailStatus } from "../../../components/ServiceEmailStatus";
 import { Nav } from "../../../components/Nav";
 import { createBrowserSupabaseClient } from "../../../lib/supabase-browser";
 import styles from "./service-operations.module.css";
@@ -198,6 +199,7 @@ function ServiceWorkflowWorkspace() {
         {phase === "signed-out" || phase === "unauthorized" ? <section className="card admin-panel-card" role="alert"><h2>{phase === "signed-out" ? ui("ui.app.admin.service.workflow.page.6755e16dc239", "Admin sign-in required.") : ui("ui.app.admin.service.workflow.page.d92c603b66e1", "Admin access required.")}</h2><p>{message || ui("ui.app.admin.service.workflow.page.a9beddcfffc7", "Use an authorized admin account to open Service Operations.")}</p><div className="form-actions"><Link className="button" href="/login?next=%2Fadmin%2Fservice-workflow">{ui("ui.app.admin.service.workflow.page.bfd402b2f6f3", "Sign in")}</Link>{phase === "unauthorized" ? <button className="button secondary" type="button" onClick={() => void load()}>{ui("ui.app.admin.service.workflow.page.e5222230e095", "Retry access")}</button> : null}</div></section> : null}
         {phase === "error" ? <section className="card admin-panel-card" role="alert"><h2>{ui("ui.app.admin.service.workflow.page.2235d7becad3", "Service Operations is temporarily unavailable.")}</h2><p>{message || ui("ui.app.admin.service.workflow.page.2b8eba2e5b40", "Service operations could not be loaded.")}</p><button className="button secondary" type="button" onClick={() => void load()}>{ui("ui.app.admin.service.workflow.page.d8b8392e2c54", "Try again")}</button></section> : null}
         {phase === "ready" ? <>
+          <ServiceEmailStatus />
           <section className="admin-service-section">
             <div className="admin-section-head"><div><div className="eyebrow">{ui("ui.app.admin.service.workflow.page.1f2a406ada3d", "Service providers")}</div><h2>{ui("ui.app.admin.service.workflow.page.a701acdcc02f", "Provider accounts")}</h2><p>{ui("ui.app.admin.service.workflow.page.f3ad7b9b7092", "Verification applies to the account. It does not verify every service entry.")}</p></div></div>
             <div className="admin-service-list">
