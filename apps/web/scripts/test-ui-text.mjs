@@ -79,3 +79,28 @@ test("workspace wording changes labels, never destinations or stored account-typ
   assert.deepEqual(after.actions.map(action => action.href), before.actions.map(action => action.href));
   assert.deepEqual(WORKSPACE_OPTIONS.map(option => option.value), ["player", "collector", "shop", "builder", "luthier", "other"]);
 });
+
+test("UI copy preview routes are real safe representatives, not fabricated record links", () => {
+  assert.equal(registry.contentPreviewPathForUiText("app/dashboard/page.tsx", "Dashboard"), "/dashboard");
+  assert.equal(registry.contentPreviewPathForUiText("app/account/page.tsx", "Account"), "/account");
+  assert.equal(registry.contentPreviewPathForUiText("components/Nav.tsx", "Nav"), "/");
+  assert.equal(registry.contentPreviewPathForUiText("app/site-editor/page.tsx", "Site Composition Editor"), undefined);
+  assert.equal(registry.contentPreviewPathForUiText("app/i/[code]/ProfileClient.tsx", "Public Profile"), undefined);
+  assert.equal(registry.contentPreviewPathForUiText("app/edit/[code]/page.tsx", "Profile Editor"), undefined);
+  assert.equal(registry.contentPreviewPathForUiText("app/unavailable/page.tsx", "Unavailable Page"), undefined);
+  assert.equal(registry.contentPreviewPathForUiText("app/admin/site-editor/page.tsx", "Site Composition Editor"), undefined);
+  assert.equal(registry.contentPreviewPathForUiText("app/billing/paypal/return/page.tsx", "Billing"), undefined);
+  assert.equal(registry.contentPreviewPathForUiText("app/messages/[conversationId]/page.tsx", "Messages"), undefined);
+  assert.equal(registry.contentPreviewPathForUiText("components/QRGuitarBotPopup.tsx", "QRGuitar Bot Popup"), undefined);
+  assert.equal(registry.contentPreviewPathForUiText("app/admin/payments/AdminPaymentsPage.tsx", "Admin Payments"), "/admin/payments");
+  const publicProfileEntries = registry.contentRegistry.filter((entry) => entry.page === "Public Profile");
+  const homeEntries = registry.contentRegistry.filter((entry) => entry.page === "Homepage");
+  assert.equal(registry.contentPreviewPathForSelection(publicProfileEntries, "Public Profile"), undefined);
+  assert.equal(registry.contentPreviewPathForSelection(homeEntries, "Homepage"), "/");
+  for (const entry of uiTextEntries) {
+    const previewPath = registry.contentRegistryByKey.get(entry.key)?.previewPath;
+    if (!previewPath) continue;
+    assert.match(previewPath, /^\/(?:[^\\?#]*)$/);
+    assert.ok(!/\[[^\]]+\]/.test(previewPath), `Fabricated route parameter for ${entry.key}: ${previewPath}`);
+  }
+});

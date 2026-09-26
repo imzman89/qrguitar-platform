@@ -503,12 +503,74 @@ const seoRegistry: ContentRegistryEntry[] = [
   ].flatMap(seoPage)
 ];
 
+const uiTextSourcePreviewPaths: Record<string, string> = {
+  "app/account/page.tsx": "/account",
+  "app/admin/page.tsx": "/admin",
+  "app/admin/payments/AdminPaymentsPage.tsx": "/admin/payments",
+  "app/admin/payments/PayPalReviewQueue.tsx": "/admin/payments",
+  "app/admin/promotions/PromoCodesPage.tsx": "/admin/promotions",
+  "app/admin/service-workflow/page.tsx": "/admin/service-workflow",
+  "app/billing/BillingPage.tsx": "/billing",
+  "app/billing/DirectBillingPage.tsx": "/billing",
+  "app/billing/PayPalBillingPage.tsx": "/billing",
+  "app/catalog/CatalogClient.tsx": "/catalog",
+  "app/collections/CollectionsDirectoryClient.tsx": "/collections",
+  "app/collections/page.tsx": "/collections",
+  "app/contact/page.tsx": "/contact",
+  "app/create/page.tsx": "/create",
+  "app/dashboard/page.tsx": "/dashboard",
+  "app/dashboard/service/page.tsx": "/dashboard/service",
+  "app/how-it-works/HowItWorksClient.tsx": "/how-it-works",
+  "app/installers/page.tsx": "/installers",
+  "app/login/page.tsx": "/login",
+  "app/messages/new/page.tsx": "/messages/new",
+  "app/ownership-claim/page.tsx": "/ownership-claim",
+  "app/privacy/page.tsx": "/privacy",
+  "app/reset-password/page.tsx": "/reset-password",
+  "app/terms/page.tsx": "/terms",
+  "lib/account-deletion/AccountDeletionSection.tsx": "/account",
+  "lib/account-deletion/admin-ui/AdminIntakeQueue.tsx": "/admin/deletion-requests"
+};
+
+const uiTextPagePreviewPaths: Record<string, string> = {
+  "Admin Workspace Gate": "/admin",
+  "Brand Logo": "/",
+  "Bulk Import Workspace": "/dashboard/import",
+  "Bulk Profile Import": "/dashboard/import",
+  "Footer": "/",
+  "Home Page Client": "/",
+  "Nav": "/",
+  "Recovery Copy Correction": "/site-editor/recovery-copy"
+};
+
+const previewSelectionPagesWithoutRepresentativeRoute = new Set([
+  "Profile Editor",
+  "Public Profile",
+  "Print Workspace",
+  "Service Review",
+  "Ownership Transfers",
+  "Site Composition Editor",
+  "Unavailable Page"
+]);
+
+export function contentPreviewPathForSelection(entries: ContentRegistryEntry[], page: string): string | undefined {
+  if (previewSelectionPagesWithoutRepresentativeRoute.has(page)) return undefined;
+  const previewPath = entries.find((entry) => entry.previewPath)?.previewPath;
+  if (!previewPath) return undefined;
+  return previewPath.split(/[?#]/, 1)[0] || "/";
+}
+
+export function contentPreviewPathForUiText(source: string, page: string): string | undefined {
+  const normalized = source.replaceAll("\\", "/");
+  return uiTextSourcePreviewPaths[normalized] || uiTextPagePreviewPaths[page];
+}
 export const contentRegistry: ContentRegistryEntry[] = Array.from(
   new Map([...coreContentRegistry, ...completionRegistry, ...emailRegistry, ...seoRegistry, ...uiTextEntries.map((entry) => field(
     entry.key, entry.area as ContentArea, entry.page, entry.section,
     entry.text.length > 85 ? `${entry.text.slice(0, 82)}…` : entry.text,
     entry.text,
     { maxLength: Math.max(240, entry.text.length * 3), allowedVariables: Array.from(entry.text.matchAll(/\{\{([a-zA-Z0-9_]+)\}\}/g), (match) => match[1]),
+      previewPath: contentPreviewPathForUiText(entry.source, entry.page),
       classification: protectedUiTextKeys.has(entry.key) ? "security-locked" : "editable-standard",
       help: "Site interface wording. Values in {{braces}} come from the application; keep those placeholders. This does not edit anyone’s saved Profile or account data." }
   ))].map((entry) => [entry.key, entry])).values()

@@ -44,6 +44,7 @@ import {
   contentCoverageSummary,
   contentPagesForArea,
   contentRegistry,
+  contentPreviewPathForSelection,
   validateContentValues,
   type ContentArea,
   type ContentRegistryEntry
@@ -311,9 +312,7 @@ function SiteEditorWorkspace() {
       ? supported[selected.area as ContentArea]?.[selected.page] || null
       : null;
   }, [query, selected]);
-  const previewPath = activeSectionEntries.find((entry) => entry.previewPath)?.previewPath
-    || currentPageEntries.find((entry) => entry.previewPath)?.previewPath
-    || "/";
+  const previewPath = contentPreviewPathForSelection(activeSectionEntries.length ? activeSectionEntries : currentPageEntries, selected.page) || "";
   const changeReview = useMemo(() => settingsChangeReview(settings, published), [published, settings]);
   const changeCount = changeReview.length;
   const mutationLocked = Boolean(editorIssue) || writeBusy;
@@ -539,6 +538,11 @@ function SiteEditorWorkspace() {
   useEffect(() => {
     let cancelled = false;
     if (!authorized || !previewOpen) return;
+    if (!previewPath) {
+      setPreviewUrl("");
+      setPreviewError(ui("ui.app.site.editor.page.previewUnavailableForSelection", "This selection needs a real permitted record or does not have a standalone page to preview."));
+      return;
+    }
     if (previewSource === "published") {
       setPreviewError("");
       setPreviewUrl("");
@@ -1002,7 +1006,7 @@ function SiteEditorWorkspace() {
           <span className={!seoIndexingValid || seoIndexingValue.startsWith("noindex") ? "is-warning" : "is-pass"}>{seoIndexingValid ? seoIndexingValue : ui("ui.app.site.editor.page.6d1ad6e2ee80", "Invalid indexing value — page blocked")}</span>
         </div>
         <div className="cms-search-preview">
-          <span>https://www.qrguitar.com{previewPath === "/" ? "" : previewPath}</span>
+          <span>{previewPath ? `https://www.qrguitar.com${previewPath === "/" ? "" : previewPath}` : ui("ui.app.site.editor.page.previewRouteUnavailable", "Not available for this selection")}</span>
           <h3>{seoTitle || ui("ui.app.site.editor.page.4bdfc8059e30", "Untitled QRguitar page")}</h3>
           <p>{seoDescription || ui("ui.app.site.editor.page.09722b5de3c0", "Add a clear description for search results.")}</p>
         </div>
@@ -1222,7 +1226,7 @@ function SiteEditorWorkspace() {
                 <button type="button" className={device === "mobile" ? "active" : ""} onClick={() => setDevice("mobile")} aria-label={ui("ui.app.site.editor.page.f4185502ae83", "Mobile preview")}><Smartphone size={16} /></button>
               </div>
               <button type="button" onClick={() => setPreviewVersion((value) => value + 1)} aria-label={ui("ui.app.site.editor.page.5b529abadacc", "Refresh preview")}><RefreshCw size={16} /></button>
-              <a href={previewUrl || previewPath} target="_blank" rel="noreferrer" aria-label={ui("ui.app.site.editor.page.7723e4dec204", "Open full preview")}><Eye size={16} /></a>
+              {previewUrl ? <a href={previewUrl} target="_blank" rel="noreferrer" aria-label={ui("ui.app.site.editor.page.7723e4dec204", "Open full preview")}><Eye size={16} /></a> : <button type="button" disabled aria-label={ui("ui.app.site.editor.page.7723e4dec204", "Open full preview")}><Eye size={16} /></button>}
               <button type="button" className="cms-preview-close" onClick={closePreview} aria-label={ui("ui.app.site.editor.page.7d8ab368210c", "Close preview")}><PanelRightClose size={16} /><span>{ui("ui.app.site.editor.page.7d9eb7acb13e", "Close")}</span></button>
             </div>
             <div className={`cms-preview-frame is-${device}`}>
@@ -1231,7 +1235,7 @@ function SiteEditorWorkspace() {
               {!previewError && !previewUrl ? <div className="cms-preview-loading"><RefreshCw size={18} className="spin" /><span>{ui("ui.app.site.editor.page.d8f27ff08958", "Opening the real")}{" "}{previewSource}{" "}{ui("ui.app.site.editor.page.5ccec630b66f", "page…")}</span></div> : null}
             </div>
             <div className="cms-preview-meta">
-              <div><span>{ui("ui.app.site.editor.page.489499d1fba4", "Selected route")}</span><strong>{previewPath}</strong></div>
+              <div><span>{ui("ui.app.site.editor.page.489499d1fba4", "Selected route")}</span><strong>{previewPath || ui("ui.app.site.editor.page.previewRouteUnavailable", "Not available for this selection")}</strong></div>
               <div><span>{ui("ui.app.site.editor.page.31c9df53eaed", "Previewing")}</span><strong>{previewSource === "draft" ? ui("ui.app.site.editor.page.9f03d34eb73f", "Shared draft") : ui("ui.app.site.editor.page.caf8e3e0baf3", "Published site")}</strong></div>
             </div>
           </aside> : null}

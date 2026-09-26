@@ -1,5 +1,8 @@
 // Stable site-authored presentation entries. Existing CMS keys remain unchanged.
 export const uiTextEntries: Array<{ key: string; scope: string; text: string; area: string; page: string; section: string; source: string }> = [
+  { key: "ui.app.dashboard.page.managePublicCollection", scope: "app.dashboard.page", text: "Manage public collection", area: "Product", page: "Dashboard", section: "Page text", source: "app/dashboard/page.tsx" },
+  { key: "ui.app.site.editor.page.previewUnavailableForSelection", scope: "app.site.editor.page", text: "This selection needs a real permitted record or does not have a standalone page to preview.", area: "Product", page: "Site Composition Editor", section: "Preview", source: "app/site-editor/page.tsx" },
+  { key: "ui.app.site.editor.page.previewRouteUnavailable", scope: "app.site.editor.page", text: "Not available for this selection", area: "Product", page: "Site Composition Editor", section: "Preview", source: "app/site-editor/page.tsx" },
   {"key":"ui.app.dashboard.page.98d395c5face","scope":"app.dashboard.page","text":"Workspace tools","page":"Dashboard","area":"Product","section":"Page text","source":"app/dashboard/page.tsx"},
   {"key":"ui.app.dashboard.page.d6d8303655f5","scope":"app.dashboard.page","text":"Print Suite","page":"Dashboard","area":"Product","section":"Page text","source":"app/dashboard/page.tsx"},
   {"key":"ui.app.dashboard.page.11de928b330a","scope":"app.dashboard.page","text":"Needs your attention","page":"Dashboard","area":"Product","section":"Page text","source":"app/dashboard/page.tsx"},
