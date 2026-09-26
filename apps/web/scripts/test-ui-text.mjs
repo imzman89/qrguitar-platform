@@ -80,6 +80,41 @@ test("workspace wording changes labels, never destinations or stored account-typ
   assert.deepEqual(WORKSPACE_OPTIONS.map(option => option.value), ["player", "collector", "shop", "builder", "luthier", "other"]);
 });
 
+test("Content Studio email preview keeps accessible colors inside the light simulation card", () => {
+  const css = fs.readFileSync(path.join(root, "app/site-editor/site-editor.module.css"), "utf8");
+  const declarations = (selector) => {
+    const escaped = selector.replace(/[.*+?^$()|[\]\\]/g, "\\$&");
+    const match = css.match(new RegExp(escaped + "\\s*\\{([^}]*)\\}"));
+    assert.ok(match, "Missing scoped email preview rule: " + selector);
+    return match[1];
+  };
+  const property = (selector, name) => {
+    const match = declarations(selector).match(new RegExp(name + ":\\s*(#[0-9a-f]{6})", "i"));
+    assert.ok(match, "Missing " + name + " in scoped email preview rule: " + selector);
+    return match[1];
+  };
+  const luminance = (hex) => {
+    const channels = hex.slice(1).match(/../g).map((value) => Number.parseInt(value, 16) / 255);
+    const [red, green, blue] = channels.map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  };
+  const contrast = (foreground, background) => {
+    const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+    return (values[0] + 0.05) / (values[1] + 0.05);
+  };
+  const card = ".studio.studio :global(.cms-email-preview article)";
+  const background = property(card, "background");
+  for (const selector of [
+    ".studio.studio :global(.cms-email-preview article h3)",
+    ".studio.studio :global(.cms-email-preview article p)",
+    ".studio.studio :global(.cms-email-preview .cms-email-kicker)",
+    ".studio.studio :global(.cms-email-preview article small)",
+    ".studio.studio :global(.cms-email-preview .cms-email-brand span)",
+  ]) assert.ok(contrast(property(selector, "color"), background) >= 4.5, selector + " must meet 4.5:1 contrast");
+  const button = ".studio.studio :global(.cms-email-preview .cms-email-button)";
+  assert.ok(contrast(property(button, "color"), property(button, "background")) >= 4.5, "Email preview button must meet 4.5:1 contrast");
+});
+
 test("UI copy preview routes are real safe representatives, not fabricated record links", () => {
   assert.equal(registry.contentPreviewPathForUiText("app/dashboard/page.tsx", "Dashboard"), "/dashboard");
   assert.equal(registry.contentPreviewPathForUiText("app/account/page.tsx", "Account"), "/account");

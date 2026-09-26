@@ -110,6 +110,14 @@
 .studio.studio :global(.cms-block-fields) { gap: 20px 16px; padding: 0; border: 0; }
 .studio.studio :global(.cms-section-empty) { margin: 0; padding: 4px 0 24px; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .studio.studio :global(.cms-visibility) { border: 0; background: var(--surface-subtle); color: var(--muted); text-transform: none; font-size: 10px; letter-spacing: 0; }
+/* Keep the simulated email's light palette isolated from the dark product-theme defaults. */
+.studio.studio :global(.cms-email-preview article) { color: #1b2023; background: #f1eee6; }
+.studio.studio :global(.cms-email-preview article h3) { color: #111719; }
+.studio.studio :global(.cms-email-preview article p) { color: #394146; }
+.studio.studio :global(.cms-email-preview .cms-email-kicker) { color: #5f686c; }
+.studio.studio :global(.cms-email-preview article small) { color: #5f686c; }
+.studio.studio :global(.cms-email-preview .cms-email-brand span) { color: #9a5e00; }
+.studio.studio :global(.cms-email-preview .cms-email-button) { color: #101719; background: #eaa026; }
 .studio.studio:global(.is-preview-open) :global(.cms-editor) { display: none; }
 .studio.studio :global(.cms-preview-panel) { position: sticky; inset: auto; top: 76px; grid-column: 2; grid-row: auto; width: 100%; height: calc(100dvh - 76px); margin: 0; border: 0; border-radius: 0; box-shadow: none; background: var(--surface-subtle); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; z-index: 1; }
 .studio.studio :global(.cms-preview-toolbar) { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 10px; padding: 14px 20px; border: 0; background: var(--surface); }
