@@ -78,7 +78,7 @@ ok(!publicInstruments.includes("service_submission_tokens"), "Public mapping ref
 ok(!publicInstruments.includes("service_submission_evidence"), "Public mapping references private evidence");
 
 ok(email.includes("Nothing becomes part of the public Profile until you approve it"), "Owner email overstates publication");
-ok(email.includes('status: "failed"') && email.includes("email delivery failed"), "Email failure is not reported honestly");
+ok(email.includes('status: "failed"') && email.includes('outcome: "unknown"') && email.includes("provider acceptance was not confirmed"), "Email rejection and unknown outcomes are not reported honestly");
 const printLayout = await read("lib/print-layout.ts");
 const printDocument = await read("app/handout/[code]/PrintDocument.tsx");
 ok(printLayout.includes('PrintMode = "label" | "hangtag" | "handout" | "service"'), "Service Summary print mode missing");
