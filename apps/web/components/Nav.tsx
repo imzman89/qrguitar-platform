@@ -114,8 +114,8 @@ export function Nav() {
               </div> : null}
             </div>
           ) : isSignedIn === false ? <Link href={signInHref} onClick={() => setIsOpen(false)}>{ui("ui.components.Nav.bfd402b2f6f3", "Sign in")}</Link>
-            : authError ? <button type="button" onClick={retrySession}>{ui("ui.components.Nav.retrySignIn", "Retry sign-in check")}</button>
-            : <span role="status" aria-busy="true">{ui("ui.components.Nav.checkingSignIn", "Checking sign-in...")}</span>}
+            : authError ? <button className={styles.accountButton} type="button" onClick={retrySession}>{ui("ui.components.Nav.retrySignIn", "Retry sign-in check")}</button>
+            : <span className={styles.sessionStatus} role="status" aria-busy="true">{ui("ui.components.Nav.checkingSignIn", "Checking sign-in...")}</span>}
         </nav>
       </div>
       {!isSignedIn && logoutError ? <div className="shell"><p className={styles.sessionNotice} role="alert">{logoutError}</p></div> : null}

@@ -48,9 +48,9 @@ export function Footer() {
           ) : isSignedIn === false ? (
             <Link href={signInHref}>{ui("ui.components.Footer.9d6322c1f4d9", "Login")}</Link>
           ) : authError ? <button type="button" onClick={retrySession}>{ui("ui.components.Footer.retrySignIn", "Retry sign-in check")}</button>
-            : <span role="status" aria-busy="true">{ui("ui.components.Footer.checkingSignIn", "Checking sign-in...")}</span>}
-          {authError ? <p role="alert">{ui("ui.components.Footer.signInCheckFailure", "Your sign-in could not be checked. Retry without signing in again.")}</p> : null}
-          {logoutError ? <p role="alert">{logoutError}</p> : null}
+            : <span className={styles.sessionStatus} role="status" aria-busy="true">{ui("ui.components.Footer.checkingSignIn", "Checking sign-in...")}</span>}
+          {authError ? <p className={styles.sessionNotice} role="alert">{ui("ui.components.Footer.signInCheckFailure", "Your sign-in could not be checked. Retry without signing in again.")}</p> : null}
+          {logoutError ? <p className={styles.sessionNotice} role="alert">{logoutError}</p> : null}
           <a href="mailto:support@qrguitar.com">{getContentValue(settings.content, "global.footer.supportLabel")}{ui("ui.components.Footer.7f508ae575ac", ": support@qrguitar.com")}</a>
         </nav>
       </div>

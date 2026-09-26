@@ -16,3 +16,4 @@
 .dropdown p,.sessionNotice { color:var(--negative); font-size:14px; padding:8px; margin:0; overflow-wrap:anywhere; }
 .header :is(a,button):focus-visible { outline:3px solid var(--action); outline-offset:3px; }
 @media(max-width:960px) { .inner { min-height:68px; flex-wrap:wrap; gap:0 20px; } .logo { width:138px; } .toggle { display:flex; } .links { display:none; flex:0 0 100%; width:100%; padding:8px 0 20px; } .links.open { display:flex; flex-direction:column; align-items:stretch; gap:4px; } .links > a,.accountButton { justify-content:flex-start; min-height:48px; font-size:16px; padding-inline:12px; } .links > .primary { margin:8px 0 0; justify-content:center; } .accountButton { width:100%; } .dropdown { position:static; margin-top:4px; box-shadow:none; } }
+.sessionStatus { display:inline-flex; align-items:center; min-height:44px; padding:10px 14px; color:var(--muted); font-size:14px; line-height:1.5; }
