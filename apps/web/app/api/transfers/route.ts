@@ -305,10 +305,11 @@ export async function POST(request: Request) {
   if (result.error) return transferFailure(result.error);
   const committed = transferSnapshot(result.data);
   if (!committed || committed.transfer.status !== "sent" || (buyerCode && committed.replayed)) return transferFailure();
-  const emailResult = committed.transfer.to_email ? await sendCommittedTransferEmail(request, committed.transfer, committed.guitar) : null;
+  // A replay confirms the existing handoff; only explicit Resend may replace its invitation.
+  const emailResult = !committed.replayed && committed.transfer.to_email ? await sendCommittedTransferEmail(request, committed.transfer, committed.guitar) : null;
   return json({ ok: true, transfer: mapTransfer(committed.transfer, committed.guitar, true),
     ...(buyerCode ? { buyerCode } : {}), replayed: committed.replayed, emailSent: emailResult?.ok || false,
-    message: buyerCode
+    message: committed.replayed ? "Transfer is already ready. No new email was sent. Use the existing invitation or choose Resend if needed." : buyerCode
       ? emailResult?.ok ? "Private buyer code prepared and a secure sign-in invitation was emailed. Copy the code now; QRguitar will not display it again."
         : "Private buyer code prepared. Copy it now; QRguitar will not display it again."
       : emailResult?.ok ? "Transfer is ready and a claim email was sent to the recipient. You can also copy the claim link."
