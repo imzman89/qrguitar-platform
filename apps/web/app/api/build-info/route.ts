@@ -17,9 +17,9 @@ export async function GET(request: Request) {
   const requestProtocol = forwardedProtocol || requestUrl.protocol.replace(":", "");
   const originUrl = new URL(`${requestProtocol}://${requestHost}`);
   const isCanonicalLocal = originUrl.hostname === "127.0.0.1" && originUrl.port === "3003";
-  const isLocal = isCanonicalLocal || originUrl.hostname === "localhost";
+  const isLocal = originUrl.hostname === "127.0.0.1" || originUrl.hostname === "localhost" || originUrl.hostname === "[::1]";
   const identity = resolveBuildIdentity(process.env, {
-    environment: isCanonicalLocal ? "local" : "production"
+    environment: isLocal ? "local" : "production"
   });
 
   return Response.json(

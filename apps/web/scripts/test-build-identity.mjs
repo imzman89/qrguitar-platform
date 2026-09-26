@@ -169,3 +169,23 @@ test("release identity can bind verification to the Netlify deploy ID", async ()
     })
   );
 });
+
+
+test("loopback review ports are local identities without implying backend isolation", async () => {
+  await withEnvironment({}, async () => {
+    for (const [origin, classification, environment] of [
+      ["http://127.0.0.1:3003", "canonical-local-review", "local"],
+      ["http://127.0.0.1:3008", "alternate-local", "local"],
+      ["https://localhost:55440", "alternate-local", "local"],
+      ["http://[::1]:3008", "alternate-local", "local"],
+      ["https://127.0.0.1.example.invalid", "production", "production"],
+      ["https://www.qrguitar.com", "production", "production"]
+    ]) {
+      const response = await buildInfo(new Request(origin + "/api/build-info"));
+      const identity = await response.json();
+      assert.equal(identity.originClassification, classification, origin);
+      assert.equal(identity.environment, environment, origin);
+      assert.equal(identity.origin, origin);
+    }
+  });
+});
