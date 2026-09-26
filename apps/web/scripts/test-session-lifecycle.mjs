@@ -294,3 +294,5 @@ test("bot welcome state follows route changes even when the Profile identity is 
   assert.doesNotMatch(editor.message, /Route test guitar/);
   assert.notDeepEqual(profile.dependencies, editor.dependencies);
 });
+
+test('late initial null cannot clear the clock of a confirmed session',async()=>{const f=fixture();f.seed(f.now-hour);await f.mount();const before=[f.storage.get(startedKey),f.storage.get(activityKey),f.storage.get(identityKey)];f.change('INITIAL_SESSION',null);assert.deepEqual([f.storage.get(startedKey),f.storage.get(activityKey),f.storage.get(identityKey)],before);f.dispose();});

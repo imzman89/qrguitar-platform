@@ -51,7 +51,8 @@ export function StartConversation({ handle, profileCode }: { handle: string; pro
       try {
         const auth = createBrowserSupabaseClient().auth;
         const subscription = auth.onAuthStateChange((_event, session) => {
-          if (!active || !current) return;
+          // Use readSession for startup; INITIAL_SESSION can be a stale failure snapshot.
+          if (!active || !current || _event === "INITIAL_SESSION") return;
           const nextActor = session?.user.id || "";
           if (actor !== undefined && actor !== nextActor) stop("sessionChanged");
           else actor = nextActor;

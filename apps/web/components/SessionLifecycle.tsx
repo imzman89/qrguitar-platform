@@ -180,6 +180,8 @@ export function SessionLifecycle() {
     }, 60 * 1000);
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Initial provider-read errors are not confirmed sign-out events.
+      if (_event === "INITIAL_SESSION") return;
       authRevision++;
       if (!session?.user) {
         if (actorId) actorEpoch++;

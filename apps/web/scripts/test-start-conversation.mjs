@@ -43,6 +43,7 @@ function fixture(options = {}) {
   f.render = () => { let turns = 0; dirty = true; while (dirty) { assert.ok(turns++ < 20); dirty = false; cursor = ec = 0; tree = C(props); for (const e of effects) if (e.pending) { e.pending = false; e.cleanup?.(); e.cleanup = e.run(); } } return tree; };
   f.text = () => words(f.render());
   f.retry = () => { const b = nodes(f.render()).find(n => n.type === 'button' && /try again/i.test(words(n))); assert.ok(b, 'Retry must be available'); b.props.onClick(); f.render(); };
+  f.event = (event,id) => listener?.(event,session(id));
   f.change = id => { f.session = session(id); listener?.('SIGNED_IN', f.session); };
   f.route = patch => { props = { ...props, ...patch }; f.render(); };
   f.replay = () => { for (const e of effects) { e.cleanup?.(); e.cleanup = e.run(); } };
@@ -106,6 +107,7 @@ for (const kind of ['sessionChanged', 'openingTimedOut', 'openRetryFailure', 'c2
   f.copy = { ['ui.components.StartConversation.' + kind]: 'Localized failure', 'ui.components.StartConversation.retryConversation': 'Localized retry' };
   assert.match(f.text(), /Localized failure/); assert.match(f.text(), /Localized retry/); await tick(); assert.equal(f.requests.length, count); assert.deepEqual(f.redirects, []); f.unmount();
 });
+await test('late initial null from failed refresh does not cancel a recovered same-actor action', async () => { const g=deferred(),f=fixture({reply:()=>g.promise}); await tick(); f.event('INITIAL_SESSION',null); g.resolve(Response.json({ok:true,conversationId:'conversation-a'})); await tick(); assert.deepEqual(f.redirects,['/messages/conversation-a']); assert.equal(f.requests.length,1); f.unmount(); });
 assert.equal(unhandled.length, 0, 'No component promise may be unhandled');
 console.log(JSON.stringify({ passed, failed, unhandledRejections: unhandled.length }));
 process.removeListener('unhandledRejection', capture);

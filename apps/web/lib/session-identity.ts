@@ -14,7 +14,8 @@ export function observeSessionIdentity(auth: IdentityAuth, onIdentity: (actorId:
   let timer: ReturnType<typeof setTimeout> | undefined;
   const clearTimer = () => { if (timer) clearTimeout(timer); timer = undefined; };
   const { data } = auth.onAuthStateChange((_event, session) => {
-    if (!active) return;
+    // INITIAL_SESSION(null) can mean a failed initial refresh, not logout.
+    if (!active || (options.onError && _event === "INITIAL_SESSION")) return;
     revision++;
     clearTimer();
     onIdentity(session?.user?.id || "");

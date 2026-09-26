@@ -47,7 +47,7 @@ export function navigationFixture(component, options = {}) {
   };
   const auth = {
     getSession: () => options.read ? options.read() : Promise.resolve(result(options.actor || 'owner-a')),
-    onAuthStateChange(listener) { listeners.add(listener); if (Object.hasOwn(options, 'immediateActor')) listener('INITIAL_SESSION', session(options.immediateActor)); return { data: { subscription: { unsubscribe: () => listeners.delete(listener) } } }; },
+    onAuthStateChange(listener) { listeners.add(listener); if (Object.hasOwn(options, 'immediateActor')) listener(options.immediateEvent || 'SIGNED_IN', session(options.immediateActor)); return { data: { subscription: { unsubscribe: () => listeners.delete(listener) } } }; },
     async signOut() { f.signouts++; return options.signOut ? options.signOut() : { error: null }; },
   };
   const browser = { createBrowserSupabaseClient: () => ({ auth }), clearQrGuitarSessionState: () => { f.clears++; } };
@@ -74,6 +74,7 @@ export function navigationFixture(component, options = {}) {
     return tree;
   };
   f.flush = async () => { await tick(); return f.render(); };
+  f.emitEvent = (event, id) => { for (const listener of [...listeners]) listener(event, session(id)); f.render(); };
   f.emit = id => { for (const listener of [...listeners]) listener(id ? 'SIGNED_IN' : 'SIGNED_OUT', session(id)); f.render(); };
   f.signedIn = () => Boolean(find(f.render(), node => node.props?.['aria-label'] === 'Account menu' || (node.type === 'button' && /Logout|Signing out/.test(text(node)))));
   f.openAccount = () => { const button = find(f.render(), node => node.props?.['aria-label'] === 'Account menu'); if (button) { button.props.onClick(); f.render(); } };
@@ -119,8 +120,8 @@ for (const component of ['Nav', 'Footer']) {
     const gate = deferred(), f = navigationFixture(component, { read: () => gate.promise });
     f.emit('owner-b'); gate.resolve(result('')); await f.flush(); assert.equal(f.signedIn(), true); f.dispose();
   });
-  test(component + ': a synchronous initial Auth event outranks stale session lookup', async () => {
-    const f = navigationFixture(component, { immediateActor: '', read: async () => result('owner-a') });
+  test(component + ': a synchronous explicit sign-out event outranks stale session lookup', async () => {
+    const f = navigationFixture(component, { immediateActor: '', immediateEvent:'SIGNED_OUT', read: async () => result('owner-a') });
     await f.flush(); assert.equal(f.signedIn(), false); f.dispose();
   });
   test(component + ': rejected current initial lookup shows retry without an unhandled rejection or private controls', async () => {
@@ -179,3 +180,5 @@ for (const component of ['Nav', 'Footer']) {
     assert.equal(f.clears, 0); assert.equal(f.writes, writes);
   });
 }
+
+for (const component of ['Nav','Footer']) test(component + ': stale INITIAL_SESSION null cannot erase a successful session', async () => { const f=navigationFixture(component); await f.flush(); assert.equal(f.signedIn(),true); f.emitEvent('INITIAL_SESSION',''); await f.flush(); assert.equal(f.signedIn(),true); f.emit(''); await f.flush(); assert.equal(f.signedIn(),false); f.dispose(); });
