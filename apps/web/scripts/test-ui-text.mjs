@@ -93,6 +93,8 @@ test("UI copy preview routes are real safe representatives, not fabricated recor
   assert.equal(registry.contentPreviewPathForUiText("app/messages/[conversationId]/page.tsx", "Messages"), undefined);
   assert.equal(registry.contentPreviewPathForUiText("components/QRGuitarBotPopup.tsx", "QRGuitar Bot Popup"), undefined);
   assert.equal(registry.contentPreviewPathForUiText("app/admin/payments/AdminPaymentsPage.tsx", "Admin Payments"), "/admin/payments");
+  assert.equal(registry.contentPreviewPathForUiText("app/billing/DirectBillingPage.tsx", "Billing"), "/billing/manual");
+  assert.equal(registry.contentPreviewPathForUiText("app/billing/BillingPage.tsx", "Billing"), undefined);
   const publicProfileEntries = registry.contentRegistry.filter((entry) => entry.page === "Public Profile");
   const homeEntries = registry.contentRegistry.filter((entry) => entry.page === "Homepage");
   assert.equal(registry.contentPreviewPathForSelection(publicProfileEntries, "Public Profile"), undefined);
