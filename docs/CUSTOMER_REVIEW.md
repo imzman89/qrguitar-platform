@@ -20,7 +20,7 @@ For a collection, use Account's collection section. Public collection identity a
 
 Open Print Suite from the Profile or Dashboard. Choose the supported format and paper size, inspect the preview, then print. Optional appearance settings are in the settings drawer. Keep the QR high contrast with its clear surrounding margin. Browser PDF verification does not establish physical printer or phone performance.
 
-For a buyer, use the existing ownership request or transfer workflow. The current owner and intended recipient have different actions. Sending a link, scanning a QR, or describing an instrument as sold does not complete a transfer. Ownership changes only after authorized recipient acceptance.
+For a buyer, use the existing ownership request or transfer workflow. The current owner and intended recipient have different actions. Sending a link, scanning a QR, or describing an instrument as sold does not complete a transfer. An invited transfer completes only after the authorized recipient accepts it. An ownership request is a separate reviewed process; submitting one does not change ownership.
 
 For service work, the provider records the work and submits it for owner review. The owner decides whether to accept it into the Profile history. Provider contributions do not automatically establish ownership or authenticity.
 
