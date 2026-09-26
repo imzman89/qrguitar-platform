@@ -65,7 +65,7 @@
     "test:qr-output": "node --test scripts/test-qr-output.mjs scripts/test-qr-component.mjs",
     "test:record-share": "node --test scripts/test-record-share.mjs && npm run test:clipboard-feedback",
     "test:clipboard-feedback": "node --test scripts/test-profile-copy-feedback.mjs scripts/test-transfer-copy-feedback.mjs scripts/test-editor-copy-feedback.mjs",
-    "test:session-lifecycle": "node --test scripts/test-session-lifecycle.mjs scripts/test-auth-navigation.mjs scripts/test-auth-pages.mjs",
+    "test:session-lifecycle": "node --test scripts/test-session-lifecycle.mjs scripts/test-auth-navigation.mjs scripts/test-auth-pages.mjs scripts/test-start-conversation.mjs",
     "test:billing": "node scripts/test-billing-service.mjs && node scripts/test-stripe-sdk-gateway.mjs && node scripts/test-billing-http.mjs && node scripts/test-billing-environment.mjs && node scripts/test-billing-runtime.mjs && node scripts/test-billing-client.mjs && node scripts/test-billing-ledger.mjs && node scripts/test-billing-integration.mjs && node scripts/generate-billing-readiness.mjs && node --test scripts/test-billing-concurrency-config.mjs",
     "test:billing-concurrency": "node scripts/test-billing-concurrency.mjs",
     "test:billing-concurrency-config": "node --test scripts/test-billing-concurrency-config.mjs",
