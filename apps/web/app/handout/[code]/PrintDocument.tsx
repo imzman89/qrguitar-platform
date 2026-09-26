@@ -81,7 +81,7 @@ export function PrintDocument(props: Props) {
     </div> : <div className={`${styles.sheet} ${mode === "service" ? styles.serviceSheet : ""}`}>
       <header className={`${styles.header} ${mode === "handout" ? styles.profileHeader : styles.serviceHeader}`}>
         {brand}
-        {mode === "handout" ? <div className={styles.documentMeta}><span>{ui("ui.app.handout.code.PrintDocument.4538b821a0d6", "QRguitar Profile")}</span><strong>{ui("ui.app.handout.code.PrintDocument.c01d92587bd7", "Permanent identity")}</strong></div> : <div className={styles.documentMeta}><span>{ui("ui.app.handout.code.PrintDocument.a734981c99b6", "Service history")}</span><strong>{ui("ui.app.handout.code.PrintDocument.ce86d91e272a", "Service Summary")}</strong></div>}
+        {mode === "handout" ? <div className={styles.documentMeta}><span>{ui("ui.app.handout.code.PrintDocument.a6c8f92c19f4", "QRguitar ID")}</span><strong>{code}</strong></div> : <div className={styles.documentMeta}><span>{ui("ui.app.handout.code.PrintDocument.a734981c99b6", "Service history")}</span><strong>{ui("ui.app.handout.code.PrintDocument.ce86d91e272a", "Service Summary")}</strong></div>}
       </header>
       <section className={mode === "service" ? styles.serviceIdentity : styles.identity}>
         {mode === "service" ? photograph : null}
@@ -90,12 +90,10 @@ export function PrintDocument(props: Props) {
       {mode === "handout" ? <div className={styles.profileBody} data-has-photo={Boolean(photo)} data-density={props.specifications.length + props.details.length > 9 || [...props.specifications, ...props.details].some(([, value]) => value.length > 100) ? "compact" : "comfortable"}>
         {photograph ? <div className={styles.profilePhoto}>{photograph}</div> : null}
         <aside className={styles.profileDetails}>
-          <section className={styles.profileIdentity} aria-label={ui("ui.app.handout.code.PrintDocument.9b7e3e571ecb", "Profile identity")}>
-            <span className={styles.sectionLabel}>{ui("ui.app.handout.code.PrintDocument.a6c8f92c19f4", "QRguitar ID")}</span>
-            <strong>{code}</strong>
-            {serial ? <div><span>{ui("ui.app.handout.code.PrintDocument.14b1b3c5b151", "Serial Number")}</span><b>{serial}</b></div> : null}
-          </section>
-          {props.details.length ? <section className={styles.detailGroup} aria-label={ui("ui.app.handout.code.PrintDocument.73949bb1bdba", "Profile details")}><h3>{ui("ui.app.handout.code.PrintDocument.73949bb1bdba", "Profile details")}</h3><Facts facts={props.details} /></section> : null}
+          {serial ? <section className={styles.profileIdentity} aria-label={ui("ui.app.handout.code.PrintDocument.9b7e3e571ecb", "Profile identity")}>
+            <Facts facts={[[ui("ui.app.handout.code.PrintDocument.14b1b3c5b151", "Serial Number"), serial]]} />
+          </section> : null}
+          {props.details.length ? <section className={styles.detailGroup} aria-label={ui("ui.app.handout.code.PrintDocument.73949bb1bdba", "Profile details")}><Facts facts={props.details} /></section> : null}
           {props.specifications.length ? <section className={`${styles.profileSpecifications} ${styles.detailGroup}`} aria-label={ui("ui.app.handout.code.PrintDocument.b70ec7c6b4ce", "Profile specifications")}><h3>{ui("ui.app.handout.code.PrintDocument.015b4e0a76e5", "Specifications")}</h3><Facts facts={props.specifications} expandLong /></section> : null}
         </aside>
       </div> : null}

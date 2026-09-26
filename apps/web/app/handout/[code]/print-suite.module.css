@@ -113,3 +113,17 @@
   :global([data-print-ready="false"]) .pageCanvas :global([data-print-document]) { display: none !important; }
   :global([data-print-ready="false"]) .printUnavailable { display: block; color: #000; font: 14px/1.5 Arial, sans-serif; }
 }
+
+/* Match the legacy layer: its important full-stock sizes otherwise beat module overrides. */
+@layer legacy {
+  @media print {
+    .root:global(.handout-page)[data-print-page-size="compact"],
+    .root:global(.handout-page)[data-print-page-size="compact"] :global(.handout-shell),
+    .root:global(.handout-page)[data-print-page-size="compact"] [data-print-frame] {
+      width: auto !important;
+      height: auto !important;
+      max-height: none !important;
+      overflow: visible !important;
+    }
+  }
+}

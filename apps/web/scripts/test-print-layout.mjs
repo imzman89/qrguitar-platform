@@ -74,6 +74,21 @@ test('all printable dimensions reserve a real paper margin', () => {
     assert.ok(g.contentHeight > 0 && g.contentHeight < g.height);
   }
 });
+
+test('compact print wrappers respect printable margins instead of forcing a full-stock-height blank page', () => {
+  const postcss = require('postcss');
+  const stylesheet = postcss.parse(fs.readFileSync(path.join(web, 'app/handout/[code]/print-suite.module.css'), 'utf8'));
+  let compact;
+  stylesheet.walkRules(rule => {
+    if (rule.parent.type === 'atrule' && rule.parent.params === 'print' && rule.selector.includes('.root:global(.handout-page)[data-print-page-size="compact"] [data-print-frame]')) compact = rule;
+  });
+  assert.ok(compact, 'scoped compact wrappers must override the legacy full-paper dimensions');
+  assert.equal(compact.parent.parent.name, 'layer');
+  assert.equal(compact.parent.parent.params, 'legacy', 'important rules must share the legacy cascade layer');
+  for (const [property, value] of [['height', 'auto'], ['width', 'auto'], ['max-height', 'none'], ['overflow', 'visible']]) {
+    assert.ok(compact.nodes.some(node => node.prop === property && node.value === value && node.important), property);
+  }
+});
 test('availability is omitted from every compact fact when switched off', () => {
   assert.deepEqual(printDetailFacts('Used', 'Modified', 'For Sale', false), ['Used', 'Modified']);
   assert.deepEqual(printDetailFacts('Used', '', 'For Sale', true), ['Used', 'For Sale']);
@@ -113,6 +128,21 @@ test('Profile Sheet presents one integrated permanent-profile scan band', () => 
 
 test('Profile Sheet renders the published scan instruction', () => {
   assert.ok(render({ mode: 'handout', scanInstruction: 'Open this Profile with your camera.' }).includes('Open this Profile with your camera.'));
+});
+
+test('Profile Sheet identifies the item once in the header without duplicate identity jargon', () => {
+  const html = render({ serial: 'VISIBLE-123', details: [['Condition', 'Used'], ['Availability', 'Not for Sale']] });
+  assert.equal((html.match(/<strong>QRG-123456<\/strong>/g) || []).length, 1);
+  assert.match(html, /class="documentMeta"><span>QRguitar ID<\/span><strong>QRG-123456<\/strong>/);
+  assert.doesNotMatch(html, /Permanent identity|<h3>Profile details<\/h3>/);
+  for (const value of ['VISIBLE-123', 'Condition', 'Used', 'Availability', 'Not for Sale']) assert.ok(html.includes(value));
+  assert.ok(html.includes('New owner? Scan, then choose Start ownership request on the Profile.'));
+});
+
+test('hiding the serial removes the empty identity block but retains the permanent Profile code', () => {
+  const html = render({ serial: '' });
+  assert.doesNotMatch(html, /class="profileIdentity"|Serial Number/);
+  assert.match(html, /<strong>QRG-123456<\/strong>/);
 });
 
 test('Profile Sheet groups readable specifications beside the photograph, before the QR band', () => {
