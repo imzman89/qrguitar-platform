@@ -3,7 +3,7 @@ import { useUiText } from "../../components/UiTextProvider";
 
 
 import workflow from "../../components/WorkflowWorkspace.module.css";
-import { ArrowLeft, Check, FileCheck2, Gift, Handshake, PackageCheck, ShieldCheck, Store, Wrench } from "lucide-react";
+import { ArrowLeft, Check, FileCheck2, Gift, Handshake, PackageCheck, ShieldCheck, Store, Wrench, X } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -18,7 +18,11 @@ import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } f
 type EvidenceDraft = { name: string; dataUrl: string; type: string; bytes: number };
 type ClaimType = "owner_transfer" | "store_purchase" | "legacy_review";
 type ScenarioId = "store" | "builder" | "seller" | "no-transfer" | "gift" | "legacy";
-type ClaimSummary = { id: string; status: string; profileTitle: string; qrCode: string; evidenceCount: number; claimType: ClaimType; createdAt: string; adminReviewNote?: string };
+type ClaimSummary = { id: string; status: string; profileTitle: string; qrCode: string; evidenceCount: number; claimType: ClaimType; createdAt: string; adminReviewNote?: string; canWithdraw?: boolean };
+
+function canWithdrawClaim(claim: ClaimSummary) {
+  return claim.canWithdraw === true && ["awaiting_claimant", "awaiting_owner", "admin_review"].includes(claim.status);
+}
 
 const scenarioDefinitions: Array<{ id: ScenarioId; key: "store" | "builder" | "transfer" | "used" | "gift" | "legacy"; icon: typeof Store; claimType: ClaimType; preferredTransfer?: boolean }> = [
   { id: "store", key: "store", icon: Store, claimType: "store_purchase" },
@@ -48,7 +52,7 @@ function OwnershipClaimContent() {
   const searchParams = useSearchParams();
   const returnPath = claimReturnPath(searchParams);
   const claimGuard = useRef<ReturnType<typeof createClaimSessionGuard> | null>(null);
-  const reloadClaimsRef = useRef<() => Promise<void>>(async () => undefined);
+  const reloadClaimsRef = useRef<() => Promise<ClaimSummary[] | null>>(async () => null);
   const claimLoadRevision = useRef(0);
   const evidenceRead = useRef<symbol | null>(null);
   const [evidenceReading, setEvidenceReading] = useState(false);
@@ -70,6 +74,8 @@ function OwnershipClaimContent() {
   const [responseEvidence, setResponseEvidence] = useState<EvidenceDraft[]>([]);
   const [buyerCode, setBuyerCode] = useState("");
   const [buyerOrderReference, setBuyerOrderReference] = useState("");
+  const [withdrawClaimId, setWithdrawClaimId] = useState("");
+  const [withdrawNotice, setWithdrawNotice] = useState<{ id: string; text: string; error: boolean } | null>(null);
   const scenarios = useMemo(() => scenarioDefinitions.map((item) => ({
     ...item,
     title: getContentValue(content, `claimCenter.scenarios.${item.key}.title`),
@@ -86,19 +92,21 @@ function OwnershipClaimContent() {
     const initial = new URLSearchParams(returnPath.split("?")[1] || "");
     const reloadClaims = async () => {
       const lease = current.lease();
-      if (!lease) return;
+      if (!lease) return null;
       const requestRevision = ++claimLoadRevision.current;
       setClaimsLoading(true); setClaimsError("");
       try {
         const payload = await current.request(lease, "/api/ownership-claims");
-        if (!current.isCurrent(lease) || requestRevision !== claimLoadRevision.current) return;
+        if (!current.isCurrent(lease) || requestRevision !== claimLoadRevision.current) return null;
         if (!Array.isArray(payload.claims) || payload.claims.some((claim) => !claim || typeof claim.id !== "string" || typeof claim.status !== "string" || typeof claim.profileTitle !== "string" || typeof claim.qrCode !== "string" || !Number.isSafeInteger(claim.evidenceCount) || claim.evidenceCount < 0)) throw new Error("The saved ownership requests could not be read. Please retry.");
         setClaims(payload.claims as ClaimSummary[]);
+        return payload.claims as ClaimSummary[];
       } catch (error) {
         if (current.isCurrent(lease) && requestRevision === claimLoadRevision.current) setClaimsError(error instanceof Error ? error.message : "Could not load ownership requests. Please retry.");
       } finally {
         if (current.isCurrent(lease) && requestRevision === claimLoadRevision.current) setClaimsLoading(false);
       }
+      return null;
     };
     reloadClaimsRef.current = reloadClaims;
     const unsubscribe = current.subscribe((snapshot) => {
@@ -108,6 +116,7 @@ function OwnershipClaimContent() {
         evidenceRead.current = null;
         setEvidenceReading(false); setClaimsLoading(false); setClaimsError("");
         setClaims([]); setEvidence([]); setResponseEvidence([]); setResponseClaimId("");
+        setWithdrawClaimId(""); setWithdrawNotice(null);
         setAcquisitionDetails(""); setOwnershipDeclaration(""); setBuyerCode(""); setBuyerOrderReference("");
         setComplete(false); setMessage(""); setChallengeCode("");
         setIdentifier(initial.get("code") || initial.get("serial") || "");
@@ -123,7 +132,7 @@ function OwnershipClaimContent() {
     void current.start();
     return () => {
       unsubscribe(); current.dispose();
-      if (claimGuard.current === current) { claimGuard.current = null; reloadClaimsRef.current = async () => undefined; }
+      if (claimGuard.current === current) { claimGuard.current = null; reloadClaimsRef.current = async () => null; }
     };
   }, [returnPath]);
 
@@ -211,6 +220,38 @@ function OwnershipClaimContent() {
     });
   }
 
+  async function withdrawRequest(claimId: string) {
+    const current = claimGuard.current;
+    const claim = claims.find((item) => item.id === claimId);
+    if (!current || evidenceRead.current || claimsLoading || claimsError || withdrawClaimId !== claimId || !claim || !canWithdrawClaim(claim)) return;
+    const lease = current.beginWrite();
+    if (!lease) return;
+    claimLoadRevision.current++;
+    setWithdrawNotice(null);
+    let rejected = false;
+    try {
+      try {
+        await current.request(lease, "/api/ownership-claims", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: serializeClaimBody({ id: claimId, action: "cancel" }) });
+      } catch {
+        rejected = true;
+      }
+      if (!current.isCurrent(lease)) return;
+      // Reconcile even a rejected or lost response; another session may have closed the request.
+      const saved = await reloadClaimsRef.current();
+      if (!current.isCurrent(lease)) return;
+      const latest = saved?.find((item) => item.id === claimId);
+      const cancelled = latest?.status === "cancelled";
+      setWithdrawNotice({ id: claimId, error: !cancelled, text: !saved
+        ? ui("ui.app.ownership.claim.page.withdrawRefreshFailure", "The saved request status could not be loaded. Refresh before taking another action.")
+        : cancelled ? ui("ui.app.ownership.claim.page.withdrawSuccess", "Ownership request withdrawn.")
+        : !latest || !canWithdrawClaim(latest) || !rejected ? ui("ui.app.ownership.claim.page.withdrawConflict", "This request changed before it could be withdrawn. Refresh the latest status and try again.")
+        : ui("ui.app.ownership.claim.page.withdrawFailure", "Could not withdraw this request. Refresh its status and try again.") });
+      setWithdrawClaimId("");
+      if (cancelled && responseClaimId === claimId) { setResponseClaimId(""); setResponseEvidence([]); }
+      window.requestAnimationFrame(() => document.getElementById(`withdraw-status-${claimId}`)?.focus());
+    } finally { current.finishWrite(lease); }
+  }
+
   return (
     <>
       <Nav />
@@ -230,6 +271,7 @@ function OwnershipClaimContent() {
               <div className="claim-load-status">
                 {claimsLoading ? <p role="status">{ui("ui.app.ownership.claim.page.ae324303eaa6", "Loading your ownership requests...")}</p> : null}
                 {claimsError ? <p role="alert">{claimsError}</p> : null}
+                {withdrawNotice && !claims.some((claim) => claim.id === withdrawNotice.id) ? <p id={`withdraw-status-${withdrawNotice.id}`} tabIndex={-1} role={withdrawNotice.error ? "alert" : "status"}>{withdrawNotice.text}</p> : null}
                 {message && !complete ? <p className="form-message" role="status">{message}</p> : null}
                 <button type="button" className="button secondary" disabled={busy || evidenceReading || claimsLoading} onClick={() => void reloadClaimsRef.current()}>{ui("ui.app.ownership.claim.page.6bc7c88e3f4e", "Refresh request status")}</button>
               </div>
@@ -284,11 +326,22 @@ function OwnershipClaimContent() {
                   <div className="section-head"><div><div className="eyebrow">{ui("ui.app.ownership.claim.page.4c64a2a1c581", "Your requests")}</div><h2>{ui("ui.app.ownership.claim.page.54403cae6653", "Claim status")}</h2></div></div>
                   <div className="claim-status-list">
                     {claims.slice(0, 6).map((claim) => (
-                      <article key={claim.id}>
+                      <article key={claim.id} style={{ gridTemplateColumns: "minmax(0, 1fr)" }}>
                         <div>
                           <span>{claimStatusLabel(claim.status)}</span>
                           <h3>{claim.profileTitle}</h3>
                           <small>{claim.qrCode || ui("ui.app.ownership.claim.page.0e2a9633188b", "Private Profile")} · {claim.evidenceCount}{" "}{ui("ui.app.ownership.claim.page.21ea0f42e3ae", "evidence file")}{claim.evidenceCount === 1 ? "" : ui("ui.app.ownership.claim.page.043a718774c5", "s")}</small>
+                          {canWithdrawClaim(claim) ? <div className="claim-response">
+                            {withdrawClaimId === claim.id ? <div role="group" aria-labelledby={`withdraw-title-${claim.id}`} style={{ display: "grid", gap: 12 }}>
+                              <h4 id={`withdraw-title-${claim.id}`} style={{ margin: 0 }}>{ui("ui.app.ownership.claim.page.withdrawConfirmTitle", "Withdraw this ownership request?")}</h4>
+                              <p>{ui("ui.app.ownership.claim.page.withdrawConfirmBody", "This closes the pending request. Ownership and submitted evidence stay unchanged. A withdrawn request cannot be reopened.")}</p>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                                <button id={`keep-request-${claim.id}`} className="button secondary" type="button" disabled={busy || evidenceReading} onClick={() => { setWithdrawClaimId(""); window.requestAnimationFrame(() => document.getElementById(`withdraw-request-${claim.id}`)?.focus()); }}>{ui("ui.app.ownership.claim.page.keepRequest", "Keep request")}</button>
+                                <button className="button" type="button" disabled={busy || evidenceReading || claimsLoading || Boolean(claimsError)} onClick={() => void withdrawRequest(claim.id)}><X size={16} aria-hidden="true" />{busy ? ui("ui.app.ownership.claim.page.withdrawingRequest", "Withdrawing request...") : ui("ui.app.ownership.claim.page.withdrawConfirmAction", "Yes, withdraw request")}</button>
+                              </div>
+                            </div> : <button id={`withdraw-request-${claim.id}`} className="button secondary" type="button" disabled={busy || evidenceReading || claimsLoading || Boolean(claimsError)} onClick={() => { setWithdrawClaimId(claim.id); setWithdrawNotice(null); window.requestAnimationFrame(() => document.getElementById(`keep-request-${claim.id}`)?.focus()); }}><X size={16} aria-hidden="true" />{ui("ui.app.ownership.claim.page.withdrawRequest", "Withdraw request")}</button>}
+                          </div> : null}
+                          {withdrawNotice?.id === claim.id ? <p id={`withdraw-status-${claim.id}`} tabIndex={-1} role={withdrawNotice.error ? "alert" : "status"}>{withdrawNotice.text}</p> : null}
                           {claim.status === "awaiting_claimant" ? (
                             <div className="claim-response">
                               <p><b>{ui("ui.app.ownership.claim.page.e9672027cf43", "QRguitar needs more information.")}</b>{claim.adminReviewNote ? ui("ui.app.ownership.claim.page.7130515d99f1", " {{value1}}", { value1: claim.adminReviewNote }) : ui("ui.app.ownership.claim.page.aa618133af62", " Add the requested private evidence below.")}</p>

@@ -145,6 +145,7 @@ function visit(node) {
   ts.forEachChild(node, visit);
 }
 visit(ast);
+const canWithdrawClaim = compile(functions.get("canWithdrawClaim"), {}, "canWithdrawClaim");
 function compile(code, env, result) {
   const { useUiText } = withUiTextTestContext(() => { throw new Error("Unexpected module"); })("UiTextProvider");
   env = { useUiText, ui: useUiText("app.ownership.claim.page"), ...env };
@@ -154,7 +155,7 @@ function compile(code, env, result) {
 function setters(state) { return Object.fromEntries(Object.keys(state).map(key => ["set" + key[0].toUpperCase() + key.slice(1), value => { state[key] = typeof value === "function" ? value(state[key]) : value; }])); }
 function pageHarness(options = {}) {
   const h = harness(options);
-  const state = { evidenceReading: false, claimsLoading: false, claimsError: "", signedIn: null, scenarioId: "", identifier: "", acquisitionDetails: "old private narrative", ownershipDeclaration: "", challengeCode: "", evidence: [], claims: [], busy: false, message: "", complete: false, responseClaimId: "", responseEvidence: [], buyerCode: "private-code", buyerOrderReference: "", authError: "" };
+  const state = { evidenceReading: false, claimsLoading: false, claimsError: "", signedIn: null, scenarioId: "", identifier: "", acquisitionDetails: "old private narrative", ownershipDeclaration: "", challengeCode: "", evidence: [], claims: [], busy: false, message: "", complete: false, responseClaimId: "", responseEvidence: [], buyerCode: "private-code", buyerOrderReference: "", authError: "", withdrawClaimId: "", withdrawNotice: null };
   const refs = { claimGuard: { current: null }, reloadClaimsRef: { current: async () => {} }, claimLoadRevision: { current: 0 }, evidenceRead: { current: null } };
   const env = { ...refs, ...setters(state), returnPath: "/ownership-claim?code=QRG-SYNTH&handoff=buyer-code", createClaimSessionGuard: () => h.guard, createBrowserSupabaseClient: () => { throw new Error("Unexpected auth factory use"); } };
   const dispose = compile("const effect = " + pageEffect + ";", env, "effect")();
@@ -214,9 +215,9 @@ await test("signed-out page renders login return intent without private controls
   assert.match(html, /next=%2Fownership-claim%3Fcode%3DQRG-SYNTH%26handoff%3Dbuyer-code/); assert.doesNotMatch(html, /type="file"|Accept handoff|Submit for review/);
 });
 
-function claimChooserHarness(search = "") {
+function claimChooserHarness(search = "", savedClaims = [], notice = null) {
   const empty = () => null;
-  const icons = Object.fromEntries(["ArrowLeft", "Check", "FileCheck2", "Gift", "Handshake", "PackageCheck", "ShieldCheck", "Store", "Wrench"].map(name => [name, empty]));
+  const icons = Object.fromEntries(["ArrowLeft", "Check", "FileCheck2", "Gift", "Handshake", "PackageCheck", "ShieldCheck", "Store", "Wrench", "X"].map(name => [name, empty]));
   const definition = ast.statements.flatMap(statement => ts.isVariableStatement(statement) ? [...statement.declarationList.declarations] : []).find(item => item.name.getText(ast) === "scenarioDefinitions");
   const actualScenarios = compile("const scenarioDefinitions = " + definition.initializer.getText(ast), icons, "scenarioDefinitions");
   const params = new URLSearchParams(search);
@@ -227,11 +228,11 @@ function claimChooserHarness(search = "") {
     React, ...icons, workflow: { claims: "claims-workspace" }, useSiteContent: () => ({}), useSearchParams: () => params, claimReturnPath,
     useState(initial) {
       const index = stateIndex++;
-      if (!(index in values)) values[index] = index === 4 ? true : typeof initial === "function" ? initial() : initial;
+      if (!(index in values)) values[index] = index === 4 ? true : index === 11 ? savedClaims : index === 20 ? notice : typeof initial === "function" ? initial() : initial;
       return [values[index], next => { values[index] = typeof next === "function" ? next(values[index]) : next; }];
     },
     useRef(initial) { const index = refIndex++; return refs[index] ||= { current: initial }; },
-    useMemo: fn => fn(), useEffect() {}, scenarioDefinitions: actualScenarios, statusSteps: [], getContentValue: (_, key) => key,
+    useMemo: fn => fn(), useEffect() {}, scenarioDefinitions: actualScenarios, statusSteps: [], getContentValue: (_, key) => key, canWithdrawClaim, claimStatusLabel: status => status,
     createChallengeCode: () => "ABC234", window: { requestAnimationFrame(callback) { frames.push(callback); } },
     document: { getElementById(id) { const node = claimElements(currentTree, item => item.props.id === id)[0]; return node ? { focus() { focused.push(id); }, scrollIntoView() {}, querySelector(selector) { assert.equal(selector, "button"); return claimElements(node, item => item.type === "button").length ? { focus() { focused.push(id + " button"); } } : null; } } : null; } },
     Nav: empty, Footer: empty, Link: ({ children, ...props }) => React.createElement("a", props, children)
@@ -288,6 +289,66 @@ await test("buyer-code deep links open the selected handoff without an extra sit
   assert.match(html, /Private buyer handoff code/);
   assert.match(html, /Order reference supplied by the seller/);
   assert.ok(changeSituation(tree));
+});
+
+await test("withdrawal eligibility requires an explicit server capability and an open state", () => {
+  for (const status of ['awaiting_claimant','awaiting_owner','admin_review','approved','denied','expired','cancelled']) {
+    for (const canWithdraw of [true,false,undefined,'true']) {
+      const expected = canWithdraw === true && ['awaiting_claimant','awaiting_owner','admin_review'].includes(status);
+      const tree = claimChooserHarness('', [{...claim,status,canWithdraw}]).render();
+      const actions = claimElements(tree, node => node.type === 'button' && node.props.id === 'withdraw-request-claim-a');
+      assert.equal(actions.length, expected ? 1 : 0);
+    }
+  }
+});
+
+await test("withdraw confirmation states consequences, defaults focus to Keep, and Keep makes no mutation", () => {
+  const ui = claimChooserHarness('', [{...claim,canWithdraw:true}]);
+  const button = (tree, label) => claimElements(tree, node => node.type === 'button' && renderToStaticMarkup(node).includes(label))[0];
+  button(ui.render(),'Withdraw request').props.onClick();
+  const confirmation = ui.render(), html = renderToStaticMarkup(confirmation);
+  assert.match(html,/Ownership and submitted evidence stay unchanged/);assert.match(html,/cannot be reopened/);
+  ui.flushFrames();assert.equal(ui.focused.at(-1),'keep-request-claim-a');
+  button(confirmation,'Keep request').props.onClick();
+  assert.doesNotMatch(renderToStaticMarkup(ui.render()),/Yes, withdraw request/);
+  ui.flushFrames();assert.equal(ui.focused.at(-1),'withdraw-request-claim-a');
+});
+
+async function withdrawalHarness() {
+  const p=pageHarness({reply:async()=>ok({claims:[{...claim,canWithdraw:true}]})});
+  await until(()=>p.state.signedIn===true&&!p.state.claimsLoading);p.state.withdrawClaimId=claim.id;
+  p.focused=[];
+  p.withdraw=()=>compile(functions.get('withdrawRequest'),{...p.env,...p.state,canWithdrawClaim,serializeClaimBody,window:{requestAnimationFrame:fn=>fn()},document:{getElementById:id=>({focus:()=>p.focused.push(id)})}},'withdrawRequest')(claim.id);
+  return p;
+}
+await test("withdraw sends authenticated cancel once, waits for authoritative status and preserves evidence", async()=>{
+  const p=await withdrawalHarness(),gate=deferred();let cancelled=false;
+  p.h.reply=async(_url,init)=>{if(init.method==='PATCH'){await gate.promise;cancelled=true;return ok({message:'cancelled'});}return ok({claims:[{...claim,canWithdraw:!cancelled,status:cancelled?'cancelled':'awaiting_owner'}]});};
+  const pending=p.withdraw();await until(()=>p.h.calls.some(c=>c.method==='PATCH'));
+  assert.equal(p.state.busy,true);assert.equal(p.state.claims[0].status,'awaiting_owner');await p.withdraw();
+  assert.equal(p.h.calls.filter(c=>c.method==='PATCH').length,1);gate.resolve();await pending;
+  const patch=p.h.calls.find(c=>c.method==='PATCH');assert.deepEqual(JSON.parse(patch.body),{id:claim.id,action:'cancel'});assert.equal(patch.headers.Authorization,'Bearer token-a');
+  assert.equal(p.state.claims[0].status,'cancelled');assert.equal(p.state.claims[0].evidenceCount,claim.evidenceCount);assert.equal(p.state.withdrawNotice.error,false);assert.equal(p.state.busy,false);assert.equal(p.focused.at(-1),'withdraw-status-claim-a');p.dispose();
+});
+await test("closed409 refreshes saved status without claiming successful withdrawal",async()=>{
+  const p=await withdrawalHarness();p.h.reply=async(_url,init)=>init.method==='PATCH'?Response.json({ok:false,message:'Already closed'},{status:409}):ok({claims:[{...claim,status:'approved',canWithdraw:false}]});
+  await p.withdraw();assert.equal(p.state.claims[0].status,'approved');assert.equal(p.state.withdrawNotice.error,true);assert.match(p.state.withdrawNotice.text,/changed/);assert.equal(p.state.busy,false);p.dispose();
+});
+await test("uncertain withdrawal is resolved by GET, while failed refresh blocks further writes",async()=>{
+  for(const refreshFails of [false,true]){const p=await withdrawalHarness();p.h.reply=async(_url,init)=>{if(init.method==='PATCH')throw Error('Lost reply');return refreshFails?Response.json({ok:false,message:'Read failed'},{status:503}):ok({claims:[{...claim,status:'cancelled',canWithdraw:false}]});};
+    await p.withdraw();assert.equal(p.state.withdrawNotice.error,refreshFails);assert.equal(Boolean(p.state.claimsError),refreshFails);const count=p.h.calls.length;await p.withdraw();assert.equal(p.h.calls.length,count);assert.equal(p.state.busy,false);p.dispose();}
+});
+await test("withdrawal cannot run without confirmation or apply a late response after sign-out",async()=>{
+  const p=await withdrawalHarness();p.state.withdrawClaimId='';const before=p.h.calls.length;await p.withdraw();assert.equal(p.h.calls.length,before);
+  p.state.withdrawClaimId=claim.id;const gate=deferred();p.h.reply=()=>gate.promise;const pending=p.withdraw();await until(()=>p.h.calls.length>before);p.h.change(null);gate.resolve(ok());await pending;
+  assert.deepEqual(p.state.claims,[]);assert.equal(p.state.withdrawClaimId,'');assert.equal(p.state.withdrawNotice,null);p.dispose();
+});
+
+await test("removed request keeps its authoritative reconciliation notice visible and focusable",async()=>{
+  const p=await withdrawalHarness();p.h.reply=async(_url,init)=>init.method==='PATCH'?Response.json({ok:false,message:'Changed'},{status:409}):ok({claims:[]});await p.withdraw();
+  assert.deepEqual(p.state.claims,[]);assert.equal(p.state.withdrawNotice.error,true);
+  const tree=claimChooserHarness('',[],p.state.withdrawNotice).render();
+  const notices=claimElements(tree,node=>node.props.id==='withdraw-status-claim-a');assert.equal(notices.length,1);assert.equal(notices[0].props.role,'alert');assert.equal(notices[0].props.tabIndex,-1);assert.equal(p.focused.at(-1),'withdraw-status-claim-a');p.dispose();
 });
 
 console.log(`${count} ownership claim client cases passed.`);
