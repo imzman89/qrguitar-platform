@@ -83,3 +83,8 @@ export function createEmailTemplateSetupExport(templatePrefix: string, fields: R
     fields: Object.fromEntries(Object.entries(fields).sort(([left], [right]) => left.localeCompare(right)))
   };
 }
+export function nonNavigatingEmailPreviewHtml(html: string) {
+  return String(html || "")
+    .replace(/<a\b([^>]*)>/gi, (_match, attributes: string) => `<span${attributes.replace(/\s+(?:href|target|rel)="[^"]*"/gi, "")} aria-disabled="true">`)
+    .replace(/<\/a>/gi, "</span>");
+}

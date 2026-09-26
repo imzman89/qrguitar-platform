@@ -52,3 +52,14 @@ These registered families describe a useful action or high-value state change, b
 2. Choose a durable post-commit dispatch model before connecting more application email. Do not send inside a transaction or infer success from a lost response; do not rely on the unverified optional Brevo idempotency field.
 3. Define recipient revalidation and safe authenticated destinations per event. Never place evidence, ownership tokens, payment identifiers, or deletion secrets in email.
 4. Decide account-deletion completion timing and lawful address retention before Auth deletion. This is the only identified event for which in-app-only status becomes unavailable by design.
+
+## Live published-content precedence
+
+On 2026-09-26 the public merged settings endpoint still returned the prior Account → Notifications wording for these exact keys:
+
+- `ui.app.account.page.b7d24faecb5a`
+- `ui.app.account.page.c9aae06952ae`
+- `ui.app.account.page.92c1cdfdf4cb`
+- `ui.app.account.page.e16273f1c0f6`
+
+A read-only query of the production `site_content` record confirmed that none of these four keys is explicitly stored in `homepage.content`, and that no draft row exists. `UiTextProvider` gives published content precedence, but no saved override blocks the corrected registry defaults: they will become effective on deployment without a Content Studio mutation. The read-only receipt is `outputs/email-automation-20260926/notification-raw-overrides.json` (2026-09-26T20:56:29Z). No production Content Studio value was changed during this audit.

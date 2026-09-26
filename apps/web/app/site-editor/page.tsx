@@ -52,8 +52,11 @@ import {
 import {
   createEmailTemplateSetupExport,
   emailTemplateDeliveryBoundary,
-  emailTemplatePrefixFromKeys
+  emailTemplatePrefixFromKeys,
+  nonNavigatingEmailPreviewHtml
 } from "../../lib/email-template-boundary";
+import { renderServiceReviewEmailDocument } from "../../lib/transactional-email-renderer";
+
 import {
   applyThemeSettings,
   defaultSiteSettings,
@@ -961,6 +964,23 @@ function SiteEditorWorkspace() {
     : emailDeliveryBoundary.kind === "provider"
       ? ui("ui.app.site.editor.page.emailProviderDelivery", "Provider delivery · Supabase Auth")
       : ui("ui.app.site.editor.page.emailPreviewOnly", "Design preview · no production trigger");
+  const emailFieldPreview = (entry: ContentRegistryEntry | undefined, fallback: string) => emailPreviewValue(entry ? (settings.content[entry.key] ?? entry.defaultValue) : fallback);
+  const applicationEmailPreview = emailDeliveryBoundary.kind === "application" && emailTemplatePrefix === "email.service.submitted" ? (() => {
+    try {
+      return renderServiceReviewEmailDocument({
+        subject: emailFieldPreview(emailSubject, `${selected.page} notification`),
+        preheader: emailFieldPreview(emailPreheader, "A secure QRguitar update is ready."),
+        heading: emailFieldPreview(emailHeading, selected.page),
+        body: emailFieldPreview(emailBody, "Review this QRguitar update securely from your account."),
+        ctaLabel: emailFieldPreview(emailCta, "Review service work"),
+        reviewUrl: "https://www.qrguitar.com/service-review/00000000-0000-4000-8000-000000000000",
+        footer: emailFieldPreview(emailFooter, "QRguitar · Permanent instrument identity and history"),
+        allowedCtaOrigins: ["https://www.qrguitar.com"]
+      });
+    } catch {
+      return null;
+    }
+  })() : null;
   const emailEditor = (
     <div className="cms-fields">
       {standardEditor}
@@ -974,18 +994,29 @@ function SiteEditorWorkspace() {
             <strong>{emailPreviewValue(emailSubject ? settings.content[emailSubject.key] : `${selected.page} notification`)}</strong>
             <small>{emailPreviewValue(emailPreheader ? settings.content[emailPreheader.key] : "A secure QRguitar update is ready.")}</small>
           </div>
-          <article>
-            <div className="cms-email-brand">{ui("ui.app.site.editor.page.a439fba430a3", "QR")}<span>{ui("ui.app.site.editor.page.d081f5e40298", "guitar")}</span></div>
-            <p className="cms-email-kicker">{ui("ui.app.site.editor.page.77cf4575c15c", "QRguitar notification")}</p>
-            <h3>{emailPreviewValue(emailHeading ? settings.content[emailHeading.key] : selected.page)}</h3>
-            <p>{emailPreviewValue(emailBody ? settings.content[emailBody.key] : "Review this QRguitar update securely from your account.")}</p>
-            <span className="cms-email-button">{emailCta ? settings.content[emailCta.key] : ui("ui.app.site.editor.page.3dcab0a37bb0", "Open QRguitar")}</span>
-            <small>{emailPreviewValue(emailFooter ? settings.content[emailFooter.key] : "QRguitar · Permanent instrument identity and history")}</small>
-          </article>
-          <div className="cms-plain-preview">
-            <strong>{ui("ui.app.site.editor.page.2f40e3ad9bf8", "Plain-text preview")}</strong>
-            <pre>{ui("ui.app.site.editor.page.dadbd9e6486e", "{{value1}}\n\n{{value2}}\n\n{{value3}}\n\n{{value4}}\n\n{{value5}}", { value1: emailPreviewValue(emailPreheader ? settings.content[emailPreheader.key] : "A secure QRguitar update is ready."), value2: emailPreviewValue(emailHeading ? settings.content[emailHeading.key] : selected.page), value3: emailPreviewValue(emailBody ? settings.content[emailBody.key] : "Review this QRguitar update securely from your account."), value4: emailCta ? settings.content[emailCta.key] : "Open QRguitar", value5: emailPreviewValue(emailFooter ? settings.content[emailFooter.key] : "QRguitar · Permanent instrument identity and history") })}</pre>
-          </div>
+          {emailDeliveryBoundary.kind === "application" ? (applicationEmailPreview ? <>
+            <div className="cms-email-renderer-preview" data-testid="application-email-renderer-preview">
+              <iframe title={ui("ui.app.site.editor.page.emailApplicationPreviewTitle", "Non-interactive service email preview")} srcDoc={nonNavigatingEmailPreviewHtml(applicationEmailPreview.htmlContent)} sandbox="" tabIndex={0} referrerPolicy="no-referrer" />
+            </div>
+            <p className="cms-email-preview-safety">{ui("ui.app.site.editor.page.emailApplicationPreviewSafety", "Rendered with the application email code. Scroll inside to review every section. Links are disabled and no message is sent from this preview.")}</p>
+            <div className="cms-plain-preview">
+              <strong>{ui("ui.app.site.editor.page.2f40e3ad9bf8", "Plain-text preview")}</strong>
+              <pre>{applicationEmailPreview.textContent}</pre>
+            </div>
+          </> : <p className="cms-email-preview-error" role="alert">{ui("ui.app.site.editor.page.emailApplicationPreviewUnavailable", "Complete the required Service / Submitted fields to restore the application-rendered preview.")}</p>) : <>
+            <article>
+              <div className="cms-email-brand">{ui("ui.app.site.editor.page.a439fba430a3", "QR")}<span>{ui("ui.app.site.editor.page.d081f5e40298", "guitar")}</span></div>
+              <p className="cms-email-kicker">{ui("ui.app.site.editor.page.77cf4575c15c", "QRguitar notification")}</p>
+              <h3>{emailPreviewValue(emailHeading ? settings.content[emailHeading.key] : selected.page)}</h3>
+              <p>{emailPreviewValue(emailBody ? settings.content[emailBody.key] : "Review this QRguitar update securely from your account.")}</p>
+              <span className="cms-email-button">{emailCta ? settings.content[emailCta.key] : ui("ui.app.site.editor.page.3dcab0a37bb0", "Open QRguitar")}</span>
+              <small>{emailPreviewValue(emailFooter ? settings.content[emailFooter.key] : "QRguitar · Permanent instrument identity and history")}</small>
+            </article>
+            <div className="cms-plain-preview">
+              <strong>{ui("ui.app.site.editor.page.2f40e3ad9bf8", "Plain-text preview")}</strong>
+              <pre>{ui("ui.app.site.editor.page.dadbd9e6486e", "{{value1}}\n\n{{value2}}\n\n{{value3}}\n\n{{value4}}\n\n{{value5}}", { value1: emailPreviewValue(emailPreheader ? settings.content[emailPreheader.key] : "A secure QRguitar update is ready."), value2: emailPreviewValue(emailHeading ? settings.content[emailHeading.key] : selected.page), value3: emailPreviewValue(emailBody ? settings.content[emailBody.key] : "Review this QRguitar update securely from your account."), value4: emailCta ? settings.content[emailCta.key] : "Open QRguitar", value5: emailPreviewValue(emailFooter ? settings.content[emailFooter.key] : "QRguitar · Permanent instrument identity and history") })}</pre>
+            </div>
+          </>}
         </div>
         <div className="cms-email-actions">
           {emailDeliveryBoundary.canSendApplicationTest ? <>

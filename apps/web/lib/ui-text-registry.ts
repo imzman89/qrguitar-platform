@@ -15,6 +15,9 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   { key: "ui.app.site.editor.page.previewRouteUnavailable", scope: "app.site.editor.page", text: "Not available for this selection", area: "Product", page: "Site Composition Editor", section: "Preview", source: "app/site-editor/page.tsx" },
   { key: "ui.app.site.editor.page.emailDeliveryBoundary", scope: "app.site.editor.page", text: "Only Service / Submitted is sent by the application. Supabase owns password-reset and transfer sign-in delivery; the remaining templates are design previews with no production trigger.", area: "Product", page: "Site Composition Editor", section: "Emails", source: "app/site-editor/page.tsx" },
   { key: "ui.app.site.editor.page.emailApplicationDelivery", scope: "app.site.editor.page", text: "Application delivery · Brevo", area: "Product", page: "Site Composition Editor", section: "Emails", source: "app/site-editor/page.tsx" },
+  { key: "ui.app.site.editor.page.emailApplicationPreviewTitle", scope: "app.site.editor.page", text: "Non-interactive service email preview", area: "Product", page: "Site Composition Editor", section: "Emails", source: "app/site-editor/page.tsx" },
+  { key: "ui.app.site.editor.page.emailApplicationPreviewSafety", scope: "app.site.editor.page", text: "Rendered with the application email code. Scroll inside to review every section. Links are disabled and no message is sent from this preview.", area: "Product", page: "Site Composition Editor", section: "Emails", source: "app/site-editor/page.tsx" },
+  { key: "ui.app.site.editor.page.emailApplicationPreviewUnavailable", scope: "app.site.editor.page", text: "Complete the required Service / Submitted fields to restore the application-rendered preview.", area: "Product", page: "Site Composition Editor", section: "Emails", source: "app/site-editor/page.tsx" },
   { key: "ui.app.site.editor.page.emailProviderDelivery", scope: "app.site.editor.page", text: "Provider delivery · Supabase Auth", area: "Product", page: "Site Composition Editor", section: "Emails", source: "app/site-editor/page.tsx" },
   { key: "ui.app.site.editor.page.emailPreviewOnly", scope: "app.site.editor.page", text: "Design preview · no production trigger", area: "Product", page: "Site Composition Editor", section: "Emails", source: "app/site-editor/page.tsx" },
   { key: "ui.app.site.editor.page.emailSetupExportDownloaded", scope: "app.site.editor.page", text: "Template setup export downloaded.", area: "Product", page: "Site Composition Editor", section: "Emails", source: "app/site-editor/page.tsx" },
@@ -1037,7 +1040,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.account.page.b7d24faecb5a",
     "scope": "app.account.page",
-    "text": "Security, transfer, claim, and service-review notices are sent to your account email when action is required.",
+    "text": "Email currently covers account confirmation and recovery, transfer sign-in invitations, and service work ready for owner review. Other workflow updates stay in QRguitar; PayPal handles its own payment notices.",
     "page": "Account",
     "area": "Product",
     "section": "Page text",
@@ -1055,7 +1058,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.account.page.c9aae06952ae",
     "scope": "app.account.page",
-    "text": "Required notices",
+    "text": "Connected QRguitar email",
     "page": "Account",
     "area": "Product",
     "section": "Page text",
@@ -1064,7 +1067,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.account.page.92c1cdfdf4cb",
     "scope": "app.account.page",
-    "text": "Enabled",
+    "text": "Service owner review",
     "page": "Account",
     "area": "Product",
     "section": "Page text",
@@ -1073,7 +1076,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.account.page.e16273f1c0f6",
     "scope": "app.account.page",
-    "text": "Required account and ownership notices stay visible.",
+    "text": "Claim, transfer, service, message, deletion-request, and billing updates stay available in their QRguitar workspaces while account access exists.",
     "page": "Account",
     "area": "Product",
     "section": "Page text",

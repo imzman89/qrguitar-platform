@@ -11696,6 +11696,10 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
 .cms-contrast-grid .is-pass strong { color: #8edeb0; }
 .cms-contrast-grid .is-warning strong { color: #f0b45d; }
 .cms-email-preview { display: grid; gap: 12px; margin-top: 18px; }
+.cms-email-renderer-preview { min-width: 0; overflow: hidden; border: 1px solid rgba(239, 236, 228, .14); border-radius: 8px; background: #090d0f; }
+.cms-email-renderer-preview iframe { display: block; width: 100%; min-height: 600px; height: min(980px, 75vh); border: 0; background: #090d0f; }
+.cms-email-preview-safety { color: var(--muted); font-size: 11px; line-height: 1.55; }
+.cms-email-preview-error { margin: 0; border: 1px solid rgba(255, 180, 90, .35); border-radius: 7px; padding: 14px; color: #f5c27d; background: #16110a; }
 .cms-email-envelope, .cms-plain-preview, .cms-search-preview, .cms-social-preview { border: 1px solid rgba(239, 236, 228, .1); border-radius: 7px; padding: 15px; background: #081014; }
 .cms-email-envelope { display: grid; gap: 4px; }
 .cms-email-envelope span, .cms-email-kicker { color: var(--muted); font-size: 9px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }

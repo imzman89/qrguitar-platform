@@ -1,5 +1,5 @@
 import { contentRegistryByKey, getContentValue, validateVariables } from "./content-registry";
-import { renderBrandedTransactionalEmail, type TransactionalEmailDocument } from "./transactional-email-renderer";
+import { renderBrandedTransactionalEmail, renderServiceReviewEmailDocument, type TransactionalEmailDocument } from "./transactional-email-renderer";
 import { loadPublishedSiteSettings } from "./site-settings-server";
 
 export type EmailResult = {
@@ -171,15 +171,13 @@ export async function sendServiceReviewEmail(input: {
 
   let document: TransactionalEmailDocument;
   try {
-    document = renderBrandedTransactionalEmail({
+    document = renderServiceReviewEmailDocument({
       subject: render("subject"),
       preheader: render("preheader"),
-      eyebrow: "Private owner review",
       heading: render("heading"),
       body: render("body"),
       ctaLabel: render("cta"),
-      ctaUrl: input.reviewUrl,
-      notice: "Nothing becomes part of the public Profile until you approve it. Supporting evidence stays private and is not attached to this email. This request expires 14 days after submission; resending does not extend that deadline. The link still requires the authorized owner account.",
+      reviewUrl: input.reviewUrl,
       footer: render("footer"),
       allowedCtaOrigins: approvedApplicationOrigins()
     });

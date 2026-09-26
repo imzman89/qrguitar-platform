@@ -94,6 +94,37 @@ test("renderer rejects non-HTTPS, credentialed, and off-origin CTA links", () =>
     assert.throws(() => renderer.renderBrandedTransactionalEmail({ ...baseEmail, ctaUrl }), /approved HTTPS|absolute HTTPS/);
   }
 });
+test("Content Studio application preview uses the same fixed service-review document and plaintext output", () => {
+  const document = renderer.renderServiceReviewEmailDocument({
+    subject: "Review 1962 Sunburst Stratocaster",
+    preheader: "Private owner review",
+    heading: "Service work is ready",
+    body: "Example Guitar Service submitted work for 1962 Sunburst Stratocaster.",
+    ctaLabel: "Review service work",
+    reviewUrl: "https://www.qrguitar.com/service-review/00000000-0000-4000-8000-000000000000",
+    footer: "QRguitar · Permanent instrument identity and history",
+    allowedCtaOrigins: ["https://www.qrguitar.com"]
+  });
+  assert.match(document.htmlContent, /Private owner review/i);
+  assert.match(document.htmlContent, /resending does not extend that deadline/);
+  assert.match(document.htmlContent, /If the button does not work/);
+  assert.match(document.textContent, /Review service work: https:\/\/www\.qrguitar\.com\/service-review\/00000000-0000-4000-8000-000000000000/);
+  assert.match(document.textContent, /resending does not extend that deadline/);
+
+  const previewHtml = boundary.nonNavigatingEmailPreviewHtml(document.htmlContent);
+  assert.doesNotMatch(previewHtml, /<a\b/i);
+  assert.doesNotMatch(previewHtml, /\s(?:href|target|rel)="/i);
+  assert.match(previewHtml, /<span class="email-button wrap"/);
+  assert.match(previewHtml, /resending does not extend that deadline/);
+
+  const editor = fs.readFileSync(path.join(webRoot, "app/site-editor/page.tsx"), "utf8");
+  assert.match(editor, /renderServiceReviewEmailDocument/);
+  assert.match(editor, /applicationEmailPreview\.htmlContent/);
+  assert.match(editor, /applicationEmailPreview\.textContent/);
+  assert.match(editor, /sandbox=""/);
+  assert.match(editor, /tabIndex=\{0\}/);
+  assert.match(editor, /Links are disabled and no message is sent from this preview/);
+});
 
 async function withEmailEnvironment(run) {
   const before = {
@@ -241,6 +272,14 @@ test("only the real application-bound family can use Content Studio delivery", (
   assert.match(route, /not bound to application delivery/);
   assert.doesNotMatch(sender, /sendCollectionInquiryEmail/);
   assert.match(sender, /textContent: document\.textContent/);
+});
+test("Account notification presentation names implemented email without advertising unconnected families", () => {
+  const account = fs.readFileSync(path.join(webRoot, "app/account/page.tsx"), "utf8");
+  assert.match(account, /account confirmation and recovery, transfer sign-in invitations, and service work ready for owner review/);
+  assert.match(account, /Other workflow updates stay in QRguitar/);
+  assert.match(account, /Connected QRguitar email/);
+  assert.match(account, /Service owner review/);
+  assert.doesNotMatch(account, /Security, transfer, claim, and service-review notices are sent to your account email when action is required/);
 });
 
 test("email ownership map exposes only one application sender and honest provider exports", () => {

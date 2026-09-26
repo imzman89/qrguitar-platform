@@ -18,6 +18,19 @@ export type BrandedEmailInput = {
   testRecipientNote?: string;
 };
 
+export type ServiceReviewEmailDocumentInput = {
+  subject: string;
+  preheader: string;
+  heading: string;
+  body: string;
+  ctaLabel: string;
+  reviewUrl: string;
+  footer: string;
+  allowedCtaOrigins: string[];
+};
+
+export const SERVICE_REVIEW_EMAIL_NOTICE = "Nothing becomes part of the public Profile until you approve it. Supporting evidence stays private and is not attached to this email. This request expires 14 days after submission; resending does not extend that deadline. The link still requires the authorized owner account.";
+
 function singleLine(value: string, maxLength: number) {
   return String(value || "").replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
@@ -156,4 +169,19 @@ export function renderBrandedTransactionalEmail(input: BrandedEmailInput): Trans
   ].filter(Boolean).join("\n\n");
 
   return { subject, htmlContent, textContent };
+}
+
+export function renderServiceReviewEmailDocument(input: ServiceReviewEmailDocumentInput): TransactionalEmailDocument {
+  return renderBrandedTransactionalEmail({
+    subject: input.subject,
+    preheader: input.preheader,
+    eyebrow: "Private owner review",
+    heading: input.heading,
+    body: input.body,
+    ctaLabel: input.ctaLabel,
+    ctaUrl: input.reviewUrl,
+    notice: SERVICE_REVIEW_EMAIL_NOTICE,
+    footer: input.footer,
+    allowedCtaOrigins: input.allowedCtaOrigins
+  });
 }
