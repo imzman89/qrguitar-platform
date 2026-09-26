@@ -939,6 +939,7 @@ function SiteEditorWorkspace() {
       <section className="cms-field-group cms-email-studio">
         <header><div><span>{ui("ui.app.site.editor.page.eeb51b63cf49", "Safe preview")}</span><h2>{activeSectionName ? ui("ui.app.site.editor.page.f199529a30df", "{{value1}} email", { value1: activeSectionName }) : ui("ui.app.site.editor.page.92f2897724bf", "Email preview")}</h2></div><Send size={20} /></header>
         <p className="cms-section-intro">{ui("ui.app.site.editor.page.bbad0a028b19", "Whitelisted variables are replaced with sample values here. Previewing never sends an email or exposes a real token.")}</p>
+        <p className="cms-section-intro">{ui("ui.app.site.editor.page.emailDeliveryBoundary", "Service-submission templates are used by configured application delivery. Other templates are preview/test only; authentication-provider templates are configured separately.")}</p>
         <div className="cms-email-preview">
           <div className="cms-email-envelope">
             <span>{ui("ui.app.site.editor.page.68971283841a", "Subject")}</span>

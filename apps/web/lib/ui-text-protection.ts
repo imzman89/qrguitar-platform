@@ -1,6 +1,7 @@
 // Audited presentation strings whose wording communicates a product guarantee,
 // payment/consent boundary, trust status, or the fixed brand identity.
 export const protectedUiTextKeys = new Set<string>([
+  "ui.app.site.editor.page.emailDeliveryBoundary",
   "ui.app.site.editor.page.a439fba430a3",
   "ui.app.site.editor.page.d081f5e40298",
   "ui.app.site.editor.page.1a32cd5a3a29",

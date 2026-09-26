@@ -46,6 +46,10 @@ test("content map distinguishes representative, record-required, and delivery bo
   assert.equal(byKey.get("profile.tabs.overview").preview.route, null);
   assert.equal(byKey.get("email.service.submitted.subject").binding.status, "application-renderer-bound");
   assert.equal(byKey.get("email.ownership.transferInvitation.subject").binding.status, "editor-preview-only");
+  const deliveryNotice = byKey.get("ui.app.site.editor.page.emailDeliveryBoundary");
+  assert.equal(deliveryNotice.classification, "security-locked");
+  assert.equal(deliveryNotice.binding.status, "connected-interface-call");
+  assert.match(deliveryNotice.defaultValue, /authentication-provider templates are configured separately/);
   assert.equal(map.emailBoundary.authProviderTemplates.includes("does not configure"), true);
   for (const surface of map.surfaces) {
     if (surface.preview.mode !== "representative-route") continue;
