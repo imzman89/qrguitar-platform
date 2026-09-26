@@ -37,6 +37,7 @@ function fixture(options = {}) {
     removeItem(key) { if (f.denied === "remove") throw new DOMException("Storage blocked", "SecurityError"); storage.delete(key); }
   };
   const window = {
+    location: { pathname: f.pathname || '/dashboard', search: f.search || '', hash: f.hash || '' },
     get localStorage() { if (f.denied === "getter") throw new DOMException("Storage blocked", "SecurityError"); return localStorage; },
     addEventListener: (name, fn) => windowEvents.set(name, fn), removeEventListener: (name) => windowEvents.delete(name),
     setInterval(fn) { f.intervals.push(fn); return f.intervals.length; }, clearInterval() {}, dispatchEvent() {}
@@ -46,7 +47,7 @@ function fixture(options = {}) {
   const auth = {
     getSession: () => f.readSession ? f.readSession() : Promise.resolve({ data: { session: f.session }, error: null }),
     onAuthStateChange(fn) { listeners.add(fn); return { data: { subscription: { unsubscribe: () => listeners.delete(fn) } } }; },
-    async signOut() { f.signouts++; f.change("SIGNED_OUT", null); return { error: null }; }
+    async signOut() { f.signouts++; if (f.signOut) return f.signOut(); f.change("SIGNED_OUT", null); return { error: null }; }
   };
   class FakeDate extends Date { static now() { return f.now; } }
   const globals = { window, document, Date: FakeDate, CustomEvent: class { constructor(type) { this.type = type; } } };
@@ -55,10 +56,11 @@ function fixture(options = {}) {
   }, { ...globals, process: { env: { NEXT_PUBLIC_SUPABASE_URL: "https://synthetic.invalid", NEXT_PUBLIC_SUPABASE_ANON_KEY: "synthetic" } } });
   const component = compile("components/SessionLifecycle.tsx", {
     react: { useEffect: (fn) => effects.push(fn), useRef: (value) => ({ current: value }) },
-    "next/navigation": { useRouter: () => ({ replace: (url) => f.redirects.push(url) }), usePathname: () => "/dashboard" },
+    "next/navigation": { useRouter: () => ({ replace: (url) => f.redirects.push(url) }), usePathname: () => f.pathname || "/dashboard" },
+    "../lib/auth-redirect": compile("lib/auth-redirect.ts", {}, {}),
     "../lib/supabase-browser": browser
   }, globals);
-  f.storage = storage; f.browser = browser;
+  f.storage = storage; f.browser = browser; f.window = window;
   f.seed = (started, activity = f.now, identity = JSON.stringify([f.session.user.id, f.session.user.last_sign_in_at])) => {
     storage.set(startedKey, String(started)); storage.set(activityKey, String(activity));
     if (identity !== null) storage.set(identityKey, identity);
@@ -191,6 +193,37 @@ test("late initial session read cannot overwrite a newer account's clock", async
 test("late session read after unmount cannot recreate cleared metadata", async () => {
   const f = fixture(); let resolve; f.readSession = () => new Promise((done) => { resolve = done; }); await f.mount(); f.dispose();
   resolve({ data: { session: f.session }, error: null }); await tick(); assert.equal(f.storage.size, 0);
+});
+
+test("pending expiry completion cannot redirect a newly signed-in account", async () => {
+  const f = fixture(); let settle; f.signOut = () => new Promise(resolve => { settle = resolve; }); f.seed(f.now - 15 * day);
+  await f.mount(); assert.equal(f.signouts, 1);
+  f.change('SIGNED_IN', { user: { id: 'owner-b', last_sign_in_at: new Date(f.now).toISOString() } });
+  settle({ error: null }); await tick();
+  assert.deepEqual(f.redirects, []); assert.match(f.storage.get(identityKey), /owner-b/); f.dispose();
+});
+test("expiry preserves safe collection settings query and hash", async () => {
+  const f = fixture({ pathname: '/account', search: '?section=collection', hash: '#public-collection' }); f.seed(f.now - 15 * day); await f.mount();
+  assert.equal(f.redirects[0], '/login?reason=session-expired&next='+encodeURIComponent('/account?section=collection#public-collection')); f.dispose();
+});
+test("overlapping expiry checks start one sign-out operation", async () => {
+  const f = fixture(); let settle; f.signOut = () => new Promise(resolve => { settle = resolve; }); f.seed(f.now - 15 * day); await f.mount(); await f.poll(); await f.focus();
+  assert.equal(f.signouts, 1); f.change('SIGNED_OUT', null); settle({ error: null }); await tick(); f.dispose();
+});
+test("same-session token refresh while expiry is pending cannot extend idle activity", async () => {
+  const f = fixture(); f.session.access_token = jwt(sessionIdA); let settle;
+  f.signOut = () => new Promise(resolve => { settle = resolve; });
+  f.seed(f.now - day, f.now - 9 * hour, JSON.stringify([f.session.user.id, `session:${sessionIdA}`])); await f.mount();
+  const oldActivity = f.storage.get(activityKey);
+  f.change('TOKEN_REFRESHED', { ...f.session, access_token: jwt(sessionIdA, 'owner-a', 1800000000) }); f.activity();
+  assert.equal(f.storage.get(activityKey), oldActivity); assert.equal(f.signouts, 1);
+  f.change('SIGNED_OUT', null); settle({ error: null }); await tick(); assert.equal(f.redirects.length, 1); f.dispose();
+});
+test("pending expiry uses the browser's current path and query together after navigation", async () => {
+  const f = fixture(); let settle; f.signOut = () => new Promise(resolve => { settle = resolve; }); f.seed(f.now - 15 * day); await f.mount();
+  f.window.location = { pathname: '/account', search: '?section=collection', hash: '#public-collection', href: 'https://synthetic.invalid/account?section=collection#public-collection' };
+  f.change('SIGNED_OUT', null); settle({ error: null }); await tick();
+  assert.equal(f.redirects[0], '/login?reason=session-expired&next='+encodeURIComponent('/account?section=collection#public-collection')); f.dispose();
 });
 
 for (const reject of [false, true]) test(`failed resume session check does not extend activity (${reject ? "throw" : "result error"})`, async () => {

@@ -8,6 +8,7 @@ import { LogOut, Menu, MessageCircle, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { BrandLogo } from "./BrandLogo";
 import { useAuthNavigation } from "../lib/use-auth-navigation";
+import { safeAuthRedirect } from "../lib/auth-redirect";
 import { defaultSiteSettings, fetchPublishedSiteSettings } from "../lib/site-settings";
 import { getContentValue } from "../lib/content-registry";
 import styles from "./Nav.module.css";
@@ -15,7 +16,7 @@ import styles from "./Nav.module.css";
 export function Nav() {
   const ui = useUiText("components.Nav");
   const pathname = usePathname();
-  const { signedIn: isSignedIn, signingOut, logoutError, logout: signOut, clearLogoutError } = useAuthNavigation();
+  const { signedIn: isSignedIn, authError, retrySession, signingOut, logoutError, logout: signOut, clearLogoutError } = useAuthNavigation();
   const [isOpen, setIsOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [content, setContent] = useState(defaultSiteSettings.content);
@@ -75,6 +76,7 @@ export function Nav() {
     { href: "/how-it-works", label: getContentValue(content, "global.navigation.howItWorks") },
     { href: "/create", label: getContentValue(content, "global.navigation.create"), primary: true }
   ];
+  const signInHref = `/login?next=${encodeURIComponent(safeAuthRedirect(`${pathname}${typeof window === "undefined" ? "" : window.location.search + window.location.hash}`))}`;
 
   return (
     <header className={`brand-frame ${styles.header}`} ref={headerRef} onBlur={(event) => {
@@ -111,10 +113,13 @@ export function Nav() {
                 {logoutError ? <p role="alert">{logoutError}</p> : null}
               </div> : null}
             </div>
-          ) : <Link href="/login" onClick={() => setIsOpen(false)}>{ui("ui.components.Nav.bfd402b2f6f3", "Sign in")}</Link>}
+          ) : isSignedIn === false ? <Link href={signInHref} onClick={() => setIsOpen(false)}>{ui("ui.components.Nav.bfd402b2f6f3", "Sign in")}</Link>
+            : authError ? <button type="button" onClick={retrySession}>{ui("ui.components.Nav.retrySignIn", "Retry sign-in check")}</button>
+            : <span role="status" aria-busy="true">{ui("ui.components.Nav.checkingSignIn", "Checking sign-in...")}</span>}
         </nav>
       </div>
       {!isSignedIn && logoutError ? <div className="shell"><p className={styles.sessionNotice} role="alert">{logoutError}</p></div> : null}
+      {authError ? <div className="shell"><p className={styles.sessionNotice} role="alert">{ui("ui.components.Nav.signInCheckFailure", "Your sign-in could not be checked. Retry without signing in again.")}</p></div> : null}
     </header>
   );
 }

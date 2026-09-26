@@ -16,6 +16,15 @@ function compile(relative, imports, globals = {}, sourceOverride) {
   return module.exports;
 }
 const observer = compile('lib/session-identity.ts', {});
+const redirect = compile('lib/auth-redirect.ts', {});
+test('shared observer bounds a stuck read and ignores its late result until explicit retry', async () => {
+  const gate = deferred(), identities = []; let errors = 0, reads = 0;
+  const auth = { getSession: () => ++reads === 1 ? gate.promise : Promise.resolve(result('owner-b')), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) };
+  const stop = observer.observeSessionIdentity(auth, id => identities.push(id), { timeoutMs: 1, onError: () => errors++ });
+  await new Promise(resolve => setTimeout(resolve, 10)); assert.equal(errors, 1); assert.deepEqual(identities, []);
+  gate.resolve(result('owner-a')); await tick(); assert.deepEqual(identities, []);
+  stop.refresh(); await tick(); assert.deepEqual(identities, ['owner-b']); stop();
+});
 function find(tree, predicate) {
   if (!tree || typeof tree !== 'object') return;
   if (predicate(tree)) return tree;
@@ -50,6 +59,7 @@ export function navigationFixture(component, options = {}) {
     'lucide-react': { LogOut: () => null, Menu: () => null, UserRound: () => null, X: () => null },
     './BrandLogo': { BrandLogo: () => null }, './Nav.module.css': { default: {}, __esModule: true }, './Footer.module.css': { default: {}, __esModule: true },
     '../lib/supabase-browser': browser, '../lib/use-auth-navigation': hook,
+    '../lib/auth-redirect': redirect,
     '../lib/site-settings': { defaultSiteSettings: settings, fetchPublishedSiteSettings: options.published || (async () => settings) },
     '../lib/content-registry': { getContentValue: (content, key) => content[key] || key },
   };
@@ -72,6 +82,7 @@ export function navigationFixture(component, options = {}) {
     assert.ok(button, 'sign-out button exists'); button.props.onClick(); return button;
   };
   f.alert = () => text(find(f.render(), node => node.props?.role === 'alert'));
+  f.retry = () => { const button = find(f.render(), node => node.type === 'button' && /Retry sign-in check/.test(text(node))); assert.ok(button, 'session retry exists'); button.props.onClick(); f.render(); };
   f.text = () => text(f.render());
   f.pending = () => Boolean(find(f.render(), node => node.type === 'button' && text(node).includes('Signing out') && node.props.disabled));
   f.dispose = () => { effects.forEach(effect => effect.cleanup?.()); f.disposed = true; };
@@ -80,10 +91,25 @@ export function navigationFixture(component, options = {}) {
 }
 
 for (const component of ['Nav', 'Footer']) {
+  test(component + ': unresolved identity never renders a sign-in prompt', async () => {
+    const gate = deferred(), f = navigationFixture(component, { read: () => gate.promise });
+    assert.match(f.text(), /Checking sign-in/); assert.equal(Boolean(find(f.render(), node => node.type === 'a' && node.props.href?.startsWith('/login'))), false);
+    gate.resolve(result('owner-a')); await f.flush(); assert.equal(f.signedIn(), true); f.dispose();
+  });
+  test(component + ': transient lookup failure is retryable, not confirmed anonymous', async () => {
+    let failed = true; const f = navigationFixture(component, { read: async () => failed ? Promise.reject(Error('Private transport detail')) : result('owner-a') });
+    await f.flush(); assert.match(f.alert(), /sign-in could not be checked/); assert.equal(Boolean(find(f.render(), node => node.type === 'a' && node.props.href?.startsWith('/login'))), false);
+    failed = false; f.retry(); await f.flush(); assert.equal(f.signedIn(), true); assert.equal(f.alert(), ''); f.dispose();
+  });
   test(component + ': published navigation/footer content still loads on mount', async () => {
     const published = { content: { 'global.navigation.dashboard': 'Published collection link', 'global.footer.description': 'Published collection description' }, composition: { footer: { sections: [] } } };
     const f = navigationFixture(component, { published: async () => published });
     await f.flush(); assert.match(f.text(), /Published collection/); f.dispose();
+  });
+  test(component + ': confirmed anonymous sign-in link preserves an app-local return path', async () => {
+    const f = navigationFixture(component, { read: async () => result('') }); await f.flush();
+    const link = find(f.render(), node => node.type === 'a' && node.props.href?.startsWith('/login'));
+    assert.equal(link.props.href, '/login?next=%2F'); f.dispose();
   });
   test(component + ': late initial session cannot restore signed-in controls after sign-out', async () => {
     const gate = deferred(), f = navigationFixture(component, { read: () => gate.promise });
@@ -97,9 +123,9 @@ for (const component of ['Nav', 'Footer']) {
     const f = navigationFixture(component, { immediateActor: '', read: async () => result('owner-a') });
     await f.flush(); assert.equal(f.signedIn(), false); f.dispose();
   });
-  test(component + ': rejected current initial lookup stays signed out without an unhandled rejection', async () => {
+  test(component + ': rejected current initial lookup shows retry without an unhandled rejection or private controls', async () => {
     const f = navigationFixture(component, { read: async () => { throw Error('Private transport detail'); } });
-    await f.flush(); assert.equal(f.signedIn(), false); assert.equal(f.alert(), ''); f.dispose();
+    await f.flush(); assert.equal(f.signedIn(), false); assert.match(f.alert(), /sign-in could not be checked/); f.dispose();
   });
   test(component + ': late initial error cannot erase a new account', async () => {
     const gate = deferred(), f = navigationFixture(component, { read: () => gate.promise });

@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
+import { safeAuthRedirect } from "../lib/auth-redirect";
 import {
   clearQrGuitarSessionState,
   createBrowserSupabaseClient,
@@ -64,7 +65,7 @@ function sessionClock(session: { access_token?: string; user: { id: string; last
   writeSessionStorage(sessionIdentityKey, identity);
   writeSessionStorage(sessionStartedAtKey, String(startedAt));
   writeSessionStorage(lastActivityAtKey, String(lastActivityAt));
-  return { startedAt, lastActivityAt };
+  return { startedAt, lastActivityAt, identity };
 }
 
 export function SessionLifecycle() {
@@ -81,32 +82,53 @@ export function SessionLifecycle() {
   useEffect(() => {
     let cancelled = false;
     let authRevision = 0;
+    let actorId = "";
+    let actorEpoch = 0;
+    let clockIdentity = "";
+    let expiryOperation: symbol | undefined;
+    let expiryIdentity = "";
     const supabase = createBrowserSupabaseClient();
 
-    async function expireSession() {
-      if (cancelled) {
+    async function expireSession(revision: number, expectedActor: string) {
+      if (cancelled || expiryOperation || revision !== authRevision || actorId !== expectedActor) {
         return;
       }
-
+      const operation = Symbol("expire-session");
+      const expiredEpoch = actorEpoch;
+      const expiredIdentity = clockIdentity;
+      expiryOperation = operation;
+      expiryIdentity = expiredIdentity;
+      const current = () => !cancelled && expiryOperation === operation && (
+        (actorEpoch === expiredEpoch && actorId === expectedActor && clockIdentity === expiredIdentity) ||
+        (actorEpoch === expiredEpoch + 1 && actorId === "")
+      );
       sessionActiveRef.current = false;
-      clearQrGuitarSessionState();
-      writeSessionStorage(sessionExpiredMessageKey, "Your session expired. Please sign in again.");
-      await supabase.auth.signOut();
-      window.dispatchEvent(new CustomEvent("qrguitar:auth"));
-
-      const currentPath = pathnameRef.current || "/";
-      if (routeRequiresSession(currentPath)) {
-        router.replace(`/login?reason=session-expired&next=${encodeURIComponent(currentPath)}`);
-      }
+      try {
+        const result = await supabase.auth.signOut();
+        if (!current() || (result.error && actorId)) return;
+        clearQrGuitarSessionState();
+        writeSessionStorage(sessionExpiredMessageKey, "Your session expired. Please sign in again.");
+        window.dispatchEvent(new CustomEvent("qrguitar:auth"));
+        const location = new URL(window.location.href || `${window.location.pathname}${window.location.search}${window.location.hash}`, "https://qrguitar.invalid");
+        const currentPath = location.pathname;
+        if (routeRequiresSession(currentPath)) {
+          const destination = safeAuthRedirect(`${currentPath}${location.search}${location.hash}`);
+          router.replace(`/login?reason=session-expired&next=${encodeURIComponent(destination)}`);
+        }
+      } catch { /* A failed sign-out is not a confirmed anonymous session. Retry the expired clock on the next check. */ }
+      finally { if (expiryOperation === operation) { expiryOperation = undefined; expiryIdentity = ""; } }
     }
 
     async function checkSession() {
+      if (expiryOperation) return false;
       const revision = authRevision;
       const { data, error } = await supabase.auth.getSession();
       if (cancelled || revision !== authRevision || error) return false;
       const session = data.session;
 
       if (!session?.user) {
+        if (actorId) actorEpoch++;
+        actorId = ""; clockIdentity = "";
         sessionActiveRef.current = false;
         clearQrGuitarSessionState();
         return false;
@@ -114,11 +136,13 @@ export function SessionLifecycle() {
 
       sessionActiveRef.current = true;
       const now = Date.now();
-      const { startedAt, lastActivityAt } = sessionClock(session);
+      const { startedAt, lastActivityAt, identity } = sessionClock(session);
+      if (clockIdentity !== identity) actorEpoch++;
+      clockIdentity = identity; actorId = session.user.id;
 
       const idleLimit = routeUsesAdminTimeout(pathnameRef.current || "/") ? adminIdleMs : normalIdleMs;
       if (now - lastActivityAt > idleLimit || now - startedAt > absoluteMaxMs) {
-        await expireSession();
+        await expireSession(revision, session.user.id);
         return false;
       }
       return true;
@@ -158,14 +182,18 @@ export function SessionLifecycle() {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       authRevision++;
       if (!session?.user) {
+        if (actorId) actorEpoch++;
+        actorId = ""; clockIdentity = "";
         sessionActiveRef.current = false;
         clearQrGuitarSessionState();
         return;
       }
 
-      sessionActiveRef.current = true;
       // SIGNED_IN also fires when an existing tab resumes; it is not a new login.
-      sessionClock(session);
+      const { identity } = sessionClock(session);
+      if (clockIdentity !== identity) actorEpoch++;
+      clockIdentity = identity; actorId = session.user.id;
+      sessionActiveRef.current = !expiryOperation || clockIdentity !== expiryIdentity;
     });
 
     return () => {

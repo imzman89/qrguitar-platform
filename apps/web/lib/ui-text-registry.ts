@@ -1,5 +1,11 @@
 // Stable site-authored presentation entries. Existing CMS keys remain unchanged.
 export const uiTextEntries: Array<{ key: string; scope: string; text: string; area: string; page: string; section: string; source: string }> = [
+  { key: "ui.components.Nav.checkingSignIn", scope: "components.Nav", text: "Checking sign-in...", area: "Product", page: "Shared Navigation", section: "Session status", source: "components/Nav.tsx" },
+  { key: "ui.components.Nav.retrySignIn", scope: "components.Nav", text: "Retry sign-in check", area: "Product", page: "Shared Navigation", section: "Session status", source: "components/Nav.tsx" },
+  { key: "ui.components.Nav.signInCheckFailure", scope: "components.Nav", text: "Your sign-in could not be checked. Retry without signing in again.", area: "Product", page: "Shared Navigation", section: "Session status", source: "components/Nav.tsx" },
+  { key: "ui.components.Footer.checkingSignIn", scope: "components.Footer", text: "Checking sign-in...", area: "Product", page: "Shared Footer", section: "Session status", source: "components/Footer.tsx" },
+  { key: "ui.components.Footer.retrySignIn", scope: "components.Footer", text: "Retry sign-in check", area: "Product", page: "Shared Footer", section: "Session status", source: "components/Footer.tsx" },
+  { key: "ui.components.Footer.signInCheckFailure", scope: "components.Footer", text: "Your sign-in could not be checked. Retry without signing in again.", area: "Product", page: "Shared Footer", section: "Session status", source: "components/Footer.tsx" },
   { key: "ui.app.dashboard.page.managePublicCollection", scope: "app.dashboard.page", text: "Manage public collection", area: "Product", page: "Dashboard", section: "Page text", source: "app/dashboard/page.tsx" },
   { key: "ui.app.site.editor.page.previewUnavailableForSelection", scope: "app.site.editor.page", text: "This selection needs a real permitted record or does not have a standalone page to preview.", area: "Product", page: "Site Composition Editor", section: "Preview", source: "app/site-editor/page.tsx" },
   { key: "ui.app.site.editor.page.previewRouteUnavailable", scope: "app.site.editor.page", text: "Not available for this selection", area: "Product", page: "Site Composition Editor", section: "Preview", source: "app/site-editor/page.tsx" },
