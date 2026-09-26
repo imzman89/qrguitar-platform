@@ -2686,10 +2686,9 @@ select {
   display: grid;
   gap: 14px;
   min-width: 0;
-  border: 1px solid rgba(248, 246, 242, .12);
-  border-radius: 8px;
-  padding: 14px;
-  background: rgba(7, 12, 16, .48);
+  border: 0;
+  padding: 0;
+  background: transparent;
 }
 
 .photo-organizer.empty {
@@ -2712,6 +2711,7 @@ select {
 }
 
 .photo-organizer-header {
+  flex-wrap: wrap;
   justify-content: space-between;
   color: var(--muted);
   font-size: 12px;
@@ -2754,8 +2754,8 @@ select {
 }
 
 .photo-organizer-tile.is-main {
-  border-color: rgba(240, 161, 43, .76);
-  box-shadow: 0 0 0 1px rgba(240, 161, 43, .18);
+  border-color: var(--line);
+  box-shadow: none;
 }
 
 .photo-organizer-tile.is-drop-target {
@@ -2801,14 +2801,13 @@ select {
 
 .photo-organizer-controls {
   display: grid;
-  grid-template-columns: repeat(3, 44px);
-  justify-content: end;
-  gap: 6px;
-  padding: 8px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  padding: 0;
 }
 
 .photo-organizer-controls button {
-  width: 44px;
+  width: 100%;
   height: 44px;
   border: 1px solid rgba(248, 246, 242, .15);
   border-radius: 7px;
@@ -2903,17 +2902,18 @@ select {
   display: none;
 }
 
+.photo-organizer-menu:not([open]) > div { display: none; }
+
 .photo-organizer-menu > div {
   position: relative;
   margin-top: 6px;
   width: 100%;
   display: grid;
   gap: 4px;
-  border: 1px solid rgba(248, 246, 242, .16);
-  border-radius: 8px;
-  padding: 6px;
-  background: #11191e;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, .34);
+  border: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .photo-organizer-menu button {
@@ -2927,7 +2927,7 @@ select {
   padding: 7px 8px;
   color: var(--text);
   background: transparent;
-  font-size: 11px;
+  font-size: 13px;
   text-align: left;
 }
 
@@ -10693,15 +10693,6 @@ body.qrguitar-bot-page .qrguitar-bot-shell {
     gap: 8px;
   }
 
-  .photo-organizer-controls {
-    grid-template-columns: repeat(3, 44px);
-    padding: 7px;
-  }
-
-  .photo-organizer-controls button {
-    width: 44px;
-    height: 44px;
-  }
 
   .photo-organizer-menu { margin: 0 7px 7px; }
 }

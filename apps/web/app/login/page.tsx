@@ -284,7 +284,7 @@ export default function LoginPage() {
 
 
                 <div id="auth-access-panel" role={mode === "reset" ? undefined : "tabpanel"} aria-labelledby={mode === "reset" ? undefined : `auth-${mode}-tab`}>
-                <form onSubmit={(event) => { event.preventDefault(); void submitAccountAction(); }} aria-busy={isWorking}>
+                <form method="post" onSubmit={(event) => { event.preventDefault(); void submitAccountAction(); }} aria-busy={isWorking}>
                 {mode === "register" ? (
                   <div className="field">
                     <label htmlFor="name">{ui("ui.app.login.page.2b7f6a84de91", "Display name")}</label>

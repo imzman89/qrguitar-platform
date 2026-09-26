@@ -1,4 +1,5 @@
 import { request as httpsRequest } from "node:https";
+import { request as loopbackHttpRequest } from "node:http";
 import { getSupabaseEnvStatus } from "./supabase-server";
 
 type SupabaseHttpOptions = {
@@ -33,13 +34,17 @@ function authHeaders(serviceRole = false, hasBody = false) {
 export function supabaseHttpsJson<T>(path: string, options: SupabaseHttpOptions = {}) {
   const bodyText = options.body === undefined ? "" : JSON.stringify(options.body);
   const requestUrl = new URL(path.startsWith("/") ? path : `/${path}`, baseUrl());
+  // The disposable review stack binds only to loopback. Production always requires HTTPS.
+  const localReviewHttp = requestUrl.protocol === "http:" && requestUrl.hostname === "127.0.0.1" && process.env.NODE_ENV === "development" && process.env.QRGUITAR_LOCAL_REVIEW === "1";
+  if (requestUrl.protocol !== "https:" && !localReviewHttp) throw new Error("Supabase requests require HTTPS outside the local review stack.");
+  const transport = localReviewHttp ? loopbackHttpRequest : httpsRequest;
   const headers = {
     ...authHeaders(options.serviceRole, Boolean(bodyText)),
     ...(bodyText ? { "Content-Length": Buffer.byteLength(bodyText).toString() } : {})
   };
 
   return new Promise<T>((resolve, reject) => {
-    const request = httpsRequest(
+    const request = transport(
       requestUrl,
       {
         family: 4,

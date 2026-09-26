@@ -1,5 +1,23 @@
 // Stable site-authored presentation entries. Existing CMS keys remain unchanged.
 export const uiTextEntries: Array<{ key: string; scope: string; text: string; area: string; page: string; section: string; source: string }> = [
+  {"key":"ui.app.dashboard.page.98d395c5face","scope":"app.dashboard.page","text":"Workspace tools","page":"Dashboard","area":"Product","section":"Page text","source":"app/dashboard/page.tsx"},
+  {"key":"ui.app.dashboard.page.d6d8303655f5","scope":"app.dashboard.page","text":"Print Suite","page":"Dashboard","area":"Product","section":"Page text","source":"app/dashboard/page.tsx"},
+  {"key":"ui.app.dashboard.page.11de928b330a","scope":"app.dashboard.page","text":"Needs your attention","page":"Dashboard","area":"Product","section":"Page text","source":"app/dashboard/page.tsx"},
+  {"key":"ui.app.dashboard.page.1127784eea0a","scope":"app.dashboard.page","text":"Ownership transfers could not be checked. Reload your collection first.","page":"Dashboard","area":"Product","section":"Page text","source":"app/dashboard/page.tsx"},
+  {"key":"ui.app.dashboard.page.f3ccb68e0839","scope":"app.dashboard.page","text":"No ownership transfers need your attention.","page":"Dashboard","area":"Product","section":"Page text","source":"app/dashboard/page.tsx"},
+  {"key":"ui.app.dashboard.page.ab405a433d94","scope":"app.dashboard.page","text":"waiting on recipient","page":"Dashboard","area":"Product","section":"Page text","source":"app/dashboard/page.tsx"},
+  { key: "ui.app.i.code.ProfileClient.shopItem", scope: "app.i.code.ProfileClient", text: "Shop this item", area: "Product", page: "Public Profile", section: "Seller actions", source: "app/i/[code]/ProfileClient.tsx" },
+  { key: "ui.app.i.code.ProfileClient.lifetimeProfile", scope: "app.i.code.ProfileClient", text: "One Profile, for its whole life.", area: "Product", page: "Public Profile", section: "Ownership", source: "app/i/[code]/ProfileClient.tsx" },
+  { key: "ui.app.i.code.ProfileClient.afterPurchase", scope: "app.i.code.ProfileClient", text: "After you buy it, ask the seller to transfer this Profile to you for free. Its photos, specifications and history stay together.", area: "Product", page: "Public Profile", section: "Ownership", source: "app/i/[code]/ProfileClient.tsx" },
+  { key: "ui.app.i.code.ProfileClient.alreadyOwn", scope: "app.i.code.ProfileClient", text: "Already own it?", area: "Product", page: "Public Profile", section: "Ownership", source: "app/i/[code]/ProfileClient.tsx" },
+  {"key":"ui.app.create.page.choosePhotos","scope":"app.create.page","text":"Choose photos","area":"Product","page":"Create Profile","section":"Photos and details","source":"app/create/page.tsx"},
+  {"key":"ui.app.create.page.photoReadFailed","scope":"app.create.page","text":"Could not open: {{files}}. Choose those photos again or try another JPG, PNG, or WebP. Your other photos and details are still here.","area":"Product","page":"Create Profile","section":"Photos and details","source":"app/create/page.tsx"},
+  {"key":"ui.app.create.page.duplicatePhotos","scope":"app.create.page","text":"Photos already selected were skipped.","area":"Product","page":"Create Profile","section":"Photos and details","source":"app/create/page.tsx"},
+  {"key":"ui.app.create.page.documentsSkipped","scope":"app.create.page","text":"{{count}} not added. Choose readable PDF, JPG, PNG, or WebP files up to 12MB each, with up to 10 documents per Profile. Your other files and details are still here.","area":"Product","page":"Create Profile","section":"Photos and details","source":"app/create/page.tsx"},
+  {"key":"ui.app.create.page.uploadRetry","scope":"app.create.page","text":"Some files could not be uploaded. Choose Retry safely below. Your details and successful uploads are kept.","area":"Product","page":"Create Profile","section":"Photos and details","source":"app/create/page.tsx"},
+  {"key":"ui.app.create.page.preparingFiles","scope":"app.create.page","text":"Preparing your files…","area":"Product","page":"Create Profile","section":"Photos and details","source":"app/create/page.tsx"},
+  {"key":"ui.app.create.page.ownerDetailsOptional","scope":"app.create.page","text":"Owner and purchase details (optional)","area":"Product","page":"Create Profile","section":"Photos and details","source":"app/create/page.tsx"},
+  {"key":"ui.app.create.page.optionalDetails","scope":"app.create.page","text":"More instrument details (optional)","area":"Product","page":"Create Profile","section":"Photos and details","source":"app/create/page.tsx"},
   { key: "ui.app.handout.code.PrintDocument.buyerRequest", scope: "app.handout.code.PrintDocument", text: "New owner? Scan, then choose Start ownership request on the Profile.", area: "Product", page: "Print Workspace", section: "Page text", source: "app/handout/[code]/PrintDocument.tsx" },
   { key: "ui.app.dashboard.page.noHandoff", scope: "app.dashboard.page", text: "No handoff started. Choose a method below when you are ready.", area: "Product", page: "Dashboard", section: "Page text", source: "app/dashboard/page.tsx" },
   { key: "ui.app.dashboard.page.handoffCompleted", scope: "app.dashboard.page", text: "Handoff completed. The next owner accepted the Profile.", area: "Product", page: "Dashboard", section: "Page text", source: "app/dashboard/page.tsx" },
@@ -11275,36 +11293,9 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/create/page.tsx"
   },
   {
-    "key": "ui.app.create.page.72880691b674",
-    "scope": "app.create.page",
-    "text": "QRguitar ID preview",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/create/page.tsx"
-  },
-  {
-    "key": "ui.app.create.page.08787577237c",
-    "scope": "app.create.page",
-    "text": "Create Profile sections",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Accessibility",
-    "source": "app/create/page.tsx"
-  },
-  {
     "key": "ui.app.create.page.6fdf3c9bc618",
     "scope": "app.create.page",
     "text": "Instrument",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/create/page.tsx"
-  },
-  {
-    "key": "ui.app.create.page.5e3147ab51e0",
-    "scope": "app.create.page",
-    "text": "Photos",
     "page": "Create Profile",
     "area": "Product",
     "section": "Page text",
@@ -11323,15 +11314,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.create.page.45989de49fb7",
     "scope": "app.create.page",
     "text": "Details",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/create/page.tsx"
-  },
-  {
-    "key": "ui.app.create.page.aff0766a5290",
-    "scope": "app.create.page",
-    "text": "Review",
     "page": "Create Profile",
     "area": "Product",
     "section": "Page text",

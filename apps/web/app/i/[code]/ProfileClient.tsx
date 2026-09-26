@@ -5,6 +5,7 @@ import { useUiText } from "../../../components/UiTextProvider";
 import {
   ArrowLeft,
   ArrowRight,
+  ArrowUpRight,
   Clock3,
   Download,
   Copy,
@@ -47,6 +48,7 @@ import { fetchOwnerProfile, OwnerProfileError } from "../../../lib/owner-profile
 import { resolveInstrumentPresentation } from "../../../lib/instrument-profile-contract";
 import { getContentValue } from "../../../lib/content-registry";
 import { publicProfileUrl } from "../../../lib/profile-url";
+import { profilePurchaseLink } from "../../../lib/profile-purchase-link";
 import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "../../../lib/optional-tracking-consent";
 import { appendFailedImageSource, filterAvailableImageSources } from "../../../lib/image-fallback";
 import { publicMediaVariantSrcSet, publicMediaVariantUrl } from "../../../lib/public-media-variant";
@@ -615,6 +617,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
     return Boolean(value);
   });
 
+  const purchaseLink = profilePurchaseLink(instrument);
   const profileLinks = [
     { label: "Website", href: instrument.websiteUrl },
     { label: "Instagram", href: instrument.instagramUrl },
@@ -660,7 +663,12 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
               className={styles["profile-hero-badges"]}
               ownerCollection={instrument.publicCollection}
             />
-            {instrument.publicCollection ? <div className={styles["profile-member-actions"]}><SellerWebsiteLink {...instrument.publicCollection} />{instrument.publicCollection.allowMessages ? <MemberMessageLink className={styles["profile-message-link"]} handle={instrument.publicCollection.handle} profileCode={instrument.qrCode} label={ui("ui.app.i.code.ProfileClient.577c10d6f210", "Message {{value1}}", { value1: instrument.publicCollection.publicName })} /> : null}</div> : null}
+            {purchaseLink || instrument.publicCollection ? <div className={styles["profile-member-actions"]}>
+              {purchaseLink ? <a className={styles["profile-purchase-link"]} href={purchaseLink.href} target="_blank" rel="ugc nofollow noopener noreferrer">
+                <span><strong>{ui("ui.app.i.code.ProfileClient.shopItem", "Shop this item")}</strong><small>{purchaseLink.host}</small></span><ArrowUpRight size={19} aria-hidden="true" />
+              </a> : instrument.publicCollection ? <SellerWebsiteLink {...instrument.publicCollection} /> : null}
+              {instrument.publicCollection?.allowMessages ? <MemberMessageLink className={styles["profile-message-link"]} handle={instrument.publicCollection.handle} profileCode={instrument.qrCode} label={ui("ui.app.i.code.ProfileClient.577c10d6f210", "Message {{value1}}", { value1: instrument.publicCollection.publicName })} /> : null}
+            </div> : null}
 
         {safetyStatus === "lost" || safetyStatus === "stolen" ? (
           <section className={styles["scan-safety-alert"]} aria-label={ui("ui.app.i.code.ProfileClient.88e9f0875799", "Reported {{value1}}", { value1: safetyStatus })}>
@@ -862,10 +870,6 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
               {shareNotice === "failed" ? (
                 <small className={styles["scan-copy-notice"]}>{ui("ui.app.i.code.ProfileClient.0854b0c9c202", "Copy failed. You can copy the URL from your browser bar.")}</small>
               ) : null}
-              {!canEdit ? <div className={styles["profile-claim-entry"]}>
-                <Link href={"/ownership-claim?code=" + encodeURIComponent(instrument.qrCode)}>{ui("ui.app.i.code.ProfileClient.21f95b4c7342", "Start ownership request")} <ArrowRight size={14} aria-hidden="true" /></Link>
-                <p>{ui("ui.app.i.code.ProfileClient.b5c3490dde3a", "Scanning this QR code opens the Profile. It never changes ownership. Ask the current owner for a transfer, or start a private request if they cannot send one.")}</p>
-              </div> : null}
             </ProfileIdentity>
           </div>
         </section>
@@ -982,6 +986,16 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
           timelineEvents={timelineEvents}
           serviceEntries={presentation?.serviceEntries || []}
         />
+
+        {!canEdit ? <section className={styles["profile-claim-entry"]}>
+          <h2>{ui("ui.app.i.code.ProfileClient.lifetimeProfile", "One Profile, for its whole life.")}</h2>
+          <p>{ui("ui.app.i.code.ProfileClient.afterPurchase", "After you buy it, ask the seller to transfer this Profile to you for free. Its photos, specifications and history stay together.")}</p>
+          <details>
+            <summary>{ui("ui.app.i.code.ProfileClient.alreadyOwn", "Already own it?")}</summary>
+            <p>{ui("ui.app.i.code.ProfileClient.b5c3490dde3a", "Scanning this QR code opens the Profile. It never changes ownership. Ask the current owner for a transfer, or start a private request if they cannot send one.")}</p>
+            <Link href={"/ownership-claim?code=" + encodeURIComponent(instrument.qrCode)}>{ui("ui.app.i.code.ProfileClient.21f95b4c7342", "Start ownership request")} <ArrowRight size={14} aria-hidden="true" /></Link>
+          </details>
+        </section> : null}
 
         {activeMedia ? (
           <PhotoViewer

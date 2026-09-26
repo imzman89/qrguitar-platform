@@ -13,6 +13,13 @@
 .profile-heading :global(.record-badge) { background: none; border: 0; padding: 0; font-size: 12px; font-weight: 500; }
 .profile-heading :global(.record-owner-link) { flex-basis: 100%; margin-top: 10px; padding: 0; border: 0; background: none; font-size: 13px; }
 .profile-member-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px; margin-top: 10px; }
+.profile-purchase-link { display: inline-flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 52px; padding: 10px 16px; border-radius: 8px; color: #101719; background: var(--gold); text-decoration: none; max-width: 100%; }
+.profile-purchase-link span { display: grid; gap: 3px; min-width: 0; }
+.profile-purchase-link strong { font-size: 15px; line-height: 1.3; }
+.profile-purchase-link small { font-size: 12px; overflow-wrap: anywhere; }
+.profile-purchase-link svg { flex-shrink: 0; }
+.profile-purchase-link:hover { filter: brightness(1.08); }
+.profile-purchase-link:focus-visible { outline: 2px solid var(--text); outline-offset: 4px; }
 .profile-message-link { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; color: var(--muted-strong); font-size: 13px; text-decoration: none; }
 .profile-message-link:hover { color: var(--text); text-decoration: underline; }
 .scan-hero-gallery { grid-area: gallery; min-width: 0; }
@@ -94,8 +101,11 @@
 .external-media-card p { color: var(--muted); font-size: 13px; }
 .media-placeholder-grid, .collaboration-thread { color: var(--muted); font-size: 14px; line-height: 1.65; }
 .media-placeholder-grid span { display: block; }
-.profile-claim-entry { margin-top: 12px; color: var(--muted); font-size: 12px; line-height: 1.5; }
-.profile-claim-entry p { margin: 3px 0 0; }
+.profile-claim-entry { margin-top: 32px; padding-block: 24px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; line-height: 1.6; }
+.profile-claim-entry h2 { color: var(--text); font-size: 20px; line-height: 1.3; margin: 0 0 10px; }
+.profile-claim-entry p { margin: 0 0 12px; max-width: 640px; }
+.profile-claim-entry summary { color: var(--text); cursor: pointer; padding-block: 12px; min-height: 44px; font-weight: 600; }
+.profile-claim-entry summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .profile-claim-entry a { display: inline-flex; min-height: 44px; align-items: center; gap: 8px; color: var(--text); font-size: 13px; font-weight: 600; }
 .scan-profile :is(button,a,summary):focus-visible { outline: 2px solid var(--action); outline-offset: 4px; }
 @media (max-width: 900px) {

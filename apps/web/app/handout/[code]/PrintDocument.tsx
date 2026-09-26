@@ -87,7 +87,7 @@ export function PrintDocument(props: Props) {
         {mode === "service" ? photograph : null}
         <div>{mode === "handout" ? <span className={styles.identityEyebrow}>{ui("ui.app.handout.code.PrintDocument.3ec29e5e7860", "Registered Profile")}</span> : <span className={styles.identityEyebrow}>{ui("ui.app.handout.code.PrintDocument.d696a35bdd18", "Profile")}</span>}<h2>{title}</h2><p className={styles.primaryFacts}>{props.facts.join(" / ")}</p>{props.badges}{mode === "service" ? <Facts facts={[...identity, ...props.details]} /> : null}</div>
       </section>
-      {mode === "handout" ? <div className={styles.profileBody} data-has-photo={Boolean(photo)}>
+      {mode === "handout" ? <div className={styles.profileBody} data-has-photo={Boolean(photo)} data-density={props.specifications.length + props.details.length > 9 || [...props.specifications, ...props.details].some(([, value]) => value.length > 100) ? "compact" : "comfortable"}>
         {photograph ? <div className={styles.profilePhoto}>{photograph}</div> : null}
         <aside className={styles.profileDetails}>
           <section className={styles.profileIdentity} aria-label={ui("ui.app.handout.code.PrintDocument.9b7e3e571ecb", "Profile identity")}>
@@ -96,9 +96,9 @@ export function PrintDocument(props: Props) {
             {serial ? <div><span>{ui("ui.app.handout.code.PrintDocument.14b1b3c5b151", "Serial Number")}</span><b>{serial}</b></div> : null}
           </section>
           {props.details.length ? <section className={styles.detailGroup} aria-label={ui("ui.app.handout.code.PrintDocument.73949bb1bdba", "Profile details")}><h3>{ui("ui.app.handout.code.PrintDocument.73949bb1bdba", "Profile details")}</h3><Facts facts={props.details} /></section> : null}
+          {props.specifications.length ? <section className={`${styles.profileSpecifications} ${styles.detailGroup}`} aria-label={ui("ui.app.handout.code.PrintDocument.b70ec7c6b4ce", "Profile specifications")}><h3>{ui("ui.app.handout.code.PrintDocument.015b4e0a76e5", "Specifications")}</h3><Facts facts={props.specifications} expandLong /></section> : null}
         </aside>
       </div> : null}
-      {mode === "handout" && props.specifications.length ? <section className={`${styles.profileSpecifications} ${styles.detailGroup}`} aria-label={ui("ui.app.handout.code.PrintDocument.b70ec7c6b4ce", "Profile specifications")}><h3>{ui("ui.app.handout.code.PrintDocument.015b4e0a76e5", "Specifications")}</h3><Facts facts={props.specifications} expandLong /></section> : null}
       {mode === "handout" ? profileScan : null}
       {mode === "service" && service ? <section className={styles.service}>
         <header><div><span>{service.category}</span><h3>{service.title}</h3></div><time>{service.date}</time></header>

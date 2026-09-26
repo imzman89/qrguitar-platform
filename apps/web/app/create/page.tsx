@@ -7,6 +7,7 @@ import authStyles from "../../components/AuthForm.module.css";
 import styles from "./create.module.css";
 
 import { uploadProfileFile, dataUrlToProfileFile } from "../../lib/profile-upload-client";
+import { prepareProfilePhotos } from "../../lib/prepare-profile-photos";
 import { ownerProfileHref } from "../../lib/owner-profile";
 
 import Link from "next/link";
@@ -84,6 +85,11 @@ export default function CreatePage() {
   const content = useSiteContent();
   const router = useRouter();
   const uploadFileIds = useRef(new Map<string,string>());
+  const saveInFlight = useRef(false);
+  const fileSelectionPending = useRef(false);
+  const [preparingFiles, setPreparingFiles] = useState(false);
+  const [photoFeedback, setPhotoFeedback] = useState("");
+  const [documentFeedback, setDocumentFeedback] = useState("");
   const [message, setMessage] = useState("");
   const [honeypot, setHoneypot] = useState("");
   const [authChecked, setAuthChecked] = useState(false);
@@ -217,59 +223,53 @@ export default function CreatePage() {
   }
 
   async function addProfilePhotos(files: FileList | null) {
-    if (!files?.length) {
-      return;
+    if (!files?.length || saveInFlight.current || fileSelectionPending.current) return;
+    fileSelectionPending.current = true;
+    setPreparingFiles(true);
+    setPhotoFeedback("");
+    try {
+      const remainingSlots = Math.max(0, 20 - galleryImages.length);
+      const validation = validateImageFiles(Array.from(files));
+      const selectedFiles = validation.files.slice(0, remainingSlots);
+      const omittedCount = Math.max(0, validation.files.length - selectedFiles.length);
+      const prepared = await prepareProfilePhotos(selectedFiles, fileToCompressedDataUrl, galleryImages);
+      const dataUrls = prepared.images;
+      if (dataUrls.length) {
+        setPhotoUploads((current) => ({ ...current, ...Object.fromEntries(dataUrls.map((url) => [url, { state: "ready" as const }])) }));
+        setGalleryImages((current) => [...current, ...dataUrls].slice(0, 20));
+        setForm((current) => ({ ...current, heroImageDataUrl: current.heroImageDataUrl || dataUrls[0] }));
+        setFieldErrors((current) => { const next = { ...current }; delete next.photos; return next; });
+      }
+      const feedback = [ui("ui.app.create.page.08c41bf0de08", "{{value1}} photo{{value2}} added. Choose any photo as the main image.{{value3}}{{value4}}", {value1: dataUrls.length, value2: dataUrls.length === 1 ? "" : "s", value3: omittedCount ? " " + omittedCount + " photos were not added because each Profile supports up to 20." : "", value4: validation.message ? " " + validation.message : ""})];
+      if (prepared.failedNames.length) feedback.push(ui("ui.app.create.page.photoReadFailed", "Could not open: {{files}}. Choose those photos again or try another JPG, PNG, or WebP. Your other photos and details are still here.", { files: prepared.failedNames.join(", ") }));
+      if (prepared.duplicateCount) feedback.push(ui("ui.app.create.page.duplicatePhotos", "Photos already selected were skipped."));
+      setPhotoFeedback(feedback.join(" "));
+    } finally {
+      fileSelectionPending.current = false;
+      setPreparingFiles(false);
     }
-
-    const remainingSlots = Math.max(0, 20 - galleryImages.length);
-    const selectedFiles = Array.from(files).slice(0, remainingSlots);
-    const omittedCount = Math.max(0, files.length - selectedFiles.length);
-    const validation = validateImageFiles(selectedFiles);
-    if (!validation.files.length) {
-      setMessage(validation.message);
-      return;
-    }
-
-    const dataUrls = await Promise.all(validation.files.map(fileToCompressedDataUrl));
-
-    setPhotoUploads((current) => {
-      const next = { ...current };
-      dataUrls.forEach((dataUrl) => { next[dataUrl] = { state: "ready" }; });
-      return next;
-    });
-
-    setGalleryImages((current) => {
-      const next = [...current, ...dataUrls].slice(0, 20);
-      setForm((formCurrent) => ({ ...formCurrent, heroImageDataUrl: formCurrent.heroImageDataUrl || next[0] || "" }));
-      return next;
-    });
-    setMessage(ui("ui.app.create.page.08c41bf0de08", "{{value1}} photo{{value2}} added. Choose any photo as the main image.{{value3}}{{value4}}", {value1: dataUrls.length, value2: dataUrls.length === 1 ? "" : "s", value3: omittedCount ? ` ${omittedCount} photo${omittedCount === 1 ? " was" : "s were"} not added because each Profile supports up to 20.` : "", value4: validation.message ? ` ${validation.message}` : ""}));
   }
 
   async function addDocuments(files: FileList | null) {
-    if (!files?.length) {
-      return;
+    if (!files?.length || saveInFlight.current || fileSelectionPending.current) return;
+    fileSelectionPending.current = true;
+    setPreparingFiles(true);
+    setDocumentFeedback("");
+    try {
+      const selection = Array.from(files);
+      const selectedFiles = selection.slice(0, Math.max(0, 10 - documents.length));
+      const results = await Promise.allSettled(selectedFiles.map(async (file) => {
+        if (!["application/pdf", "image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > MAX_IMAGE_FILE_SIZE || file.size === 0) throw new Error("Unsupported document");
+        return { id: makeClientKey(), name: file.name, dataUrl: await fileToDataUrl(file), visibility: "hidden" as const, documentType: "Receipt", issuerSource: "", documentDate: "", description: "", publicDescription: "", privateNotes: "" };
+      }));
+      const nextDocs = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+      setDocuments((current) => [...current, ...nextDocs].slice(0, 10));
+      const skipped = selection.length - nextDocs.length;
+      setDocumentFeedback(ui("ui.app.create.page.7e22ae7ac922", "{{value1}} document{{value2}} added.", {value1: nextDocs.length, value2: nextDocs.length === 1 ? "" : "s"}) + (skipped ? " " + ui("ui.app.create.page.documentsSkipped", "{{count}} not added. Choose readable PDF, JPG, PNG, or WebP files up to 12MB each, with up to 10 documents per Profile. Your other files and details are still here.", { count: skipped }) : ""));
+    } finally {
+      fileSelectionPending.current = false;
+      setPreparingFiles(false);
     }
-
-    const remainingSlots = Math.max(0, 10 - documents.length);
-    const selectedFiles = Array.from(files).slice(0, remainingSlots);
-    const nextDocs = await Promise.all(
-      selectedFiles.map(async (file, index) => ({
-        id: `doc-${Date.now()}-${index}`,
-        name: file.name,
-        dataUrl: await fileToDataUrl(file),
-        visibility: "hidden" as const,
-        documentType: "Receipt",
-        issuerSource: "",
-        documentDate: "",
-        description: "",
-        publicDescription: "",
-        privateNotes: ""
-      }))
-    );
-
-    setDocuments((current) => [...current, ...nextDocs].slice(0, 10));
-    setMessage(ui("ui.app.create.page.7e22ae7ac922", "{{value1}} document{{value2}} added.", {value1: nextDocs.length, value2: nextDocs.length === 1 ? "" : "s"}));
   }
 
   function selectMainPhoto(imageUrl: string) {
@@ -277,6 +277,7 @@ export default function CreatePage() {
   }
 
   function removePhoto(imageUrl: string) {
+    setPhotoFeedback("");
     uploadFileIds.current.delete("image:" + imageUrl);
     const stagedPath = photoUploads[imageUrl]?.storagePath;
     setGalleryImages((current) => {
@@ -315,10 +316,10 @@ export default function CreatePage() {
     }).catch(() => null);
   }
 
-  async function uploadStagedFile(kind: "image" | "document", dataUrl: string, _index: number) {
+  async function uploadStagedFile(kind: "image" | "document", dataUrl: string, identityKey: string) {
     const expectedOwnerId = user?.id;
     if (!expectedOwnerId) throw new Error("Sign in again before uploading.");
-    const identity = kind + ":" + dataUrl;
+    const identity = kind + ":" + identityKey;
     let fileId = uploadFileIds.current.get(identity);
     if (!fileId) { fileId = crypto.randomUUID(); uploadFileIds.current.set(identity,fileId); }
     return uploadProfileFile({file:dataUrlToProfileFile(dataUrl),uploadId,fileId,kind,expectedOwnerId,
@@ -347,7 +348,7 @@ export default function CreatePage() {
       if (photoPaths[index]) return;
       setPhotoUploads((current) => ({ ...current, [imageUrl]: { ...current[imageUrl], state: "uploading", progress: 15 } }));
       try {
-        const storagePath = await uploadStagedFile("image", imageUrl, index);
+        const storagePath = await uploadStagedFile("image", imageUrl, imageUrl);
         photoPaths[index] = storagePath;
         setPhotoUploads((current) => ({ ...current, [imageUrl]: { state: "uploaded", progress: 100, storagePath } }));
       } catch (error) {
@@ -363,7 +364,7 @@ export default function CreatePage() {
       if (documentPaths[index]) return;
       setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, uploadState: "uploading", uploadMessage: "Uploading" } : item));
       try {
-        const storagePath = await uploadStagedFile("document", document.dataUrl, index);
+        const storagePath = await uploadStagedFile("document", document.dataUrl, document.id);
         documentPaths[index] = storagePath;
         setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, storagePath, uploadState: "uploaded", uploadMessage: "Uploaded" } : item));
       } catch (error) {
@@ -374,7 +375,7 @@ export default function CreatePage() {
     });
 
     if (failedPhotos.length || failedDocuments.length) {
-      throw new Error("Some files could not be uploaded. Retry the files marked in red; successful uploads are preserved.");
+      throw new Error(ui("ui.app.create.page.uploadRetry", "Some files could not be uploaded. Choose Retry safely below. Your details and successful uploads are kept."));
     }
     return { photoPaths, documentPaths };
   }
@@ -386,7 +387,7 @@ export default function CreatePage() {
   }
 
   async function createRecordAndRedirect(showProfile = false) {
-    if (savingProfile) return;
+    if (savingProfile || saveInFlight.current || fileSelectionPending.current) return;
 
     try {
       const nextFieldErrors: Record<string, string> = {};
@@ -413,6 +414,7 @@ export default function CreatePage() {
         return;
       }
 
+      saveInFlight.current = true;
       setSavingProfile(true);
       setMessage("");
       setBillingHelp(false);
@@ -535,6 +537,7 @@ export default function CreatePage() {
       setLastErrorRetryable(true);
       setMessage(error instanceof Error ? error.message : ui("ui.app.create.page.7becb15765b7", "The network request failed. Your form and selected files are preserved; try again."));
     } finally {
+      saveInFlight.current = false;
       setSavingProfile(false);
     }
   }
@@ -545,12 +548,12 @@ export default function CreatePage() {
       const target = firstField === "photos"
         ? document.getElementById("profilePhotos")
         : firstField === "customLinks"
-          ? document.querySelector<HTMLElement>('[aria-label="Link URL"]')
-          : document.getElementById(firstField || "");
+          ? document.querySelector<HTMLElement>('[data-create-link-url]')
+          : document.getElementById(firstField === "documents" ? "profileDocuments" : firstField || "");
       let disclosure = target?.closest("details");
       while (disclosure) { disclosure.open = true; disclosure = disclosure.parentElement?.closest("details"); }
-      target?.focus();
-      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      target?.focus({ preventScroll: true });
+      target?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
     }, 0);
   }
 
@@ -592,17 +595,14 @@ export default function CreatePage() {
               <h1>{getContentValue(content, "create.hero.headline")}</h1>
               <p>{getContentValue(content, "create.hero.body")}</p>
             </div>
-            <div className={styles.identity}>
-              <span>{ui("ui.app.create.page.72880691b674", "QRguitar ID preview")}</span>
-              <strong>{qrCode}</strong>
-              <small>{getContentValue(content, "create.serial.help")}</small>
-            </div>
+
           </header>
 
 
-          <nav className={styles.sectionNav} aria-label={ui("ui.app.create.page.08787577237c", "Create Profile sections")}><a href="#create-step-one">{ui("ui.app.create.page.6fdf3c9bc618", "Instrument")}</a><a href="#create-step-two">{ui("ui.app.create.page.5e3147ab51e0", "Photos")}</a><a href="#create-step-three">{ui("ui.app.create.page.c7d3acc826a8", "Ownership")}</a><a href="#create-step-four">{ui("ui.app.create.page.45989de49fb7", "Details")}</a><a href="#create-step-five">{ui("ui.app.create.page.aff0766a5290", "Review")}</a></nav>
+
           <div className={styles.editor}>
-            <form className={styles.form} onSubmit={(event) => event.preventDefault()}>
+            <form className={styles.form} onSubmit={(event) => event.preventDefault()} aria-busy={savingProfile || preparingFiles}>
+              <fieldset className={styles.fields} disabled={savingProfile || preparingFiles}>
               <input aria-hidden="true" autoComplete="off" name="company" style={{ display: "none" }} tabIndex={-1} value={honeypot} onChange={(event) => setHoneypot(event.target.value)} />
               <datalist id="qrguitar-known-brands">{establishedInstrumentBrands.map((brand) => <option value={brand} key={brand} />)}</datalist>
 
@@ -627,15 +627,19 @@ export default function CreatePage() {
                   <label className="create-photo-drop" htmlFor="profilePhotos">
                     <strong>{getContentValue(content, "create.photo.help")}</strong>
                     <span>{ui("ui.app.create.page.b20d74653b53", "Choose photos from your device or use your phone camera. Files can be up to 12MB each.")}</span>
-                    <input id="profilePhotos" name="profilePhotos" type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={(event) => void addProfilePhotos(event.target.files)} />
+                    <span className={styles.photoChoose}>{ui("ui.app.create.page.choosePhotos", "Choose photos")}</span>
+                    <input className={styles.photoInput} id="profilePhotos" name="profilePhotos" type="file" accept="image/png,image/jpeg,image/webp" multiple aria-describedby="photo-feedback" aria-invalid={Boolean(fieldErrors.photos)} onChange={(event) => { const files = event.currentTarget.files; void addProfilePhotos(files); event.currentTarget.value = ""; }} />
                   </label>
                   {fieldErrors.photos ? <p className="field-error" role="alert">{fieldErrors.photos}</p> : null}
-                  <PhotoOrganizer images={galleryImages} mainImage={form.heroImageDataUrl} onSelectMain={selectMainPhoto} onRemove={removePhoto} onMove={movePhoto} statusByImage={photoUploads} />
+                  <p id="photo-feedback" className={styles.photoFeedback} role="status">{preparingFiles ? ui("ui.app.create.page.preparingFiles", "Preparing your files…") : photoFeedback}</p>
+                  {galleryImages.length ? <PhotoOrganizer images={galleryImages} mainImage={form.heroImageDataUrl} onSelectMain={selectMainPhoto} onRemove={removePhoto} onMove={movePhoto} statusByImage={photoUploads} disabled={savingProfile || preparingFiles} /> : null}
                 </section>
 
 
                 <section className={styles.section} aria-labelledby="create-step-three">
                   <div className={styles.sectionHeading}><h2 id="create-step-three">{getContentValue(content, "create.ownership.heading")}</h2><p>{getContentValue(content, "create.ownership.body")}</p></div>
+                  <details className={styles.disclosure}>
+                    <summary>{ui("ui.app.create.page.ownerDetailsOptional", "Owner and purchase details (optional)")}</summary>
                   <div className="form-grid">
                     <div className="field">
                       <label htmlFor="ownerStatus">{ui("ui.app.create.page.aaf826b59e24", "Relationship (optional)")}</label>
@@ -653,6 +657,7 @@ export default function CreatePage() {
                     <Field label={ui("ui.app.create.page.5e553fd3aa01", "Seller / store (optional)")} id="seller" value={form.seller} onChange={(value) => updateField("seller", value)} />
                     <Field label={ui("ui.app.create.page.15b61974b270", "Location")} id="location" value={form.location} onChange={(value) => updateField("location", value)} placeholder={ui("ui.app.create.page.fef8ce3a04b7", "City, region, country")} />
                   </div>
+                  </details>
                   <div className={styles.visibility} aria-label={ui("ui.app.create.page.1c47f10cc99e", "Profile visibility")}>
                     <div><strong>{form.visibility === "public" ? ui("ui.app.create.page.591935b15b1c", "Public") : form.visibility === "unlisted" ? ui("ui.app.create.page.bc96567e77ca", "Unlisted") : ui("ui.app.create.page.c63eb6720c6e", "Private")}</strong><span>{form.visibility === "public" ? ui("ui.app.create.page.f88c0d40c301", "Listed in the Catalog and available by QR or direct link.") : form.visibility === "unlisted" ? ui("ui.app.create.page.3d1d2fd4f39f", "Hidden from the Catalog but available by QR or direct link.") : ui("ui.app.create.page.f0d2868fe175", "Available only to the signed-in owner and authorized admin.")}</span></div>
                     <label className="field visibility-select" htmlFor="profileVisibility"><span>{ui("ui.app.create.page.7448611d5f93", "Visibility")}</span><select id="profileVisibility" value={form.visibility} onChange={(event) => updateField("visibility", event.target.value)}><option value="public">{ui("ui.app.create.page.591935b15b1c", "Public")}</option><option value="unlisted">{ui("ui.app.create.page.bc96567e77ca", "Unlisted")}</option><option value="private">{ui("ui.app.create.page.c63eb6720c6e", "Private")}</option></select></label>
@@ -663,8 +668,9 @@ export default function CreatePage() {
                 </section>
 
 
-                <section className={styles.section} aria-labelledby="create-step-four">
-                  <div className={styles.sectionHeading}><h2 id="create-step-four">{ui("ui.app.create.page.45989de49fb7", "Details")}</h2><p>{getContentValue(content, "create.details.body")}</p></div>
+                <details className={styles.disclosure} id="create-step-four">
+                  <summary>{ui("ui.app.create.page.optionalDetails", "More instrument details (optional)")}</summary>
+                  <div className={styles.sectionHeading}><h2>{ui("ui.app.create.page.45989de49fb7", "Details")}</h2><p>{getContentValue(content, "create.details.body")}</p></div>
                   <div className="form-grid">
                     <Field label={ui("ui.app.create.page.e69702d5925c", "Display title / nickname")} id="name" value={form.name} onChange={(value) => updateField("name", value)} placeholder={ui("ui.app.create.page.1c2552da9e8f", "Defaults to Brand + Model")} />
                     <div className="field"><label htmlFor="instrumentCondition">{ui("ui.app.create.page.39b36d38d6eb", "Condition")}</label><select id="instrumentCondition" value={form.instrumentCondition} onChange={(event) => updateField("instrumentCondition", event.target.value)}><option value="new">{ui("ui.app.create.page.18fdd549b2ed", "New")}</option><option value="used">{ui("ui.app.create.page.ae7d8dfac9ff", "Used")}</option></select></div>
@@ -700,21 +706,22 @@ export default function CreatePage() {
                   <details className={styles.disclosure}>
                     <summary>{ui("ui.app.create.page.f9397a00eca8", "Links and supporting documents")}</summary>
                     <div className="custom-list">
-                      {customLinks.map((link) => <div className="custom-row" key={link.id}><input aria-label={ui("ui.app.create.page.acaa9ea6688f", "Link label")} placeholder={ui("ui.app.create.page.acaa9ea6688f", "Link label")} value={link.label} onChange={(event) => setCustomLinks((current) => current.map((item) => item.id === link.id ? { ...item, label: event.target.value } : item))} /><input aria-label={ui("ui.app.create.page.9dfd0b9f8f42", "Link URL")} placeholder="https://..." value={link.url} onChange={(event) => setCustomLinks((current) => current.map((item) => item.id === link.id ? { ...item, url: event.target.value } : item))} /><button className="button secondary" type="button" onClick={() => setCustomLinks((current) => current.filter((item) => item.id !== link.id))}>{ui("ui.app.create.page.c3812fc4acb8", "Remove")}</button></div>)}
+                      {customLinks.map((link) => <div className="custom-row" key={link.id}><input aria-label={ui("ui.app.create.page.acaa9ea6688f", "Link label")} placeholder={ui("ui.app.create.page.acaa9ea6688f", "Link label")} value={link.label} onChange={(event) => setCustomLinks((current) => current.map((item) => item.id === link.id ? { ...item, label: event.target.value } : item))} /><input data-create-link-url aria-label={ui("ui.app.create.page.9dfd0b9f8f42", "Link URL")} placeholder="https://..." value={link.url} onChange={(event) => setCustomLinks((current) => current.map((item) => item.id === link.id ? { ...item, url: event.target.value } : item))} /><button className="button secondary" type="button" onClick={() => setCustomLinks((current) => current.filter((item) => item.id !== link.id))}>{ui("ui.app.create.page.c3812fc4acb8", "Remove")}</button></div>)}
                       <button className="button secondary" type="button" onClick={() => setCustomLinks((current) => [...current, { id: `link-${Date.now()}`, label: "", url: "" }])}>{ui("ui.app.create.page.dfe9ca4d0f96", "Add link")}</button>
                       {fieldErrors.customLinks ? <span className="field-error" role="alert">{fieldErrors.customLinks}</span> : null}
                     </div>
-                    <label className="create-photo-drop compact" htmlFor="profileDocuments"><strong>{ui("ui.app.create.page.37b809b43319", "Add documents (optional)")}</strong><span>{ui("ui.app.create.page.1dd25576bcdc", "Receipts, appraisals, invoices, build sheets, or service slips. New documents stay private by default.")}</span><input id="profileDocuments" type="file" accept="application/pdf,image/png,image/jpeg,image/webp" multiple onChange={(event) => void addDocuments(event.target.files)} /></label>
-                    {documents.length ? <div className="create-document-list">{documents.map((document) => <div key={document.id}><div><strong>{document.name}</strong><span>{document.uploadMessage || (document.visibility === "public" ? ui("ui.app.create.page.d60bb2d3cfea", "Public document") : ui("ui.app.create.page.899485baa668", "Private document"))}</span></div><select aria-label={ui("ui.app.create.page.a4382f496011", "{{value1}} visibility", { value1: document.name })} value={document.visibility} onChange={(event) => setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, visibility: event.target.value as "public" | "hidden" } : item))}><option value="hidden">{ui("ui.app.create.page.c63eb6720c6e", "Private")}</option><option value="public">{ui("ui.app.create.page.591935b15b1c", "Public")}</option></select><button type="button" onClick={() => { uploadFileIds.current.delete("document:" + document.dataUrl); if (document.storagePath) void cleanupStagedPaths([document.storagePath]); setDocuments((current) => current.filter((item) => item.id !== document.id)); }}>{ui("ui.app.create.page.c3812fc4acb8", "Remove")}</button></div>)}</div> : null}
+                    <label className="create-photo-drop compact" htmlFor="profileDocuments"><strong>{ui("ui.app.create.page.37b809b43319", "Add documents (optional)")}</strong><span>{ui("ui.app.create.page.1dd25576bcdc", "Receipts, appraisals, invoices, build sheets, or service slips. New documents stay private by default.")}</span><input id="profileDocuments" type="file" accept="application/pdf,image/png,image/jpeg,image/webp" multiple aria-invalid={Boolean(fieldErrors.documents)} aria-describedby={fieldErrors.documents ? "document-feedback document-error" : "document-feedback"} onChange={(event) => { const files = event.currentTarget.files; void addDocuments(files); event.currentTarget.value = ""; }} /></label>
+                    {fieldErrors.documents ? <p id="document-error" className="field-error" role="alert">{fieldErrors.documents}</p> : null}
+                    <p id="document-feedback" className={styles.photoFeedback} role="status">{documentFeedback}</p>
+                    {documents.length ? <div className="create-document-list">{documents.map((document) => <div key={document.id}><div><strong>{document.name}</strong><span>{document.uploadMessage || (document.visibility === "public" ? ui("ui.app.create.page.d60bb2d3cfea", "Public document") : ui("ui.app.create.page.899485baa668", "Private document"))}</span></div><select aria-label={ui("ui.app.create.page.a4382f496011", "{{value1}} visibility", { value1: document.name })} value={document.visibility} onChange={(event) => setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, visibility: event.target.value as "public" | "hidden" } : item))}><option value="hidden">{ui("ui.app.create.page.c63eb6720c6e", "Private")}</option><option value="public">{ui("ui.app.create.page.591935b15b1c", "Public")}</option></select><button type="button" onClick={() => { uploadFileIds.current.delete("document:" + document.id); if (document.storagePath) void cleanupStagedPaths([document.storagePath]); setDocuments((current) => current.filter((item) => item.id !== document.id)); }}>{ui("ui.app.create.page.c3812fc4acb8", "Remove")}</button></div>)}</div> : null}
                   </details>
                   <p className="fine-print">{ui("ui.app.create.page.03dc3eccc380", "Originality describes disclosed modification status. It does not mean QRguitar verification or authenticity confirmation.")}</p>
-                </section>
+                </details>
 
 
             <details className={styles.preview}>
               <summary>{ui("ui.app.create.page.f06c99a84731", "Preview your Profile")}</summary>
               <InstrumentPreview qrCode={qrCode} name={form.name} brand={form.brand} model={form.model} serial={form.serial} year={form.year} owner={form.owner} location={form.location} summary={form.summary} heroImageDataUrl={form.heroImageDataUrl} customFields={previewFields} customLinks={customLinks} />
-            </details>
 
                 <section className={styles.section} aria-labelledby="create-step-five">
                   <div className={styles.sectionHeading}><h2 id="create-step-five">{getContentValue(content, "create.review.heading")}</h2><p>{getContentValue(content, "create.review.body")}</p></div>
@@ -729,10 +736,12 @@ export default function CreatePage() {
                   <p className="create-permanent-note">{ui("ui.app.create.page.fec85e780f9d", "This QRguitar ID and Profile URL remain permanent. Customize the downloadable QR later from your Dashboard.")}</p>
                 </section>
 
-              {message ? <div className="form-message" role={fieldErrors && Object.keys(fieldErrors).length ? "alert" : "status"}><strong>{message}</strong>{existingProfileHref || claimHref ? <div className="form-actions">{existingProfileHref ? <Link className="button secondary" href={existingProfileHref}>{ui("ui.app.create.page.24ccf710b746", "View existing Profile")}</Link> : null}{claimHref ? <Link className="button secondary" href={claimHref}>{ui("ui.app.create.page.b819c86a0d98", "Request ownership")}</Link> : null}</div> : null}{billingHelp ? <div className="form-actions"><Link className="button secondary" href="/billing" target="_blank" rel="noopener noreferrer">{ui("ui.app.create.page.8090fdcc6209", "Check Profile credits in a new tab")}</Link><span>{ui("ui.app.create.page.19e972d95676", "Keep this form open, then return to create your Profile.")}</span></div> : null}{lastErrorRetryable ? <button className="button secondary" type="button" onClick={() => void createRecordAndRedirect(false)} disabled={savingProfile}>{ui("ui.app.create.page.aea7359da3eb", "Retry safely")}</button> : null}</div> : null}
+              </details>
+              </fieldset>
+              {message ? <div className="form-message" role={fieldErrors && Object.keys(fieldErrors).length ? "alert" : "status"}><strong>{message}</strong>{existingProfileHref || claimHref ? <div className="form-actions">{existingProfileHref ? <Link className="button secondary" href={existingProfileHref}>{ui("ui.app.create.page.24ccf710b746", "View existing Profile")}</Link> : null}{claimHref ? <Link className="button secondary" href={claimHref}>{ui("ui.app.create.page.b819c86a0d98", "Request ownership")}</Link> : null}</div> : null}{billingHelp ? <div className="form-actions"><Link className="button secondary" href="/billing" target="_blank" rel="noopener noreferrer">{ui("ui.app.create.page.8090fdcc6209", "Check Profile credits in a new tab")}</Link><span>{ui("ui.app.create.page.19e972d95676", "Keep this form open, then return to create your Profile.")}</span></div> : null}{lastErrorRetryable ? <button className="button secondary" type="button" onClick={() => void createRecordAndRedirect(false)} disabled={savingProfile || preparingFiles}>{ui("ui.app.create.page.aea7359da3eb", "Retry safely")}</button> : null}</div> : null}
               <div className={styles.actions}>
-                <Link className="button secondary" href="/dashboard">{ui("ui.app.create.page.19766ed6ccb2", "Cancel")}</Link>
-                <button className="button" type="button" onClick={saveDraft} disabled={savingProfile}>{savingProfile ? ui("ui.app.create.page.aeb7e60a2efa", "Creating Profile...") : getContentValue(content, "create.actions.submit")}</button>
+                <Link className="button secondary" href="/dashboard" aria-disabled={savingProfile || preparingFiles} onClick={(event) => { if (saveInFlight.current || fileSelectionPending.current) event.preventDefault(); }}>{ui("ui.app.create.page.19766ed6ccb2", "Cancel")}</Link>
+                <button className="button" type="button" onClick={saveDraft} disabled={savingProfile || preparingFiles}>{savingProfile ? ui("ui.app.create.page.aeb7e60a2efa", "Creating Profile...") : getContentValue(content, "create.actions.submit")}</button>
               </div>
             </form>
 
@@ -799,8 +808,12 @@ function fileToCompressedDataUrl(file: File) {
           return;
         }
 
-        context.drawImage(image, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL(file.type === "image/webp" ? "image/webp" : "image/jpeg", 0.88));
+        try {
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          const prepared = canvas.toDataURL(file.type === "image/webp" ? "image/webp" : "image/jpeg", 0.88);
+          if (!prepared.startsWith("data:image/")) throw new Error("Could not prepare image.");
+          resolve(prepared);
+        } catch (error) { reject(error); }
       };
       image.onerror = () => reject(new Error("Could not load image."));
       image.src = String(reader.result);

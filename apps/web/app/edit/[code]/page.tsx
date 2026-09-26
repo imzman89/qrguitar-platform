@@ -111,6 +111,25 @@ type StagedPhoto = PhotoOrganizerStatus & { storagePath?: string };
 function makeClientKey() {
   return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
+
+function isKnownEditorSection(section: string) {
+  return ["identity", "photos", "details", "timeline", "service", "media", "documents", "trust-verification", "privacy-safety", "qr-print"].includes(section);
+}
+
+function scrollToEditorSection(section: string) {
+  if (!isKnownEditorSection(section)) return false;
+  const target = document.getElementById(section);
+  if (!target) return false;
+  const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+  target.scrollIntoView({ behavior, block: "start" });
+  return true;
+}
+
+function replaceEditorSectionHash(section: string) {
+  if (!isKnownEditorSection(section)) return false;
+  window.history.replaceState(window.history.state, "", `#${section}`);
+  return scrollToEditorSection(section);
+}
 const emptyServiceForm = {
   serviceDate: "",
   datePrecision: "day",
@@ -180,13 +199,21 @@ export default function EditInstrumentPage() {
   useEffect(() => {
     const syncSectionFromHash = () => {
       const section = window.location.hash.slice(1);
-      if (section) setActiveEditorSection(section);
+      if (isKnownEditorSection(section)) setActiveEditorSection(section);
     };
 
     syncSectionFromHash();
     window.addEventListener("hashchange", syncSectionFromHash);
     return () => window.removeEventListener("hashchange", syncSectionFromHash);
   }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    const section = window.location.hash.slice(1);
+    if (!isKnownEditorSection(section)) return;
+    setActiveEditorSection(section);
+    scrollToEditorSection(section);
+  }, [ready]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1126,9 +1153,9 @@ export default function EditInstrumentPage() {
                   value={activeEditorSection}
                   onChange={(event) => {
                     const section = event.target.value;
+                    if (!isKnownEditorSection(section)) return;
                     setActiveEditorSection(section);
-                    window.history.replaceState(null, "", `#${section}`);
-                    document.getElementById(section)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    replaceEditorSectionHash(section);
                   }}
                 >
                   <option value="identity">{ui("ui.app.edit.code.page.999f23fcd7be", "Identity")}</option>
@@ -1338,18 +1365,28 @@ export default function EditInstrumentPage() {
                   <button className="button secondary" type="button" onClick={() => setCustomLinks((current) => [...current, { id: `link-${Date.now()}`, label: "", url: "" }])}>{ui("ui.app.edit.code.page.b8c42654c8ce", "Add Link")}</button>
                 </div>
               </details>
-              <div className="field photo-field">
-                <label htmlFor="profilePhotos">{ui("ui.app.edit.code.page.215ed206acf2", "Profile photos")}</label>
-                <input
-                  id="profilePhotos"
-                  name="profilePhotos"
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  multiple
-                  onChange={(event) => void addProfilePhotos(event.target.files)}
+              <section className={styles.photoSection} id="photos">
+                <div className="field photo-field">
+                  <label htmlFor="profilePhotos">{ui("ui.app.edit.code.page.215ed206acf2", "Profile photos")}</label>
+                  <input
+                    id="profilePhotos"
+                    name="profilePhotos"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    multiple
+                    onChange={(event) => void addProfilePhotos(event.target.files)}
+                  />
+                  <span>{ui("ui.app.edit.code.page.d7aea5f0f7db", "Upload up to 20 photos, 12MB each. Pick one as the main image for dashboard cards, catalog listings, and the public profile hero.")}</span>
+                </div>
+                <PhotoOrganizer
+                  images={galleryImages}
+                  mainImage={form.heroImageDataUrl}
+                  onSelectMain={selectMainPhoto}
+                  onRemove={removePhoto}
+                  onMove={movePhoto}
+                  statusByImage={photoUploads}
                 />
-                <span>{ui("ui.app.edit.code.page.d7aea5f0f7db", "Upload up to 20 photos, 12MB each. Pick one as the main image for dashboard cards, catalog listings, and the public profile hero.")}</span>
-              </div>
+              </section>
               <div className="field photo-field" id="documents">
                 <label htmlFor="profileDocuments">{ui("ui.app.edit.code.page.b4e929d8bcfe", "Documents")}</label>
                 <input
@@ -1483,16 +1520,7 @@ export default function EditInstrumentPage() {
                   </div>
                 </section>
               ) : null}
-              <div id="photos">
-                <PhotoOrganizer
-                  images={galleryImages}
-                  mainImage={form.heroImageDataUrl}
-                  onSelectMain={selectMainPhoto}
-                  onRemove={removePhoto}
-                  onMove={movePhoto}
-                  statusByImage={photoUploads}
-                />
-              </div>
+
               <section className="qr-customizer" id="media" aria-label={ui("ui.app.edit.code.page.3e3ac8296196", "External media")}>
                 <div>
                   <span className="eyebrow">{ui("ui.app.edit.code.page.dc600f6490d8", "Media links")}</span>

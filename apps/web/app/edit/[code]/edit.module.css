@@ -12,12 +12,13 @@
 .layout :global(.privacy-toggle) > div { min-width: 0; }
 .layout :global(.privacy-toggle) strong { color: var(--text); font-size: 14px; }
 .layout :global(.visibility-field) { flex: 0 0 165px; }
-.layout :global(.editor-section-nav) { max-width: 100%; margin: 16px 0 28px; padding: 0; border: 0; background: transparent; }
+.layout :global(.editor-section-nav) { max-width: 100%; margin: 16px 0 28px; padding: 0; border: 0; background: var(--surface); }
 .layout :global(.editor-section-nav) a { display: inline-flex; align-items: center; min-height: 44px; font-size: 12px; font-weight: 600; text-transform: none; }
 .layout :global(.editor-section-select) { border: 0; border-radius: 10px; background: var(--surface-raised); color: var(--muted); font-size: 12px; font-weight: 500; text-transform: none; }
 .layout :global(.editor-section-select) select { color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 7px; padding: 10px; font-weight: 500; }
 .layout :global(.verification-card) { padding: 0 0 28px; margin-bottom: 28px; border: 0; border-bottom: 1px solid var(--line); background: transparent; border-radius: 0; box-shadow: none; }
 .secondarySections { display: grid; gap: 32px; margin-top: 36px; }
+.photoSection { display: grid; gap: 16px; scroll-margin-top: 78px; }
 .secondarySections :global(.verification-card) { margin: 0; padding: 0; border: 0; scroll-margin-top: 24px; }
 .safetyNotice { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 24px; padding: 12px 16px; border-left: 3px solid var(--negative); background: var(--surface); color: var(--text); font-size: 14px; line-height: 1.5; }
 .safetyNotice strong { color: var(--negative); }
@@ -71,6 +72,7 @@
 }
 @media (max-width: 760px) {
   .page { padding: 22px 0 44px; }
+  .photoSection { scroll-margin-top: 112px; }
   .layout { width: calc(100% - 36px); }
   .layout > div > h1 { font-size: 30px; }
   .layout :global(.form-grid), .layout :global(.qr-controls), .layout :global(.custom-row) { grid-template-columns: minmax(0, 1fr); }

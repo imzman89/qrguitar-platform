@@ -19,6 +19,7 @@ type PhotoOrganizerProps = {
   onMove: (fromIndex: number, toIndex: number) => void;
   statusByImage?: Record<string, PhotoOrganizerStatus>;
   maxPhotos?: number;
+  disabled?: boolean;
 };
 
 export function PhotoOrganizer({
@@ -28,7 +29,8 @@ export function PhotoOrganizer({
   onRemove,
   onMove,
   statusByImage = {},
-  maxPhotos = 20
+  maxPhotos = 20,
+  disabled = false
 }: PhotoOrganizerProps) {
   const ui = useUiText("components.PhotoOrganizer");
   const dragIndex = useRef<number | null>(null);
@@ -37,7 +39,7 @@ export function PhotoOrganizer({
   const [announcement, setAnnouncement] = useState("");
 
   function movePhoto(fromIndex: number, toIndex: number) {
-    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= images.length || toIndex >= images.length) return;
+    if (disabled || fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= images.length || toIndex >= images.length) return;
     onMove(fromIndex, toIndex);
     pointerIndex.current = toIndex;
     dragIndex.current = toIndex;
@@ -46,6 +48,7 @@ export function PhotoOrganizer({
   }
 
   function handleDragStart(event: DragEvent<HTMLElement>, index: number) {
+    if (disabled) { event.preventDefault(); return; }
     dragIndex.current = index;
     setDropIndex(index);
     event.dataTransfer.effectAllowed = "move";
@@ -53,7 +56,7 @@ export function PhotoOrganizer({
   }
 
   function handlePointerMove(event: PointerEvent<HTMLButtonElement>) {
-    if (pointerIndex.current == null || event.pointerType === "mouse") return;
+    if (disabled || pointerIndex.current == null || event.pointerType === "mouse") return;
     event.preventDefault();
     const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-photo-index]");
     const targetIndex = Number(target?.dataset.photoIndex);
@@ -83,8 +86,8 @@ export function PhotoOrganizer({
             <article
               className={`photo-organizer-tile${isMain ? " is-main" : ""}${dropIndex === index ? " is-drop-target" : ""}`}
               data-photo-index={index}
-              draggable
-              key={`${imageUrl}-${index}`}
+              draggable={!disabled}
+              key={imageUrl}
               onDragStart={(event) => handleDragStart(event, index)}
               onDragEnter={(event) => {
                 event.preventDefault();
@@ -106,10 +109,19 @@ export function PhotoOrganizer({
               />
               <span className="photo-organizer-number">{String(index + 1).padStart(2, "0")}</span>
               {isMain ? <span className="photo-organizer-main">{ui("ui.components.PhotoOrganizer.eb814be3ca3b", "Main")}</span> : null}
+              {status?.state && status.state !== "ready" ? (
+                <div className={`photo-organizer-status is-${status.state}`} role={status.state === "error" ? "alert" : undefined}>
+                  <span>{status.state === "uploading" ? ui("ui.components.PhotoOrganizer.2ad1142c1f1c", "Uploading {{value1}}%", { value1: Math.max(1, Math.round(status.progress || 1)) }) : status.state === "uploaded" ? ui("ui.components.PhotoOrganizer.3cc3767e7032", "Uploaded") : status.message || ui("ui.components.PhotoOrganizer.6efc5d27f30b", "Upload failed")}</span>
+                  {status.state === "uploading" ? <i style={{ width: `${Math.max(2, status.progress || 2)}%` }} /> : null}
+                </div>
+              ) : null}
+              <details className="photo-organizer-menu">
+                <summary aria-label={ui("ui.components.PhotoOrganizer.c7dbb502bdce", "More options for photo {{value1}}", { value1: index + 1 })}>{ui("ui.components.PhotoOrganizer.d47d7cb0e4f8", "More")}</summary>
+                <div>
               <div className="photo-organizer-controls">
-                <button
+                {images.length > 1 ? <button
                   className="photo-drag-handle"
-                  type="button"
+                  type="button" disabled={disabled}
                   aria-label={ui("ui.components.PhotoOrganizer.829f729dbe1d", "Drag photo {{value1}} to reorder", { value1: index + 1 })}
                   title={ui("ui.components.PhotoOrganizer.ef86a0ed9287", "Drag to reorder")}
                   onPointerDown={(event) => {
@@ -126,38 +138,29 @@ export function PhotoOrganizer({
                   }}
                   onPointerCancel={() => { pointerIndex.current = null; setDropIndex(null); }}
                 >
-                  <GripVertical size={16} aria-hidden="true" />
-                </button>
-                <button
+                  <GripVertical size={16} aria-hidden="true" />{ui("ui.components.PhotoOrganizer.ef86a0ed9287", "Drag to reorder")}
+                </button> : null}
+                {!isMain ? <button
                   className={isMain ? "is-active" : ""}
-                  type="button"
+                  type="button" disabled={disabled}
                   aria-label={isMain ? ui("ui.components.PhotoOrganizer.daaaffa5d6f6", "Photo {{value1}} is the main photo", { value1: index + 1 }) : ui("ui.components.PhotoOrganizer.3fa930326917", "Set photo {{value1}} as main", { value1: index + 1 })}
                   title={isMain ? ui("ui.components.PhotoOrganizer.14b29400712f", "Main photo") : ui("ui.components.PhotoOrganizer.d35820958872", "Set as main")}
-                  onClick={() => { onSelectMain(imageUrl); setAnnouncement(`Photo ${index + 1} set as main.`); }}
+                  onClick={(event) => { event.currentTarget.closest("details")?.querySelector("summary")?.focus({ preventScroll: true }); onSelectMain(imageUrl); setAnnouncement(`Photo ${index + 1} set as main.`); }}
                 >
-                  <Star size={15} fill={isMain ? "currentColor" : "none"} aria-hidden="true" />
-                </button>
+                  <Star size={15} fill={isMain ? "currentColor" : "none"} aria-hidden="true" />{isMain ? ui("ui.components.PhotoOrganizer.14b29400712f", "Main photo") : ui("ui.components.PhotoOrganizer.d35820958872", "Set as main")}
+                </button> : null}
                 <button
                   className="is-danger"
-                  type="button"
+                  type="button" disabled={disabled}
                   aria-label={ui("ui.components.PhotoOrganizer.83b5debd0495", "Remove photo {{value1}}", { value1: index + 1 })}
                   title={ui("ui.components.PhotoOrganizer.f46512ab2099", "Remove photo")}
                   onClick={() => { onRemove(imageUrl); setAnnouncement(`Photo ${index + 1} removed.`); }}
                 >
-                  <Trash2 size={15} aria-hidden="true" />
+                  <Trash2 size={15} aria-hidden="true" />{ui("ui.components.PhotoOrganizer.f46512ab2099", "Remove photo")}
                 </button>
               </div>
-              {status?.state && status.state !== "ready" ? (
-                <div className={`photo-organizer-status is-${status.state}`} role={status.state === "error" ? "alert" : undefined}>
-                  <span>{status.state === "uploading" ? ui("ui.components.PhotoOrganizer.2ad1142c1f1c", "Uploading {{value1}}%", { value1: Math.max(1, Math.round(status.progress || 1)) }) : status.state === "uploaded" ? ui("ui.components.PhotoOrganizer.3cc3767e7032", "Uploaded") : status.message || ui("ui.components.PhotoOrganizer.6efc5d27f30b", "Upload failed")}</span>
-                  {status.state === "uploading" ? <i style={{ width: `${Math.max(2, status.progress || 2)}%` }} /> : null}
-                </div>
-              ) : null}
-              <details className="photo-organizer-menu">
-                <summary aria-label={ui("ui.components.PhotoOrganizer.c7dbb502bdce", "More options for photo {{value1}}", { value1: index + 1 })}>{ui("ui.components.PhotoOrganizer.d47d7cb0e4f8", "More")}</summary>
-                <div>
-                  <button type="button" disabled={index === 0} onClick={() => movePhoto(index, index - 1)}><ChevronLeft size={14} />{" "}{ui("ui.components.PhotoOrganizer.736612d4d0a9", "Move earlier")}</button>
-                  <button type="button" disabled={index === images.length - 1} onClick={() => movePhoto(index, index + 1)}>{ui("ui.components.PhotoOrganizer.d6e856081ebe", "Move later")}{" "}<ChevronRight size={14} /></button>
+                  {images.length > 1 ? <button type="button" disabled={disabled || index === 0} onClick={(event) => { const summary = event.currentTarget.closest("details")?.querySelector("summary"); movePhoto(index, index - 1); requestAnimationFrame(() => summary?.isConnected && summary.focus({ preventScroll: true })); }}><ChevronLeft size={14} />{" "}{ui("ui.components.PhotoOrganizer.736612d4d0a9", "Move earlier")}</button> : null}
+                  {images.length > 1 ? <button type="button" disabled={disabled || index === images.length - 1} onClick={(event) => { const summary = event.currentTarget.closest("details")?.querySelector("summary"); movePhoto(index, index + 1); requestAnimationFrame(() => summary?.isConnected && summary.focus({ preventScroll: true })); }}>{ui("ui.components.PhotoOrganizer.d6e856081ebe", "Move later")}{" "}<ChevronRight size={14} /></button> : null}
                 </div>
               </details>
             </article>

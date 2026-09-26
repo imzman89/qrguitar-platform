@@ -44,6 +44,7 @@ const Profile = compile("app/i/[code]/ProfileClient.tsx", {
   "../../../lib/instrument-profile-contract": contract,
   "../../../lib/content-registry": { getContentValue: (_, key) => contentLabels[key] || key },
   "../../../lib/profile-url": { publicProfileUrl: (code) => "https://www.qrguitar.com/i/" + code },
+  "../../../lib/profile-purchase-link": compile("lib/profile-purchase-link.ts", { "./public-collections": compile("lib/public-collections.ts") }),
   "../../../lib/optional-tracking-consent": { dispatchOptionalTrackingProductEvent() {}, optionalTrackingProductEvents: {} },
   "../../../lib/image-fallback": compile("lib/image-fallback.ts"),
   "../../../lib/public-media-variant": compile("lib/public-media-variant.ts"),
@@ -83,13 +84,24 @@ test("confirmed trust explanations appear once and saved badge visibility remain
   assert.doesNotMatch(render({ showVerificationBadge: false, showAuthenticityBadge: false }), /Verified by QRguitar|Authenticity Confirmed/);
 });
 
-test("buyer ownership request stays visible beside the QR before record details while owner actions stay absent", () => {
+test("post-purchase ownership help follows item details while owner actions stay absent", () => {
   const html = render();
   assert.ok(html.indexOf('class="profile-claim-entry"') > html.indexOf('class="scan-qr"'));
-  assert.ok(html.indexOf('class="profile-claim-entry"') < html.indexOf("Original cabinet with documented service."));
-  assert.match(html, /<div class="profile-claim-entry">/);
+  assert.ok(html.indexOf('class="profile-claim-entry"') > html.indexOf("Original cabinet with documented service."));
+  assert.match(html, /<section class="profile-claim-entry">/);
+  assert.match(html, /Already own it\?/);
   assert.match(html, /ownership-claim\?code=QRG-LAYOUT/);
   assert.doesNotMatch(html, /Owner profile actions|Edit Profile|Ownership Tools/);
+});
+
+test("seller purchase action precedes the gallery only for available safe listings", () => {
+  const listing = { saleStatus: "for_sale", shopUrl: "https://shop.example/item" };
+  const html = render(listing);
+  assert.ok(html.indexOf("Shop this item") < html.indexOf('class="scan-hero-gallery"'));
+  assert.match(html, /href="https:\/\/shop.example\/item"/);
+  assert.match(html, /shop.example/);
+  for (const safetyStatus of ["lost", "stolen"]) assert.doesNotMatch(render({ ...listing, safetyStatus }), /Shop this item/);
+  assert.doesNotMatch(render({ ...listing, saleStatus: "not_for_sale" }), /Shop this item/);
 });
 
 const { catalogFilterUrl, defaultCatalogFilters, readCatalogFilters } = compile("lib/catalog-filter-state.ts");

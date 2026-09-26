@@ -234,8 +234,8 @@ export default function DashboardPage() {
   const pendingTransfers = transfers.filter(
     (transfer) => transfer.status === "sent" && instrumentCodes.has(transfer.guitarQrCode.toUpperCase())
   ).length;
-  const pendingServiceRequests = serviceRequests.filter(
-    (request) => request.status === "submitted" || request.status === "changes_requested"
+  const ownerReviewRequests = serviceRequests.filter(
+    (request) => request.status === "submitted"
   ).length;
   const publicRecords = instruments.filter((instrument) => instrument.visibility === "public").length;
   const privateRecords = instruments.filter((instrument) => instrument.visibility === "private").length;
@@ -260,11 +260,33 @@ export default function DashboardPage() {
   function focusServiceRequests() {
     setDashboardMessage("");
     if (!recordsLoaded || recordsError) { setDashboardMessage("Service requests could not be checked. Reload your collection first."); return; }
-    if (!pendingServiceRequests) {
+    if (!ownerReviewRequests) {
       setDashboardMessage("No service requests need review.");
       return;
     }
-    document.getElementById("service-requests")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const workspaceTools = document.getElementById("workspace-tools");
+    if (workspaceTools instanceof HTMLDetailsElement) workspaceTools.open = true;
+    const serviceRequestRegion = document.getElementById("service-requests");
+    if (serviceRequestRegion instanceof HTMLElement) serviceRequestRegion.focus({ preventScroll: true });
+    const scrollBehavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    serviceRequestRegion?.scrollIntoView({ behavior: scrollBehavior, block: "start" });
+  }
+
+  function focusOwnershipTransfers() {
+    setDashboardMessage("");
+    if (!recordsLoaded || recordsError) { setDashboardMessage(ui("ui.app.dashboard.page.1127784eea0a", "Ownership transfers could not be checked. Reload your collection first.")); return; }
+    if (!pendingTransfers) {
+      setDashboardMessage(ui("ui.app.dashboard.page.f3ccb68e0839", "No ownership transfers need your attention."));
+      return;
+    }
+    const transferSection = document.getElementById("ownership-transfers");
+    if (transferSection instanceof HTMLDetailsElement) {
+      transferSection.open = true;
+      const summary = transferSection.querySelector("summary");
+      if (summary instanceof HTMLElement) summary.focus({ preventScroll: true });
+    }
+    const scrollBehavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    transferSection?.scrollIntoView({ behavior: scrollBehavior, block: "start" });
   }
 
   const stats = useMemo(
@@ -392,6 +414,21 @@ export default function DashboardPage() {
           {dashboardMessage ? <div className="admin-message" role="status">{dashboardMessage}</div> : null}
           {recordsError ? <div className="profile-refresh-notice" role="alert"><p>{recordsError} {recordsLoaded ? ui("ui.app.dashboard.page.6fe48008e091", "Previously loaded Profiles are shown below.") : ui("ui.app.dashboard.page.65dc6018f43f", "Your collection is not yet loaded.")}</p><button type="button" className="button secondary" onClick={refreshInstruments}>{ui("ui.app.dashboard.page.d8b8392e2c54", "Try again")}</button></div> : null}
 
+          {recordsLoaded && ownerReviewRequests > 0 ? (
+            <section className={styles.taskPanel} aria-labelledby="dashboard-tasks-title">
+              <div className={styles.taskHeading}>
+                <span className={styles.taskIndicator} aria-hidden="true" />
+                <h2 id="dashboard-tasks-title">{ui("ui.app.dashboard.page.11de928b330a", "Needs your attention")}</h2>
+              </div>
+              <div className={styles.taskActions}>
+                <button type="button" title={ui("ui.app.dashboard.page.aefc059cfcc0", "Service review")} onClick={focusServiceRequests}>
+                  <Wrench size={17} aria-hidden="true" />
+                  <span><b>{ui("ui.app.dashboard.page.f97efc02c5d2", "Service requests")}</b><small>{ownerReviewRequests} {ui("ui.app.dashboard.page.0f503c13fb6a", "awaiting review")}</small></span>
+                </button>
+              </div>
+            </section>
+          ) : null}
+
           <div className={styles.collectionControls}>
           <div className={styles.filters} aria-label={ui("ui.app.dashboard.page.c4e6f5e2cc0b", "Collection overview")}>
             {stats.map((stat) => (
@@ -468,8 +505,8 @@ export default function DashboardPage() {
                       </Link>
                       <aside className={styles.qrActionColumn} aria-label={ui("ui.app.dashboard.page.34e14d665e15", "Actions for {{value1}}", { value1: title })}>
                         <div className={styles.primaryActions}>
-                          <Link className="button secondary" href={`/edit/${instrument.qrCode}`}>{getContentValue(content, "dashboard.card.edit")}</Link>
-                          <button className="button secondary" type="button" onClick={() => setQuickEditRecord(instrument)}>{ui("ui.app.dashboard.page.d4e63f569f33", "Quick Edit")}</button>
+                          <Link className={`button ${styles.editAction}`} href={`/edit/${instrument.qrCode}`}>{getContentValue(content, "dashboard.card.edit")}</Link>
+                          <Link className={`button secondary ${styles.printAction}`} href={`/handout/${instrument.qrCode}`}><Printer size={15} aria-hidden="true" /> {ui("ui.app.dashboard.page.d6d8303655f5", "Print Suite")}</Link>
                         </div>
                         <button
                           className={styles.moreButton}
@@ -499,11 +536,12 @@ export default function DashboardPage() {
               )}
             </div>
           </section>
-          <section className={styles.toolsArea} aria-label={ui("ui.app.dashboard.page.4dc38afcfa8e", "Ownership and workspace tools")}>
+          <details className={styles.toolsArea} id="workspace-tools">
+          <summary>{ui("ui.app.dashboard.page.98d395c5face", "Workspace tools")}</summary>
+          <div className={styles.toolsBody} role="region" aria-label={ui("ui.app.dashboard.page.4dc38afcfa8e", "Ownership and workspace tools")}>
           <nav className={styles.toolLinks} aria-label={ui("ui.app.dashboard.page.832fd327544b", "Owner tools")}>
-            <button type="button" onClick={focusServiceRequests}><Wrench size={15} />{" "}{ui("ui.app.dashboard.page.aefc059cfcc0", "Service review")}{" "}<span>{recordsLoaded ? pendingServiceRequests : "—"}</span></button>
             <Link href="/ownership-claim">{ui("ui.app.dashboard.page.1d5aee2be8a0", "Ownership claims")}</Link>
-            <a href="#ownership-transfers">{ui("ui.app.dashboard.page.48920b5ab551", "Ownership transfers")}{" "}<span>{recordsLoaded ? pendingTransfers : "—"}</span></a>
+            <button type="button" onClick={focusOwnershipTransfers}><Repeat2 size={15} aria-hidden="true" /> {ui("ui.app.dashboard.page.48920b5ab551", "Ownership transfers")} <span>{recordsLoaded ? pendingTransfers : "—"} {ui("ui.app.dashboard.page.ab405a433d94", "waiting on recipient")}</span></button>
             <Link href="/account?section=collection" title={ui("ui.app.dashboard.page.073f22d50013", "Publish your public Profiles together and control member inquiries")}><UsersRound size={15} />{" "}{ui("ui.app.dashboard.page.2c8274b24de5", "Collection & inquiries")}{" "}<span>{collectionHandle ? ui("ui.app.dashboard.page.b64ac05f17e6", "Live") : ui("ui.app.dashboard.page.4da10f1fbb17", "Set up")}</span></Link>
           </nav>
           <div className={styles.trustSummary} aria-label={ui("ui.app.dashboard.page.9aab2ecb991d", "Trust summary")}>
@@ -513,14 +551,14 @@ export default function DashboardPage() {
           </div>
 
           {serviceRequests.length ? (
-            <section className="card service-request-inbox" id="service-requests" aria-labelledby="service-requests-title">
+            <section className="card service-request-inbox" id="service-requests" aria-labelledby="service-requests-title" tabIndex={-1}>
               <div className="service-request-inbox__header">
                 <div>
                   <div className="eyebrow"><Wrench aria-hidden="true" />{" "}{ui("ui.app.dashboard.page.d677190e0a99", "Service")}</div>
                   <h3 id="service-requests-title">{ui("ui.app.dashboard.page.f97efc02c5d2", "Service requests")}</h3>
                   <p>{ui("ui.app.dashboard.page.b2df16574d8f", "Review provider-submitted work before it is added to the Profile.")}</p>
                 </div>
-                <span>{pendingServiceRequests}{" "}{ui("ui.app.dashboard.page.0f503c13fb6a", "awaiting review")}</span>
+                <span>{ownerReviewRequests}{" "}{ui("ui.app.dashboard.page.0f503c13fb6a", "awaiting review")}</span>
               </div>
               <div className="service-request-list">
                 {serviceRequests.slice(0, 8).map((request) => {
@@ -553,7 +591,8 @@ export default function DashboardPage() {
             })}
           </details>
           <WorkspaceActions accountType={collectionAccountType} />
-          </section>
+          </div>
+          </details>
 
         </div>
       </OwnerWorkspace>
@@ -564,6 +603,7 @@ export default function DashboardPage() {
             <DashboardInstrumentThumb sources={getProfilePhotoUrls(actionRecord)} title={dashboardRecordTitle(actionRecord)} />
             <div><b>{actionRecord.qrCode}</b><span>{actionRecord.serial ? ui("ui.app.dashboard.page.78b42b116d41", "Serial Number {{value1}}", { value1: actionRecord.serial }) : ui("ui.app.dashboard.page.0006179f0706", "No Serial Number")}</span></div>
           </div>
+          <button className={styles.drawerQuickEdit} type="button" onClick={() => { setQuickEditRecord(actionRecord); setActionRecord(null); }}>{ui("ui.app.dashboard.page.d4e63f569f33", "Quick Edit")}</button>
           <div className={styles.drawerSections}>
             <section>
               <b>{ui("ui.app.dashboard.page.9af3e044122c", "QR, print & sharing")}</b>

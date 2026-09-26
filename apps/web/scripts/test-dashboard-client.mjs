@@ -75,4 +75,52 @@ await test("collection search finds identity fields and composes with visibility
   assert.deepEqual(records.filter(r=>visible(r,"public")&&matches(r,"fender")),[]);
   assert.deepEqual(records.filter(r=>visible(r,"private")&&matches(r,"amp")),[records[0]]);
 });
+await test("Profile cards keep Edit and Print Suite direct while Quick Edit lives in More",async()=>{
+  const cardStart=source.indexOf('<aside className={styles.qrActionColumn}');
+  const cardEnd=source.indexOf('</aside>',cardStart);
+  const card=source.slice(cardStart,cardEnd);
+  assert.match(card,/href=\{`\/edit\/\$\{instrument\.qrCode\}`\}/);
+  assert.match(card,/href=\{`\/handout\/\$\{instrument\.qrCode\}`\}/);
+  assert.doesNotMatch(card,/setQuickEditRecord\(instrument\)/);
+  assert.match(source,/className=\{styles\.drawerQuickEdit\}[\s\S]*setQuickEditRecord\(actionRecord\); setActionRecord\(null\)/);
+});
+await test("Needs your attention counts only owner-reviewable submissions",async()=>{
+  const countStart=source.indexOf("const ownerReviewRequests");
+  const countEnd=source.indexOf("const publicRecords",countStart);
+  const countSource=source.slice(countStart,countEnd);
+  assert.match(countSource,/request\.status === "submitted"/);
+  assert.doesNotMatch(countSource,/changes_requested/);
+  const panelStart=source.indexOf("{recordsLoaded && ownerReviewRequests > 0");
+  const panelEnd=source.indexOf('<div className={styles.collectionControls}>',panelStart);
+  assert.doesNotMatch(source.slice(panelStart,panelEnd),/pendingTransfers/);
+});
+await test("Workspace tools stays closed until an actionable service shortcut opens and focuses it",async()=>{
+  const toolsStart=source.indexOf('<details className={styles.toolsArea} id="workspace-tools">');
+  const toolsSummary=source.indexOf('<summary>{ui("ui.app.dashboard.page.98d395c5face", "Workspace tools")}</summary>',toolsStart);
+  assert.ok(toolsStart>=0&&toolsSummary>toolsStart);assert.doesNotMatch(source.slice(toolsStart,toolsSummary),/\sopen(?:=|\s|>)/);
+  assert.match(source,/id="service-requests"[^>]*tabIndex=\{-1\}/);
+  const events=[];class Element {}
+  class Details { set open(value){this.isOpen=value;events.push("open");} }
+  class Region extends Element { focus(options){this.focusOptions=options;events.push("focus");} scrollIntoView(options){this.scrollOptions=options;events.push(`scroll:${options.behavior}`);} }
+  const tools=new Details(),region=new Region(),state={dashboardMessage:"old"};
+  const focus=compile(functions.get("focusServiceRequests"),{...stateSetters(state),recordsLoaded:true,recordsError:"",ownerReviewRequests:2,document:{getElementById:id=>id==="workspace-tools"?tools:region},window:{matchMedia:()=>({matches:true})},HTMLDetailsElement:Details,HTMLElement:Element},"focusServiceRequests");
+  focus();assert.equal(tools.isOpen,true);assert.deepEqual(region.focusOptions,{preventScroll:true});assert.deepEqual(region.scrollOptions,{behavior:"auto",block:"start"});assert.deepEqual(events,["open","focus","scroll:auto"]);
+});
+await test("ownership activity opens details, focuses its summary, and scrolls smoothly",async()=>{
+  class Element {}
+  class Summary extends Element { focus(options){this.focusOptions=options;} }
+  class Details { constructor(){this.open=false;this.summary=new Summary();} querySelector(value){assert.equal(value,"summary");return this.summary;} scrollIntoView(options){this.options=options;} }
+  const section=new Details();const state={dashboardMessage:"old"};
+  const focus=compile(functions.get("focusOwnershipTransfers"),{...stateSetters(state),ui:(_key,fallback)=>fallback,recordsLoaded:true,recordsError:"",pendingTransfers:2,document:{getElementById:id=>{assert.equal(id,"ownership-transfers");return section;}},window:{matchMedia:()=>({matches:false})},HTMLElement:Element,HTMLDetailsElement:Details},"focusOwnershipTransfers");
+  focus();assert.equal(state.dashboardMessage,"");assert.equal(section.open,true);assert.deepEqual(section.summary.focusOptions,{preventScroll:true});assert.deepEqual(section.options,{behavior:"smooth",block:"start"});
+});
+await test("ownership activity honors reduced motion and keeps feedback CMS-editable",async()=>{
+  class Element {}
+  class Summary extends Element { focus(){} }
+  class Details { constructor(){this.summary=new Summary();} querySelector(){return this.summary;} scrollIntoView(options){this.options=options;} }
+  const section=new Details();const state={dashboardMessage:"old"};const keys=[];
+  const env={...stateSetters(state),ui:(key,fallback)=>{keys.push(key);return `Edited: ${fallback}`;},recordsLoaded:true,recordsError:"",pendingTransfers:1,document:{getElementById:()=>section},window:{matchMedia:query=>{assert.equal(query,"(prefers-reduced-motion: reduce)");return{matches:true};}},HTMLElement:Element,HTMLDetailsElement:Details};
+  compile(functions.get("focusOwnershipTransfers"),env,"focusOwnershipTransfers")();assert.equal(section.options.behavior,"auto");
+  env.pendingTransfers=0;compile(functions.get("focusOwnershipTransfers"),env,"focusOwnershipTransfers")();assert.deepEqual(keys,["ui.app.dashboard.page.f3ccb68e0839"]);assert.match(state.dashboardMessage,/^Edited:/);
+});
 console.log(count+" dashboard behavior cases passed.");

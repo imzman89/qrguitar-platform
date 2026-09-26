@@ -64,4 +64,69 @@ await test("the edit client stages bytes first and its PATCH contains paths inst
   assert.doesNotMatch(save, /heroImageDataUrl:\s*form\.heroImageDataUrl/);
 });
 
+await test("the Photos target groups its picker and organizer before Documents", async () => {
+  const page = readRepo("apps/web/app/edit/[code]/page.tsx");
+  const photosStart = page.indexOf('<section className={styles.photoSection} id="photos">');
+  const photosEnd = page.indexOf("</section>", photosStart);
+  const documentsStart = page.indexOf('<div className="field photo-field" id="documents">');
+  const photos = page.slice(photosStart, photosEnd);
+  assert.ok(photosStart >= 0 && photosEnd > photosStart && documentsStart > photosEnd);
+  assert.match(photos, /id="profilePhotos"/);
+  assert.match(photos, /<PhotoOrganizer/);
+  assert.equal((page.match(/id="photos"/g) || []).length, 1);
+  assert.equal((page.match(/id="profilePhotos"/g) || []).length, 1);
+  assert.equal((page.match(/<PhotoOrganizer/g) || []).length, 1);
+  const css = readRepo("apps/web/app/edit/[code]/edit.module.css");
+  assert.match(css, /\.photoSection\s*\{[^}]*scroll-margin-top:\s*78px/);
+  assert.match(css, /@media \(max-width: 760px\)[\s\S]*?\.photoSection\s*\{[^}]*scroll-margin-top:\s*112px/);
+});
+
+await test("ready hash sync and section selection use the extracted navigation behavior", async () => {
+  const page = readRepo("apps/web/app/edit/[code]/page.tsx");
+  const tree = ts.createSourceFile("page.tsx", page, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const functions = new Map(), effects = [], handlers = [];
+  function visit(node) {
+    if (ts.isFunctionDeclaration(node) && node.name) functions.set(node.name.text, node.getText(tree));
+    if (ts.isCallExpression(node) && node.expression.getText(tree) === "useEffect") effects.push(node.arguments[0]?.getText(tree) || "");
+    if (ts.isJsxAttribute(node) && node.name.getText(tree) === "onChange" && node.initializer && ts.isJsxExpression(node.initializer) && node.initializer.expression) handlers.push(node.initializer.expression.getText(tree));
+    ts.forEachChild(node, visit);
+  }
+  visit(tree);
+  function compile(code, env, returned) {
+    const javascript = ts.transpileModule(code, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+    return new Function(...Object.keys(env), `${javascript}\nreturn ${returned};`)(...Object.values(env));
+  }
+
+  const historyState = { preserved: true }, scrolls = [], replacements = [];
+  const browser = {
+    location: { hash: "#photos" },
+    history: { state: historyState, replaceState: (...args) => replacements.push(args) },
+    matchMedia: query => { assert.equal(query, "(prefers-reduced-motion: reduce)"); return { matches: true }; }
+  };
+  const target = { scrollIntoView: options => scrolls.push(options) };
+  const helperSource = ["isKnownEditorSection", "scrollToEditorSection", "replaceEditorSectionHash"].map(name => functions.get(name)).join("\n");
+  const helpers = compile(helperSource, { window: browser, document: { getElementById: id => id === "photos" ? target : null } }, "{ isKnownEditorSection, scrollToEditorSection, replaceEditorSectionHash }");
+  assert.equal(helpers.replaceEditorSectionHash("photos"), true);
+  assert.equal(replacements.length, 1);assert.equal(replacements[0][0], historyState);assert.equal(replacements[0][2], "#photos");
+  assert.deepEqual(scrolls, [{ behavior: "auto", block: "start" }]);
+  assert.equal(helpers.replaceEditorSectionHash("unknown"), false);assert.equal(replacements.length, 1);assert.equal(scrolls.length, 1);
+
+  const readyEffect = effects.find(code => code.includes("if (!ready) return") && code.includes("scrollToEditorSection(section)"));
+  assert.ok(readyEffect);
+  const runReadyEffect = ready => {
+    const events = [];
+    const effect = compile(`const effect = ${readyEffect};`, { ready, window: browser, isKnownEditorSection: helpers.isKnownEditorSection, setActiveEditorSection: value => events.push(`active:${value}`), scrollToEditorSection: value => events.push(`scroll:${value}`) }, "effect");
+    effect();return events;
+  };
+  assert.deepEqual(runReadyEffect(false), []);
+  assert.deepEqual(runReadyEffect(true), ["active:photos", "scroll:photos"]);
+
+  const selectHandler = handlers.find(code => code.includes("replaceEditorSectionHash(section)"));
+  assert.ok(selectHandler);
+  const selectionEvents = [];
+  const handler = compile(`const handler = ${selectHandler};`, { isKnownEditorSection: helpers.isKnownEditorSection, setActiveEditorSection: value => selectionEvents.push(`active:${value}`), replaceEditorSectionHash: value => selectionEvents.push(`replace:${value}`) }, "handler");
+  handler({ target: { value: "photos" } });handler({ target: { value: "unknown" } });
+  assert.deepEqual(selectionEvents, ["active:photos", "replace:photos"]);
+});
+
 console.log(`Completed ${passed} Profile edit request-boundary tests.`);

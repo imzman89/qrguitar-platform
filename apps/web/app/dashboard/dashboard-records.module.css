@@ -17,7 +17,22 @@
 .filters strong { order: 2; flex-shrink: 0; font-size: .75rem; font-weight: 500; opacity: .8; }
 .filters button.filterActive, .filters button:hover { color: var(--text); background: var(--surface-subtle); }
 .filters button:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
-.toolsArea { display: grid; gap: 22px; padding-top: 12px; }
+.taskPanel { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 16px; border: 1px solid color-mix(in srgb,var(--action) 24%,var(--border)); border-radius: 10px; background: color-mix(in srgb,var(--action) 5%,var(--surface)); }
+.taskHeading { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.taskHeading h2 { margin: 0; color: var(--text); font-size: .875rem; font-weight: 600; letter-spacing: -.01em; }
+.taskIndicator { flex: 0 0 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--action); }
+.taskActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.taskActions button { display: flex; align-items: center; gap: 9px; min-height: 44px; padding: 8px 12px; border: 0; border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.taskActions button:hover { background: var(--surface-subtle,var(--panel-2)); }
+.taskActions button:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
+.taskActions button > svg { flex: 0 0 auto; color: var(--action); }
+.taskActions button > span { display: grid; gap: 2px; }
+.taskActions b { font-size: .8125rem; font-weight: 600; }
+.taskActions small { color: var(--muted); font-size: .6875rem; }
+.toolsArea { padding-top: 12px; border: 0; background: transparent; }
+.toolsArea > summary { min-height: 44px; width: fit-content; color: var(--text); font-size: .875rem; font-weight: 600; line-height: 44px; cursor: pointer; }
+.toolsArea > summary:focus-visible { outline: 2px solid var(--action); outline-offset: 3px; }
+.toolsBody { display: grid; gap: 22px; padding-top: 16px; }
 .toolLinks { display: flex; flex-wrap: wrap; gap: 8px 24px; }
 .toolLinks :is(a,button) { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0; border: 0; background: transparent; color: var(--muted-strong,var(--text)); font: inherit; font-size: .8125rem; text-decoration: none; cursor: pointer; }
 .toolLinks :is(a,button):hover { color: var(--text); text-decoration: underline; text-underline-offset: 4px; }
@@ -30,7 +45,7 @@
 .transfers summary span { color: var(--muted); font-size: .75rem; font-weight: 400; }
 .transfers > p { margin: 6px 0 16px; max-width: 76ch; color: var(--muted); font-size: .8125rem; line-height: 1.6; }
 @media(max-width: 1120px) { .collectionControls { align-items: stretch; flex-direction: column; gap: 12px; } .search { width: 100%; } .header { flex-direction: column; gap: 18px; } .headerActions { justify-content: flex-start; max-width: none; } }
-@media(max-width: 760px) { .search input { font-size: 1rem; } .dashboard { gap: 20px; } .header h1 { font-size: 1.875rem; } .headerActions { gap: 8px; } .filters { gap: 4px; } .filters button { padding-inline: 11px; } .toolsArea { padding-top: 4px; } }
+@media(max-width: 760px) { .search input { font-size: 1rem; } .dashboard { gap: 20px; } .header h1 { font-size: 1.875rem; } .headerActions { gap: 8px; } .filters { gap: 4px; } .filters button { padding-inline: 11px; } .taskPanel { align-items: stretch; flex-direction: column; gap: 12px; } .taskActions { justify-content: stretch; } .taskActions button { flex: 1 1 100%; } .toolsArea { padding-top: 4px; } }
 
 /* Owner collection: photographs, useful details, and direct controls. */
 .instrumentTable {
@@ -160,6 +175,10 @@
 .qrActionColumn { display: flex; align-items: center; gap: 8px; min-width: 0; margin-top: auto; }
 .primaryActions { display: flex; flex: 1; flex-wrap: wrap; gap: 6px; min-width: 0; }
 :global(body[data-product-theme]) .primaryActions :global(.button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 44px;
@@ -175,9 +194,10 @@
   letter-spacing: 0;
   white-space: nowrap;
 }
-:global(body[data-product-theme]) .primaryActions :global(.button):first-child { background: var(--surface-subtle); color: var(--text); }
+:global(body[data-product-theme]) .primaryActions .editAction { background: var(--action); color: var(--on-action); }
 :global(body[data-product-theme]) .primaryActions :global(.button):hover { background: var(--panel); color: var(--text); }
-:global(body[data-product-theme]) .primaryActions :global(.button):first-child:hover { background: var(--surface); color: var(--text); }
+:global(body[data-product-theme]) .primaryActions .editAction:hover { background: var(--action-hover); color: var(--on-action); }
+.printAction svg { flex: 0 0 auto; }
 .moreButton {
   display: grid;
   place-items: center;
@@ -201,6 +221,9 @@
 .drawerIdentity > div:last-child { display: grid; gap: 5px; }
 .drawerIdentity b { overflow-wrap: anywhere; color: var(--text); font-size: .875rem; font-weight: 600; }
 .drawerIdentity span { overflow-wrap: anywhere; color: var(--muted); font-size: .75rem; }
+.drawerQuickEdit { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 44px; margin-top: 16px; padding: 10px 14px; border: 1px solid var(--border-strong); border-radius: 9px; background: transparent; color: var(--text); font: inherit; font-size: .8125rem; font-weight: 600; cursor: pointer; }
+.drawerQuickEdit:hover { background: var(--surface-subtle,var(--panel-2)); }
+.drawerQuickEdit:focus-visible { outline: 2px solid var(--action); outline-offset: 3px; }
 .drawerSections { display: grid; gap: 28px; margin-top: 24px; }
 .drawerSections section { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; min-width: 0; padding: 0; border: 0; background: transparent; }
 .drawerSections section > b { grid-column: 1 / -1; margin-bottom: 5px; color: var(--muted); font-size: .75rem; font-weight: 600; line-height: 1.5; }

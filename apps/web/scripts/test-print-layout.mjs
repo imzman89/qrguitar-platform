@@ -115,6 +115,15 @@ test('Profile Sheet renders the published scan instruction', () => {
   assert.ok(render({ mode: 'handout', scanInstruction: 'Open this Profile with your camera.' }).includes('Open this Profile with your camera.'));
 });
 
+test('Profile Sheet groups readable specifications beside the photograph, before the QR band', () => {
+  const html = render({ specifications: [['Type', 'Electric Guitar'], ['Features', 'Passive pickups']] });
+  assert.ok(html.indexOf('class="profileSpecifications detailGroup"') < html.indexOf('</aside>'));
+  assert.ok(html.indexOf('</aside>') < html.indexOf('class="profileScan"'));
+  assert.match(html, /data-density="comfortable"/);
+  assert.match(render({ specifications: Array.from({ length: 10 }, (_, i) => [`Detail ${i}`, 'Value']) }), /data-density="compact"/);
+  assert.match(render({ photo: '' }), /data-has-photo="false"/);
+});
+
 test('every print format uses the canonical logo in the matching paper appearance', () => {
   const { BrandLogo } = compile('components/BrandLogo.tsx');
   const logo = renderToStaticMarkup(React.createElement(BrandLogo));

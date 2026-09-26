@@ -587,9 +587,9 @@ test("photo upload failure stays attached to its source through reordering and l
   const code = ts.transpileModule(photoOrganizer, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX }
   }).outputText;
-  new Function("require", "module", "exports", code)((name) => name === "react"
+  new Function("require", "module", "exports", "requestAnimationFrame", code)((name) => name === "react"
     ? { useState: (initial) => [initial, () => {}], useRef: (initial) => ({ current: initial }) }
-    : require(name), module, module.exports);
+    : require(name), module, module.exports, (callback) => callback());
   const Organizer = module.exports.PhotoOrganizer;
   const original = ["/lead.jpg", "/detail.jpg", "/back.jpg"];
   let images = [...original];
@@ -605,6 +605,9 @@ test("photo upload failure stays attached to its source through reordering and l
   });
   const tileAt = (tree, index) => findElement(tree, (node) => node.type === "article" && node.props["data-photo-index"] === index);
   const plain = (node) => Array.isArray(node) ? node.map(plain).join("") : typeof node === "string" ? node : node?.props ? plain(node.props.children) : "";
+  let focusCount = 0;
+  const summary = { isConnected: true, focus: (options) => { assert.equal(options.preventScroll, true); focusCount++; } };
+  const clickEvent = { currentTarget: { closest: () => ({ querySelector: () => summary }) } };
   let tree = render();
   let failedTile = tileAt(tree, 0);
   assert.equal(findElement(failedTile, (node) => node.props?.role === "alert").props.children[0].props.children, errorMessage);
@@ -613,7 +616,8 @@ test("photo upload failure stays attached to its source through reordering and l
   assert.equal(findElement(menu, (node) => node.type === "button" && plain(node).includes("Move earlier")).props.disabled, true);
   const moveLater = findElement(menu, (node) => node.type === "button" && plain(node).includes("Move later"));
   assert.equal(moveLater.props.disabled, false);
-  moveLater.props.onClick();
+  moveLater.props.onClick(clickEvent);
+  assert.equal(focusCount, 1, "reordering returns keyboard focus to its retained photo menu");
   assert.deepEqual(images, ["/detail.jpg", "/lead.jpg", "/back.jpg"]);
   assert.deepEqual(original, ["/lead.jpg", "/detail.jpg", "/back.jpg"], "reordering must not mutate caller-owned input");
   tree = render();
@@ -621,7 +625,8 @@ test("photo upload failure stays attached to its source through reordering and l
   assert.equal(findElement(failedTile, (node) => node.type === "img").props.src, "/lead.jpg");
   assert.match(plain(findElement(failedTile, (node) => node.props?.role === "alert")), /selected photograph is preserved/);
   assert.equal(findElement(tileAt(tree, 0), (node) => node.props?.role === "alert"), null, "the error cannot move to the next photo by index");
-  findElement(failedTile, (node) => node.type === "button" && node.props["aria-label"] === "Set photo 2 as main").props.onClick();
+  findElement(failedTile, (node) => node.type === "button" && node.props["aria-label"] === "Set photo 2 as main").props.onClick(clickEvent);
+  assert.equal(focusCount, 2, "main-photo selection retains useful focus");
   assert.equal(mainImage, "/lead.jpg");
   findElement(failedTile, (node) => node.type === "button" && node.props["aria-label"] === "Remove photo 2").props.onClick();
   assert.deepEqual(removed, ["/lead.jpg"]);

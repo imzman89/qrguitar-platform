@@ -35,12 +35,6 @@ type PrintScope = "public" | "owner";
 
 const modeOrder: PrintMode[] = ["label", "hangtag", "handout", "service"];
 
-const modeDescriptions: Record<PrintMode, string> = {
-  label: "A 3.5 x 2.25 label for a case, hang tag, or product paperwork.",
-  hangtag: "A retail-ready 4 x 6 display card with photograph and QR.",
-  handout: "A complete Letter or A4 Profile Sheet for the owner or customer.",
-  service: "A one-page record of one approved service-history entry."
-};
 
 const printSizeLabels: Record<PrintSize, string> = {
   letter: "US Letter",
@@ -148,12 +142,11 @@ export default function HandoutPage() {
   useEffect(() => {
     if (!mobileControlsOpen) return;
     const sheet = document.getElementById("print-suite-controls");
-    const media = window.matchMedia("(max-width: 1000px)");
-    if (!sheet || !media.matches) { setMobileControlsOpen(false); return; }
+    if (!sheet) return;
     const previousFocus = document.activeElement as HTMLElement | null;
     const previousOverflow = document.documentElement.style.overflow;
     document.documentElement.style.overflow = "hidden";
-    const controls = () => Array.from(sheet.querySelectorAll<HTMLElement>("button:not(:disabled), select, input, textarea, [tabindex='0']")).filter((element) => element.getClientRects().length > 0);
+    const controls = () => Array.from(sheet.querySelectorAll<HTMLElement>("button:not(:disabled), select, input, textarea, summary, [tabindex='0']")).filter((element) => element.getClientRects().length > 0);
     controls()[0]?.focus();
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") { event.preventDefault(); setMobileControlsOpen(false); }
@@ -162,10 +155,8 @@ export default function HandoutPage() {
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     }
-    const onResize = () => { if (!media.matches) setMobileControlsOpen(false); };
     document.addEventListener("keydown", onKey);
-    media.addEventListener("change", onResize);
-    return () => { document.documentElement.style.overflow = previousOverflow; document.removeEventListener("keydown", onKey); media.removeEventListener("change", onResize); previousFocus?.focus(); };
+    return () => { document.documentElement.style.overflow = previousOverflow; document.removeEventListener("keydown", onKey); previousFocus?.focus(); };
   }, [mobileControlsOpen]);
 
   useEffect(() => {
@@ -309,7 +300,7 @@ export default function HandoutPage() {
   const primaryFacts = instrument ? [instrument.brand, instrument.year, location].filter(Boolean) : [];
   const isPrivate = instrument?.visibility === "private";
   const activeFormat = formatConfig[mode];
-  const availableModes = modeOrder.filter((candidate) => candidate !== "service" || printableServiceEntries.length > 0);
+  const availableModes = modeOrder.filter((candidate) => candidate !== "service" || printableServiceEntries.length > 0 || (loading && candidate === mode));
   const geometry = printGeometry(printSize, orientation);
   const resolvedPageDimensions = `${geometry.width}in ${geometry.height}in`;
   const previewScale = Math.min(1, Math.max(0.1, (viewportWidth - 32) / (geometry.width * 96))) * zoom / 100;
@@ -376,6 +367,7 @@ export default function HandoutPage() {
 
   function selectPrintMode(nextMode: PrintMode) {
     const config = formatConfig[nextMode];
+    setZoom(100);
     setMode(nextMode);
     setPrintSize(config.defaultSize);
     setOrientation(config.orientations[0]);
@@ -442,18 +434,16 @@ export default function HandoutPage() {
     <>
       <style>{ui("ui.app.handout.code.page.edca82c0915c", "@media print { @page { size: {{value1}}; margin: {{value2}}in; } }", { value1: resolvedPageDimensions, value2: geometry.margin })}</style>
       <div className={`no-print ${styles.screenChrome}`}><Nav /></div>
-      <main className={`section handout-page ${styles.root}`} data-print-page-size={printSize}>
+      <main className={`section handout-page ${styles.root}`} data-print-page-size={printSize} aria-label={ui("ui.app.handout.code.page.3eed152bf351", "QR and print")}>
         <div className="shell handout-shell" data-print-ready={readyToPrint} data-print-mode={mode} data-print-size={printSize} data-print-orientation={orientation} data-print-theme={theme}>
           <div className="print-kit-toolbar no-print">
-            <div>
-              <Link className="print-kit-back-link" href="/dashboard">
-                <ArrowLeft size={15} />{ui("ui.app.handout.code.page.67b696468610", "Dashboard")}</Link>
-              <div className="eyebrow">{ui("ui.app.handout.code.page.3eed152bf351", "QR and print")}</div>
+            <div className={styles.workspaceHeading}>
+              <Link className={styles.backButton} href="/dashboard" aria-label={ui("ui.app.handout.code.page.67b696468610", "Dashboard")} title={ui("ui.app.handout.code.page.67b696468610", "Dashboard")}>
+                <ArrowLeft size={20} /></Link>
               <h1>{getContentValue(content, "printWorkspace.title")}</h1>
-              <p>{getContentValue(content, "printWorkspace.body")}</p>
             </div>
             <div className="print-kit-toolbar-actions">
-              <Link className="button secondary" href={instrument ? ownerProfileHref(instrument) : "/dashboard"} target="_blank">
+              <Link className={styles.profileLink} href={instrument ? ownerProfileHref(instrument) : "/dashboard"} target="_blank">
                 <ExternalLink size={16} />{ui("ui.app.handout.code.page.f9d77f6cb2f2", "Open Profile")}</Link>
               <button className="button" type="button" onClick={printSelectedPage} disabled={!readyToPrint || printing}>
                 <Printer size={16} />
@@ -462,6 +452,13 @@ export default function HandoutPage() {
             </div>
           </div>
 
+          <div className={`${styles.formatToolbar} no-print`} role="group" aria-label={ui("ui.app.handout.code.page.2b60a18bae15", "Print format")}>
+            <label className={styles.formatSelect}>
+              <span>{ui("ui.app.handout.code.page.2f343666aaa8", "Format")}</span>
+              <select value={mode} disabled={!instrument || loading} onChange={(event) => selectPrintMode(event.target.value as PrintMode)}>
+                {availableModes.map((key) => <option key={key} value={key}>{printModeLabel(key)}</option>)}
+              </select>
+            </label>
           <button
             className={`${styles.mobileControlsButton} no-print`}
             type="button"
@@ -473,6 +470,7 @@ export default function HandoutPage() {
             <SlidersHorizontal size={16} />
             {mobileControlsOpen ? ui("ui.app.handout.code.page.f14f3c9238ed", "Close print options") : ui("ui.app.handout.code.page.45e209da028e", "Print options")}
           </button>
+          </div>
 
           {mobileControlsOpen ? <button type="button" className={`${styles.mobileControlsBackdrop} no-print`} aria-label={ui("ui.app.handout.code.page.f14f3c9238ed", "Close print options")} onClick={() => setMobileControlsOpen(false)} /> : null}
 
@@ -483,24 +481,6 @@ export default function HandoutPage() {
                   <strong>{ui("ui.app.handout.code.page.45e209da028e", "Print options")}</strong>
                   <button type="button" aria-label={ui("ui.app.handout.code.page.f14f3c9238ed", "Close print options")} onClick={() => setMobileControlsOpen(false)}><X size={17} /></button>
                 </div>
-                <div className={styles.controlSection}>
-                  <span className={styles.controlLabel}>{ui("ui.app.handout.code.page.2f343666aaa8", "Format")}</span>
-                  <div className={styles.formatList} role="group" aria-label={ui("ui.app.handout.code.page.2b60a18bae15", "Print format")}>
-                    {availableModes.map((key) => (
-                      <button
-                        key={key}
-                        type="button"
-                        className={mode === key ? styles.selectedFormat : ""}
-                        aria-pressed={mode === key}
-                        onClick={() => selectPrintMode(key)}
-                      >
-                        <strong>{printModeLabel(key)}</strong>
-                        <span>{modeDescriptions[key]}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 <div className={styles.controlGrid}>
                   {activeFormat.sizes.length > 1 ? <label>{ui("ui.app.handout.code.page.35045eff549e", "Paper")}<select value={printSize} onChange={(event) => setPrintSize(event.target.value as PrintSize)}>{activeFormat.sizes.map((size) => <option value={size} key={size}>{printSizeLabels[size]}</option>)}</select></label> : null}
                   {activeFormat.orientations.length > 1 ? <label>{ui("ui.app.handout.code.page.e3d11242200f", "Orientation")}<select value={orientation} onChange={(event) => setOrientation(event.target.value as PrintOrientation)}>{activeFormat.orientations.map((value) => <option value={value} key={value}>{value === "portrait" ? ui("ui.app.handout.code.page.f71094c30160", "Portrait") : ui("ui.app.handout.code.page.e658d3ae034a", "Landscape")}</option>)}</select></label> : null}
@@ -516,8 +496,8 @@ export default function HandoutPage() {
 
                 {mode === "service" ? <label className={styles.controlSection}><span className={styles.controlLabel}>{ui("ui.app.handout.code.page.cd06117a4a90", "Service Entry")}</span><select value={selectedService?.id || ""} onChange={(event) => setSelectedServiceId(event.target.value)}>{printableServiceEntries.map((entry) => <option value={entry.id} key={entry.id}>{formatServiceDate(entry)} - {entry.title}</option>)}</select></label> : null}
 
-                <fieldset className={styles.controlSection}>
-                  <legend className={styles.controlLabel}>{ui("ui.app.handout.code.page.616f48c1db19", "Fields")}</legend>
+                <details className={styles.optionGroup}>
+                  <summary>{ui("ui.app.handout.code.page.616f48c1db19", "Fields")}</summary>
                   <div className={styles.toggleGrid}>
                     <label><input type="checkbox" checked={includeLogo} onChange={(event) => setIncludeLogo(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.d707dc2f1936", "Logo")}</label>
                     {activeFormat.photo && photoUrl ? <label><input type="checkbox" checked={includePhoto} onChange={(event) => setIncludePhoto(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.bb1de9720797", "Photograph")}</label> : null}
@@ -527,7 +507,7 @@ export default function HandoutPage() {
                     {activeFormat.specifications && printableSpecs.length ? <label><input type="checkbox" checked={includeSpecifications} onChange={(event) => setIncludeSpecifications(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.015b4e0a76e5", "Specifications")}</label> : null}
                     {activeFormat.timeline && timelineEntries.length ? <label><input type="checkbox" checked={includeTimeline} onChange={(event) => setIncludeTimeline(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.a7a952cb15e6", "Timeline summary")}</label> : null}
                   </div>
-                </fieldset>
+                </details>
 
                 {activeFormat.photo && includePhoto && galleryImages.length ? <div className={styles.controlGrid}>
                   {galleryImages.length > 1 ? <label>{ui("ui.app.handout.code.page.bb1de9720797", "Photograph")}<select value={photoUrl} onChange={(event) => setSelectedPhoto(event.target.value)}>{galleryImages.map((url, index) => <option value={url} key={url}>{index === 0 ? ui("ui.app.handout.code.page.7cbea1608d56", "Main photograph") : ui("ui.app.handout.code.page.db641bc07db6", "Photograph {{value1}}", { value1: index + 1 })}</option>)}</select></label> : null}
@@ -537,13 +517,13 @@ export default function HandoutPage() {
                 <label className={styles.controlSection}><span className={styles.controlLabel}>{ui("ui.app.handout.code.page.eaea51b2ef4f", "Title on this printout")}</span><input type="text" maxLength={120} value={printTitle ?? title} onChange={(event) => setPrintTitle(event.target.value)} /></label>
                 {mode !== "label" ? <label className={styles.controlSection}><span className={styles.controlLabel}>{ui("ui.app.handout.code.page.e100b01df2b6", "Note on this printout")}</span><textarea rows={3} maxLength={240} value={printNote} placeholder={ui("ui.app.handout.code.page.2faf4e50e727", "Care advice, collection details or a message for the recipient")} onChange={(event) => setPrintNote(event.target.value)} /><small>{printNote.length}/240</small></label> : null}
 
-                <fieldset className={styles.controlSection}>
-                  <legend className={styles.controlLabel}>{ui("ui.app.handout.code.page.a439fba430a3", "QR")}</legend>
+                <details className={styles.optionGroup}>
+                  <summary>{ui("ui.app.handout.code.page.a439fba430a3", "QR")}</summary>
                   <div className={styles.toggleGrid}>
                     <label><input type="checkbox" checked={includeUrlLabel} onChange={(event) => setIncludeUrlLabel(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.b36c5aceb02f", "URL label")}</label>
                     <label><input type="checkbox" checked={includeScanInstruction} onChange={(event) => setIncludeScanInstruction(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.eaf0a0e32cc3", "Scan instruction")}</label>
                   </div>
-                </fieldset>
+                </details>
 
                 <div className={styles.controlActions}>
                   <button type="button" className={styles.resetButton} onClick={resetPrintOptions}><RotateCcw size={14} /> {getContentValue(content, "printWorkspace.reset")}</button>
@@ -555,12 +535,14 @@ export default function HandoutPage() {
             <section className={`${styles.previewStage} ${!instrument ? styles.previewStageEmpty : ""}`} data-print-frame aria-label={ui("ui.app.handout.code.page.d0f8e8312681", "Print preview stage")}>
               <div className={`${styles.previewToolbar} no-print`}>
                 <div><strong>{printModeLabel(mode)}</strong><span>{printSizeLabels[printSize]} / {orientation}{readyToPrint ? ui("ui.app.handout.code.page.3fb0090fff7a", " / 1 page") : ""}</span></div>
-                {instrument ? <div className={styles.zoomControls} aria-label={ui("ui.app.handout.code.page.317ab210624d", "Preview zoom")}>
+                {instrument ? <details className={styles.previewZoom}>
+                  <summary aria-label={ui("ui.app.handout.code.page.317ab210624d", "Preview zoom")} title={ui("ui.app.handout.code.page.317ab210624d", "Preview zoom")}><ZoomIn size={17} /><output aria-live="polite" aria-label={ui("ui.app.handout.code.page.aeffe78362f7", "Preview scale")}>{Math.round(previewScale * 100)}%</output></summary>
+                  <div className={styles.zoomControls}>
                   <button type="button" aria-label={ui("ui.app.handout.code.page.bc7b631a689b", "Zoom out")} title={ui("ui.app.handout.code.page.bc7b631a689b", "Zoom out")} disabled={zoom <= 75} onClick={() => setZoom((current) => Math.max(75, current - 25))}><ZoomOut size={17} /></button>
                   <button type="button" aria-label={ui("ui.app.handout.code.page.3626161a4685", "Fit page")} title={ui("ui.app.handout.code.page.3626161a4685", "Fit page")} onClick={() => setZoom(100)}><Maximize size={17} /></button>
-                  <output aria-live="polite" aria-label={ui("ui.app.handout.code.page.aeffe78362f7", "Preview scale")}>{Math.round(previewScale * 100)}%</output>
                   <button type="button" aria-label={ui("ui.app.handout.code.page.0e47f09a748f", "Zoom in")} title={ui("ui.app.handout.code.page.0e47f09a748f", "Zoom in")} disabled={zoom >= 300} onClick={() => setZoom((current) => Math.min(300, current + 25))}><ZoomIn size={17} /></button>
-                </div> : null}
+                  </div>
+                </details> : null}
               </div>
 
               {instrument ? <div className={`${styles.validation} no-print`} role="status">

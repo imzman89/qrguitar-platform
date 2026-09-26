@@ -388,3 +388,9 @@ test('both pages typecheck against the actual canonical dependencies', () => {
   const errors = ts.getPreEmitDiagnostics(program).filter(item => item.category === ts.DiagnosticCategory.Error);
   assert.equal(errors.length, 0, ts.formatDiagnosticsWithColorAndContext(errors, { getCanonicalFileName: value => value, getCurrentDirectory: () => repo, getNewLine: () => '\n' }));
 });
+
+test('login: native fallback submits credentials by POST, never in the URL', async () => {
+  const f = fixture('login'); await f.flush();
+  assert.equal(f.node(node => node.type === 'form').props.method, 'post');
+  f.dispose();
+});
