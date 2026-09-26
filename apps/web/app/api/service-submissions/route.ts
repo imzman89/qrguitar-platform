@@ -9,7 +9,6 @@ import {
   cleanServiceDate,
   cleanServiceText,
   cleanServiceVisibility,
-  createReviewToken,
   hashReviewToken,
   loadProviderProfile,
   loadServiceGuitar,
@@ -84,27 +83,61 @@ async function serializeSubmissions(supabase: Supabase, rows: ServiceSubmissionR
 }
 
 async function sendOwnerReview(supabase: Supabase, submission: ServiceSubmissionRow, guitar: ServiceGuitarRow, provider: ServiceProviderProfileRow | null) {
-  const owner = await supabase.auth.admin.getUserById(submission.owner_user_id);
-  const email = owner.data.user?.email || "";
-  if (!email) {
-    const message = "Owner notification created, but the owner account has no delivery email.";
-    await supabase.from("service_submissions").update({ email_delivery_status: "failed", email_delivery_message: message, updated_at: new Date().toISOString() }).eq("id", submission.id);
-    await addActivity(supabase, submission.id, submission.provider_user_id, "email_failed", message);
-    return { ok: false, message };
+  let fresh: ServiceSubmissionRow;
+  let currentGuitar: ServiceGuitarRow;
+  let email: string;
+  try {
+    const latest = await loadSubmission(supabase, submission.id);
+    if (!latest || latest.status !== "submitted" || latest.owner_user_id !== submission.owner_user_id
+      || latest.provider_user_id !== submission.provider_user_id || latest.provider_revision !== submission.provider_revision
+      || latest.guitar_id !== guitar.id || !latest.owner_user_id || !latest.expires_at
+      || !Number.isFinite(Date.parse(latest.expires_at)) || Date.parse(latest.expires_at) <= Date.now()) {
+      return { ok: false, outcome: "not_sent", retryable: false, message: "Review email was not sent because the service request changed or expired. Refresh the request before continuing." };
+    }
+    const owner = await supabase.auth.admin.getUserById(latest.owner_user_id);
+    if (owner.error || !owner.data.user?.email) return { ok: false, outcome: "not_sent", retryable: true, message: "Review email was not sent because the owner's delivery address could not be confirmed." };
+    const latestGuitar = await loadGuitarById(supabase, latest.guitar_id);
+    if (!latestGuitar || latestGuitar.owner_id !== latest.owner_user_id || latestGuitar.admin_archived_at || latestGuitar.owner_removed_at) {
+      return { ok: false, outcome: "not_sent", retryable: false, message: "Review email was not sent because Profile ownership or availability changed. The request needs review." };
+    }
+    fresh = latest;
+    currentGuitar = latestGuitar;
+    email = owner.data.user.email;
+  } catch {
+    return { ok: false, outcome: "not_sent", retryable: true, message: "Review email was not sent because the current request and owner could not be confirmed. Please try again." };
   }
 
-  const review = createReviewToken();
-  const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-  await supabase.from("service_submission_tokens").delete().eq("submission_id", submission.id).is("consumed_at", null);
-  const tokenInsert = await supabase.from("service_submission_tokens").insert({ submission_id: submission.id, token_hash: review.hash, expires_at: expiresAt });
-  if (tokenInsert.error) return { ok: false, message: "Owner notification created, but a secure email link could not be created." };
+  // This existing review route requires the current owner's account, with or without a token.
+  // Retries never rotate previous emailed links or extend the submission's original deadline.
   const siteUrl = String(process.env.NEXT_PUBLIC_SITE_URL || "https://www.qrguitar.com").replace(/\/$/, "");
-  const reviewUrl = `${siteUrl}/service-review/${submission.id}?token=${encodeURIComponent(review.token)}`;
+  const reviewUrl = `${siteUrl}/service-review/${encodeURIComponent(fresh.id)}`;
   const providerName = provider?.public_display_name || provider?.business_name || "A service provider";
-  const result = await sendServiceReviewEmail({ to: email, profileTitle: serviceTitle(guitar), providerName, reviewUrl });
-  await supabase.from("service_submissions").update({ email_delivery_status: result.status, email_delivery_message: result.message, expires_at: expiresAt, updated_at: new Date().toISOString() }).eq("id", submission.id);
-  await addActivity(supabase, submission.id, submission.provider_user_id, result.ok ? "email_sent" : "email_failed", result.message, result.providerMessageId ? { providerMessageId: result.providerMessageId } : {});
-  return result;
+  let outcome: "accepted" | "rejected" | "unknown" = "unknown";
+  let providerMessageId: string | undefined;
+  let retryable = false;
+  try {
+    const result = await sendServiceReviewEmail({ to: email, profileTitle: serviceTitle(currentGuitar), providerName, reviewUrl }) as Awaited<ReturnType<typeof sendServiceReviewEmail>> & { outcome?: "accepted" | "rejected" | "unknown"; retryable?: boolean };
+    providerMessageId = result.providerMessageId;
+    // Legacy transport's success with a receipt is acceptance, never confirmed inbox delivery.
+    outcome = result.outcome || (result.ok && providerMessageId ? "accepted" : "unknown");
+    if (outcome === "accepted" && !providerMessageId) outcome = "unknown";
+    retryable = outcome === "rejected" && result.retryable === true;
+  } catch { /* A lost response cannot establish whether the provider accepted the email. */ }
+  const message = outcome === "accepted" ? "Review email accepted by the email provider. Inbox delivery is not yet confirmed."
+    : outcome === "rejected" ? "The email provider rejected the review email. The service request and previous review links are unchanged."
+    : "Email acceptance could not be confirmed. Check the owner's inbox before resending; the service request and previous review links are unchanged.";
+  const unrecorded = () => ({ ok: false, outcome, recorded: false, retryable: false,
+    message: outcome === "accepted" ? "The email provider accepted the review email, but its delivery record could not be confirmed. Check the request and owner's inbox before resending."
+      : "The review email outcome could not be recorded. Check the request and owner's inbox before resending; previous review links are unchanged." });
+  try {
+    const saved = await supabase.from("service_submissions").update({ email_delivery_status: outcome === "accepted" ? "sent" : "failed", email_delivery_message: message, updated_at: new Date().toISOString() })
+      .eq("id", fresh.id).eq("status", "submitted").eq("owner_user_id", fresh.owner_user_id).eq("provider_revision", fresh.provider_revision).eq("expires_at", fresh.expires_at).select("id").maybeSingle();
+    if (saved.error || !saved.data) return unrecorded();
+    const activity = await addActivity(supabase, fresh.id, fresh.provider_user_id, outcome === "accepted" ? "email_sent" : "email_failed", message,
+      { outcome, ...(providerMessageId ? { providerMessageId } : {}) });
+    if (activity.error) return unrecorded();
+  } catch { return unrecorded(); }
+  return { ok: outcome === "accepted", outcome, recorded: true, retryable, message };
 }
 
 export async function GET(request: Request) {
@@ -222,6 +255,9 @@ export async function PATCH(request: Request) {
 
     if (action === "save_draft" || action === "submit" || action === "revise") {
       if (!provider) return json({ ok: false, message: "Only the submitting provider can edit this request." }, 403);
+      if (action !== "save_draft" && (guitar.owner_id !== submission.owner_user_id || guitar.admin_archived_at || guitar.owner_removed_at)) {
+        return json({ ok: false, message: "Profile ownership or availability changed. Review the service request before submitting it." }, 409);
+      }
       if (action === "save_draft" && !["draft", "changes_requested"].includes(submission.status)) return json({ ok: false, message: "This request can no longer be edited." }, 409);
       if (action === "revise" && submission.status !== "changes_requested") return json({ ok: false, message: "This request is not awaiting a revision." }, 409);
       if (action === "submit" && !["draft", "changes_requested"].includes(submission.status)) return json({ ok: false, message: "Only a draft or requested revision can be submitted." }, 409);
@@ -259,15 +295,22 @@ export async function PATCH(request: Request) {
         },
         revisedToVersion: updated.data.provider_revision
       } : {};
-      await addActivity(supabase, id, auth.user.id, action === "save_draft" ? "draft_saved" : action === "revise" ? "revised" : "submitted", "", revisionMetadata);
+      const activity = await addActivity(supabase, id, auth.user.id, action === "save_draft" ? "draft_saved" : action === "revise" ? "revised" : "submitted", "", revisionMetadata).catch(() => ({ error: true }));
       let message = action === "save_draft" ? "Private service draft saved." : "Service work submitted for owner approval.";
+      let emailOutcome: string | undefined;
+      let emailRetryable: boolean | undefined;
       if (action !== "save_draft") {
-        await addNotification(supabase, id, submission.owner_user_id, "owner_review", `${(await loadProviderProfile(supabase, auth.user.id))?.public_display_name || "A service provider"} submitted service work for ${serviceTitle(guitar)}.`);
-        const email = await sendOwnerReview(supabase, updated.data, guitar, await loadProviderProfile(supabase, auth.user.id));
-        message = email.message;
+        const providerProfile = await loadProviderProfile(supabase, auth.user.id).catch(() => null);
+        const notification = await addNotification(supabase, id, submission.owner_user_id, "owner_review", `${providerProfile?.public_display_name || "A service provider"} submitted service work for ${serviceTitle(guitar)}.`).catch(() => ({ error: true }));
+        const email = await sendOwnerReview(supabase, updated.data, guitar, providerProfile);
+        emailOutcome = email.outcome;
+        emailRetryable = email.retryable;
+        message += ` ${email.message}`;
+        if (notification.error) message += " The in-app owner notification could not be confirmed.";
       }
+      if (activity.error) message += " The service activity entry could not be confirmed.";
       const fresh = await loadSubmission(supabase, id);
-      return json({ ok: true, submission: (await serializeSubmissions(supabase, fresh ? [fresh] : []))[0], message });
+      return json({ ok: true, committed: true, submission: (await serializeSubmissions(supabase, fresh ? [fresh] : []))[0], emailOutcome, emailRetryable, message });
     }
 
     if (action === "request_changes" || action === "decline") {
@@ -313,7 +356,7 @@ export async function PATCH(request: Request) {
       if (!provider && !admin) return json({ ok: false, message: "Only the provider or QRguitar admin can retry this email." }, 403);
       if (submission.status !== "submitted") return json({ ok: false, message: "Only a submitted request can send an owner review email." }, 409);
       const result = await sendOwnerReview(supabase, submission, guitar, await loadProviderProfile(supabase, submission.provider_user_id));
-      return json({ ok: result.ok, message: result.message }, result.ok ? 200 : 502);
+      return json({ ok: result.ok, emailOutcome: result.outcome, retryable: result.retryable, message: result.message }, result.ok ? 200 : 502);
     }
 
     if (action === "mark_read") {
