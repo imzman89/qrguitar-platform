@@ -59,3 +59,28 @@ test("content map distinguishes representative, record-required, and delivery bo
   }
 });
 
+test("claim withdrawal copy is typed, connected, and mapped to the real workflow", () => {
+  const byKey = new Map(map.surfaces.map((entry) => [entry.key, entry]));
+  const expected = new Map([
+    ["withdrawRequest", "Withdraw request"],
+    ["withdrawConfirmTitle", "Withdraw this ownership request?"],
+    ["withdrawConfirmBody", "This closes the pending request. Ownership and submitted evidence stay unchanged. A withdrawn request cannot be reopened."],
+    ["withdrawConfirmAction", "Yes, withdraw request"],
+    ["keepRequest", "Keep request"],
+    ["withdrawingRequest", "Withdrawing request..."],
+    ["withdrawSuccess", "Ownership request withdrawn."],
+    ["withdrawConflict", "This request changed before it could be withdrawn. Refresh the latest status and try again."],
+    ["withdrawFailure", "Could not withdraw this request. Refresh its status and try again."],
+    ["withdrawRefreshFailure", "The saved request status could not be loaded. Refresh before taking another action."],
+  ]);
+  for (const [suffix, defaultValue] of expected) {
+    const entry = byKey.get("ui.app.ownership.claim.page." + suffix);
+    assert.ok(entry, "Missing claim withdrawal map entry: " + suffix);
+    assert.equal(entry.defaultValue, defaultValue);
+    assert.equal(entry.editorLocation, "Content Studio / Product / Ownership Claims / Request withdrawal");
+    assert.equal(entry.binding.status, "connected-interface-call");
+    assert.deepEqual(entry.binding.sourceFiles, ["app/ownership-claim/page.tsx"]);
+    assert.equal(entry.preview.mode, "representative-route");
+    assert.equal(entry.preview.route, "/ownership-claim");
+  }
+});
