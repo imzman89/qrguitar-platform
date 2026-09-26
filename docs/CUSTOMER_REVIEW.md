@@ -22,6 +22,8 @@ Open Print Suite from the Profile or Dashboard. Choose the supported format and 
 
 For a buyer, use the existing ownership request or transfer workflow. The current owner and intended recipient have different actions. Sending a link, scanning a QR, or describing an instrument as sold does not complete a transfer. An invited transfer completes only after the authorized recipient accepts it. An ownership request is a separate reviewed process; submitting one does not change ownership.
 
+To withdraw your own pending ownership request, open Ownership Requests and choose Withdraw request on that request. Review the confirmation; Keep request leaves it unchanged. A completed withdrawal closes the request without changing the instrument's owner, permanent link, or evidence. Closed requests cannot be withdrawn. If the request changed in another session, review its refreshed status before taking another action.
+
 For service work, the provider records the work and submits it for owner review. The owner decides whether to accept it into the Profile history. Provider contributions do not automatically establish ownership or authenticity.
 
 ## Edit website wording
