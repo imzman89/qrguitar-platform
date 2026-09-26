@@ -407,7 +407,7 @@ export default function DashboardPage() {
             </div>
             <div className={styles.headerActions}>
               {collectionAccountType === "luthier" ? <Link className="button" href="/dashboard/service"><Wrench size={16} />{" "}{ui("ui.app.dashboard.page.61669a91a83b", "Open service workbench")}</Link> : <Link className="button" href="/create">{getContentValue(content, "dashboard.actions.create")}</Link>}
-              {collectionAccountType === "shop" || collectionAccountType === "builder" ? <Link className="button secondary" href="/dashboard/import"><FileSpreadsheet size={16} /> {getContentValue(content, "dashboard.actions.bulk")}</Link> : <Link className="button secondary" href={collectionAccountType === "luthier" ? "/create" : "/account?section=collection"}>{collectionAccountType === "luthier" ? ui("ui.app.dashboard.page.3880eee7e45c", "Add your own instrument") : ui("ui.app.dashboard.page.e4ecedd588e1", "Set up public collection")}</Link>}
+              {collectionAccountType === "shop" || collectionAccountType === "builder" ? <Link className="button secondary" href="/dashboard/import"><FileSpreadsheet size={16} /> {getContentValue(content, "dashboard.actions.bulk")}</Link> : <Link className="button secondary" href={collectionAccountType === "luthier" ? "/create" : "/account?section=collection"}>{collectionAccountType === "luthier" ? ui("ui.app.dashboard.page.3880eee7e45c", "Add your own instrument") : collectionHandle ? ui("ui.app.dashboard.page.managePublicCollection", "Manage public collection") : ui("ui.app.dashboard.page.e4ecedd588e1", "Set up public collection")}</Link>}
             </div>
           </div>
 

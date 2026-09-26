@@ -8,6 +8,11 @@
 .layout :global(.permanent-id) { margin: 0 0 24px; padding: 0; border: 0; border-radius: 0; background: transparent; }
 .layout :global(.permanent-id) strong { font-size: 16px; }
 .layout :global(.permanent-id) small { font-size: 12px; font-weight: 400; line-height: 1.55; }
+.identityHelp summary { min-height: 44px; padding-block: 10px; cursor: pointer; color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; }
+.identityHelp summary span { font-size: 12px; font-weight: 500; }
+.identityHelp summary strong { margin-left: 8px; color: var(--action); }
+.identityHelp summary:focus-visible { outline: 2px solid var(--action); outline-offset: 3px; }
+.identityHelp[open] small { display: block; padding-top: 4px; }
 .layout :global(.privacy-toggle) { display: flex; gap: 24px; margin-bottom: 24px; padding: 0; border: 0; background: transparent; border-radius: 0; }
 .layout :global(.privacy-toggle) > div { min-width: 0; }
 .layout :global(.privacy-toggle) strong { color: var(--text); font-size: 14px; }

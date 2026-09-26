@@ -202,8 +202,10 @@ async function accountPageUI(f, section = "collection") {
     useRef(initial) { const index = cursor++; return values[index] ||= { current: initial }; },
     useEffect(run, deps) { const index = effectCursor++; if (!previous[index] || deps.some((item, i) => item !== previous[index][i])) { previous[index] = deps; effects.push(run); } }
   };
-  const search = new URLSearchParams("section=" + section);
-  const ui = runtime({ react: hooks, "next/navigation": { useSearchParams: () => search }, "next/link": ({ children, ...props }) => React.createElement("a", props, children),
+  const search = new URLSearchParams(f.searchQuery || "section=" + section);
+  f.navigation = [];
+  const router = { push: (href, options) => f.navigation.push({ href, options }) };
+  const ui = runtime({ react: hooks, "next/navigation": { useSearchParams: () => search, useRouter: () => router }, "next/link": ({ children, ...props }) => React.createElement("a", props, children),
     "apps/web/lib/account-settings": { ...load("apps/web/lib/account-settings"), createAccountSettings: () => f.client },
     "apps/web/lib/supabase-browser": {}, "apps/web/lib/use-site-content": { useSiteContent: () => ({}) },
     "apps/web/components/Nav": { Nav: () => null }, "apps/web/components/Footer": { Footer: () => null }, "apps/web/components/PwaInstall": { PwaInstall: () => null },
@@ -220,6 +222,28 @@ function nodes(tree, match, result = []) {
   React.Children.forEach(tree.props?.children, (child) => nodes(child, match, result));
   return result;
 }
+
+test("account section controls update the route without saving or clearing drafts", async () => {
+  const f = await fixture().mount(), render = await accountPageUI(f, "overview");
+  f.edit();
+  const draft = structuredClone(f.client.getState().draft);
+  nodes(render(), node => node.type === "button" && node.props.children === "Edit details")[0].props.onClick();
+  assert.deepEqual(f.navigation.at(-1), { href: "/account?section=profile", options: { scroll: false } });
+  nodes(render(), node => node.type === "select")[0].props.onChange({ target: { value: "security" } });
+  assert.deepEqual(f.navigation.at(-1), { href: "/account?section=security", options: { scroll: false } });
+  assert.deepEqual(f.client.getState().draft, draft);
+  assert.equal(f.saved, 0);
+  f.client.dispose();
+});
+
+test("account Overview removes only the section query and repeated section clicks do not push", async () => {
+  const f = await fixture({ searchQuery: "section=collection&context=owner" }).mount(), render = await accountPageUI(f);
+  nodes(render(), node => node.type === "button" && node.props.children === "Collection page")[0].props.onClick();
+  assert.equal(f.navigation.length, 0);
+  nodes(render(), node => node.type === "button" && node.props.children === "Overview")[0].props.onClick();
+  assert.equal(f.navigation[0].href, "/account?context=owner");
+  f.client.dispose();
+});
 test("actual account page keeps saved preview and collection sign-in destination", async () => {
   const f = await fixture().mount(), render = await accountPageUI(f); f.edit();
   let html = renderToStaticMarkup(render()); assert.match(html, /href="\/collections\/a-saved"/); assert.doesNotMatch(html, /href="\/collections\/updated-link"/);

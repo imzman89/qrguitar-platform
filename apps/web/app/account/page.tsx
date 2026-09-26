@@ -9,7 +9,7 @@ import styles from "./account.module.css";
 import { PwaInstall } from "../../components/PwaInstall";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ExternalLink, LockKeyhole, LogOut, ShieldCheck, UserRound, UsersRound } from "lucide-react";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { Footer } from "../../components/Footer";
@@ -44,6 +44,7 @@ function AccountSettingsPage() {
   const ui = useUiText("app.account.page");
   const content = useSiteContent();
   const search = useSearchParams();
+  const router = useRouter();
   const controller = useRef<ReturnType<typeof createAccountSettings> | null>(null);
   const [state, setState] = useState(initialAccountSettings);
   const [activeSection, setActiveSection] = useState<AccountSection>("overview");
@@ -79,6 +80,15 @@ function AccountSettingsPage() {
     const requestedSection = search.get("section");
     setActiveSection(accountSections.some((section) => section.id === requestedSection) ? requestedSection as AccountSection : "overview");
   }, [search]);
+
+  function navigateSection(section: AccountSection) {
+    if (section === activeSection) return;
+    const query = new URLSearchParams(search.toString());
+    if (section === "overview") query.delete("section");
+    else query.set("section", section);
+    setActiveSection(section);
+    router.push(`/account${query.size ? `?${query}` : ""}`, { scroll: false });
+  }
 
   async function saveAccount() {
     await controller.current?.save();
@@ -129,14 +139,14 @@ function AccountSettingsPage() {
           </header>
 
           <div className={styles.settings}>
-            <label className={styles.mobileSectionNav}><span>{ui("ui.app.account.page.settingsSection", "Settings section")}</span><select value={activeSection} onChange={(event) => setActiveSection(event.target.value as AccountSection)}>{accountSections.map((section) => <option key={section.id} value={section.id}>{(section.label === "Overview" ? ui("ui.app.account.page.d4b1ea5708dd", "Overview") : section.label === "Public Collection" ? ui("ui.app.account.page.81d7c837c3e8", "Collection page") : section.label === "Profile & Identity" ? ui("ui.app.account.page.999fcfbc4384", "Profile & Identity") : section.label === "Security" ? ui("ui.app.account.page.8f6fb4eb7f42", "Security") : section.label === "Notifications" ? ui("ui.app.account.page.788011833a5a", "Notifications") : section.label === "Provider / Business" ? ui("ui.app.account.page.963dc63cbd9f", "Provider / Business") : section.label === "Privacy & Data" ? ui("ui.app.account.page.ade3e28bc653", "Privacy & Data") : section.label)}</option>)}</select></label>
+            <label className={styles.mobileSectionNav}><span>{ui("ui.app.account.page.settingsSection", "Settings section")}</span><select value={activeSection} onChange={(event) => navigateSection(event.target.value as AccountSection)}>{accountSections.map((section) => <option key={section.id} value={section.id}>{(section.label === "Overview" ? ui("ui.app.account.page.d4b1ea5708dd", "Overview") : section.label === "Public Collection" ? ui("ui.app.account.page.81d7c837c3e8", "Collection page") : section.label === "Profile & Identity" ? ui("ui.app.account.page.999fcfbc4384", "Profile & Identity") : section.label === "Security" ? ui("ui.app.account.page.8f6fb4eb7f42", "Security") : section.label === "Notifications" ? ui("ui.app.account.page.788011833a5a", "Notifications") : section.label === "Provider / Business" ? ui("ui.app.account.page.963dc63cbd9f", "Provider / Business") : section.label === "Privacy & Data" ? ui("ui.app.account.page.ade3e28bc653", "Privacy & Data") : section.label)}</option>)}</select></label>
             <nav className={styles.sectionNav} aria-label={ui("ui.app.account.page.baa77cb99154", "Account sections")}>
               {accountSections.map((section) => (
                 <button
                   aria-current={activeSection === section.id ? "page" : undefined}
                   className={activeSection === section.id ? styles.active : undefined}
                   key={section.id}
-                  onClick={() => setActiveSection(section.id)}
+                  onClick={() => navigateSection(section.id)}
                   type="button"
                 >
                   {(section.label === "Overview" ? ui("ui.app.account.page.d4b1ea5708dd", "Overview") : section.label === "Public Collection" ? ui("ui.app.account.page.81d7c837c3e8", "Collection page") : section.label === "Profile & Identity" ? ui("ui.app.account.page.999fcfbc4384", "Profile & Identity") : section.label === "Security" ? ui("ui.app.account.page.8f6fb4eb7f42", "Security") : section.label === "Notifications" ? ui("ui.app.account.page.788011833a5a", "Notifications") : section.label === "Provider / Business" ? ui("ui.app.account.page.963dc63cbd9f", "Provider / Business") : section.label === "Privacy & Data" ? ui("ui.app.account.page.ade3e28bc653", "Privacy & Data") : section.label)}
@@ -160,9 +170,9 @@ function AccountSettingsPage() {
                   <div><strong>{stats.privateRecords + stats.unlistedRecords}</strong><span>{ui("ui.app.account.page.658ed7b26eff", "Private or unlisted")}</span></div>
                 </div>
                 <div className={styles.overviewRows}>
-                  <div><span><b>{ui("ui.app.account.page.73949bb1bdba", "Profile details")}</b><small>{ui("ui.app.account.page.53babca0609e", "Your name and the tools you use.")}</small></span><button type="button" className="button secondary" onClick={() => setActiveSection("profile")}>{ui("ui.app.account.page.fd9c61ac500e", "Edit details")}</button></div>
-                  <div><span><b>{ui("ui.app.account.page.8ca6da5bcd1b", "Public collection")}</b><small>{publishedHref ? ui("ui.app.account.page.a5b70b30efb9", "Your saved collection is ready to share.") : ui("ui.app.account.page.e7a081e4c5a2", "Bring your public Profiles together on one page.")}</small></span><button type="button" className="button secondary" onClick={() => setActiveSection("collection")}>{publishedHref ? ui("ui.app.account.page.b751505accb1", "Manage collection") : ui("ui.app.account.page.67aa727721b2", "Set up collection")}</button></div>
-                  <div><span><b>{ui("ui.app.account.page.3386f588f0c2", "Account access")}</b><small>{ui("ui.app.account.page.9880be836d93", "Manage your password and active sign-in.")}</small></span><button type="button" className="button secondary" onClick={() => setActiveSection("security")}>{ui("ui.app.account.page.8f6fb4eb7f42", "Security")}</button></div>
+                  <div><span><b>{ui("ui.app.account.page.73949bb1bdba", "Profile details")}</b><small>{ui("ui.app.account.page.53babca0609e", "Your name and the tools you use.")}</small></span><button type="button" className="button secondary" onClick={() => navigateSection("profile")}>{ui("ui.app.account.page.fd9c61ac500e", "Edit details")}</button></div>
+                  <div><span><b>{ui("ui.app.account.page.8ca6da5bcd1b", "Public collection")}</b><small>{publishedHref ? ui("ui.app.account.page.a5b70b30efb9", "Your saved collection is ready to share.") : ui("ui.app.account.page.e7a081e4c5a2", "Bring your public Profiles together on one page.")}</small></span><button type="button" className="button secondary" onClick={() => navigateSection("collection")}>{publishedHref ? ui("ui.app.account.page.b751505accb1", "Manage collection") : ui("ui.app.account.page.67aa727721b2", "Set up collection")}</button></div>
+                  <div><span><b>{ui("ui.app.account.page.3386f588f0c2", "Account access")}</b><small>{ui("ui.app.account.page.9880be836d93", "Manage your password and active sign-in.")}</small></span><button type="button" className="button secondary" onClick={() => navigateSection("security")}>{ui("ui.app.account.page.8f6fb4eb7f42", "Security")}</button></div>
                 </div>
                 <Link className={styles.textLink} href="/dashboard">{ui("ui.app.account.page.a1464d30c916", "Open your collection")}{" "}<span aria-hidden="true">↗</span></Link>
               </section>

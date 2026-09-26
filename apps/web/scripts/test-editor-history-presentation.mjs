@@ -4,15 +4,16 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { withUiTextTestContext } from './ui-text-test-context.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
-const require=createRequire(path.join(root,'package.json')),ts=require('typescript'),React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+const require=createRequire(path.join(root,'apps/web/package.json')),ts=require('typescript'),React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
 const cache=new Map();
 function load(file){
   if(cache.has(file))return cache.get(file);
   const exports={};cache.set(file,exports);
   const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-  const localRequire=name=>{if(!name.startsWith('.'))return require(name);const base=path.resolve(path.dirname(file),name);const resolved=['.ts','.tsx'].map(ext=>base+ext).find(fs.existsSync);assert.ok(resolved,name);return load(resolved);};
+  const localRequire=withUiTextTestContext(name=>{if(!name.startsWith('.'))return require(name);const base=path.resolve(path.dirname(file),name);const resolved=['.ts','.tsx'].map(ext=>base+ext).find(fs.existsSync);assert.ok(resolved,name);return load(resolved);});
   new Function('require','exports',code)(localRequire,exports);return exports;
 }
 const {EditorTimelineEntry}=load(path.join(root,'apps/web/components/EditorTimelineEntry.tsx'));

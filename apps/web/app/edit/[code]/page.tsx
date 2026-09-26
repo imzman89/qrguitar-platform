@@ -1090,10 +1090,9 @@ export default function EditInstrumentPage() {
   return ready && original && !forbidden ? (
     <>
       <Nav />
-      <main className={`${styles.page} section create-page`}>
+      <main className={`${styles.page} section create-page`} aria-label={ui("ui.app.edit.code.page.fec2ac0f4cf1", "Edit Profile")}>
         <div className={`${styles.layout} shell create-layout`}>
           <div>
-            <div className="eyebrow">{ui("ui.app.edit.code.page.fec2ac0f4cf1", "Edit Profile")}</div>
             <h1>{getContentValue(content, "edit.hero.headline")}</h1>
             <p>{getContentValue(content, "edit.hero.body")}</p>
             {original.safetyStatus === "lost" || original.safetyStatus === "stolen" ? (
@@ -1103,11 +1102,13 @@ export default function EditInstrumentPage() {
                 <a href="#privacy-safety">{ui("ui.app.edit.code.page.48d5a8281410", "Review safety status")}</a>
               </div>
             ) : null}
-              <div className="permanent-id">
-                <span>{ui("ui.app.edit.code.page.a6c8f92c19f4", "QRguitar ID")}</span>
-                <strong>{qrCodeFromSerial(form.serial) || original?.qrCode || code}</strong>
+              <details className={`${styles.identityHelp} permanent-id`}>
+                <summary>
+                  <span>{ui("ui.app.edit.code.page.a6c8f92c19f4", "QRguitar ID")}</span>{" "}
+                  <strong>{qrCodeFromSerial(form.serial) || original?.qrCode || code}</strong>
+                </summary>
                 <small>{ui("ui.app.edit.code.page.379e7e78d21e", "When a Serial Number exists, the QRguitar ID uses the format QRG-SERIAL. Previous QR links remain active after approved corrections.")}</small>
-              </div>
+              </details>
               <div className="privacy-toggle" aria-label={ui("ui.app.edit.code.page.1c47f10cc99e", "Profile visibility")}>
                 <div>
                   <strong>
