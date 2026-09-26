@@ -85,7 +85,7 @@ export function StartConversation({ handle, profileCode }: { handle: string; pro
         }
         router.replace(`/messages/${encodeURIComponent(payload.conversationId)}`);
       } catch {
-        if (active && current) setError("The conversation could not be opened. Check your connection and try again.");
+        if (active && current) setError("The conversation could not be opened.");
       } finally { clearTimeout(timer); }
     })();
 
@@ -101,7 +101,7 @@ export function StartConversation({ handle, profileCode }: { handle: string; pro
   return <div className={styles.state}>
     {error ? <MessageCircle /> : <LoaderCircle className={styles.spin} />}
     <h1>{error ? ui("ui.components.StartConversation.6117bce566e1", "Conversation unavailable") : ui("ui.components.StartConversation.2a8b850dadd9", "Opening conversation")}</h1>
-    <p role="status">{error || ui("ui.components.StartConversation.33b411810f73", "Creating a private QRguitar conversation.")}</p>
-    {error ? <><button className="button" type="button" onClick={() => setAttempt(value => value + 1)}>{ui("ui.components.StartConversation.retryConversation", "Try again")}</button><Link className="text-link" href={`/collections/${encodeURIComponent(handle)}`}>{ui("ui.components.StartConversation.30f0846e225a", "Return to member page")}</Link></> : null}
+    <p role="status">{error === "The conversation could not be opened." ? ui("ui.components.StartConversation.c2ad2f8a287b", "The conversation could not be opened.") : error || ui("ui.components.StartConversation.33b411810f73", "Creating a private QRguitar conversation.")}</p>
+    {error ? <><button className="button" type="button" onClick={() => setAttempt(value => value + 1)}>{ui("ui.components.StartConversation.retryConversation", "Try again")}</button><Link className="text-link" href={`/collections/${encodeURIComponent(handle)}`}>{ui("ui.components.StartConversation.30f0846e225a", "Return to member page")}</Link><Link className="text-link" href="/messages">{ui("ui.components.StartConversation.7ff385329889", "Open Messages")}</Link></> : null}
   </div>;
 }
