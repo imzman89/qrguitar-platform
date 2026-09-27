@@ -50,7 +50,22 @@ export function createMemoryDatabase(tables, hooks = {}) {
     tables, calls,
     from: (table) => new Query(table),
     auth: { admin: { updateUserById: async () => ({ error: null }) } },
-    rpc: async () => { throw new Error("Unexpected RPC in read-only local fixture."); }
+    rpc(name, args) {
+      let signal, pending;
+      const query = {
+        abortSignal(value) { signal = value; return query; },
+        then(resolve, reject) {
+          pending ||= Promise.resolve().then(() => {
+            signal?.throwIfAborted();
+            calls.push({ operation: "rpc", name, args: structuredClone(args), signal });
+            if (!hooks.rpc) throw new Error("Unexpected RPC in read-only local fixture.");
+            return hooks.rpc(name, args, signal);
+          });
+          return pending.then(resolve, reject);
+        }
+      };
+      return query;
+    }
   };
 }
 
@@ -78,7 +93,13 @@ export function loadRoutes(repo, database, { user = null, overlay = null, afterA
     const module = { exports: {} };
     cache.set(relative, module);
     const require = (specifier) => {
-      if (Object.prototype.hasOwnProperty.call(modules, specifier)) return modules[specifier];
+      if (Object.prototype.hasOwnProperty.call(modules, specifier)) {
+        const mock = modules[specifier];
+        // Default-shaped overrides are module namespaces, not CommonJS values
+        // for TypeScript's __importDefault helper to wrap a second time.
+        return mock && typeof mock === "object" && Object.prototype.hasOwnProperty.call(mock, "default")
+          && !Object.prototype.hasOwnProperty.call(mock, "__esModule") ? { ...mock, __esModule: true } : mock;
+      }
       if (specifier === "next/server") return { NextResponse: Response };
       if (specifier === "next/cache") return { revalidatePath() {}, unstable_noStore() {} };
       if (!specifier.startsWith(".")) return nodeRequire(specifier);
@@ -86,7 +107,7 @@ export function loadRoutes(repo, database, { user = null, overlay = null, afterA
       return load(target + ".ts");
     };
     const fn = vm.runInNewContext("(function(require,module,exports){\n" + code + "\n})", {
-      URL, Request, Response, Buffer, File, FormData, TextDecoder, setTimeout, clearTimeout, console,
+      URL, Request, Response, Buffer, File, FormData, TextDecoder, AbortSignal, setTimeout, clearTimeout, console,
       process: { env: {} }
     }, { filename: source });
     fn(require, module, module.exports);
