@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import {createRequire} from 'node:module';
+import {fileURLToPath} from 'node:url';
+import test from 'node:test';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),require=createRequire(import.meta.url),ts=require('typescript');
+function load(file,imports={}){const exports={};new Function('exports','require',ts.transpileModule(fs.readFileSync(path.join(root,file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(exports,name=>{if(name in imports)return imports[name];throw Error('Unexpected import '+name)});return exports;}
+const registry=load('lib/content-registry.ts',{'./ui-text-registry':{uiTextEntries:[]},'./ui-text-protection':{protectedUiTextKeys:new Set()}});
+const renderer=load('lib/transactional-email-renderer.ts');
+const {createActionRequiredEmailSender}=load('lib/action-required-email-delivery.ts',{'./content-registry':registry,'./transactional-email-renderer':renderer});
+const id='11111111-1111-4111-8111-111111111111';
+const input=(event='claim.ownerReview')=>({event,to:'synthetic@example.invalid',profileTitle:'Synthetic <instrument>',actionUrl:event==='service.revisionRequested'?'https://www.qrguitar.com/service-work/QRG-SYNTH?submission='+id:'https://www.qrguitar.com/ownership-claim?claim='+id,idempotencyKey:id});
+const accepted={ok:true,status:'sent',outcome:'accepted',message:'Provider receipt',providerMessageId:'synthetic-receipt'};
+function harness(overrides={}){const calls=[];let loads=0;const send=createActionRequiredEmailSender({loadContent:async()=>{loads++;return {}},deliver:async(...args)=>{calls.push(args);return accepted},...overrides});return {send,calls,loads:()=>loads};}
+const signal=()=>new AbortController().signal;
+test('disabled sender never reads content or contacts transport',async()=>{const h=harness();assert.equal((await h.send(input(),signal())).outcome,'rejected');assert.equal(h.loads(),0);assert.equal(h.calls.length,0)});
+test('three enabled families render registered published copy and deliver exactly once',async()=>{for(const event of ['claim.ownerReview','claim.moreInfo','service.revisionRequested']){const h=harness({enabled:true,loadContent:async()=>({['email.'+event+'.heading']:'Saved wording for {{profile_title}}'})});const r=await h.send(input(event),signal());assert.equal(r,accepted);assert.equal(h.calls.length,1);const [to,doc,options]=h.calls[0];assert.equal(to,'synthetic@example.invalid');assert.match(doc.htmlContent,/Saved wording for Synthetic &lt;instrument&gt;/);assert.match(doc.textContent,/Saved wording for Synthetic <instrument>/);assert.equal(options.idempotencyKey,id);assert.doesNotMatch(doc.htmlContent,/undefined|provider_name/);}});
+test('invalid destinations and unavailable private context are rejected before transport',async()=>{for(const overrides of [{actionUrl:'https://evil.invalid/ownership-claim?claim='+id},{actionUrl:'https://www.qrguitar.com/ownership-claim?claim='+id+'&token=secret'},{idempotencyKey:'wrong'}]){const h=harness({enabled:true});assert.equal((await h.send({...input(),...overrides},signal())).outcome,'rejected');assert.equal(h.calls.length,0);}const h=harness({enabled:true,loadContent:async()=>({'email.service.revisionRequested.body':'{{provider_name}} needs changes.'})});assert.equal((await h.send(input('service.revisionRequested'),signal())).outcome,'rejected');assert.equal(h.calls.length,0)});
+test('failed CMS read and abort after loading are definite no-send',async()=>{const h=harness({enabled:true,loadContent:async()=>{throw Error('read failed')}});assert.equal((await h.send(input(),signal())).retryable,true);assert.equal(h.calls.length,0);const c=new AbortController();const aborted=harness({enabled:true,loadContent:async()=>{c.abort();return {}}});assert.equal((await aborted.send(input(),c.signal)).outcome,'rejected');assert.equal(aborted.calls.length,0)});
+test('unknown transport result is never retried and acceptance is not invented',async()=>{let calls=0;const h=harness({enabled:true,deliver:async()=>{calls++;throw Error('lost response')}});const r=await h.send(input(),signal());assert.equal(r.outcome,'unknown');assert.equal(r.retryable,false);assert.equal(calls,1)});
