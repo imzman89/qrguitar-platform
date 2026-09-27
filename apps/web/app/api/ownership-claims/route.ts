@@ -34,6 +34,8 @@ type ClaimRow = {
   expires_at: string | null;
   decided_at: string | null;
   decided_by?: string | null;
+  action_email_completed?: boolean;
+  completion_expected_evidence?: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -133,7 +135,14 @@ function safeClaim(
     claimType: claim.claim_type,
     status: claim.status,
     canWithdraw: Boolean(viewerId) && claim.claimant_user_id === viewerId && ["awaiting_claimant", "awaiting_owner", "admin_review"].includes(claim.status),
-    canReview: Boolean(viewerId) && claim.current_owner_id === viewerId && guitar?.owner_id === viewerId
+    ...(typeof claim.action_email_completed === "boolean" ? { submissionComplete: claim.action_email_completed } : {}),
+    canCompleteSubmission: Boolean(viewerId) && claim.claimant_user_id === viewerId && claim.action_email_completed === false
+      && Number.isInteger(claim.completion_expected_evidence) && Number(claim.completion_expected_evidence) >= 1
+      && Number(claim.completion_expected_evidence) <= MAX_EVIDENCE_FILES && evidenceCount === claim.completion_expected_evidence
+      && ["awaiting_owner", "admin_review"].includes(claim.status) && Boolean(guitar)
+      && guitar?.owner_id === claim.current_owner_id && !guitar?.admin_archived_at && !guitar?.owner_removed_at
+      && (!claim.expires_at || Date.parse(claim.expires_at) > Date.now()),
+    canReview: !(claim.completion_expected_evidence && claim.action_email_completed !== true) && Boolean(viewerId) && claim.current_owner_id === viewerId && guitar?.owner_id === viewerId
       && claim.status === "awaiting_owner" && (!claim.expires_at || Date.parse(claim.expires_at) > Date.now())
       && !guitar.admin_archived_at && !guitar.owner_removed_at,
     canSubmitEvidence: Boolean(viewerId) && claim.claimant_user_id === viewerId && claim.status === "awaiting_claimant"
@@ -269,6 +278,7 @@ export async function POST(request: Request) {
     if (evidenceError) return json({ ok: false, message: evidenceError }, 400);
     const claimInsert = await supabase.from("ownership_claims").insert({
       guitar_id: guitar.id,
+      completion_expected_evidence: evidence.length,
       claim_type: claimType,
       status: guitar.owner_id ? "awaiting_owner" : "admin_review",
       current_owner_id: guitar.owner_id,
@@ -297,23 +307,28 @@ export async function POST(request: Request) {
         });
         if (evidenceInsert.error) throw evidenceInsert.error;
       }
-    } catch (error) {
-      if (uploadedPaths.length) await supabase.storage.from(EVIDENCE_BUCKET).remove(uploadedPaths);
-      await supabase.from("ownership_claims").delete().eq("id", claim.id);
-      throw error;
+    } catch {
+      // A lost final evidence reply can overlap explicit recovery. Never remove storage before a locked cleanup receipt.
+      try {
+        const cleanup = await supabase.rpc("discard_incomplete_claim_submission", { p_claim_id: claim.id, p_claimant_id: auth.user.id });
+        const receipt = cleanup.data as { ok?: boolean; claim_id?: string; deleted?: boolean } | null;
+        if (!cleanup.error && receipt?.ok === true && receipt.claim_id === claim.id && receipt.deleted === true) {
+          if (uploadedPaths.length) await supabase.storage.from(EVIDENCE_BUCKET).remove(uploadedPaths);
+          return json({ ok: false, message: "The evidence upload failed. Please choose your files and try again." }, 503);
+        }
+      } catch { /* An uncertain cleanup must not delete storage that a completed request may use. */ }
+      return json({ ok: false, uncertain: true, claimId: claim.id, message: "The upload outcome could not be confirmed. Refresh your requests before trying again; a saved request may be ready to finish submitting." }, 503);
     }
 
-    const completed = await supabase.from("ownership_claim_events").insert({
-      claim_id: claim.id,
-      actor_user_id: auth.user.id,
-      action: "submitted",
-      note: "Ownership request submitted with private evidence.",
-      metadata: { evidence_count: evidence.length, claim_type: claimType, possession_challenge: claimType === "legacy_review" ? challengeCode : null }
-    });
+    try {
+      const completed = await supabase.rpc("complete_ownership_claim_submission", { p_claim_id: claim.id, p_claimant_id: auth.user.id });
+      const receipt = completed.data as { ok?: boolean; claim_id?: string; submission_complete?: boolean } | null;
+      if (completed.error || receipt?.ok !== true || receipt.claim_id !== claim.id || receipt.submission_complete !== true) throw new Error("Completion unconfirmed");
+    } catch {
+      return json({ ok: false, committed: true, claimId: claim.id, message: "Your request and evidence were saved, but submission could not be confirmed. Refresh your requests and choose Finish submitting; do not upload the files again." }, 503);
+    }
 
-    if (completed.error) return json({ ok: false, committed: true, claimId: claim.id, message: "Your request and evidence were saved, but completion could not be confirmed. Refresh your requests before trying again." }, 503);
-
-    return json({ ok: true, message: guitar.owner_id ? "Ownership request sent to the current owner for review." : "Ownership request sent for QRguitar review.", claim: safeClaim(claim, guitar, evidence.length, [], false, auth.user.id) }, 201);
+    return json({ ok: true, message: guitar.owner_id ? "Ownership request sent to the current owner for review." : "Ownership request sent for QRguitar review.", claim: safeClaim({ ...claim, action_email_completed: true }, guitar, evidence.length, [], false, auth.user.id) }, 201);
   } catch (error) {
     return json({ ok: false, message: error instanceof Error ? error.message : "Could not create the ownership request." }, 500);
   }
@@ -328,17 +343,32 @@ export async function PATCH(request: Request) {
 
   const body = await request.json().catch(() => ({})) as {
     id?: string;
-    action?: "cancel" | "approve" | "deny" | "request_information" | "expire" | "resubmit";
+    action?: "cancel" | "approve" | "deny" | "request_information" | "expire" | "resubmit" | "complete_submission";
     note?: string;
     evidence?: EvidenceInput[];
   };
   const id = cleanText(body.id, 80);
   const action = body.action;
-  if (!id || !action || !["cancel", "approve", "deny", "request_information", "expire", "resubmit"].includes(action)) return json({ ok: false, message: "A valid ownership request action is required." }, 400);
+  if (!id || !action || !["cancel", "approve", "deny", "request_information", "expire", "resubmit", "complete_submission"].includes(action)) return json({ ok: false, message: "A valid ownership request action is required." }, 400);
   const claimResult = await supabase.from("ownership_claims").select("*").eq("id", id).maybeSingle<ClaimRow>();
   const claim = claimResult.data;
   if (claimResult.error) return json({ ok: false, message: "Ownership request lookup is temporarily unavailable. Please retry." }, 503);
   if (!claim) return json({ ok: false, message: "Ownership request not found." }, 404);
+  if (action === "complete_submission") {
+    if (claim.claimant_user_id !== auth.user.id) return json({ ok: false, message: "Only the claimant can finish submitting this request." }, 403);
+    // The RPC rechecks locked authority and persisted evidence. No upload, new claim, or direct-update fallback.
+    try {
+      const result = await supabase.rpc("complete_ownership_claim_submission", { p_claim_id: id, p_claimant_id: auth.user.id });
+      const receipt = result.data as { ok?: boolean; claim_id?: string; submission_complete?: boolean } | null;
+      if (result.error || receipt?.ok !== true || receipt.claim_id !== id || receipt.submission_complete !== true) {
+        return json({ ok: false, uncertain: true, message: "Submission could not be confirmed. Your saved evidence is unchanged. Refresh this request before retrying." }, 503);
+      }
+      return json({ ok: true, submissionComplete: true, message: "Your saved request is ready for review. This does not confirm email delivery." });
+    } catch {
+      return json({ ok: false, uncertain: true, message: "Submission could not be confirmed. Refresh this request; do not upload the evidence again." }, 503);
+    }
+  }
+  if (action === "approve" && claim.completion_expected_evidence && claim.action_email_completed !== true) return json({ ok: false, message: "The claimant must finish submitting this request before it can be approved." }, 409);
   const ownDecisionReplay = claim.decided_by === auth.user.id && ((action === "approve" && claim.status === "approved") || (action === "deny" && claim.status === "denied"));
   if (!ownDecisionReplay && !["awaiting_claimant", "awaiting_owner", "admin_review"].includes(claim.status)) return json({ ok: false, message: "This ownership request is already closed." }, 409);
 

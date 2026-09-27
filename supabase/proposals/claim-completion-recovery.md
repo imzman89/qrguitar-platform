@@ -1,0 +1,13 @@
+# Claim submission completion recovery — proposal only
+
+Dependency order: service-email-outbox.sql, action-required-email.sql, claim-completion-recovery.sql. No activation, historical backfill, provider call, scheduled task or migration runner. Production schema changes remain unauthorized. New API requires this schema before deployment, with no direct-update fallback.
+
+New submissions persist the original evidence count before uploading. The authenticated claimant can explicitly finish that same saved request. Atomic completion locks Profile then claim, verifies current ownership, active claimant, pending deletion, expiry, state and exact evidence count, then inserts one submitted event. Existing triggers persist completion and capture the disabled queue intent atomically. Replay returns the existing receipt without a duplicate event, intent or ownership change. Unknown legacy evidence scope is not inferred or backfilled.
+
+GET remains read-only. Capability canCompleteSubmission is claimant-specific; submissionComplete is returned only when known. Incomplete new claims cannot be approved by either API or the actual approval RPC. A lost reply stays unconfirmed until authoritative reload. Submission success never implies email delivery.
+
+Upload cleanup is serialized with completion. discard_incomplete_claim_submission locks Profile then claim, rejects foreign actors, preserves completed/submitted/fully evidenced requests, and deletes only definitely partial requests. Storage removal follows only an exact deleted:true receipt. Lost/mismatched replies leave files alone. This can leave orphaned private upload objects after a lost cleanup reply; broad storage deletion or production repair is not authorized.
+
+Focused recovery DB21/21 and API88/88 pass, independently rerun by Audit. DB tests use full repository schema and three proposals in disposable PGlite; API tests load the real route with mocked Auth/Storage/transport. This is not hydrated browser or native simultaneous transaction acceptance. Prior native7 at54d4104 predates these new RPCs and must not be relabeled as their concurrency proof.
+
+Remaining: integrate claimant UI and reconcile-GET proof; native completion/discard overlap; authenticated integration; schema authorization and cutover. The recovery feature does not complete every outcome email, activate delivery, or prove external inbox behavior. No production data or CMS changes.

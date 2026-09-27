@@ -33,7 +33,7 @@ function fixture({ user = owner, adminSource = "none", hooks = {}, fresh = false
     remove: async (names) => { removals.push(...names); return { error: null }; },
     createSignedUrl: signer || (async (name) => ({ data: { signedUrl: "https://storage.example.invalid/" + name }, error: null }))
   }) };
-  db.rpc = async (name, args) => { rpcCalls.push({ name, args }); return rpc ? rpc(name, args) : { data: { ok: true, claim_id: args.p_claim_id }, error: null }; };
+  db.rpc = async (name, args) => { rpcCalls.push({ name, args }); return rpc ? rpc(name, args) : { data: { ok: true, claim_id: args.p_claim_id, ...(name === "complete_ownership_claim_submission" ? { submission_complete: true } : {}) }, error: null }; };
   const route = loadRoutes(repo, db, { user, modules: { "apps/web/lib/admin-auth.ts": {
     assertAccountCanWrite: async () => ({ ok: true }),
     getAdminContext: async () => ({ ok: adminSource !== "none", accessSource: adminSource })
@@ -75,7 +75,7 @@ for(const action of ['deny','resubmit'])test(`stale owner blocks ${action} befor
 });
 
 test('failed post-evidence completion reports saved but unconfirmed, preserving claim/evidence',async()=>{
- const f=fixture({user:claimant,fresh:true,hooks:{before(query){if(query.table==='ownership_claim_events'&&query.operation==='insert')return {data:null,error:{message:'Receipt unavailable'}};}}});
+ const f=fixture({user:claimant,fresh:true,rpc:async()=>({data:null,error:{message:'Receipt unavailable'}})});
  const response=await f.route.POST(request('POST',claimBody()));assert.equal(response.status,503);assert.equal((await response.json()).committed,true);assert.equal(f.tables.ownership_claims.length,1);assert.equal(f.tables.ownership_claim_evidence.length,1);assert.equal(f.removals.length,0);
 });
 
@@ -200,4 +200,62 @@ for (const result of [null, {}, { ok: true, claim_id: "other" }]) test(`missing 
 for (const failure of ["throw", "transport-error"]) test(`approval ${failure} returns unconfirmed state for safe recovery`, async () => {
   const f = fixture({ rpc: async () => { if (failure === "throw") throw new Error("Reply lost after commit"); return { data: null, error: { message: "fetch failed" } }; } });
   const response = await f.route.PATCH(request("PATCH", { id: "claim-one", action: "approve" })); assert.equal(response.status, 503); assert.equal((await response.json()).uncertain, true);
+});
+
+for(const actor of ['owner','admin','stranger']) test('completion recovery refuses '+actor+' without RPC or files',async()=>{
+ const f=fixture({user:actor==='stranger'?{id:'stranger'}:owner,adminSource:actor==='admin'?'role':'none'});
+ assert.equal((await f.route.PATCH(request('PATCH',{id:'claim-one',action:'complete_submission',p_claimant_id:claimant.id}))).status,403);
+ assert.equal(f.rpcCalls.length,0);assert.equal(f.uploads.length,0);assert.equal(f.writes().length,0);
+});
+test('completion uses authenticated claimant and checks exact persisted RPC receipt',async()=>{
+ const f=fixture({user:claimant});const r=await f.route.PATCH(request('PATCH',{id:'claim-one',action:'complete_submission',p_claimant_id:'forged'}));
+ assert.equal(r.status,200);assert.equal((await r.json()).submissionComplete,true);
+ assert.deepEqual(JSON.parse(JSON.stringify(f.rpcCalls[0])),{name:'complete_ownership_claim_submission',args:{p_claim_id:'claim-one',p_claimant_id:claimant.id}});
+ assert.equal(f.uploads.length,0);assert.equal(f.removals.length,0);assert.equal(f.writes().length,0);
+});
+for(const result of [null,{}, {ok:true,claim_id:'wrong',submission_complete:true},{ok:true,claim_id:'claim-one',submission_complete:false}])test('completion rejects unconfirmed receipt '+JSON.stringify(result),async()=>{
+ const f=fixture({user:claimant,rpc:async()=>({data:result,error:null})});const r=await f.route.PATCH(request('PATCH',{id:'claim-one',action:'complete_submission'}));assert.equal(r.status,503);assert.equal((await r.json()).uncertain,true);assert.equal(f.writes().length,0);assert.equal(f.removals.length,0);
+});
+for(const mode of ['missing','throw']) test('completion '+mode+' never falls back or destroys evidence',async()=>{
+ const f=fixture({user:claimant,rpc:async()=>{if(mode==='throw')throw Error('lost reply');return{data:null,error:{code:'PGRST202'}};}});
+ assert.equal((await f.route.PATCH(request('PATCH',{id:'claim-one',action:'complete_submission'}))).status,503);assert.equal(f.writes().length,0);assert.equal(f.removals.length,0);
+});
+test('GET recovery capability requires exact known evidence scope and current authority without writes',async()=>{
+ const f=fixture({user:claimant});const c=f.tables.ownership_claims[0];
+ Object.assign(c,{action_email_completed:false,completion_expected_evidence:1});
+ const read=async()=> (await (await f.route.GET(request())).json()).claims[0];
+ assert.equal((await read()).canCompleteSubmission,true);assert.equal((await read()).submissionComplete,false);
+ c.completion_expected_evidence=2;assert.equal((await read()).canCompleteSubmission,false);
+ c.completion_expected_evidence=null;assert.equal((await read()).canCompleteSubmission,false);
+ c.completion_expected_evidence=1;c.action_email_completed=true;assert.equal((await read()).canCompleteSubmission,false);
+ c.action_email_completed=false;f.tables.guitars[0].owner_id='changed';assert.equal((await read()).canCompleteSubmission,false);
+ assert.equal(f.writes().length,0);assert.equal(f.rpcCalls.length,0);
+});
+test('incomplete new claim cannot be approved or presented as review-ready',async()=>{
+ const f=fixture();Object.assign(f.tables.ownership_claims[0],{action_email_completed:false,completion_expected_evidence:1});
+ assert.equal((await (await f.route.GET(request())).json()).claims[0].canReview,false);
+ assert.equal((await f.route.PATCH(request('PATCH',{id:'claim-one',action:'approve'}))).status,409);assert.equal(f.rpcCalls.length,0);
+});
+test('POST saves the intended file count before uploading and handles lost completion response without deleting',async()=>{
+ const f=fixture({user:claimant,fresh:true,rpc:async()=>{throw Error('lost completion response');}});
+ const r=await f.route.POST(request('POST',claimBody([evidence(),evidence()])));const body=await r.json();
+ assert.equal(r.status,503);assert.equal(body.committed,true);assert.equal(body.claimId,f.tables.ownership_claims[0].id);
+ assert.equal(f.tables.ownership_claims[0].completion_expected_evidence,2);assert.equal(f.tables.ownership_claim_evidence.length,2);assert.equal(f.removals.length,0);
+});
+
+for(const recovered of [false,true])test('lost final evidence response preserves fully saved request; recovered='+recovered,async()=>{
+ let f;f=fixture({user:claimant,fresh:true,hooks:{after(query){if(query.table==='ownership_claim_evidence'&&query.operation==='insert'){
+ if(recovered)f.tables.ownership_claims[0].action_email_completed=true;
+ throw Error('Final evidence committed but reply lost');
+ }}},rpc:async(name,args)=>{assert.equal(name,'discard_incomplete_claim_submission');return{data:{ok:true,claim_id:args.p_claim_id,deleted:false},error:null};}});
+ const r=await f.route.POST(request('POST',claimBody()));assert.equal(r.status,503);assert.equal((await r.json()).uncertain,true);
+ assert.equal(f.tables.ownership_claims.length,1);assert.equal(f.tables.ownership_claim_evidence.length,1);assert.equal(f.removals.length,0);
+ assert.equal(f.writes().some(c=>c.operation==='delete'),false);
+});
+for(const cleanup of ['deleted','lost','mismatch'])test('partial upload storage cleanup requires exact locked receipt '+cleanup,async()=>{
+ let f;f=fixture({user:claimant,fresh:true,hooks:{before(query){if(query.table==='ownership_claim_evidence'&&query.operation==='insert')return{data:null,error:{message:'Evidence row rejected'}};}},rpc:async(name,args)=>{
+ assert.equal(name,'discard_incomplete_claim_submission');assert.equal(f.removals.length,0);
+ if(cleanup==='lost')throw Error('cleanup response lost');
+ return{data:{ok:true,claim_id:cleanup==='mismatch'?'wrong':args.p_claim_id,deleted:true},error:null};}});
+ const r=await f.route.POST(request('POST',claimBody()));assert.equal(r.status,503);assert.equal(f.removals.length,cleanup==='deleted'?1:0);
 });
