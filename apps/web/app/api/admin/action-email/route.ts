@@ -55,10 +55,19 @@ async function handle(request: Request, write: boolean) {
     if (process.env.QRGUITAR_ACTION_EMAIL_OPERATOR_ENABLED !== "true") {
       return json({ ok: false, code: "disabled", message: "Action-email operator controls are not enabled." });
     }
-    const deleting = await database.from("account_deletion_requests").select("id")
-      .eq("actor_id", auth.user.id).eq("status", "requested").limit(1).abortSignal(AbortSignal.timeout(5000)).maybeSingle();
-    if (deleting.error) return unavailable();
-    if (deleting.data) return json({ ok: false, code: "forbidden", message: "Account deletion is pending. Delivery review is unavailable." }, 403);
+    // Privacy tables prohibit direct reads, including by service_role. Use the
+    // existing actor-scoped reader without exposing its private DTO to callers.
+    const deleting = await database.rpc("read_account_deletion_requests", {
+      p_actor_id: auth.user.id, p_request_id: null
+    }).abortSignal(AbortSignal.timeout(5000));
+    const deletion = deleting.data;
+    if (deleting.error || !deletion || typeof deletion !== "object" || Array.isArray(deletion)
+      || deletion.ok !== true || !Object.prototype.hasOwnProperty.call(deletion, "activeRequest")) return unavailable();
+    if (deletion.activeRequest !== null) {
+      if (!deletion.activeRequest || typeof deletion.activeRequest !== "object" || Array.isArray(deletion.activeRequest)
+        || deletion.activeRequest.status !== "requested") return unavailable();
+      return json({ ok: false, code: "forbidden", message: "Account deletion is pending. Delivery review is unavailable." }, 403);
+    }
     const operator = createActionEmailOperator({ enabled: true,
       authorize: async () => ({ actorId: auth.user!.id, envAdmin: auth.accessSource === "env" }),
       database: { rpc: async (name, args, signal) => database.rpc(name, args).abortSignal(signal) }
