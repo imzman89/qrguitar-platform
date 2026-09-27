@@ -21,3 +21,7 @@ for(const event of families){
 }
 test('cancellation can reach the existing authenticated owner review while approved/declined cannot',async()=>{for(const event of ['service.cancelled','service.approved','service.declined']){const f=fixture();assert.equal((await f.send({...input(event),actionUrl:ownerUrl},signal())).outcome,event==='service.cancelled'?'accepted':'rejected');}});
 test('invalid or duplicate status identifiers fail before transport',async()=>{for(const actionUrl of [ownerUrl+'/',ownerUrl+'?token=x',transferUrl+'?id='+id,serviceUrl+'&submission='+id,serviceUrl.replace(id,'bad'),transferUrl.replace(id,'bad')]){const event=actionUrl.includes('/transfer/')?'ownership.transferAccepted':'service.cancelled';const f=fixture();assert.equal((await f.send({...input(event),actionUrl},signal())).outcome,'rejected');assert.equal(f.calls.length,0);}});
+
+test('saved destination variables identify status screens, never manufacture Profile or participant details',async()=>{
+ for(const event of families){const variable=event.startsWith('service.')?'review_url':'claim_url';const f=fixture({loadContent:async()=>({['email.'+event+'.body']:'Saved status link {{'+variable+'}}.'})});assert.equal((await f.send(input(event),signal())).outcome,'accepted');assert.ok(f.calls[0][1].textContent.includes('Saved status link '+input(event).actionUrl));}
+});
