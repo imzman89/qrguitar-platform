@@ -1,0 +1,59 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import ts from 'typescript';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url),root=path.resolve(import.meta.dirname,'..');
+function load(file,mocks={}){const js=ts.transpileModule(fs.readFileSync(path.join(root,file),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,m={exports:{}};new Function('module','exports','require',js)(m,m.exports,name=>mocks[name]??require(name));return m.exports;}
+const {createActionEmailOperator}=load('lib/action-email-operator.ts');
+const actor='10000000-0000-4000-8000-000000000001',id='20000000-0000-4000-8000-000000000002',claim='30000000-0000-4000-8000-000000000003';
+const time='2026-09-27T01:10:00.123456+00:00';
+const item=()=>({id,event:'claim.ownerReview',state:'unknown',attempts:1,claimId:claim,submissionId:null,createdAt:time,updatedAt:time,nextAttemptAt:time,code:'provider_acceptance_unknown',canRetry:false,canReconcile:true});
+const page=()=>({captureEnabled:false,dispatchEnabled:false,queued:0,unknown:1,failed:0,accepted:0,inFlight:0,suppressed:0,total:1,offset:0,limit:50,oldestPendingAt:null,items:[item()]});
+let auth,dbCreates,calls,deleted,reply,authCalls,profile;const oldFlag=process.env.QRGUITAR_ACTION_EMAIL_OPERATOR_ENABLED;
+const database={from(table){assert.ok(['profiles','account_deletion_requests'].includes(table));const query={select(){return query;},eq(key,value){if(key==='actor_id')assert.equal(value,actor);return query;},limit(){return query;},maybeSingle(){return Promise.resolve(table==='profiles'?profile:deleted);},abortSignal(signal){assert.ok(signal instanceof AbortSignal);return query;}};return query;},rpc(name,args){calls.push({name,args});return{abortSignal(signal){assert.ok(signal instanceof AbortSignal);return reply(name,args,signal);}};}};
+const route=load('app/api/admin/action-email/route.ts',{'../../../../lib/admin-auth':{getAdminContext:async()=>{authCalls++;if(auth instanceof Error)throw auth;return auth;}},'../../../../lib/supabase-server':{createServerSupabaseClient:()=>{dbCreates++;return database;}},'../../../../lib/action-email-operator':{createActionEmailOperator}});
+function reset(){process.env.QRGUITAR_ACTION_EMAIL_OPERATOR_ENABLED='true';auth={ok:true,user:{id:actor},status:200,accountStatus:'active',accessSource:'role'};dbCreates=0;calls=[];authCalls=0;deleted={data:null,error:null};profile={data:{id:actor,role:'admin',account_status:'active'},error:null};reply=async(name,args)=>({data:name==='action_email_admin_status'?{...page(),offset:args.p_offset}:{...item(),state:'accepted',code:'operator_confirmed_accepted',canReconcile:false},error:null});}
+const body=()=>({intentId:id,resolution:'confirmed_accepted',reason:'Inspected provider receipt in private console',providerMessageId:'synthetic-receipt',expectedUpdatedAt:time});
+const get=offset=>new Request('https://app.invalid/api/admin/action-email'+(offset===undefined?'':'?offset='+offset));
+const patch=(value=body(),headers={})=>new Request('https://app.invalid/api/admin/action-email',{method:'PATCH',headers:{'content-type':'application/json',...headers},body:typeof value==='string'?value:JSON.stringify(value)});
+let passed=0;async function test(name,fn){reset();await fn();passed++;console.log('PASS '+name);}
+try{
+ for(const flag of [undefined,'false','TRUE','1'])await test('default disabled='+flag+' exposes no queue data or mutation',async()=>{if(flag===undefined)delete process.env.QRGUITAR_ACTION_EMAIL_OPERATOR_ENABLED;else process.env.QRGUITAR_ACTION_EMAIL_OPERATOR_ENABLED=flag;for(const [fn,request] of [[route.GET,get()],[route.PATCH,patch('malformed')]]){const r=await fn(request);assert.equal(r.status,200);assert.equal((await r.json()).code,'disabled');}assert.equal(dbCreates,2);assert.equal(calls.length,0);assert.equal(authCalls,2);});
+ for(const mode of ['anonymous','member','locked-env','banned','removed','missing-source'])await test('actual route refuses '+mode+' before queue access',async()=>{if(mode==='anonymous')auth={ok:false,status:401,user:null};else if(mode==='member')auth={ok:false,status:403,user:{id:actor}};else if(mode==='missing-source')auth.accessSource='none';else{auth.accountStatus=mode==='locked-env'?'locked':mode;auth.accessSource='env';}for(const [fn,request] of [[route.GET,get()],[route.PATCH,patch()]])assert.equal((await fn(request)).status,mode==='anonymous'?401:403);assert.equal(dbCreates,0);});
+ await test('auth failures reveal no provider diagnostics',async()=>{auth=Error('secret-auth-details');const r=await route.GET(get());assert.equal(r.status,503);assert.doesNotMatch(await r.text(),/secret-auth/);assert.equal(calls.length,0);});
+ for(const failing of [false,true])await test('pending deletion or unavailable deletion check refuses queue access '+failing,async()=>{deleted=failing?{data:null,error:{message:'private'}}:{data:{id:'deletion'},error:null};for(const [fn,request]of [[route.GET,get()],[route.PATCH,patch()]])assert.equal((await fn(request)).status,failing?503:403);assert.equal(calls.length,0);});
+ for(const failure of ['error','missing','locked','role-changed'])await test('verified status required despite env/context grant '+failure,async()=>{
+ if(failure==='error')profile={data:null,error:{message:'Private status failure'}};else if(failure==='missing')profile={data:null,error:null};else if(failure==='locked')profile.data.account_status='locked';else profile.data.role='owner';
+ for(const [fn,r] of [[route.GET,get()],[route.PATCH,patch()]])assert.equal((await fn(r)).status,failure==='error'?503:403);assert.equal(calls.length,0);
+ });
+ await test('GET returns projected no-store page and only validated offset',async()=>{reply=async()=>({data:{...page(),offset:50,privateEmail:'private@example.invalid'},error:null});const r=await route.GET(get(50));assert.equal(r.status,200);assert.match(r.headers.get('cache-control'),/no-store/);assert.equal(r.headers.get('x-content-type-options'),'nosniff');const result=await r.json();assert.equal(result.status.offset,50);assert.equal(result.status.privateEmail,undefined);assert.equal(calls[0].args.p_offset,50);});
+ for(const offset of ['-1','abc','1.5','1000001'])await test('invalid offset '+offset+' makes no RPC',async()=>{assert.equal((await route.GET(get(offset))).status,400);assert.equal(calls.length,0);});
+ for(const env of [false,true])await test('PATCH uses verified server administrator, preserves timestamp precision '+env,async()=>{auth.accessSource=env?'env':'role';const r=await route.PATCH(patch({...body(),p_actor_id:'forged',actorId:'forged',envAdmin:!env}));assert.equal(r.status,200);const result=await r.json();assert.equal(result.status.state,'accepted');assert.equal(result.status.updatedAt,time);assert.equal(calls[0].args.p_actor_id,actor);assert.equal(calls[0].args.p_env_admin,env);assert.equal(calls[0].args.p_expected_updated_at,time);assert.equal(calls.length,1);});
+ for(const invalid of ['{',null,{...body(),reason:'short'},{...body(),resolution:'send_now'},{...body(),expectedUpdatedAt:'today'},{...body(),providerMessageId:''}])await test('invalid review fails before mutation '+JSON.stringify(invalid).slice(0,20),async()=>{const r=await route.PATCH(patch(invalid));assert.equal(r.status,400);assert.equal(calls.length,0);});
+ await test('non-JSON review rejected',async()=>{assert.equal((await route.PATCH(patch(body(),{'content-type':'text/plain'}))).status,415);assert.equal(calls.length,0);});
+ for(const declared of [false,true])await test('oversized body rejected without RPC '+declared,async()=>{const request=declared?patch(body(),{'content-length':'9000'}):patch(JSON.stringify({reason:'x'.repeat(9000)}));assert.equal((await route.PATCH(request)).status,413);assert.equal(calls.length,0);});
+ for(const kind of ['error','throw','mismatch'])await test('uncertain review '+kind+' never claims success or leaks diagnostic',async()=>{reply=async()=>{if(kind==='throw')throw Error('private-sql-message');return kind==='error'?{error:{message:'private-sql-message'},data:null}:{error:null,data:{...item(),id:claim,state:'accepted'}};};const r=await route.PATCH(patch());assert.equal(r.status,503);const value=await r.text();assert.match(value,/unconfirmed/);assert.doesNotMatch(value,/private-sql-message/);assert.equal(calls.length,1);});
+ await test('stalled body is bounded and cancelled before any RPC',async()=>{let cancelled=false;const stream=new ReadableStream({cancel(){cancelled=true;}});const request=new Request('https://app.invalid/api/admin/action-email',{method:'PATCH',headers:{'content-type':'application/json'},body:stream,duplex:'half'});assert.equal((await route.PATCH(request)).status,408);assert.equal(cancelled,true);assert.equal(calls.length,0);});
+ // Exercise the real legacy helper: its environment allowlist must not bypass the route's positive status check.
+ const oldOwner=process.env.QRGUITAR_OWNER_EMAILS,oldAdmin=process.env.QRGUITAR_ADMIN_EMAILS;
+ try {
+  process.env.QRGUITAR_OWNER_EMAILS='operator@example.invalid';delete process.env.QRGUITAR_ADMIN_EMAILS;
+  for(const scenario of ['error','missing','locked','banned','removed','recovered'])await test('real admin helper environment grant '+scenario,async()=>{
+   let reads=0;
+   const verified={data:{id:actor,role:'owner',account_status:'active'},error:null};
+   const unavailableProfile={data:null,error:{message:'synthetic lookup failure'}};
+   const helperDatabase={...database,from(table){
+    if(table!=='profiles')return database.from(table);
+    const q={select(){return q;},eq(){return q;},abortSignal(){return q;},maybeSingle(){reads++;return Promise.resolve(scenario==='recovered'?(reads%2===1?unavailableProfile:verified):scenario==='error'?unavailableProfile:scenario==='missing'?{data:null,error:null}:{data:{...verified.data,account_status:scenario},error:null});}};return q;
+   }};
+   const server={createServerSupabaseClient:()=>helperDatabase,getAuthenticatedUser:async()=>({user:{id:actor,email:'operator@example.invalid'},error:null})};
+   const realAuth=load('lib/admin-auth.ts',{'./supabase-server':server});
+   const actual=load('app/api/admin/action-email/route.ts',{'../../../../lib/admin-auth':realAuth,'../../../../lib/supabase-server':server,'../../../../lib/action-email-operator':{createActionEmailOperator}});
+   for(const [fn,request]of [[actual.GET,get()],[actual.PATCH,patch()]])assert.equal((await fn(request)).status,scenario==='recovered'?200:scenario==='error'?503:403);
+   assert.equal(calls.length,scenario==='recovered'?2:0);
+   if(scenario==='recovered'){assert.equal(reads,4);assert.equal(calls[1].args.p_env_admin,true);}
+  });
+ }finally{for(const [key,value]of [['QRGUITAR_OWNER_EMAILS',oldOwner],['QRGUITAR_ADMIN_EMAILS',oldAdmin]])if(value===undefined)delete process.env[key];else process.env[key]=value;}
+ console.log(JSON.stringify({passed,scope:'actual admin route + actual operator adapter, real admin-helper boundary cases plus mocked context/DB; no network/provider'}));
+}finally{if(oldFlag===undefined)delete process.env.QRGUITAR_ACTION_EMAIL_OPERATOR_ENABLED;else process.env.QRGUITAR_ACTION_EMAIL_OPERATOR_ENABLED=oldFlag;}
