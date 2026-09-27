@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 
 export type ActionEmailEnvironment = Record<string, string | undefined>;
-export const actionEmailOperationsVersion = "2026-09-27.action-email.1";
+export const actionEmailOperationsVersion = "2026-09-27.action-email.2";
 const endpoint = "https://www.qrguitar.com/api/internal/action-email-sweep";
 const json = (body: unknown, status: number) => Response.json(body, { status, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
 
