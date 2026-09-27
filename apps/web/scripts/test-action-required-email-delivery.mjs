@@ -8,7 +8,8 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),requi
 function load(file,imports={}){const exports={};new Function('exports','require',ts.transpileModule(fs.readFileSync(path.join(root,file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(exports,name=>{if(name in imports)return imports[name];throw Error('Unexpected import '+name)});return exports;}
 const registry=load('lib/content-registry.ts',{'./ui-text-registry':{uiTextEntries:[]},'./ui-text-protection':{protectedUiTextKeys:new Set()}});
 const renderer=load('lib/transactional-email-renderer.ts');
-const {createActionRequiredEmailSender}=load('lib/action-required-email-delivery.ts',{'./content-registry':registry,'./transactional-email-renderer':renderer});
+const {createActionEmailWorker}=load('lib/action-required-email.ts',{'node:crypto':require('node:crypto')});
+const {createActionRequiredEmailSender,createActionRequiredEmailPipeline}=load('lib/action-required-email-delivery.ts',{'./content-registry':registry,'./transactional-email-renderer':renderer,'./action-required-email':{createActionEmailWorker}});
 const id='11111111-1111-4111-8111-111111111111';
 const input=(event='claim.ownerReview')=>({event,to:'synthetic@example.invalid',profileTitle:'Synthetic <instrument>',actionUrl:event==='service.revisionRequested'?'https://www.qrguitar.com/service-work/QRG-SYNTH?submission='+id:'https://www.qrguitar.com/ownership-claim?claim='+id,idempotencyKey:id});
 const accepted={ok:true,status:'sent',outcome:'accepted',message:'Provider receipt',providerMessageId:'synthetic-receipt'};
@@ -19,3 +20,24 @@ test('three enabled families render registered published copy and deliver exactl
 test('invalid destinations and unavailable private context are rejected before transport',async()=>{for(const overrides of [{actionUrl:'https://evil.invalid/ownership-claim?claim='+id},{actionUrl:'https://www.qrguitar.com/ownership-claim?claim='+id+'&token=secret'},{idempotencyKey:'wrong'}]){const h=harness({enabled:true});assert.equal((await h.send({...input(),...overrides},signal())).outcome,'rejected');assert.equal(h.calls.length,0);}const h=harness({enabled:true,loadContent:async()=>({'email.service.revisionRequested.body':'{{provider_name}} needs changes.'})});assert.equal((await h.send(input('service.revisionRequested'),signal())).outcome,'rejected');assert.equal(h.calls.length,0)});
 test('failed CMS read and abort after loading are definite no-send',async()=>{const h=harness({enabled:true,loadContent:async()=>{throw Error('read failed')}});assert.equal((await h.send(input(),signal())).retryable,true);assert.equal(h.calls.length,0);const c=new AbortController();const aborted=harness({enabled:true,loadContent:async()=>{c.abort();return {}}});assert.equal((await aborted.send(input(),c.signal)).outcome,'rejected');assert.equal(aborted.calls.length,0)});
 test('unknown transport result is never retried and acceptance is not invented',async()=>{let calls=0;const h=harness({enabled:true,deliver:async()=>{calls++;throw Error('lost response')}});const r=await h.send(input(),signal());assert.equal(r.outcome,'unknown');assert.equal(r.retryable,false);assert.equal(calls,1)});
+
+function workerFor(sender, options={}){
+ let claimed=false;const receipts=[];
+ const worker=createActionEmailWorker({enabled:true,databaseTimeoutMs:50,prepareTimeoutMs:5,sendTimeoutMs:15,prepare:sender.prepare,send:sender,database:{async rpc(name,args){
+  if(name==='claim_action_email'){if(claimed)return {data:null};claimed=true;return {data:{id,leaseToken:args.p_lease_token}};}
+  if(name==='begin_action_email')return {data:{event:'claim.ownerReview',to:'synthetic@example.invalid',profileTitle:'Synthetic',subjectId:id}};
+  if(name==='settle_action_email'){receipts.push(args);return {data:true};}throw Error('Unexpected RPC '+name);
+ }},...options});return {worker,receipts};
+}
+test('combined worker times out content preparation as retry without entering transport',async()=>{
+ const h=harness({enabled:true,loadContent:()=>new Promise(()=>{})}),w=workerFor(h.send);const counts=await w.worker.run();assert.equal(h.calls.length,0);assert.equal(counts.retry,1);assert.equal(w.receipts[0].p_state,'retry');
+});
+test('late CMS result cannot send after preparation timeout',async()=>{
+ let resolve;const h=harness({enabled:true,loadContent:()=>new Promise(r=>resolve=r)}),w=workerFor(h.send);await w.worker.run();resolve({});await new Promise(r=>setImmediate(r));assert.equal(h.calls.length,0);assert.equal(w.receipts[0].p_state,'retry');
+});
+test('combined worker keeps actual hung provider acceptance unknown',async()=>{
+ let calls=0;const h=harness({enabled:true,deliver:()=>{calls++;return new Promise(()=>{})}}),w=workerFor(h.send);const counts=await w.worker.run();assert.equal(calls,1);assert.equal(counts.unknown,1);assert.equal(w.receipts[0].p_state,'unknown');
+});
+test('assembled pipeline defaults disabled without touching any dependency',async()=>{
+ const fail=()=>{throw Error('Disabled pipeline touched dependency')};const pipeline=createActionRequiredEmailPipeline({database:{rpc:fail},loadContent:fail,deliver:fail});assert.equal((await pipeline.run()).disabled,true);
+});

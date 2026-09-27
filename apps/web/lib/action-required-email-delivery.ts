@@ -1,3 +1,4 @@
+import { createActionEmailWorker } from "./action-required-email";
 import { contentRegistryByKey, getContentValue, validateVariables } from "./content-registry";
 import { renderClaimOwnerReviewEmailDocument, renderClaimMoreInfoEmailDocument, renderServiceRevisionRequestedEmailDocument, type TransactionalEmailDocument } from "./transactional-email-renderer";
 import type { EmailResult } from "./transactional-email";
@@ -18,15 +19,16 @@ export function createActionRequiredEmailSender(deps: {
   loadContent(signal: AbortSignal): Promise<Record<string, string>>;
   deliver(to: string, document: TransactionalEmailDocument, options: DeliveryOptions): Promise<EmailResult>;
 }) {
-  return async (input: Input, signal: AbortSignal): Promise<EmailResult> => {
-    if (deps.enabled !== true) return rejected("Action-required email delivery is disabled.");
-    if (signal.aborted) return rejected("Action-required email delivery was cancelled before sending.", true);
+  async function prepare(input: Input, signal: AbortSignal): Promise<(transportSignal: AbortSignal) => Promise<EmailResult>> {
+    const noSend = (result: EmailResult) => async () => result;
+    if (deps.enabled !== true) return noSend(rejected("Action-required email delivery is disabled."));
+    if (signal.aborted) return noSend(rejected("Action-required email delivery was cancelled before sending.", true));
     if (!Object.hasOwn(renderers, input.event) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.to) || /[\x00-\x1f]/.test(input.to)
       || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.idempotencyKey)
-      || typeof input.profileTitle !== "string" || input.profileTitle.length > 500) return rejected("Action-required email context is invalid.");
+      || typeof input.profileTitle !== "string" || input.profileTitle.length > 500) return noSend(rejected("Action-required email context is invalid."));
     let content: Record<string, string>;
     try { content = await deps.loadContent(signal); }
-    catch { return rejected("Published email wording is temporarily unavailable.", true); }
+    catch { return noSend(rejected("Published email wording is temporarily unavailable.", true)); }
     let document: TransactionalEmailDocument;
     try {
       const variables: Record<string, string> = { profile_title: input.profileTitle, claim_url: input.actionUrl, review_url: input.actionUrl };
@@ -42,11 +44,27 @@ export function createActionRequiredEmailSender(deps: {
         });
       };
       document = renderers[input.event]({ subject: render("subject"), preheader: render("preheader"), heading: render("heading"), body: render("body"), ctaLabel: render("cta"), footer: render("footer"), actionUrl: input.actionUrl, allowedCtaOrigins: ["https://www.qrguitar.com"] });
-    } catch { return rejected("Action-required email wording or destination is invalid; nothing was sent."); }
-    if (signal.aborted) return rejected("Action-required email delivery was cancelled before sending.", true);
-    try {
-      return await deps.deliver(input.to, document, { idempotencyKey: input.idempotencyKey, signal,
-        successMessage: "Action-required email accepted by the provider.", failureMessage: "Action-required email provider acceptance was not confirmed" });
-    } catch { return { ok: false, status: "failed", outcome: "unknown", retryable: false, message: "Email acceptance is unknown. Do not resend automatically." }; }
-  };
+    } catch { return noSend(rejected("Action-required email wording or destination is invalid; nothing was sent.")); }
+    if (signal.aborted) return noSend(rejected("Action-required email delivery was cancelled before sending.", true));
+    return async (transportSignal: AbortSignal) => {
+      if (signal.aborted || transportSignal.aborted) return rejected("Action-required email delivery was cancelled before sending.", true);
+      try {
+        return await deps.deliver(input.to, document, { idempotencyKey: input.idempotencyKey, signal: transportSignal,
+          successMessage: "Action-required email accepted by the provider.", failureMessage: "Action-required email provider acceptance was not confirmed" });
+      } catch { return { ok: false, status: "failed", outcome: "unknown", retryable: false, message: "Email acceptance is unknown. Do not resend automatically." }; }
+    };
+  }
+  const send = async (input: Input, signal: AbortSignal) => (await prepare(input, signal))(signal);
+  return Object.assign(send, { prepare });
+}
+
+/** Assemble the prepared sender with the worker so CMS preparation has its own no-send timeout. */
+export function createActionRequiredEmailPipeline(deps: Parameters<typeof createActionRequiredEmailSender>[0] & {
+  database: Parameters<typeof createActionEmailWorker>[0]["database"];
+  databaseTimeoutMs?: number; prepareTimeoutMs?: number; sendTimeoutMs?: number;
+}) {
+  const sender = createActionRequiredEmailSender(deps);
+  return createActionEmailWorker({ enabled: deps.enabled, database: deps.database,
+    databaseTimeoutMs: deps.databaseTimeoutMs, prepareTimeoutMs: deps.prepareTimeoutMs, sendTimeoutMs: deps.sendTimeoutMs,
+    prepare: sender.prepare, send: sender });
 }
