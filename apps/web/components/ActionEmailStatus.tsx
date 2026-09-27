@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { RefreshCw } from "lucide-react";
+import { ChevronDown, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useUiText } from "./UiTextProvider";
 import { createBrowserSupabaseClient } from "../lib/supabase-browser";
@@ -48,6 +48,16 @@ export function actionEmailSessionChanged(event: string, previousActor: string, 
   if (event === "INITIAL_SESSION") return false;
   if (event === "SIGNED_OUT") return true;
   return Boolean(previousActor && (!nextActor || nextActor !== previousActor));
+}
+
+export async function boundedActionEmailSession<T>(read: () => Promise<T>, signal?: AbortSignal, timeoutMs = 15000) {
+  let rejectStop: (error: Error) => void = () => {};
+  const stopped = new Promise<never>((_resolve, reject) => { rejectStop = reject; });
+  const stop = () => rejectStop(new Error("Administrator session check timed out or was cancelled."));
+  if (signal?.aborted) stop(); else signal?.addEventListener("abort", stop, { once: true });
+  const timer = setTimeout(stop, timeoutMs);
+  try { return await Promise.race([Promise.resolve().then(read), stopped]); }
+  finally { clearTimeout(timer); signal?.removeEventListener("abort", stop); }
 }
 
 export function actionEmailResolutionValid(value: ActionEmailResolution) {
@@ -98,7 +108,7 @@ export async function requestActionEmailStatus(options: { token: string; offset:
       if (payload?.code === "disabled") return { kind: "disabled" };
     } catch { /* A lost mutation response must reconcile through GET and must never be replayed automatically. */ }
   }
-  const pageOffset = input ? 0 : options.offset;
+  const pageOffset = options.offset;
   try {
     const { response, payload } = await timedRequest(fetcher, `/api/admin/action-email?offset=${pageOffset}`, { headers, cache: "no-store" }, signal, timeoutMs);
     if (payload?.code === "disabled") return { kind: "disabled" };
@@ -109,7 +119,7 @@ export async function requestActionEmailStatus(options: { token: string; offset:
     return { kind: "ready", status, reconciled: Boolean(input) };
   } catch { return input ? { kind: "unconfirmed" } : { kind: "unavailable" }; }
 }
-export function ActionEmailStatus() {
+export function ActionEmailStatus({ sessionTimeoutMs = 15000 }: { sessionTimeoutMs?: number } = {}) {
   const ui = useUiText("components.ActionEmailStatus");
   const [mode, setMode] = useState<"loading" | "ready" | "disabled" | "unavailable">("loading");
   const [status, setStatus] = useState<ActionEmailPage | null>(null), [offset, setOffset] = useState(0);
@@ -122,9 +132,11 @@ export function ActionEmailStatus() {
     const run = ++revision.current;
     const requestController = new AbortController(); controller.current?.abort(); controller.current = requestController;
     try {
-      const session = await createBrowserSupabaseClient().auth.getSession();
+      const session = await boundedActionEmailSession(() => createBrowserSupabaseClient().auth.getSession(), requestController.signal, sessionTimeoutMs);
       if (run !== revision.current) return;
-      if (session.error || !session.data.session) throw new Error("session");
+      if (session.error || !session.data.session) {
+        setStatus(null); offsetRef.current = 0; setOffset(0); setMode("unavailable"); setNotice({ text: ui("ui.components.ActionEmailStatus.adminRequired", "Sign in with an authorized administrator account to review action-email delivery."), error: true }); return;
+      }
       const nextActor = session.data.session.user.id;
       if (actor.current && actor.current !== nextActor) {
         ++revision.current; actor.current = ""; offsetRef.current = 0; setStatus(null); setOffset(0); setMode("unavailable"); setBusy(false); setNotice({ text: ui("ui.components.ActionEmailStatus.accountChanged", "Account changed. Refresh action-email status with the current administrator account."), error: true }); return;
@@ -143,13 +155,13 @@ export function ActionEmailStatus() {
         setStatus(null); setMode("unavailable"); setNotice({ text: ui("ui.components.ActionEmailStatus.unavailable", "Action-email delivery review is unavailable. Refresh and try again."), error: true });
       }
     } catch {
-      if (run === revision.current) { setStatus(null); setMode("unavailable"); setNotice({ text: ui("ui.components.ActionEmailStatus.adminRequired", "Sign in with an authorized administrator account to review action-email delivery."), error: true }); }
+      if (run === revision.current) { setStatus(null); setMode("unavailable"); setNotice({ text: ui("ui.components.ActionEmailStatus.unavailable", "Action-email delivery review is unavailable. Refresh and try again."), error: true }); }
     } finally {
       if (controller.current === requestController) controller.current = null;
       if (operation.current === key) operation.current = null;
       if (run === revision.current) { setBusy(false); if (input) window.requestAnimationFrame(() => noticeRef.current?.focus()); }
     }
-  }, [ui]);
+  }, [sessionTimeoutMs, ui]);
   useEffect(() => {
     let active = true;
     queueMicrotask(() => { if (active) void perform(); });
@@ -181,7 +193,7 @@ export function ActionEmailStatusView({ mode, status, offset, busy, notice, noti
       <p className={styles.configuration}>{configurationLabel(status, ui)}</p>
       <dl className={styles.metrics}><Metric label={ui("ui.components.ActionEmailStatus.queued", "Queued")} value={status.queued} /><Metric label={ui("ui.components.ActionEmailStatus.unknown", "Outcome unknown")} value={status.unknown} /><Metric label={ui("ui.components.ActionEmailStatus.failed", "Failed")} value={status.failed} /><Metric label={ui("ui.components.ActionEmailStatus.accepted", "Accepted")} value={status.accepted} /><Metric label={ui("ui.components.ActionEmailStatus.inFlight", "In flight")} value={status.inFlight} /><Metric label={ui("ui.components.ActionEmailStatus.suppressed", "Suppressed")} value={status.suppressed} /></dl>
       {status.oldestPendingAt ? <p>{ui("ui.components.ActionEmailStatus.oldest", "Oldest pending:")} {status.oldestPendingAt}</p> : null}
-      <div className={styles.list}>{status.items.length ? status.items.map(item => <ActionEmailDelivery key={item.id} item={item} busy={busy} ui={ui} submit={onReconcile} />) : <p>{ui("ui.components.ActionEmailStatus.empty", "No action-email delivery records are on this page.")}</p>}</div>
+      <div className={styles.list}>{status.items.length ? status.items.map(item => <ActionEmailDelivery key={actionEmailDeliveryKey(item)} item={item} busy={busy} ui={ui} submit={onReconcile} />) : <p>{ui("ui.components.ActionEmailStatus.empty", "No action-email delivery records are on this page.")}</p>}</div>
       {offset > 0 || status.items.length === 50 ? <div className={styles.pages}><button type="button" disabled={busy || offset === 0} onClick={() => onPage(Math.max(0, offset - 50))}>{ui("ui.components.ActionEmailStatus.previous", "Previous")}</button><button type="button" disabled={busy || status.items.length < 50} onClick={() => onPage(offset + 50)}>{ui("ui.components.ActionEmailStatus.next", "Next")}</button></div> : null}
     </> : null}
   </section>;
@@ -196,6 +208,8 @@ function configurationLabel(status: ActionEmailPage, ui: Ui) {
   return ui("ui.components.ActionEmailStatus.configActive", "Capture and dispatch are reported enabled.");
 }
 
+export function actionEmailDeliveryKey(item: ActionEmailItem) { return `${item.id}:${item.updatedAt}`; }
+
 export function ActionEmailDelivery({ item, busy, ui, submit }: { item: ActionEmailItem; busy: boolean; ui: Ui; submit(input: ActionEmailResolution): void }) {
   const [resolution, setResolution] = useState<"" | "confirmed_accepted" | "confirmed_not_accepted">(""), [reason, setReason] = useState(""), [receipt, setReceipt] = useState("");
   const unknown = item.state === "unknown" && item.canReconcile;
@@ -204,7 +218,7 @@ export function ActionEmailDelivery({ item, busy, ui, submit }: { item: ActionEm
   const draft: ActionEmailResolution | null = selected ? { intentId: item.id, expectedUpdatedAt: item.updatedAt, resolution: selected, reason, ...(selected === "confirmed_accepted" ? { providerMessageId: receipt } : {}) } : null;
   const valid = Boolean(draft && actionEmailResolutionValid(draft));
   return <details className={styles.delivery}>
-    <summary><span>{eventLabel(item.event, ui)}</span><b>{stateLabel(item.state, ui)}</b><small>{ui("ui.components.ActionEmailStatus.attempts", "{{value1}} of 6 attempts", { value1: item.attempts })}</small></summary>
+    <summary><ChevronDown className={styles.chevron} size={17} aria-hidden="true" /><span>{eventLabel(item.event, ui)}</span><b>{stateLabel(item.state, ui)}</b><small>{ui("ui.components.ActionEmailStatus.attempts", "{{value1}} of 6 attempts", { value1: item.attempts })}</small></summary>
     <div className={styles.deliveryBody}>
       <p>{ui("ui.components.ActionEmailStatus.updated", "Updated:")} <time dateTime={item.updatedAt}>{item.updatedAt}</time></p>
       {item.submissionId ? <Link href={`/service-review/${item.submissionId}`}>{ui("ui.components.ActionEmailStatus.openService", "Open service request")}</Link> : null}

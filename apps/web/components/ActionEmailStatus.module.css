@@ -17,7 +17,9 @@
 .metrics dd { margin: 4px 0 0; font-size: 22px; font-variant-numeric: tabular-nums; }
 .list { border-top: 1px solid var(--line); }
 .delivery { border-bottom: 1px solid var(--line); padding-block: 4px; overflow-wrap: anywhere; }
-.delivery summary { min-height: 44px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px 16px; cursor: pointer; padding-block: 10px; }
+.delivery summary { min-height: 44px; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto auto; align-items: center; gap: 10px 16px; cursor: pointer; padding-block: 10px; }
+.chevron { color: var(--muted); transition: transform 140ms ease; }
+.delivery[open] .chevron { transform: rotate(180deg); }
 .delivery summary span { color: var(--text); }
 .delivery summary b { color: var(--muted-strong); font-weight: 600; }
 .delivery summary small { color: var(--muted); font-size: 12px; }
@@ -36,6 +38,6 @@
 @media (max-width: 900px) { .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 640px) {
   .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .delivery summary { grid-template-columns: minmax(0, 1fr) auto; }
-  .delivery summary small { grid-column: 1 / -1; }
+  .delivery summary { grid-template-columns: 20px minmax(0, 1fr) auto; }
+  .delivery summary small { grid-column: 2 / -1; }
 }
