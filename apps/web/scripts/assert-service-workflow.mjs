@@ -77,7 +77,11 @@ ok(publicInstruments.includes("providerDisplayName") && publicInstruments.includ
 ok(!publicInstruments.includes("service_submission_tokens"), "Public mapping references private review tokens");
 ok(!publicInstruments.includes("service_submission_evidence"), "Public mapping references private evidence");
 
-ok(email.includes("Nothing becomes part of the public Profile until you approve it"), "Owner email overstates publication");
+const emailRenderer = await read("lib/transactional-email-renderer.ts");
+ok(emailRenderer.includes("Nothing becomes part of the public Profile until you approve it"), "Owner email overstates publication");
+ok(email.includes('from "./transactional-email-renderer"') && email.includes("document = renderServiceReviewEmailDocument({")
+  && emailRenderer.includes("export function renderServiceReviewEmailDocument(") && emailRenderer.includes("notice: SERVICE_REVIEW_EMAIL_NOTICE"),
+  "Owner review email must use the renderer's protected publication notice");
 ok(email.includes('status: "failed"') && email.includes('outcome: "unknown"') && email.includes("provider acceptance was not confirmed"), "Email rejection and unknown outcomes are not reported honestly");
 const printLayout = await read("lib/print-layout.ts");
 const printDocument = await read("app/handout/[code]/PrintDocument.tsx");

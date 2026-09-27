@@ -30,7 +30,7 @@ function fixture(options={}) {
     const declaration=ast.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='PATCH');
     const routeJs=ts.transpileModule(declaration.getText(ast).replace(/^export /,''),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
     const routeEnv={...env,createServerSupabaseClient:()=>supabase,getAuthenticatedUser:async()=>({user:h.anonymous?null:{id:h.actor||'provider-a'}}),assertAccountCanWrite:async()=>({ok:true}),
-      isAdmin:async()=>false,cleanServiceText:v=>String(v||''),cleanServiceDate:v=>v,cleanServiceCategory:v=>v,cleanServiceVisibility:v=>v,
+      getAdminContext:async()=>({ok:false,user:null}),cleanServiceText:v=>String(v||''),cleanServiceDate:v=>v,cleanServiceCategory:v=>v,cleanServiceVisibility:v=>v,
       loadProviderProfile:async()=>({public_display_name:'Synthetic provider'}),sendOwnerReview:sender,
       addNotification:async()=>{h.notifications++;return {error:h.notificationError?Error('private notification error'):null};},serializeSubmissions:async(_db,rows)=>rows,
       json:(data,status=200)=>({data,status}),errorResponse:(message,status=500)=>({data:{ok:false,message},status})};
