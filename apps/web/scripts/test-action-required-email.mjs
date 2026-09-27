@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import ts from 'typescript';
+import { createRequire } from 'node:module';
+const require=createRequire(import.meta.url),root=path.resolve(import.meta.dirname,'..');
+const source=fs.readFileSync(path.join(root,'lib/action-required-email.ts'),'utf8');
+const module={exports:{}};new Function('module','exports','require',ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText)(module,module.exports,require);
+const {createActionEmailWorker,actionEmailInput}=module.exports;
+const id='10000000-0000-4000-8000-000000000001',subject='20000000-0000-4000-8000-000000000002',lease='30000000-0000-4000-8000-000000000003';
+const payload={event:'claim.ownerReview',to:'owner@example.invalid',profileTitle:'Synthetic Profile',subjectId:subject};
+let passed=0;
+async function test(name,run){await run();console.log('PASS '+name);passed++;}
+function fixture({enabled=true,dispatch=payload,result={outcome:'accepted',providerMessageId:'synthetic-receipt'},fail='',hang='',repeat=false}={}){
+ const calls=[],sent=[];let claimed=false;
+ const worker=createActionEmailWorker({enabled,uuid:()=>lease,databaseTimeoutMs:20,sendTimeoutMs:20,database:{async rpc(name,args,signal){calls.push({name,args});assert.ok(signal instanceof AbortSignal);if(name===fail)return{error:{private:'not exposed'},data:null};if(name===hang)return new Promise(()=>{});if(name==='claim_action_email'){if(claimed&&!repeat)return{data:null,error:null};claimed=true;return{data:{id,leaseToken:lease},error:null};}if(name==='begin_action_email')return{data:dispatch,error:null};return{data:true,error:null};}},send:async(input,signal)=>{sent.push(input);assert.ok(signal instanceof AbortSignal);if(hang==='send')return new Promise(()=>{});if(result==='throw')throw Error('private provider detail');return result;}});
+ return{worker,calls,sent};
+}
+await test('default disabled adapter never touches database or transport',async()=>{const f=fixture({enabled:undefined});const d=createActionEmailWorker({database:{rpc:async()=>{throw Error('Must not run');}},send:async()=>{throw Error('Must not send');}});assert.equal((await d.run()).disabled,true);assert.equal((await fixture({enabled:false}).worker.run()).disabled,true);});
+for(const event of ['claim.ownerReview','claim.moreInfo','service.revisionRequested'])await test('strict safe payload and actionable canonical URL '+event,async()=>{const p=actionEmailInput({...payload,event,qrCode:'QRG-TEST',privateNote:'secret',evidence:['secret'],ownerName:'secret',token:'secret'},id);assert.equal(new URL(p.actionUrl).origin,'https://www.qrguitar.com');assert.equal(new URL(p.actionUrl).pathname,event.startsWith('claim.')?'/ownership-claim':'/service-work/QRG-TEST');assert.equal(new URL(p.actionUrl).searchParams.get(event.startsWith('claim.')?'claim':'submission'),subject);assert.doesNotMatch(JSON.stringify(p),/secret/);assert.deepEqual(Object.keys(p).sort(),['actionUrl','event','idempotencyKey','profileTitle','to']);});
+for(const patch of [{event:'service.resubmitted'},{subjectId:'bad'},{to:'victim@invalid\r\nBcc:other@example.invalid'},{event:'service.revisionRequested',qrCode:'../../admin'},{profileTitle:undefined}])await test('invalid dispatch cannot reach transport '+Object.keys(patch).join(','),async()=>{const f=fixture({dispatch:{...payload,...patch}});const r=await f.worker.run();assert.equal(r.failed,1);assert.equal(f.sent.length,0);});
+await test('current-authority suppression never calls sender',async()=>{const f=fixture({dispatch:null});assert.equal((await f.worker.run()).suppressed,1);assert.equal(f.sent.length,0);});
+for(const qrCode of ['qrg-test','QRG-test','QRG--TEST','QRG-'+ 'X'.repeat(77)])await test('renderer-incompatible QR path fails before transport '+qrCode.length,async()=>{const f=fixture({dispatch:{...payload,event:'service.revisionRequested',qrCode}});assert.equal((await f.worker.run()).failed,1);assert.equal(f.sent.length,0);});
+await test('accepted requires provider receipt and persists before success count',async()=>{const f=fixture();assert.equal((await f.worker.run()).accepted,1);assert.equal(f.sent.length,1);assert.equal(f.calls.find(c=>c.name==='settle_action_email').args.p_provider_message_id,'synthetic-receipt');});
+for(const result of [{outcome:'accepted'},{outcome:'accepted',providerMessageId:' '},{outcome:'accepted',providerMessageId:'bad\r\nreceipt'},{outcome:'unknown'},'throw'])await test('ambiguous outcome remains unknown '+JSON.stringify(result),async()=>{const f=fixture({result});assert.equal((await f.worker.run()).unknown,1);assert.equal(f.sent.length,1);});
+await test('definite rejection alone can request bounded retry',async()=>{const f=fixture({result:{outcome:'rejected',retryable:true,retryAfterSeconds:999999}});assert.equal((await f.worker.run()).retry,1);assert.equal(f.calls.find(c=>c.name==='settle_action_email').args.p_retry_after_seconds,21600);});
+await test('provider timeout quarantines unknown',async()=>{const f=fixture({hang:'send'});assert.equal((await f.worker.run()).unknown,1);assert.equal(f.sent.length,1);});
+for(const fail of ['claim_action_email','begin_action_email','settle_action_email'])await test('failed persistence never announces success '+fail,async()=>{const f=fixture({fail});await assert.rejects(f.worker.run(),/persistence unavailable/);assert.equal(f.sent.length,fail==='settle_action_email'?1:0);});
+await test('database timeout bounded before transport',async()=>{const f=fixture({hang:'begin_action_email'});await assert.rejects(f.worker.run(),/timed out/);assert.equal(f.sent.length,0);});
+await test('worker run processes at most three intents',async()=>{const f=fixture({repeat:true});assert.equal((await f.worker.run()).claimed,3);assert.equal(f.sent.length,3);});
+console.log(JSON.stringify({passed,scope:'actual TypeScript worker with synthetic transport and DB receipts; no runtime launch/provider'}));

@@ -1,0 +1,43 @@
+# Action-Required Emails: Disabled Proposal
+
+Scope: `claim.ownerReview`, `claim.moreInfo`, `service.revisionRequested` only. No live route, cron, sender activation, production migration or backfill. The original service-submitted package at 3197d44 is preserved. These changes are a separate package, not production-ready activation.
+
+## Why A Separate Queue
+
+The audited service queue has a service-only FK, submitted-owner recipient and review-link contract. Claims require claimant/current-owner authority and a completed-evidence boundary; revision requests address the service provider. The new queue has explicit claim/service FKs and family constraints instead of overloading that contract. It reuses the prior lease/outcome design and TypeScript outcome types; integration therefore includes 0c5951b + 3197d44. No copied emails, actor IDs, private notes, evidence, bodies or tokens are stored in intents.
+
+## Committed Event Boundaries
+
+- A claim's initial insert does NOT enqueue. The post-upload `ownership_claim_events.submitted` insert must confirm claimant authority and evidence-row count, then atomically mark completion and capture `claim.ownerReview`. Failure rolls back the completion marker and intent together. The API checks this receipt; failure preserves the saved claim/evidence and reports unconfirmed completion instead of claiming it was sent.
+- Claim resubmission uploads evidence before the status transition. Committed return to `awaiting_owner` queues owner review. A failed later activity receipt no longer deletes committed evidence. A lost state-write response preserves evidence and instructs reload, not automatic resubmission. A known no-row conflict can clean up that request's temporary evidence.
+- An admin request moves to `awaiting_claimant` with a nonempty note. A changed note in that state is a new action; identical state/note replay is a no-op. Another cycle back into that state is a new action even with the same text. There is deliberately no same-text email resend feature or inferred request identity.
+- Service `submitted -> changes_requested` with an owner note captures one provider revision request without assuming `provider_revision` increments. Later provider resubmission is handled only by the existing `service.submitted` queue, never by an additional generic resubmitted email here.
+- Monotonic per-source versions invalidate obsolete queued/retry/leased intents. Historical unknown/dispatching outcomes remain evidence, never silently retried. Unrelated edits do not backfill historical claims. Expiry and authority changes cannot redirect an old event to another account.
+
+## Authority And Decisions
+
+Dispatch locks source authority and rechecks version, state, expiry, current Profile owner, Profile removal/archive, recipient account status and pending account deletion. Email address is read from current authenticated identity, not a claim's typed recipient address. Claim owner-review targets the current owner; more-info targets the claimant; service revision targets the provider. Private notes and evidence stay in the signed-in application.
+
+Claim capability DTOs expose `canReview` and `canSubmitEvidence`, not actor IDs. A stale former owner can see historical status but no newly signed evidence URL or private declaration/body. Claim denial now requires `deny_ownership_claim_current`, which locks Profile then claim like existing approval, revalidates owner/admin/active account, records one decision/event, and supports original-reviewer replay. There is NO direct-update fallback. Until this RPC is installed, denial returns unconfirmed/unavailable, not success. Do not deploy this route alone.
+
+Direct claim resubmission and initial completion also have a DB current-owner guard. Their existing route transaction takes the claim lock before acquiring Profile share lock; a concurrent ownership writer may cause a PostgreSQL deadlock/retry conflict. The transaction must abort, never commit stale authority. The API preserves evidence on an uncertain outcome. Native concurrent testing of this new proposal remains an integration gate; do not claim the earlier queue's native tests cover it.
+
+## Callable Worker Contract
+
+`createActionEmailWorker` in `lib/action-required-email.ts` defaults disabled and touches neither DB nor transport in that state. Its injected DB adapter must pass the provided AbortSignal to the actual RPC request; its injected sender must propagate the send signal. DB control also defaults capture/dispatch off. No code here enables it.
+
+RPCs: `claim_action_email`, `begin_action_email`, `settle_action_email`, `action_email_status`. Queue tables and trigger functions are not client-callable. Three intents per run, five-second DB and twelve-second send bounds, 120-second leases and six attempts maximum. Definite transient rejection backs off; lost post-dispatch receipt, timeout or malformed acceptance becomes unknown with no automatic resend. Provider acceptance is not inbox delivery. Pausing DB dispatch leaves captured work durable.
+
+Strict transport DTO: `{event,to,profileTitle,actionUrl,idempotencyKey}`. Extra private fields are discarded. Canonical destinations are `/ownership-claim?claim=<UUID>` and `/service-work/<QRG code>?submission=<UUID>`. QR validation matches Agent2's renderer exactly. Invalid payloads fail before transport. Renderer/content failures must be mapped by the delivery adapter to definite rejected/no-send, not thrown after a supposed provider attempt. Actual transport exceptions remain unknown.
+
+Boss owns the default-disabled delivery assembly (`action-required-email-delivery.ts`) and focused claim UI; Agent2 owns the three pure renderers, commit 7c768bf. This package does not duplicate or edit those files. Do not call a document-rendering callback a real transport or substitute a fake receipt in production.
+
+## Evidence And Remaining Gates
+
+Run `npm run test:action-email --workspace @qrguitar/web`: actual TS worker with synthetic transport, actual full repository schema plus both proposals in isolated PGlite, and actual API module with mocked storage/database/auth. Current coverage includes 27 worker, 35 SQL and 70 API cases. The actual privacy intake/fulfillment test blocks deletion while service work is active, suppresses mail during the pending deletion, then preserves contributed service facts after the workflow is closed and pseudonymization completes. Closed same-status source versions remain stable to preserve the existing retained-facts fingerprint. No test contacts a provider or shared/production DB. Focused lint and web typecheck are separate checks; the unchanged whole-platform build was not rerun for this bounded package.
+
+Before activation: independent review; integrate exact Boss UI and Agent2 renderer/delivery commits; normal supported authenticated runtime testing; native concurrent owner/claim transition tests; actual account-deletion compatibility for these new families; authorized schema installation and deploy sequencing (RPC before API); explicit capture/dispatch operations with readiness check; an authorized worker route/secret/schedule; Admin visibility and evidence-based reconciliation for action-queue unknowns. Current aggregate status is not a complete operator recovery screen, and unknowns must not be edited/replayed casually. Activation stays blocked while those integration pieces are absent.
+
+Initial completion receipt failure can leave a saved claim without an email intent. It must remain visible/reviewable in Claim Center; any completion retry/recovery must explicitly reconcile the existing claim and evidence, never create a second claim or infer delivery. No automated production repair/backfill is authorized by this proposal. Actual provider acceptance and inbox proof remain separate from synthetic transport tests.
+
+All prior production fences, migration authorization and no-policy-workaround restrictions remain. Preserve current runtime, dirty integration worktree, existing containers and real user data.

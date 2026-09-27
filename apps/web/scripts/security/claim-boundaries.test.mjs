@@ -52,6 +52,51 @@ test("owner list exposes its private review evidence and excludes unrelated clai
   assert.equal(response.status, 200); assert.match(response.headers.get("cache-control"), /no-store/);
   const body = await response.json(); assert.deepEqual(body.claims.map((item) => item.id), ["claim-one"]); assert.equal(body.claims[0].evidenceCount, 1); assert.equal(body.claims[0].evidence.length, 1);
 });
+
+test("claim capabilities follow actual owner, state and expiry without exposing actor IDs", async () => {
+  const f=fixture();
+  f.tables.ownership_claims[0].acquisition_details='Private purchase';f.tables.ownership_claims[0].ownership_declaration='Private declaration';
+  let row=(await (await f.route.GET(request())).json()).claims[0];
+  assert.equal(row.canReview,true);assert.equal(row.canSubmitEvidence,false);
+  f.tables.guitars[0].owner_id='new-owner';
+  row=(await (await f.route.GET(request())).json()).claims[0];
+  assert.equal(row.canReview,false);assert.equal(row.evidence,undefined);
+  assert.equal(row.acquisitionDetails,'');assert.equal(row.ownershipDeclaration,'');
+  f.tables.guitars[0].owner_id=owner.id;f.tables.ownership_claims[0].expires_at='2000-01-01T00:00:00Z';
+  assert.equal((await (await f.route.GET(request())).json()).claims[0].canReview,false);
+  const c=fixture({user:claimant});c.tables.ownership_claims[0].status='awaiting_claimant';
+  row=(await (await c.route.GET(request())).json()).claims[0];assert.equal(row.canSubmitEvidence,true);assert.equal(row.canReview,false);
+  c.tables.guitars[0].owner_id='new-owner';assert.equal((await (await c.route.GET(request())).json()).claims[0].canSubmitEvidence,false);
+});
+
+for(const action of ['deny','resubmit'])test(`stale owner blocks ${action} before any mutation`,async()=>{
+ const f=fixture({user:action==='resubmit'?claimant:owner});f.tables.guitars[0].owner_id='new-owner';if(action==='resubmit')f.tables.ownership_claims[0].status='awaiting_claimant';
+ assert.equal((await f.route.PATCH(request('PATCH',{id:'claim-one',action,evidence:[evidence()]}))).status,409);assert.equal(f.writes().length,0);
+});
+
+test('failed post-evidence completion reports saved but unconfirmed, preserving claim/evidence',async()=>{
+ const f=fixture({user:claimant,fresh:true,hooks:{before(query){if(query.table==='ownership_claim_events'&&query.operation==='insert')return {data:null,error:{message:'Receipt unavailable'}};}}});
+ const response=await f.route.POST(request('POST',claimBody()));assert.equal(response.status,503);assert.equal((await response.json()).committed,true);assert.equal(f.tables.ownership_claims.length,1);assert.equal(f.tables.ownership_claim_evidence.length,1);assert.equal(f.removals.length,0);
+});
+
+test('resubmit audit failure does not erase evidence after state committed',async()=>{
+ const f=fixture({user:claimant,hooks:{before(query){if(query.table==='ownership_claim_events'&&query.operation==='insert')return {data:null,error:{message:'Receipt unavailable'}};}}});f.tables.ownership_claims[0].status='awaiting_claimant';
+ const response=await f.route.PATCH(request('PATCH',{id:'claim-one',action:'resubmit',evidence:[evidence()]}));assert.equal(response.status,503);assert.equal((await response.json()).committed,true);assert.equal(f.tables.ownership_claims[0].status,'awaiting_owner');assert.equal(f.removals.length,0);assert.equal(f.tables.ownership_claim_evidence.length,2);
+});
+
+test('resubmit uncertain state write preserves uploaded evidence and does not claim success',async()=>{
+ const f=fixture({user:claimant,hooks:{before(query){if(query.table==='ownership_claims'&&query.operation==='update')return {data:null,error:{message:'Reply lost'}};}}});f.tables.ownership_claims[0].status='awaiting_claimant';
+ const response=await f.route.PATCH(request('PATCH',{id:'claim-one',action:'resubmit',evidence:[evidence()]}));assert.equal(response.status,503);assert.equal((await response.json()).uncertain,true);assert.equal(f.removals.length,0);assert.equal(f.tables.ownership_claim_evidence.length,2);
+});
+
+test('owner denial uses locked RPC and never an unsafe direct update fallback',async()=>{
+ const f=fixture();const response=await f.route.PATCH(request('PATCH',{id:'claim-one',action:'deny',note:'Reviewed evidence'}));
+ assert.equal(response.status,200);assert.equal(f.rpcCalls[0].name,'deny_ownership_claim_current');assert.equal(f.rpcCalls[0].args.p_decided_by,owner.id);assert.equal(f.writes().filter(c=>c.table==='ownership_claims').length,0);
+});
+for(const failure of ['missing','mismatch','throw'])test(`denial ${failure} stays unconfirmed without direct-update fallback`,async()=>{
+ const f=fixture({rpc:async()=>{if(failure==='throw')throw Error('Reply lost');return failure==='missing'?{data:null,error:{code:'PGRST202',message:'Not installed'}}:{data:{ok:true,claim_id:'wrong'},error:null};}});
+ const response=await f.route.PATCH(request('PATCH',{id:'claim-one',action:'deny',note:'Reviewed evidence'}));assert.equal(response.status,503);assert.equal((await response.json()).uncertain,true);assert.equal(f.tables.ownership_claims[0].status,'awaiting_owner');assert.equal(f.writes().length,0);
+});
 for (const status of ["awaiting_claimant", "awaiting_owner", "admin_review", "approved", "denied", "cancelled", "expired", "unknown"]) {
   for (const actor of ["claimant", "owner", "admin"]) test(`GET canWithdraw is server-derived for ${actor} / ${status}`, async () => {
     const user = actor === "claimant" ? claimant : actor === "owner" ? owner : { id: "reviewer", email: "reviewer@example.invalid" };
