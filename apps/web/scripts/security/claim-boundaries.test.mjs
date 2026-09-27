@@ -259,3 +259,5 @@ for(const cleanup of ['deleted','lost','mismatch'])test('partial upload storage 
  return{data:{ok:true,claim_id:cleanup==='mismatch'?'wrong':args.p_claim_id,deleted:true},error:null};}});
  const r=await f.route.POST(request('POST',claimBody()));assert.equal(r.status,503);assert.equal(f.removals.length,cleanup==='deleted'?1:0);
 });
+
+test('legacy unknown completion marker is omitted rather than called incomplete',async()=>{const f=fixture({user:claimant});f.tables.ownership_claims[0].action_email_completed=false;const row=(await (await f.route.GET(request())).json()).claims[0];assert.equal(row.submissionComplete,undefined);assert.equal(row.canCompleteSubmission,false);});

@@ -63,7 +63,7 @@
     "test:provider-workbench": "node scripts/test-provider-workbench.mjs && node scripts/test-service-workbench.mjs && node scripts/security/service-submission-reads.test.mjs && npm run test:service-evidence",
     "test:service-evidence": "node scripts/test-service-evidence-upload.mjs && node scripts/test-service-evidence-upload-db.mjs && node scripts/test-service-evidence-recovery-db.mjs && node scripts/test-service-evidence-upload-integration.mjs && node --test scripts/test-evidence-postgres-config.mjs scripts/test-postgres-lock-observer.mjs scripts/storage-stack/test-guards.mjs",
     "test:print-layout": "node --test scripts/test-print-layout.mjs",
-    "test:ownership-claims": "node scripts/test-ownership-claim-db.mjs && node scripts/security/claim-boundaries.test.mjs && node scripts/test-ownership-claim-client.mjs",
+    "test:ownership-claims": "node scripts/test-ownership-claim-db.mjs && node scripts/security/claim-boundaries.test.mjs && node scripts/test-ownership-claim-client.mjs && node scripts/test-claim-completion-recovery-db.mjs",
     "test:qr-output": "node --test scripts/test-qr-output.mjs scripts/test-qr-component.mjs",
     "test:record-share": "node --test scripts/test-record-share.mjs && npm run test:clipboard-feedback",
     "test:clipboard-feedback": "node --test scripts/test-profile-copy-feedback.mjs scripts/test-transfer-copy-feedback.mjs scripts/test-editor-copy-feedback.mjs",

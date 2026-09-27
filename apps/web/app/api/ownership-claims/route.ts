@@ -135,7 +135,7 @@ function safeClaim(
     claimType: claim.claim_type,
     status: claim.status,
     canWithdraw: Boolean(viewerId) && claim.claimant_user_id === viewerId && ["awaiting_claimant", "awaiting_owner", "admin_review"].includes(claim.status),
-    ...(typeof claim.action_email_completed === "boolean" ? { submissionComplete: claim.action_email_completed } : {}),
+    ...((claim.completion_expected_evidence != null && typeof claim.action_email_completed === "boolean") || claim.action_email_completed === true ? { submissionComplete: claim.action_email_completed } : {}),
     canCompleteSubmission: Boolean(viewerId) && claim.claimant_user_id === viewerId && claim.action_email_completed === false
       && Number.isInteger(claim.completion_expected_evidence) && Number(claim.completion_expected_evidence) >= 1
       && Number(claim.completion_expected_evidence) <= MAX_EVIDENCE_FILES && evidenceCount === claim.completion_expected_evidence
