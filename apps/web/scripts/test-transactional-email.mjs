@@ -25,6 +25,10 @@ function compile(relativePath, imports = {}) {
 
 const renderer = compile("lib/transactional-email-renderer.ts");
 const boundary = compile("lib/email-template-boundary.ts");
+const contentRegistry = compile("lib/content-registry.ts", {
+  "./ui-text-registry": { uiTextEntries: [] },
+  "./ui-text-protection": { protectedUiTextKeys: new Set() }
+});
 const emailEntries = new Map([
   ["email.service.submitted.subject", { area: "Emails", allowedVariables: ["profile_title"] }],
   ["email.service.submitted.preheader", { area: "Emails", allowedVariables: ["profile_title"] }],
@@ -92,6 +96,94 @@ test("renderer rejects non-HTTPS, credentialed, and off-origin CTA links", () =>
     "https://attacker.example/service-review/example"
   ]) {
     assert.throws(() => renderer.renderBrandedTransactionalEmail({ ...baseEmail, ctaUrl }), /approved HTTPS|absolute HTTPS/);
+  }
+});
+function registeredEmailDefault(prefix, suffix, variables) {
+  const entry = contentRegistry.contentRegistryByKey.get(`${prefix}.${suffix}`);
+  assert.ok(entry, `Missing registered email field ${prefix}.${suffix}`);
+  return entry.defaultValue.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_match, name) => variables[name] || "");
+}
+
+const actionRequiredFamilies = [
+  {
+    prefix: "email.claim.ownerReview",
+    renderer: "renderClaimOwnerReviewEmailDocument",
+    actionUrl: "https://www.qrguitar.com/ownership-claim?claim=11111111-1111-4111-8111-111111111111",
+    eyebrow: "PRIVATE OWNERSHIP REVIEW",
+    notice: renderer.CLAIM_OWNER_REVIEW_EMAIL_NOTICE
+  },
+  {
+    prefix: "email.claim.moreInfo",
+    renderer: "renderClaimMoreInfoEmailDocument",
+    actionUrl: "https://www.qrguitar.com/ownership-claim?claim=22222222-2222-4222-8222-222222222222",
+    eyebrow: "OWNERSHIP CLAIM UPDATE",
+    notice: renderer.CLAIM_MORE_INFO_EMAIL_NOTICE
+  },
+  {
+    prefix: "email.service.revisionRequested",
+    renderer: "renderServiceRevisionRequestedEmailDocument",
+    actionUrl: "https://www.qrguitar.com/service-work/QRG-RENDER-123?submission=33333333-3333-4333-8333-333333333333",
+    eyebrow: "SERVICE REVISION REQUESTED",
+    notice: renderer.SERVICE_REVISION_REQUESTED_EMAIL_NOTICE
+  }
+];
+
+test("action-required family renderers use current registered copy, shared branding, escaped HTML, and complete plaintext", () => {
+  const profileTitle = `1962 <script>alert("owner")</script> ${"WideWord".repeat(30)}`;
+  const variables = {
+    profile_title: profileTitle,
+    profile_url: "https://www.qrguitar.com/i/QRG-RENDER-123",
+    claim_url: "https://www.qrguitar.com/ownership-claim",
+    review_url: "https://www.qrguitar.com/service-work/QRG-RENDER-123"
+  };
+  for (const family of actionRequiredFamilies) {
+    const document = renderer[family.renderer]({
+      subject: registeredEmailDefault(family.prefix, "subject", variables),
+      preheader: registeredEmailDefault(family.prefix, "preheader", variables),
+      heading: registeredEmailDefault(family.prefix, "heading", variables),
+      body: registeredEmailDefault(family.prefix, "body", variables),
+      ctaLabel: registeredEmailDefault(family.prefix, "cta", variables),
+      actionUrl: family.actionUrl,
+      footer: registeredEmailDefault(family.prefix, "footer", variables),
+      allowedCtaOrigins: ["https://www.qrguitar.com"],
+      privateNote: "PRIVATE-NOTE-MUST-NOT-RENDER",
+      evidenceUrl: "https://www.qrguitar.com/private-evidence/MUST-NOT-RENDER",
+      recipientName: "PRIVATE-NAME-MUST-NOT-RENDER",
+      eventDate: "PRIVATE-DATE-MUST-NOT-RENDER"
+    });
+    assert.match(document.htmlContent, /#090d0f/);
+    assert.match(document.htmlContent, /#f59e0b/);
+    assert.match(document.htmlContent, /name="viewport"/);
+    assert.match(document.htmlContent, /&lt;script&gt;alert\(&quot;owner&quot;\)&lt;\/script&gt;/);
+    assert.doesNotMatch(document.htmlContent, /<script>alert/);
+    assert.match(document.htmlContent, new RegExp(family.actionUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.match(document.textContent, new RegExp(family.eyebrow));
+    assert.match(document.textContent, /1962 <script>alert\("owner"\)<\/script>/);
+    assert.match(document.textContent, new RegExp(family.notice.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.match(document.textContent, new RegExp(family.actionUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(`${document.htmlContent}\n${document.textContent}`, /PRIVATE-(?:NOTE|NAME|DATE)|private-evidence\/MUST-NOT-RENDER/);
+  }
+});
+
+test("action-required family renderers reject off-route, secret-bearing, malformed, and off-origin destinations", () => {
+  const common = {
+    subject: "Action required",
+    preheader: "Open QRguitar securely.",
+    heading: "Review this update",
+    body: "Sign in to review the saved request.",
+    ctaLabel: "Open request",
+    footer: "QRguitar · Permanent instrument identity and history",
+    allowedCtaOrigins: ["https://www.qrguitar.com"]
+  };
+  const invalid = [
+    ["renderClaimOwnerReviewEmailDocument", "https://www.qrguitar.com/ownership-claim?claim=11111111-1111-4111-8111-111111111111&token=secret"],
+    ["renderClaimMoreInfoEmailDocument", "https://www.qrguitar.com/admin?claim=22222222-2222-4222-8222-222222222222"],
+    ["renderClaimMoreInfoEmailDocument", "https://attacker.example/ownership-claim?claim=22222222-2222-4222-8222-222222222222"],
+    ["renderServiceRevisionRequestedEmailDocument", "https://www.qrguitar.com/service-work/QRG-RENDER-123?submission=not-a-uuid"],
+    ["renderServiceRevisionRequestedEmailDocument", "https://www.qrguitar.com/service-work/QRG-RENDER-123?submission=33333333-3333-4333-8333-333333333333&token=secret"]
+  ];
+  for (const [render, actionUrl] of invalid) {
+    assert.throws(() => renderer[render]({ ...common, actionUrl }), /approved HTTPS origin|authenticated claim destination|provider workbench destination/);
   }
 });
 test("Content Studio application preview uses the same fixed service-review document and plaintext output", () => {

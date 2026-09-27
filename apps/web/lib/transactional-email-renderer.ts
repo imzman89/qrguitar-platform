@@ -29,7 +29,21 @@ export type ServiceReviewEmailDocumentInput = {
   allowedCtaOrigins: string[];
 };
 
+export type ActionRequiredEmailDocumentInput = {
+  subject: string;
+  preheader: string;
+  heading: string;
+  body: string;
+  ctaLabel: string;
+  actionUrl: string;
+  footer: string;
+  allowedCtaOrigins: string[];
+};
+
 export const SERVICE_REVIEW_EMAIL_NOTICE = "Nothing becomes part of the public Profile until you approve it. Supporting evidence stays private and is not attached to this email. This request expires 14 days after submission; resending does not extend that deadline. The link still requires the authorized owner account.";
+export const CLAIM_OWNER_REVIEW_EMAIL_NOTICE = "Sign in to review the specific claim. Ownership does not change from an email, QR scan, or Profile link. Private evidence stays in QRguitar and is not attached to this message.";
+export const CLAIM_MORE_INFO_EMAIL_NOTICE = "Sign in to the Ownership Claim Center to review the request and add information. Private review notes and evidence stay in QRguitar and are not attached to this message.";
+export const SERVICE_REVISION_REQUESTED_EMAIL_NOTICE = "Sign in with the provider account that created this submission to review the requested changes. The owner's private review note and supporting evidence stay in QRguitar and are not attached to this message.";
 
 function singleLine(value: string, maxLength: number) {
   return String(value || "").replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().slice(0, maxLength);
@@ -74,6 +88,28 @@ export function requireSafeEmailCtaUrl(value: string, allowedOrigins: string[]) 
   const origins = normalizedOrigins(allowedOrigins);
   if (parsed.protocol !== "https:" || parsed.username || parsed.password || !origins.has(parsed.origin)) {
     throw new Error("Transactional email CTA must use an approved HTTPS origin.");
+  }
+  return parsed.href;
+}
+
+const ACTION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function requireCanonicalClaimActionUrl(value: string, allowedOrigins: string[]) {
+  const parsed = new URL(requireSafeEmailCtaUrl(value, allowedOrigins));
+  const parameters = [...parsed.searchParams.entries()];
+  if (parsed.pathname !== "/ownership-claim" || parsed.hash || parameters.length !== 1 || parameters[0][0] !== "claim" || !ACTION_ID_PATTERN.test(parameters[0][1])) {
+    throw new Error("Ownership claim email CTA must use the authenticated claim destination without a secret token.");
+  }
+  return parsed.href;
+}
+
+function requireCanonicalServiceRevisionActionUrl(value: string, allowedOrigins: string[]) {
+  const parsed = new URL(requireSafeEmailCtaUrl(value, allowedOrigins));
+  const parameters = [...parsed.searchParams.entries()];
+  let profileCode = "";
+  try { profileCode = decodeURIComponent(parsed.pathname.slice("/service-work/".length)); } catch { /* rejected below */ }
+  if (!parsed.pathname.startsWith("/service-work/") || !/^QRG-[A-Z0-9][A-Z0-9-]{0,75}$/.test(profileCode) || parsed.hash || parameters.length !== 1 || parameters[0][0] !== "submission" || !ACTION_ID_PATTERN.test(parameters[0][1])) {
+    throw new Error("Service revision email CTA must use the authenticated provider workbench destination without a secret token.");
   }
   return parsed.href;
 }
@@ -184,4 +220,31 @@ export function renderServiceReviewEmailDocument(input: ServiceReviewEmailDocume
     footer: input.footer,
     allowedCtaOrigins: input.allowedCtaOrigins
   });
+}
+
+function renderActionRequiredEmailDocument(input: ActionRequiredEmailDocumentInput, eyebrow: string, notice: string): TransactionalEmailDocument {
+  return renderBrandedTransactionalEmail({
+    subject: input.subject,
+    preheader: input.preheader,
+    eyebrow,
+    heading: input.heading,
+    body: input.body,
+    ctaLabel: input.ctaLabel,
+    ctaUrl: input.actionUrl,
+    notice,
+    footer: input.footer,
+    allowedCtaOrigins: input.allowedCtaOrigins
+  });
+}
+
+export function renderClaimOwnerReviewEmailDocument(input: ActionRequiredEmailDocumentInput): TransactionalEmailDocument {
+  return renderActionRequiredEmailDocument({ ...input, actionUrl: requireCanonicalClaimActionUrl(input.actionUrl, input.allowedCtaOrigins) }, "Private ownership review", CLAIM_OWNER_REVIEW_EMAIL_NOTICE);
+}
+
+export function renderClaimMoreInfoEmailDocument(input: ActionRequiredEmailDocumentInput): TransactionalEmailDocument {
+  return renderActionRequiredEmailDocument({ ...input, actionUrl: requireCanonicalClaimActionUrl(input.actionUrl, input.allowedCtaOrigins) }, "Ownership claim update", CLAIM_MORE_INFO_EMAIL_NOTICE);
+}
+
+export function renderServiceRevisionRequestedEmailDocument(input: ActionRequiredEmailDocumentInput): TransactionalEmailDocument {
+  return renderActionRequiredEmailDocument({ ...input, actionUrl: requireCanonicalServiceRevisionActionUrl(input.actionUrl, input.allowedCtaOrigins) }, "Service revision requested", SERVICE_REVISION_REQUESTED_EMAIL_NOTICE);
 }
