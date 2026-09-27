@@ -1,14 +1,17 @@
 import { createActionEmailWorker } from "./action-required-email";
 import { contentRegistryByKey, getContentValue, validateVariables } from "./content-registry";
-import { renderClaimOwnerReviewEmailDocument, renderClaimMoreInfoEmailDocument, renderServiceRevisionRequestedEmailDocument, type TransactionalEmailDocument } from "./transactional-email-renderer";
+import { renderClaimOwnerReviewEmailDocument, renderClaimMoreInfoEmailDocument, renderServiceRevisionRequestedEmailDocument, renderClaimApprovedEmailDocument, renderClaimDeclinedEmailDocument, renderClaimExpiredEmailDocument, requireCanonicalClaimActionUrl, type TransactionalEmailDocument } from "./transactional-email-renderer";
 import type { EmailResult } from "./transactional-email";
 
-type Family = "claim.ownerReview" | "claim.moreInfo" | "service.revisionRequested";
-type Input = { event: Family; to: string; profileTitle: string; actionUrl: string; idempotencyKey: string };
+type Family = "claim.ownerReview" | "claim.moreInfo" | "claim.approved" | "claim.declined" | "claim.expired" | "service.revisionRequested";
+type Input = { event: Family; to: string; profileTitle: string; actionUrl: string; claimUrl?: string; idempotencyKey: string };
 type DeliveryOptions = { idempotencyKey: string; signal: AbortSignal; successMessage: string; failureMessage: string };
 const renderers = {
   "claim.ownerReview": renderClaimOwnerReviewEmailDocument,
   "claim.moreInfo": renderClaimMoreInfoEmailDocument,
+  "claim.approved": renderClaimApprovedEmailDocument,
+  "claim.declined": renderClaimDeclinedEmailDocument,
+  "claim.expired": renderClaimExpiredEmailDocument,
   "service.revisionRequested": renderServiceRevisionRequestedEmailDocument
 };
 const rejected = (message: string, retryable = false): EmailResult => ({ ok: false, status: "failed", outcome: "rejected", retryable, message });
@@ -32,6 +35,10 @@ export function createActionRequiredEmailSender(deps: {
     let document: TransactionalEmailDocument;
     try {
       const variables: Record<string, string> = { profile_title: input.profileTitle, claim_url: input.actionUrl, review_url: input.actionUrl };
+      if (input.event === "claim.approved") {
+        variables.claim_url = requireCanonicalClaimActionUrl(input.claimUrl || "", ["https://www.qrguitar.com"]);
+        variables.profile_url = input.actionUrl;
+      }
       const render = (suffix: string) => {
         const key = "email." + input.event + "." + suffix;
         const entry = contentRegistryByKey.get(key);

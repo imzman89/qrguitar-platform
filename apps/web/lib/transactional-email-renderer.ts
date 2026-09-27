@@ -94,7 +94,7 @@ export function requireSafeEmailCtaUrl(value: string, allowedOrigins: string[]) 
 
 const ACTION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function requireCanonicalClaimActionUrl(value: string, allowedOrigins: string[]) {
+export function requireCanonicalClaimActionUrl(value: string, allowedOrigins: string[]) {
   const parsed = new URL(requireSafeEmailCtaUrl(value, allowedOrigins));
   const parameters = [...parsed.searchParams.entries()];
   if (parsed.pathname !== "/ownership-claim" || parsed.hash || parameters.length !== 1 || parameters[0][0] !== "claim" || !ACTION_ID_PATTERN.test(parameters[0][1])) {
@@ -243,6 +243,26 @@ export function renderClaimOwnerReviewEmailDocument(input: ActionRequiredEmailDo
 
 export function renderClaimMoreInfoEmailDocument(input: ActionRequiredEmailDocumentInput): TransactionalEmailDocument {
   return renderActionRequiredEmailDocument({ ...input, actionUrl: requireCanonicalClaimActionUrl(input.actionUrl, input.allowedCtaOrigins) }, "Ownership claim update", CLAIM_MORE_INFO_EMAIL_NOTICE);
+}
+
+function requireCanonicalProfileActionUrl(value: string, allowedOrigins: string[]) {
+  const parsed = new URL(requireSafeEmailCtaUrl(value, allowedOrigins));
+  if (!/^\/i\/QRG-[A-Z0-9][A-Z0-9-]{0,75}$/.test(parsed.pathname) || parsed.search || parsed.hash) {
+    throw new Error("Approved claim email CTA must use the permanent Profile destination without a secret token.");
+  }
+  return parsed.href;
+}
+
+export function renderClaimApprovedEmailDocument(input: ActionRequiredEmailDocumentInput): TransactionalEmailDocument {
+  return renderActionRequiredEmailDocument({ ...input, actionUrl: requireCanonicalProfileActionUrl(input.actionUrl, input.allowedCtaOrigins) }, "Ownership claim update", "");
+}
+
+export function renderClaimDeclinedEmailDocument(input: ActionRequiredEmailDocumentInput): TransactionalEmailDocument {
+  return renderActionRequiredEmailDocument({ ...input, actionUrl: requireCanonicalClaimActionUrl(input.actionUrl, input.allowedCtaOrigins) }, "Ownership claim update", "");
+}
+
+export function renderClaimExpiredEmailDocument(input: ActionRequiredEmailDocumentInput): TransactionalEmailDocument {
+  return renderActionRequiredEmailDocument({ ...input, actionUrl: requireCanonicalClaimActionUrl(input.actionUrl, input.allowedCtaOrigins) }, "Ownership claim update", "");
 }
 
 export function renderServiceRevisionRequestedEmailDocument(input: ActionRequiredEmailDocumentInput): TransactionalEmailDocument {
