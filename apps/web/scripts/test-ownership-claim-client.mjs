@@ -23,7 +23,7 @@ class FakeFileReader {
 const source = fs.readFileSync(path.join(root, "lib/ownership-claim-client.ts"), "utf8");
 const exports = {};
 new Function("exports", "FileReader", ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText)(exports, FakeFileReader);
-const { createClaimSessionGuard, ClaimRequestError, StaleClaimRequest, claimReturnPath, serializeClaimBody, confirmedClaimMutation, readClaimEvidence, MAX_CLAIM_EVIDENCE_BYTES } = exports;
+const { createClaimSessionGuard, ClaimRequestError, StaleClaimRequest, claimReturnPath, claimLinkId, visibleClaimRequests, serializeClaimBody, confirmedClaimMutation, readClaimEvidence, MAX_CLAIM_EVIDENCE_BYTES } = exports;
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
 async function until(predicate) { for (let i = 0; i < 80 && !predicate(); i++) await tick(); assert.ok(predicate(), "state did not settle"); }
@@ -155,8 +155,8 @@ function compile(code, env, result) {
 function setters(state) { return Object.fromEntries(Object.keys(state).map(key => ["set" + key[0].toUpperCase() + key.slice(1), value => { state[key] = typeof value === "function" ? value(state[key]) : value; }])); }
 function pageHarness(options = {}) {
   const h = harness(options);
-  const state = { evidenceReading: false, claimsLoading: false, claimsError: "", signedIn: null, scenarioId: "", identifier: "", acquisitionDetails: "old private narrative", ownershipDeclaration: "", challengeCode: "", evidence: [], claims: [], busy: false, message: "", complete: false, responseClaimId: "", responseEvidence: [], buyerCode: "private-code", buyerOrderReference: "", authError: "", withdrawClaimId: "", withdrawNotice: null };
-  const refs = { claimGuard: { current: null }, reloadClaimsRef: { current: async () => {} }, claimLoadRevision: { current: 0 }, evidenceRead: { current: null } };
+  const state = { evidenceReading: false, claimsLoading: false, claimsError: "", signedIn: null, scenarioId: "", identifier: "", acquisitionDetails: "old private narrative", ownershipDeclaration: "", challengeCode: "", evidence: [], claims: [], busy: false, message: "", complete: false, responseClaimId: "", responseEvidence: [], buyerCode: "private-code", buyerOrderReference: "", authError: "", withdrawClaimId: "", withdrawNotice: null, reviewNotice: null };
+  const refs = { focusedClaim: { current: "" }, claimGuard: { current: null }, reloadClaimsRef: { current: async () => {} }, claimLoadRevision: { current: 0 }, evidenceRead: { current: null } };
   const env = { ...refs, ...setters(state), returnPath: "/ownership-claim?code=QRG-SYNTH&handoff=buyer-code", createClaimSessionGuard: () => h.guard, createBrowserSupabaseClient: () => { throw new Error("Unexpected auth factory use"); } };
   const dispose = compile("const effect = " + pageEffect + ";", env, "effect")();
   return { h, state, refs, env, dispose };
@@ -208,7 +208,7 @@ await test("page applies only a verified successful mutation receipt once", asyn
 await test("signed-out page renders login return intent without private controls or claim records", () => {
   const params = new URLSearchParams({ code: "QRG-SYNTH", handoff: "buyer-code" }); let index = 0;
   const empty = () => null;
-  const Component = compile(functions.get("OwnershipClaimContent"), { React, workflow: { claims: "claims-workspace" }, useSiteContent: () => ({}), useSearchParams: () => params, claimReturnPath, useRef: value => ({ current: value }), useMemo: fn => fn(), useEffect() {}, useState: initial => [index++ === 4 ? false : typeof initial === "function" ? initial() : initial, () => {}], scenarioDefinitions: [], statusSteps: [], getContentValue: (_, key) => key,
+  const Component = compile(functions.get("OwnershipClaimContent"), { React, workflow: { claims: "claims-workspace" }, useSiteContent: () => ({}), useSearchParams: () => params, claimReturnPath, claimLinkId, visibleClaimRequests, ClaimOwnerReview: () => null, useRef: value => ({ current: value }), useMemo: fn => fn(), useEffect() {}, useState: initial => [index++ === 4 ? false : typeof initial === "function" ? initial() : initial, () => {}], scenarioDefinitions: [], statusSteps: [], getContentValue: (_, key) => key,
     Nav: empty, Footer: empty, ShieldCheck: empty, Link: ({ children, ...props }) => React.createElement("a", props, children)
   }, "OwnershipClaimContent");
   const html = renderToStaticMarkup(React.createElement(Component));
@@ -225,7 +225,7 @@ function claimChooserHarness(search = "", savedClaims = [], notice = null) {
   let currentTree;
   let stateIndex = 0, refIndex = 0;
   const Component = compile(functions.get("OwnershipClaimContent"), {
-    React, ...icons, workflow: { claims: "claims-workspace" }, useSiteContent: () => ({}), useSearchParams: () => params, claimReturnPath,
+    React, ...icons, workflow: { claims: "claims-workspace" }, useSiteContent: () => ({}), useSearchParams: () => params, claimReturnPath, claimLinkId, visibleClaimRequests, ClaimOwnerReview: () => null,
     useState(initial) {
       const index = stateIndex++;
       if (!(index in values)) values[index] = index === 4 ? true : index === 11 ? savedClaims : index === 20 ? notice : typeof initial === "function" ? initial() : initial;
@@ -351,4 +351,66 @@ await test("removed request keeps its authoritative reconciliation notice visibl
   const notices=claimElements(tree,node=>node.props.id==='withdraw-status-claim-a');assert.equal(notices.length,1);assert.equal(notices[0].props.role,'alert');assert.equal(notices[0].props.tabIndex,-1);assert.equal(p.focused.at(-1),'withdraw-status-claim-a');p.dispose();
 });
 
-console.log(`${count} ownership claim client cases passed.`);
+
+
+await test("claim email link preserves only valid request identity through sign-in", () => {
+ const id="aabbccdd-1111-4111-8111-123456789abc";
+ assert.equal(claimReturnPath(new URLSearchParams({claim:id,next:"https://invalid.test",token:"secret"})),"/ownership-claim?claim="+id);
+ assert.equal(claimReturnPath(new URLSearchParams({claim:"//evil.test?token=secret"})),"/ownership-claim");
+ assert.equal(claimLinkId(id.toUpperCase()),id);
+});
+await test("email target beyond six requests is visible without manufacturing missing/private data", () => {
+ const rows=Array.from({length:10},(_,i)=>({id:"claim-"+i}));
+ assert.equal(visibleClaimRequests(rows,"claim-9")[0],rows[9]);
+ assert.equal(visibleClaimRequests(rows,"missing").length,6);
+ assert.equal(new Set(visibleClaimRequests(rows,"claim-9")).size,6);
+ assert.deepEqual(visibleClaimRequests([],"private-claim"),[]);
+});
+await test("owner decision reconciles lost response without repeating mutation", async () => {
+ const review={...claim,canReview:true};const p=pageHarness({reply:async()=>ok({claims:[review]})});
+ await until(()=>p.state.signedIn===true&&!p.state.claimsLoading);
+ let writes=0;p.h.reply=async (_url,init)=>{if(init?.method==="PATCH"){writes++;throw new Error("Lost reply");}return ok({claims:[{...review,status:"approved",canReview:false}]});};
+ const decide=compile(functions.get("reviewClaim"),{...p.env,...p.state,serializeClaimBody,window:{requestAnimationFrame(){} }},"reviewClaim");
+ assert.equal(await decide(claim.id,"approve","Evidence reviewed"),true);assert.equal(writes,1);assert.equal(p.state.reviewNotice.error,false);p.dispose();
+});
+await test("owner decision does not claim success when refreshed state is unavailable", async () => {
+ const review={...claim,canReview:true};const p=pageHarness({reply:async()=>ok({claims:[review]})});
+ await until(()=>p.state.signedIn===true&&!p.state.claimsLoading);
+ p.h.reply=async (_url,init)=>init?.method==="PATCH"?ok({status:"approved"}):Response.json({ok:false},{status:503});
+ const decide=compile(functions.get("reviewClaim"),{...p.env,...p.state,serializeClaimBody,window:{requestAnimationFrame(){} }},"reviewClaim");
+ assert.equal(await decide(claim.id,"approve","Evidence reviewed"),false);assert.equal(p.state.reviewNotice.error,true);assert.equal(p.state.busy,false);p.dispose();
+});
+await test("status-only claim never enables owner mutations", async () => {
+ const p=pageHarness();await until(()=>p.state.signedIn===true&&!p.state.claimsLoading);
+ const before=p.h.calls.length;
+ const decide=compile(functions.get("reviewClaim"),{...p.env,...p.state,serializeClaimBody},"reviewClaim");
+ assert.equal(await decide(claim.id,"approve","Not authorized"),false);assert.equal(p.h.calls.length,before);p.dispose();
+});
+
+
+const ownerReviewSource = fs.readFileSync(path.join(root,"components/ClaimOwnerReview.tsx"),"utf8");
+const ownerAst=ts.createSourceFile("ClaimOwnerReview.tsx",ownerReviewSource,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+const ownerFunction=ownerAst.statements.find(node=>ts.isFunctionDeclaration(node)&&node.name?.text==="ClaimOwnerReview");
+function ownerReviewHarness(claimValue={...claim,canReview:true}, callback=async()=>true){
+ const state=[],refs=[],frames=[],focused=[];let index=0,refIndex=0;
+ const Component=compile(ownerFunction.getText(ownerAst).replace(/^export /, ""),{React,styles:{review:"review",confirmation:"confirmation"},useState(initial){const i=index++;if(!(i in state))state[i]=initial;return [state[i],v=>state[i]=typeof v==="function"?v(state[i]):v];},useRef(initial){const i=refIndex++;return refs[i]||={current:initial};},window:{requestAnimationFrame(fn){frames.push(fn);}}},"ClaimOwnerReview");
+ return {focused,flush(){while(frames.length)frames.shift()();},render(){index=0;refIndex=0;const tree=Component({claim:claimValue,disabled:false,onDecision:callback});for(const node of claimElements(tree,n=>Boolean(n.props.ref)))node.props.ref.current={focus(){focused.push(renderToStaticMarkup(node).replace(/<[^>]*>/g,""));}};return tree;}};
+}
+function reviewButton(tree,label){return claimElements(tree,n=>n.type==="button"&&renderToStaticMarkup(n).replace(/<[^>]*>/g,"")===label)[0];}
+await test("owner review requires server capability, confirms consequences, and Escape makes no decision",async()=>{
+ let writes=0;const p=ownerReviewHarness({...claim,canReview:true},async()=>{writes++;return true;});let tree=p.render();
+ reviewButton(tree,"Approve ownership request").props.onClick();tree=p.render();p.flush();assert.equal(p.focused.at(-1),"Keep reviewing");
+ assert.match(renderToStaticMarkup(tree),/Approval moves this Profile/);assert.equal(reviewButton(tree,"Confirm decision").props.disabled,true);assert.equal(writes,0);
+ claimElements(tree,n=>n.props.role==="group")[0].props.onKeyDown({key:"Escape",preventDefault(){}});tree=p.render();p.flush();assert.equal(p.focused.at(-1),"Approve ownership request");assert.equal(writes,0);
+ assert.equal(ownerReviewHarness({...claim,canReview:false}).render(),null);assert.equal(ownerReviewHarness({...claim,canReview:true,status:"approved"}).render(),null);
+});
+await test("confirm decision sends once even before rerender and preserves note on failure",async()=>{
+ const gate=deferred(),calls=[];const p=ownerReviewHarness({...claim,canReview:true},async(...args)=>{calls.push(args);return gate.promise;});let tree=p.render();
+ reviewButton(tree,"Decline request").props.onClick();tree=p.render();claimElements(tree,n=>n.type==="textarea")[0].props.onChange({target:{value:"Wrong instrument"}});tree=p.render();
+ const confirm=reviewButton(tree,"Confirm decision");confirm.props.onClick();confirm.props.onClick();assert.deepEqual(calls,[["deny","Wrong instrument"]]);gate.resolve(false);await tick();tree=p.render();
+ assert.equal(claimElements(tree,n=>n.type==="textarea")[0].props.value,"Wrong instrument");assert.equal(reviewButton(tree,"Confirm decision").props.disabled,false);
+});
+await test("owner review escapes evidence labels and excludes script links",()=>{
+ const tree=ownerReviewHarness({...claim,canReview:true,evidence:[{id:"bad",fileName:"<script>private</script>",url:"javascript:alert(1)"}]}).render();const html=renderToStaticMarkup(tree);assert.doesNotMatch(html,/href=|<script>/);assert.match(html,/&lt;script&gt;/);
+});
+console.log(count + " ownership claim client cases passed.");

@@ -1,0 +1,11 @@
+.review { display: grid; gap: 16px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-soft, #39434a); min-width: 0; }
+.review h4 { margin: 0; font-size: 17px; line-height: 1.4; }
+.review p { margin: 0; font-size: 15px; line-height: 1.6; color: var(--muted); }
+.review strong { color: var(--text); font-weight: 550; }
+.review ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.review.review ul li { border: 0; padding: 0; font-size: 15px; text-transform: none; background: transparent; }
+.review ul a { display: inline-flex; align-items: center; min-height: 44px; text-decoration: underline; }
+.review button { min-height: 44px; }
+.review label { display: grid; gap: 8px; width: 100%; font-size: 15px; }
+.review textarea { width: 100%; min-height: 100px; resize: vertical; font: inherit; }
+.confirmation { display: grid; gap: 16px; min-width: 0; }

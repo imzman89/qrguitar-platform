@@ -7,18 +7,19 @@ import { ArrowLeft, Check, FileCheck2, Gift, Handshake, PackageCheck, ShieldChec
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { ClaimOwnerReview, type OwnerClaimReview } from "../../components/ClaimOwnerReview";
 import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import { createBrowserSupabaseClient } from "../../lib/supabase-browser";
 import { getContentValue } from "../../lib/content-registry";
 import { useSiteContent } from "../../lib/use-site-content";
-import { createClaimSessionGuard, ClaimRequestError, claimReturnPath, confirmedClaimMutation, serializeClaimBody, readClaimEvidence, MAX_CLAIM_EVIDENCE_BYTES } from "../../lib/ownership-claim-client";
+import { createClaimSessionGuard, ClaimRequestError, claimReturnPath, claimLinkId, visibleClaimRequests, confirmedClaimMutation, serializeClaimBody, readClaimEvidence, MAX_CLAIM_EVIDENCE_BYTES } from "../../lib/ownership-claim-client";
 import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "../../lib/optional-tracking-consent";
 
 type EvidenceDraft = { name: string; dataUrl: string; type: string; bytes: number };
 type ClaimType = "owner_transfer" | "store_purchase" | "legacy_review";
 type ScenarioId = "store" | "builder" | "seller" | "no-transfer" | "gift" | "legacy";
-type ClaimSummary = { id: string; status: string; profileTitle: string; qrCode: string; evidenceCount: number; claimType: ClaimType; createdAt: string; adminReviewNote?: string; canWithdraw?: boolean };
+type ClaimSummary = { id: string; status: string; profileTitle: string; qrCode: string; evidenceCount: number; claimType: ClaimType; createdAt: string; adminReviewNote?: string; canWithdraw?: boolean; canSubmitEvidence?: boolean } & OwnerClaimReview;
 
 function canWithdrawClaim(claim: ClaimSummary) {
   return claim.canWithdraw === true && ["awaiting_claimant", "awaiting_owner", "admin_review"].includes(claim.status);
@@ -51,6 +52,8 @@ function OwnershipClaimContent() {
   const content = useSiteContent();
   const searchParams = useSearchParams();
   const returnPath = claimReturnPath(searchParams);
+  const requestedClaim = claimLinkId(searchParams.get("claim"));
+  const focusedClaim = useRef("");
   const claimGuard = useRef<ReturnType<typeof createClaimSessionGuard> | null>(null);
   const reloadClaimsRef = useRef<() => Promise<ClaimSummary[] | null>>(async () => null);
   const claimLoadRevision = useRef(0);
@@ -76,6 +79,7 @@ function OwnershipClaimContent() {
   const [buyerOrderReference, setBuyerOrderReference] = useState("");
   const [withdrawClaimId, setWithdrawClaimId] = useState("");
   const [withdrawNotice, setWithdrawNotice] = useState<{ id: string; text: string; error: boolean } | null>(null);
+  const [reviewNotice, setReviewNotice] = useState<{ id: string; text: string; error: boolean } | null>(null);
   const scenarios = useMemo(() => scenarioDefinitions.map((item) => ({
     ...item,
     title: getContentValue(content, `claimCenter.scenarios.${item.key}.title`),
@@ -116,7 +120,7 @@ function OwnershipClaimContent() {
         evidenceRead.current = null;
         setEvidenceReading(false); setClaimsLoading(false); setClaimsError("");
         setClaims([]); setEvidence([]); setResponseEvidence([]); setResponseClaimId("");
-        setWithdrawClaimId(""); setWithdrawNotice(null);
+        setWithdrawClaimId(""); setWithdrawNotice(null); setReviewNotice(null); focusedClaim.current = "";
         setAcquisitionDetails(""); setOwnershipDeclaration(""); setBuyerCode(""); setBuyerOrderReference("");
         setComplete(false); setMessage(""); setChallengeCode("");
         setIdentifier(initial.get("code") || initial.get("serial") || "");
@@ -135,6 +139,34 @@ function OwnershipClaimContent() {
       if (claimGuard.current === current) { claimGuard.current = null; reloadClaimsRef.current = async () => null; }
     };
   }, [returnPath]);
+
+  useEffect(() => {
+    if (!signedIn || claimsLoading || claimsError || !requestedClaim || focusedClaim.current === requestedClaim || !claims.some(claim => claim.id.toLowerCase() === requestedClaim)) return;
+    const target = document.getElementById("claim-title-" + requestedClaim);
+    if (target) { target.focus(); focusedClaim.current = requestedClaim; }
+  }, [signedIn, claimsLoading, claimsError, requestedClaim, claims]);
+
+  async function reviewClaim(claimId: string, action: "approve" | "deny", note: string) {
+    const current = claimGuard.current;
+    const claim = claims.find(item => item.id === claimId);
+    if (!current || evidenceRead.current || claimsLoading || claimsError || claim?.canReview !== true || claim.status !== "awaiting_owner" || !note.trim()) return false;
+    const lease = current.beginWrite();
+    if (!lease) return false;
+    claimLoadRevision.current++; setReviewNotice(null);
+    try {
+      try { await current.request(lease, "/api/ownership-claims", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: serializeClaimBody({ id: claimId, action, note }) }); }
+      catch { /* Reconcile lost replies; never replay a decision automatically. */ }
+      if (!current.isCurrent(lease)) return false;
+      const saved = await reloadClaimsRef.current();
+      if (!current.isCurrent(lease)) return false;
+      const confirmed = saved?.find(item => item.id === claimId)?.status === (action === "approve" ? "approved" : "denied");
+      setReviewNotice({ id: claimId, error: !confirmed, text: confirmed
+        ? ui("ui.app.ownership.claim.page.reviewSaved", "Decision saved. The request status below has been refreshed.")
+        : ui("ui.app.ownership.claim.page.reviewUnconfirmed", "Your decision could not be confirmed. Refresh the saved request status before trying again.") });
+      window.requestAnimationFrame(() => document.getElementById("claim-review-status-" + claimId)?.focus());
+      return confirmed;
+    } finally { current.finishWrite(lease); }
+  }
 
   function chooseScenario(id: ScenarioId) {
     if (busy || evidenceReading) return;
@@ -271,12 +303,15 @@ function OwnershipClaimContent() {
               <div className="claim-load-status">
                 {claimsLoading ? <p role="status">{ui("ui.app.ownership.claim.page.ae324303eaa6", "Loading your ownership requests...")}</p> : null}
                 {claimsError ? <p role="alert">{claimsError}</p> : null}
+                {requestedClaim && !claimsLoading && !claimsError && !claims.some(claim => claim.id.toLowerCase() === requestedClaim) ? <p role="status">{ui("ui.app.ownership.claim.page.linkUnavailable", "This request is unavailable to this account. Check that you signed in with the account the email was sent to.")}</p> : null}
+                {requestedClaim ? <Link href="/ownership-claim">{ui("ui.app.ownership.claim.page.newRequest", "Start a new ownership request")}</Link> : null}
+                {reviewNotice && !claims.some(claim => claim.id === reviewNotice.id) ? <p id={"claim-review-status-" + reviewNotice.id} tabIndex={-1} role={reviewNotice.error ? "alert" : "status"}>{reviewNotice.text}</p> : null}
                 {withdrawNotice && !claims.some((claim) => claim.id === withdrawNotice.id) ? <p id={`withdraw-status-${withdrawNotice.id}`} tabIndex={-1} role={withdrawNotice.error ? "alert" : "status"}>{withdrawNotice.text}</p> : null}
                 {message && !complete ? <p className="form-message" role="status">{message}</p> : null}
                 <button type="button" className="button secondary" disabled={busy || evidenceReading || claimsLoading} onClick={() => void reloadClaimsRef.current()}>{ui("ui.app.ownership.claim.page.6bc7c88e3f4e", "Refresh request status")}</button>
               </div>
               <fieldset disabled={busy || evidenceReading} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-              {!scenario ? (
+              {!scenario && !requestedClaim ? (
               <section className="claim-scenario-grid" id="claim-situations" aria-label={ui("ui.app.ownership.claim.page.4c17f2a2ba0a", "Ownership situations")}>
                 {scenarios.map((item) => {
                   const Icon = item.icon;
@@ -325,12 +360,14 @@ function OwnershipClaimContent() {
                 <section className="claim-status-section">
                   <div className="section-head"><div><div className="eyebrow">{ui("ui.app.ownership.claim.page.4c64a2a1c581", "Your requests")}</div><h2>{ui("ui.app.ownership.claim.page.54403cae6653", "Claim status")}</h2></div></div>
                   <div className="claim-status-list">
-                    {claims.slice(0, 6).map((claim) => (
+                    {visibleClaimRequests(claims, requestedClaim).map((claim) => (
                       <article key={claim.id} style={{ gridTemplateColumns: "minmax(0, 1fr)" }}>
                         <div>
                           <span>{claimStatusLabel(claim.status)}</span>
-                          <h3>{claim.profileTitle}</h3>
+                          <h3 id={"claim-title-" + claim.id.toLowerCase()} tabIndex={-1}>{claim.profileTitle}</h3>
                           <small>{claim.qrCode || ui("ui.app.ownership.claim.page.0e2a9633188b", "Private Profile")} · {claim.evidenceCount}{" "}{ui("ui.app.ownership.claim.page.21ea0f42e3ae", "evidence file")}{claim.evidenceCount === 1 ? "" : ui("ui.app.ownership.claim.page.043a718774c5", "s")}</small>
+                          <ClaimOwnerReview key={claim.id + ":" + claim.status} claim={claim} disabled={busy || claimsLoading || Boolean(claimsError) || evidenceReading} onDecision={(action, note) => reviewClaim(claim.id, action, note)} />
+                          {reviewNotice?.id === claim.id ? <p id={"claim-review-status-" + claim.id} tabIndex={-1} role={reviewNotice.error ? "alert" : "status"}>{reviewNotice.text}</p> : null}
                           {canWithdrawClaim(claim) ? <div className="claim-response">
                             {withdrawClaimId === claim.id ? <div role="group" aria-labelledby={`withdraw-title-${claim.id}`} style={{ display: "grid", gap: 12 }}>
                               <h4 id={`withdraw-title-${claim.id}`} style={{ margin: 0 }}>{ui("ui.app.ownership.claim.page.withdrawConfirmTitle", "Withdraw this ownership request?")}</h4>
@@ -342,7 +379,7 @@ function OwnershipClaimContent() {
                             </div> : <button id={`withdraw-request-${claim.id}`} className="button secondary" type="button" disabled={busy || evidenceReading || claimsLoading || Boolean(claimsError)} onClick={() => { setWithdrawClaimId(claim.id); setWithdrawNotice(null); window.requestAnimationFrame(() => document.getElementById(`keep-request-${claim.id}`)?.focus()); }}><X size={16} aria-hidden="true" />{ui("ui.app.ownership.claim.page.withdrawRequest", "Withdraw request")}</button>}
                           </div> : null}
                           {withdrawNotice?.id === claim.id ? <p id={`withdraw-status-${claim.id}`} tabIndex={-1} role={withdrawNotice.error ? "alert" : "status"}>{withdrawNotice.text}</p> : null}
-                          {claim.status === "awaiting_claimant" ? (
+                          {claim.status === "awaiting_claimant" && (claim.canSubmitEvidence === true || claim.canWithdraw === true) ? (
                             <div className="claim-response">
                               <p><b>{ui("ui.app.ownership.claim.page.e9672027cf43", "QRguitar needs more information.")}</b>{claim.adminReviewNote ? ui("ui.app.ownership.claim.page.7130515d99f1", " {{value1}}", { value1: claim.adminReviewNote }) : ui("ui.app.ownership.claim.page.aa618133af62", " Add the requested private evidence below.")}</p>
                               {responseClaimId === claim.id ? (

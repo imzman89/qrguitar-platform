@@ -9,6 +9,8 @@ export const MAX_CLAIM_BODY_BYTES = 4_200_000;
 export function claimReturnPath(params: Pick<URLSearchParams, "get">) {
   const next = new URLSearchParams();
   for (const key of ["code", "serial", "handoff"]) { const value = params.get(key); if (value) next.set(key, value.slice(0, 120)); }
+  const claim = claimLinkId(params.get("claim"));
+  if (claim) next.set("claim", claim);
   return `/ownership-claim${next.size ? `?${next.toString()}` : ""}`;
 }
 export function serializeClaimBody(body: unknown) {
@@ -112,4 +114,12 @@ export function createClaimSessionGuard(deps: { auth: () => ClaimAuth; fetch?: t
     finishWrite(lease: ClaimLease) { if (lock === lease.operation && isCurrent(lease)) { lock = undefined; publish({ busy: false }); } },
     dispose() { disposed = true; abort(); unsubscribe?.(); listeners.clear(); state = { phase: "loading", actorId: "", revision: state.revision + 1, busy: false, error: "" }; },
   };
+}
+
+export function claimLinkId(value: string | null) {
+  return value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value) ? value.toLowerCase() : "";
+}
+export function visibleClaimRequests<T extends { id: string }>(claims: T[], requestedId: string) {
+  const selected = claims.find(claim => claim.id.toLowerCase() === requestedId);
+  return selected ? [selected, ...claims.filter(claim => claim !== selected).slice(0, 5)] : claims.slice(0, 6);
 }

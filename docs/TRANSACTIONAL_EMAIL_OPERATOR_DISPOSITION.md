@@ -1,6 +1,6 @@
 # Transactional notification disposition
 
-This is the operator view of production behavior. Content Studio registration is not a trigger. The Account → Notifications page currently says security, transfer, claim, and service-review notices are emailed when action is required, but that statement is broader than runtime delivery.
+This is the operator view of production behavior at release `0bde417` (September 26, 2026). Content Studio registration is not a delivery trigger. Earlier Account → Notifications wording promised more email delivery than was connected. The released page now names the implemented email paths and directs other updates to the relevant workspace. This copy correction does not implement the missing triggers listed below.
 
 ## Implemented delivery
 
@@ -48,18 +48,18 @@ These registered families describe a useful action or high-value state change, b
 
 ## Remaining operator decisions
 
-1. Reconcile Account → Notifications copy with reality: either implement the action-required claim/service/transfer rows above or narrow the promise. There is currently no user-selectable email preference; the UI labels these notices “Required” and “Enabled.”
-2. Choose a durable post-commit dispatch model before connecting more application email. Do not send inside a transaction or infer success from a lost response; do not rely on the unverified optional Brevo idempotency field.
+1. The Account → Notifications copy correction is released and live-verified at `0bde417`; the former “Required” and “Enabled” claims no longer describe the current interface. There is no user-selectable email preference. The action-required claim/service and transfer-outcome delivery gaps above remain implementation work.
+2. A separate disabled service-email recovery candidate exists at `3197d44`; it is not part of production `0bde417`. Complete its configured integration gate and separately authorize the required production migration/cutover before activation. It does not connect every family above. Do not send inside a transaction or infer success from a lost response; do not rely on the unverified optional Brevo idempotency field.
 3. Define recipient revalidation and safe authenticated destinations per event. Never place evidence, ownership tokens, payment identifiers, or deletion secrets in email.
 4. Decide account-deletion completion timing and lawful address retention before Auth deletion. This is the only identified event for which in-app-only status becomes unavailable by design.
 
 ## Live published-content precedence
 
-On 2026-09-26 the public merged settings endpoint still returned the prior Account → Notifications wording for these exact keys:
+Before the September 26 release, the public merged settings endpoint returned the prior Account → Notifications wording for these exact keys:
 
 - `ui.app.account.page.b7d24faecb5a`
 - `ui.app.account.page.c9aae06952ae`
 - `ui.app.account.page.92c1cdfdf4cb`
 - `ui.app.account.page.e16273f1c0f6`
 
-A read-only query of the production `site_content` record confirmed that none of these four keys is explicitly stored in `homepage.content`, and that no draft row exists. `UiTextProvider` gives published content precedence, but no saved override blocks the corrected registry defaults: they will become effective on deployment without a Content Studio mutation. The read-only receipt is `outputs/email-automation-20260926/notification-raw-overrides.json` (2026-09-26T20:56:29Z). No production Content Studio value was changed during this audit.
+A read-only query of the production `site_content` record confirmed that none of these four keys is explicitly stored in `homepage.content`, and that no draft row exists. `UiTextProvider` gives published content precedence, but no saved override blocked the corrected registry defaults. Release `0bde417` made those defaults effective; the settled live owner Account screen was independently inspected after deployment. No Content Studio mutation was needed. The read-only receipt is `outputs/email-automation-20260926/notification-raw-overrides.json` (2026-09-26T20:56:29Z). No production Content Studio value was changed during this audit.
