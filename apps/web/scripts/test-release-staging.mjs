@@ -196,3 +196,42 @@ test("CLI resolver rejects ambiguous output or unpinned metadata before commands
  for(const output of ["not json",JSON.stringify({version:"0.0.0",entrypoint}),JSON.stringify({version:VERCEL_VERSION,entrypoint,other:true}),JSON.stringify({version:VERCEL_VERSION,entrypoint:"relative.js"})])assert.throws(()=>resolveVercelCli("fixture-npx",()=>output));
  assert.throws(()=>resolveVercelCli("fixture-npx",()=>{throw Error("npm resolution failed");}),/npm resolution failed/);
 }));
+
+test("native Git snapshot preserves exact reviewed identity without ignored secrets or source hooks",()=>{
+ const fixture=fs.mkdtempSync(path.join(os.tmpdir(),"qrguitar-snapshot-test-"));let snapshot;
+ try{
+  const git=(...args)=>execFileSync("git",args,{cwd:fixture,encoding:"utf8",stdio:["ignore","pipe","pipe"]}).trim();
+  git("init","--template=");git("remote","add","origin","https://github.com/imzman89/qrguitar-platform-live.git");
+  fs.writeFileSync(path.join(fixture,".gitignore"),".env.local\n");fs.writeFileSync(path.join(fixture,"tracked.txt"),"reviewed");
+  git("add",".");git("-c","user.name=QA","-c","user.email=qa@example.invalid","commit","-m","reviewed");const sha=git("rev-parse","HEAD"),tree=git("rev-parse","HEAD^{tree}");
+  // Even a later source commit must not change which tree the snapshot contains.
+  fs.writeFileSync(path.join(fixture,"tracked.txt"),"later commit");git("add",".");git("-c","user.name=QA","-c","user.email=qa@example.invalid","commit","-m","later");
+  fs.writeFileSync(path.join(fixture,"tracked.txt"),"uncommitted work");fs.writeFileSync(path.join(fixture,".env.local"),"fixture-secret");fs.writeFileSync(path.join(fixture,"untracked.txt"),"unreviewed");
+  git("config","private.fixture","not-for-deployment");const before=git("status","--porcelain");
+  snapshot=createReleaseSnapshot(fixture,sha,'{"projectId":"fixture"}',{includeGitMetadata:true});
+  const snapGit=(...args)=>execFileSync("git",args,{cwd:snapshot,encoding:"utf8",stdio:["ignore","pipe","pipe"]}).trim();
+  assert.equal(snapGit("rev-parse","HEAD"),sha);assert.equal(snapGit("rev-parse","HEAD^{tree}"),tree);
+  assert.equal(snapGit("remote","get-url","origin"),"https://github.com/imzman89/qrguitar-platform-live.git");
+  assert.equal(snapGit("status","--porcelain","--untracked-files=all"),"");
+  assert.equal(fs.readFileSync(path.join(snapshot,"tracked.txt"),"utf8"),"reviewed");
+  for(const file of [".env.local","untracked.txt"])assert.equal(fs.existsSync(path.join(snapshot,file)),false);
+  assert.doesNotMatch(fs.readFileSync(path.join(snapshot,".git/config"),"utf8"),/not-for-deployment|private\.fixture/);
+  assert.deepEqual(fs.readdirSync(snapGit("config","core.hooksPath")),[]);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(snapshot,".vercel/project.json"))),{projectId:"fixture"});
+  assert.equal(git("status","--porcelain"),before);assert.equal(fs.readFileSync(path.join(fixture,"tracked.txt"),"utf8"),"uncommitted work");
+  removeReleaseSnapshot(snapshot);snapshot=undefined;
+  git("remote","set-url","origin","https://github.com/imzman89/qrguitar-platform.git");
+  assert.throws(()=>createReleaseSnapshot(fixture,sha,undefined,{includeGitMetadata:true}),/Unexpected QRguitar release remote/);
+ }finally{
+  if(snapshot)removeReleaseSnapshot(snapshot);
+  const target=path.resolve(fixture);if(path.dirname(target)!==path.resolve(os.tmpdir())||!path.basename(target).startsWith("qrguitar-snapshot-test-"))throw Error("Unsafe fixture cleanup");fs.rmSync(target,{recursive:true,force:true});
+ }
+});
+
+test("Vercel staging independently requires the native platform SHA",async()=>{
+ const sha="a".repeat(40),base={gitCommitSha:sha,environment:"production",origin:fixtureUrl,dirtyWorkingTree:false};
+ for(const platformGitCommitSha of [undefined,"b".repeat(40)])await assert.rejects(verifyDeploymentIdentity({sha,platformGitCommitSha:sha,origin:fixtureUrl,staged:true,fetchImpl:async()=>Response.json({...base,platformGitCommitSha})}));
+ const identity=await verifyDeploymentIdentity({sha,platformGitCommitSha:sha,origin:fixtureUrl,staged:true,fetchImpl:async()=>Response.json({...base,platformGitCommitSha:sha})});assert.equal(identity.platformGitCommitSha,sha);
+ let healthProbed=false;
+ await assert.rejects(verifyProduction({sha,platformGitCommitSha:sha,origin:fixtureUrl,staged:true,fetchImpl:async url=>{if(String(url).includes('/api/health'))healthProbed=true;return Response.json(base)}}));assert.equal(healthProbed,false);
+});

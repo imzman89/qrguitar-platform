@@ -189,3 +189,15 @@ test("loopback review ports are local identities without implying backend isolat
     }
   });
 });
+
+test("build-info exposes native Vercel identity separately from the supplied release label",async()=>{
+ await withEnvironment({VERCEL:"1",VERCEL_GIT_COMMIT_SHA:"b".repeat(40),QRGUITAR_GIT_SHA:"a".repeat(40)},async()=>{
+  const result=await (await buildInfo(new Request("https://www.qrguitar.com/api/build-info"))).json();
+  assert.equal(result.gitCommitSha,"a".repeat(40));assert.equal(result.platformGitCommitSha,"b".repeat(40));
+ });
+ for(const native of [undefined,"not-a-commit"]){
+  await withEnvironment({VERCEL:"1",QRGUITAR_GIT_SHA:"a".repeat(40),...(native?{VERCEL_GIT_COMMIT_SHA:native}:{})},async()=>{
+   const result=await (await buildInfo(new Request("https://www.qrguitar.com/api/build-info"))).json();assert.equal(Object.hasOwn(result,"platformGitCommitSha"),false);
+  });
+ }
+});

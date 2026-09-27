@@ -63,7 +63,7 @@ try {
   });
   const stage = () => {
     // Upload exactly the reviewed commit, without local secrets or concurrent checkout edits.
-    snapshot = createReleaseSnapshot(root, gitSha, projectLink);
+    snapshot = createReleaseSnapshot(root, gitSha, projectLink, { includeGitMetadata: true });
     const deployment = parseDeploymentJson(cli(["deploy", "--project", projectId, "--prod", "--skip-domain", "--json", "--yes", ...vercelArgs], true));
     console.log("Staged production deployment " + deployment.id + " at " + deployment.url + ".");
     return deployment.url;
@@ -81,10 +81,10 @@ try {
       return parseCurlProbe(output);
     };
     const verifier = identityOnly ? verifyDeploymentIdentity : verifyProduction;
-    await verifier({ sha: gitSha, buildTimestamp: releaseEnvironment.QRGUITAR_BUILD_TIMESTAMP, origin: url, staged: true, fetchImpl: probe });
+    await verifier({ sha: gitSha, platformGitCommitSha: gitSha, buildTimestamp: releaseEnvironment.QRGUITAR_BUILD_TIMESTAMP, origin: url, staged: true, fetchImpl: probe });
   };
   const promote = url => cli(["promote", url, "--yes"]);
-  const verifyLive = () => verifyProduction({ sha: gitSha, buildTimestamp: releaseEnvironment.QRGUITAR_BUILD_TIMESTAMP });
+  const verifyLive = () => verifyProduction({ sha: gitSha, platformGitCommitSha: gitSha, buildTimestamp: releaseEnvironment.QRGUITAR_BUILD_TIMESTAMP });
   console.log("Checking committed QRguitar release " + gitSha + " (" + mode + ").");
   if (mode !== "promote-staged") {
     // A new release attempt must not leave an older deployment eligible for promotion.

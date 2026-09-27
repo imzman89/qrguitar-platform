@@ -47,6 +47,7 @@ export async function checkBackendReadiness({ url, serviceKey, fetchImpl = fetch
 
 export async function verifyDeploymentIdentity({
   sha,
+  platformGitCommitSha,
   buildTimestamp,
   deploymentIdentifier,
   origin = "https://qrguitar.com",
@@ -59,7 +60,7 @@ export async function verifyDeploymentIdentity({
   });
   if (!response.ok) throw new Error("Production identity endpoint returned HTTP " + response.status + ".");
   const identity = await response.json();
-  if (identity.gitCommitSha !== sha || (buildTimestamp !== undefined && identity.buildTimestamp !== buildTimestamp) ||
+  if (identity.gitCommitSha !== sha || (platformGitCommitSha !== undefined && identity.platformGitCommitSha !== platformGitCommitSha) || (buildTimestamp !== undefined && identity.buildTimestamp !== buildTimestamp) ||
       (deploymentIdentifier !== undefined && identity.deploymentIdentifier !== deploymentIdentifier) ||
       identity.environment !== "production" || identity.dirtyWorkingTree === true ||
       !(staged ? [new URL(origin).origin] : productionOrigins).includes(identity.origin)) {
@@ -70,6 +71,7 @@ export async function verifyDeploymentIdentity({
 
 export async function verifyProduction({
   sha,
+  platformGitCommitSha,
   buildTimestamp,
   deploymentIdentifier,
   origin = "https://qrguitar.com",
@@ -79,6 +81,7 @@ export async function verifyProduction({
 }) {
   const identity = await verifyDeploymentIdentity({
     sha,
+    platformGitCommitSha,
     buildTimestamp,
     deploymentIdentifier,
     origin,

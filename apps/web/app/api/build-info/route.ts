@@ -25,6 +25,9 @@ export async function GET(request: Request) {
   return Response.json(
     {
       ...identity,
+      // Independent platform identity: never fall back to the supplied release label.
+      ...(process.env.VERCEL === "1" && /^[a-f0-9]{40}$/.test(process.env.VERCEL_GIT_COMMIT_SHA || "")
+        ? { platformGitCommitSha: process.env.VERCEL_GIT_COMMIT_SHA } : {}),
       origin: originUrl.origin,
       originClassification: isCanonicalLocal ? "canonical-local-review" : isLocal ? "alternate-local" : "production"
     },
