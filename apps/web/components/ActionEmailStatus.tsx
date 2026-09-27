@@ -7,7 +7,7 @@ import { useUiText } from "./UiTextProvider";
 import { createBrowserSupabaseClient } from "../lib/supabase-browser";
 import styles from "./ActionEmailStatus.module.css";
 
-type EventName = "claim.ownerReview" | "claim.moreInfo" | "service.revisionRequested";
+type EventName = "claim.ownerReview" | "claim.moreInfo" | "claim.approved" | "claim.declined" | "claim.expired" | "service.revisionRequested";
 type DeliveryState = "queued" | "leased" | "dispatching" | "retry" | "accepted" | "failed" | "unknown" | "suppressed";
 export type ActionEmailItem = { id: string; event: EventName; state: DeliveryState; attempts: number; claimId: string | null; submissionId: string | null; updatedAt: string; createdAt: string; nextAttemptAt: string; code: string | null; canRetry: boolean; canReconcile: boolean };
 export type ActionEmailPage = { captureEnabled: boolean; dispatchEnabled: boolean; queued: number; unknown: number; failed: number; accepted: number; inFlight: number; suppressed: number; total: number; offset: number; oldestPendingAt: string | null; limit: 50; items: ActionEmailItem[] };
@@ -17,7 +17,7 @@ type Ui = (key: string, fallback: string, values?: Record<string, string | numbe
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/;
-const EVENTS: EventName[] = ["claim.ownerReview", "claim.moreInfo", "service.revisionRequested"];
+const EVENTS: EventName[] = ["claim.ownerReview", "claim.moreInfo", "claim.approved", "claim.declined", "claim.expired", "service.revisionRequested"];
 const STATES: DeliveryState[] = ["queued", "leased", "dispatching", "retry", "accepted", "failed", "unknown", "suppressed"];
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 const timestamp = (value: unknown): value is string => typeof value === "string" && value.length <= 40 && TIMESTAMP.test(value) && Number.isFinite(Date.parse(value));
@@ -233,7 +233,8 @@ export function ActionEmailDelivery({ item, busy, ui, submit }: { item: ActionEm
 }
 
 function eventLabel(event: EventName, ui: Ui) {
-  return event === "claim.ownerReview" ? ui("ui.components.ActionEmailStatus.ownerReview", "Ownership review") : event === "claim.moreInfo" ? ui("ui.components.ActionEmailStatus.moreInfo", "Ownership evidence request") : ui("ui.components.ActionEmailStatus.serviceRevision", "Service revision request");
+  const labels: Record<EventName, string> = { "claim.ownerReview": ui("ui.components.ActionEmailStatus.ownerReview", "Ownership review"), "claim.moreInfo": ui("ui.components.ActionEmailStatus.moreInfo", "Ownership evidence request"), "claim.approved": ui("ui.components.ActionEmailStatus.claimApproved", "Ownership claim approved"), "claim.declined": ui("ui.components.ActionEmailStatus.claimDeclined", "Ownership claim declined"), "claim.expired": ui("ui.components.ActionEmailStatus.claimExpired", "Ownership claim expired"), "service.revisionRequested": ui("ui.components.ActionEmailStatus.serviceRevision", "Service revision request") };
+  return labels[event];
 }
 function stateLabel(state: DeliveryState, ui: Ui) {
   const labels: Record<DeliveryState, string> = { queued: ui("ui.components.ActionEmailStatus.stateQueued", "Queued"), leased: ui("ui.components.ActionEmailStatus.stateLeased", "Leased"), dispatching: ui("ui.components.ActionEmailStatus.stateDispatching", "Dispatching"), retry: ui("ui.components.ActionEmailStatus.stateRetry", "Retry queued"), accepted: ui("ui.components.ActionEmailStatus.stateAccepted", "Provider accepted"), failed: ui("ui.components.ActionEmailStatus.stateFailed", "Failed"), unknown: ui("ui.components.ActionEmailStatus.stateUnknown", "Outcome unknown"), suppressed: ui("ui.components.ActionEmailStatus.stateSuppressed", "Suppressed") };

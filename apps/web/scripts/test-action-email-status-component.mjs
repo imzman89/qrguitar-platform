@@ -42,6 +42,7 @@ await test("DTO projection preserves exact microsecond timestamps and strips pri
   const parsedPage = parseActionEmailPage({ ...page, privateDiagnostics: "secret", items: [{ ...item, note: "private" }] });
   assert.equal(parsedPage.items[0].updatedAt, stamp); assert.equal(JSON.stringify(parsedPage).includes("secret"), false); assert.equal(JSON.stringify(parsedPage).includes("private"), false);
   assert.equal(parseActionEmailPage({ ...page, items: [{ ...item, updatedAt: "2026-09-27T10:15:00.1234567Z" }] }), null);
+  for (const event of ["claim.approved", "claim.declined", "claim.expired"]) assert.equal(parseActionEmailItem({ ...item, event })?.event, event);
 });
 
 await test("default-disabled GET is a normal off result with no follow-up request", async () => {
@@ -99,6 +100,18 @@ await test("unknown delivery renders evidence workflow, exact timestamp, and no 
   const html = renderToStaticMarkup(React.createElement(ActionEmailStatusView, { mode: "ready", status: { ...page, items: [item, service] }, offset: 0, busy: false, notice: null, ui, onRefresh() {}, onPage() {}, onReconcile() {} }));
   assert.match(html, /No automatic retry/); assert.match(html, /<summary><svg/); assert.match(html, /Provider evidence and reason/); assert.match(html, /minLength="10"/); assert.match(html, new RegExp(stamp.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(html, new RegExp(`/service-review/${submissionId}`)); assert.doesNotMatch(html, /ownership-claim\?claim=/); assert.match(html, /These controls do not activate delivery/);
+});
+
+await test("terminal claim outcomes render distinct labels without claimant-facing links", () => {
+  const events = [
+    ["claim.approved", "Ownership claim approved", "40000000-0000-4000-8000-000000000004"],
+    ["claim.declined", "Ownership claim declined", "50000000-0000-4000-8000-000000000005"],
+    ["claim.expired", "Ownership claim expired", "60000000-0000-4000-8000-000000000006"]
+  ];
+  const items = events.map(([event, _label, id]) => ({ ...item, id, event, state: "accepted", code: null, canReconcile: false }));
+  const html = renderToStaticMarkup(React.createElement(ActionEmailStatusView, { mode: "ready", status: { ...page, items }, offset: 0, busy: false, notice: null, ui, onRefresh() {}, onPage() {}, onReconcile() {} }));
+  for (const [, label] of events) assert.match(html, new RegExp(label));
+  assert.doesNotMatch(html, /<a\b|ownership-claim\?claim=|\/i\/QRG-/);
 });
 
 await test("component source uses bearer auth, aborts stale work, and is mounted beside existing review status", () => {

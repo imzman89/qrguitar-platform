@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { ServiceEmailOutcome, ServiceEmailReceipt } from "./service-email-outbox";
 
-export type ActionEmailFamily = "claim.ownerReview" | "claim.moreInfo" | "service.revisionRequested";
-export type ActionEmailInput = { event: ActionEmailFamily; to: string; profileTitle: string; actionUrl: string; idempotencyKey: string };
+export type ActionEmailFamily = "claim.ownerReview" | "claim.moreInfo" | "claim.approved" | "claim.declined" | "claim.expired" | "service.revisionRequested";
+export type ActionEmailInput = { event: ActionEmailFamily; to: string; profileTitle: string; actionUrl: string; claimUrl?: string; idempotencyKey: string };
 type Intent = { id: string; leaseToken: string };
 type Dispatch = { event: ActionEmailFamily; to: string; profileTitle: string; subjectId: string; qrCode?: string | null };
 type Database = { rpc(name: string, args: Record<string, unknown>, signal: AbortSignal): Promise<{ data: unknown; error: unknown }> };
@@ -10,15 +10,17 @@ const uuid = (value: unknown): value is string => typeof value === "string" && /
 
 export function actionEmailInput(value: unknown, intentId: string): ActionEmailInput {
   const row = value as Dispatch;
-  if (!uuid(intentId) || !uuid(row?.subjectId) || !["claim.ownerReview", "claim.moreInfo", "service.revisionRequested"].includes(row?.event)
+  if (!uuid(intentId) || !uuid(row?.subjectId) || !["claim.ownerReview", "claim.moreInfo", "claim.approved", "claim.declined", "claim.expired", "service.revisionRequested"].includes(row?.event)
     || typeof row.to !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.to) || /[\x00-\x1f]/.test(row.to)
     || typeof row.profileTitle !== "string" || row.profileTitle.length > 500) throw new Error("Invalid action email payload.");
-  if (row.event === "service.revisionRequested" && (typeof row.qrCode !== "string" || !/^QRG-[A-Z0-9][A-Z0-9-]{0,75}$/.test(row.qrCode))) throw new Error("Invalid service Profile path.");
+  if (["service.revisionRequested", "claim.approved"].includes(row.event) && (typeof row.qrCode !== "string" || !/^QRG-[A-Z0-9][A-Z0-9-]{0,75}$/.test(row.qrCode))) throw new Error("Invalid Profile path.");
+  const claimUrl = row.event === "claim.approved" ? `https://www.qrguitar.com/ownership-claim?claim=${row.subjectId}` : undefined;
   const path = row.event === "service.revisionRequested"
     ? `/service-work/${encodeURIComponent(row.qrCode!)}?submission=${row.subjectId}`
+    : row.event === "claim.approved" ? `/i/${encodeURIComponent(row.qrCode!)}`
     : `/ownership-claim?claim=${row.subjectId}`;
   // Return a strict allowlist. Private source notes and evidence never reach the renderer.
-  return { event: row.event, to: row.to, profileTitle: row.profileTitle, actionUrl: `https://www.qrguitar.com${path}`, idempotencyKey: intentId };
+  return { event: row.event, to: row.to, profileTitle: row.profileTitle, actionUrl: `https://www.qrguitar.com${path}`, ...(claimUrl ? { claimUrl } : {}), idempotencyKey: intentId };
 }
 
 /** Callable integration adapter, not a live route. Capture and dispatch require separate DB gates. */
