@@ -133,6 +133,10 @@ await test("service and transfer outcomes render distinct labels with strict fam
     : { ...item, id, event, state: "accepted", claimId: null, submissionId: null, transferId: id, code: null, canReconcile: false });
   const html = renderToStaticMarkup(React.createElement(ActionEmailStatusView, { mode: "ready", status: { ...page, items }, offset: 0, busy: false, notice: null, ui, onRefresh() {}, onPage() {}, onReconcile() {} }));
   for (const [, label] of events) assert.match(html, new RegExp(label));
+  assert.match(html, /Workflow email delivery/);
+  assert.match(html, /Review email-provider acceptance for ownership and service updates\. These controls do not activate delivery\./);
+  assert.equal((html.match(/Mail provider accepted/g) || []).length, 5);
+  assert.doesNotMatch(html, /Ownership and revision emails|Provider accepted/);
   assert.equal((html.match(/href="\/service-review\//g) || []).length, 3);
   assert.doesNotMatch(html, /href="\/transfer\//);
 });
