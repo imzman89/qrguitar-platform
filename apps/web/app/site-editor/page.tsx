@@ -55,7 +55,12 @@ import {
   emailTemplatePrefixFromKeys,
   nonNavigatingEmailPreviewHtml
 } from "../../lib/email-template-boundary";
-import { renderServiceReviewEmailDocument } from "../../lib/transactional-email-renderer";
+import {
+  renderClaimMoreInfoEmailDocument,
+  renderClaimOwnerReviewEmailDocument,
+  renderServiceRevisionRequestedEmailDocument,
+  renderServiceReviewEmailDocument
+} from "../../lib/transactional-email-renderer";
 
 import {
   applyThemeSettings,
@@ -177,7 +182,7 @@ function pagePurpose(selected: SelectedPage) {
   return purposes[selected.page] || `Edit the approved customer-facing content for ${selected.page}.`;
 }
 
-function emailPreviewValue(value: string) {
+function emailPreviewValue(value: string, overrides: Record<string, string> = {}) {
   const samples: Record<string, string> = {
     profile_title: "1962 Sunburst Stratocaster",
     profile_url: "https://www.qrguitar.com/i/QRG-EXAMPLE123",
@@ -185,10 +190,15 @@ function emailPreviewValue(value: string) {
     claim_url: "https://www.qrguitar.com/ownership-claim",
     sender_name: "Current owner",
     reset_url: "https://www.qrguitar.com/reset-password",
-    safety_status: "Reported lost"
+    safety_status: "Reported lost",
+    ...overrides
   };
   return value.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (match, key: string) => samples[key] || match);
 }
+
+const EMAIL_PREVIEW_CLAIM_URL = "https://www.qrguitar.com/ownership-claim?claim=00000000-0000-4000-8000-000000000000";
+const EMAIL_PREVIEW_SERVICE_REVIEW_URL = "https://www.qrguitar.com/service-review/00000000-0000-4000-8000-000000000000";
+const EMAIL_PREVIEW_SERVICE_REVISION_URL = "https://www.qrguitar.com/service-work/QRG-PREVIEW-001?submission=00000000-0000-4000-8000-000000000000";
 
 const focusableSelector = [
   "a[href]", "button:not([disabled])", "input:not([disabled])", "select:not([disabled])",
@@ -964,19 +974,36 @@ function SiteEditorWorkspace() {
     : emailDeliveryBoundary.kind === "provider"
       ? ui("ui.app.site.editor.page.emailProviderDelivery", "Provider delivery · Supabase Auth")
       : ui("ui.app.site.editor.page.emailPreviewOnly", "Design preview · no production trigger");
-  const emailFieldPreview = (entry: ContentRegistryEntry | undefined, fallback: string) => emailPreviewValue(entry ? (settings.content[entry.key] ?? entry.defaultValue) : fallback);
-  const applicationEmailPreview = emailDeliveryBoundary.kind === "application" && emailTemplatePrefix === "email.service.submitted" ? (() => {
+  const rendererPreviewExpected = [
+    "email.service.submitted",
+    "email.claim.ownerReview",
+    "email.claim.moreInfo",
+    "email.service.revisionRequested"
+  ].includes(emailTemplatePrefix);
+  const rendererPreviewVariables: Record<string, string> = emailTemplatePrefix === "email.claim.ownerReview" || emailTemplatePrefix === "email.claim.moreInfo"
+    ? { claim_url: EMAIL_PREVIEW_CLAIM_URL }
+    : emailTemplatePrefix === "email.service.submitted"
+      ? { review_url: EMAIL_PREVIEW_SERVICE_REVIEW_URL }
+      : emailTemplatePrefix === "email.service.revisionRequested"
+        ? { review_url: EMAIL_PREVIEW_SERVICE_REVISION_URL }
+        : {};
+  const emailFieldPreview = (entry: ContentRegistryEntry | undefined, fallback: string) => emailPreviewValue(entry ? (settings.content[entry.key] ?? entry.defaultValue) : fallback, rendererPreviewVariables);
+  const rendererEmailPreview = rendererPreviewExpected ? (() => {
     try {
-      return renderServiceReviewEmailDocument({
+      const content = {
         subject: emailFieldPreview(emailSubject, `${selected.page} notification`),
         preheader: emailFieldPreview(emailPreheader, "A secure QRguitar update is ready."),
         heading: emailFieldPreview(emailHeading, selected.page),
         body: emailFieldPreview(emailBody, "Review this QRguitar update securely from your account."),
-        ctaLabel: emailFieldPreview(emailCta, "Review service work"),
-        reviewUrl: "https://www.qrguitar.com/service-review/00000000-0000-4000-8000-000000000000",
+        ctaLabel: emailFieldPreview(emailCta, "Open QRguitar"),
         footer: emailFieldPreview(emailFooter, "QRguitar · Permanent instrument identity and history"),
         allowedCtaOrigins: ["https://www.qrguitar.com"]
-      });
+      };
+      if (emailTemplatePrefix === "email.service.submitted") return renderServiceReviewEmailDocument({ ...content, reviewUrl: EMAIL_PREVIEW_SERVICE_REVIEW_URL });
+      if (emailTemplatePrefix === "email.claim.ownerReview") return renderClaimOwnerReviewEmailDocument({ ...content, actionUrl: EMAIL_PREVIEW_CLAIM_URL });
+      if (emailTemplatePrefix === "email.claim.moreInfo") return renderClaimMoreInfoEmailDocument({ ...content, actionUrl: EMAIL_PREVIEW_CLAIM_URL });
+      if (emailTemplatePrefix === "email.service.revisionRequested") return renderServiceRevisionRequestedEmailDocument({ ...content, actionUrl: EMAIL_PREVIEW_SERVICE_REVISION_URL });
+      return null;
     } catch {
       return null;
     }
@@ -994,16 +1021,16 @@ function SiteEditorWorkspace() {
             <strong>{emailPreviewValue(emailSubject ? settings.content[emailSubject.key] : `${selected.page} notification`)}</strong>
             <small>{emailPreviewValue(emailPreheader ? settings.content[emailPreheader.key] : "A secure QRguitar update is ready.")}</small>
           </div>
-          {emailDeliveryBoundary.kind === "application" ? (applicationEmailPreview ? <>
+          {rendererPreviewExpected ? (rendererEmailPreview ? <>
             <div className="cms-email-renderer-preview" data-testid="application-email-renderer-preview">
-              <iframe title={ui("ui.app.site.editor.page.emailApplicationPreviewTitle", "Non-interactive service email preview")} srcDoc={nonNavigatingEmailPreviewHtml(applicationEmailPreview.htmlContent)} sandbox="" tabIndex={0} referrerPolicy="no-referrer" />
+              <iframe title={emailTemplatePrefix === "email.service.submitted" ? ui("ui.app.site.editor.page.emailApplicationPreviewTitle", "Non-interactive service email preview") : rendererEmailPreview.subject} srcDoc={nonNavigatingEmailPreviewHtml(rendererEmailPreview.htmlContent)} sandbox="" tabIndex={0} referrerPolicy="no-referrer" />
             </div>
             <p className="cms-email-preview-safety">{ui("ui.app.site.editor.page.emailApplicationPreviewSafety", "Rendered with the application email code. Scroll inside to review every section. Links are disabled and no message is sent from this preview.")}</p>
             <div className="cms-plain-preview">
               <strong>{ui("ui.app.site.editor.page.2f40e3ad9bf8", "Plain-text preview")}</strong>
-              <pre>{applicationEmailPreview.textContent}</pre>
+              <pre>{rendererEmailPreview.textContent}</pre>
             </div>
-          </> : <p className="cms-email-preview-error" role="alert">{ui("ui.app.site.editor.page.emailApplicationPreviewUnavailable", "Complete the required Service / Submitted fields to restore the application-rendered preview.")}</p>) : <>
+          </> : <p className="cms-email-preview-error" role="alert">{emailTemplatePrefix === "email.service.submitted" ? ui("ui.app.site.editor.page.emailApplicationPreviewUnavailable", "Complete the required Service / Submitted fields to restore the application-rendered preview.") : "Complete the required email fields to restore the shared-renderer preview."}</p>) : <>
             <article>
               <div className="cms-email-brand">{ui("ui.app.site.editor.page.a439fba430a3", "QR")}<span>{ui("ui.app.site.editor.page.d081f5e40298", "guitar")}</span></div>
               <p className="cms-email-kicker">{ui("ui.app.site.editor.page.77cf4575c15c", "QRguitar notification")}</p>

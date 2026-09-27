@@ -186,8 +186,8 @@ test("action-required family renderers reject off-route, secret-bearing, malform
     assert.throws(() => renderer[render]({ ...common, actionUrl }), /approved HTTPS origin|authenticated claim destination|provider workbench destination/);
   }
 });
-test("Content Studio application preview uses the same fixed service-review document and plaintext output", () => {
-  const document = renderer.renderServiceReviewEmailDocument({
+test("Content Studio renderer-backed previews use fixed notices, inert links, and complete plaintext", () => {
+  const serviceDocument = renderer.renderServiceReviewEmailDocument({
     subject: "Review 1962 Sunburst Stratocaster",
     preheader: "Private owner review",
     heading: "Service work is ready",
@@ -197,25 +197,58 @@ test("Content Studio application preview uses the same fixed service-review docu
     footer: "QRguitar · Permanent instrument identity and history",
     allowedCtaOrigins: ["https://www.qrguitar.com"]
   });
-  assert.match(document.htmlContent, /Private owner review/i);
-  assert.match(document.htmlContent, /resending does not extend that deadline/);
-  assert.match(document.htmlContent, /If the button does not work/);
-  assert.match(document.textContent, /Review service work: https:\/\/www\.qrguitar\.com\/service-review\/00000000-0000-4000-8000-000000000000/);
-  assert.match(document.textContent, /resending does not extend that deadline/);
+  assert.match(serviceDocument.htmlContent, /Private owner review/i);
+  assert.match(serviceDocument.htmlContent, /resending does not extend that deadline/);
+  assert.match(serviceDocument.textContent, /Review service work: https:\/\/www\.qrguitar\.com\/service-review\/00000000-0000-4000-8000-000000000000/);
+  assert.match(serviceDocument.textContent, /resending does not extend that deadline/);
 
-  const previewHtml = boundary.nonNavigatingEmailPreviewHtml(document.htmlContent);
-  assert.doesNotMatch(previewHtml, /<a\b/i);
-  assert.doesNotMatch(previewHtml, /\s(?:href|target|rel)="/i);
-  assert.match(previewHtml, /<span class="email-button wrap"/);
-  assert.match(previewHtml, /resending does not extend that deadline/);
+  const previewDocuments = [serviceDocument];
+  for (const family of actionRequiredFamilies) {
+    const document = renderer[family.renderer]({
+      subject: `${family.prefix} preview`,
+      preheader: "A secure QRguitar update is ready.",
+      heading: "Review this update",
+      body: "Sign in to review the saved request.",
+      ctaLabel: "Open request",
+      actionUrl: family.actionUrl,
+      footer: "QRguitar · Permanent instrument identity and history",
+      allowedCtaOrigins: ["https://www.qrguitar.com"]
+    });
+    assert.ok(document.htmlContent.includes(family.notice.replaceAll("&", "&amp;").replaceAll("'", "&#39;")));
+    assert.match(document.textContent, new RegExp(family.notice.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.match(document.textContent, new RegExp(family.actionUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    previewDocuments.push(document);
+  }
+
+  for (const document of previewDocuments) {
+    const previewHtml = boundary.nonNavigatingEmailPreviewHtml(document.htmlContent);
+    assert.doesNotMatch(previewHtml, /<a\b/i);
+    assert.doesNotMatch(previewHtml, /\s(?:href|target|rel)="/i);
+    assert.match(previewHtml, /<span class="email-button wrap"/);
+  }
 
   const editor = fs.readFileSync(path.join(webRoot, "app/site-editor/page.tsx"), "utf8");
-  assert.match(editor, /renderServiceReviewEmailDocument/);
-  assert.match(editor, /applicationEmailPreview\.htmlContent/);
-  assert.match(editor, /applicationEmailPreview\.textContent/);
+  for (const rendererName of [
+    "renderServiceReviewEmailDocument",
+    "renderClaimOwnerReviewEmailDocument",
+    "renderClaimMoreInfoEmailDocument",
+    "renderServiceRevisionRequestedEmailDocument"
+  ]) assert.match(editor, new RegExp(rendererName));
+  for (const prefix of [
+    "email.service.submitted",
+    "email.claim.ownerReview",
+    "email.claim.moreInfo",
+    "email.service.revisionRequested"
+  ]) assert.match(editor, new RegExp(prefix.replaceAll(".", "\\.")));
+  assert.match(editor, /ownership-claim\?claim=00000000-0000-4000-8000-000000000000/);
+  assert.match(editor, /service-work\/QRG-PREVIEW-001\?submission=00000000-0000-4000-8000-000000000000/);
+  assert.match(editor, /rendererPreviewExpected \? \(rendererEmailPreview \? <>/);
+  assert.match(editor, /nonNavigatingEmailPreviewHtml\(rendererEmailPreview\.htmlContent\)/);
+  assert.match(editor, /<pre>\{rendererEmailPreview\.textContent\}<\/pre>/);
   assert.match(editor, /sandbox=""/);
   assert.match(editor, /tabIndex=\{0\}/);
   assert.match(editor, /Links are disabled and no message is sent from this preview/);
+  assert.match(editor, /emailDeliveryBoundary\.canSendApplicationTest \? <>/);
 });
 
 async function withEmailEnvironment(run) {
@@ -385,9 +418,11 @@ test("email ownership map exposes only one application sender and honest provide
   const recovery = boundary.emailTemplateDeliveryBoundary("email.security.passwordReset");
   assert.equal(recovery.kind, "provider");
   assert.equal(recovery.providerTemplate, "recovery");
-  const preview = boundary.emailTemplateDeliveryBoundary("email.claim.approved");
-  assert.equal(preview.kind, "preview");
-  assert.equal(preview.canSendApplicationTest, false);
+  for (const prefix of ["email.claim.ownerReview", "email.claim.moreInfo", "email.service.revisionRequested", "email.claim.approved"]) {
+    const preview = boundary.emailTemplateDeliveryBoundary(prefix);
+    assert.equal(preview.kind, "preview");
+    assert.equal(preview.canSendApplicationTest, false);
+  }
   const bundle = boundary.createEmailTemplateSetupExport("email.security.passwordReset", {
     "email.security.passwordReset.subject": "Reset",
     "email.security.passwordReset.body": "Body"
