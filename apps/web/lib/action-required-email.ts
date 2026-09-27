@@ -26,9 +26,11 @@ export function createActionEmailWorker(deps: {
   enabled?: boolean;
   database: Database;
   send(input: ActionEmailInput, signal: AbortSignal): Promise<ServiceEmailOutcome>;
+  prepare?(input: ActionEmailInput, signal: AbortSignal): Promise<(signal: AbortSignal) => Promise<ServiceEmailOutcome>>;
   now?: () => number;
   uuid?: () => string;
   databaseTimeoutMs?: number;
+  prepareTimeoutMs?: number;
   sendTimeoutMs?: number;
 }) {
   async function bounded<T>(run: (signal: AbortSignal) => Promise<T>, milliseconds: number): Promise<T> {
@@ -63,13 +65,24 @@ export function createActionEmailWorker(deps: {
       try { input = actionEmailInput(dispatch, intent.id); } catch { /* A malformed persisted payload is a definite no-send. */ }
       if (!input) receipt = { state: "failed" };
       else {
+        let prepared: ((signal: AbortSignal) => Promise<ServiceEmailOutcome>) | null = signal => deps.send(input!, signal);
+        if (deps.prepare) {
+          // Preparation may load content/render only. A timed-out closure is never invoked.
+          try {
+            prepared = await bounded(signal => deps.prepare!(input!, signal), deps.prepareTimeoutMs ?? 5000);
+            if (typeof prepared !== "function") prepared = null;
+          } catch { prepared = null; }
+        }
+        if (!prepared) receipt = { state: "retry", retryAfterSeconds: 60 };
+        else {
         let result: ServiceEmailOutcome;
-        try { result = await bounded(signal => deps.send(input!, signal), deps.sendTimeoutMs ?? 12000); }
+        try { result = await bounded(prepared, deps.sendTimeoutMs ?? 12000); }
         catch { result = { outcome: "unknown" }; }
         const messageId = typeof result?.providerMessageId === "string" && result.providerMessageId.trim() && result.providerMessageId.length <= 300 && !/[\x00-\x1f]/.test(result.providerMessageId) ? result.providerMessageId : undefined;
         if (result?.outcome === "accepted" && messageId) receipt = { state: "accepted", providerMessageId: messageId };
         else if (result?.outcome === "rejected") receipt = result.retryable ? { state: "retry", retryAfterSeconds: Number.isFinite(result.retryAfterSeconds) ? Math.min(21600, Math.max(60, Math.ceil(result.retryAfterSeconds!))) : 60 } : { state: "failed" };
         else receipt = { state: "unknown" };
+        }
       }
       const saved = await rpc("settle_action_email", { p_intent_id: intent.id, p_lease_token: lease, p_state: receipt.state, p_provider_message_id: receipt.providerMessageId || null, p_retry_after_seconds: receipt.retryAfterSeconds || 60 });
       if (saved !== true) throw new Error("Action email receipt unavailable; do not resend.");
