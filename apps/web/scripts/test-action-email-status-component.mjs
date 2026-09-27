@@ -30,6 +30,7 @@ const ui = (_key, fallback, values = {}) => Object.entries(values).reduce((text,
 const intentId = "10000000-0000-4000-8000-000000000001";
 const claimId = "20000000-0000-4000-8000-000000000002";
 const submissionId = "30000000-0000-4000-8000-000000000003";
+const transferId = "70000000-0000-4000-8000-000000000007";
 const stamp = "2026-09-27T10:15:00.123456+00:00";
 const item = { id: intentId, event: "claim.ownerReview", state: "unknown", attempts: 1, claimId, submissionId: null, updatedAt: stamp, createdAt: stamp, nextAttemptAt: stamp, code: "provider_acceptance_unknown", canRetry: false, canReconcile: true };
 const page = { captureEnabled: true, dispatchEnabled: true, queued: 0, unknown: 1, failed: 0, accepted: 0, inFlight: 0, suppressed: 0, oldestPendingAt: stamp, total: 1, offset: 0, limit: 50, items: [item] };
@@ -38,11 +39,16 @@ async function test(name, run) { await run(); console.log("PASS " + name); passe
 
 await test("DTO projection preserves exact microsecond timestamps and strips private extras", () => {
   const parsed = parseActionEmailItem({ ...item, recipient: "private@example.invalid", providerResponse: "secret" });
+  assert.equal(parsed.transferId, null);
   assert.equal(parsed.updatedAt, stamp); assert.equal(parsed.nextAttemptAt, stamp); assert.equal("recipient" in parsed, false); assert.equal("providerResponse" in parsed, false);
   const parsedPage = parseActionEmailPage({ ...page, privateDiagnostics: "secret", items: [{ ...item, note: "private" }] });
   assert.equal(parsedPage.items[0].updatedAt, stamp); assert.equal(JSON.stringify(parsedPage).includes("secret"), false); assert.equal(JSON.stringify(parsedPage).includes("private"), false);
   assert.equal(parseActionEmailPage({ ...page, items: [{ ...item, updatedAt: "2026-09-27T10:15:00.1234567Z" }] }), null);
   for (const event of ["claim.approved", "claim.declined", "claim.expired"]) assert.equal(parseActionEmailItem({ ...item, event })?.event, event);
+  for (const event of ["service.approved", "service.declined", "service.cancelled"]) assert.equal(parseActionEmailItem({ ...item, event, claimId: null, submissionId, transferId: null })?.event, event);
+  for (const event of ["ownership.transferAccepted", "ownership.transferCancelled"]) assert.equal(parseActionEmailItem({ ...item, event, claimId: null, submissionId: null, transferId })?.event, event);
+  assert.equal(parseActionEmailItem({ ...item, event: "ownership.transferAccepted", claimId: null, submissionId: null }), null);
+  assert.equal(parseActionEmailItem({ ...item, transferId }), null);
 });
 
 await test("default-disabled GET is a normal off result with no follow-up request", async () => {
@@ -112,6 +118,23 @@ await test("terminal claim outcomes render distinct labels without claimant-faci
   const html = renderToStaticMarkup(React.createElement(ActionEmailStatusView, { mode: "ready", status: { ...page, items }, offset: 0, busy: false, notice: null, ui, onRefresh() {}, onPage() {}, onReconcile() {} }));
   for (const [, label] of events) assert.match(html, new RegExp(label));
   assert.doesNotMatch(html, /<a\b|ownership-claim\?claim=|\/i\/QRG-/);
+});
+
+await test("service and transfer outcomes render distinct labels with strict family identifiers", () => {
+  const events = [
+    ["service.approved", "Service work approved", "40000000-0000-4000-8000-000000000004"],
+    ["service.declined", "Service work declined", "50000000-0000-4000-8000-000000000005"],
+    ["service.cancelled", "Service work cancelled", "60000000-0000-4000-8000-000000000006"],
+    ["ownership.transferAccepted", "Ownership transfer accepted", "80000000-0000-4000-8000-000000000008"],
+    ["ownership.transferCancelled", "Ownership transfer cancelled", "90000000-0000-4000-8000-000000000009"]
+  ];
+  const items = events.map(([event, _label, id]) => event.startsWith("service.")
+    ? { ...item, id, event, state: "accepted", claimId: null, submissionId: id, transferId: null, code: null, canReconcile: false }
+    : { ...item, id, event, state: "accepted", claimId: null, submissionId: null, transferId: id, code: null, canReconcile: false });
+  const html = renderToStaticMarkup(React.createElement(ActionEmailStatusView, { mode: "ready", status: { ...page, items }, offset: 0, busy: false, notice: null, ui, onRefresh() {}, onPage() {}, onReconcile() {} }));
+  for (const [, label] of events) assert.match(html, new RegExp(label));
+  assert.equal((html.match(/href="\/service-review\//g) || []).length, 3);
+  assert.doesNotMatch(html, /href="\/transfer\//);
 });
 
 await test("component source uses bearer auth, aborts stale work, and is mounted beside existing review status", () => {

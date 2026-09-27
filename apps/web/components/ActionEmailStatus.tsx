@@ -7,9 +7,9 @@ import { useUiText } from "./UiTextProvider";
 import { createBrowserSupabaseClient } from "../lib/supabase-browser";
 import styles from "./ActionEmailStatus.module.css";
 
-type EventName = "claim.ownerReview" | "claim.moreInfo" | "claim.approved" | "claim.declined" | "claim.expired" | "service.revisionRequested";
+type EventName = "claim.ownerReview" | "claim.moreInfo" | "claim.approved" | "claim.declined" | "claim.expired" | "service.revisionRequested" | "service.approved" | "service.declined" | "service.cancelled" | "ownership.transferAccepted" | "ownership.transferCancelled";
 type DeliveryState = "queued" | "leased" | "dispatching" | "retry" | "accepted" | "failed" | "unknown" | "suppressed";
-export type ActionEmailItem = { id: string; event: EventName; state: DeliveryState; attempts: number; claimId: string | null; submissionId: string | null; updatedAt: string; createdAt: string; nextAttemptAt: string; code: string | null; canRetry: boolean; canReconcile: boolean };
+export type ActionEmailItem = { id: string; event: EventName; state: DeliveryState; attempts: number; claimId: string | null; submissionId: string | null; transferId: string | null; updatedAt: string; createdAt: string; nextAttemptAt: string; code: string | null; canRetry: boolean; canReconcile: boolean };
 export type ActionEmailPage = { captureEnabled: boolean; dispatchEnabled: boolean; queued: number; unknown: number; failed: number; accepted: number; inFlight: number; suppressed: number; total: number; offset: number; oldestPendingAt: string | null; limit: 50; items: ActionEmailItem[] };
 export type ActionEmailResolution = { intentId: string; expectedUpdatedAt: string; resolution: "retry" | "confirmed_accepted" | "confirmed_not_accepted"; reason: string; providerMessageId?: string };
 type RequestResult = { kind: "ready"; status: ActionEmailPage; reconciled: boolean } | { kind: "unconfirmed"; status?: ActionEmailPage } | { kind: "disabled" } | { kind: "unavailable" } | { kind: "invalid" };
@@ -17,17 +17,20 @@ type Ui = (key: string, fallback: string, values?: Record<string, string | numbe
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/;
-const EVENTS: EventName[] = ["claim.ownerReview", "claim.moreInfo", "claim.approved", "claim.declined", "claim.expired", "service.revisionRequested"];
+const EVENTS: EventName[] = ["claim.ownerReview", "claim.moreInfo", "claim.approved", "claim.declined", "claim.expired", "service.revisionRequested", "service.approved", "service.declined", "service.cancelled", "ownership.transferAccepted", "ownership.transferCancelled"];
 const STATES: DeliveryState[] = ["queued", "leased", "dispatching", "retry", "accepted", "failed", "unknown", "suppressed"];
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 const timestamp = (value: unknown): value is string => typeof value === "string" && value.length <= 40 && TIMESTAMP.test(value) && Number.isFinite(Date.parse(value));
 
 export function parseActionEmailItem(value: unknown): ActionEmailItem | null {
+  const transferId = record(value) && value.transferId !== undefined ? value.transferId : null;
   if (!record(value) || typeof value.id !== "string" || !UUID.test(value.id) || !EVENTS.includes(value.event as EventName) || !STATES.includes(value.state as DeliveryState)
     || !Number.isInteger(value.attempts) || Number(value.attempts) < 0 || Number(value.attempts) > 6 || !timestamp(value.updatedAt) || !timestamp(value.createdAt) || !timestamp(value.nextAttemptAt)
     || typeof value.canRetry !== "boolean" || typeof value.canReconcile !== "boolean" || (value.code !== null && (typeof value.code !== "string" || !/^[a-z_]{1,100}$/.test(value.code)))
-    || (value.event === "service.revisionRequested" ? typeof value.submissionId !== "string" || !UUID.test(value.submissionId) || value.claimId !== null : typeof value.claimId !== "string" || !UUID.test(value.claimId) || value.submissionId !== null)) return null;
-  return { id: value.id, event: value.event as EventName, state: value.state as DeliveryState, attempts: Number(value.attempts), claimId: value.claimId as string | null, submissionId: value.submissionId as string | null,
+    || (String(value.event).startsWith("service.") ? typeof value.submissionId !== "string" || !UUID.test(value.submissionId) || value.claimId !== null || transferId !== null
+      : String(value.event).startsWith("ownership.") ? typeof transferId !== "string" || !UUID.test(transferId) || value.claimId !== null || value.submissionId !== null
+      : typeof value.claimId !== "string" || !UUID.test(value.claimId) || value.submissionId !== null || transferId !== null)) return null;
+  return { id: value.id, event: value.event as EventName, state: value.state as DeliveryState, attempts: Number(value.attempts), claimId: value.claimId as string | null, submissionId: value.submissionId as string | null, transferId: transferId as string | null,
     updatedAt: value.updatedAt, createdAt: value.createdAt, nextAttemptAt: value.nextAttemptAt, code: value.code as string | null, canRetry: value.canRetry, canReconcile: value.canReconcile };
 }
 
@@ -233,7 +236,7 @@ export function ActionEmailDelivery({ item, busy, ui, submit }: { item: ActionEm
 }
 
 function eventLabel(event: EventName, ui: Ui) {
-  const labels: Record<EventName, string> = { "claim.ownerReview": ui("ui.components.ActionEmailStatus.ownerReview", "Ownership review"), "claim.moreInfo": ui("ui.components.ActionEmailStatus.moreInfo", "Ownership evidence request"), "claim.approved": ui("ui.components.ActionEmailStatus.claimApproved", "Ownership claim approved"), "claim.declined": ui("ui.components.ActionEmailStatus.claimDeclined", "Ownership claim declined"), "claim.expired": ui("ui.components.ActionEmailStatus.claimExpired", "Ownership claim expired"), "service.revisionRequested": ui("ui.components.ActionEmailStatus.serviceRevision", "Service revision request") };
+  const labels: Record<EventName, string> = { "claim.ownerReview": ui("ui.components.ActionEmailStatus.ownerReview", "Ownership review"), "claim.moreInfo": ui("ui.components.ActionEmailStatus.moreInfo", "Ownership evidence request"), "claim.approved": ui("ui.components.ActionEmailStatus.claimApproved", "Ownership claim approved"), "claim.declined": ui("ui.components.ActionEmailStatus.claimDeclined", "Ownership claim declined"), "claim.expired": ui("ui.components.ActionEmailStatus.claimExpired", "Ownership claim expired"), "service.revisionRequested": ui("ui.components.ActionEmailStatus.serviceRevision", "Service revision request"), "service.approved": ui("ui.components.ActionEmailStatus.serviceApproved", "Service work approved"), "service.declined": ui("ui.components.ActionEmailStatus.serviceDeclined", "Service work declined"), "service.cancelled": ui("ui.components.ActionEmailStatus.serviceCancelled", "Service work cancelled"), "ownership.transferAccepted": ui("ui.components.ActionEmailStatus.transferAccepted", "Ownership transfer accepted"), "ownership.transferCancelled": ui("ui.components.ActionEmailStatus.transferCancelled", "Ownership transfer cancelled") };
   return labels[event];
 }
 function stateLabel(state: DeliveryState, ui: Ui) {

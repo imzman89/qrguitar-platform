@@ -1,22 +1,30 @@
 import { randomUUID } from "node:crypto";
 import type { ServiceEmailOutcome, ServiceEmailReceipt } from "./service-email-outbox";
 
-export type ActionEmailFamily = "claim.ownerReview" | "claim.moreInfo" | "claim.approved" | "claim.declined" | "claim.expired" | "service.revisionRequested";
+export type ActionEmailFamily = "claim.ownerReview" | "claim.moreInfo" | "claim.approved" | "claim.declined" | "claim.expired" | "service.revisionRequested" | "service.approved" | "service.declined" | "service.cancelled" | "ownership.transferAccepted" | "ownership.transferCancelled";
 export type ActionEmailInput = { event: ActionEmailFamily; to: string; profileTitle: string; actionUrl: string; claimUrl?: string; idempotencyKey: string };
 type Intent = { id: string; leaseToken: string };
-type Dispatch = { event: ActionEmailFamily; to: string; profileTitle: string; subjectId: string; qrCode?: string | null };
+type Dispatch = { event: ActionEmailFamily; to: string; profileTitle: string; subjectId: string; qrCode?: string | null; serviceRole?: "provider" | "owner" | null };
 type Database = { rpc(name: string, args: Record<string, unknown>, signal: AbortSignal): Promise<{ data: unknown; error: unknown }> };
 const uuid = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
 export function actionEmailInput(value: unknown, intentId: string): ActionEmailInput {
   const row = value as Dispatch;
-  if (!uuid(intentId) || !uuid(row?.subjectId) || !["claim.ownerReview", "claim.moreInfo", "claim.approved", "claim.declined", "claim.expired", "service.revisionRequested"].includes(row?.event)
+  if (!uuid(intentId) || !uuid(row?.subjectId) || !["claim.ownerReview", "claim.moreInfo", "claim.approved", "claim.declined", "claim.expired", "service.revisionRequested", "service.approved", "service.declined", "service.cancelled", "ownership.transferAccepted", "ownership.transferCancelled"].includes(row?.event)
     || typeof row.to !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.to) || /[\x00-\x1f]/.test(row.to)
     || typeof row.profileTitle !== "string" || row.profileTitle.length > 500) throw new Error("Invalid action email payload.");
-  if (["service.revisionRequested", "claim.approved"].includes(row.event) && (typeof row.qrCode !== "string" || !/^QRG-[A-Z0-9][A-Z0-9-]{0,75}$/.test(row.qrCode))) throw new Error("Invalid Profile path.");
+  const serviceOutcome = ["service.approved", "service.declined", "service.cancelled"].includes(row.event);
+  const transferOutcome = ["ownership.transferAccepted", "ownership.transferCancelled"].includes(row.event);
+  if (serviceOutcome ? !["provider", "owner"].includes(String(row.serviceRole)) || (row.event !== "service.cancelled" && row.serviceRole !== "provider") : row.serviceRole != null) throw new Error("Invalid service recipient role.");
+  if (transferOutcome && row.qrCode !== null) throw new Error("Invalid transfer destination.");
+  if ((["service.revisionRequested", "claim.approved"].includes(row.event) || (serviceOutcome && row.serviceRole === "provider"))
+    && (typeof row.qrCode !== "string" || !/^QRG-[A-Z0-9][A-Z0-9-]{0,75}$/.test(row.qrCode))) throw new Error("Invalid Profile path.");
+  if (serviceOutcome && row.serviceRole === "owner" && row.qrCode !== null) throw new Error("Invalid owner service destination.");
   const claimUrl = row.event === "claim.approved" ? `https://www.qrguitar.com/ownership-claim?claim=${row.subjectId}` : undefined;
-  const path = row.event === "service.revisionRequested"
+  const path = row.event === "service.revisionRequested" || (serviceOutcome && row.serviceRole === "provider")
     ? `/service-work/${encodeURIComponent(row.qrCode!)}?submission=${row.subjectId}`
+    : serviceOutcome ? `/service-review/${row.subjectId}`
+    : transferOutcome ? `/transfer/${row.subjectId}`
     : row.event === "claim.approved" ? `/i/${encodeURIComponent(row.qrCode!)}`
     : `/ownership-claim?claim=${row.subjectId}`;
   // Return a strict allowlist. Private source notes and evidence never reach the renderer.

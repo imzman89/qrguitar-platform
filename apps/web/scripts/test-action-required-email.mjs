@@ -25,6 +25,29 @@ for(const event of ['claim.ownerReview','claim.moreInfo','claim.approved','claim
  else{assert.equal(p.claimUrl,undefined);assert.deepEqual(Object.keys(p).sort(),['actionUrl','event','idempotencyKey','profileTitle','to']);assert.equal(destination.pathname,'/ownership-claim');assert.equal(destination.searchParams.get('claim'),subject);}
  assert.doesNotMatch(JSON.stringify(p),/secret/);
 });
+const outcomeCases=[
+ {event:'service.approved',serviceRole:'provider',qrCode:'QRG-TEST',pathname:'/service-work/QRG-TEST',parameter:'submission'},
+ {event:'service.declined',serviceRole:'provider',qrCode:'QRG-TEST',pathname:'/service-work/QRG-TEST',parameter:'submission'},
+ {event:'service.cancelled',serviceRole:'provider',qrCode:'QRG-TEST',pathname:'/service-work/QRG-TEST',parameter:'submission'},
+ {event:'service.cancelled',serviceRole:'owner',qrCode:null,pathname:'/service-review/'+subject,parameter:null},
+ {event:'ownership.transferAccepted',qrCode:null,pathname:'/transfer/'+subject,parameter:null},
+ {event:'ownership.transferCancelled',qrCode:null,pathname:'/transfer/'+subject,parameter:null}
+];
+for(const dispatch of outcomeCases)await test('terminal service or transfer URL '+dispatch.event+' '+(dispatch.serviceRole||'participant'),async()=>{
+ const p=actionEmailInput({...payload,...dispatch,privateNote:'secret',evidence:['secret'],token:'secret'},id),destination=new URL(p.actionUrl);
+ assert.equal(destination.origin,'https://www.qrguitar.com');assert.equal(destination.pathname,dispatch.pathname);assert.equal(destination.searchParams.size,dispatch.parameter?1:0);if(dispatch.parameter)assert.equal(destination.searchParams.get(dispatch.parameter),subject);
+ assert.equal(p.claimUrl,undefined);assert.deepEqual(Object.keys(p).sort(),['actionUrl','event','idempotencyKey','profileTitle','to']);assert.doesNotMatch(JSON.stringify(p),/secret|serviceRole/);
+});
+for(const dispatch of [
+ {event:'service.approved',qrCode:'QRG-TEST'},
+ {event:'service.approved',serviceRole:'owner',qrCode:null},
+ {event:'service.declined',serviceRole:'owner',qrCode:null},
+ {event:'service.cancelled',serviceRole:'owner',qrCode:'QRG-TEST'},
+ {event:'service.cancelled',serviceRole:'provider',qrCode:null},
+ {event:'ownership.transferAccepted',qrCode:'QRG-TEST'},
+ {event:'ownership.transferCancelled',qrCode:null,serviceRole:'provider'},
+ {event:'service.revisionRequested',qrCode:'QRG-TEST',serviceRole:'provider'}
+])await test('invalid outcome contract cannot reach transport '+dispatch.event+' '+(dispatch.serviceRole||'missing'),async()=>{const f=fixture({dispatch:{...payload,...dispatch}});assert.equal((await f.worker.run()).failed,1);assert.equal(f.sent.length,0);});
 for(const patch of [{event:'service.resubmitted'},{subjectId:'bad'},{to:'victim@invalid\r\nBcc:other@example.invalid'},{event:'service.revisionRequested',qrCode:'../../admin'},{event:'claim.approved',qrCode:null},{profileTitle:undefined}])await test('invalid dispatch cannot reach transport '+Object.keys(patch).join(','),async()=>{const f=fixture({dispatch:{...payload,...patch}});const r=await f.worker.run();assert.equal(r.failed,1);assert.equal(f.sent.length,0);});
 await test('current-authority suppression never calls sender',async()=>{const f=fixture({dispatch:null});assert.equal((await f.worker.run()).suppressed,1);assert.equal(f.sent.length,0);});
 for(const event of ['service.revisionRequested','claim.approved'])for(const qrCode of ['qrg-test','QRG-test','QRG--TEST','QRG-'+ 'X'.repeat(77)])await test('renderer-incompatible QR path fails before transport '+event+' '+qrCode.length,async()=>{const f=fixture({dispatch:{...payload,event,qrCode}});assert.equal((await f.worker.run()).failed,1);assert.equal(f.sent.length,0);});
