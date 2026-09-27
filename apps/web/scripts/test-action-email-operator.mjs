@@ -34,4 +34,19 @@ await test('auth timeout cannot enter mutation',async()=>{const f=fixture({hangA
 await test('status failure remains unavailable rather than zero counts',async()=>{assert.equal((await fixture({fail:true}).operator.list()).code,'unavailable');});
 await test('invalid or wrong mutation receipt never produces success',async()=>{for(const data of [null,{...status,id:actorId},{...status,state:'unknown'},{...status,attempts:8}])assert.equal((await fixture({data}).operator.reconcile(input)).code,'unconfirmed');});
 await test('historical suppression and exhausted budget receipts remain terminal',async()=>{for(const state of ['suppressed','failed']){const r=await fixture({data:{...status,state,canReconcile:false}}).operator.reconcile(input);assert.equal(r.ok,true);assert.equal(r.status.state,state);}});
+for(const event of ['claim.approved','claim.declined','claim.expired']){
+ await test(event+' operator receipt projects only safe claim identity and exact revision',async()=>{
+  const receipt={...status,event,to:'private@example.invalid',evidenceUrl:'private-storage',decisionNote:'private-note',providerMessageId:'private-provider-receipt'};
+  const f=fixture({data:{...page,items:[receipt]}}), result=await f.operator.list();
+  assert.equal(result.ok,true);assert.equal(result.status.items[0].event,event);assert.equal(result.status.items[0].claimId,actorId);assert.equal(result.status.items[0].updatedAt,stamp);assert.doesNotMatch(JSON.stringify(result),/private/);
+  const accepted=await fixture({data:{...receipt,state:'accepted',canReconcile:false}}).operator.reconcile({...input,resolution:'confirmed_accepted',providerMessageId:'synthetic-reviewed-receipt'});
+  assert.equal(accepted.ok,true);assert.equal(accepted.status.event,event);assert.doesNotMatch(JSON.stringify(accepted),/private/);
+ });
+ await test(event+' invalid subject correlation cannot be exposed or acknowledged',async()=>{
+  for(const patch of [{claimId:null},{claimId:'not-an-id'},{submissionId:id}]){
+   assert.equal((await fixture({data:{...page,items:[{...status,event,...patch}]}}).operator.list()).code,'unavailable');
+   assert.equal((await fixture({data:{...status,event,state:'accepted',...patch}}).operator.reconcile({...input,resolution:'confirmed_accepted',providerMessageId:'synthetic-reviewed-receipt'})).code,'unconfirmed');
+  }
+ });
+}
 console.log(JSON.stringify({passed,scope:'default-disabled callable operator; synthetic authenticated adapter and RPC only; no route/provider'}));

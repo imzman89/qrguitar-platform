@@ -13,7 +13,7 @@ const unavailable = (code = "unavailable"): Result => ({ ok: false, code, messag
 
 // Explicit projection prevents database diagnostics, private notes or recipients reaching a future UI.
 function item(value: unknown) {
-  if (!record(value) || !uuid(value.id) || !["claim.ownerReview", "claim.moreInfo", "service.revisionRequested"].includes(String(value.event))
+  if (!record(value) || !uuid(value.id) || !["claim.ownerReview", "claim.moreInfo", "claim.approved", "claim.declined", "claim.expired", "service.revisionRequested"].includes(String(value.event))
     || !["queued", "leased", "dispatching", "retry", "accepted", "failed", "unknown", "suppressed"].includes(String(value.state))
     || !Number.isInteger(value.attempts) || Number(value.attempts) < 0 || Number(value.attempts) > 6
     || !timestamp(value.updatedAt) || !timestamp(value.createdAt) || !timestamp(value.nextAttemptAt)
