@@ -2,8 +2,12 @@ export type ClaimSession = { access_token: string; user: { id: string } } | null
 export type ClaimAuth = { getSession(): Promise<{ data: { session: ClaimSession }; error?: unknown }>; onAuthStateChange(callback: (event: string, session: ClaimSession) => void): { data: { subscription: { unsubscribe(): void } } } };
 export type ClaimLease = { actorId: string; revision: number; operation?: symbol };
 export type ClaimSessionState = { phase: "loading" | "ready" | "signed-out" | "error"; actorId: string; revision: number; busy: boolean; error: string };
+const CLAIM_LINK_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function verifiedClaimId(value: unknown) {
+  return typeof value === "string" && CLAIM_LINK_ID_PATTERN.test(value) ? value.toLowerCase() : "";
+}
 export class StaleClaimRequest extends Error {}
-export class ClaimRequestError extends Error { constructor(message: string, readonly uncertain = false) { super(message); } }
+export class ClaimRequestError extends Error { constructor(message: string, readonly uncertain = false, readonly claimId = "") { super(message); } }
 export const MAX_CLAIM_EVIDENCE_BYTES = 3_000_000;
 export const MAX_CLAIM_BODY_BYTES = 4_200_000;
 export function claimReturnPath(params: Pick<URLSearchParams, "get">) {
@@ -98,7 +102,7 @@ export function createClaimSessionGuard(deps: { auth: () => ClaimAuth; fetch?: t
         return { response, payload: value as Record<string, unknown> };
       });
       check(lease); await fresh(lease); check(lease);
-      if (!response.ok || payload.ok !== true) throw new ClaimRequestError(typeof payload.message === "string" ? payload.message : "The server did not confirm this request.", mutation && (response.status >= 500 || response.ok || payload.uncertain === true));
+      if (!response.ok || payload.ok !== true) throw new ClaimRequestError(typeof payload.message === "string" ? payload.message : "The server did not confirm this request.", mutation && (response.status >= 500 || response.ok || payload.uncertain === true), verifiedClaimId(payload.claimId));
       return payload;
     } catch (error) {
       check(lease);
@@ -117,7 +121,7 @@ export function createClaimSessionGuard(deps: { auth: () => ClaimAuth; fetch?: t
 }
 
 export function claimLinkId(value: string | null) {
-  return value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value) ? value.toLowerCase() : "";
+  return verifiedClaimId(value);
 }
 export function visibleClaimRequests<T extends { id: string }>(claims: T[], requestedId: string) {
   const selected = claims.find(claim => claim.id.toLowerCase() === requestedId);

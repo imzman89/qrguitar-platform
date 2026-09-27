@@ -19,10 +19,23 @@ import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } f
 type EvidenceDraft = { name: string; dataUrl: string; type: string; bytes: number };
 type ClaimType = "owner_transfer" | "store_purchase" | "legacy_review";
 type ScenarioId = "store" | "builder" | "seller" | "no-transfer" | "gift" | "legacy";
-type ClaimSummary = { id: string; status: string; profileTitle: string; qrCode: string; evidenceCount: number; claimType: ClaimType; createdAt: string; adminReviewNote?: string; canWithdraw?: boolean; canSubmitEvidence?: boolean } & OwnerClaimReview;
+type ClaimSummary = { id: string; status: string; profileTitle: string; qrCode: string; evidenceCount: number; claimType: ClaimType; createdAt: string; adminReviewNote?: string; canWithdraw?: boolean; canSubmitEvidence?: boolean; canCompleteSubmission?: boolean; submissionComplete?: boolean } & OwnerClaimReview;
 
 function canWithdrawClaim(claim: ClaimSummary) {
   return claim.canWithdraw === true && ["awaiting_claimant", "awaiting_owner", "admin_review"].includes(claim.status);
+}
+
+function canCompleteClaimSubmission(claim: ClaimSummary) {
+  return claim.canCompleteSubmission === true && claim.submissionComplete === false;
+}
+
+function claimSubmissionIncomplete(claim: ClaimSummary) {
+  return claim.submissionComplete === false && ["awaiting_owner", "admin_review"].includes(claim.status);
+}
+
+function canonicalClaimQrIdentifier(value: unknown) {
+  const candidate = typeof value === "string" ? value.trim().toUpperCase() : "";
+  return /^QRG-[A-Z0-9][A-Z0-9-]{0,75}$/.test(candidate) ? candidate : "";
 }
 
 const scenarioDefinitions: Array<{ id: ScenarioId; key: "store" | "builder" | "transfer" | "used" | "gift" | "legacy"; icon: typeof Store; claimType: ClaimType; preferredTransfer?: boolean }> = [
@@ -80,6 +93,7 @@ function OwnershipClaimContent() {
   const [withdrawClaimId, setWithdrawClaimId] = useState("");
   const [withdrawNotice, setWithdrawNotice] = useState<{ id: string; text: string; error: boolean } | null>(null);
   const [reviewNotice, setReviewNotice] = useState<{ id: string; text: string; error: boolean } | null>(null);
+  const [completionNotice, setCompletionNotice] = useState<{ id: string; text: string; error: boolean } | null>(null);
   const scenarios = useMemo(() => scenarioDefinitions.map((item) => ({
     ...item,
     title: getContentValue(content, `claimCenter.scenarios.${item.key}.title`),
@@ -102,7 +116,7 @@ function OwnershipClaimContent() {
       try {
         const payload = await current.request(lease, "/api/ownership-claims");
         if (!current.isCurrent(lease) || requestRevision !== claimLoadRevision.current) return null;
-        if (!Array.isArray(payload.claims) || payload.claims.some((claim) => !claim || typeof claim.id !== "string" || typeof claim.status !== "string" || typeof claim.profileTitle !== "string" || typeof claim.qrCode !== "string" || !Number.isSafeInteger(claim.evidenceCount) || claim.evidenceCount < 0)) throw new Error("The saved ownership requests could not be read. Please retry.");
+        if (!Array.isArray(payload.claims) || payload.claims.some((claim) => !claim || typeof claim.id !== "string" || typeof claim.status !== "string" || typeof claim.profileTitle !== "string" || typeof claim.qrCode !== "string" || !Number.isSafeInteger(claim.evidenceCount) || claim.evidenceCount < 0 || (claim.canCompleteSubmission !== undefined && typeof claim.canCompleteSubmission !== "boolean") || (claim.submissionComplete !== undefined && typeof claim.submissionComplete !== "boolean") || (claim.canCompleteSubmission === true && claim.submissionComplete !== false))) throw new Error("The saved ownership requests could not be read. Please retry.");
         setClaims(payload.claims as ClaimSummary[]);
         return payload.claims as ClaimSummary[];
       } catch (error) {
@@ -120,7 +134,7 @@ function OwnershipClaimContent() {
         evidenceRead.current = null;
         setEvidenceReading(false); setClaimsLoading(false); setClaimsError("");
         setClaims([]); setEvidence([]); setResponseEvidence([]); setResponseClaimId("");
-        setWithdrawClaimId(""); setWithdrawNotice(null); setReviewNotice(null); focusedClaim.current = "";
+        setWithdrawClaimId(""); setWithdrawNotice(null); setReviewNotice(null); setCompletionNotice(null); focusedClaim.current = "";
         setAcquisitionDetails(""); setOwnershipDeclaration(""); setBuyerCode(""); setBuyerOrderReference("");
         setComplete(false); setMessage(""); setChallengeCode("");
         setIdentifier(initial.get("code") || initial.get("serial") || "");
@@ -218,6 +232,7 @@ function OwnershipClaimContent() {
     if (!current || evidenceRead.current) return;
     const lease = current.beginWrite();
     if (!lease) return;
+    const knownClaimIds = kind === "claim" ? new Set(claims.map((claim) => claim.id)) : null;
     claimLoadRevision.current++; setClaimsLoading(false); setMessage("");
     try {
       const payload = await current.request(lease, path, { method, headers: { "Content-Type": "application/json" }, body: serializeClaimBody(body) });
@@ -226,6 +241,19 @@ function OwnershipClaimContent() {
       onConfirmed(payload);
       setMessage(typeof payload.message === "string" ? payload.message : kind === "buyer" ? ui("ui.app.ownership.claim.page.85595a4753c6", "Ownership accepted.") : kind === "evidence" ? ui("ui.app.ownership.claim.page.65f71b1451b4", "Evidence submitted.") : ui("ui.app.ownership.claim.page.7562713c29a5", "Ownership request submitted."));
     } catch (error) {
+      if (current.isCurrent(lease) && kind === "claim" && error instanceof ClaimRequestError && error.uncertain && knownClaimIds) {
+        const saved = await reloadClaimsRef.current();
+        if (!current.isCurrent(lease)) return;
+        const reportedClaim = error.claimId ? saved?.find((claim) => claim.id.toLowerCase() === error.claimId) : undefined;
+        const qrIdentifier = canonicalClaimQrIdentifier(body.identifier);
+        const qrMatches = !error.claimId && qrIdentifier ? saved?.filter((claim) => !knownClaimIds.has(claim.id) && claim.qrCode.trim().toUpperCase() === qrIdentifier) || [] : [];
+        const recovered = reportedClaim || (qrMatches.length === 1 ? qrMatches[0] : undefined);
+        if (recovered) {
+          setComplete(true); setEvidence([]); setAcquisitionDetails(""); setOwnershipDeclaration(""); setChallengeCode("");
+          setMessage(ui("ui.app.ownership.claim.page.claimRecovered", "Your saved request was found after the interrupted response. Do not submit another request. Use Finish submitting below if it is offered."));
+          return;
+        }
+      }
       if (current.isCurrent(lease)) setMessage(error instanceof ClaimRequestError && error.uncertain ? ui("ui.app.ownership.claim.page.7eef482a4cd9", "{{value1}} The last request may already be saved. Check your request status or collection before retrying.", {value1: error.message}) : error instanceof Error ? error.message : ui("ui.app.ownership.claim.page.2a833d45816f", "Could not complete the request."));
     } finally { current.finishWrite(lease); }
   }
@@ -284,6 +312,33 @@ function OwnershipClaimContent() {
     } finally { current.finishWrite(lease); }
   }
 
+  async function completeSubmission(claimId: string) {
+    const current = claimGuard.current;
+    const claim = claims.find((item) => item.id === claimId);
+    if (!current || evidenceRead.current || claimsLoading || claimsError || !claim || !canCompleteClaimSubmission(claim)) return false;
+    const lease = current.beginWrite();
+    if (!lease) return false;
+    claimLoadRevision.current++;
+    setCompletionNotice(null);
+    try {
+      try {
+        const payload = await current.request(lease, "/api/ownership-claims", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: serializeClaimBody({ id: claimId, action: "complete_submission" }) });
+        if (payload.submissionComplete !== true) throw new ClaimRequestError("The server did not confirm submission completion.", true);
+      } catch { /* Reconcile every reply, including a lost response; never replay automatically. */ }
+      if (!current.isCurrent(lease)) return false;
+      const saved = await reloadClaimsRef.current();
+      if (!current.isCurrent(lease)) return false;
+      const completed = saved?.find((item) => item.id === claimId)?.submissionComplete === true;
+      setCompletionNotice({ id: claimId, error: !completed, text: !saved
+        ? ui("ui.app.ownership.claim.page.completionRefreshFailure", "The saved submission status could not be loaded. Refresh before taking another action.")
+        : completed
+          ? ui("ui.app.ownership.claim.page.completionSuccess", "Submission is confirmed. Your saved evidence remains attached.")
+          : ui("ui.app.ownership.claim.page.completionUnconfirmed", "The submission is not yet confirmed complete. Your saved files remain attached; refresh and try Finish submitting again.") });
+      window.requestAnimationFrame(() => document.getElementById(`completion-status-${claimId}`)?.focus());
+      return completed;
+    } finally { current.finishWrite(lease); }
+  }
+
   return (
     <>
       <Nav />
@@ -307,6 +362,7 @@ function OwnershipClaimContent() {
                 {requestedClaim ? <Link href="/ownership-claim">{ui("ui.app.ownership.claim.page.newRequest", "Start a new ownership request")}</Link> : null}
                 {reviewNotice && !claims.some(claim => claim.id === reviewNotice.id) ? <p id={"claim-review-status-" + reviewNotice.id} tabIndex={-1} role={reviewNotice.error ? "alert" : "status"}>{reviewNotice.text}</p> : null}
                 {withdrawNotice && !claims.some((claim) => claim.id === withdrawNotice.id) ? <p id={`withdraw-status-${withdrawNotice.id}`} tabIndex={-1} role={withdrawNotice.error ? "alert" : "status"}>{withdrawNotice.text}</p> : null}
+                {completionNotice && !claims.some((claim) => claim.id === completionNotice.id) ? <p id={`completion-status-${completionNotice.id}`} tabIndex={-1} role={completionNotice.error ? "alert" : "status"}>{completionNotice.text}</p> : null}
                 {message && !complete ? <p className="form-message" role="status">{message}</p> : null}
                 <button type="button" className="button secondary" disabled={busy || evidenceReading || claimsLoading} onClick={() => void reloadClaimsRef.current()}>{ui("ui.app.ownership.claim.page.6bc7c88e3f4e", "Refresh request status")}</button>
               </div>
@@ -363,7 +419,7 @@ function OwnershipClaimContent() {
                     {visibleClaimRequests(claims, requestedClaim).map((claim) => (
                       <article key={claim.id} style={{ gridTemplateColumns: "minmax(0, 1fr)" }}>
                         <div>
-                          <span>{claimStatusLabel(claim.status)}</span>
+                          <span>{claimSubmissionIncomplete(claim) ? ui("ui.app.ownership.claim.page.completionStatus", "Submission incomplete") : claimStatusLabel(claim.status)}</span>
                           <h3 id={"claim-title-" + claim.id.toLowerCase()} tabIndex={-1}>{claim.profileTitle}</h3>
                           <small>{claim.qrCode || ui("ui.app.ownership.claim.page.0e2a9633188b", "Private Profile")} · {claim.evidenceCount}{" "}{ui("ui.app.ownership.claim.page.21ea0f42e3ae", "evidence file")}{claim.evidenceCount === 1 ? "" : ui("ui.app.ownership.claim.page.043a718774c5", "s")}</small>
                           <ClaimOwnerReview key={claim.id + ":" + claim.status} claim={claim} disabled={busy || claimsLoading || Boolean(claimsError) || evidenceReading} onDecision={(action, note) => reviewClaim(claim.id, action, note)} />
@@ -379,6 +435,11 @@ function OwnershipClaimContent() {
                             </div> : <button id={`withdraw-request-${claim.id}`} className="button secondary" type="button" disabled={busy || evidenceReading || claimsLoading || Boolean(claimsError)} onClick={() => { setWithdrawClaimId(claim.id); setWithdrawNotice(null); window.requestAnimationFrame(() => document.getElementById(`keep-request-${claim.id}`)?.focus()); }}><X size={16} aria-hidden="true" />{ui("ui.app.ownership.claim.page.withdrawRequest", "Withdraw request")}</button>}
                           </div> : null}
                           {withdrawNotice?.id === claim.id ? <p id={`withdraw-status-${claim.id}`} tabIndex={-1} role={withdrawNotice.error ? "alert" : "status"}>{withdrawNotice.text}</p> : null}
+                          {canCompleteClaimSubmission(claim) ? <div className="claim-response">
+                            <p><b>{ui("ui.app.ownership.claim.page.completionTitle", "Finish this saved request.")}</b>{" "}{ui("ui.app.ownership.claim.page.completionBody", "Your evidence files are already saved and will be reused. You do not need to upload them again.")}</p>
+                            <button id={`complete-submission-${claim.id}`} className="button" type="button" disabled={busy || evidenceReading || claimsLoading || Boolean(claimsError)} onClick={() => void completeSubmission(claim.id)}><FileCheck2 size={16} aria-hidden="true" />{busy ? ui("ui.app.ownership.claim.page.finishingSubmission", "Finishing...") : ui("ui.app.ownership.claim.page.finishSubmitting", "Finish submitting")}</button>
+                          </div> : null}
+                          {completionNotice?.id === claim.id ? <p id={`completion-status-${claim.id}`} tabIndex={-1} role={completionNotice.error ? "alert" : "status"}>{completionNotice.text}</p> : null}
                           {claim.status === "awaiting_claimant" && claim.canSubmitEvidence === true ? (
                             <div className="claim-response">
                               <p><b>{ui("ui.app.ownership.claim.page.e9672027cf43", "QRguitar needs more information.")}</b>{claim.adminReviewNote ? ui("ui.app.ownership.claim.page.7130515d99f1", " {{value1}}", { value1: claim.adminReviewNote }) : ui("ui.app.ownership.claim.page.aa618133af62", " Add the requested private evidence below.")}</p>
@@ -395,7 +456,7 @@ function OwnershipClaimContent() {
                             </div>
                           ) : null}
                         </div>
-                        <ol>{statusSteps.map((step) => <li className={claim.status === step || (step === "submitted" && claim.status !== "awaiting_claimant") ? "is-current" : ""} key={step}>{step.replaceAll("_", " ")}</li>)}</ol>
+                        <ol>{statusSteps.map((step) => <li className={claimSubmissionIncomplete(claim) ? step === "submitted" ? "is-current" : "" : claim.status === step || (step === "submitted" && claim.status !== "awaiting_claimant") ? "is-current" : ""} key={step}>{claimSubmissionIncomplete(claim) && step === "submitted" ? ui("ui.app.ownership.claim.page.completionSavedStep", "saved, not submitted") : step.replaceAll("_", " ")}</li>)}</ol>
                       </article>
                     ))}
                   </div>

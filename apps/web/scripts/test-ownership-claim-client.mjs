@@ -95,6 +95,16 @@ await test("transport, invalid JSON, 5xx and unconfirmed successes are uncertain
     h.guard.finishWrite(lease); assert.equal(h.guard.getState().busy, false); h.guard.dispose();
   }
 });
+await test("uncertain server errors expose only a validated claim UUID", async () => {
+  const valid = "11111111-1111-4111-8111-111111111111";
+  for (const [claimId, expected] of [[valid.toUpperCase(), valid], ["claim-fixture", ""], ["22222222-2222-2222-2222-222222222222", ""], [null, ""]]) {
+    const h = await harness({ reply: async () => Response.json({ ok: false, uncertain: true, message: "Saved but unconfirmed", claimId, privateEvidence: "must-not-escape" }, { status: 503 }) }).mount();
+    const lease = h.guard.beginWrite(); let error;
+    try { await h.guard.request(lease, "/api/ownership-claims", { method: "PATCH" }); } catch (caught) { error = caught; }
+    assert.ok(error instanceof ClaimRequestError); assert.equal(error.claimId, expected); assert.equal("privateEvidence" in error, false);
+    h.guard.finishWrite(lease); h.guard.dispose();
+  }
+});
 await test("read outage and confirmed validation rejection are not uncertain writes", async () => {
   for (const method of ["GET", "POST"]) {
     const h = await harness({ reply: async () => Response.json({ ok: false, message: "Unavailable" }, { status: method === "GET" ? 503 : 400 }) }).mount(), lease = h.guard.lease();
@@ -147,6 +157,9 @@ function visit(node) {
 }
 visit(ast);
 const canWithdrawClaim = compile(functions.get("canWithdrawClaim"), {}, "canWithdrawClaim");
+const canCompleteClaimSubmission = compile(functions.get("canCompleteClaimSubmission"), {}, "canCompleteClaimSubmission");
+const claimSubmissionIncomplete = compile(functions.get("claimSubmissionIncomplete"), {}, "claimSubmissionIncomplete");
+const canonicalClaimQrIdentifier = compile(functions.get("canonicalClaimQrIdentifier"), {}, "canonicalClaimQrIdentifier");
 function compile(code, env, result) {
   const { useUiText } = withUiTextTestContext(() => { throw new Error("Unexpected module"); })("UiTextProvider");
   env = { useUiText, ui: useUiText("app.ownership.claim.page"), ...env };
@@ -156,7 +169,7 @@ function compile(code, env, result) {
 function setters(state) { return Object.fromEntries(Object.keys(state).map(key => ["set" + key[0].toUpperCase() + key.slice(1), value => { state[key] = typeof value === "function" ? value(state[key]) : value; }])); }
 function pageHarness(options = {}) {
   const h = harness(options);
-  const state = { evidenceReading: false, claimsLoading: false, claimsError: "", signedIn: null, scenarioId: "", identifier: "", acquisitionDetails: "old private narrative", ownershipDeclaration: "", challengeCode: "", evidence: [], claims: [], busy: false, message: "", complete: false, responseClaimId: "", responseEvidence: [], buyerCode: "private-code", buyerOrderReference: "", authError: "", withdrawClaimId: "", withdrawNotice: null, reviewNotice: null };
+  const state = { evidenceReading: false, claimsLoading: false, claimsError: "", signedIn: null, scenarioId: "", identifier: "", acquisitionDetails: "old private narrative", ownershipDeclaration: "", challengeCode: "", evidence: [], claims: [], busy: false, message: "", complete: false, responseClaimId: "", responseEvidence: [], buyerCode: "private-code", buyerOrderReference: "", authError: "", withdrawClaimId: "", withdrawNotice: null, reviewNotice: null, completionNotice: null };
   const refs = { focusedClaim: { current: "" }, claimGuard: { current: null }, reloadClaimsRef: { current: async () => {} }, claimLoadRevision: { current: 0 }, evidenceRead: { current: null } };
   const env = { ...refs, ...setters(state), returnPath: "/ownership-claim?code=QRG-SYNTH&handoff=buyer-code", createClaimSessionGuard: () => h.guard, createBrowserSupabaseClient: () => { throw new Error("Unexpected auth factory use"); } };
   const dispose = compile("const effect = " + pageEffect + ";", env, "effect")();
@@ -165,11 +178,11 @@ function pageHarness(options = {}) {
 await test("page actor changes clear drafts, evidence, codes and previously loaded claims", async () => {
   const p = pageHarness(); await until(() => p.state.signedIn === true && !p.state.claimsLoading);
   assert.equal(p.state.claims.length, 1); assert.equal(p.state.identifier, "QRG-SYNTH"); assert.equal(p.state.scenarioId, "builder");
-  p.state.evidence = [{ private: "file" }]; p.state.buyerCode = "secret-code"; p.state.acquisitionDetails = "private narrative"; p.h.change(null);
-  assert.equal(p.state.signedIn, false); assert.deepEqual(p.state.evidence, []); assert.deepEqual(p.state.claims, []); assert.equal(p.state.buyerCode, ""); assert.equal(p.state.acquisitionDetails, ""); p.dispose();
+  p.state.evidence = [{ private: "file" }]; p.state.buyerCode = "secret-code"; p.state.acquisitionDetails = "private narrative"; p.state.completionNotice = { id: claim.id, text: "private completion", error: false }; p.h.change(null);
+  assert.equal(p.state.signedIn, false); assert.deepEqual(p.state.evidence, []); assert.deepEqual(p.state.claims, []); assert.equal(p.state.buyerCode, ""); assert.equal(p.state.acquisitionDetails, ""); assert.equal(p.state.completionNotice, null); p.dispose();
 });
 await test("page keeps real empty claims distinct from list outage or malformed response", async () => {
-  for (const reply of [async () => ok({ claims: [] }), async () => Response.json({ ok: false, message: "Claims unavailable" }, { status: 503 }), async () => ok({ claims: [{ id: "incomplete" }] })]) {
+  for (const reply of [async () => ok({ claims: [] }), async () => Response.json({ ok: false, message: "Claims unavailable" }, { status: 503 }), async () => ok({ claims: [{ id: "incomplete" }] }), async () => ok({ claims: [{ ...claim, canCompleteSubmission: "true", submissionComplete: false }] }), async () => ok({ claims: [{ ...claim, canCompleteSubmission: true }] })]) {
     const p = pageHarness({ reply }); await until(() => p.state.signedIn === true && !p.state.claimsLoading);
     const payload = await reply().then(response => response.json());
     assert.equal(Boolean(p.state.claimsError), !(payload.ok && payload.claims?.length === 0)); assert.deepEqual(p.state.claims, []); p.dispose();
@@ -195,13 +208,57 @@ await test("page rejects excess files and combined bytes without starting FileRe
 });
 await test("page unknown write outcome warns without marking complete and releases its lock", async () => {
   const p = pageHarness(); await until(() => p.state.signedIn === true && !p.state.claimsLoading); p.h.reply = async () => { throw new Error("Network reply lost"); };
-  const write = compile(functions.get("writeClaim"), { ...p.env, ClaimRequestError, serializeClaimBody, confirmedClaimMutation }, "writeClaim");
+  const write = compile(functions.get("writeClaim"), { ...p.env, ...p.state, ClaimRequestError, serializeClaimBody, confirmedClaimMutation, canonicalClaimQrIdentifier }, "writeClaim");
   await write("/api/ownership-claims", "POST", { evidence: [] }, "claim", () => { p.state.complete = true; });
   assert.equal(p.state.complete, false); assert.equal(p.state.busy, false); assert.match(p.state.message, /may already be saved/); p.dispose();
 });
+await test("uncertain claim POST discovers the saved request and suppresses duplicate form submission", async () => {
+  const p = pageHarness(); await until(() => p.state.signedIn === true && !p.state.claimsLoading);
+  const recovered = { ...claim, id: "claim-recovered", canCompleteSubmission: true, submissionComplete: false };
+  p.state.evidence = [{ name: "private.pdf" }];
+  p.h.reply = async (_url, init) => {
+    if (init.method === "POST") throw new Error("Lost final acknowledgement");
+    return ok({ claims: [claim, recovered] });
+  };
+  const write = compile(functions.get("writeClaim"), { ...p.env, ...p.state, ClaimRequestError, serializeClaimBody, confirmedClaimMutation, canonicalClaimQrIdentifier }, "writeClaim");
+  await write("/api/ownership-claims", "POST", { identifier: "QRG-SYNTH", evidence: p.state.evidence }, "claim", () => assert.fail("uncertain POST must not use its missing receipt"));
+  assert.equal(p.h.calls.filter(call => call.method === "POST").length, 1);
+  assert.equal(p.h.calls.filter(call => !call.method).length, 2);
+  assert.equal(p.state.complete, true); assert.deepEqual(p.state.evidence, []); assert.equal(p.state.claims.some(item => item.id === recovered.id), true);
+  assert.match(p.state.message, /Do not submit another request/); assert.match(p.state.message, /Finish submitting/); assert.equal(p.state.busy, false); p.dispose();
+});
+await test("authoritative error claimId recovers the exact saved request even from a serial lookup", async () => {
+  const p = pageHarness(); await until(() => p.state.signedIn === true && !p.state.claimsLoading);
+  const exactId = "11111111-1111-4111-8111-111111111111";
+  const recovered = { ...claim, id: exactId, qrCode: "QRG-EXACT", canCompleteSubmission: true, submissionComplete: false };
+  p.h.reply = async (_url, init) => init.method === "POST"
+    ? Response.json({ ok: false, uncertain: true, message: "Saved but completion failed", claimId: exactId, ignoredPrivate: "never expose" }, { status: 503 })
+    : ok({ claims: [claim, recovered] });
+  const write = compile(functions.get("writeClaim"), { ...p.env, ...p.state, ClaimRequestError, serializeClaimBody, confirmedClaimMutation, canonicalClaimQrIdentifier }, "writeClaim");
+  await write("/api/ownership-claims", "POST", { identifier: "SERIAL-ONLY" }, "claim", () => assert.fail("uncertain response must reconcile through GET"));
+  assert.equal(p.state.complete, true); assert.equal(p.state.claims.some(item => item.id === exactId), true); assert.doesNotMatch(p.state.message, /ignoredPrivate|never expose/); p.dispose();
+});
+
+await test("uncertain POST never guesses an unrelated, ambiguous, or serial-only new request", async () => {
+  const cases = [
+    { identifier: "QRG-SYNTH", rows: [{ ...claim, id: "other-a", qrCode: "QRG-OTHER" }] },
+    { identifier: "SERIAL-ONLY", rows: [{ ...claim, id: "other-b", qrCode: "QRG-SYNTH" }] },
+    { identifier: "QRG-SYNTH", rows: [{ ...claim, id: "other-c", qrCode: "QRG-SYNTH" }, { ...claim, id: "other-d", qrCode: "QRG-SYNTH" }] }
+  ];
+  for (const example of cases) {
+    const p = pageHarness(); await until(() => p.state.signedIn === true && !p.state.claimsLoading);
+    p.h.reply = async (_url, init) => {
+      if (init.method === "POST") throw new Error("No response");
+      return ok({ claims: [claim, ...example.rows] });
+    };
+    const write = compile(functions.get("writeClaim"), { ...p.env, ...p.state, ClaimRequestError, serializeClaimBody, confirmedClaimMutation, canonicalClaimQrIdentifier }, "writeClaim");
+    await write("/api/ownership-claims", "POST", { identifier: example.identifier }, "claim", () => assert.fail("uncertain response must not confirm"));
+    assert.equal(p.state.complete, false); assert.match(p.state.message, /may already be saved/); assert.equal(p.h.calls.filter(call => call.method === "POST").length, 1); p.dispose();
+  }
+});
 await test("page applies only a verified successful mutation receipt once", async () => {
   const p = pageHarness(); await until(() => p.state.signedIn === true && !p.state.claimsLoading); const gate = deferred(); p.h.reply = () => gate.promise;
-  const write = compile(functions.get("writeClaim"), { ...p.env, ClaimRequestError, serializeClaimBody, confirmedClaimMutation }, "writeClaim"); let confirmed = 0;
+  const write = compile(functions.get("writeClaim"), { ...p.env, ...p.state, ClaimRequestError, serializeClaimBody, confirmedClaimMutation, canonicalClaimQrIdentifier }, "writeClaim"); let confirmed = 0;
   const saving = write("/api/ownership-claims", "POST", {}, "claim", () => confirmed++);
   await until(() => p.h.calls.length === 2); await write("/api/ownership-claims", "POST", {}, "claim", () => confirmed++); assert.equal(p.h.calls.length, 2);
   gate.resolve(ok({ claim })); await saving; assert.equal(confirmed, 1); assert.equal(p.state.busy, false); p.dispose();
@@ -216,7 +273,7 @@ await test("signed-out page renders login return intent without private controls
   assert.match(html, /next=%2Fownership-claim%3Fcode%3DQRG-SYNTH%26handoff%3Dbuyer-code/); assert.doesNotMatch(html, /type="file"|Accept handoff|Submit for review/);
 });
 
-function claimChooserHarness(search = "", savedClaims = [], notice = null) {
+function claimChooserHarness(search = "", savedClaims = [], notice = null, completionNotice = null, busy = false) {
   const empty = () => null;
   const icons = Object.fromEntries(["ArrowLeft", "Check", "FileCheck2", "Gift", "Handshake", "PackageCheck", "ShieldCheck", "Store", "Wrench", "X"].map(name => [name, empty]));
   const definition = ast.statements.flatMap(statement => ts.isVariableStatement(statement) ? [...statement.declarationList.declarations] : []).find(item => item.name.getText(ast) === "scenarioDefinitions");
@@ -229,11 +286,11 @@ function claimChooserHarness(search = "", savedClaims = [], notice = null) {
     React, ...icons, workflow: { claims: "claims-workspace" }, useSiteContent: () => ({}), useSearchParams: () => params, claimReturnPath, claimLinkId, visibleClaimRequests, ClaimOwnerReview: () => null,
     useState(initial) {
       const index = stateIndex++;
-      if (!(index in values)) values[index] = index === 4 ? true : index === 11 ? savedClaims : index === 20 ? notice : typeof initial === "function" ? initial() : initial;
+      if (!(index in values)) values[index] = index === 4 ? true : index === 11 ? savedClaims : index === 12 ? busy : index === 20 ? notice : index === 22 ? completionNotice : typeof initial === "function" ? initial() : initial;
       return [values[index], next => { values[index] = typeof next === "function" ? next(values[index]) : next; }];
     },
     useRef(initial) { const index = refIndex++; return refs[index] ||= { current: initial }; },
-    useMemo: fn => fn(), useEffect() {}, scenarioDefinitions: actualScenarios, statusSteps: [], getContentValue: (_, key) => key, canWithdrawClaim, claimStatusLabel: status => status,
+    useMemo: fn => fn(), useEffect() {}, scenarioDefinitions: actualScenarios, statusSteps: ["submitted", "awaiting_owner", "admin_review", "approved"], getContentValue: (_, key) => key, canWithdrawClaim, canCompleteClaimSubmission, claimSubmissionIncomplete, claimStatusLabel: status => status,
     createChallengeCode: () => "ABC234", window: { requestAnimationFrame(callback) { frames.push(callback); } },
     document: { getElementById(id) { const node = claimElements(currentTree, item => item.props.id === id)[0]; return node ? { focus() { focused.push(id); }, scrollIntoView() {}, querySelector(selector) { assert.equal(selector, "button"); return claimElements(node, item => item.type === "button").length ? { focus() { focused.push(id + " button"); } } : null; } } : null; } },
     Nav: empty, Footer: empty, Link: ({ children, ...props }) => React.createElement("a", props, children)
@@ -292,6 +349,110 @@ await test("buyer-code deep links open the selected handoff without an extra sit
   assert.ok(changeSituation(tree));
 });
 
+await test("completion recovery renders only an explicit incomplete capability and explains saved-file reuse", () => {
+  const eligible = { ...claim, canCompleteSubmission: true, submissionComplete: false };
+  const tree = claimChooserHarness("", [eligible]).render();
+  const buttons = claimElements(tree, node => node.type === "button" && node.props.id === "complete-submission-claim-a");
+  assert.equal(buttons.length, 1); assert.equal(buttons[0].props.disabled, false);
+  const html = renderToStaticMarkup(tree);
+  assert.match(html, /Submission incomplete/); assert.match(html, /Finish submitting/); assert.match(html, /evidence files are already saved and will be reused/); assert.match(html, /do not need to upload them again/);
+  const currentSteps = claimElements(tree, node => node.type === "li" && node.props.className === "is-current");
+  assert.equal(currentSteps.length, 1); assert.match(renderToStaticMarkup(currentSteps[0]), /saved, not submitted/); assert.doesNotMatch(renderToStaticMarkup(currentSteps[0]), /awaiting owner/);
+  assert.doesNotMatch(html, /complete_submission|type="file"/);
+  for (const visibleIncomplete of [
+    { ...claim, status: "awaiting_owner", canCompleteSubmission: false, submissionComplete: false },
+    { ...claim, status: "admin_review", submissionComplete: false }
+  ]) {
+    const incompleteTree = claimChooserHarness("", [visibleIncomplete]).render();
+    const incompleteHtml = renderToStaticMarkup(incompleteTree);
+    assert.match(incompleteHtml, /Submission incomplete/); assert.match(incompleteHtml, /saved, not submitted/);
+    assert.doesNotMatch(incompleteHtml, /Finish submitting/);
+  }
+  for (const preserved of [
+    { ...claim, status: "awaiting_owner" },
+    { ...claim, status: "cancelled", submissionComplete: false },
+    { ...claim, status: "approved", submissionComplete: true }
+  ]) {
+    const preservedHtml = renderToStaticMarkup(claimChooserHarness("", [preserved]).render());
+    assert.doesNotMatch(preservedHtml, /Submission incomplete|saved, not submitted|Finish submitting/);
+  }
+  const busyTree = claimChooserHarness("", [eligible], null, null, true).render();
+  assert.equal(claimElements(busyTree, node => node.props.id === "complete-submission-claim-a")[0].props.disabled, true);
+  for (const capability of [
+    {},
+    { canCompleteSubmission: false, submissionComplete: false },
+    { canCompleteSubmission: true, submissionComplete: true },
+    { canCompleteSubmission: "true", submissionComplete: false },
+    { canCompleteSubmission: true }
+  ]) {
+    const candidate = { ...claim, ...capability };
+    assert.equal(canCompleteClaimSubmission(candidate), false);
+    assert.equal(claimElements(claimChooserHarness("", [candidate]).render(), node => node.props.id === "complete-submission-claim-a").length, 0);
+  }
+});
+
+async function completionHarness() {
+  const incomplete = { ...claim, canCompleteSubmission: true, submissionComplete: false };
+  const p = pageHarness({ reply: async () => ok({ claims: [incomplete] }) });
+  await until(() => p.state.signedIn === true && !p.state.claimsLoading);
+  p.focused = [];
+  p.finish = () => compile(functions.get("completeSubmission"), {
+    ...p.env, ...p.state, canCompleteClaimSubmission, serializeClaimBody, ClaimRequestError,
+    window: { requestAnimationFrame: fn => fn() },
+    document: { getElementById: id => ({ focus: () => p.focused.push(id) }) }
+  }, "completeSubmission")(claim.id);
+  return { p, incomplete };
+}
+
+await test("Finish submitting writes once, stays busy, and succeeds only after authoritative GET", async () => {
+  const { p, incomplete } = await completionHarness();
+  const gate = deferred(); let completed = false;
+  p.h.reply = async (_url, init) => {
+    if (init.method === "PATCH") { await gate.promise; completed = true; return ok({ submissionComplete: true }); }
+    return ok({ claims: [{ ...incomplete, evidenceCount: 1, canCompleteSubmission: !completed, submissionComplete: completed }] });
+  };
+  const pending = p.finish(); await until(() => p.h.calls.some(call => call.method === "PATCH"));
+  assert.equal(p.state.busy, true); await p.finish();
+  assert.equal(p.h.calls.filter(call => call.method === "PATCH").length, 1);
+  gate.resolve(); assert.equal(await pending, true);
+  const patch = p.h.calls.find(call => call.method === "PATCH");
+  assert.equal(patch.url, "/api/ownership-claims"); assert.deepEqual(JSON.parse(patch.body), { id: claim.id, action: "complete_submission" });
+  assert.equal(patch.headers.Authorization, "Bearer token-a");
+  assert.equal(p.h.calls.filter(call => !call.method).length, 2); assert.ok(p.h.calls.filter(call => !call.method).every(call => call.body === undefined));
+  assert.equal(p.state.claims[0].submissionComplete, true); assert.equal(p.state.claims[0].evidenceCount, 1);
+  assert.equal(p.state.completionNotice.error, false); assert.match(p.state.completionNotice.text, /Submission is confirmed/);
+  assert.equal(p.state.busy, false); assert.equal(p.focused.at(-1), "completion-status-claim-a"); p.dispose();
+});
+
+await test("lost completion reply reconciles by GET without replaying the mutation", async () => {
+  const { p, incomplete } = await completionHarness(); let writes = 0;
+  p.h.reply = async (_url, init) => {
+    if (init.method === "PATCH") { writes++; throw new Error("Lost response"); }
+    return ok({ claims: [{ ...incomplete, canCompleteSubmission: false, submissionComplete: true }] });
+  };
+  assert.equal(await p.finish(), true); assert.equal(writes, 1);
+  assert.equal(p.state.completionNotice.error, false); assert.equal(p.state.claims[0].submissionComplete, true); p.dispose();
+});
+
+await test("PATCH receipt alone never claims completion when GET is incomplete or unavailable", async () => {
+  for (const readFails of [false, true]) {
+    const { p, incomplete } = await completionHarness();
+    p.h.reply = async (_url, init) => init.method === "PATCH"
+      ? ok({ submissionComplete: true })
+      : readFails ? Response.json({ ok: false, message: "Read unavailable" }, { status: 503 }) : ok({ claims: [incomplete] });
+    assert.equal(await p.finish(), false); assert.equal(p.state.completionNotice.error, true);
+    assert.match(p.state.completionNotice.text, readFails ? /could not be loaded/ : /not yet confirmed complete/);
+    assert.equal(Boolean(p.state.claimsError), readFails); assert.equal(p.state.busy, false); p.dispose();
+  }
+});
+
+await test("completion capability and late replies cannot cross an account revision", async () => {
+  const { p } = await completionHarness(); const gate = deferred();
+  p.h.reply = async (_url, init) => init.method === "PATCH" ? gate.promise : ok({ claims: [] });
+  const pending = p.finish(); await until(() => p.h.calls.some(call => call.method === "PATCH"));
+  p.h.change(null); gate.resolve(ok({ submissionComplete: true }));
+  assert.equal(await pending, false); assert.deepEqual(p.state.claims, []); assert.equal(p.state.completionNotice, null); assert.equal(p.state.signedIn, false); p.dispose();
+});
 await test("withdrawal eligibility requires an explicit server capability and an open state", () => {
   for (const status of ['awaiting_claimant','awaiting_owner','admin_review','approved','denied','expired','cancelled']) {
     for (const canWithdraw of [true,false,undefined,'true']) {
