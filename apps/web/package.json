@@ -14,7 +14,7 @@
     "test:launch": "node scripts/assert-launch-readiness.mjs",
     "test:service-workflow": "node scripts/assert-service-workflow.mjs && node scripts/test-service-review-delivery.mjs && npm run test:service-email-outbox",
     "test:service-email-outbox": "node scripts/test-service-email-outbox.mjs && node scripts/test-service-email-outbox-db.mjs && node scripts/test-service-email-outbox-http.mjs && node scripts/test-service-email-outbox-schema.mjs",
-    "test:action-email": "node scripts/test-action-required-email.mjs && node scripts/test-action-required-email-db.mjs && node --test scripts/security/claim-boundaries.test.mjs",
+    "test:action-email": "node scripts/test-action-required-email.mjs && node scripts/test-action-email-operator.mjs && node scripts/test-action-required-email-db.mjs && node --test scripts/security/claim-boundaries.test.mjs",
     "test:owner-experience": "node scripts/assert-owner-experience.mjs",
     "test:premium-product": "node scripts/assert-premium-product.mjs",
     "test:public-collectible": "node scripts/assert-public-collectible.mjs",

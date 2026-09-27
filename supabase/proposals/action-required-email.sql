@@ -209,8 +209,107 @@ create function public.action_email_status() returns jsonb language sql stable s
  select jsonb_build_object('captureEnabled',(select capture_enabled from public.action_email_control where singleton),
  'dispatchEnabled',(select dispatch_enabled from public.action_email_control where singleton),
  'queued',count(*) filter(where state in('queued','retry')),'unknown',count(*) filter(where state='unknown'),
- 'failed',count(*) filter(where state='failed'),'accepted',count(*) filter(where state='accepted')) from public.action_email_intents;
+ 'failed',count(*) filter(where state='failed'),'accepted',count(*) filter(where state='accepted'),
+ 'inFlight',count(*) filter(where state in('leased','dispatching')),'suppressed',count(*) filter(where state='suppressed'),
+ 'oldestPendingAt',min(created_at) filter(where state in('queued','retry'))) from public.action_email_intents;
 $$;
+-- Read-only eligibility hints are rechecked after source locks before an operator retry.
+create function public.action_email_retry_eligible(p_intent_id uuid) returns boolean
+language sql stable security definer set search_path=pg_catalog,public as $$
+ select coalesce((select g.id is not null and g.admin_archived_at is null and g.owner_removed_at is null
+   and case when i.claim_id is not null then
+     c.action_email_completed and c.action_email_version=i.source_version
+     and (c.expires_at is null or c.expires_at>statement_timestamp()) and c.claimant_user_id is not null
+     and g.owner_id is not distinct from c.current_owner_id
+     and ((i.event_type='claim.ownerReview' and c.status='awaiting_owner' and c.current_owner_id is not null)
+       or (i.event_type='claim.moreInfo' and c.status='awaiting_claimant'))
+   else s.status='changes_requested' and s.action_email_version=i.source_version and s.expires_at>statement_timestamp()
+     and s.owner_user_id=g.owner_id and s.owner_user_id is not null and s.provider_user_id is not null end
+   and exists(select 1 from auth.users u join public.profiles p on p.id=u.id
+     where u.id=r.recipient and p.account_status='active' and nullif(btrim(u.email),'') is not null)
+   and (r.other_actor is null or exists(select 1 from public.profiles where id=r.other_actor and account_status='active'))
+   and not exists(select 1 from public.account_deletion_requests where actor_id in(r.recipient,r.other_actor) and status='requested')
+ from public.action_email_intents i left join public.ownership_claims c on c.id=i.claim_id
+ left join public.service_submissions s on s.id=i.submission_id
+ left join public.guitars g on g.id=coalesce(c.guitar_id,s.guitar_id)
+ cross join lateral(select case when i.event_type='claim.ownerReview' then c.current_owner_id
+   when i.event_type='claim.moreInfo' then c.claimant_user_id else s.provider_user_id end recipient,
+   case when i.event_type='claim.ownerReview' then c.claimant_user_id
+   when i.event_type='claim.moreInfo' then c.current_owner_id else s.owner_user_id end other_actor) r
+ where i.id=p_intent_id),false);
+$$;
+create function public.action_email_intent_status(p_intent_id uuid) returns jsonb
+language sql stable security definer set search_path=pg_catalog,public as $$
+ select jsonb_build_object('id',i.id,'event',i.event_type,'state',i.state,'attempts',i.attempt_count,
+   'claimId',i.claim_id,'submissionId',i.submission_id,'updatedAt',i.updated_at,'createdAt',i.created_at,
+   'nextAttemptAt',i.next_attempt_at,'code',i.outcome_code,
+   'canRetry',i.state='failed' and i.attempt_count<6 and public.action_email_retry_eligible(i.id),
+   'canReconcile',i.state='unknown') from public.action_email_intents i where i.id=p_intent_id;
+$$;
+create function public.action_email_admin_status(p_offset integer default 0) returns jsonb
+language plpgsql stable security definer set search_path=pg_catalog,public as $$
+begin
+ if p_offset is null or p_offset<0 or p_offset>1000000 then raise exception 'Invalid delivery page.' using errcode='22023';end if;
+ return public.action_email_status() || jsonb_build_object('offset',p_offset,'limit',50,
+   'total',(select count(*) from public.action_email_intents),
+   'items',coalesce((select jsonb_agg(item order by created_at,id) from (
+     select public.action_email_intent_status(i.id) item,i.created_at,i.id
+       from public.action_email_intents i order by i.created_at,i.id limit 50 offset p_offset) rows),'[]'::jsonb));
+end;$$;
+-- Only a verified server-side administrator can assert external provider evidence.
+-- Accepted means provider acceptance, never proof of delivery to an inbox.
+create function public.reconcile_action_email(p_intent_id uuid,p_actor_id uuid,p_env_admin boolean,
+ p_resolution text,p_reason text,p_provider_message_id text,p_expected_updated_at timestamptz) returns jsonb
+language plpgsql security definer set search_path=pg_catalog,public as $$
+declare i public.action_email_intents;claim uuid;submission uuid;gid uuid;eligible boolean;actor public.profiles;
+begin
+ select * into actor from public.profiles where id=p_actor_id for share;
+ if actor.id is null or actor.account_status is distinct from 'active'
+   or not exists(select 1 from auth.users where id=p_actor_id)
+   or (actor.role is distinct from 'admin' and p_env_admin is not true)
+   or exists(select 1 from public.account_deletion_requests where actor_id=p_actor_id and status='requested') then
+   raise exception 'Active administrator required.' using errcode='42501';end if;
+ if p_expected_updated_at is null or p_resolution is null or p_resolution not in('retry','confirmed_accepted','confirmed_not_accepted')
+   or p_reason is null or length(btrim(p_reason))<10 or length(p_reason)>1000 or p_reason ~ '[[:cntrl:]]'
+   or (p_resolution='confirmed_accepted' and (nullif(btrim(p_provider_message_id),'') is null
+     or length(p_provider_message_id)>300 or p_provider_message_id ~ '[[:cntrl:]]'))
+   or (p_resolution<>'confirmed_accepted' and p_provider_message_id is not null) then
+   raise exception 'Record valid provider evidence without personal information.' using errcode='22023';end if;
+ select claim_id,submission_id into claim,submission from public.action_email_intents where id=p_intent_id;
+ if claim is not null then
+   select guitar_id into gid from public.ownership_claims where id=claim;
+   perform 1 from public.guitars where id=gid for share;
+   perform 1 from public.ownership_claims where id=claim for update;
+ elsif submission is not null then
+   select guitar_id into gid from public.service_submissions where id=submission for update;
+   perform 1 from public.guitars where id=gid for share;
+ else raise exception 'Delivery unavailable.' using errcode='22023';end if;
+ select * into i from public.action_email_intents where id=p_intent_id for update;
+ if i.id is null or i.updated_at is distinct from p_expected_updated_at then
+   raise exception 'Delivery changed. Refresh before reviewing.' using errcode='40001';end if;
+ if (p_resolution='retry' and (i.state<>'failed' or i.attempt_count>=6))
+   or (p_resolution<>'retry' and i.state<>'unknown') then
+   raise exception 'Delivery cannot be reviewed with this resolution.' using errcode='22023';end if;
+ if p_resolution='confirmed_accepted' then
+   update public.action_email_intents set state='accepted',provider_message_id=btrim(p_provider_message_id),
+     outcome_code='operator_confirmed_accepted',lease_token=null,locked_until=null,updated_at=clock_timestamp() where id=i.id;
+ else
+   eligible:=public.action_email_retry_eligible(i.id);
+   if p_resolution='retry' and not eligible then raise exception 'Source is no longer eligible.' using errcode='40001';end if;
+   update public.action_email_intents set state=case when not eligible then 'suppressed' when attempt_count>=6 then 'failed' else 'retry' end,
+     outcome_code=case when not eligible then 'operator_confirmed_not_accepted_closed' when attempt_count>=6 then 'retry_budget_exhausted' else 'operator_requested_retry' end,
+     provider_message_id=null,lease_token=null,locked_until=null,next_attempt_at=clock_timestamp(),updated_at=clock_timestamp() where id=i.id;
+ end if;
+ insert into public.admin_audit_events(actor_user_id,action,target_type,target_id,reason,metadata)
+   values(p_actor_id,'action_email.reviewed','action_email_intent',i.id::text,btrim(p_reason),
+     jsonb_build_object('resolution',p_resolution,'previousState',i.state,'event',i.event_type));
+ return public.action_email_intent_status(i.id);
+end;$$;
+revoke all on function public.action_email_retry_eligible(uuid) from public,anon,authenticated,service_role;
+revoke all on function public.action_email_intent_status(uuid),public.action_email_admin_status(integer),
+ public.reconcile_action_email(uuid,uuid,boolean,text,text,text,timestamptz) from public,anon,authenticated;
+grant execute on function public.action_email_intent_status(uuid),public.action_email_admin_status(integer),
+ public.reconcile_action_email(uuid,uuid,boolean,text,text,text,timestamptz) to service_role;
 -- Decision authority is checked with the same Profile -> claim lock order as approval.
 create function public.deny_ownership_claim_current(p_claim_id uuid,p_decided_by uuid,p_decision_note text,p_env_admin boolean) returns jsonb
 language plpgsql security definer set search_path=pg_catalog,public as $$
