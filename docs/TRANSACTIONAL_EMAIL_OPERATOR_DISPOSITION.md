@@ -63,3 +63,9 @@ Before the September 26 release, the public merged settings endpoint returned th
 - `ui.app.account.page.e16273f1c0f6`
 
 A read-only query of the production `site_content` record confirmed that none of these four keys is explicitly stored in `homepage.content`, and that no draft row exists. `UiTextProvider` gives published content precedence, but no saved override blocked the corrected registry defaults. Release `0bde417` made those defaults effective; the settled live owner Account screen was independently inspected after deployment. No Content Studio mutation was needed. The read-only receipt is `outputs/email-automation-20260926/notification-raw-overrides.json` (2026-09-26T20:56:29Z). No production Content Studio value was changed during this audit.
+
+## Local candidate continuation — September 27
+
+The production dispositions above remain unchanged. Locally, the disabled service/action foundation, claim completion recovery, authenticated delivery-review UI, guarded runtime and inactive scheduler are integrated. The additional claimant outcomes `claim.approved`, `claim.declined` and `claim.expired` now have proposed atomic capture, current-recipient checks, registered-copy renderers and safe destinations. Approval uses the permanent Profile link only while the claimant remains its owner; declined/expired use the authenticated claim page. Withdrawal stays in-app. No current-owner outcome copy, automatic time-based expiry job, historical backfill or duplicate submission mail was added.
+
+See `supabase/proposals/claim-outcome-email.md` for implementation and evidence. These are not live sends: required production schema installation and activation remain unauthorized, and actual candidate browser/Auth/Storage integration remains pending. Service/transfer outcomes and deletion-completion delivery are not completed by this claim-only extension.

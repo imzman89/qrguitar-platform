@@ -1,5 +1,7 @@
 # Action Email Runtime: Disabled Preparation
 
+The current claimant-outcome candidate also requires `claim-outcome-email.sql` after this baseline proposal. That extension advances readiness to `2026-09-27.action-email.2`; the current worker refuses this baseline `.1` alone. See `claim-outcome-email.md` for exact preconditions and evidence. Neither proposal activates delivery.
+
 This candidate adds a mounted POST-only internal worker route, not an active mail system. Nothing in this change installs production SQL, writes secrets, enables flags, binds a database/release, activates cron, or sends real mail. Boss owns the separate authenticated Admin route and Agent2 owns its UI. No operator adapter or Admin files are changed here.
 
 ## Admission Contract
