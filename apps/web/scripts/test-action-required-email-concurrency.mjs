@@ -36,6 +36,8 @@ else{
   for(const file of ['service-email-outbox.sql','action-required-email.sql'])await a.query(fs.readFileSync(path.join(root,'supabase/proposals',file),'utf8'));
   const recoveryRef=process.argv[4];
   if(recoveryRef){assert.match(recoveryRef,/^[0-9a-f]{40}$/);await a.query(execFileSync('git',['show',`${recoveryRef}:supabase/proposals/claim-completion-recovery.sql`],{cwd:root,encoding:'utf8',maxBuffer:65536}));}
+  const operations=process.argv[5]==='--operations';
+  if(operations){assert.ok(recoveryRef);await a.query(fs.readFileSync(path.join(root,'supabase/proposals/action-email-operations.sql'),'utf8'));assert.equal(await one(a,"select count(*)::int from cron.job where jobname='qrguitar-action-email-sweep' and active=false"),1);}
   await a.query('update cron.job set active=false');
   for(const [id,name] of [[owner,'owner'],[claimant,'claimant'],[other,'other']]){await a.query('insert into auth.users(id,email) values($1,$2)',[id,`${name}@example.invalid`]);await a.query("insert into profiles(id,display_name,role,plan) values($1,$2,'owner','single')",[id,name]);}
   await a.query('update action_email_control set capture_enabled=true,dispatch_enabled=true');
@@ -63,7 +65,10 @@ else{
    await test('concurrent duplicate completion records one event and intent',async()=>{const x=await recoverable();await a.query('begin');assert.equal((await recover(x)).replayed,false);const pending=outcome(recover(x,b));await waitBlocked(bpid);await a.query('commit');assert.equal((await pending).value.replayed,true);assert.equal(await one(c,"select count(*)::int from ownership_claim_events where claim_id=$1 and action='submitted'",[x.id]),1);assert.equal(await one(c,'select count(*)::int from action_email_intents where claim_id=$1',[x.id]),1);});
   }
   assert.equal(await one(a,'select count(*)::int from cron.job where active'),0);
+  if(operations){
+   await test('operations schedule is unique inactive and unbound readiness blocks HTTP',async()=>{const status=await one(a,'select action_email_readiness(null,null)');assert.equal(status.schemaReady,true);assert.equal(status.destinationBound,false);assert.equal(status.ready,false);assert.equal(await one(a,"select count(*)::int from cron.job where jobname='qrguitar-action-email-sweep' and active=false and command='select public.queue_action_email_sweep()'"),1);await a.query('select queue_action_email_sweep()');assert.equal(await one(a,'select count(*)::int from net.http_request_queue'),0);});
+  }
   assert.equal(await one(a,'select count(*)::int from net.http_request_queue'),0);
-  console.log(JSON.stringify({passed,recoveryRef:recoveryRef||null,scope:'native PostgreSQL17, full repository schema + disabled proposals, three real connections, authority/operator/recovery races; no sender/HTTP/cron'}));
+  console.log(JSON.stringify({passed,recoveryRef:recoveryRef||null,operations,scope:'native PostgreSQL17, full repository schema + disabled proposals, three real connections, authority/operator/recovery races; no sender/HTTP/cron'}));
  }finally{await a.end();await b.end();await c.end();}
 }
