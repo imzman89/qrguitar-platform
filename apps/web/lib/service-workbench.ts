@@ -248,7 +248,7 @@ export function createServiceWorkbench(qrCode: string, submissionId: string, dep
     try {
       if (!auth) {
         auth = deps.auth();
-        const subscription = auth.onAuthStateChange((_event, session) => changeActor(session));
+        const subscription = auth.onAuthStateChange((event, session) => { if (event !== "INITIAL_SESSION") changeActor(session); });
         unsubscribe = () => subscription.data.subscription.unsubscribe();
       }
       const result = await bounded(() => auth!.getSession());

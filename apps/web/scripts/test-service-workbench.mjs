@@ -120,6 +120,7 @@ function harness(options = {}) {
     fetch: async (url, init) => { h.calls.push({ url, ...init }); return h.reply ? h.reply(url, init) : h.respond(url, init); }
   });
   h.change = (session, event = "SIGNED_IN") => { h.session = session; callback(event, session); };
+  h.emit = (event, next) => callback(event, next);
   h.mount = async () => { await h.client.start(); await until(() => h.client.getState().phase !== "loading" && h.client.getState().evidenceRecovery.phase !== "checking"); return h; };
   h.writes = () => h.calls.filter(call => call.method && call.method !== "GET");
   h.fill = () => h.client.setForm({ ...h.client.getState().form, serviceDate: "2026-09-17", title: "New work", workPerformed: "Adjusted relief", workOrderReference: "WO-1" });
@@ -692,4 +693,14 @@ await test("checking snapshot disables new upload and explicit completion contro
   assert.equal(findButton(tree, "Finish existing upload").props.disabled, true); assert.equal(findButton(tree, "Discard unfinished attempt").props.disabled, true);
   assert.equal(findButton(tree, "Upload evidence").props.disabled, true);
 });
-console.log(`Service workbench: ${count} behavior tests passed.`);
+
+await test("late INITIAL_SESSION null preserves provider edit and evidence state",async()=>{
+ const h=await harness({id:submissionFor().id}).mount();h.fill();const before=h.client.getState();h.emit("INITIAL_SESSION",null);assert.equal(h.client.getState().phase,"ready");assert.equal(h.client.getState().actorId,before.actorId);assert.deepEqual(h.client.getState().form,before.form);assert.equal(h.writes().length,0);h.client.dispose();
+});
+await test("INITIAL_SESSION null while provider lookup is pending defers to getSession",async()=>{
+ const gate=deferred(),h=harness({getSession:()=>gate.promise});const starting=h.client.start();h.emit("INITIAL_SESSION",null);assert.equal(h.client.getState().phase,"loading");gate.resolve({data:{session:h.session}});await starting;await until(()=>h.client.getState().phase==="ready");h.client.dispose();
+});
+await test("real provider logout clears private drafts despite late initial callback",async()=>{
+ const h=await harness({id:submissionFor().id}).mount();h.fill();h.change(null,"SIGNED_OUT");h.emit("INITIAL_SESSION",sessionFor("11111111-1111-4111-8111-111111111111"));assert.equal(h.client.getState().phase,"signed-out");assert.equal(h.client.getState().actorId,"");assert.equal(h.client.getState().form.privateProviderNote,"");h.client.dispose();
+});
+console.log("Service workbench: " + count + " behavior tests passed.");
