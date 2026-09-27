@@ -49,4 +49,12 @@ for(const event of ['claim.approved','claim.declined','claim.expired']){
   }
  });
 }
+
+
+for(const event of ['service.approved','service.declined','service.cancelled','ownership.transferAccepted','ownership.transferCancelled'])await test('safe terminal status projection '+event,async()=>{
+ const service=event.startsWith('service.');const row={...status,event,claimId:null,submissionId:service?actorId:null,transferId:service?null:actorId,privateNote:'secret',to:'private@example.invalid'};
+ const f=fixture({data:{...page,items:[row]}}),r=await f.operator.list();assert.equal(r.ok,true);assert.equal(r.status.items[0].transferId,service?null:actorId);assert.doesNotMatch(JSON.stringify(r),/secret|private@/);
+ for(const patch of [{claimId:actorId},service?{transferId:actorId}:{submissionId:actorId},service?{submissionId:null}:{transferId:null}])assert.equal((await fixture({data:{...page,items:[{...row,...patch}]}}).operator.list()).code,'unavailable');
+});
+
 console.log(JSON.stringify({passed,scope:'default-disabled callable operator; synthetic authenticated adapter and RPC only; no route/provider'}));

@@ -268,3 +268,31 @@ export function renderClaimExpiredEmailDocument(input: ActionRequiredEmailDocume
 export function renderServiceRevisionRequestedEmailDocument(input: ActionRequiredEmailDocumentInput): TransactionalEmailDocument {
   return renderActionRequiredEmailDocument({ ...input, actionUrl: requireCanonicalServiceRevisionActionUrl(input.actionUrl, input.allowedCtaOrigins) }, "Service revision requested", SERVICE_REVISION_REQUESTED_EMAIL_NOTICE);
 }
+
+function requireCanonicalServiceOutcomeUrl(value: string, allowedOrigins: string[], allowOwner = false) {
+  const parsed = new URL(requireSafeEmailCtaUrl(value, allowedOrigins));
+  if (allowOwner && parsed.pathname.startsWith("/service-review/") && ACTION_ID_PATTERN.test(parsed.pathname.slice("/service-review/".length)) && !parsed.search && !parsed.hash) return parsed.href;
+  return requireCanonicalServiceRevisionActionUrl(value, allowedOrigins);
+}
+
+function requireCanonicalTransferOutcomeUrl(value: string, allowedOrigins: string[]) {
+  const parsed = new URL(requireSafeEmailCtaUrl(value, allowedOrigins));
+  if (!parsed.pathname.startsWith("/transfer/") || !ACTION_ID_PATTERN.test(parsed.pathname.slice("/transfer/".length)) || parsed.search || parsed.hash) throw new Error("Transfer outcome must use its authenticated status page without a secret token.");
+  return parsed.href;
+}
+
+export function renderServiceApprovedEmailDocument(input: ActionRequiredEmailDocumentInput): TransactionalEmailDocument {
+  return renderActionRequiredEmailDocument({ ...input, actionUrl: requireCanonicalServiceOutcomeUrl(input.actionUrl, input.allowedCtaOrigins) }, "Service submission update", "");
+}
+export function renderServiceDeclinedEmailDocument(input: ActionRequiredEmailDocumentInput): TransactionalEmailDocument {
+  return renderActionRequiredEmailDocument({ ...input, actionUrl: requireCanonicalServiceOutcomeUrl(input.actionUrl, input.allowedCtaOrigins) }, "Service submission update", "");
+}
+export function renderServiceCancelledEmailDocument(input: ActionRequiredEmailDocumentInput): TransactionalEmailDocument {
+  return renderActionRequiredEmailDocument({ ...input, actionUrl: requireCanonicalServiceOutcomeUrl(input.actionUrl, input.allowedCtaOrigins, true) }, "Service submission update", "");
+}
+export function renderTransferAcceptedEmailDocument(input: ActionRequiredEmailDocumentInput): TransactionalEmailDocument {
+  return renderActionRequiredEmailDocument({ ...input, actionUrl: requireCanonicalTransferOutcomeUrl(input.actionUrl, input.allowedCtaOrigins) }, "Ownership transfer update", "");
+}
+export function renderTransferCancelledEmailDocument(input: ActionRequiredEmailDocumentInput): TransactionalEmailDocument {
+  return renderActionRequiredEmailDocument({ ...input, actionUrl: requireCanonicalTransferOutcomeUrl(input.actionUrl, input.allowedCtaOrigins) }, "Ownership transfer update", "");
+}

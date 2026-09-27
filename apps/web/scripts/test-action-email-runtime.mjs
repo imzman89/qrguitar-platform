@@ -15,13 +15,13 @@ const base={QRGUITAR_ACTION_EMAIL_WORKER_ENABLED:'true',QRGUITAR_ACTION_EMAIL_TR
 const request=(url=endpoint,secret=base.QRGUITAR_ACTION_EMAIL_CRON_SECRET,method='POST')=>new Request(url,{method,headers:{authorization:'Bearer '+secret}});
 let passed=0;
 async function test(name,fn){await fn();console.log('PASS '+name);passed++;}
-function fixture({event="claim.ownerReview",env={...base},ready=true,version=http.actionEmailOperationsVersion,content={},cmsError=false,cmsDelay=false,providerHang=false,heartbeatError=false,mutateAdmission=false}={}){
+function fixture({event="claim.ownerReview",serviceRole="provider",env={...base},ready=true,version=http.actionEmailOperationsVersion,content={},cmsError=false,cmsDelay=false,providerHang=false,heartbeatError=false,mutateAdmission=false}={}){
  const calls=[],sent=[];let clients=0,claimed=false,finishCms;
  const db={rpc(name,args){calls.push({name,args});return{async abortSignal(signal){assert.ok(signal instanceof AbortSignal);
   if(name==='action_email_readiness')return{data:{ready,version},error:null};
   if(name==='action_email_worker_heartbeat')return{data:!heartbeatError,error:heartbeatError?{}:null};
   if(name==='claim_action_email'){if(claimed)return{data:null,error:null};claimed=true;return{data:{id,leaseToken:args.p_lease_token},error:null};}
-  if(name==='begin_action_email')return{data:{event,to:'synthetic@example.invalid',profileTitle:'Synthetic',subjectId:id,qrCode:event==='claim.approved'?'QRG-SYNTHETIC-OUTCOME':null},error:null};
+  if(name==='begin_action_email')return{data:{event,to:'synthetic@example.invalid',profileTitle:'Synthetic',subjectId:id,qrCode:event==='claim.approved'||(event.startsWith('service.')&&serviceRole==='provider')?'QRG-SYNTHETIC-OUTCOME':null,...(event.startsWith('service.')&&event!=='service.revisionRequested'?{serviceRole}:{})},error:null};
   if(name==='settle_action_email')return{data:true,error:null};throw Error('Unexpected RPC');
  }};},from(table){assert.equal(table,'site_content');return{select(columns){assert.equal(columns,'content_value');return this;},eq(key,value){assert.equal(key,'content_key');assert.equal(value,'homepage');return this;},abortSignal(signal){assert.ok(signal instanceof AbortSignal);return this;},async maybeSingle(){if(cmsDelay)await new Promise(r=>finishCms=r);if(mutateAdmission)env.QRGUITAR_ACTION_EMAIL_TRANSPORT_ENABLED='false';return{data:{content_value:{content}},error:cmsError?{}:null};}};}};
  const runtime=load('lib/action-email-runtime.ts',{'./supabase-server':{createServerSupabaseClient(){clients++;return db;}},'./action-required-email-delivery':{createActionRequiredEmailPipeline:deps=>pipeline.createActionRequiredEmailPipeline({...deps,databaseTimeoutMs:20,prepareTimeoutMs:10,sendTimeoutMs:15})},'./transactional-email':{async deliverBrevoEmail(...args){sent.push(args);if(providerHang)return new Promise(()=>{});return{ok:true,status:'sent',outcome:'accepted',providerMessageId:'synthetic-receipt'};}},'./site-settings':{publishedSiteSettingsKey:'homepage'},'./action-email-sweep-http':http},{env});
@@ -47,4 +47,13 @@ for(const event of ['claim.approved','claim.declined','claim.expired'])await tes
  const document=f.sent[0][1];const expected=event==='claim.approved'?'https://www.qrguitar.com/i/QRG-SYNTHETIC-OUTCOME':'https://www.qrguitar.com/ownership-claim?claim='+id;
  assert.ok(document.htmlContent.includes(expected));assert.ok(document.textContent.includes(expected));assert.equal(f.calls.find(c=>c.name==='settle_action_email').args.p_state,'accepted');
 });
+
+
+await test('pre service-transfer readiness prevents any queue/CMS/provider entry',async()=>{const f=fixture({version:'2026-09-27.action-email.2'});assert.equal((await f.handler(request())).status,503);assert.deepEqual(f.calls.map(c=>c.name),['action_email_readiness']);assert.equal(f.sent.length,0);});
+for(const event of ['service.approved','service.declined','service.cancelled','ownership.transferAccepted','ownership.transferCancelled'])await test('actual pipeline prepares '+event+' with recipient status destination',async()=>{
+ const f=fixture({event});const response=await f.handler(request());assert.equal(response.status,200);assert.equal((await response.json()).accepted,1);assert.equal(f.sent.length,1);
+ const expected=event.startsWith('service.')?'https://www.qrguitar.com/service-work/QRG-SYNTHETIC-OUTCOME?submission='+id:'https://www.qrguitar.com/transfer/'+id;
+ assert.ok(f.sent[0][1].textContent.includes(expected));assert.equal(f.calls.find(c=>c.name==='settle_action_email').args.p_state,'accepted');
+});
+await test('provider cancellation reaches owner service-review destination without private Profile context',async()=>{const f=fixture({event:'service.cancelled',serviceRole:'owner'});assert.equal((await(await f.handler(request())).json()).accepted,1);assert.ok(f.sent[0][1].textContent.includes('https://www.qrguitar.com/service-review/'+id));});
 console.log(JSON.stringify({passed,scope:'actual HTTP/runtime/pipeline source with injected process env, captured transport and synthetic DB; no network or real environment mutation'}));

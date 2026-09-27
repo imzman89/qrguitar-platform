@@ -81,7 +81,8 @@
     "test:account-deletion-fulfillment": "node scripts/account-deletion/test-account-deletion-fulfillment.mjs && node scripts/account-deletion/test-fulfillment-http.mjs && node scripts/account-deletion/test-container-inspection.mjs",
     "test:native-associations": "node --test scripts/test-native-association.mjs scripts/test-native-association-routes.mjs",
     "test:member-messaging": "node scripts/test-member-messaging-db.mjs && node scripts/account-deletion/test-member-messaging-compatibility.mjs && node scripts/test-member-messaging-http.mjs && node scripts/test-member-messaging-pagination.mjs && node scripts/test-member-messaging-contract.mjs",
-    "test:ui-copy": "node --test scripts/test-ui-text.mjs scripts/test-site-editor-protected-copy.mjs scripts/test-content-studio-map.mjs"
+    "test:ui-copy": "node --test scripts/test-ui-text.mjs scripts/test-site-editor-protected-copy.mjs scripts/test-content-studio-map.mjs",
+    "test:service-transfer-outcomes": "node --test scripts/test-service-cancel-http.mjs scripts/test-service-transfer-outcome-delivery.mjs && node scripts/test-action-email-operator.mjs && node scripts/test-action-required-email.mjs && node scripts/test-action-email-runtime.mjs"
   },
   "dependencies": {
     "@qrguitar/shared": "*",

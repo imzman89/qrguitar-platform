@@ -1,9 +1,9 @@
 import { createActionEmailWorker } from "./action-required-email";
 import { contentRegistryByKey, getContentValue, validateVariables } from "./content-registry";
-import { renderClaimOwnerReviewEmailDocument, renderClaimMoreInfoEmailDocument, renderServiceRevisionRequestedEmailDocument, renderClaimApprovedEmailDocument, renderClaimDeclinedEmailDocument, renderClaimExpiredEmailDocument, requireCanonicalClaimActionUrl, type TransactionalEmailDocument } from "./transactional-email-renderer";
+import { renderClaimOwnerReviewEmailDocument, renderClaimMoreInfoEmailDocument, renderServiceRevisionRequestedEmailDocument, renderClaimApprovedEmailDocument, renderClaimDeclinedEmailDocument, renderClaimExpiredEmailDocument, requireCanonicalClaimActionUrl, renderServiceApprovedEmailDocument, renderServiceDeclinedEmailDocument, renderServiceCancelledEmailDocument, renderTransferAcceptedEmailDocument, renderTransferCancelledEmailDocument, type TransactionalEmailDocument } from "./transactional-email-renderer";
 import type { EmailResult } from "./transactional-email";
 
-type Family = "claim.ownerReview" | "claim.moreInfo" | "claim.approved" | "claim.declined" | "claim.expired" | "service.revisionRequested";
+type Family = "claim.ownerReview" | "claim.moreInfo" | "claim.approved" | "claim.declined" | "claim.expired" | "service.revisionRequested" | "service.approved" | "service.declined" | "service.cancelled" | "ownership.transferAccepted" | "ownership.transferCancelled";
 type Input = { event: Family; to: string; profileTitle: string; actionUrl: string; claimUrl?: string; idempotencyKey: string };
 type DeliveryOptions = { idempotencyKey: string; signal: AbortSignal; successMessage: string; failureMessage: string };
 const renderers = {
@@ -12,7 +12,12 @@ const renderers = {
   "claim.approved": renderClaimApprovedEmailDocument,
   "claim.declined": renderClaimDeclinedEmailDocument,
   "claim.expired": renderClaimExpiredEmailDocument,
-  "service.revisionRequested": renderServiceRevisionRequestedEmailDocument
+  "service.revisionRequested": renderServiceRevisionRequestedEmailDocument,
+  "service.approved": renderServiceApprovedEmailDocument,
+  "service.declined": renderServiceDeclinedEmailDocument,
+  "service.cancelled": renderServiceCancelledEmailDocument,
+  "ownership.transferAccepted": renderTransferAcceptedEmailDocument,
+  "ownership.transferCancelled": renderTransferCancelledEmailDocument
 };
 const rejected = (message: string, retryable = false): EmailResult => ({ ok: false, status: "failed", outcome: "rejected", retryable, message });
 
@@ -34,7 +39,9 @@ export function createActionRequiredEmailSender(deps: {
     catch { return noSend(rejected("Published email wording is temporarily unavailable.", true)); }
     let document: TransactionalEmailDocument;
     try {
-      const variables: Record<string, string> = { profile_title: input.profileTitle, claim_url: input.actionUrl, review_url: input.actionUrl };
+      const variables: Record<string, string> = { profile_title: input.profileTitle };
+      if (input.event.startsWith("service.")) variables.review_url = input.actionUrl;
+      else variables.claim_url = input.actionUrl;
       if (input.event === "claim.approved") {
         variables.claim_url = requireCanonicalClaimActionUrl(input.claimUrl || "", ["https://www.qrguitar.com"]);
         variables.profile_url = input.actionUrl;

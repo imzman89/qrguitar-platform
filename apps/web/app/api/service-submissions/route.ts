@@ -256,7 +256,8 @@ export async function PATCH(request: Request) {
     if (!submission) return json({ ok: false, message: "Service submission was not found." }, 404);
     const guitar = await loadGuitarById(supabase, submission.guitar_id);
     if (!guitar) return json({ ok: false, message: "QRguitar Profile was not found." }, 404);
-    const admin = await isAdmin(request);
+    const adminContext = await getAdminContext(request);
+    const admin = adminContext.ok && adminContext.user?.id === auth.user.id;
     const provider = submission.provider_user_id === auth.user.id;
     const owner = submission.owner_user_id === auth.user.id && guitar.owner_id === auth.user.id;
     const now = new Date().toISOString();
@@ -341,13 +342,25 @@ export async function PATCH(request: Request) {
 
     if (action === "cancel") {
       if (!provider && !admin) return json({ ok: false, message: "Only the submitting provider or QRguitar admin can cancel this request." }, 403);
-      if (["approved", "declined", "cancelled", "expired"].includes(submission.status)) return json({ ok: false, message: "This request is already closed." }, 409);
-      const updated = await supabase.from("service_submissions").update({ status: "cancelled", cancelled_at: now, updated_at: now }).eq("id", id).eq("status", submission.status).select("*").maybeSingle<ServiceSubmissionRow>();
-      if (updated.error) return errorResponse(updated.error.message);
-      if (!updated.data) return json({ ok: false, message: "This service request changed while you were reviewing it. Refresh and try again." }, 409);
-      await addActivity(supabase, id, auth.user.id, "cancelled", cleanServiceText(body?.note, 2000));
-      await addNotification(supabase, id, provider ? submission.owner_user_id : submission.provider_user_id, "cancelled", "The service submission was cancelled. Nothing was published.");
-      return json({ ok: true, submission: (await serializeSubmissions(supabase, [updated.data]))[0], message: "Service submission cancelled. Nothing was published." });
+      if (["approved", "declined", "expired"].includes(submission.status)) return json({ ok: false, message: "This request is already closed." }, 409);
+      // Status, counterparty notification and activity are committed together. No direct-update fallback.
+      const unconfirmed = () => json({ ok: false, code: "unconfirmed", message: "Cancellation could not be confirmed. Refresh the service request before trying again." }, 503);
+      try {
+        const rpc = await supabase.rpc("cancel_service_submission", {
+          p_submission_id: id, p_actor_id: auth.user.id,
+          p_env_admin: admin && adminContext.accessSource === "env",
+          p_note: cleanServiceText(body?.note, 2000)
+        }).abortSignal(AbortSignal.timeout(10000));
+        if (rpc.error) return unconfirmed();
+        const receipt = rpc.data;
+        const saved = receipt?.submission as ServiceSubmissionRow | undefined;
+        if (receipt?.ok !== true || typeof receipt.alreadyCancelled !== "boolean" || !saved || saved.id !== id || saved.status !== "cancelled"
+          || saved.guitar_id !== submission.guitar_id || saved.provider_user_id !== submission.provider_user_id || saved.owner_user_id !== submission.owner_user_id) return unconfirmed();
+        const serialized = (await serializeSubmissions(supabase, [saved]))[0];
+        if (!serialized) return unconfirmed();
+        return json({ ok: true, committed: true, submission: serialized, alreadyCancelled: receipt.alreadyCancelled,
+          message: receipt.alreadyCancelled ? "This service submission was already cancelled. Nothing was published." : "Service submission cancelled. Nothing was published." });
+      } catch { return unconfirmed(); }
     }
 
     if (action === "approve") {

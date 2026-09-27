@@ -13,17 +13,19 @@ const unavailable = (code = "unavailable"): Result => ({ ok: false, code, messag
 
 // Explicit projection prevents database diagnostics, private notes or recipients reaching a future UI.
 function item(value: unknown) {
-  if (!record(value) || !uuid(value.id) || !["claim.ownerReview", "claim.moreInfo", "claim.approved", "claim.declined", "claim.expired", "service.revisionRequested"].includes(String(value.event))
+  if (!record(value) || !uuid(value.id) || !["claim.ownerReview", "claim.moreInfo", "claim.approved", "claim.declined", "claim.expired", "service.revisionRequested", "service.approved", "service.declined", "service.cancelled", "ownership.transferAccepted", "ownership.transferCancelled"].includes(String(value.event))
     || !["queued", "leased", "dispatching", "retry", "accepted", "failed", "unknown", "suppressed"].includes(String(value.state))
     || !Number.isInteger(value.attempts) || Number(value.attempts) < 0 || Number(value.attempts) > 6
     || !timestamp(value.updatedAt) || !timestamp(value.createdAt) || !timestamp(value.nextAttemptAt)
     || typeof value.canRetry !== "boolean" || typeof value.canReconcile !== "boolean"
     || (value.code !== null && (typeof value.code !== "string" || !/^[a-z_]{1,100}$/.test(value.code)))
-    || (value.event === "service.revisionRequested" ? !uuid(value.submissionId) || value.claimId !== null : !uuid(value.claimId) || value.submissionId !== null)) {
+    || (String(value.event).startsWith("service.") ? !uuid(value.submissionId) || value.claimId !== null || value.transferId != null
+      : String(value.event).startsWith("ownership.") ? !uuid(value.transferId) || value.claimId !== null || value.submissionId !== null
+      : !uuid(value.claimId) || value.submissionId !== null || value.transferId != null)) {
     throw new Error("Invalid operator receipt");
   }
   return { id: value.id, event: value.event, state: value.state, attempts: value.attempts,
-    claimId: value.claimId, submissionId: value.submissionId, updatedAt: value.updatedAt, createdAt: value.createdAt,
+    claimId: value.claimId, submissionId: value.submissionId, transferId: value.transferId ?? null, updatedAt: value.updatedAt, createdAt: value.createdAt,
     nextAttemptAt: value.nextAttemptAt, code: value.code, canRetry: value.canRetry, canReconcile: value.canReconcile };
 }
 function page(value: unknown) {
