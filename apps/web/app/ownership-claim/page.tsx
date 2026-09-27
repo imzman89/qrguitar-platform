@@ -379,7 +379,7 @@ function OwnershipClaimContent() {
                             </div> : <button id={`withdraw-request-${claim.id}`} className="button secondary" type="button" disabled={busy || evidenceReading || claimsLoading || Boolean(claimsError)} onClick={() => { setWithdrawClaimId(claim.id); setWithdrawNotice(null); window.requestAnimationFrame(() => document.getElementById(`keep-request-${claim.id}`)?.focus()); }}><X size={16} aria-hidden="true" />{ui("ui.app.ownership.claim.page.withdrawRequest", "Withdraw request")}</button>}
                           </div> : null}
                           {withdrawNotice?.id === claim.id ? <p id={`withdraw-status-${claim.id}`} tabIndex={-1} role={withdrawNotice.error ? "alert" : "status"}>{withdrawNotice.text}</p> : null}
-                          {claim.status === "awaiting_claimant" && (claim.canSubmitEvidence === true || claim.canWithdraw === true) ? (
+                          {claim.status === "awaiting_claimant" && claim.canSubmitEvidence === true ? (
                             <div className="claim-response">
                               <p><b>{ui("ui.app.ownership.claim.page.e9672027cf43", "QRguitar needs more information.")}</b>{claim.adminReviewNote ? ui("ui.app.ownership.claim.page.7130515d99f1", " {{value1}}", { value1: claim.adminReviewNote }) : ui("ui.app.ownership.claim.page.aa618133af62", " Add the requested private evidence below.")}</p>
                               {responseClaimId === claim.id ? (

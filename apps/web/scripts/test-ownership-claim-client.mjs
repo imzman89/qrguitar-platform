@@ -427,4 +427,10 @@ await test("real SIGNED_OUT and SIGNED_IN account changes supersede initial snap
  const h=await harness().mount();let lease=h.guard.lease();h.change(null,"SIGNED_OUT");h.emit("INITIAL_SESSION",session("a"));assert.equal(h.guard.isCurrent(lease),false);assert.equal(h.guard.getState().phase,"signed-out");
  h.change(session("b"),"SIGNED_IN");lease=h.guard.lease();h.emit("INITIAL_SESSION",null);assert.equal(h.guard.getState().actorId,"b");assert.equal(h.guard.isCurrent(lease),true);h.guard.dispose();
 });
+
+await test("explicitly denied evidence capability cannot be overridden by withdrawal permission",()=>{
+ const row={...claim,status:"awaiting_claimant",canWithdraw:true,canSubmitEvidence:false};
+ const html=renderToStaticMarkup(claimChooserHarness('',[row]).render());assert.doesNotMatch(html,/Add requested evidence|Requested evidence \(/);assert.match(html,/Withdraw request/);
+ const permitted=renderToStaticMarkup(claimChooserHarness('',[{...row,canSubmitEvidence:true}]).render());assert.match(permitted,/Add requested evidence/);
+});
 console.log(count + " ownership claim client cases passed.");
