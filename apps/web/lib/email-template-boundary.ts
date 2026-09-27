@@ -2,7 +2,7 @@ export type EmailTemplateDeliveryBoundary =
   | {
       kind: "application";
       owner: "qrguitar-brevo";
-      canSendApplicationTest: true;
+      canSendApplicationTest: boolean;
       providerTemplate: null;
       providerArtifact: null;
     }
@@ -20,6 +20,21 @@ export type EmailTemplateDeliveryBoundary =
       providerTemplate: null;
       providerArtifact: null;
     };
+
+const applicationFamilies = new Set([
+  "email.service.submitted",
+  "email.service.revisionRequested",
+  "email.service.approved",
+  "email.service.declined",
+  "email.service.cancelled",
+  "email.claim.ownerReview",
+  "email.claim.moreInfo",
+  "email.claim.approved",
+  "email.claim.declined",
+  "email.claim.expired",
+  "email.ownership.transferAccepted",
+  "email.ownership.transferCancelled"
+]);
 
 const providerBoundaries: Record<string, EmailTemplateDeliveryBoundary> = {
   "email.security.passwordReset": {
@@ -44,11 +59,11 @@ export function emailTemplatePrefixFromKeys(keys: string[]) {
 }
 
 export function emailTemplateDeliveryBoundary(templatePrefix: string): EmailTemplateDeliveryBoundary {
-  if (templatePrefix === "email.service.submitted") {
+  if (applicationFamilies.has(templatePrefix)) {
     return {
       kind: "application",
       owner: "qrguitar-brevo",
-      canSendApplicationTest: true,
+      canSendApplicationTest: templatePrefix === "email.service.submitted",
       providerTemplate: null,
       providerArtifact: null
     };
@@ -75,7 +90,7 @@ export function createEmailTemplateSetupExport(templatePrefix: string, fields: R
       providerArtifact: boundary.providerArtifact,
       applicationTestAvailable: boundary.canSendApplicationTest,
       note: boundary.kind === "application"
-        ? "This family is rendered and submitted by the QRguitar application through Brevo."
+        ? "Published fields for this family are used by QRguitar workflow delivery through Brevo when its runtime and delivery controls are enabled. This export does not enable delivery or verify inbox receipt."
         : boundary.kind === "provider"
           ? "This CMS copy is a review reference and is not synchronized to Supabase Auth. Review and install the named provider artifact through the provider change process."
           : "No production trigger or delivery integration is registered for this design-only family."

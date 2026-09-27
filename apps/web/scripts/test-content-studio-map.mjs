@@ -49,7 +49,11 @@ test("content map distinguishes representative, record-required, and delivery bo
   const deliveryNotice = byKey.get("ui.app.site.editor.page.emailDeliveryBoundary");
   assert.equal(deliveryNotice.classification, "security-locked");
   assert.equal(deliveryNotice.binding.status, "connected-interface-call");
-  assert.match(deliveryNotice.defaultValue, /Supabase owns password-reset and transfer sign-in delivery/);
+  assert.match(deliveryNotice.defaultValue, /Supabase Auth templates require separate provider setup/);
+  assert.equal(map.emailBoundary.applicationRendererBoundPrefixes.length, 12);
+  assert.equal(map.emailBoundary.applicationTestSendPrefix, "email.service.submitted.");
+  assert.equal(byKey.get("email.claim.approved.subject").binding.status, "application-renderer-bound");
+  assert.equal(byKey.get("email.service.resubmitted.subject").binding.status, "editor-preview-only");
   assert.equal(map.emailBoundary.authProviderTemplates.includes("does not configure or synchronize"), true);
   for (const surface of map.surfaces) {
     if (surface.preview.mode !== "representative-route") continue;

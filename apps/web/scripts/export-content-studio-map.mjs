@@ -23,6 +23,7 @@ function load(relative) {
 }
 
 const registry = load("lib/content-registry.ts");
+const { emailTemplateDeliveryBoundary } = load("lib/email-template-boundary.ts");
 const { uiTextEntries } = load("lib/ui-text-registry.ts");
 const uiByKey = new Map(uiTextEntries.map((entry) => [entry.key, entry]));
 const sourceFiles = [];
@@ -103,11 +104,11 @@ function bindingFor(entry) {
         : "The registry reservation is present, but this branch does not yet contain the matching source call."
     };
   }
-  if (entry.key.startsWith("email.service.submitted.")) return {
+  if (entry.key.startsWith("email.") && emailTemplateDeliveryBoundary(entry.key.slice(0, entry.key.lastIndexOf("."))).kind === "application") return {
     kind: "transactional-email",
     status: "application-renderer-bound",
-    sourceFiles: ["lib/transactional-email.ts"],
-    note: "Rendered by the application service-submitted email path."
+    sourceFiles: [entry.key.startsWith("email.service.submitted.") ? "lib/transactional-email.ts" : "lib/action-required-email-delivery.ts"],
+    note: "Published wording is rendered by application workflow delivery when runtime and database controls are enabled; binding does not prove activation or inbox delivery."
   };
   if (entry.key.startsWith("email.security.passwordReset.")) return {
     kind: "provider-auth-email",
@@ -187,7 +188,8 @@ const document = {
     boundary: "Content Studio edits presentation settings only, never saved member/Profile/account data."
   },
   emailBoundary: {
-    applicationRendererBoundPrefix: "email.service.submitted.",
+    applicationRendererBoundPrefixes: [...new Set(registry.contentRegistry.filter(entry => entry.key.startsWith("email.")).map(entry => entry.key.slice(0, entry.key.lastIndexOf("."))).filter(prefix => emailTemplateDeliveryBoundary(prefix).kind === "application"))].sort().map(prefix => prefix + "."),
+    applicationTestSendPrefix: "email.service.submitted.",
     providerOwnedPrefixes: ["email.security.passwordReset.", "email.ownership.transferInvitation."],
     allOtherEmailTemplates: "editor-preview-only",
     authProviderTemplates: "reviewed install artifacts; Content Studio does not configure or synchronize the authentication provider"

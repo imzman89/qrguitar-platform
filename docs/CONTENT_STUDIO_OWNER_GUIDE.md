@@ -52,9 +52,15 @@ Variables such as `{{profile_title}}` are application values. Keep every registe
 
 ## Email boundary
 
-Only the `email.service.submitted.*` family is bound to application delivery. It can send a safe test only to the authenticated administrator when Brevo is configured.
+Twelve template families are bound to application delivery through Brevo: `service.submitted`, `service.revisionRequested`, `service.approved`, `service.declined`, `service.cancelled`, `claim.ownerReview`, `claim.moreInfo`, `claim.approved`, `claim.declined`, `claim.expired`, `ownership.transferAccepted`, and `ownership.transferCancelled`. Their fields use the `email.<family>.*` prefix. Published wording is loaded by the delivery code; drafts do not change outgoing workflow emails. Sending also requires enabled runtime and database controls and an eligible workflow event/recipient. A template label or export is not proof of activation or inbox delivery.
 
-Supabase Auth owns password-recovery and transfer sign-in delivery. Their related Content Studio families are review references, not synchronized provider configuration; use the reviewed artifacts in `docs/provider-email-templates/` through the controlled provider change process. The other sixteen registered families are design previews with no production trigger. Content Studio offers a setup export for these non-application families and does not claim to send them.
+Only `email.service.submitted.*` supports the safe test-send action, with the recipient fixed to the authenticated administrator when Brevo is configured. Other application families can export their template without enabling delivery or sending a test.
+
+Supabase Auth owns password-recovery and transfer sign-in delivery. The `security.passwordReset` and `ownership.transferInvitation` families are review references, not synchronized provider configuration; use the reviewed artifacts in `docs/provider-email-templates/` through the controlled provider change process.
+
+Five registered families remain design previews without a dedicated delivery binding: `service.resubmitted`, `ownership.storeHandoff`, `claim.submitted`, `notification.lostStolen`, and `security.accountNotice`. Content Studio offers a setup export for these families, not a send action. This describes template bindings, not whether the underlying business workflow exists; revised service submissions can use the `service.submitted` delivery family.
+
+The machine-readable inventory derives application delivery classifications from `apps/web/lib/email-template-boundary.ts`. Runtime rendering is in `apps/web/lib/action-required-email-delivery.ts` and `apps/web/lib/transactional-email.ts`.
 
 ## Reading the content map
 

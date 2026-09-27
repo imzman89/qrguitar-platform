@@ -606,6 +606,11 @@ export const defaultContentValues: Record<string, string> = Object.fromEntries(
 );
 
 const legacyContentDefaults: Record<string, string[]> = {
+  "ui.app.site.editor.page.emailDeliveryBoundary": ["Only Service / Submitted is sent by the application. Supabase owns password-reset and transfer sign-in delivery; the remaining templates are design previews with no production trigger."],
+  "ui.app.site.editor.page.downloadEmailSetupExport": ["Download setup export"],
+  "ui.app.account.page.b7d24faecb5a": ["Email currently covers account confirmation and recovery, transfer sign-in invitations, and service work ready for owner review. Other workflow updates stay in QRguitar; PayPal handles its own payment notices."],
+  "ui.app.account.page.c9aae06952ae": ["Connected QRguitar email"],
+  "ui.app.account.page.92c1cdfdf4cb": ["Service owner review"],
   "global.brand.tagline": ["Permanent QRguitar Profiles for instruments, builders, shops, collectors, and future owners."],
   "global.navigation.create": ["Create"],
   "global.footer.description": ["Permanent QRguitar Profiles for instruments, builders, shops, collectors, and future owners."],

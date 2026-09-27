@@ -26,8 +26,8 @@ function compile(relativePath, imports = {}) {
 const renderer = compile("lib/transactional-email-renderer.ts");
 const boundary = compile("lib/email-template-boundary.ts");
 const contentRegistry = compile("lib/content-registry.ts", {
-  "./ui-text-registry": { uiTextEntries: [] },
-  "./ui-text-protection": { protectedUiTextKeys: new Set() }
+  "./ui-text-registry": compile("lib/ui-text-registry.ts"),
+  "./ui-text-protection": compile("lib/ui-text-protection.ts")
 });
 const emailEntries = new Map([
   ["email.service.submitted.subject", { area: "Emails", allowedVariables: ["profile_title"] }],
@@ -400,14 +400,15 @@ test("only the real application-bound family can use Content Studio delivery", (
 });
 test("Account notification presentation names implemented email without advertising unconnected families", () => {
   const account = fs.readFileSync(path.join(webRoot, "app/account/page.tsx"), "utf8");
-  assert.match(account, /account confirmation and recovery, transfer sign-in invitations, and service work ready for owner review/);
-  assert.match(account, /Other workflow updates stay in QRguitar/);
-  assert.match(account, /Connected QRguitar email/);
-  assert.match(account, /Service owner review/);
+  assert.match(account, /Email updates can cover account security, service reviews, ownership claims and transfer outcomes/);
+  assert.match(account, /Check your QRguitar workspace for the latest status/);
+  assert.doesNotMatch(account, /Other workflow updates stay in QRguitar/);
+  assert.match(account, /QRguitar workflow emails/);
+  assert.match(account, /Service, claims and transfers/);
   assert.doesNotMatch(account, /Security, transfer, claim, and service-review notices are sent to your account email when action is required/);
 });
 
-test("email ownership map exposes only one application sender and honest provider exports", () => {
+test("email ownership map matches all delivery families without widening test-send access", () => {
   assert.deepEqual(boundary.emailTemplateDeliveryBoundary("email.service.submitted"), {
     kind: "application",
     owner: "qrguitar-brevo",
@@ -415,14 +416,40 @@ test("email ownership map exposes only one application sender and honest provide
     providerTemplate: null,
     providerArtifact: null
   });
-  const recovery = boundary.emailTemplateDeliveryBoundary("email.security.passwordReset");
-  assert.equal(recovery.kind, "provider");
-  assert.equal(recovery.providerTemplate, "recovery");
-  for (const prefix of ["email.claim.ownerReview", "email.claim.moreInfo", "email.service.revisionRequested", "email.claim.approved"]) {
+  const application = ["service.submitted", "service.revisionRequested", "service.approved", "service.declined", "service.cancelled", "claim.ownerReview", "claim.moreInfo", "claim.approved", "claim.declined", "claim.expired", "ownership.transferAccepted", "ownership.transferCancelled"];
+  const senderPath = path.join(webRoot, "lib/action-required-email-delivery.ts");
+  const ast = ts.createSourceFile(senderPath, fs.readFileSync(senderPath, "utf8"), ts.ScriptTarget.Latest, true);
+  const familyType = ast.statements.find(node => ts.isTypeAliasDeclaration(node) && node.name.text === "Family");
+  assert.ok(familyType && ts.isUnionTypeNode(familyType.type));
+  assert.deepEqual(application.filter(id => id !== "service.submitted").sort(), familyType.type.types.map(node => node.literal.text).sort());
+  for (const family of application) {
+    const prefix = `email.${family}`;
+    const delivery = boundary.emailTemplateDeliveryBoundary(prefix);
+    assert.equal(delivery.kind, "application");
+    assert.equal(delivery.owner, "qrguitar-brevo");
+    assert.equal(delivery.canSendApplicationTest, family === "service.submitted");
+    const exported = boundary.createEmailTemplateSetupExport(prefix, {});
+    assert.equal(exported.delivery.kind, "application");
+    assert.equal(exported.delivery.applicationTestAvailable, family === "service.submitted");
+    assert.match(exported.delivery.note, /when its runtime and delivery controls are enabled/);
+    assert.doesNotMatch(exported.delivery.note, /design-only|No production trigger/);
+  }
+  for (const [prefix, providerTemplate] of [["email.security.passwordReset", "recovery"], ["email.ownership.transferInvitation", "magic-link"]]) {
+    const provider = boundary.emailTemplateDeliveryBoundary(prefix);
+    assert.equal(provider.kind, "provider");
+    assert.equal(provider.providerTemplate, providerTemplate);
+    assert.equal(provider.canSendApplicationTest, false);
+  }
+  const previews = ["service.resubmitted", "ownership.storeHandoff", "claim.submitted", "notification.lostStolen", "security.accountNotice"];
+  for (const family of [...previews, "unknown.family"]) {
+    const prefix = `email.${family}`;
     const preview = boundary.emailTemplateDeliveryBoundary(prefix);
     assert.equal(preview.kind, "preview");
     assert.equal(preview.canSendApplicationTest, false);
+    assert.match(boundary.createEmailTemplateSetupExport(prefix, {}).delivery.note, /No production trigger/);
   }
+  const registered = [...contentRegistry.contentRegistryByKey.keys()].filter(key => key.startsWith("email.") && key.endsWith(".subject")).map(key => key.slice(6, -8)).sort();
+  assert.deepEqual(registered, [...application, ...previews, "security.passwordReset", "ownership.transferInvitation"].sort());
   const bundle = boundary.createEmailTemplateSetupExport("email.security.passwordReset", {
     "email.security.passwordReset.subject": "Reset",
     "email.security.passwordReset.body": "Body"
@@ -434,6 +461,26 @@ test("email ownership map exposes only one application sender and honest provide
     "email.security.passwordReset.body",
     "email.security.passwordReset.subject"
   ]);
+});
+
+test("editor uses fresh delivery help and separates live templates from setup exports", () => {
+  const editor = fs.readFileSync(path.join(webRoot, "app/site-editor/page.tsx"), "utf8");
+  const registry = fs.readFileSync(path.join(webRoot, "lib/ui-text-registry.ts"), "utf8");
+  assert.match(editor, /emailDeliveryBoundary/);
+  assert.match(registry, /emailDeliveryBoundary/);
+  assert.doesNotMatch(editor, /Only Service \/ Submitted is sent by the application/);
+  assert.match(editor, /emailDeliveryBoundary\.canSendApplicationTest \? <>/);
+  assert.match(editor, /downloadEmailSetupExport", "Download template"/);
+  const key = "ui.app.site.editor.page.emailDeliveryBoundary";
+  const legacy = "Only Service / Submitted is sent by the application. Supabase owns password-reset and transfer sign-in delivery; the remaining templates are design previews with no production trigger.";
+  assert.match(contentRegistry.mergeContentValues({ [key]: legacy })[key], /Published application templates/);
+  const custom = "Owner-approved custom delivery wording.";
+  assert.equal(contentRegistry.mergeContentValues({ [key]: custom })[key], custom);
+  assert.equal(contentRegistry.contentRegistryByKey.get(key).classification, "security-locked");
+  const accountKey = "ui.app.account.page.b7d24faecb5a";
+  const accountLegacy = "Email currently covers account confirmation and recovery, transfer sign-in invitations, and service work ready for owner review. Other workflow updates stay in QRguitar; PayPal handles its own payment notices.";
+  assert.match(contentRegistry.mergeContentValues({ [accountKey]: accountLegacy })[accountKey], /Email updates can cover/);
+  assert.equal(contentRegistry.mergeContentValues({ [accountKey]: custom })[accountKey], custom);
 });
 
 const captureDir = process.env.QRG_EMAIL_CAPTURE_DIR;

@@ -264,10 +264,10 @@ function AccountSettingsPage() {
                 <span>{ui("ui.app.account.page.788011833a5a", "Notifications")}</span>
                 <strong><ShieldCheck size={18} aria-hidden="true" />{" "}{ui("ui.app.account.page.ff52142d2401", "Account notices")}</strong>
               </div>
-              <p className={styles.copy}>{ui("ui.app.account.page.b7d24faecb5a", "Email currently covers account confirmation and recovery, transfer sign-in invitations, and service work ready for owner review. Other workflow updates stay in QRguitar; PayPal handles its own payment notices.")}</p>
+              <p className={styles.copy}>{ui("ui.app.account.page.b7d24faecb5a", "Email updates can cover account security, service reviews, ownership claims and transfer outcomes. Check your QRguitar workspace for the latest status. PayPal sends its own payment notices.")}</p>
               <div className={styles.statusGrid}>
                 <div><span>{ui("ui.app.account.page.1efeceaedae0", "Delivery email")}</span><strong>{email}</strong></div>
-                <div><span>{ui("ui.app.account.page.c9aae06952ae", "Connected QRguitar email")}</span><strong>{ui("ui.app.account.page.92c1cdfdf4cb", "Service owner review")}</strong></div>
+                <div><span>{ui("ui.app.account.page.c9aae06952ae", "QRguitar workflow emails")}</span><strong>{ui("ui.app.account.page.92c1cdfdf4cb", "Service, claims and transfers")}</strong></div>
               </div>
               <p className="field-note">{ui("ui.app.account.page.e16273f1c0f6", "Claim, transfer, service, message, deletion-request, and billing updates stay available in their QRguitar workspaces while account access exists.")}</p>
             </section> : null}

@@ -1014,7 +1014,7 @@ function SiteEditorWorkspace() {
       <section className="cms-field-group cms-email-studio">
         <header><div><span>{ui("ui.app.site.editor.page.eeb51b63cf49", "Safe preview")}</span><h2>{activeSectionName ? ui("ui.app.site.editor.page.f199529a30df", "{{value1}} email", { value1: activeSectionName }) : ui("ui.app.site.editor.page.92f2897724bf", "Email preview")}</h2></div><Send size={20} /></header>
         <p className="cms-section-intro">{ui("ui.app.site.editor.page.bbad0a028b19", "Whitelisted variables are replaced with sample values here. Previewing never sends an email or exposes a real token.")}</p>
-        <p className="cms-section-intro"><strong>{emailDeliveryLabel}.</strong>{" "}{ui("ui.app.site.editor.page.emailDeliveryBoundary", "Only Service / Submitted is sent by the application. Supabase owns password-reset and transfer sign-in delivery; the remaining templates are design previews with no production trigger.")}</p>
+        <p className="cms-section-intro"><strong>{emailDeliveryLabel}.</strong>{" "}{ui("ui.app.site.editor.page.emailDeliveryBoundary", "Published application templates supply workflow emails when delivery is enabled. Only Service / Submitted supports an admin test email. Supabase Auth templates require separate provider setup; design previews have no delivery trigger.")}</p>
         <div className="cms-email-preview">
           <div className="cms-email-envelope">
             <span>{ui("ui.app.site.editor.page.68971283841a", "Subject")}</span>
@@ -1053,7 +1053,7 @@ function SiteEditorWorkspace() {
             <small>{ui("ui.app.site.editor.page.8ddb6a61231c", "The recipient is fixed to the authenticated admin account. Addresses cannot be entered here.")}</small>
           </> : <>
             <button type="button" className="button secondary" onClick={downloadEmailSetupExport}>
-              <Code2 size={16} /> {ui("ui.app.site.editor.page.downloadEmailSetupExport", "Download setup export")}
+              <Code2 size={16} /> {ui("ui.app.site.editor.page.downloadEmailSetupExport", "Download template")}
             </button>
           </>}
         </div>
