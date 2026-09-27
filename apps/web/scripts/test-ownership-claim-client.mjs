@@ -160,6 +160,7 @@ const canWithdrawClaim = compile(functions.get("canWithdrawClaim"), {}, "canWith
 const canCompleteClaimSubmission = compile(functions.get("canCompleteClaimSubmission"), {}, "canCompleteClaimSubmission");
 const claimSubmissionIncomplete = compile(functions.get("claimSubmissionIncomplete"), {}, "claimSubmissionIncomplete");
 const canonicalClaimQrIdentifier = compile(functions.get("canonicalClaimQrIdentifier"), {}, "canonicalClaimQrIdentifier");
+const claimHasRecoverableSubmission = compile(functions.get("claimHasRecoverableSubmission"), { canCompleteClaimSubmission }, "claimHasRecoverableSubmission");
 function compile(code, env, result) {
   const { useUiText } = withUiTextTestContext(() => { throw new Error("Unexpected module"); })("UiTextProvider");
   env = { useUiText, ui: useUiText("app.ownership.claim.page"), ...env };
@@ -208,19 +209,19 @@ await test("page rejects excess files and combined bytes without starting FileRe
 });
 await test("page unknown write outcome warns without marking complete and releases its lock", async () => {
   const p = pageHarness(); await until(() => p.state.signedIn === true && !p.state.claimsLoading); p.h.reply = async () => { throw new Error("Network reply lost"); };
-  const write = compile(functions.get("writeClaim"), { ...p.env, ...p.state, ClaimRequestError, serializeClaimBody, confirmedClaimMutation, canonicalClaimQrIdentifier }, "writeClaim");
+  const write = compile(functions.get("writeClaim"), { ...p.env, ...p.state, ClaimRequestError, serializeClaimBody, confirmedClaimMutation, canonicalClaimQrIdentifier, claimHasRecoverableSubmission }, "writeClaim");
   await write("/api/ownership-claims", "POST", { evidence: [] }, "claim", () => { p.state.complete = true; });
   assert.equal(p.state.complete, false); assert.equal(p.state.busy, false); assert.match(p.state.message, /may already be saved/); p.dispose();
 });
 await test("uncertain claim POST discovers the saved request and suppresses duplicate form submission", async () => {
   const p = pageHarness(); await until(() => p.state.signedIn === true && !p.state.claimsLoading);
-  const recovered = { ...claim, id: "claim-recovered", canCompleteSubmission: true, submissionComplete: false };
+  const recovered = { ...claim, id: "claim-recovered", canWithdraw: true, canCompleteSubmission: true, submissionComplete: false };
   p.state.evidence = [{ name: "private.pdf" }];
   p.h.reply = async (_url, init) => {
     if (init.method === "POST") throw new Error("Lost final acknowledgement");
     return ok({ claims: [claim, recovered] });
   };
-  const write = compile(functions.get("writeClaim"), { ...p.env, ...p.state, ClaimRequestError, serializeClaimBody, confirmedClaimMutation, canonicalClaimQrIdentifier }, "writeClaim");
+  const write = compile(functions.get("writeClaim"), { ...p.env, ...p.state, ClaimRequestError, serializeClaimBody, confirmedClaimMutation, canonicalClaimQrIdentifier, claimHasRecoverableSubmission }, "writeClaim");
   await write("/api/ownership-claims", "POST", { identifier: "QRG-SYNTH", evidence: p.state.evidence }, "claim", () => assert.fail("uncertain POST must not use its missing receipt"));
   assert.equal(p.h.calls.filter(call => call.method === "POST").length, 1);
   assert.equal(p.h.calls.filter(call => !call.method).length, 2);
@@ -234,9 +235,37 @@ await test("authoritative error claimId recovers the exact saved request even fr
   p.h.reply = async (_url, init) => init.method === "POST"
     ? Response.json({ ok: false, uncertain: true, message: "Saved but completion failed", claimId: exactId, ignoredPrivate: "never expose" }, { status: 503 })
     : ok({ claims: [claim, recovered] });
-  const write = compile(functions.get("writeClaim"), { ...p.env, ...p.state, ClaimRequestError, serializeClaimBody, confirmedClaimMutation, canonicalClaimQrIdentifier }, "writeClaim");
+  const write = compile(functions.get("writeClaim"), { ...p.env, ...p.state, ClaimRequestError, serializeClaimBody, confirmedClaimMutation, canonicalClaimQrIdentifier, claimHasRecoverableSubmission }, "writeClaim");
   await write("/api/ownership-claims", "POST", { identifier: "SERIAL-ONLY" }, "claim", () => assert.fail("uncertain response must reconcile through GET"));
   assert.equal(p.state.complete, true); assert.equal(p.state.claims.some(item => item.id === exactId), true); assert.doesNotMatch(p.state.message, /ignoredPrivate|never expose/); p.dispose();
+});
+
+await test("authoritative partial save preserves the local evidence and declarations", async () => {
+  const p = pageHarness(); await until(() => p.state.signedIn === true && !p.state.claimsLoading);
+  const exactId = "11111111-1111-4111-8111-111111111111";
+  const partial = { ...claim, id: exactId, canWithdraw: true, canCompleteSubmission: false, submissionComplete: false };
+  p.state.evidence = [{ name: "private.pdf", dataUrl: "private-data", bytes: 12, type: "ownership_document" }];
+  p.state.acquisitionDetails = "private acquisition"; p.state.ownershipDeclaration = "private declaration"; p.state.challengeCode = "ABC234";
+  p.h.reply = async (_url, init) => init.method === "POST"
+    ? Response.json({ ok: false, uncertain: true, message: "Only part of the request was saved", claimId: exactId }, { status: 503 })
+    : ok({ claims: [claim, partial] });
+  const write = compile(functions.get("writeClaim"), { ...p.env, ...p.state, ClaimRequestError, serializeClaimBody, confirmedClaimMutation, canonicalClaimQrIdentifier, claimHasRecoverableSubmission }, "writeClaim");
+  await write("/api/ownership-claims", "POST", { identifier: "QRG-SYNTH", evidence: p.state.evidence }, "claim", () => assert.fail("partial save must not confirm"));
+  assert.equal(p.state.complete, false); assert.equal(p.state.evidence.length, 1); assert.equal(p.state.evidence[0].dataUrl, "private-data");
+  assert.equal(p.state.acquisitionDetails, "private acquisition"); assert.equal(p.state.ownershipDeclaration, "private declaration"); assert.equal(p.state.challengeCode, "ABC234");
+  assert.match(p.state.message, /partial request was saved/); assert.match(p.state.message, /local files and declarations remain/); assert.match(p.state.message, /will not replay/); p.dispose();
+});
+
+await test("QR fallback does not recover an owner-side incoming claim with the same code", async () => {
+  const p = pageHarness(); await until(() => p.state.signedIn === true && !p.state.claimsLoading);
+  const ownerSide = { ...claim, id: "owner-side", qrCode: "QRG-SYNTH", canWithdraw: false, canReview: true, canCompleteSubmission: true, submissionComplete: false };
+  p.state.evidence = [{ name: "private.pdf", dataUrl: "private-data", bytes: 12, type: "ownership_document" }];
+  p.state.ownershipDeclaration = "private declaration";
+  p.h.reply = async (_url, init) => init.method === "POST" ? Promise.reject(new Error("No response")) : ok({ claims: [claim, ownerSide] });
+  const write = compile(functions.get("writeClaim"), { ...p.env, ...p.state, ClaimRequestError, serializeClaimBody, confirmedClaimMutation, canonicalClaimQrIdentifier, claimHasRecoverableSubmission }, "writeClaim");
+  await write("/api/ownership-claims", "POST", { identifier: "QRG-SYNTH", evidence: p.state.evidence }, "claim", () => assert.fail("owner-side match must not confirm"));
+  assert.equal(p.state.complete, false); assert.equal(p.state.evidence.length, 1); assert.equal(p.state.ownershipDeclaration, "private declaration");
+  assert.match(p.state.message, /may already be saved/); assert.doesNotMatch(p.state.message, /Do not submit another request/); p.dispose();
 });
 
 await test("uncertain POST never guesses an unrelated, ambiguous, or serial-only new request", async () => {
@@ -251,14 +280,14 @@ await test("uncertain POST never guesses an unrelated, ambiguous, or serial-only
       if (init.method === "POST") throw new Error("No response");
       return ok({ claims: [claim, ...example.rows] });
     };
-    const write = compile(functions.get("writeClaim"), { ...p.env, ...p.state, ClaimRequestError, serializeClaimBody, confirmedClaimMutation, canonicalClaimQrIdentifier }, "writeClaim");
+    const write = compile(functions.get("writeClaim"), { ...p.env, ...p.state, ClaimRequestError, serializeClaimBody, confirmedClaimMutation, canonicalClaimQrIdentifier, claimHasRecoverableSubmission }, "writeClaim");
     await write("/api/ownership-claims", "POST", { identifier: example.identifier }, "claim", () => assert.fail("uncertain response must not confirm"));
     assert.equal(p.state.complete, false); assert.match(p.state.message, /may already be saved/); assert.equal(p.h.calls.filter(call => call.method === "POST").length, 1); p.dispose();
   }
 });
 await test("page applies only a verified successful mutation receipt once", async () => {
   const p = pageHarness(); await until(() => p.state.signedIn === true && !p.state.claimsLoading); const gate = deferred(); p.h.reply = () => gate.promise;
-  const write = compile(functions.get("writeClaim"), { ...p.env, ...p.state, ClaimRequestError, serializeClaimBody, confirmedClaimMutation, canonicalClaimQrIdentifier }, "writeClaim"); let confirmed = 0;
+  const write = compile(functions.get("writeClaim"), { ...p.env, ...p.state, ClaimRequestError, serializeClaimBody, confirmedClaimMutation, canonicalClaimQrIdentifier, claimHasRecoverableSubmission }, "writeClaim"); let confirmed = 0;
   const saving = write("/api/ownership-claims", "POST", {}, "claim", () => confirmed++);
   await until(() => p.h.calls.length === 2); await write("/api/ownership-claims", "POST", {}, "claim", () => confirmed++); assert.equal(p.h.calls.length, 2);
   gate.resolve(ok({ claim })); await saving; assert.equal(confirmed, 1); assert.equal(p.state.busy, false); p.dispose();

@@ -29,6 +29,10 @@ function canCompleteClaimSubmission(claim: ClaimSummary) {
   return claim.canCompleteSubmission === true && claim.submissionComplete === false;
 }
 
+function claimHasRecoverableSubmission(claim: ClaimSummary) {
+  return claim.submissionComplete === true || canCompleteClaimSubmission(claim);
+}
+
 function claimSubmissionIncomplete(claim: ClaimSummary) {
   return claim.submissionComplete === false && ["awaiting_owner", "admin_review"].includes(claim.status);
 }
@@ -246,11 +250,15 @@ function OwnershipClaimContent() {
         if (!current.isCurrent(lease)) return;
         const reportedClaim = error.claimId ? saved?.find((claim) => claim.id.toLowerCase() === error.claimId) : undefined;
         const qrIdentifier = canonicalClaimQrIdentifier(body.identifier);
-        const qrMatches = !error.claimId && qrIdentifier ? saved?.filter((claim) => !knownClaimIds.has(claim.id) && claim.qrCode.trim().toUpperCase() === qrIdentifier) || [] : [];
-        const recovered = reportedClaim || (qrMatches.length === 1 ? qrMatches[0] : undefined);
+        const qrMatches = !error.claimId && qrIdentifier ? saved?.filter((claim) => !knownClaimIds.has(claim.id) && claim.canWithdraw === true && claimHasRecoverableSubmission(claim) && claim.qrCode.trim().toUpperCase() === qrIdentifier) || [] : [];
+        const recovered = reportedClaim && claimHasRecoverableSubmission(reportedClaim) ? reportedClaim : (qrMatches.length === 1 ? qrMatches[0] : undefined);
         if (recovered) {
           setComplete(true); setEvidence([]); setAcquisitionDetails(""); setOwnershipDeclaration(""); setChallengeCode("");
           setMessage(ui("ui.app.ownership.claim.page.claimRecovered", "Your saved request was found after the interrupted response. Do not submit another request. Use Finish submitting below if it is offered."));
+          return;
+        }
+        if (reportedClaim) {
+          setMessage(ui("ui.app.ownership.claim.page.claimPartialRecovered", "A partial request was saved after the interrupted response, but it is not ready to finish. Your local files and declarations remain available here. Refresh or withdraw the saved request before starting a new attempt. This page will not replay the submission automatically."));
           return;
         }
       }
