@@ -39,7 +39,7 @@ function page(value: unknown) {
     oldestPendingAt: value.oldestPendingAt, limit: 50, items: value.items.map(item) };
 }
 
-/** Preparation only: no mounted route, environment activation or transport dependency. */
+/** Default-disabled adapter for the authenticated admin route; no transport dependency. */
 export function createActionEmailOperator(deps: {
   enabled?: boolean;
   // Server boundary must authenticate and authorize the actual caller; never populate from request JSON.
