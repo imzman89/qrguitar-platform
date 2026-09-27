@@ -94,10 +94,46 @@ export async function PATCH(request: Request) {
     return json({ ok: true, provider: mapProviderProfile(updated.data, true), message: verified ? "Provider account verified." : "Provider verification revoked." });
   }
 
-  if (action === "cancel_submission" || action === "expire_submission") {
+  if (action === "cancel_submission") {
+    if (context.accountStatus !== "active" || !["role", "env"].includes(context.accessSource)) {
+      return json({ ok: false, message: "An active administrator account is required." }, 403);
+    }
     if (!submissionId) return json({ ok: false, message: "Submission is required." }, 400);
-    const status = action === "cancel_submission" ? "cancelled" : "expired";
-    const updated = await supabase.from("service_submissions").update({ status, cancelled_at: status === "cancelled" ? now : null, updated_at: now }).eq("id", submissionId).in("status", ["draft", "submitted", "changes_requested"]).select("id,provider_user_id,owner_user_id,status").maybeSingle();
+    if (note.length > 2000) return json({ ok: false, message: "Keep the cancellation note to 2,000 characters or fewer." }, 400);
+    const unconfirmed = () => json({ ok: false, code: "unconfirmed", message: "Cancellation could not be confirmed. Refresh the service request before trying again." }, 503);
+    let alreadyCancelled: boolean;
+    try {
+      const current = await supabase.from("service_submissions").select("id,guitar_id,provider_user_id,owner_user_id,status")
+        .eq("id", submissionId).abortSignal(AbortSignal.timeout(5000)).maybeSingle();
+      if (current.error) return unconfirmed();
+      if (!current.data || !["draft", "submitted", "changes_requested", "cancelled"].includes(current.data.status)) {
+        return json({ ok: false, message: "Only an open submission can be cancelled." }, 409);
+      }
+      // The RPC commits cancellation, counterparty notification and activity together.
+      // Its trigger captures the outcome; do not fall back to separate status writes.
+      const result = await supabase.rpc("cancel_service_submission", {
+        p_submission_id: submissionId, p_actor_id: context.user.id,
+        p_env_admin: context.accessSource === "env", p_note: note
+      }).abortSignal(AbortSignal.timeout(10000));
+      const saved = result.data?.submission;
+      if (result.error || result.data?.ok !== true || typeof result.data.alreadyCancelled !== "boolean"
+        || !saved || saved.id !== submissionId || saved.status !== "cancelled"
+        || saved.guitar_id !== current.data.guitar_id || saved.provider_user_id !== current.data.provider_user_id
+        || saved.owner_user_id !== current.data.owner_user_id) return unconfirmed();
+      alreadyCancelled = result.data.alreadyCancelled;
+    } catch { return unconfirmed(); }
+    if (alreadyCancelled) return json({ ok: true, committed: true, alreadyCancelled: true, message: "This service submission was already cancelled. Nothing was published." });
+    // A separate audit failure cannot undo the committed cancellation or justify replay.
+    const audit = await logAdminAuditEvent(supabase, { actorUserId: context.user.id, actorEmail: context.email,
+      action: "service_submission.cancelled", targetType: "service_submission", targetId: submissionId, reason: note }).catch(() => ({ ok: false }));
+    return json({ ok: true, committed: true, alreadyCancelled: false, auditRecorded: audit.ok,
+      message: "Service submission cancelled. Nothing was published." + (audit.ok ? "" : " The Admin audit entry could not be confirmed.") });
+  }
+
+  if (action === "expire_submission") {
+    if (!submissionId) return json({ ok: false, message: "Submission is required." }, 400);
+    const status = "expired";
+    const updated = await supabase.from("service_submissions").update({ status, cancelled_at: null, updated_at: now }).eq("id", submissionId).in("status", ["draft", "submitted", "changes_requested"]).select("id,provider_user_id,owner_user_id,status").maybeSingle();
     if (updated.error) return json({ ok: false, message: updated.error.message }, 500);
     if (!updated.data) return json({ ok: false, message: "Only an open submission can be cancelled or expired." }, 409);
     await supabase.from("service_submission_activity").insert({ submission_id: submissionId, actor_user_id: context.user.id, action: status, note: note || null });
