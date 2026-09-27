@@ -72,7 +72,7 @@ export function createClaimSessionGuard(deps: { auth: () => ClaimAuth; fetch?: t
     const revision = state.revision;
     publish({ phase: "loading", error: "" });
     try {
-      if (!auth) { auth = deps.auth(); const result = auth.onAuthStateChange((_event, session) => change(session)); unsubscribe = () => result.data.subscription.unsubscribe(); }
+      if (!auth) { auth = deps.auth(); const result = auth.onAuthStateChange((event, session) => { if (event !== "INITIAL_SESSION") change(session); }); unsubscribe = () => result.data.subscription.unsubscribe(); }
       const result = await bounded(() => auth!.getSession());
       if (disposed || revision !== state.revision) return;
       if (result.error) throw new Error("Could not check your sign-in session. Please retry.");

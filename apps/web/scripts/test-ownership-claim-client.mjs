@@ -37,7 +37,8 @@ function harness(options = {}) {
     if (h.constructError) throw new Error("Auth unavailable");
     return { getSession: async () => { h.authCalls++; return h.getSession ? h.getSession() : { data: { session: h.session } }; }, onAuthStateChange(callback) { listener = callback; return { data: { subscription: { unsubscribe() { h.unsubscribed = true; } } } }; } };
   }, fetch: async (url, init) => { h.calls.push({ url, ...init }); return h.reply ? h.reply(url, init) : ok({ claims: [claim] }); } });
-  h.change = (next) => { h.session = next; listener("TEST", next); };
+  h.change = (next, event = "TEST") => { h.session = next; listener(event, next); };
+  h.emit = (event, next) => listener(event, next);
   h.mount = async () => { await h.guard.start(); return h; };
   return h;
 }
@@ -412,5 +413,18 @@ await test("confirm decision sends once even before rerender and preserves note 
 });
 await test("owner review escapes evidence labels and excludes script links",()=>{
  const tree=ownerReviewHarness({...claim,canReview:true,evidence:[{id:"bad",fileName:"<script>private</script>",url:"javascript:alert(1)"}]}).render();const html=renderToStaticMarkup(tree);assert.doesNotMatch(html,/href=|<script>/);assert.match(html,/&lt;script&gt;/);
+});
+
+await test("actual late INITIAL_SESSION null cannot clear a confirmed owner or write lease",async()=>{
+ const h=await harness().mount(),lease=h.guard.beginWrite(),before=h.guard.getState();h.emit("INITIAL_SESSION",null);
+ assert.deepEqual(h.guard.getState(),before);assert.equal(h.guard.isCurrent(lease),true);h.guard.finishWrite(lease);h.guard.dispose();
+});
+await test("INITIAL_SESSION null before resolved getSession keeps loading and accepts valid snapshot",async()=>{
+ const gate=deferred(),h=harness({getSession:()=>gate.promise});const pending=h.guard.start();h.emit("INITIAL_SESSION",null);assert.equal(h.guard.getState().phase,"loading");
+ gate.resolve({data:{session:session("a")}});await pending;assert.equal(h.guard.getState().phase,"ready");assert.equal(h.guard.getState().actorId,"a");h.guard.dispose();
+});
+await test("real SIGNED_OUT and SIGNED_IN account changes supersede initial snapshots",async()=>{
+ const h=await harness().mount();let lease=h.guard.lease();h.change(null,"SIGNED_OUT");h.emit("INITIAL_SESSION",session("a"));assert.equal(h.guard.isCurrent(lease),false);assert.equal(h.guard.getState().phase,"signed-out");
+ h.change(session("b"),"SIGNED_IN");lease=h.guard.lease();h.emit("INITIAL_SESSION",null);assert.equal(h.guard.getState().actorId,"b");assert.equal(h.guard.isCurrent(lease),true);h.guard.dispose();
 });
 console.log(count + " ownership claim client cases passed.");
