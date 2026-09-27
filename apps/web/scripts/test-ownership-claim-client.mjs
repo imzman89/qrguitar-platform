@@ -382,7 +382,7 @@ await test("completion recovery renders only an explicit incomplete capability a
   const eligible = { ...claim, canCompleteSubmission: true, submissionComplete: false };
   const tree = claimChooserHarness("", [eligible]).render();
   const buttons = claimElements(tree, node => node.type === "button" && node.props.id === "complete-submission-claim-a");
-  assert.equal(buttons.length, 1); assert.equal(buttons[0].props.disabled, false);
+  assert.equal(buttons.length, 1); assert.equal(buttons[0].props.disabled, false); assert.equal(buttons[0].props.style.minHeight, 44);
   const html = renderToStaticMarkup(tree);
   assert.match(html, /Submission incomplete/); assert.match(html, /Finish submitting/); assert.match(html, /evidence files are already saved and will be reused/); assert.match(html, /do not need to upload them again/);
   const currentSteps = claimElements(tree, node => node.type === "li" && node.props.className === "is-current");
