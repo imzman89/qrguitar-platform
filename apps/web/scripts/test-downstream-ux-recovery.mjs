@@ -16,7 +16,8 @@ function nodes(tree) { return !tree || typeof tree !== "object" ? [] : [tree, ..
 
 // Execute actual route/component source with deterministic hooks and in-memory
 // response fixtures. No local service, account, customer record, or real request.
-function fixture(kind = "service", options = {}) {
+export function fixture(kind = "service", options = {}) {
+  let routeId = kind === "transfer" ? "transfer-a" : "review-a";
   const values = [], effects = [], memo = [], timers = new Map(), requests = [], navigations = [];
   let cursor = 0, effectCursor = 0, memoCursor = 0, timerId = 0, dirty = true, mounted = true, tree, callback, writesAfterUnmount = 0;
   const ui = (key, fallback) => options.content?.[key] ?? fallback;
@@ -50,7 +51,7 @@ function fixture(kind = "service", options = {}) {
     if (name.endsWith("UiTextProvider")) return { useUiText: () => ui };
     if (name === "lucide-react") return new Proxy({}, { get: () => () => null });
     if (name === "next/link") return { __esModule: true, default: "a" };
-    if (name === "next/navigation") return { useParams: () => ({ id: kind === "transfer" ? "transfer-a" : "review-a" }), useSearchParams: () => new URLSearchParams() };
+    if (name === "next/navigation") return { useParams: () => ({ id: routeId }), useSearchParams: () => new URLSearchParams() };
     if (name.endsWith(".module.css")) return { __esModule: true, default: new Proxy({}, { get: (_, key) => key }) };
     if (name.endsWith("/Nav") || name.endsWith("/Footer")) return { Nav: () => null, Footer: () => null };
     if (name.endsWith("/content-registry")) return { getContentValue: (_, key) => ({ "serviceReview.actions.approve": "Approve", "serviceReview.actions.revise": "Request changes", "serviceReview.actions.decline": "Decline" })[key] || key };
@@ -70,6 +71,7 @@ function fixture(kind = "service", options = {}) {
   const Component = kind === "messages" ? module.exports.MessagesClient : module.exports.default;
   const h = {
     requests, timers, navigations,
+    route(id) { routeId = id; h.render(); },
     render() { dirty = true; let turns = 0; while (dirty) { assert.ok(turns++ < 20, "render loop"); dirty = false; cursor = effectCursor = memoCursor = 0; tree = Component(kind === "messages" ? { conversationId: "conversation-a" } : {}); if (!options.skipEffects) for (const effect of effects) if (effect.pending) { effect.pending = false; effect.cleanup?.(); effect.cleanup = effect.run(); } } return tree; },
     elements() { return nodes(h.render()); },
     button(label) { const node = h.elements().find(n => n.type === "button" && words(n).trim() === label); assert.ok(node, `Missing button: ${label}`); return node; },

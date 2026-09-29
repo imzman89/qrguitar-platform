@@ -1,3 +1,4 @@
+import { fixture as reviewFixture } from "./test-downstream-ux-recovery.mjs";
 import { withUiTextTestContext } from "./ui-text-test-context.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -249,32 +250,22 @@ function compileLifecycleHarness(source) {
   return exports;
 }
 
-test("owner service review aborts a stale route load before private data can commit", async () => {
-  const { file, statements } = componentStatements("app/service-review/[id]/page.tsx", "ServiceReviewPage");
-  const load = statements.find((node) => ts.isVariableStatement(node) && node.declarationList.declarations.some((declaration) => declaration.name.getText(file) === "load"));
-  const effect = statements.find((node) => ts.isExpressionStatement(node) && node.getText(file).includes("getSupabaseAccessToken()"));
-  assert.ok(load && effect, "service review load lifecycle source is required");
-  const harness = compileLifecycleHarness(`export function run(d:any){const {id,useCallback,useEffect,getSupabaseAccessToken,setToken,setMessage,setSubmission,setVisibility,setEvidence,fetch}=d;${load.getText(file)}${effect.getText(file)}}`);
-  let cleanup, resolveResponse, requestSignal;
-  const writes = [];
-  const response = new Promise((resolve) => { resolveResponse = resolve; });
-  harness.run({
-    id: "submission-old",
-    useCallback: (callback) => callback,
-    useEffect: (callback) => { cleanup = callback(); },
-    getSupabaseAccessToken: async () => "owner-token",
-    setToken: (value) => writes.push(["token", value]),
-    setMessage: (value) => writes.push(["message", value]),
-    setSubmission: (value) => writes.push(["submission", value]),
-    setVisibility: (value) => writes.push(["visibility", value]),
-    setEvidence: (value) => writes.push(["evidence", value]),
-    fetch: async (_url, init) => { requestSignal = init.signal; return response; }
-  });
-  await tick();
-  assert.ok(requestSignal); const writesBeforeCleanup = writes.length; cleanup(); assert.equal(requestSignal.aborted, true);
-  resolveResponse(Response.json({ ok: true, submission: { id: "submission-old", requestedVisibility: "private" } }));
-  await tick(); await tick();
-  assert.deepEqual(writes.slice(writesBeforeCleanup), []);
+for (const departure of ["route change", "unmount"]) test("owner service review aborts a stale load before private data can commit on " + departure, async () => {
+  let resolveResponse, requestSignal;
+  const response = new Promise(resolve => { resolveResponse = resolve; });
+  const h = reviewFixture("service", { fetch: request => {
+    if (request.method === "GET" && request.url.includes("/api/service-submissions?id=review-a")) { requestSignal = request.signal; return response; }
+    if (request.url.startsWith("/api/service-evidence")) return Response.json({ ok: true, evidence: [] });
+    if (request.body?.action === "mark_read") return Response.json({ ok: true });
+    return Response.json({ ok: true, submission: { id: "review-b", status: "submitted", title: "Current route review", profileTitle: "Current route instrument", requestedVisibility: "private", evidenceCount: 0, provider: {} } });
+  } });
+  await h.settle(); assert.ok(requestSignal, "actual component issued the old route request");
+  if (departure === "route change") { h.route("review-b"); await h.settle(); assert.match(h.text(), /Current route review/); }
+  else h.unmount();
+  assert.equal(requestSignal.aborted, true, "departure aborts the old request");
+  resolveResponse(Response.json({ ok: true, submission: { id: "review-a", status: "submitted", title: "Stale private review", privateProviderNote: "Stale private note", requestedVisibility: "private" } }));
+  if (departure === "route change") { await h.settle(); assert.match(h.text(), /Current route review/); assert.doesNotMatch(h.text(), /Stale private/); h.unmount(); }
+  else { await tick(); await tick(); assert.equal(h.afterUnmount(), 0, "late response makes no unmounted state writes"); }
 });
 
 test("bot welcome state follows route changes even when the Profile identity is unchanged", () => {
