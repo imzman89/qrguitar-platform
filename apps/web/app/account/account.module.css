@@ -7,6 +7,8 @@
 .sectionNav button { flex: 0 0 auto; min-height: 42px; padding: 10px 14px; border: 0; border-radius: 8px; color: var(--muted); background: transparent; font: inherit; font-size: .8125rem; line-height: 1.4; cursor: pointer; white-space: nowrap; }
 .sectionNav button.active, .sectionNav button:hover { color: var(--text); background: var(--surface-subtle); }
 .sectionNav button:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
+.saveFeedback { display: grid; gap: 6px; }
+.saveFeedback :global(.field-note) { margin: 0; font-size: .8125rem; line-height: 1.6; color: var(--muted); }
 .content { display: grid; gap: 24px; max-width: 840px; min-width: 0; }
 .panel { display: grid; gap: 24px; min-width: 0; margin: 0; padding: 0; border: 0; background: transparent; }
 .panelHeading { display: grid; gap: 6px; }

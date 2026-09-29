@@ -20,7 +20,7 @@
 .formatSelect select { width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--surface); color: var(--text); font: inherit; }
 .profileLink { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; color: var(--muted-strong); font-size: 14px; }
 .profileLink:hover { color: var(--text); }
-.optionGroup { border-block: 1px solid var(--line); }
+.optionGroup { border: 0; border-top: 1px solid var(--line); }
 .optionGroup summary { padding-block: 14px; color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer; }
 .optionGroup[open] { padding-bottom: 8px; }
 .root button:focus-visible, .root a:focus-visible, .root select:focus-visible, .root summary:focus-visible, .controlRail input:focus-visible, .controlRail textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }

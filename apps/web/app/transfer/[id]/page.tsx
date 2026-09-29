@@ -12,6 +12,7 @@ import { Nav } from "../../../components/Nav";
 import { transferStatusLabel, type DemoTransfer } from "../../../lib/local-demo";
 import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../../lib/supabase-browser";
 import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "../../../lib/optional-tracking-consent";
+import { useAuthNavigation } from "../../../lib/use-auth-navigation";
 
 type TransferPayload = {
   ok?: boolean;
@@ -37,6 +38,12 @@ export default function TransferClaimPage() {
   const acceptMutation = useRef<{ revision: number } | null>(null);
   const [signedIn, setSignedIn] = useState(false);
   const [accepting, setAccepting] = useState(false);
+  const { logout: logoutForSwitch, signingOut: switchingAccount, logoutError: switchError } = useAuthNavigation();
+
+  async function switchRecipientAccount() {
+    if (accepting || acceptMutation.current || switchingAccount) return;
+    if (await logoutForSwitch()) window.location.assign(`/login?next=${encodeURIComponent(`/transfer/${transferId}`)}`);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -213,7 +220,10 @@ export default function TransferClaimPage() {
               <p>{loadError ? ui("ui.app.transfer.id.page.42c72206d5cf", "Your instrument and transfer have not been changed by this check.") : ui("ui.app.transfer.id.page.227180c6db35", "Check the link and the account you are signed in to, or ask the current owner for help.")}</p>
               {loadError ? <button type="button" className="button" onClick={() => setLoadAttempt(value => value + 1)}>{ui("ui.app.transfer.id.page.d8b8392e2c54", "Try again")}</button> : null}
               {!signedIn ? <Link className="button" href={"/login?next=" + encodeURIComponent("/transfer/" + transferId)}>{ui("ui.app.transfer.id.page.bfd402b2f6f3", "Sign in")}</Link> : null}
-              <Link className="button" href="/dashboard">{ui("ui.app.transfer.id.page.73aefc65d247", "Go to Dashboard")}</Link>
+              {requiresAccess && signedIn ? <button type="button" className="button" disabled={switchingAccount} onClick={() => void switchRecipientAccount()}>{switchingAccount ? ui("ui.app.transfer.id.page.switchingAccount", "Signing out...") : ui("ui.app.transfer.id.page.useAnotherAccount", "Use another account")}</button> : null}
+              {requiresAccess && signedIn ? <p>{ui("ui.app.transfer.id.page.switchAccountHint", "This signs you out first, then returns you to this transfer after you sign in with the recipient account.")}</p> : null}
+              {switchError ? <p className="form-message" role="alert">{switchError}</p> : null}
+              <Link className="button secondary" href="/dashboard">{ui("ui.app.transfer.id.page.73aefc65d247", "Go to Dashboard")}</Link>
               {message ? <p className="form-message">{message}</p> : null}
             </section>
           </div>
@@ -267,10 +277,10 @@ export default function TransferClaimPage() {
                 <div className="icon"><BadgeCheck /></div>
                 <h3>{ui("ui.app.transfer.id.page.85595a4753c6", "Ownership accepted.")}</h3>
                 <p>{ui("ui.app.transfer.id.page.ca9a513b8ad6", "This Profile now belongs to the accepting account and keeps the same permanent QRguitar link.")}</p>
-                <Link className="button" href={"/dashboard/profile/" + encodeURIComponent(transfer.guitarQrCode)}>{ui("ui.app.transfer.id.page.41a634bed373", "View Profile")}</Link>
+                <Link className="button" href="/dashboard">{ui("ui.app.transfer.id.page.f6a3dab2fa61", "Open Dashboard")}</Link>
                 <button className="button secondary" type="button" disabled={accepting} onClick={() => void copyProfileLink()}>
                   <Copy size={16} />{ui("ui.app.transfer.id.page.8b812d5b9e9b", "Copy Profile Link")}</button>
-                <Link className="button secondary" href="/dashboard">{ui("ui.app.transfer.id.page.f6a3dab2fa61", "Open Dashboard")}</Link>
+                <p>{ui("ui.app.transfer.id.page.completedAccountHint", "The new owner can manage this Profile from their Dashboard. Previous owners no longer have access to its private details.")}</p>
               </>
             ) : transfer.status === "cancelled" ? (
               <>

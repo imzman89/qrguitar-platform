@@ -17,6 +17,32 @@ function compile(relative, imports, globals = {}, sourceOverride) {
 }
 const observer = compile('lib/session-identity.ts', {});
 const redirect = compile('lib/auth-redirect.ts', {});
+
+for (const pathname of ['/login', '/reset-password']) {
+  test('Nav: ' + pathname + ' retains only the validated original return destination', async () => {
+    const destination = '/account?section=collection';
+    const f = navigationFixture('Nav', { pathname, read: async () => result(''), search: '?code=synthetic-recovery&token_hash=synthetic-hash&next=' + encodeURIComponent(destination), hash: '#access_token=synthetic-token&type=recovery' });
+    await f.flush();
+    const link = find(f.render(), node => node.type === 'a' && node.props.href?.startsWith('/login'));
+    assert.equal(link.props.href, '/login?next=' + encodeURIComponent(destination));
+    assert.doesNotMatch(link.props.href, /synthetic|token|recovery/); f.dispose();
+  });
+  for (const next of ['https://untrusted.invalid', '//untrusted.invalid', '/reset-password?code=synthetic', '/login?next=%2Faccount']) {
+    test('Nav: ' + pathname + ' rejects unsafe or recursive next: ' + next, async () => {
+      const f = navigationFixture('Nav', { pathname, read: async () => result(''), search: '?next=' + encodeURIComponent(next), hash: '#access_token=synthetic' });
+      await f.flush();
+      const link = find(f.render(), node => node.type === 'a' && node.props.href?.startsWith('/login'));
+      assert.equal(link.props.href, '/login?next=%2Fdashboard'); f.dispose();
+    });
+  }
+}
+
+test('Nav: a normal page retains its own query and section hash', async () => {
+  const f = navigationFixture('Nav', { pathname: '/account', read: async () => result(''), search: '?section=collection', hash: '#public-collection' }); await f.flush();
+  const link = find(f.render(), node => node.type === 'a' && node.props.href?.startsWith('/login'));
+  assert.equal(link.props.href, '/login?next=' + encodeURIComponent('/account?section=collection#public-collection')); f.dispose();
+});
+
 test('shared observer bounds a stuck read and ignores its late result until explicit retry', async () => {
   const gate = deferred(), identities = []; let errors = 0, reads = 0;
   const auth = { getSession: () => ++reads === 1 ? gate.promise : Promise.resolve(result('owner-b')), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) };
@@ -54,7 +80,7 @@ export function navigationFixture(component, options = {}) {
   const hook = compile('lib/use-auth-navigation.ts', { react: hooks, './supabase-browser': browser, './session-identity': observer });
   const settings = { content: {}, composition: { footer: { sections: [{ id: 'links', blocks: [] }] } } };
   const imports = {
-    react: hooks, 'next/link': { default: 'a', __esModule: true }, 'next/navigation': { usePathname: () => '/' },
+    react: hooks, 'next/link': { default: 'a', __esModule: true }, 'next/navigation': { usePathname: () => options.pathname || '/' },
     './CheckoutAwareLink': { default: 'a', __esModule: true },
     'lucide-react': { LogOut: () => null, Menu: () => null, UserRound: () => null, X: () => null },
     './BrandLogo': { BrandLogo: () => null }, './Nav.module.css': { default: {}, __esModule: true }, './Footer.module.css': { default: {}, __esModule: true },
@@ -63,7 +89,7 @@ export function navigationFixture(component, options = {}) {
     '../lib/site-settings': { defaultSiteSettings: settings, fetchPublishedSiteSettings: options.published || (async () => settings) },
     '../lib/content-registry': { getContentValue: (content, key) => content[key] || key },
   };
-  const globals = { document: { addEventListener() {}, removeEventListener() {} } };
+  const globals = { document: { addEventListener() {}, removeEventListener() {} }, window: { location: { search: options.search || '', hash: options.hash || '' } } };
   const Component = compile('components/' + component + '.tsx', imports, globals, options.source)[component];
   f.render = () => {
     assert.equal(f.disposed, false); dirty = true; let remaining = 30;

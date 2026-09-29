@@ -25,6 +25,7 @@
 .threadIdentity > div { min-width: 0; }
 .threadIdentity h1 { overflow: hidden; margin: 0; font-size: 24px; text-overflow: ellipsis; white-space: nowrap; }
 .threadIdentity p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+.threadContext { grid-column: 1 / -1; display: inline-flex; align-items: center; justify-self: center; min-height: 44px; max-width: 100%; color: var(--action); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; text-underline-offset: 4px; }
 .connection { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; font-weight: 600; text-transform: none; }
 .connection i { width: 7px; height: 7px; border-radius: 50%; background: var(--action); }
 .connection.live i { background: var(--positive); }

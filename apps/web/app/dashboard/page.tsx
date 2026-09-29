@@ -615,7 +615,7 @@ export default function DashboardPage() {
               <b>{ui("ui.app.dashboard.page.de8413ab464c", "History & files")}</b>
               <Link href={`/edit/${actionRecord.qrCode}#timeline`}><BookOpenText size={15} />{" "}{ui("ui.app.dashboard.page.b4d8cb7570b7", "Timeline event")}</Link>
               <Link href={`/edit/${actionRecord.qrCode}#service`}><Wrench size={15} />{" "}{ui("ui.app.dashboard.page.ef49d7a68372", "Service entry")}</Link>
-              <Link href={`/edit/${actionRecord.qrCode}#media`}><ImagePlus size={15} />{" "}{ui("ui.app.dashboard.page.f8e0207ec66e", "Photos & media")}</Link>
+              <Link href={`/edit/${actionRecord.qrCode}#photos`}><ImagePlus size={15} />{" "}{ui("ui.app.dashboard.page.f8e0207ec66e", "Photos & media")}</Link>
               <Link href={`/edit/${actionRecord.qrCode}#documents`}><FileText size={15} />{" "}{ui("ui.app.dashboard.page.b4e929d8bcfe", "Documents")}</Link>
             </section>
             <section>

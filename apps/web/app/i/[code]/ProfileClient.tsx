@@ -34,6 +34,7 @@ import { RecordShareButton } from "../../../components/RecordShareButton";
 import { SellerWebsiteLink } from "../../../components/SellerWebsiteLink";
 import { MemberMessageLink } from "../../../components/MemberMessageLink";
 import {
+  getInstrumentCondition,
   getInstrumentVerificationStatus,
   type DemoTransfer,
   type ExternalMediaItem,
@@ -641,7 +642,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
         ) : null}
         <ProfileBreadcrumbs current={instrumentDisplayName(instrument)} />
         <div className={styles["scan-topbar"]}>
-          <button type="button" aria-label={ui("ui.app.i.code.ProfileClient.cb35f7332137", "Back to homepage")} onClick={() => router.push("/")}>
+          <button type="button" aria-label={ownerPreview ? ui("ui.app.i.code.ProfileClient.4466f3a00b0b", "Back to collection") : ui("ui.app.i.code.ProfileClient.cb35f7332137", "Back to homepage")} onClick={() => router.push(ownerPreview ? "/dashboard" : "/")}>
             <ArrowLeft size={24} />
           </button>
           <BrandLogo className={styles["scan-brand"]} />
@@ -652,6 +653,12 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
           <header className={styles["profile-heading"]}>
             <p className={styles["profile-kicker"]}>{[instrument.brand, instrument.year, instrument.instrumentType].filter(Boolean).join(" · ")}</p>
             <h1>{instrumentDisplayName(instrument)}</h1>
+            <p className={styles["profile-condition"]}>
+              <span>{ui("ui.app.i.code.ProfileClient.conditionLabel", "Condition")}</span>
+              <strong>{getInstrumentCondition(instrument) === "new"
+                ? ui("ui.app.i.code.ProfileClient.conditionNew", "New")
+                : ui("ui.app.i.code.ProfileClient.conditionUsed", "Used")}</strong>
+            </p>
             <ProfileStatusBadges
               record={{
                 ...instrument,

@@ -16,7 +16,7 @@ import { Footer } from "../../components/Footer";
 import { Nav } from "../../components/Nav";
 import { clearQrGuitarSessionState, createBrowserSupabaseClient } from "../../lib/supabase-browser";
 import { cleanCollectionHandle, type PublicCollectionSettings } from "../../lib/public-collections";
-import { accountReturnPath, createAccountSettings, initialAccountSettings, savedCollectionHref } from "../../lib/account-settings";
+import { accountReturnPath, createAccountSettings, initialAccountSettings, savedCollectionHref, type AccountDraft, type AccountSnapshot } from "../../lib/account-settings";
 import { PUBLIC_SITE_ORIGIN } from "../../lib/profile-url";
 import { getContentValue } from "../../lib/content-registry";
 import { useSiteContent } from "../../lib/use-site-content";
@@ -26,10 +26,27 @@ import { accountDeletionAuth } from "../../lib/account-deletion/account-deletion
 
 type AccountSection = "overview" | "profile" | "collection" | "security" | "notifications" | "provider" | "privacy";
 
+function changedAccountSections(draft: AccountDraft, saved: AccountSnapshot | null): Array<"profile" | "collection"> {
+  if (!saved) return [];
+  const sections: Array<"profile" | "collection"> = [];
+  if (draft.displayName !== saved.displayName || draft.publicCollection.accountType !== saved.publicCollection.accountType) sections.push("profile");
+  const collectionFields: Array<keyof PublicCollectionSettings> = ["enabled", "handle", "publicName", "bio", "location", "websiteUrl", "avatarUrl", "allowIndexing", "allowMessages"];
+  if (collectionFields.some((key) => draft.publicCollection[key] !== saved.publicCollection[key])) sections.push("collection");
+  return sections;
+}
+
+function accountValidationTarget(message: string): { section: "profile" | "collection"; id: string } | null {
+  if (/^Display name must be/.test(message)) return { section: "profile", id: "displayName" };
+  if (/^Use a complete website address/.test(message)) return { section: "collection", id: "collectionWebsite" };
+  if (/^(Choose a collection handle|That public collection handle)/.test(message)) return { section: "collection", id: "collectionHandle" };
+  if (/^Invalid public collection settings/.test(message)) return { section: "collection", id: "public-collection" };
+  return null;
+}
+
 const accountSections: Array<{ id: AccountSection; label: string }> = [
   { id: "overview", label: "Overview" },
   { id: "collection", label: "Public Collection" },
-  { id: "profile", label: "Profile & Identity" },
+  { id: "profile", label: "Account details" },
   { id: "security", label: "Security" },
   { id: "notifications", label: "Notifications" },
   { id: "provider", label: "Provider / Business" },
@@ -48,6 +65,7 @@ function AccountSettingsPage() {
   const controller = useRef<ReturnType<typeof createAccountSettings> | null>(null);
   const [state, setState] = useState(initialAccountSettings);
   const [activeSection, setActiveSection] = useState<AccountSection>("overview");
+  const [validationFocus, setValidationFocus] = useState<{ section: "profile" | "collection"; id: string; actorId: string } | null>(null);
   const { displayName, publicCollection } = state.draft;
   const email = state.account?.email || "";
   const role = state.account?.role || "";
@@ -58,6 +76,10 @@ function AccountSettingsPage() {
   const isWorking = Boolean(state.busy);
   const publishedHref = savedCollectionHref(state.account);
   const returnPath = accountReturnPath(activeSection);
+  const dirtySections = changedAccountSections(state.draft, state.account);
+  const dirtySectionNames = dirtySections.map((section) => section === "profile"
+    ? ui("ui.app.account.page.999fcfbc4384", "Account details")
+    : ui("ui.app.account.page.81d7c837c3e8", "Collection page")).join(", ");
   const setDisplayName = (value: string) => controller.current?.setDraft({ displayName: value });
   const setPublicCollection = (update: (current: PublicCollectionSettings) => PublicCollectionSettings) => {
     if (controller.current) controller.current.setDraft({ publicCollection: update(controller.current.getState().draft.publicCollection) });
@@ -90,8 +112,25 @@ function AccountSettingsPage() {
     router.push(`/account${query.size ? `?${query}` : ""}`, { scroll: false });
   }
 
+  useEffect(() => {
+    if (!validationFocus) return;
+    if (validationFocus.actorId !== state.actorId || state.phase !== "ready") { setValidationFocus(null); return; }
+    if (activeSection !== validationFocus.section) return;
+    const target = document.getElementById(validationFocus.id);
+    if (target) { target.focus(); setValidationFocus(null); }
+  }, [validationFocus, activeSection, state.actorId, state.phase]);
+
   async function saveAccount() {
-    await controller.current?.save();
+    const current = controller.current;
+    const actorId = current?.getState().actorId;
+    await current?.save();
+    const result = current?.getState();
+    if (controller.current !== current || !result || result.actorId !== actorId || result.phase !== "ready" || result.uncertainSave) return;
+    const target = accountValidationTarget(result.message);
+    if (target) {
+      setValidationFocus({ ...target, actorId: result.actorId });
+      navigateSection(target.section);
+    }
   }
   async function sendPasswordReset() {
     await controller.current?.resetPassword(`${window.location.origin}/reset-password?next=${encodeURIComponent(returnPath)}`);
@@ -139,7 +178,7 @@ function AccountSettingsPage() {
           </header>
 
           <div className={styles.settings}>
-            <label className={styles.mobileSectionNav}><span>{ui("ui.app.account.page.settingsSection", "Settings section")}</span><select value={activeSection} onChange={(event) => navigateSection(event.target.value as AccountSection)}>{accountSections.map((section) => <option key={section.id} value={section.id}>{(section.label === "Overview" ? ui("ui.app.account.page.d4b1ea5708dd", "Overview") : section.label === "Public Collection" ? ui("ui.app.account.page.81d7c837c3e8", "Collection page") : section.label === "Profile & Identity" ? ui("ui.app.account.page.999fcfbc4384", "Profile & Identity") : section.label === "Security" ? ui("ui.app.account.page.8f6fb4eb7f42", "Security") : section.label === "Notifications" ? ui("ui.app.account.page.788011833a5a", "Notifications") : section.label === "Provider / Business" ? ui("ui.app.account.page.963dc63cbd9f", "Provider / Business") : section.label === "Privacy & Data" ? ui("ui.app.account.page.ade3e28bc653", "Privacy & Data") : section.label)}</option>)}</select></label>
+            <label className={styles.mobileSectionNav}><span>{ui("ui.app.account.page.settingsSection", "Settings section")}</span><select aria-label={ui("ui.app.account.page.settingsSection", "Settings section")} value={activeSection} onChange={(event) => navigateSection(event.target.value as AccountSection)}>{accountSections.map((section) => <option key={section.id} value={section.id}>{(section.label === "Overview" ? ui("ui.app.account.page.d4b1ea5708dd", "Overview") : section.label === "Public Collection" ? ui("ui.app.account.page.81d7c837c3e8", "Collection page") : section.label === "Account details" ? ui("ui.app.account.page.999fcfbc4384", "Account details") : section.label === "Security" ? ui("ui.app.account.page.8f6fb4eb7f42", "Security") : section.label === "Notifications" ? ui("ui.app.account.page.788011833a5a", "Notifications") : section.label === "Provider / Business" ? ui("ui.app.account.page.963dc63cbd9f", "Provider / Business") : section.label === "Privacy & Data" ? ui("ui.app.account.page.ade3e28bc653", "Privacy & Data") : section.label)}</option>)}</select></label>
             <nav className={styles.sectionNav} aria-label={ui("ui.app.account.page.baa77cb99154", "Account sections")}>
               {accountSections.map((section) => (
                 <button
@@ -149,13 +188,18 @@ function AccountSettingsPage() {
                   onClick={() => navigateSection(section.id)}
                   type="button"
                 >
-                  {(section.label === "Overview" ? ui("ui.app.account.page.d4b1ea5708dd", "Overview") : section.label === "Public Collection" ? ui("ui.app.account.page.81d7c837c3e8", "Collection page") : section.label === "Profile & Identity" ? ui("ui.app.account.page.999fcfbc4384", "Profile & Identity") : section.label === "Security" ? ui("ui.app.account.page.8f6fb4eb7f42", "Security") : section.label === "Notifications" ? ui("ui.app.account.page.788011833a5a", "Notifications") : section.label === "Provider / Business" ? ui("ui.app.account.page.963dc63cbd9f", "Provider / Business") : section.label === "Privacy & Data" ? ui("ui.app.account.page.ade3e28bc653", "Privacy & Data") : section.label)}
+                  {(section.label === "Overview" ? ui("ui.app.account.page.d4b1ea5708dd", "Overview") : section.label === "Public Collection" ? ui("ui.app.account.page.81d7c837c3e8", "Collection page") : section.label === "Account details" ? ui("ui.app.account.page.999fcfbc4384", "Account details") : section.label === "Security" ? ui("ui.app.account.page.8f6fb4eb7f42", "Security") : section.label === "Notifications" ? ui("ui.app.account.page.788011833a5a", "Notifications") : section.label === "Provider / Business" ? ui("ui.app.account.page.963dc63cbd9f", "Provider / Business") : section.label === "Privacy & Data" ? ui("ui.app.account.page.ade3e28bc653", "Privacy & Data") : section.label)}
                 </button>
               ))}
             </nav>
 
             <div className={styles.content}>
             {activeSection === "overview" ? <PwaInstall /> : null}
+
+            {(activeSection === "profile" || activeSection === "collection" || dirtySections.length > 0) ? <div className={styles.saveFeedback}>
+            {(activeSection === "profile" || activeSection === "collection" || dirtySections.length > 0) ? <p className="field-note" id="account-save-scope">{ui("ui.app.account.page.sharedSaveScope", "Saving updates Account details and your collection settings together, including collection visibility. Password and sign-out actions are separate.")}</p> : null}
+            {dirtySections.length > 0 ? <p className="field-note" role="status" aria-live="polite">{ui("ui.app.account.page.unsavedSections", "Unsaved changes: {{value1}}. Nothing is applied until you save.", { value1: dirtySectionNames })}</p> : null}
+            </div> : null}
 
             <fieldset disabled={isWorking || (state.uncertainSave && (activeSection === "profile" || activeSection === "collection"))} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
             {activeSection === "overview" ? (
@@ -203,13 +247,13 @@ function AccountSettingsPage() {
               </div>
 
               <div className="form-actions">
-                <button className="button" type="button" onClick={saveAccount} disabled={isWorking}>
+                <button className="button" type="button" onClick={saveAccount} disabled={isWorking} aria-describedby="account-save-scope">
                   {isWorking ? ui("ui.app.account.page.dc85af8f2b1d", "Saving...") : getContentValue(content, "account.actions.save")}
                 </button>
               </div>
             </section> : null}
 
-            {activeSection === "collection" ? <section className={styles.panel} id="public-collection">
+            {activeSection === "collection" ? <section className={styles.panel} id="public-collection" tabIndex={-1}>
               <div className={styles.panelHeading}>
                 <strong><UsersRound size={18} aria-hidden="true" />{" "}{ui("ui.app.account.page.bfc93ccce3d7", "Your collection page")}</strong>
               </div>
@@ -221,10 +265,10 @@ function AccountSettingsPage() {
               </div>
               <div className="form-grid compact">
                 <label className="field"><span>{ui("ui.app.account.page.8bb1664e67fa", "Page name")}</span><input value={publicCollection.publicName} onChange={(event) => setPublicCollection((current) => ({ ...current, publicName: event.target.value }))} placeholder={displayName} /></label>
-                <label className="field"><span>{ui("ui.app.account.page.178b790b1cb2", "Custom link")}</span><input aria-describedby="collection-url-preview" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={publicCollection.handle} onChange={(event) => setPublicCollection((current) => ({ ...current, handle: event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") }))} placeholder={ui("ui.app.account.page.6f61c615337a", "my-collection")} /><small className={styles.urlPreview} id="collection-url-preview">{PUBLIC_SITE_ORIGIN}/collections/{cleanCollectionHandle(publicCollection.handle) || "your-link-name"}</small></label>
+                <label className="field"><span>{ui("ui.app.account.page.178b790b1cb2", "Custom link")}</span><input id="collectionHandle" aria-describedby="collection-url-preview" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={publicCollection.handle} onChange={(event) => setPublicCollection((current) => ({ ...current, handle: event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") }))} placeholder={ui("ui.app.account.page.6f61c615337a", "my-collection")} /><small className={styles.urlPreview} id="collection-url-preview">{PUBLIC_SITE_ORIGIN}/collections/{cleanCollectionHandle(publicCollection.handle) || "your-link-name"}</small></label>
                 <label className="field"><span>{ui("ui.app.account.page.9dc1bb315851", "Location (optional)")}</span><input value={publicCollection.location} onChange={(event) => setPublicCollection((current) => ({ ...current, location: event.target.value }))} placeholder={ui("ui.app.account.page.fef8ce3a04b7", "City, region, country")} /></label>
                 <label className="field custom-wide"><span>{ui("ui.app.account.page.81aa4ccb029d", "About you or your collection")}</span><textarea rows={3} value={publicCollection.bio} onChange={(event) => setPublicCollection((current) => ({ ...current, bio: event.target.value }))} placeholder={ui("ui.app.account.page.42e359637e9e", "What you collect, build, repair, or sell.")} /></label>
-                <label className="field"><span>{ui("ui.app.account.page.5fec9267ba07", "Your website (optional)")}</span><input type="url" aria-describedby="collection-website-help" value={publicCollection.websiteUrl} onChange={(event) => setPublicCollection((current) => ({ ...current, websiteUrl: event.target.value }))} placeholder="https://your-website.com" maxLength={500} /><small id="collection-website-help" className="field-note">{ui("ui.app.account.page.2a5191a8ca1b", "Use the full HTTPS address. When your public collection is enabled, visitors can open this website from the collection and its instrument Profiles. Purchases and bookings take place on your website.")}</small></label>
+                <label className="field"><span>{ui("ui.app.account.page.5fec9267ba07", "Your website (optional)")}</span><input id="collectionWebsite" type="url" aria-describedby="collection-website-help" value={publicCollection.websiteUrl} onChange={(event) => setPublicCollection((current) => ({ ...current, websiteUrl: event.target.value }))} placeholder="https://your-website.com" maxLength={500} /><small id="collection-website-help" className="field-note">{ui("ui.app.account.page.2a5191a8ca1b", "Use the full HTTPS address. When your public collection is enabled, visitors can open this website from the collection and its instrument Profiles. Purchases and bookings take place on your website.")}</small></label>
                 <label className="field"><span>{ui("ui.app.account.page.ea3c6074a51b", "Profile photo link (optional)")}</span><input type="url" value={publicCollection.avatarUrl} onChange={(event) => setPublicCollection((current) => ({ ...current, avatarUrl: event.target.value }))} placeholder="https://" /></label>
               </div>
               <div className={styles.preferenceGroup}>
@@ -237,7 +281,7 @@ function AccountSettingsPage() {
               <p className="field-note">{ui("ui.app.account.page.a9fc610e616e", "Your email stays private. Conversations stay inside QRguitar and can include up to four photos or short videos per message.")}</p>
               </div>
               <div className="form-actions">
-                <button className="button" type="button" onClick={saveAccount} disabled={isWorking}>{isWorking ? ui("ui.app.account.page.dc85af8f2b1d", "Saving...") : ui("ui.app.account.page.a7f1e189ad7b", "Save collection settings")}</button>
+                <button className="button" type="button" onClick={saveAccount} disabled={isWorking} aria-describedby="account-save-scope">{isWorking ? ui("ui.app.account.page.dc85af8f2b1d", "Saving...") : ui("ui.app.account.page.a7f1e189ad7b", "Save account changes")}</button>
                 {publishedHref ? <Link className="button secondary" href={publishedHref} target="_blank" rel="noopener noreferrer">{ui("ui.app.account.page.693b86cbac84", "View collection page")}{" "}<ExternalLink size={15} /></Link> : null}
                 <Link className="button secondary" href="/collections">{ui("ui.app.account.page.1fbba5113528", "Browse member collections")}</Link>
               </div>

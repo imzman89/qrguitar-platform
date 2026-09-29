@@ -102,6 +102,6 @@ for (const marker of ["loadPublishedSiteSettings", "renderRegisteredTemplateValu
 }
 
 if (registry.includes("unresolved: 0")) throw new Error("Coverage must not claim an unmeasured zero-unresolved count.");
-if (!registry.includes("...uiTextEntries.map") || !runtimeFiles.includes('createUiText(')) throw new Error("Additional interface text is not connected to the existing registry/runtime.");
+if (!registry.includes("...[...uiTextEntries, ...retiredUiTextEntries].map") || !runtimeFiles.includes('createUiText(')) throw new Error("Additional interface text is not connected to the existing registry/runtime.");
 
 console.log(`Content coverage assertions passed (${keys.length} established keys plus connected interface registry; detailed bindings checked by test:ui-copy).`);

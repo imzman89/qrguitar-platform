@@ -1,4 +1,4 @@
-import { uiTextEntries } from "./ui-text-registry";
+import { uiTextEntries, retiredUiTextEntries } from "./ui-text-registry";
 import { protectedUiTextKeys } from "./ui-text-protection";
 
 export type ContentFieldType = "text" | "textarea" | "email" | "url" | "select";
@@ -564,14 +564,14 @@ export function contentPreviewPathForUiText(source: string, page: string): strin
   return uiTextSourcePreviewPaths[normalized] || uiTextPagePreviewPaths[page];
 }
 export const contentRegistry: ContentRegistryEntry[] = Array.from(
-  new Map([...coreContentRegistry, ...completionRegistry, ...emailRegistry, ...seoRegistry, ...uiTextEntries.map((entry) => field(
-    entry.key, entry.area as ContentArea, entry.page, entry.section,
+  new Map([...coreContentRegistry, ...completionRegistry, ...emailRegistry, ...seoRegistry, ...[...uiTextEntries, ...retiredUiTextEntries].map((entry) => field(
+    entry.key, entry.area as ContentArea, entry.page, retiredUiTextEntries.includes(entry) ? "Legacy editor controls (not displayed)" : entry.section,
     entry.text.length > 85 ? `${entry.text.slice(0, 82)}…` : entry.text,
     entry.text,
     { maxLength: Math.max(240, entry.text.length * 3), allowedVariables: Array.from(entry.text.matchAll(/\{\{([a-zA-Z0-9_]+)\}\}/g), (match) => match[1]),
       previewPath: contentPreviewPathForUiText(entry.source, entry.page),
-      classification: protectedUiTextKeys.has(entry.key) ? "security-locked" : "editable-standard",
-      help: "Site interface wording. Values in {{braces}} come from the application; keep those placeholders. This does not edit anyone’s saved Profile or account data." }
+      classification: protectedUiTextKeys.has(entry.key) ? "security-locked" : retiredUiTextEntries.includes(entry) ? "editable-advanced" : "editable-standard",
+      help: retiredUiTextEntries.includes(entry) ? "Compatibility value for a removed editor control. Retained to preserve saved content; changing it does not change the current interface." : "Site interface wording. Values in {{braces}} come from the application; keep those placeholders. This does not edit anyone’s saved Profile or account data." }
   ))].map((entry) => [entry.key, entry])).values()
 );
 

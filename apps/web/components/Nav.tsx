@@ -13,6 +13,14 @@ import { defaultSiteSettings, fetchPublishedSiteSettings } from "../lib/site-set
 import { getContentValue } from "../lib/content-registry";
 import styles from "./Nav.module.css";
 
+function signInReturnPath(pathname: string, search: string, hash: string) {
+  if (/^\/(login|reset-password)\/?$/.test(pathname)) {
+    // Only the validated destination survives; recovery codes and tokens do not.
+    return safeAuthRedirect(new URLSearchParams(search).get("next"));
+  }
+  return safeAuthRedirect(`${pathname}${search}${hash}`);
+}
+
 export function Nav() {
   const ui = useUiText("components.Nav");
   const pathname = usePathname();
@@ -76,7 +84,7 @@ export function Nav() {
     { href: "/how-it-works", label: getContentValue(content, "global.navigation.howItWorks") },
     { href: "/create", label: getContentValue(content, "global.navigation.create"), primary: true }
   ];
-  const signInHref = `/login?next=${encodeURIComponent(safeAuthRedirect(`${pathname}${typeof window === "undefined" ? "" : window.location.search + window.location.hash}`))}`;
+  const signInHref = `/login?next=${encodeURIComponent(signInReturnPath(pathname, typeof window === "undefined" ? "" : window.location.search, typeof window === "undefined" ? "" : window.location.hash))}`;
 
   return (
     <header className={`brand-frame ${styles.header}`} ref={headerRef} onBlur={(event) => {

@@ -61,6 +61,17 @@ test("one Profile title and its category/year precede the gallery in the accessi
   assert.match(html, /photo 1 of 2/);
 });
 
+test("recorded New/Used condition is visible with the title before the gallery, independently of availability and trust", () => {
+  for (const [instrumentCondition, label] of [["new", "New"], ["used", "Used"]]) {
+    const html = render({ instrumentCondition, saleStatus: "not_for_sale" });
+    assert.match(html, new RegExp('<p class="profile-condition"><span>Condition</span><strong>' + label + '</strong></p>'));
+    assert.ok(html.indexOf('class="profile-condition"') > html.indexOf("</h1>"));
+    assert.ok(html.indexOf('class="profile-condition"') < html.indexOf('class="scan-hero-gallery"'));
+    assert.match(html, /Verified by QRguitar/);
+    assert.match(html, /Authenticity Confirmed/);
+  }
+});
+
 test("public identity uses the privacy projection and public-only document count", () => {
   const html = render();
   assert.doesNotMatch(html, /PRIVATE-SERIAL-123|Private receipt|private\.pdf/);

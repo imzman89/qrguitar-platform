@@ -20,7 +20,7 @@ function load(relative) {
 const { createUiText } = load("lib/ui-text.ts");
 const { UiTextProvider, useUiText } = load("components/UiTextProvider.tsx");
 const registry = load("lib/content-registry.ts");
-const { uiTextEntries } = load("lib/ui-text-registry.ts");
+const { uiTextEntries, retiredUiTextEntries } = load("lib/ui-text-registry.ts");
 
 test("every connected interface call has a unique registered key, matching default and required placeholders", () => {
   const seen = new Set(), entries = new Map(uiTextEntries.map(entry => [entry.key, entry]));
@@ -141,3 +141,14 @@ test("UI copy preview routes are real safe representatives, not fabricated recor
     assert.ok(!/\[[^\]]+\]/.test(previewPath), `Fabricated route parameter for ${entry.key}: ${previewPath}`);
   }
 });
+
+ test("removed editor controls retain compatible saved values without active UI bindings", () => {
+ assert.equal(retiredUiTextEntries.length,8);
+ for(const entry of retiredUiTextEntries){
+ assert.equal(uiTextEntries.some(active=>active.key===entry.key),false);
+ const field=registry.contentRegistryByKey.get(entry.key); assert.ok(field);
+ assert.equal(field.defaultValue,entry.text); assert.equal(field.classification,"editable-advanced");
+ assert.match(field.help,/removed editor control/);
+ assert.equal(registry.validateContentValues({...registry.defaultContentValues,[entry.key]:"Previously saved label"})[entry.key],undefined);
+ }
+ });

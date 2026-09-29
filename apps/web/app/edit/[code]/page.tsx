@@ -18,7 +18,6 @@ import { createSubmissionFingerprint, isRepeatedBrowserSubmission, validateInstr
 import {
   defaultQrStyle,
   getInstrumentCondition,
-  instrumentToProfileUrl,
   type DemoInstrument,
   type ExternalMediaItem,
   type QrStyle,
@@ -112,16 +111,49 @@ function makeClientKey() {
   return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function editorValidationTarget(input: typeof emptyForm, message: string) {
+  if (message === "Make and model are required.") return input.brand.trim() ? "model" : "brand";
+  if (message === "Enter a Serial Number, or mark that this instrument does not use one." || message === "Serial number can only use letters, numbers, dots, slashes, dashes, and underscores.") return "serial";
+  if (message === "One or more fields is too long. Shorten the text and try again.") return input.brand.trim().length > 80 ? "brand" : input.model.trim().length > 80 ? "model" : "summary";
+  if (message === "Make and model can only use normal letters, numbers, spaces, and basic punctuation.") return /^[a-zA-Z0-9 .,'&+/_-]+$/.test(input.brand) ? "model" : "brand";
+  if (message === "Enter a four-digit year, or leave year blank if it is unknown.") return "year";
+  return "identity";
+}
 function isKnownEditorSection(section: string) {
   return ["identity", "photos", "details", "timeline", "service", "media", "documents", "trust-verification", "privacy-safety", "qr-print"].includes(section);
 }
 
+function requestedEditorSection() {
+  const hashSection = window.location.hash.slice(1);
+  if (isKnownEditorSection(hashSection)) return hashSection;
+  const querySection = new URLSearchParams(window.location.search).get("section") || "";
+  return isKnownEditorSection(querySection) ? querySection : "";
+}
+
 function scrollToEditorSection(section: string) {
   if (!isKnownEditorSection(section)) return false;
-  const target = document.getElementById(section);
+  return revealEditorTarget(section);
+}
+
+function revealEditorTarget(id: string) {
+  const target = document.getElementById(id);
   if (!target) return false;
+  const disclosures: HTMLDetailsElement[] = [];
+  for (let ancestor: HTMLElement | null = target; ancestor; ancestor = ancestor.parentElement) {
+    if (ancestor instanceof HTMLDetailsElement) disclosures.unshift(ancestor);
+  }
+  for (const disclosure of disclosures) disclosure.open = true;
   const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
   target.scrollIntoView({ behavior, block: "start" });
+  const focusTarget = target instanceof HTMLDetailsElement
+    ? target.querySelector<HTMLElement>(":scope > summary")
+    : target.matches("input, select, textarea, button, a[href]")
+      ? target
+      : target.querySelector<HTMLElement>("input:not([type=hidden]):not([tabindex='-1']), select, textarea, button, a[href]") || target;
+  if (focusTarget) {
+    if (!focusTarget.matches("summary, input, select, textarea, button, a[href]")) focusTarget.tabIndex = -1;
+    focusTarget.focus({ preventScroll: true });
+  }
   return true;
 }
 
@@ -194,12 +226,13 @@ export default function EditInstrumentPage() {
   const [externalMedia, setExternalMedia] = useState<ExternalMediaItem[]>([]);
   const [mediaForm, setMediaForm] = useState(emptyMediaForm);
   const [savingMedia, setSavingMedia] = useState(false);
-  const [activeEditorSection, setActiveEditorSection] = useState("identity");
 
   useEffect(() => {
     const syncSectionFromHash = () => {
-      const section = window.location.hash.slice(1);
-      if (isKnownEditorSection(section)) setActiveEditorSection(section);
+      const section = requestedEditorSection();
+      if (isKnownEditorSection(section)) {
+        scrollToEditorSection(section);
+      }
     };
 
     syncSectionFromHash();
@@ -209,9 +242,8 @@ export default function EditInstrumentPage() {
 
   useEffect(() => {
     if (!ready) return;
-    const section = window.location.hash.slice(1);
+    const section = requestedEditorSection();
     if (!isKnownEditorSection(section)) return;
-    setActiveEditorSection(section);
     scrollToEditorSection(section);
   }, [ready]);
 
@@ -493,6 +525,7 @@ export default function EditInstrumentPage() {
       whoPerformed: entry.whoPerformed || "unknown",
       isPublic: entry.isPublic === true
     });
+    replaceEditorSectionHash("service");
   }
 
   function resetServiceForm() {
@@ -742,6 +775,7 @@ export default function EditInstrumentPage() {
       }
     });
     if (failedPhotos.length || failedDocuments.length) {
+      scrollToEditorSection(failedPhotos.length ? "photos" : "documents");
       throw new Error("Some files could not be uploaded. Retry the files marked in red; successful uploads are preserved.");
     }
     return { photoPaths, documentPaths };
@@ -813,6 +847,7 @@ export default function EditInstrumentPage() {
     const validationMessage = validateInstrumentSubmission(form, honeypot);
     if (validationMessage) {
       setMessage(validationMessage);
+      revealEditorTarget(editorValidationTarget(form, validationMessage));
       return;
     }
 
@@ -837,6 +872,7 @@ export default function EditInstrumentPage() {
     try {
       if (!form.heroImageDataUrl && !galleryImages.length) {
         setMessage(ui("ui.app.edit.code.page.cd1a49c2c343", "Every QRguitar Profile needs at least one photo."));
+        scrollToEditorSection("photos");
         return;
       }
 
@@ -905,12 +941,14 @@ export default function EditInstrumentPage() {
       const trustResult = await saveVerificationSettings(token || "", savedQrCode);
       if (!trustResult.ok) {
         setMessage(ui("ui.app.edit.code.page.b60a79b1ba9d", "Trust settings failed: {{value1}}", {value1: trustResult.message}));
+        scrollToEditorSection("trust-verification");
         return;
       }
 
       const safetyResult = await saveSafetySettings(token || "", savedQrCode);
       if (!safetyResult.ok) {
         setMessage(ui("ui.app.edit.code.page.dd99fa7bf17d", "Safety status failed: {{value1}}", {value1: safetyResult.message}));
+        scrollToEditorSection("privacy-safety");
         return;
       }
 
@@ -953,7 +991,7 @@ export default function EditInstrumentPage() {
       router.refresh();
 
       if (preview) {
-        router.push(savedInstrument.visibility === "public" ? instrumentToProfileUrl(savedInstrument) : "/dashboard");
+        router.push(ownerProfileHref(savedInstrument));
         return;
       }
 
@@ -1093,13 +1131,28 @@ export default function EditInstrumentPage() {
       <main className={`${styles.page} section create-page`} aria-label={ui("ui.app.edit.code.page.fec2ac0f4cf1", "Edit Profile")}>
         <div className={`${styles.layout} shell create-layout`}>
           <div>
+            <Link className={styles.backLink} href="/dashboard">{ui("ui.app.edit.code.page.97ba1d394fab", "Back to Dashboard")}</Link>
             <h1>{getContentValue(content, "edit.hero.headline")}</h1>
             <p>{getContentValue(content, "edit.hero.body")}</p>
+            <div className={styles.saveBar}>
+              {message ? <p className="form-message" role="status" aria-live="polite">{message}</p> : null}
+              <div className="form-actions editor-save-bar">
+                <button className="button" type="button" onClick={() => void saveChanges(false)} disabled={savingRecord || savingSafety} aria-busy={recordSaveAction === "save"}>
+                  {recordSaveAction === "save" ? ui("ui.app.edit.code.page.86c6e0d74cc9", "Saving changes...") : getContentValue(content, "edit.actions.save")}
+                </button>
+                <button className="button secondary" type="button" onClick={() => void saveChanges(true)} disabled={savingRecord || savingSafety} aria-busy={recordSaveAction === "view"}>
+                  {recordSaveAction === "view"
+                    ? ui("ui.app.edit.code.page.caae18bd705d", "Saving and opening...")
+                    : getContentValue(content, "edit.actions.saveView")}
+                </button>
+
+              </div>
+            </div>
             {original.safetyStatus === "lost" || original.safetyStatus === "stolen" ? (
               <div className={styles.safetyNotice}>
                 <strong>{safetyStatusLabel(original.safetyStatus)}</strong>
                 <span>{ui("ui.app.edit.code.page.44a43c5ad757", "This Profile has an active safety alert.")}</span>
-                <a href="#privacy-safety">{ui("ui.app.edit.code.page.48d5a8281410", "Review safety status")}</a>
+                <a href="#privacy-safety" onClick={(event) => { event.preventDefault(); replaceEditorSectionHash("privacy-safety"); }}>{ui("ui.app.edit.code.page.48d5a8281410", "Review safety status")}</a>
               </div>
             ) : null}
               <details className={`${styles.identityHelp} permanent-id`}>
@@ -1135,42 +1188,6 @@ export default function EditInstrumentPage() {
                   </select>
                 </label>
               </div>
-              <nav className="editor-section-nav" aria-label={ui("ui.app.edit.code.page.bf60214d782d", "Edit Profile sections")}>
-                <a aria-current={activeEditorSection === "identity" ? "location" : undefined} href="#identity">{ui("ui.app.edit.code.page.999f23fcd7be", "Identity")}</a>
-                <a aria-current={activeEditorSection === "photos" ? "location" : undefined} href="#photos">{ui("ui.app.edit.code.page.5e3147ab51e0", "Photos")}</a>
-                <a aria-current={activeEditorSection === "details" ? "location" : undefined} href="#details">{ui("ui.app.edit.code.page.45989de49fb7", "Details")}</a>
-                <a aria-current={activeEditorSection === "timeline" ? "location" : undefined} href="#timeline">{ui("ui.app.edit.code.page.23099ed0a502", "Timeline & Ownership")}</a>
-                <a aria-current={activeEditorSection === "service" ? "location" : undefined} href="#service">{ui("ui.app.edit.code.page.d677190e0a99", "Service")}</a>
-                <a aria-current={activeEditorSection === "media" ? "location" : undefined} href="#media">{ui("ui.app.edit.code.page.d357175cfe89", "Media")}</a>
-                <a aria-current={activeEditorSection === "documents" ? "location" : undefined} href="#documents">{ui("ui.app.edit.code.page.b4e929d8bcfe", "Documents")}</a>
-                <a aria-current={activeEditorSection === "trust-verification" ? "location" : undefined} href="#trust-verification">{ui("ui.app.edit.code.page.ade9248e0132", "Trust")}</a>
-                <a aria-current={activeEditorSection === "privacy-safety" ? "location" : undefined} href="#privacy-safety">{ui("ui.app.edit.code.page.f096950eacff", "Privacy & Safety")}</a>
-                <a aria-current={activeEditorSection === "qr-print" ? "location" : undefined} href="#qr-print">{ui("ui.app.edit.code.page.347d28dfa602", "QR & Print")}</a>
-              </nav>
-              <label className="editor-section-select">
-                <span>{ui("ui.app.edit.code.page.b9920fd79715", "Current section")}</span>
-                <select
-                  aria-label={ui("ui.app.edit.code.page.c5a754da6b5d", "Edit Profile section")}
-                  value={activeEditorSection}
-                  onChange={(event) => {
-                    const section = event.target.value;
-                    if (!isKnownEditorSection(section)) return;
-                    setActiveEditorSection(section);
-                    replaceEditorSectionHash(section);
-                  }}
-                >
-                  <option value="identity">{ui("ui.app.edit.code.page.999f23fcd7be", "Identity")}</option>
-                  <option value="photos">{ui("ui.app.edit.code.page.5e3147ab51e0", "Photos")}</option>
-                  <option value="details">{ui("ui.app.edit.code.page.45989de49fb7", "Details")}</option>
-                  <option value="timeline">{ui("ui.app.edit.code.page.23099ed0a502", "Timeline & Ownership")}</option>
-                  <option value="service">{ui("ui.app.edit.code.page.d677190e0a99", "Service")}</option>
-                  <option value="media">{ui("ui.app.edit.code.page.d357175cfe89", "Media")}</option>
-                  <option value="documents">{ui("ui.app.edit.code.page.b4e929d8bcfe", "Documents")}</option>
-                  <option value="trust-verification">{ui("ui.app.edit.code.page.ade9248e0132", "Trust")}</option>
-                  <option value="privacy-safety">{ui("ui.app.edit.code.page.f096950eacff", "Privacy & Safety")}</option>
-                  <option value="qr-print">{ui("ui.app.edit.code.page.347d28dfa602", "QR & Print")}</option>
-                </select>
-              </label>
             <form className="card form" id="identity">
               <input
                 aria-hidden="true"
@@ -1185,7 +1202,7 @@ export default function EditInstrumentPage() {
                 <span className="eyebrow">{ui("ui.app.edit.code.page.7708c49ad0e2", "Core identity")}</span>
                 <p>{ui("ui.app.edit.code.page.ff958113cf77", "Make/model/serial are the main identity. Add anything else only when it helps the profile.")}</p>
               </div>
-              <div className="form-grid" id="details">
+              <div className="form-grid">
                 <Field
                   label={ui("ui.app.edit.code.page.df417ce45d01", "Make / brand")}
                   id="brand"
@@ -1264,8 +1281,39 @@ export default function EditInstrumentPage() {
               </div>
               <p className="fine-print">{ui("ui.app.edit.code.page.a8782c988bf8", "This hides only the Serial Number field. The permanent QR ID and URL may still include the serial. Choose a private Profile to restrict access. No-serial records require QRguitar approval before verification or authenticity confirmation.")}</p>
               <p className="fine-print">{ui("ui.app.edit.code.page.50cccc48b0dc", "Originality is an owner-stated modification status for search and disclosure. It is not QRguitar authentication or verification.")}</p>
-              <details className="advanced-panel">
-                <summary>{ui("ui.app.edit.code.page.7c2e45c2972e", "Add Profile Basics")}</summary>
+              <section className={styles.photoSection} id="photos">
+                <div className="field photo-field">
+                  <label id="profile-photos-label" htmlFor="profilePhotos">{ui("ui.app.edit.code.page.215ed206acf2", "Profile photos")}</label>
+                  <label className={styles.photoPicker} htmlFor="profilePhotos">
+                  <span id="profile-photos-help" className={styles.photoHelp}>{ui("ui.app.edit.code.page.d7aea5f0f7db", "Upload up to 20 photos, 12MB each. Pick one as the main image for dashboard cards, catalog listings, and the public profile hero.")}</span>
+                  <span className={styles.photoChoose}>{ui("ui.app.edit.code.page.choosePhotos", "Choose photos")}</span>
+                  <input
+                    className={styles.photoInput}
+                    aria-labelledby="profile-photos-label"
+                    aria-describedby="profile-photos-help"
+                    id="profilePhotos"
+                    name="profilePhotos"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    multiple
+                    onChange={(event) => void addProfilePhotos(event.target.files)}
+                  />
+                  </label>
+                </div>
+                <PhotoOrganizer
+                  images={galleryImages}
+                  mainImage={form.heroImageDataUrl}
+                  onSelectMain={selectMainPhoto}
+                  onRemove={removePhoto}
+                  onMove={movePhoto}
+                  statusByImage={photoUploads}
+                />
+              </section>
+              <div className={styles.tools}>
+              <details className={styles.optionalSection} id="details">
+                <summary>{ui("ui.app.edit.code.page.45989de49fb7", "Details")}</summary>
+              <section className="advanced-panel">
+                <h3>{ui("ui.app.edit.code.page.7c2e45c2972e", "Add Profile Basics")}</h3>
                 <div className="form-grid">
                   <Field label={ui("ui.app.edit.code.page.e69702d5925c", "Display title / nickname")} id="name" value={form.name} onChange={(value) => updateField("name", value)} />
                   <Field label={ui("ui.app.edit.code.page.cf846c3fbd33", "Builder (optional)")} id="builder" value={form.builder} onChange={(value) => updateField("builder", value)} />
@@ -1303,9 +1351,9 @@ export default function EditInstrumentPage() {
                     onChange={(event) => updateField("serviceNotes", event.target.value)}
                   />
                 </div>
-              </details>
-              <details className="advanced-panel" open>
-                <summary>{ui("ui.app.edit.code.page.814602d348e0", "Add Any Details")}</summary>
+              </section>
+              <section className="advanced-panel">
+                <h3>{ui("ui.app.edit.code.page.814602d348e0", "Add Any Details")}</h3>
                 <div className="custom-list">
                   {customFields.map((field) => (
                     <div className="custom-row" key={field.id}>
@@ -1334,9 +1382,9 @@ export default function EditInstrumentPage() {
                   ))}
                   <button className="button secondary" type="button" onClick={() => setCustomFields((current) => [...current, { id: `field-${Date.now()}`, label: "", value: "" }])}>{ui("ui.app.edit.code.page.d9e3cfc7246e", "Add Detail")}</button>
                 </div>
-              </details>
-              <details className="advanced-panel" open>
-                <summary>{ui("ui.app.edit.code.page.5482252391a3", "Add Website or Social Links")}</summary>
+              </section>
+              <section className="advanced-panel">
+                <h3>{ui("ui.app.edit.code.page.5482252391a3", "Add Website or Social Links")}</h3>
                 <div className="custom-list">
                   {customLinks.map((link) => (
                     <div className="custom-row" key={link.id}>
@@ -1365,30 +1413,11 @@ export default function EditInstrumentPage() {
                   ))}
                   <button className="button secondary" type="button" onClick={() => setCustomLinks((current) => [...current, { id: `link-${Date.now()}`, label: "", url: "" }])}>{ui("ui.app.edit.code.page.b8c42654c8ce", "Add Link")}</button>
                 </div>
-              </details>
-              <section className={styles.photoSection} id="photos">
-                <div className="field photo-field">
-                  <label htmlFor="profilePhotos">{ui("ui.app.edit.code.page.215ed206acf2", "Profile photos")}</label>
-                  <input
-                    id="profilePhotos"
-                    name="profilePhotos"
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    multiple
-                    onChange={(event) => void addProfilePhotos(event.target.files)}
-                  />
-                  <span>{ui("ui.app.edit.code.page.d7aea5f0f7db", "Upload up to 20 photos, 12MB each. Pick one as the main image for dashboard cards, catalog listings, and the public profile hero.")}</span>
-                </div>
-                <PhotoOrganizer
-                  images={galleryImages}
-                  mainImage={form.heroImageDataUrl}
-                  onSelectMain={selectMainPhoto}
-                  onRemove={removePhoto}
-                  onMove={movePhoto}
-                  statusByImage={photoUploads}
-                />
               </section>
-              <div className="field photo-field" id="documents">
+              </details>
+              <details className={styles.optionalSection} id="documents">
+                <summary>{ui("ui.app.edit.code.page.b4e929d8bcfe", "Documents")} <span className={styles.sectionCount}>{documents.length}/10</span></summary>
+              <div className="field photo-field">
                 <label htmlFor="profileDocuments">{ui("ui.app.edit.code.page.b4e929d8bcfe", "Documents")}</label>
                 <input
                   id="profileDocuments"
@@ -1522,11 +1551,15 @@ export default function EditInstrumentPage() {
                 </section>
               ) : null}
 
-              <section className="qr-customizer" id="media" aria-label={ui("ui.app.edit.code.page.3e3ac8296196", "External media")}>
+              </details>
+              <details className={styles.optionalSection} id="media">
+                <summary>{ui("ui.app.edit.code.page.d357175cfe89", "Media")} <span className={styles.sectionCount}>{externalMedia.length}</span></summary>
+              <section className="qr-customizer" aria-label={ui("ui.app.edit.code.page.3e3ac8296196", "External media")}>
                 <div>
                   <span className="eyebrow">{ui("ui.app.edit.code.page.dc600f6490d8", "Media links")}</span>
                   <h3>{ui("ui.app.edit.code.page.55444bb1a4b8", "Add Video or Audio")}</h3>
                   <p>{ui("ui.app.edit.code.page.b2620027b28f", "Add a YouTube, Vimeo, SoundCloud, Bandcamp, or other safe HTTPS media link. QRguitar never accepts custom embed code.")}</p>
+                  <p className="fine-print">{ui("ui.app.edit.code.page.mediaSaveHint", "Media changes save immediately using the controls in this section. Save Changes does not add an unfinished media entry.")}</p>
                 </div>
                 <div className="qr-controls">
                   <div className="field custom-wide">
@@ -1566,12 +1599,30 @@ export default function EditInstrumentPage() {
                   </div>
                 ) : null}
               </section>
-              <section className="qr-customizer" id="timeline" aria-label={ui("ui.app.edit.code.page.92777e2212a7", "Timeline and service history")}>
+              </details>
+              <details className={styles.optionalSection} id="timeline">
+                <summary>{ui("ui.app.edit.code.page.23099ed0a502", "Timeline & Ownership")} <span className={styles.sectionCount}>{serviceEvents.length}</span></summary>
+              <section className="qr-customizer" aria-label={ui("ui.app.edit.code.page.92777e2212a7", "Timeline and service history")}>
                 <div>
                   <span className="eyebrow">{ui("ui.app.edit.code.page.08e02c90e8fa", "Instrument history")}</span>
-                  <h3 id="service">{ui("ui.app.edit.code.page.480686c56fb4", "Timeline & Service History")}</h3>
+                  <h3>{ui("ui.app.edit.code.page.480686c56fb4", "Timeline & Service History")}</h3>
                   <p>{ui("ui.app.edit.code.page.bb53b6bbcc71", "Add the history you know - purchases, ownership, service, modifications, restoration, and important milestones.")}</p>
+                  <p className="fine-print">{ui("ui.app.edit.code.page.historySaveHint", "History entries save separately when you add or update an entry. Save Changes does not add an unfinished history entry.")}</p>
                 </div>
+                {serviceEvents.length ? (
+                  <div className="timeline-list">
+                    {serviceEvents.map((entry) => (
+                      <EditorTimelineEntry key={entry.id} entry={entry} saving={savingService} onEdit={editServiceEvent} onDelete={(event) => void deleteServiceEntry(event)} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="photo-manager empty">
+                    <strong>{ui("ui.app.edit.code.page.e4c12bc75682", "No timeline entries yet")}</strong>
+                    <span>{ui("ui.app.edit.code.page.e3fe0f1dad4c", "Add known ownership, purchases, service, repairs, modifications, restoration, and milestones.")}</span>
+                  </div>
+                )}
+                <details className="advanced-panel" id="service">
+                  <summary>{editingServiceId ? ui("ui.app.edit.code.page.c1fa1a200083", "Update Timeline Entry") : ui("ui.app.edit.code.page.d9cf5b8885ab", "Add Timeline Entry")}</summary>
                 <div className="qr-controls">
                   <div className="field">
                     <label htmlFor="servicePrecision">{ui("ui.app.edit.code.page.1ac020fb3ee0", "Date precision")}</label>
@@ -1653,20 +1704,12 @@ export default function EditInstrumentPage() {
                     ) : null}
                   </div>
                 </div>
-                {serviceEvents.length ? (
-                  <div className="timeline-list">
-                    {serviceEvents.map((entry) => (
-                      <EditorTimelineEntry key={entry.id} entry={entry} saving={savingService} onEdit={editServiceEvent} onDelete={(event) => void deleteServiceEntry(event)} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="photo-manager empty">
-                    <strong>{ui("ui.app.edit.code.page.e4c12bc75682", "No timeline entries yet")}</strong>
-                    <span>{ui("ui.app.edit.code.page.e3fe0f1dad4c", "Add known ownership, purchases, service, repairs, modifications, restoration, and milestones.")}</span>
-                  </div>
-                )}
+                </details>
               </section>
-              <section className="qr-customizer" id="qr-print" aria-label={ui("ui.app.edit.code.page.5604505e7254", "QR code customization")}>
+              </details>
+              <details className={styles.optionalSection} id="qr-print">
+                <summary>{ui("ui.app.edit.code.page.347d28dfa602", "QR & Print")}</summary>
+              <section className="qr-customizer" aria-label={ui("ui.app.edit.code.page.5604505e7254", "QR code customization")}>
                 <div>
                   <span className="eyebrow">{ui("ui.app.edit.code.page.29ea42609e75", "QR appearance")}</span>
                   <h3>{ui("ui.app.edit.code.page.1863981d2631", "Customize QR Appearance")}</h3>
@@ -1691,9 +1734,13 @@ export default function EditInstrumentPage() {
                     <input type="checkbox" checked={qrStyle.includeLabel} onChange={(event) => updateQrStyle("includeLabel", event.target.checked)} />{ui("ui.app.edit.code.page.affe6276c345", "Include label on downloaded QR")}</label>
                 </div>
               </section>
+              </details>
+              </div>
             </form>
             <div className={styles.secondarySections}>
-              <section className="card verification-card" id="trust-verification" aria-label={ui("ui.app.edit.code.page.3dc74ca2612b", "Trust and verification")}>
+              <details className={styles.optionalSection} id="trust-verification">
+                <summary>{ui("ui.app.edit.code.page.ade9248e0132", "Trust")}</summary>
+              <section className="card verification-card" aria-label={ui("ui.app.edit.code.page.3dc74ca2612b", "Trust and verification")}>
                 <div>
                   <span className="eyebrow">{ui("ui.app.edit.code.page.5f500bb66024", "Trust & Verification")}</span>
                   <h3>{verificationStatus === "verified" ? ui("ui.app.edit.code.page.d8d9a98cd0e8", "Verified by QRguitar") : ui("ui.app.edit.code.page.33c8e8de41c3", "Unverified")}</h3>
@@ -1764,7 +1811,10 @@ export default function EditInstrumentPage() {
                   {authenticityStatus === "confirmed" && !showAuthenticityBadge ? <p className="field-note custom-wide">{ui("ui.app.edit.code.page.51e39f20046d", "Authenticity is confirmed, but the public badge is currently hidden. Turn this on and use Save Changes to publish it.")}</p> : null}
                 </div>
               </section>
-              <section className="card verification-card" id="privacy-safety" aria-label={ui("ui.app.edit.code.page.852068b96459", "Lost or stolen alert")}>
+              </details>
+              <details className={styles.optionalSection} id="privacy-safety">
+                <summary>{ui("ui.app.edit.code.page.f096950eacff", "Privacy & Safety")} <span className={styles.sectionCount}>{safetyStatusLabel(safetyStatus)}</span></summary>
+              <section className="card verification-card" aria-label={ui("ui.app.edit.code.page.852068b96459", "Lost or stolen alert")}>
                 <div>
                   <span className="eyebrow">{ui("ui.app.edit.code.page.d4607c4f0b10", "Lost / Stolen Alert")}</span>
                   <h3>{safetyStatusLabel(safetyStatus)}</h3>
@@ -1812,22 +1862,10 @@ export default function EditInstrumentPage() {
                   </div>
                 </div>
               </section>
-            </div>
-              {message ? <p className="form-message">{message}</p> : null}
-              <div className="form-actions editor-save-bar">
-                <button className="button" type="button" onClick={() => void saveChanges(false)} disabled={savingRecord || savingSafety} aria-busy={recordSaveAction === "save"}>
-                  {recordSaveAction === "save" ? ui("ui.app.edit.code.page.86c6e0d74cc9", "Saving changes...") : getContentValue(content, "edit.actions.save")}
-                </button>
-                <button className="button secondary" type="button" onClick={() => void saveChanges(true)} disabled={savingRecord || savingSafety} aria-busy={recordSaveAction === "view"}>
-                  {recordSaveAction === "view"
-                    ? form.visibility === "public" ? ui("ui.app.edit.code.page.caae18bd705d", "Saving and opening...") : ui("ui.app.edit.code.page.4a87047e033b", "Saving and returning...")
-                    : form.visibility === "public" ? getContentValue(content, "edit.actions.saveView") : ui("ui.app.edit.code.page.3c53caf4d68d", "Save and Return to Dashboard")}
-                </button>
-                <Link className="button secondary" href="/dashboard">{ui("ui.app.edit.code.page.97ba1d394fab", "Back to Dashboard")}</Link>
-              </div>
-
-          </div>
-
+              </details>
+          <details className={`${styles.optionalSection} ${styles.previewDisclosure}`}>
+            <summary>{ui("ui.app.edit.code.page.previewDetails", "Preview details")}</summary>
+            <p className="fine-print">{ui("ui.app.edit.code.page.previewHint", "This previews your instrument details. Open the saved Profile to review its complete layout and visibility.")}</p>
           <aside className="record-preview">
             <InstrumentPreview
               qrCode={original?.qrCode || code}
@@ -1850,6 +1888,12 @@ export default function EditInstrumentPage() {
               customLinks={customLinks}
             />
           </aside>
+          </details>
+            </div>
+
+          </div>
+
+
         </div>
       </main>
       <Footer />

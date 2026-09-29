@@ -11,7 +11,7 @@ const repo = path.resolve(args.includes("--repo") ? option("--repo") : path.join
 const overlay = args.includes("--overlay") ? path.resolve(option("--overlay")) : repo;
 const require = createRequire(path.join(repo, "apps/web/package.json")), ts = require("typescript"), React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
-function runtime(overrides = {}) {
+function runtime(overrides = {}, uiContent = {}) {
   const cache = new Map();
   function load(relative) {
     if (Object.hasOwn(overrides, relative)) return overrides[relative];
@@ -25,7 +25,7 @@ function runtime(overrides = {}) {
       if (specifier.endsWith(".module.css")) return { __esModule: true, default: new Proxy({}, { get: (_, key) => String(key) }) };
       if (specifier.startsWith("@/")) return load("apps/web/" + specifier.slice(2));
       return specifier.startsWith(".") ? load(path.posix.normalize(path.posix.join(path.posix.dirname(relative), specifier))) : require(specifier);
-    });
+    }, uiContent);
     new Function("require", "exports", "module", code)(localRequire, module.exports, module); return module.exports;
   }
   return load;
@@ -207,13 +207,13 @@ async function accountPageUI(f, section = "collection") {
   const router = { push: (href, options) => f.navigation.push({ href, options }) };
   const ui = runtime({ react: hooks, "next/navigation": { useSearchParams: () => search, useRouter: () => router }, "next/link": ({ children, ...props }) => React.createElement("a", props, children),
     "apps/web/lib/account-settings": { ...load("apps/web/lib/account-settings"), createAccountSettings: () => f.client },
-    "apps/web/lib/supabase-browser": {}, "apps/web/lib/use-site-content": { useSiteContent: () => ({}) },
+    "apps/web/lib/supabase-browser": {}, "apps/web/lib/use-site-content": { useSiteContent: () => f.content || {} },
     "apps/web/components/Nav": { Nav: () => null }, "apps/web/components/Footer": { Footer: () => null }, "apps/web/components/PwaInstall": { PwaInstall: () => null },
     "apps/web/components/CheckoutAwareLink": { __esModule: true, default: ({ children, ...props }) => React.createElement("a", props, children) }
-  });
+  }, f.content || {});
   const Component = ui("apps/web/app/account/page").default().props.children.type;
-  const render = () => { cursor = effectCursor = 0; return Component(); };
-  render(); effects.splice(0).forEach((run) => run()); await until(() => f.client.getState().phase === "ready");
+  const render = () => { cursor = effectCursor = 0; f.rendered = Component(); effects.splice(0).forEach((run) => run()); return f.rendered; };
+  render(); await until(() => f.client.getState().phase === "ready");
   return render;
 }
 function nodes(tree, match, result = []) {
@@ -283,4 +283,90 @@ test("authenticated metadata failure preserves self privacy intake but sign-out 
   assert.equal(intake.length, 1); assert.equal(intake[0].props.actorId, "a");
   f.change(null); assert.equal(nodes(render(), node => node.type?.name === "AccountDeletionSection").length, 0);
   f.client.dispose();
+});
+
+test("whole-account save discloses both unsaved sections and keeps one versioned write", async () => {
+  const f = await fixture().mount(), render = await accountPageUI(f, "profile");
+  f.client.setDraft({ displayName: "Updated owner", publicCollection: { ...f.client.getState().draft.publicCollection, enabled: false } });
+  let tree = render(), html = renderToStaticMarkup(tree);
+  assert.match(html, /Unsaved changes: Account details, Collection page/);
+  assert.match(html, /including collection visibility/);
+  const save = nodes(tree, node => node.type === "button" && node.props["aria-describedby"] === "account-save-scope")[0];
+  assert.ok(save); assert.equal(save.props["aria-describedby"], "account-save-scope");
+  assert.equal(f.writes().length, 0); await save.props.onClick();
+  assert.equal(f.writes().length, 1);
+  const body = JSON.parse(f.writes()[0].body);
+  assert.equal(body.displayName, "Updated owner"); assert.equal(body.publicCollection.enabled, false); assert.equal(body.expectedVersion, 0);
+  html = renderToStaticMarkup(render()); assert.doesNotMatch(html, /Unsaved changes:/);
+  nodes(render(), node => node.type === "button" && node.props.children === "Collection page")[0].props.onClick();
+  assert.equal(nodes(render(), node => node.type === "button" && node.props.children === "Save account changes").length, 1);
+  f.client.dispose();
+});
+
+test("the workspace-type preference marks Account details, not collection publication, dirty", async () => {
+  const f = await fixture().mount(), render = await accountPageUI(f, "profile");
+  f.client.setDraft({ publicCollection: { ...f.client.getState().draft.publicCollection, accountType: "shop" } });
+  const html = renderToStaticMarkup(render());
+  assert.match(html, /Unsaved changes: Account details\. Nothing/);
+  assert.doesNotMatch(html, /Unsaved changes: Account details, Collection page/);
+  assert.equal(f.writes().length, 0); f.client.dispose();
+});
+
+for (const [message, initialSection, section, id] of [
+  ["Display name must be at least 2 characters.", "collection", "profile", "displayName"],
+  ["Choose a collection handle with at least 3 letters or numbers.", "profile", "collection", "collectionHandle"],
+  ["That public collection handle is already in use.", "profile", "collection", "collectionHandle"],
+  ["Use a complete website address starting with https://, or leave Website blank.", "profile", "collection", "collectionWebsite"],
+  ["Invalid public collection settings.", "profile", "collection", "public-collection"]
+]) test("a confirmed validation reply reveals and focuses its field: " + id + " / " + message, async () => {
+  const f = await fixture().mount(), render = await accountPageUI(f, initialSection); f.edit();
+  const draft = structuredClone(f.client.getState().draft), focused = [];
+  const previousDocument = globalThis.document;
+  globalThis.document = { getElementById(target) {
+    assert.equal(target, id);
+    const mounted = nodes(f.rendered, node => node.props?.id === target); assert.equal(mounted.length, 1, "offending field must be mounted before focus");
+    return { focus: () => focused.push(target) };
+  } };
+  try {
+    f.reply = async () => Response.json({ ok: false, message }, { status: 400 });
+    await nodes(render(), node => node.type === "button" && node.props["aria-describedby"] === "account-save-scope")[0].props.onClick();
+    assert.equal(f.navigation.at(-1).href, "/account?section=" + section);
+    render(); assert.deepEqual(focused, [id]);
+    assert.deepEqual(f.client.getState().draft, draft); assert.equal(f.writes().length, 1); assert.equal(f.saved, 0);
+  } finally { if (previousDocument === undefined) delete globalThis.document; else globalThis.document = previousDocument; f.client.dispose(); }
+});
+
+test("an uncertain Account save stays put, retains the draft and does not guess a validation field", async () => {
+  const f = await fixture().mount(), render = await accountPageUI(f, "profile"); f.edit();
+  const draft = structuredClone(f.client.getState().draft);
+  f.reply = async () => { throw new Error("synthetic lost reply"); };
+  await nodes(render(), node => node.type === "button" && node.props["aria-describedby"] === "account-save-scope")[0].props.onClick();
+  assert.equal(f.client.getState().uncertainSave, true); assert.deepEqual(f.navigation, []); assert.deepEqual(f.client.getState().draft, draft);
+  assert.equal(nodes(render(), node => node.type === "fieldset")[0].props.disabled, true); f.client.dispose();
+});
+
+test("an old Account validation reply cannot navigate or focus after an actor switch", async () => {
+  const f = await fixture().mount(), render = await accountPageUI(f, "profile"), gate = deferred(); f.edit();
+  f.reply = (url, init) => init.method === "PATCH" ? gate.promise : f.respond(url, init);
+  const saving = nodes(render(), node => node.type === "button" && node.props["aria-describedby"] === "account-save-scope")[0].props.onClick();
+  await until(() => f.writes().length === 1);
+  f.change(sessionFor("b")); await until(() => f.client.getState().phase === "ready" && f.client.getState().actorId === "b");
+  const previousDocument = globalThis.document;
+  globalThis.document = { getElementById() { assert.fail("Old validation must not reach the next actor's DOM"); } };
+  try {
+    gate.resolve(Response.json({ ok: false, message: "Choose a collection handle with at least 3 letters or numbers." }, { status: 400 }));
+    await saving; render(); assert.deepEqual(f.navigation, []); assert.equal(f.client.getState().draft.displayName, "Owner b");
+    assert.equal(f.saved, 0);
+  } finally { if (previousDocument === undefined) delete globalThis.document; else globalThis.document = previousDocument; f.client.dispose(); }
+});
+
+test("Profile and Collection preserve independently published CMS save labels with shared scope", async () => {
+  const content = { "account.actions.save": "Save owner identity draft", "ui.app.account.page.a7f1e189ad7b": "Apply public collection settings" };
+  const f = await fixture({ content }).mount(), render = await accountPageUI(f, "profile");
+  const saveButton = tree => nodes(tree, node => node.type === "button" && node.props["aria-describedby"] === "account-save-scope")[0];
+  assert.equal(saveButton(render()).props.children, content["account.actions.save"]);
+  nodes(render(), node => node.type === "button" && node.props.children === "Collection page")[0].props.onClick();
+  assert.equal(saveButton(render()).props.children, content["ui.app.account.page.a7f1e189ad7b"]);
+  assert.match(renderToStaticMarkup(render()), /including collection visibility/);
+  assert.equal(f.writes().length, 0); f.client.dispose();
 });

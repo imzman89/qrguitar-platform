@@ -52,7 +52,7 @@ export function CollectionsClient({ records, content }: { records: DemoInstrumen
     <p className="collection-result-count" role="status">
       {getContentValue(content, "collections.results.count").replace("{count}", String(visible.length))}
     </p>
-    {hasFilters && <div className="form-actions"><button className="button secondary" type="button" onClick={clearFilters}>{ui("ui.app.collections.handle.CollectionsClient.7179ea0035fc", "Clear filters")}</button></div>}
+    {hasFilters && visible.length > 0 && <div className="form-actions"><button className="button secondary" type="button" onClick={clearFilters}>{ui("ui.app.collections.handle.CollectionsClient.7179ea0035fc", "Clear filters")}</button></div>}
     <div className={`${styles.profileGrid} catalog-record-grid collection-record-grid`}>
       {visible.map((record) => <CollectibleRecordCard key={record.qrCode} record={record} content={content} />)}
     </div>

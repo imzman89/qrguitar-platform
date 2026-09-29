@@ -1,5 +1,30 @@
 // Stable site-authored presentation entries. Existing CMS keys remain unchanged.
 export const uiTextEntries: Array<{ key: string; scope: string; text: string; area: string; page: string; section: string; source: string }> = [
+  { key: "ui.app.edit.code.page.choosePhotos", scope: "app.edit.code.page", text: "Choose photos", area: "Product", page: "Edit Profile", section: "Photos", source: "app/edit/[code]/page.tsx" },
+  {"key":"ui.app.service.review.id.page.decisionSaved","scope":"app.service.review.id.page","text":"Your decision has been saved. The review status is updated.","area":"Product","page":"Service review","section":"Recovery","source":"app/service-review/[id]/page.tsx"},
+  {"key":"ui.app.service.review.id.page.decisionUnconfirmed","scope":"app.service.review.id.page","text":"Your decision could not be confirmed. Check the saved review status before trying again.","area":"Product","page":"Service review","section":"Recovery","source":"app/service-review/[id]/page.tsx"},
+  {"key":"ui.app.service.review.id.page.decisionStillPending","scope":"app.service.review.id.page","text":"The saved review is still awaiting your decision. Review the details before trying again.","area":"Product","page":"Service review","section":"Recovery","source":"app/service-review/[id]/page.tsx"},
+  {"key":"ui.app.service.review.id.page.statusChecked","scope":"app.service.review.id.page","text":"The saved review status is updated. No decision was sent again.","area":"Product","page":"Service review","section":"Recovery","source":"app/service-review/[id]/page.tsx"},
+  {"key":"ui.app.service.review.id.page.statusUnavailable","scope":"app.service.review.id.page","text":"The saved review status could not be checked. Your decision has not been sent again. Try checking once more.","area":"Product","page":"Service review","section":"Recovery","source":"app/service-review/[id]/page.tsx"},
+  {"key":"ui.app.service.review.id.page.retryReview","scope":"app.service.review.id.page","text":"Try again","area":"Product","page":"Service review","section":"Recovery","source":"app/service-review/[id]/page.tsx"},
+  {"key":"ui.app.service.review.id.page.checkingStatus","scope":"app.service.review.id.page","text":"Checking status...","area":"Product","page":"Service review","section":"Recovery","source":"app/service-review/[id]/page.tsx"},
+  {"key":"ui.app.service.review.id.page.checkStatus","scope":"app.service.review.id.page","text":"Check review status","area":"Product","page":"Service review","section":"Recovery","source":"app/service-review/[id]/page.tsx"},
+  {"key":"ui.app.service.review.id.page.loadingEvidence","scope":"app.service.review.id.page","text":"Loading private evidence...","area":"Product","page":"Service review","section":"Evidence","source":"app/service-review/[id]/page.tsx"},
+  {"key":"ui.app.service.review.id.page.evidenceUnavailable","scope":"app.service.review.id.page","text":"Private evidence could not be loaded. This does not mean no files were uploaded.","area":"Product","page":"Service review","section":"Evidence","source":"app/service-review/[id]/page.tsx"},
+  {"key":"ui.app.service.review.id.page.retryEvidence","scope":"app.service.review.id.page","text":"Retry evidence","area":"Product","page":"Service review","section":"Evidence","source":"app/service-review/[id]/page.tsx"},
+  {"key":"ui.app.transfer.id.page.switchingAccount","scope":"app.transfer.id.page","text":"Signing out...","area":"Product","page":"Ownership transfer","section":"Account recovery","source":"app/transfer/[id]/page.tsx"},
+  {"key":"ui.app.transfer.id.page.useAnotherAccount","scope":"app.transfer.id.page","text":"Use another account","area":"Product","page":"Ownership transfer","section":"Account recovery","source":"app/transfer/[id]/page.tsx"},
+  {"key":"ui.app.transfer.id.page.switchAccountHint","scope":"app.transfer.id.page","text":"This signs you out first, then returns you to this transfer after you sign in with the recipient account.","area":"Product","page":"Ownership transfer","section":"Account recovery","source":"app/transfer/[id]/page.tsx"},
+  {"key":"ui.app.transfer.id.page.completedAccountHint","scope":"app.transfer.id.page","text":"The new owner can manage this Profile from their Dashboard. Previous owners no longer have access to its private details.","area":"Product","page":"Ownership transfer","section":"Completion","source":"app/transfer/[id]/page.tsx"},
+  { key: "ui.app.account.page.sharedSaveScope", scope: "app.account.page", text: "Saving updates Account details and your collection settings together, including collection visibility. Password and sign-out actions are separate.", area: "Product", page: "Account", section: "Save status", source: "app/account/page.tsx" },
+  { key: "ui.app.account.page.unsavedSections", scope: "app.account.page", text: "Unsaved changes: {{value1}}. Nothing is applied until you save.", area: "Product", page: "Account", section: "Save status", source: "app/account/page.tsx" },
+  {"key":"ui.app.edit.code.page.mediaSaveHint","scope":"app.edit.code.page","text":"Media changes save immediately using the controls in this section. Save Changes does not add an unfinished media entry.","area":"Product","page":"Edit Profile","section":"Media","source":"app/edit/[code]/page.tsx"},
+  {"key":"ui.app.edit.code.page.historySaveHint","scope":"app.edit.code.page","text":"History entries save separately when you add or update an entry. Save Changes does not add an unfinished history entry.","area":"Product","page":"Edit Profile","section":"History","source":"app/edit/[code]/page.tsx"},
+  {"key":"ui.app.edit.code.page.previewDetails","scope":"app.edit.code.page","text":"Preview details","area":"Product","page":"Edit Profile","section":"Preview","source":"app/edit/[code]/page.tsx"},
+  {"key":"ui.app.edit.code.page.previewHint","scope":"app.edit.code.page","text":"This previews your instrument details. Open the saved Profile to review its complete layout and visibility.","area":"Product","page":"Edit Profile","section":"Preview","source":"app/edit/[code]/page.tsx"},
+  {"key":"ui.app.i.code.ProfileClient.conditionLabel","scope":"app.i.code.ProfileClient","text":"Condition","area":"Product","page":"Public Profile","section":"Profile heading","source":"app/i/[code]/ProfileClient.tsx"},
+  {"key":"ui.app.i.code.ProfileClient.conditionNew","scope":"app.i.code.ProfileClient","text":"New","area":"Product","page":"Public Profile","section":"Profile heading","source":"app/i/[code]/ProfileClient.tsx"},
+  {"key":"ui.app.i.code.ProfileClient.conditionUsed","scope":"app.i.code.ProfileClient","text":"Used","area":"Product","page":"Public Profile","section":"Profile heading","source":"app/i/[code]/ProfileClient.tsx"},
   {"key":"ui.components.ClaimOwnerReview.title","scope":"components.ClaimOwnerReview","text":"Review this ownership request","area":"Product","page":"Ownership Claims","section":"Owner review","source":"components/ClaimOwnerReview.tsx"},
   {"key":"ui.components.ClaimOwnerReview.acquisition","scope":"components.ClaimOwnerReview","text":"How it was acquired","area":"Product","page":"Ownership Claims","section":"Owner review","source":"components/ClaimOwnerReview.tsx"},
   {"key":"ui.components.ClaimOwnerReview.declaration","scope":"components.ClaimOwnerReview","text":"Claimant’s declaration","area":"Product","page":"Ownership Claims","section":"Owner review","source":"components/ClaimOwnerReview.tsx"},
@@ -590,7 +615,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.account.page.999fcfbc4384",
     "scope": "app.account.page",
-    "text": "Profile & Identity",
+    "text": "Account details",
     "page": "Account",
     "area": "Product",
     "section": "Navigation and choices",
@@ -1058,7 +1083,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.account.page.a7f1e189ad7b",
     "scope": "app.account.page",
-    "text": "Save collection settings",
+    "text": "Save account changes",
     "page": "Account",
     "area": "Product",
     "section": "Page text",
@@ -14556,33 +14581,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/edit/[code]/page.tsx"
   },
   {
-    "key": "ui.app.edit.code.page.bf60214d782d",
-    "scope": "app.edit.code.page",
-    "text": "Edit Profile sections",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Accessibility",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.999f23fcd7be",
-    "scope": "app.edit.code.page",
-    "text": "Identity",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.5e3147ab51e0",
-    "scope": "app.edit.code.page",
-    "text": "Photos",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
     "key": "ui.app.edit.code.page.45989de49fb7",
     "scope": "app.edit.code.page",
     "text": "Details",
@@ -14595,15 +14593,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.edit.code.page.23099ed0a502",
     "scope": "app.edit.code.page",
     "text": "Timeline & Ownership",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.d677190e0a99",
-    "scope": "app.edit.code.page",
-    "text": "Service",
     "page": "Edit Profile",
     "area": "Product",
     "section": "Page text",
@@ -14652,24 +14641,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "page": "Edit Profile",
     "area": "Product",
     "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.b9920fd79715",
-    "scope": "app.edit.code.page",
-    "text": "Current section",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.c5a754da6b5d",
-    "scope": "app.edit.code.page",
-    "text": "Edit Profile section",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Accessibility",
     "source": "app/edit/[code]/page.tsx"
   },
   {
@@ -16143,24 +16114,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.edit.code.page.caae18bd705d",
     "scope": "app.edit.code.page",
     "text": "Saving and opening...",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.4a87047e033b",
-    "scope": "app.edit.code.page",
-    "text": "Saving and returning...",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.3c53caf4d68d",
-    "scope": "app.edit.code.page",
-    "text": "Save and Return to Dashboard",
     "page": "Edit Profile",
     "area": "Product",
     "section": "Page text",
@@ -28594,5 +28547,81 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "area": "Product",
     "section": "Page text",
     "source": "lib/account-deletion/admin-ui/AdminIntakeQueue.tsx"
+  }
+];
+
+// Compatibility only: retained for saved CMS snapshots; these removed controls are not displayed.
+export const retiredUiTextEntries = [
+{
+    "key": "ui.app.edit.code.page.bf60214d782d",
+    "scope": "app.edit.code.page",
+    "text": "Edit Profile sections",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Accessibility",
+    "source": "app/edit/[code]/page.tsx"
+  },
+{
+    "key": "ui.app.edit.code.page.999f23fcd7be",
+    "scope": "app.edit.code.page",
+    "text": "Identity",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+{
+    "key": "ui.app.edit.code.page.5e3147ab51e0",
+    "scope": "app.edit.code.page",
+    "text": "Photos",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+{
+    "key": "ui.app.edit.code.page.d677190e0a99",
+    "scope": "app.edit.code.page",
+    "text": "Service",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+{
+    "key": "ui.app.edit.code.page.b9920fd79715",
+    "scope": "app.edit.code.page",
+    "text": "Current section",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+{
+    "key": "ui.app.edit.code.page.c5a754da6b5d",
+    "scope": "app.edit.code.page",
+    "text": "Edit Profile section",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Accessibility",
+    "source": "app/edit/[code]/page.tsx"
+  },
+{
+    "key": "ui.app.edit.code.page.4a87047e033b",
+    "scope": "app.edit.code.page",
+    "text": "Saving and returning...",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+{
+    "key": "ui.app.edit.code.page.3c53caf4d68d",
+    "scope": "app.edit.code.page",
+    "text": "Save and Return to Dashboard",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
   }
 ];

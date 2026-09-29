@@ -107,8 +107,7 @@ function fixture(page, options = {}) {
   f.input = (id, value) => { const node = f.node(node => node.type === 'input' && node.props.id === id); assert.ok(node, id + ' input'); node.props.onChange({ target: { value } }); f.render(); };
   f.fill = () => { if (page === 'login') f.input('email', 'owner@example.test'); f.input('password', 'new-password-123'); if (page === 'reset-password') f.input('confirmPassword', 'new-password-123'); };
   f.submit = () => {
-    if (page === 'login') { const form = f.node(node => node.type === 'form'); assert.ok(form); form.props.onSubmit({ preventDefault() {} }); }
-    else { const button = f.button('Save new password'); assert.ok(button); void button.props.onClick(); }
+    const form = f.node(node => node.type === 'form'); assert.ok(form); form.props.onSubmit({ preventDefault() {} });
     f.render();
   };
   f.click = label => { const button = f.button(label); assert.ok(button, label + ' button'); const result = button.props.onClick(); f.render(); return result; };
@@ -325,7 +324,8 @@ test('reset: fresh actor mismatch clears typed secrets and never updates the new
   assert.equal(f.count('updateUser'), 0); assert.equal(f.node(node => node.props?.id === 'password').props.value, ''); assert.equal(f.node(node => node.props?.id === 'confirmPassword').props.value, ''); f.dispose();
 });
 test('reset: same-actor refresh preserves fields and one pending update', async () => {
-  const gate = deferred(), f = fixture('reset-password', { updateUser: () => gate.promise }); await f.flush(); f.fill(); const button = f.button('Save new password'); void button.props.onClick(); void button.props.onClick(); await f.flush();
+  const gate = deferred(), f = fixture('reset-password', { updateUser: () => gate.promise }); await f.flush(); f.fill();
+  assert.equal(f.button('Save new password').props.type, 'submit'); f.submit(); f.submit(); await f.flush();
   f.emit('a', 'TOKEN_REFRESHED'); assert.equal(f.node(node => node.props?.id === 'password').props.value, 'new-password-123'); assert.equal(f.count('updateUser'), 1);
   gate.resolve({ data: { user: { id: 'a' } }, error: null }); await f.flush(); assert.match(f.text(), /Password updated/); f.dispose();
 });
@@ -359,7 +359,7 @@ test('reset: unmount suppresses late update feedback and navigation', async () =
 test('reset: pending deadline never claims failure or permits overlapping password updates', async () => {
   const gate = deferred(), f = fixture('reset-password', { updateUser: () => gate.promise }); await f.flush(); f.fill(); f.submit(); await f.flush(); await f.advance(20000);
   assert.match(f.text(), /still pending.*may already have been saved/); assert.equal(f.busy(), true);
-  const saving = f.button('Saving...'); void saving.props.onClick(); assert.equal(f.count('updateUser'), 1);
+  const saving = f.button('Saving...'); assert.equal(saving.props.disabled, true); f.submit(); assert.equal(f.count('updateUser'), 1);
   gate.reject(Error('PRIVATE')); await f.flush(); assert.equal(f.busy(), false); f.dispose();
 });
 test('reset: initial read failure offers an actual retry and preserves return destination', async () => {
@@ -372,17 +372,18 @@ test('reset: effect cleanup/setup cannot revive an earlier pending success', asy
   gate.resolve({ data: { user: { id: 'a' } }, error: null }); await f.flush(); await f.advance(900); assert.doesNotMatch(f.text(), /Password updated/); assert.equal(f.navigations.length, 0); assert.equal(f.busy(), false); assert.equal(f.listenerCount(), 1); f.dispose();
 });
 
-test('both pages typecheck against the actual canonical dependencies', () => {
+test('auth, Account and navigation pages typecheck against the actual canonical dependencies', () => {
   const configPath = path.join(repo, 'apps/web/tsconfig.json');
   const config = ts.readConfigFile(configPath, ts.sys.readFile);
   assert.equal(config.error, undefined);
   const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, path.dirname(configPath));
   const options = { ...parsed.options, noEmit: true, incremental: false };
   const host = ts.createCompilerHost(options), read = host.readFile.bind(host);
-  const roots = ['app/login/page.tsx', 'app/reset-password/page.tsx'].map(relative => path.join(repo, 'apps/web', relative));
+  const checkedSources = ['app/login/page.tsx', 'app/reset-password/page.tsx', 'app/account/page.tsx', 'components/Nav.tsx'];
+  const roots = checkedSources.map(relative => path.join(repo, 'apps/web', relative));
   host.readFile = file => {
     const relative = path.relative(path.join(repo, 'apps/web'), file).replaceAll('\\', '/');
-    return ['app/login/page.tsx', 'app/reset-password/page.tsx'].includes(relative) ? fs.readFileSync(path.join(source, 'apps/web', relative), 'utf8') : read(file);
+    return checkedSources.includes(relative) ? fs.readFileSync(path.join(source, 'apps/web', relative), 'utf8') : read(file);
   };
   const program = ts.createProgram([...roots, path.join(repo, 'apps/web/next-env.d.ts')], options, host);
   const errors = ts.getPreEmitDiagnostics(program).filter(item => item.category === ts.DiagnosticCategory.Error);
@@ -393,4 +394,13 @@ test('login: native fallback submits credentials by POST, never in the URL', asy
   const f = fixture('login'); await f.flush();
   assert.equal(f.node(node => node.type === 'form').props.method, 'post');
   f.dispose();
+});
+
+test('reset: native form submission reuses the guarded update and preserves the Account section', async () => {
+  const f = fixture('reset-password', { search: '?next=%2Faccount%3Fsection%3Dsecurity' }); await f.flush(); f.fill();
+  const form = f.node(node => node.type === 'form'); assert.equal(form.props.method, 'post');
+  assert.equal(f.button('Save new password').props.type, 'submit');
+  let prevented = false; form.props.onSubmit({ preventDefault() { prevented = true; } }); await f.flush();
+  assert.equal(prevented, true); assert.equal(f.count('updateUser'), 1);
+  await f.advance(900); assert.deepEqual(f.navigations, ['/account?section=security']); f.dispose();
 });

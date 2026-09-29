@@ -336,6 +336,7 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
         <Link className={styles.backLink} href="/messages"><ArrowLeft size={17} />{" "}{ui("ui.components.MessagesClient.04d7b4833927", "Messages")}</Link>
         <div className={styles.threadIdentity}><MemberAvatar name={thread.member.publicName} src={thread.member.avatarUrl} /><div><h1 id="thread-title">{thread.member.publicName}</h1><p>{memberRole(thread.member.accountType)}{thread.member.location ? ui("ui.components.MessagesClient.799272298625", " / {{value1}}", { value1: thread.member.location }) : ""}</p></div></div>
         <span className={`${styles.connection} ${connection === "Live" ? styles.live : ""}`}><i /> {connection}</span>
+        {thread.contextProfile ? <Link className={styles.threadContext} href={thread.contextProfile.href}>{ui("ui.components.MessagesClient.4efca0d10c5f", "About")}{" "}{thread.contextProfile.title}</Link> : null}
       </header>
       <div className={styles.threadGrid}>
         <div className={styles.threadPanel}>

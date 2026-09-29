@@ -47,6 +47,7 @@ function fixture(kind, options = {}) {
   const noop = () => null;
   const env = { ...hooks, window, workflow: new Proxy({}, { get: (_, name) => name }), BadgeCheck: noop, Copy: noop, LogIn: noop, Repeat2: noop, ShieldCheck: noop, Mail: noop, Nav: noop, Footer: noop, Link: 'a',
     useParams: () => params, transferStatusLabel: value => value.status, getSupabaseAccessToken: async () => 'synthetic-token', AbortController,
+    useAuthNavigation: () => ({ logout: async () => false, signingOut: false, logoutError: '' }),
     optionalTrackingProductEvents: { ownershipTransferCompleted: 'ownership_transfer_completed' },
     dispatchOptionalTrackingProductEvent: async event => { f.tracking.push(event); return true; },
     setTimeout: (fn, ms) => { const id = ++timerId; timers.set(id, { fn, ms }); return id; }, clearTimeout: id => timers.delete(id),

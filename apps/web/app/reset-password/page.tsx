@@ -203,7 +203,7 @@ export default function ResetPasswordPage() {
             ) : null}
 
             {authChecked && !authError && !isComplete && hasSession ? (
-              <>
+              <form method="post" onSubmit={(event) => { event.preventDefault(); void savePassword(); }} aria-busy={isWorking}>
                 <div className="field">
                   <label htmlFor="password">{ui("ui.app.reset.password.page.3dd9df4441fb", "New password")}</label>
                   <input
@@ -229,12 +229,12 @@ export default function ResetPasswordPage() {
                 </div>
 
                 <div className="form-actions">
-                  <button className="button" type="button" onClick={savePassword} disabled={isWorking}>
+                  <button className="button" type="submit" disabled={isWorking}>
                     {isWorking ? ui("ui.app.reset.password.page.dc85af8f2b1d", "Saving...") : ui("ui.app.reset.password.page.1a145dd7125d", "Save new password")}
                   </button>
                   <Link className="button secondary" href={`/login?next=${encodeURIComponent(safeNext)}`}>{ui("ui.app.reset.password.page.71fe31ccd37c", "Back to sign in")}</Link>
                 </div>
-              </>
+              </form>
             ) : null}
 
             {status && !authError && (!authChecked || hasSession) ? <p className="form-message error-message" role="status">{status}</p> : null}
