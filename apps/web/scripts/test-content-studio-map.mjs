@@ -25,6 +25,7 @@ function load(relative) {
 }
 
 const registry = load("lib/content-registry.ts");
+const { retiredUiTextEntries } = load("lib/ui-text-registry.ts");
 const map = JSON.parse(fs.readFileSync(path.join(repoRoot, "docs", "content-studio-map.json"), "utf8"));
 
 test("content map inventories every registered field exactly once", () => {
@@ -86,5 +87,17 @@ test("claim withdrawal copy is typed, connected, and mapped to the real workflow
     assert.deepEqual(entry.binding.sourceFiles, ["app/ownership-claim/page.tsx"]);
     assert.equal(entry.preview.mode, "representative-route");
     assert.equal(entry.preview.route, "/ownership-claim");
+  }
+});
+
+test("retired interface controls remain inventoried without claiming a rendered binding", () => {
+  const byKey = new Map(map.surfaces.map((entry) => [entry.key, entry]));
+  for (const entry of retiredUiTextEntries) {
+    const surface = byKey.get(entry.key);
+    assert.ok(surface, "Missing retained legacy key: " + entry.key);
+    assert.equal(surface.classification, "editable-advanced");
+    assert.equal(surface.defaultValue, entry.text);
+    assert.equal(surface.binding.status, "retired-compatible-saved-value");
+    assert.deepEqual(surface.binding.sourceFiles, [entry.source]);
   }
 });

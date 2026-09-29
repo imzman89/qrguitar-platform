@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { execFileSync } from "node:child_process";
 
 const require = createRequire(import.meta.url);
 const ts = require("typescript");
@@ -24,8 +25,9 @@ function load(relative) {
 
 const registry = load("lib/content-registry.ts");
 const { emailTemplateDeliveryBoundary } = load("lib/email-template-boundary.ts");
-const { uiTextEntries } = load("lib/ui-text-registry.ts");
+const { uiTextEntries, retiredUiTextEntries } = load("lib/ui-text-registry.ts");
 const uiByKey = new Map(uiTextEntries.map((entry) => [entry.key, entry]));
+const retiredByKey = new Map(retiredUiTextEntries.map((entry) => [entry.key, entry]));
 const sourceFiles = [];
 
 function collect(directory) {
@@ -90,6 +92,13 @@ function previewFor(entry) {
 }
 
 function bindingFor(entry) {
+  const retired = retiredByKey.get(entry.key);
+  if (retired) return {
+    kind: "retained-legacy-ui-copy",
+    status: "retired-compatible-saved-value",
+    sourceFiles: [retired.source],
+    note: "Retained for existing saved settings and revision compatibility; the removed control is not rendered."
+  };
   const uiEntry = uiByKey.get(entry.key);
   if (uiEntry) {
     const sourcePath = path.join(webRoot, uiEntry.source);
@@ -178,7 +187,7 @@ const counts = surfaces.reduce((result, surface) => {
 
 const document = {
   schemaVersion: 1,
-  sourceBaseline: "ea717cfe93ec47d952b21d2cf43b040167052f44",
+  sourceBaseline: execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot, encoding: "utf8" }).trim(),
   editorRoutes: ["/admin/site-editor", "/site-editor"],
   publicationModel: {
     draft: "One shared server draft; ordinary fields autosave.",
