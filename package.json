@@ -27,12 +27,16 @@
     "brace-expansion@5.x": "5.0.12",
     "xcode": {
       "uuid": "11.1.1"
+    },
+    "@next/eslint-plugin-next@15.5.25": {
+      "fast-glob": "file:./packages/eslint-root-glob-compat"
     }
   },
   "devDependencies": {
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "@next/eslint-plugin-next": "15.5.25"
   }
 }
