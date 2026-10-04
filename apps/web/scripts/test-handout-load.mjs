@@ -75,12 +75,12 @@ assert.ok(viewport,'Production preview viewport must remain mounted while loadin
 const ownerA={user:{id:'synthetic-owner-a'},access_token:'synthetic-token-a'};
 const ownerB={user:{id:'synthetic-owner-b'},access_token:'synthetic-token-b'};
 function effectFixture(loader,{session=ownerA,sessionRead,clientError=false}={}) {
-  const state={loading:false,message:'Old error',instrument:{qrCode:'OLD'},ownerAuthorized:true,printScope:'owner',selectedServiceId:'old-event',selectedPhoto:'private-photo',printTitle:'Private custom title',printNote:'Private custom note',printing:false,printState:'Ready to print.',mobileControlsOpen:true,loadAttempt:0};
+  const state={loading:false,message:'Old error',instrument:{qrCode:'OLD'},loadedCode:'G0',ownerAuthorized:true,printScope:'owner',selectedServiceId:'old-event',selectedPhoto:'private-photo',printTitle:'Private custom title',printNote:'Private custom note',printing:false,printState:'Ready to print.',mobileControlsOpen:true,loadAttempt:0};
   const events=[],replacements=[],listeners=new Set(),loadRevision={current:0},renderedRevision={current:0};let prints=0;
   const auth={getSession:()=>sessionRead || Promise.resolve({data:{session}}),onAuthStateChange:callback=>{listeners.add(callback);return {data:{subscription:{unsubscribe:()=>listeners.delete(callback)}}};}};
   const bindings={code:'G0',searchParams:new URLSearchParams('format=service&size=a4'),router:{replace:url=>replacements.push(url)},loadHandoutInstrument:loader,loadRevision,renderedRevision,
-    createBrowserSupabaseClient:()=>{if(clientError)throw new Error('Unavailable browser auth');return {auth};},window:{setTimeout,clearTimeout,print:()=>{prints++;}},
-    readyToPrint:true,printing:false,canvasRef:{current:{querySelector:()=>({querySelectorAll:()=>[],scrollHeight:100,clientHeight:100,scrollWidth:100,clientWidth:100})}},printReadiness:()=> 'Ready to print.'};
+    createBrowserSupabaseClient:()=>{if(clientError)throw new Error('Unavailable browser auth');return {auth};},window:{setTimeout,clearTimeout,addEventListener(){},removeEventListener(){},print:()=>{prints++;}},
+    readyToPrint:true,loadedCode:'G0',printing:false,canvasRef:{current:{querySelector:()=>({querySelectorAll:()=>[],scrollHeight:100,clientHeight:100,scrollWidth:100,clientWidth:100})}},printReadiness:()=> 'Ready to print.'};
   for(const name of Object.keys(state)) bindings[`set${name[0].toUpperCase()}${name.slice(1)}`]=value=>{state[name]=typeof value==='function'?value(state[name]):value;events.push([name,state[name]]);};
   const {runEffect,onRetry,runPrint}=compile(`export function runEffect(){return (${effect.getText(pageAst)})();}\nexport const onRetry=(${retry.getText(pageAst)});\n${printAction.getText(pageAst)}\nexport const runPrint=printSelectedPage;`,bindings);
   const emit=(event,next)=>{session=next;for(const listener of listeners)listener(event,next);};

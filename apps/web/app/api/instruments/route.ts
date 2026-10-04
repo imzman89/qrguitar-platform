@@ -1,3 +1,4 @@
+import { cleanPublicCollection, publicCollectionOwnerKey } from "../../../lib/public-collections";
 import { OwnerReadError, readAllOwnerPages, readOwnerBatches, groupOwnerRows, signOwnerSources } from "../../../lib/owner-record-read";
 import { buildCreateProfilePayload, createProfileFailure, CreateProfileError } from "../../../lib/profile-create";
 import { profileBillingEnvironment } from "../../../lib/billing-environment";
@@ -103,6 +104,8 @@ type CreateInstrumentRequest = {
 
 type UpdateInstrumentRequest = Omit<CreateInstrumentRequest, "accountPlan"> & {
   qrCode: string;
+  expectedUpdatedAt?: string;
+  expectedDocuments?: Array<{ id: string; updatedAt: string }>;
   action?: "remove_from_collection" | "restore_to_collection";
   reason?: string;
   verificationOnly?: boolean;
@@ -800,7 +803,7 @@ function mapInstrumentRow({
     ...(guitar.owner_removed_at ? { collectionRemovedAt: guitar.owner_removed_at, collectionRemovedReason: guitar.owner_removed_reason || "" } : {}),
     instrumentType: specValue(specs, "Type"),
     builder: guitar.builder || specValue(specs, "Builder"),
-    owner: ownerName || ownerEmail || "Unclaimed",
+    owner: ownerName || (exposeInternalTrust ? "" : "Unclaimed"),
     ownerUserEmail: ownerEmail,
     location: guitar.location || "",
     visibility: guitar.visibility === "private" ? "private" : guitar.visibility === "unlisted" ? "unlisted" : "public",
@@ -1150,7 +1153,21 @@ async function loadRecordsForUser(
   const profile = await supabase.from("profiles").select("id,display_name").eq("id", owner.id).maybeSingle<ProfileRow>();
   if (profile.error) throw new OwnerReadError(profile.error.message);
   const ownerEmail = owner.email || "";
-  const ownerName = profile.data?.display_name || owner.user_metadata?.display_name || ownerEmail;
+  const collectionResult = await supabase.from("site_content").select("content_value")
+    .eq("content_key", publicCollectionOwnerKey(owner.id)).maybeSingle<{ content_value?: Record<string, unknown> }>();
+  if (collectionResult.error) throw new OwnerReadError(collectionResult.error.message);
+  const rawCollection = collectionResult.data?.content_value;
+  if (rawCollection?.ownerId !== undefined && rawCollection.ownerId !== owner.id) {
+    throw new OwnerReadError("Collection settings ownership does not match this account.");
+  }
+  const collection = cleanPublicCollection(rawCollection);
+  const ownerName = collection.publicName;
+  const publicCollection = rawCollection?.ownerId === owner.id && collection.enabled
+    && collection.handle.length >= 3 && collection.publicName ? {
+      handle: collection.handle, publicName: collection.publicName, accountType: collection.accountType,
+      websiteUrl: collection.websiteUrl, bio: collection.bio, location: collection.location,
+      avatarUrl: collection.avatarUrl, allowMessages: collection.allowMessages
+    } : undefined;
   const guitars = await readAllOwnerPages<GuitarRow>((from, to) => {
     let query = supabase.from("guitars").select("*").eq("owner_id", owner.id)
       .order("created_at", { ascending: false }).order("id", { ascending: true });
@@ -1215,6 +1232,7 @@ async function loadRecordsForUser(
       trust: trustByCode.get(guitar.qr_code.toUpperCase()), exposeInternalTrust: true,
       ownershipTransferCount: transferCounts.get(guitar.id) || 0
     });
+    instrument.publicCollection = publicCollection;
     instrument.documentFiles = (documentsByGuitar.get(guitar.id) || []).map((document) => ({
       id: document.id,
       name: document.name,
@@ -1615,7 +1633,7 @@ export async function POST(request: Request) {
     // and receipt. No pre-commit pending record or compensating delete is persisted.
     const billingEnvironment = profileBillingEnvironment(process.env, getSupabaseEnvStatus().supabaseUrl);
     if (!billingEnvironment) return preserveAndFail(503,"create_configuration_unavailable","Profile creation is temporarily unavailable. Your form and uploads are preserved.",{retryable:false});
-    const result = await supabase.rpc("create_instrument_profile",{
+    const result = await supabase.rpc("create_catalog_instrument_profile",{
       p_owner_id:ownerUser.id,p_idempotency_key:idempotencyKey,p_upload_id:uploadId,p_payload:payload,
       p_launch_testing_access:hasLaunchTestingAccess(ownerUser.email||""),
       p_owner_display_name:ownerUser.user_metadata?.display_name || ownerUser.email || "",
@@ -1725,6 +1743,20 @@ export async function PATCH(request: Request) {
 
 
   try {
+    const versionPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/;
+    const expectedUpdatedAt = body.expectedUpdatedAt;
+    if (typeof expectedUpdatedAt !== "string" || !versionPattern.test(expectedUpdatedAt) || !Number.isFinite(Date.parse(expectedUpdatedAt))) {
+      throw new ProfileSaveError("Reload this Profile before saving again.", 400, "profile_version_required");
+    }
+    const documentSnapshot = body.expectedDocuments;
+    const documentIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!Array.isArray(documentSnapshot) ||
+        documentSnapshot.some((document) => !document || typeof document.id !== "string" || !documentIdPattern.test(document.id) ||
+          typeof document.updatedAt !== "string" || !versionPattern.test(document.updatedAt) || !Number.isFinite(Date.parse(document.updatedAt))) ||
+        new Set(documentSnapshot.map((document) => document.id.toLowerCase())).size !== documentSnapshot.length) {
+      throw new ProfileSaveError("Reload this Profile and its documents before saving again.", 400, "profile_document_versions_required");
+    }
+    const expectedDocuments = documentSnapshot.map(({ id, updatedAt }) => ({ id, updated_at: updatedAt }));
     const input = {
       qrCode: String(body.qrCode || "").trim().toUpperCase(),
       name: String(body.name || "").trim(), brand: String(body.brand || "").trim(),
@@ -1834,8 +1866,8 @@ export async function PATCH(request: Request) {
     // This is the only database mutation in a full profile edit. All dependent rows,
     // trust settings, redirect, serial aliases, and audit entry commit or roll back together.
     // Retain uploaded files on uncertain responses: a timed-out RPC may have committed.
-    const result = await supabase.rpc("save_instrument_profile", {
-      p_guitar_id: guitar.id, p_owner_id: ownerUser.id, p_expected_updated_at: guitar.updated_at,
+    const result = await supabase.rpc("save_catalog_instrument_profile", {
+      p_guitar_id: guitar.id, p_owner_id: ownerUser.id, p_expected_updated_at: expectedUpdatedAt,
       p_payload: {
         guitar: {
           qr_code: nextQrCode, name: input.name || `${input.brand} ${input.model}`.trim(),
@@ -1844,13 +1876,13 @@ export async function PATCH(request: Request) {
           summary: input.summary, hero_image_path: assets.heroImagePath
         },
         media: assets.media, documents: assets.documents, specs,
-        expected_media: assets.expectedMedia, expected_documents: assets.expectedDocuments,
+        expected_media: assets.expectedMedia, expected_documents: expectedDocuments,
         owner_name: input.ownerName, actor_email: ownerUser.email || "",
         serial_correction_approved: serialCorrectionApproved,
         ...(typeof body.showSerialPublic === "boolean" ? { show_serial_public: body.showSerialPublic } : {})
       }
     });
-    if (result.error || result.data?.ok !== true) {
+    if (result.error || result.data?.ok !== true || typeof result.data.updatedAt !== "string" || !versionPattern.test(result.data.updatedAt) || !Number.isFinite(Date.parse(result.data.updatedAt))) {
       const failure = profileSaveFailure(result.error);
       return noStoreJson({ ok: false, code: failure.code, message: failure.message }, { status: failure.status });
     }
@@ -1861,7 +1893,7 @@ export async function PATCH(request: Request) {
     } catch (error) {
       console.error("Profile save committed; cache refresh failed.", error);
     }
-    return noStoreJson({ ok: true, qrCode: result.data.qrCode, permanentPath: result.data.permanentPath }, { status: 200 });
+    return noStoreJson({ ok: true, qrCode: result.data.qrCode, permanentPath: result.data.permanentPath, updatedAt: result.data.updatedAt }, { status: 200 });
   } catch (error) {
     if (error instanceof ProfileSaveError) {
       return noStoreJson({ ok: false, code: error.code, message: error.message }, { status: error.status });

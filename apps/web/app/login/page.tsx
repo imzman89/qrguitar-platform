@@ -39,6 +39,7 @@ export default function LoginPage() {
   const initialized = useRef(false);
   const loginTabRef = useRef<HTMLButtonElement>(null);
   const registerTabRef = useRef<HTMLButtonElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<LoginMode>("login");
   const [safeNext, setSafeNext] = useState("/dashboard");
   const [name, setName] = useState("");
@@ -99,6 +100,12 @@ export default function LoginPage() {
   }, [sessionExpiredCopy]);
 
   useEffect(() => {
+    document.title = mode === "register" ? "Create your QRguitar account"
+      : mode === "reset" ? "Reset your QRguitar password"
+        : "Sign in to QRguitar";
+  }, [mode]);
+
+  useEffect(() => {
     const life = lifetime.current;
     life.active = true; const epoch = ++life.epoch;
     const operationRevision = life.operationRevision;
@@ -129,7 +136,7 @@ export default function LoginPage() {
     return () => { life.active = false; life.epoch++; client.current = null; unsubscribe?.(); };
   }, [router, applyIdentity]);
 
-  function switchMode(nextMode: LoginMode) {
+  function switchMode(nextMode: LoginMode, focusEmail = false) {
     if (pending.current) return;
     setMode(nextMode);
     setStatus("");
@@ -137,6 +144,7 @@ export default function LoginPage() {
     const url = new URL(window.location.href);
     url.searchParams.set("mode", nextMode);
     window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+    if (focusEmail) emailRef.current?.focus();
   }
 
   function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, tab: "login" | "register") {
@@ -294,7 +302,7 @@ export default function LoginPage() {
 
                 <div className="field">
                   <label htmlFor="email">{ui("ui.app.login.page.969ccbd3cf63", "Email")}</label>
-                  <input id="email" name="email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder={ui("ui.app.login.page.53e6cdc30765", "you@example.com")} />
+                  <input ref={emailRef} id="email" name="email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder={ui("ui.app.login.page.53e6cdc30765", "you@example.com")} />
                 </div>
 
                 {mode !== "reset" ? (
@@ -327,12 +335,12 @@ export default function LoginPage() {
                 </div>
                 <div className="auth-card-link-row">
                   {mode === "login" ? (
-                    <button className="link-button" type="button" disabled={isWorking} onClick={() => switchMode("reset")}>
+                    <button className="link-button" type="button" disabled={isWorking} onClick={() => switchMode("reset", true)}>
                       {getContentValue(content, "login.actions.forgot")}
                     </button>
                   ) : null}
                   {mode === "reset" ? (
-                    <button className="link-button" type="button" disabled={isWorking} onClick={() => switchMode("login")}>{ui("ui.app.login.page.71fe31ccd37c", "Back to sign in")}</button>
+                    <button className="link-button" type="button" disabled={isWorking} onClick={() => switchMode("login", true)}>{ui("ui.app.login.page.71fe31ccd37c", "Back to sign in")}</button>
                   ) : null}
                 </div>
               </>

@@ -12,7 +12,7 @@ export const fetchCache = "force-no-store";
 
 const ALLOWED_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const ALLOWED_DOCUMENT_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
-const VARIANT_WIDTHS = new Set([160, 640, 1200]);
+const VARIANT_WIDTHS = new Set([160, 400, 640, 1200]);
 const MAX_VARIANT_INPUT_BYTES = 12 * 1024 * 1024;
 const MAX_VARIANT_INPUT_PIXELS = 40_000_000;
 

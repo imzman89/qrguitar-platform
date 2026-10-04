@@ -5,6 +5,7 @@ import { getAdminContext, readAdminEmailList } from "../../../lib/admin-auth";
 import { validateContentValues, validateProtectedContentValues } from "../../../lib/content-registry";
 import { mergeSiteSettings, publishedSiteSettingsKey, validateBrandLogoEntries, validateEditorialComposition, validateSiteThemeContrast, type EditableSiteSettings } from "../../../lib/site-settings";
 import { createServerSupabaseClientWithTimeout } from "../../../lib/supabase-server";
+import { allowLocalCopyReconciliation, CopyReconciliationError, localCopyReconciliationSource, prepareLocalCopyMutation } from "../../../lib/site-editor-copy-reconciliation";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -137,7 +138,31 @@ export async function PUT(request: Request) {
   let revisionValue: Record<string, unknown> | null = null;
   let settings: EditableSiteSettings | null = null;
   let rawSettings: Partial<EditableSiteSettings> | undefined;
-  if (action === "restore_revision") {
+  const copyRequest = body.source === localCopyReconciliationSource;
+  let copyRawSettings: Partial<EditableSiteSettings> | null = null;
+  if (copyRequest) {
+    if (!allowLocalCopyReconciliation(request, process.env)) return json({ ok: false, uncertain: false, message: "The reviewed local copy operation is unavailable." }, { status: 403 });
+    try {
+      const prepared = await prepareLocalCopyMutation(body, {
+        readReceipt: async (requestId) => {
+          const result = await supabase.from("site_editor_receipts").select("request_body,result").eq("actor_user_id", admin.user!.id).eq("request_id", requestId).maybeSingle();
+          if (result.error) throw new Error("Could not verify the original editor receipt.");
+          return result.data;
+        },
+        readRawState: async () => {
+          const result = await supabase.rpc("read_site_editor_state");
+          if (result.error) throw new Error("Could not verify raw saved content.");
+          return result.data as RawEditorState;
+        }
+      });
+      copyRawSettings = prepared.rawSettings as Partial<EditableSiteSettings> | null;
+      if (copyRawSettings) { rawSettings = copyRawSettings; settings = mergeSiteSettings(copyRawSettings); }
+    } catch (error) {
+      if (error instanceof CopyReconciliationError) return json({ ok: false, uncertain: false, message: error.message }, { status: 400 });
+      const failure = editorFailure();
+      return json(failure.body, { status: failure.status });
+    }
+  } else if (action === "restore_revision") {
     if (typeof body.revisionId !== "string" || !body.revisionId.startsWith(REVISION_PREFIX)) return json({ ok: false, uncertain: false, message: "Select a valid revision." }, { status: 400 });
     try {
       const revision = await supabase.from("site_content").select("content_value").eq("content_key", body.revisionId).maybeSingle<{ content_value: Record<string, unknown> }>();
@@ -170,7 +195,7 @@ export async function PUT(request: Request) {
     const mutation = await supabase.rpc("mutate_site_editor", {
       p_actor_id: admin.user!.id, p_actor_email: admin.email,
       p_env_authorized: readAdminEmailList().includes(admin.email),
-      p_request: body, p_settings: settings, p_defaults: mergeSiteSettings(null), p_revision_value: revisionValue
+      p_request: body, p_settings: copyRequest ? copyRawSettings : settings, p_defaults: mergeSiteSettings(null), p_revision_value: revisionValue
     });
     if (mutation.error) {
       const failure = editorFailure(mutation.error.code);

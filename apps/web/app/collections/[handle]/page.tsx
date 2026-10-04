@@ -72,10 +72,10 @@ export default async function CollectionPage({ params }: { params: Promise<{ han
             referrerPolicy="no-referrer"
             fallback={<div className="collection-avatar" aria-hidden="true">{settings.publicName.slice(0, 1).toUpperCase()}</div>}
           />
-          <div><span className="eyebrow">{ui("ui.app.collections.handle.page.f28aefd26929", "QRguitar member")}</span><h1>{settings.publicName}</h1><p className="collection-role">{role}{settings.location ? ui("ui.app.collections.handle.page.799272298625", " / {{value1}}", { value1: settings.location }) : ""}</p>{settings.bio ? <p className={styles.memberBio}>{settings.bio}</p> : <p className={styles.memberBio}>{ui("ui.app.collections.handle.page.bb23eaeeafa6", "Explore this member's public QRguitar Profiles.")}</p>}</div>
+          <div><h1>{settings.publicName}</h1><p className="collection-role">{role}{settings.location ? ui("ui.app.collections.handle.page.799272298625", " / {{value1}}", { value1: settings.location }) : ""}</p>{settings.bio ? <p className={styles.memberBio}>{settings.bio}</p> : null}</div>
         </div>
         <div className={styles.memberActions}>
-          <strong className="collection-count">{records.length}<small>{ui("ui.app.collections.handle.page.591935b15b1c", "Public")}{" "}{records.length === 1 ? ui("ui.app.collections.handle.page.d696a35bdd18", "Profile") : ui("ui.app.collections.handle.page.535e52e4a261", "Profiles")}</small></strong>
+          <strong className="collection-count">{records.length}<small>{records.length === 1 ? ui("ui.app.collections.handle.page.d696a35bdd18", "Profile") : ui("ui.app.collections.handle.page.535e52e4a261", "Profiles")}</small></strong>
           <div className={styles.actionRow}>
             {settings.allowMessages ? <MemberMessageLink handle={settings.handle} label={ui("ui.app.collections.handle.page.577c10d6f210", "Message {{value1}}", { value1: settings.publicName })} /> : null}
             <SellerWebsiteLink {...settings} />

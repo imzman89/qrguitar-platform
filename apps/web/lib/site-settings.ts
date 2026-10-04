@@ -2,6 +2,7 @@ import { CheckCircle2 } from "lucide-react";
 import { siteCopy } from "../content/site-copy";
 import { defaultContentValues, getContentValue, mergeContentValues } from "./content-registry";
 import { defaultInstrumentCategories, normalizeInstrumentCategories } from "./instrument-categories";
+import { approvedExactCopyAfterValues } from "./site-copy-reconciliation-pairs";
 
 export const siteSettingsKey = "qrguitar.siteSettings";
 export const publishedSiteSettingsKey = "homepage";
@@ -148,20 +149,20 @@ export const defaultEditorialComposition: EditorialComposition = {
         { id: "home-anatomy-documents", name: "Documents", title: "Documents", body: "Receipts, appraisals, build sheets, and other files you choose to share.", icon: "document", visible: true }
       ] },
       { id: "roles", name: "Role and use cases", visible: true, blocks: [
-        { id: "home-role-owner", name: "Owners", title: "Owners", body: "Keep your instruments organized, control what's public, and hand the same Profile to the next owner.", ctaLabel: "Create a Profile", ctaUrl: "/create", icon: "photo", visible: true, protected: true },
-        { id: "home-role-collector", name: "Collectors", title: "Collectors", body: "Preserve photos, documents, service, and provenance without losing the story.", ctaLabel: "Open your collection", ctaUrl: "/dashboard", icon: "shield", visible: true },
-        { id: "home-role-shop", name: "Shops", title: "Shops", body: "Create or import inventory, print QR materials, and transfer Profiles to buyers.", ctaLabel: "See business tools", ctaUrl: "/how-it-works#who-it-is-for", icon: "store", visible: true },
-        { id: "home-role-builder", name: "Builders / Brands", title: "Builders / Brands", body: "Issue consistent Profiles for new builds and hand the same Profile to the first owner.", ctaLabel: "See business tools", ctaUrl: "/how-it-works#who-it-is-for", icon: "store", visible: true },
-        { id: "home-role-provider", name: "Luthiers / Technicians", title: "Luthiers / Technicians", body: "Submit completed service with private evidence for the owner to review.", ctaLabel: "See service workflow", ctaUrl: "/how-it-works#service-providers", icon: "wrench", visible: true },
-        { id: "home-role-buyer", name: "Buyers", title: "Buyers", body: "Review the public history, then receive the same Profile through a secure transfer or claim.", ctaLabel: "Open Claim Center", ctaUrl: "/ownership-claim", icon: "eye", visible: true }
+        { id: "home-role-owner", name: "Owners", title: "Owners", body: "Keep your instruments organized and transfer the Profile to the next owner.", ctaLabel: "Create a Profile", ctaUrl: "/create", icon: "photo", visible: true, protected: true },
+        { id: "home-role-collector", name: "Collectors", title: "Collectors", body: "Keep photos, documents, and history with your collection.", ctaLabel: "Dashboard", ctaUrl: "/dashboard", icon: "shield", visible: true },
+        { id: "home-role-shop", name: "Shops", title: "Shops", body: "Create or import inventory, print QR cards, and transfer Profiles after a sale.", ctaLabel: "See business tools", ctaUrl: "/how-it-works#who-it-is-for", icon: "store", visible: true },
+        { id: "home-role-builder", name: "Builders / Brands", title: "Builders / Brands", body: "Create Profiles for new builds and transfer them to the first owner.", ctaLabel: "See business tools", ctaUrl: "/how-it-works#who-it-is-for", icon: "store", visible: true },
+        { id: "home-role-provider", name: "Luthiers / Technicians", title: "Luthiers / Technicians", body: "Submit completed service for the owner to review.", ctaLabel: "See service workflow", ctaUrl: "/how-it-works#service-providers", icon: "wrench", visible: true },
+        { id: "home-role-buyer", name: "Buyers", title: "Buyers", body: "Review the photos and history, then request ownership or accept a transfer.", ctaLabel: "Open Claim Center", ctaUrl: "/ownership-claim", icon: "eye", visible: true }
       ] },
       { id: "continuity", name: "Service, ownership, and provenance", visible: true, blocks: [
-        { id: "home-continuity-service", name: "Service", title: "Owner-approved service", body: "A provider can submit completed work and private evidence for the owner to review.", icon: "wrench", visible: true, protected: true },
+        { id: "home-continuity-service", name: "Service", title: "Owner-approved service", body: "A provider can submit completed work for owner approval.", icon: "wrench", visible: true, protected: true },
         { id: "home-continuity-ownership", name: "Ownership", title: "Secure ownership handoff", body: "The current owner, shop, or builder starts the transfer. A scan alone never changes ownership.", icon: "transfer", visible: true },
         { id: "home-continuity-provenance", name: "Continuity", title: "The same Profile continues", body: "Approved history stays connected while the QRguitar ID and permanent link remain unchanged.", icon: "history", visible: true }
       ] },
       { id: "pricing", name: "Profile access", visible: true, blocks: [
-        { id: "home-price-beta", name: "Owners and collectors", title: "For owners and collectors", label: "Free", body: "Create up to 5 Profiles with photos, specifications, privacy controls, history, and downloadable QR codes.", ctaLabel: "Create a Free Profile", ctaUrl: "/create", items: ["5 free Profiles", "Public, Unlisted, or Private", "Downloadable QR codes", "Service and ownership history"], icon: "qr", visible: true, protected: true },
+        { id: "home-price-beta", name: "Owners and collectors", title: "For owners and collectors", label: "Free", body: "Create up to 5 Profiles with photos, specs, history, and downloadable QR codes.", ctaLabel: "Create a Free Profile", ctaUrl: "/create", items: ["5 free Profiles", "Choose which documents to share", "Downloadable QR codes", "Service and ownership history"], icon: "qr", visible: true, protected: true },
         { id: "home-price-commercial", name: "Shops, builders, and brands", title: "For shops, builders & brands", label: "From $99", body: "Need help with bulk setup, QR hardware, verification, or a commercial rollout? We'll help you get started.", ctaLabel: "Talk to QRguitar", ctaUrl: "mailto:support@qrguitar.com", items: ["Bulk Profile setup", "Business onboarding", "QR hardware and print support", "Verification support"], icon: "store", visible: true }
       ] },
       { id: "finalCta", name: "Closing action", visible: true, blocks: [] }
@@ -307,7 +308,7 @@ export const defaultSiteSettings: EditableSiteSettings = {
     pageTitle: "Owner dashboard",
     subtitle: "Manage profiles, photos, documents, visibility, and QR downloads from your dashboard.",
     emptyCollectionTitle: "No instruments yet.",
-    emptyCollectionBody: "Register your first instrument to create a permanent QRguitar Profile.",
+    emptyCollectionBody: "Add an instrument and a real photo to create its permanent Profile.",
     firstRecordCtaLabel: "Register your first instrument",
     collectionHealthTitle: "Collection health",
     collectionHealthHelper: "A quick read on your public, private, and unlisted Profiles.",
@@ -769,7 +770,7 @@ function mergeLegacyContent(settings?: Partial<EditableSiteSettings> | null) {
 export function mergeSiteSettings(settings?: Partial<EditableSiteSettings> | null): EditableSiteSettings {
   const sections: Partial<EditableSiteSettings["sections"]> = settings?.sections || {};
   const hasInstrumentCategories = Object.prototype.hasOwnProperty.call(settings || {}, "instrumentCategories");
-  return normalizeCopyObject({
+  const beforeCopyNormalization = {
     ...defaultSiteSettings,
     ...(settings || {}),
     brandLogos: normalizeBrandLogos(settings?.brandLogos),
@@ -811,7 +812,12 @@ export function mergeSiteSettings(settings?: Partial<EditableSiteSettings> | nul
     },
     composition: normalizeEditorialComposition(settings?.composition),
     content: mergeLegacyContent(settings)
-  });
+  };
+  const merged = normalizeCopyObject(beforeCopyNormalization);
+  for (const [key, approvedAfter] of Object.entries(approvedExactCopyAfterValues)) {
+    if (beforeCopyNormalization.content[key] === approvedAfter) merged.content[key] = approvedAfter;
+  }
+  return merged;
 }
 
 export function normalizeBrandLogoKey(value?: string | null) {
@@ -896,22 +902,51 @@ export function readSiteSettings() {
   }
 }
 
+let clientDefaultsHash: Promise<string | null> | undefined;
+
+function defaultsFingerprint() {
+  return clientDefaultsHash ||= (async () => {
+    const subtle = globalThis.crypto?.subtle;
+    if (!subtle) return null;
+    const digest = await subtle.digest(
+      "SHA-256", new TextEncoder().encode(JSON.stringify(defaultContentValues))
+    );
+    return Array.from(new Uint8Array(digest), byte =>
+      byte.toString(16).padStart(2, "0")).join("");
+  })().catch(() => null);
+}
+
+const publishedSettingsRequests = new Map<string, Promise<Partial<EditableSiteSettings> | null>>();
+
 export async function fetchPublishedSiteSettings() {
   try {
+    // Capture preview context before hashing; navigation must not change this read's mode.
     const draftPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("cmsPreview") === "draft";
-    const response = await fetch(`/api/site-settings?fresh=${Date.now()}${draftPreview ? "&cmsPreview=draft" : ""}`, {
-      cache: "no-store",
-      headers: {
-        "Cache-Control": "no-store"
+    const fingerprint = await defaultsFingerprint();
+    const key = `/api/site-settings${fingerprint ? `?defaults=${fingerprint}` : ""}`;
+    let request = draftPreview ? undefined : publishedSettingsRequests.get(key);
+    if (!request) {
+      request = (async () => {
+        const response = await fetch(`/api/site-settings?fresh=${Date.now()}${fingerprint ? `&defaults=${fingerprint}` : ""}${draftPreview ? "&cmsPreview=draft" : ""}`, {
+          cache: "no-store",
+          credentials: draftPreview ? "same-origin" : "omit",
+          headers: { "Cache-Control": "no-store" }
+        });
+        if (!response.ok) return null;
+        const payload = (await response.json()) as { ok?: boolean; settings?: Partial<EditableSiteSettings> | null };
+        return payload.ok && payload.settings ? payload.settings : null;
+      })();
+      if (!draftPreview) {
+        publishedSettingsRequests.set(key, request);
+        const currentRequest = request;
+        const clear = () => {
+          if (publishedSettingsRequests.get(key) === currentRequest) publishedSettingsRequests.delete(key);
+        };
+        void request.then(clear, clear);
       }
-    });
-
-    if (!response.ok) {
-      return null;
     }
-
-    const payload = (await response.json()) as { ok?: boolean; settings?: Partial<EditableSiteSettings> | null };
-    return payload.ok && payload.settings ? mergeSiteSettings(payload.settings) : null;
+    const settings = await request;
+    return settings ? mergeSiteSettings(settings) : null;
   } catch {
     return null;
   }

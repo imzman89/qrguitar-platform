@@ -20,6 +20,7 @@ export default function PayPalReviewQueue() {
   const ui = useUiText("app.admin.payments.PayPalReviewQueue");
   const [state, setState] = useState(initialPayPalAdminReviewsState), [selection, setSelection] = useState({ actorId: "", eventId: "" });
   const [deliverySelection, setDeliverySelection] = useState({ actorId: "", deliveryId: "" });
+  const [orderReference, setOrderReference] = useState("");
   const controller = useRef<ReturnType<typeof createPayPalAdminReviewsClient> | null>(null);
   useEffect(() => {
     const current = createPayPalAdminReviewsClient({ auth: () => createBrowserSupabaseClient().auth });
@@ -28,12 +29,19 @@ export default function PayPalReviewQueue() {
   }, []);
   const selected = selection.actorId === state.actorId ? state.reviews.find(review => review.eventId === selection.eventId) : undefined;
   const selectedDelivery = deliverySelection.actorId === state.actorId ? state.deliveries.find(delivery => delivery.deliveryId === deliverySelection.deliveryId) : undefined;
+  useEffect(() => { setOrderReference(""); setSelection({ actorId: "", eventId: "" }); }, [state.actorId]);
   if (state.phase === "signed-out") return null;
   return <section aria-labelledby="paypal-review-heading">
     <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>{ui("ui.app.admin.payments.PayPalReviewQueue.3de6b4aace7b", "Automatic PayPal exceptions")}</p><h2 id="paypal-review-heading">{ui("ui.app.admin.payments.PayPalReviewQueue.dd82d114dfb6", "Resolve verified payment holds")}</h2></div>
       {(state.phase === "ready" || state.phase === "error") && <button className={styles.secondary} disabled={state.busy || state.refreshing} onClick={() => void controller.current?.reload()}><RefreshCw size={16} aria-hidden="true" />{state.refreshing ? ui("ui.app.admin.payments.PayPalReviewQueue.ec963ffc911b", "Checking…") : ui("ui.app.admin.payments.PayPalReviewQueue.9b6ac0bb92b0", "Refresh holds")}</button>}
     </div>
     <p className={styles.intro}>{ui("ui.app.admin.payments.PayPalReviewQueue.7b7a25b992ba", "PayPal’s verified refund, dispute, reversal, and late-capture evidence appears here. Decisions only keep or release an existing credit hold. They cannot create a payment, grant credits, or send a refund.")}</p>
+    {(state.phase === "ready" || state.phase === "error") ? <form className={styles.notice} onSubmit={event => { event.preventDefault(); void controller.current?.findOrder(orderReference); }}>
+      <label>{ui("ui.app.admin.payments.PayPalReviewQueue.findOrderLabel", "Find a held order by full reference")}<input value={orderReference} onChange={event => setOrderReference(event.target.value)} placeholder="QRG-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" disabled={state.busy || state.refreshing} /></label>
+      <button className={styles.secondary} type="submit" disabled={state.busy || state.refreshing || !orderReference.trim()}>{ui("ui.app.admin.payments.PayPalReviewQueue.findOrder", "Find order (read only)")}</button>
+      {state.orderId ? <><p>{ui("ui.app.admin.payments.PayPalReviewQueue.filteredOrder", "Showing holds for")}: QRG-{state.orderId}</p><button className={styles.secondary} type="button" disabled={state.busy || state.refreshing} onClick={() => void controller.current?.showAll()}>{ui("ui.app.admin.payments.PayPalReviewQueue.backToQueue", "Back to all holds")}</button></> : null}
+      <p>{ui("ui.app.admin.payments.PayPalReviewQueue.lookupHelp", "Lookup does not release or change a hold. Use it to find older retained cases outside the first 100 results.")}</p>
+    </form> : null}
     {state.phase === "loading" && <p role="status">{ui("ui.app.admin.payments.PayPalReviewQueue.2f17062702dd", "Loading verified PayPal holds…")}</p>}
     {state.phase === "error" && <section className={`${styles.notice} ${styles.error}`} role="alert"><h2>{ui("ui.app.admin.payments.PayPalReviewQueue.3c11457acff5", "Automatic payment review is unavailable.")}</h2><p>{state.message}</p></section>}
     {state.phase === "ready" && <>
@@ -62,7 +70,7 @@ export default function PayPalReviewQueue() {
           <span>{review.eventType || review.receiptKind} · {new Date(review.createdAt).toLocaleString()}</span>
           <span>{ui("ui.app.admin.payments.PayPalReviewQueue.7e1b0d5641f2", "Account")}{" "}{review.ownerId}</span>
         </button>)}
-        {state.hasMore && <p className={styles.muted}>{ui("ui.app.admin.payments.PayPalReviewQueue.673b7a226b63", "More active holds exist. Resolve the visible cases, then refresh the queue.")}</p>}
+        {state.hasMore && <p className={styles.muted}>{ui("ui.app.admin.payments.PayPalReviewQueue.moreHoldsLookup", "More active holds exist. Find an older case by its full order reference above; no hold needs to be released to navigate.")}</p>}
       </section><section aria-label={ui("ui.app.admin.payments.PayPalReviewQueue.e968a1d1b3bf", "Selected automatic PayPal hold")}><div className={styles.notice}>{selected
         ? <ReviewHold key={`${state.actorId}:${selected.eventId}`} review={selected} busy={state.busy || state.refreshing || Boolean(state.pendingDecision)} decide={body => controller.current?.decide(body) || Promise.resolve(false)} />
         : <><h2>{ui("ui.app.admin.payments.PayPalReviewQueue.2017b02ce236", "Choose a verified hold.")}</h2><p>{ui("ui.app.admin.payments.PayPalReviewQueue.f6d008c4de41", "Compare the allowlisted provider event, resource, status, and amount with the case in PayPal before deciding.")}</p></>}</div></section></div>

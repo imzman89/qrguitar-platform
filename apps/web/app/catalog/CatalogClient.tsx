@@ -2,6 +2,7 @@
 import { useUiText } from "../../components/UiTextProvider";
 
 
+import { requestPublicProfiles } from "../../lib/public-profile-request";
 import { matchesCatalogQuery } from "../../lib/catalog-search";
 
 import { Search, SlidersHorizontal, X } from "lucide-react";
@@ -24,6 +25,10 @@ import styles from "./CatalogClient.module.css";
 export function CatalogClient({ initialRecords, content }: { initialRecords: DemoInstrument[]; content: Record<string, string>; composition: EditorialComposition["catalog"] }) {
   const ui = useUiText("app.catalog.CatalogClient");
   const [records, setRecords] = useState<DemoInstrument[]>(dedupeByCodeAndDate(initialRecords));
+  const recordsRevision = useRef(0);
+  const recordsActive = useRef(true);
+  const [recordsError, setRecordsError] = useState(false);
+  const [recordsLoading, setRecordsLoading] = useState(false);
   const [hasLoadedRecords, setHasLoadedRecords] = useState(initialRecords.length > 0);
   const [filters, setFilters] = useState<CatalogFilters>({ ...defaultCatalogFilters });
   const { brand, availability, condition, trust, authenticity, originality, safety, service, query, sortMode } = filters;
@@ -57,27 +62,25 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
 
 
   const loadRecords = useCallback(async () => {
+    const revision = ++recordsRevision.current;
+    setRecordsLoading(true);
     try {
-      const response = await fetch("/api/instruments", { cache: "no-store" });
-      const payload = (await response.json().catch(() => null)) as
-        | { ok?: boolean; instruments?: DemoInstrument[] }
-        | null;
-
-      if (!response.ok || !payload?.ok || !Array.isArray(payload.instruments)) {
-        return;
-      }
-
-      setRecords(dedupeByCodeAndDate(payload.instruments));
-    } catch {
-      return;
-    } finally {
+      const next = await requestPublicProfiles();
+      if (!recordsActive.current || revision !== recordsRevision.current) return;
+      setRecords(dedupeByCodeAndDate(next));
+      setRecordsError(false);
       setHasLoadedRecords(true);
+    } catch {
+      if (recordsActive.current && revision === recordsRevision.current) setRecordsError(true);
+    } finally {
+      if (recordsActive.current && revision === recordsRevision.current) setRecordsLoading(false);
     }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
 
+    recordsActive.current = true;
     void loadRecords();
 
     const onRefresh = async () => {
@@ -93,6 +96,8 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
 
     return () => {
       cancelled = true;
+      recordsActive.current = false;
+      recordsRevision.current++;
       window.removeEventListener("focus", onRefresh);
       window.removeEventListener("qrguitar:catalog-updated", onRefresh);
     };
@@ -222,13 +227,11 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
         <div className={styles["shell"]}>
           <div className={styles["dashboard-hero"]}>
             <div>
-              <div className={styles["eyebrow"]}>{getContentValue(content, "catalog.hero.eyebrow")}</div>
               <h1>{getContentValue(content, "catalog.hero.headline")}</h1>
-              <p>{getContentValue(content, "catalog.hero.body")}</p>
             </div>
             <div className={styles["catalog-hero-actions"]}>
               <Link className="button secondary" href="/create">{getContentValue(content, "catalog.actions.create")}</Link>
-              <Link className="text-link" href="/collections">{ui("ui.app.catalog.CatalogClient.1fbba5113528", "Browse member collections")}</Link>
+              <Link className="text-link" href="/collections">{ui("ui.app.catalog.CatalogClient.1fbba5113528", "Collections")}</Link>
             </div>
           </div>
 
@@ -236,6 +239,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
             <label className={styles["catalog-search"]}>{ui("ui.app.catalog.CatalogClient.49c266baaaa7", "Search")}<span>
                 <Search size={16} />
                 <input
+                  aria-label={ui("ui.app.catalog.CatalogClient.49c266baaaa7", "Search")}
                   value={query}
                   onChange={(event) => {
                     updateFilters({ query: event.target.value }, true);
@@ -246,7 +250,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       event.preventDefault();
-                      void searchExactSerial();
+                      // Ordinary search already filters the catalog as you type.
                     }
                   }}
                   placeholder={getContentValue(content, "catalog.search.placeholder")}
@@ -259,7 +263,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
                   aria-label={ui("ui.app.catalog.CatalogClient.0e626c38e0fe", "Find exact serial")}
                   title={ui("ui.app.catalog.CatalogClient.0e626c38e0fe", "Find exact serial")}
                 >
-                  <Search size={16} />
+                  {ui("ui.app.catalog.CatalogClient.0e626c38e0fe", "Find exact serial")}
                 </button>
               </span>
             </label>
@@ -327,8 +331,12 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
 
 
 
+          {recordsError ? <div className={styles["catalog-lookup-result"]} role="alert">
+            <span>{ui("ui.app.catalog.CatalogClient.loadUnavailable", "The catalog could not be refreshed. Try again.")}</span>
+            <button className="button secondary" type="button" disabled={recordsLoading} onClick={() => void loadRecords()}>{ui("ui.app.catalog.CatalogClient.retryLoad", "Retry")}</button>
+          </div> : null}
           <section className={styles["catalog-grid"]} aria-label={ui("ui.app.catalog.CatalogClient.8ecdd04d045f", "QRguitar Profiles")}>
-            {!hasLoadedRecords ? (
+            {!hasLoadedRecords && recordsError ? null : !hasLoadedRecords ? (
               <div className={styles["catalog-empty"]}>
                 <div className={styles["eyebrow"]}>{ui("ui.app.catalog.CatalogClient.92e7dcc9f7b7", "Loading QRguitar Profiles")}</div>
                 <h2>{ui("ui.app.catalog.CatalogClient.46d89b1c639e", "Opening the catalog.")}</h2>
@@ -341,12 +349,13 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
                   variant="catalog"
                   key={record.qrCode}
                   content={content}
+                  compactMobilePhotos
+                  deferAdjacentPhotos
                   prioritizeLeadImage={index === 0}
                 />
               ))
             ) : (
               <div className={styles["catalog-empty"]}>
-                <div className={styles["eyebrow"]}>{ui("ui.app.catalog.CatalogClient.5aeec66681b7", "No profiles found")}</div>
                 <h2>{getContentValue(content, "catalog.empty.title")}</h2>
                 <p>{getContentValue(content, "catalog.empty.body")}</p>
               </div>

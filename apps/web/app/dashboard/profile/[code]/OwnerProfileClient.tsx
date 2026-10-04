@@ -56,11 +56,11 @@ export function OwnerProfileClient({ code }: { code: string }) {
     return <ProfileClient code={code} initialInstrument={instrument} ownerPreview />;
   }
   return <><Nav /><main className="owner-profile-gate">
-    <span className="eyebrow">{ui("ui.app.dashboard.profile.code.OwnerProfileClient.9b28be3dc6ed", "Your collection")}</span>
+    <span className="eyebrow">{ui("ui.app.dashboard.profile.code.OwnerProfileClient.ownerDashboardPolicy.myCollection", "My collection")}</span>
     <h1>{status === "loading" ? ui("ui.app.dashboard.profile.code.OwnerProfileClient.ffad3e64048f", "Opening your Profile…") : status === "signin" ? ui("ui.app.dashboard.profile.code.OwnerProfileClient.46820bbeca47", "Sign in to view your Profile") : status === "missing" ? ui("ui.app.dashboard.profile.code.OwnerProfileClient.158e5a22a48c", "Profile unavailable") : ui("ui.app.dashboard.profile.code.OwnerProfileClient.cd563df66e7c", "We could not load your Profile")}</h1>
     <p role={status === "error" ? "alert" : "status"}>{status === "loading" ? ui("ui.app.dashboard.profile.code.OwnerProfileClient.f6b6e188e29b", "Checking your account and loading the instrument.")
-      : status === "signin" ? ui("ui.app.dashboard.profile.code.OwnerProfileClient.4537aa12687c", "Private Profiles are available only to their owner.")
-      : status === "missing" ? ui("ui.app.dashboard.profile.code.OwnerProfileClient.820aa22dc0e6", "This Profile is not available to this account. Check that you are signed in to the account that owns it.")
+      : status === "signin" ? ui("ui.app.dashboard.profile.code.OwnerProfileClient.ownerDashboardPolicy.signinHelp", "Sign in to the owning account to use owner tools.")
+      : status === "missing" ? ui("ui.app.dashboard.profile.code.OwnerProfileClient.ownerDashboardPolicy.missingHelp", "Owner tools are not available to this account. Sign in to the owning account.")
       : ui("ui.app.dashboard.profile.code.OwnerProfileClient.f16a60aa884d", "Your Profile has not changed. Check your connection and try again.")}</p>
     <div className="owner-profile-actions">
       {status === "signin" ? <Link className="button" href={"/login?next=" + encodeURIComponent("/dashboard/profile/" + code)}>{ui("ui.app.dashboard.profile.code.OwnerProfileClient.bfd402b2f6f3", "Sign in")}</Link> : null}

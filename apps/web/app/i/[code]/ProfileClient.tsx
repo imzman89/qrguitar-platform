@@ -49,7 +49,8 @@ import { fetchOwnerProfile, OwnerProfileError } from "../../../lib/owner-profile
 import { resolveInstrumentPresentation } from "../../../lib/instrument-profile-contract";
 import { getContentValue } from "../../../lib/content-registry";
 import { publicProfileUrl } from "../../../lib/profile-url";
-import { profilePurchaseLink } from "../../../lib/profile-purchase-link";
+import { cleanProfileSupportingUrl, isPurchaseProfileLink } from "../../../lib/profile-purchase-link";
+import { isSaleDetail, profileSaleOffer } from "../../../lib/profile-sale";
 import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "../../../lib/optional-tracking-consent";
 import { appendFailedImageSource, filterAvailableImageSources } from "../../../lib/image-fallback";
 import { publicMediaVariantSrcSet, publicMediaVariantUrl } from "../../../lib/public-media-variant";
@@ -284,7 +285,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
         year: displayRecord.year || "",
         instrumentType: displayRecord.instrumentType || "",
         builder: displayRecord.builder || "",
-        owner: displayRecord.owner || "Unclaimed",
+        owner: displayRecord.owner || "",
         location: displayRecord.location || "",
         summary: displayRecord.summary || "",
         finish: displayRecord.finish || "",
@@ -612,13 +613,14 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
     { label: "Body", value: instrument.bodyWood },
     { label: "Neck", value: instrument.neckWood },
     { label: "Pickups", value: instrument.pickups },
-    ...(instrument.customFields || [])
+    ...(instrument.customFields || []).filter((field) => !isSaleDetail(field.label))
   ].filter((spec) => {
     const value = String(spec.value || "").trim();
     return Boolean(value);
   });
 
-  const purchaseLink = profilePurchaseLink(instrument);
+  const saleOffer = profileSaleOffer(instrument);
+  const purchaseLink = saleOffer?.target;
   const profileLinks = [
     { label: "Website", href: instrument.websiteUrl },
     { label: "Instagram", href: instrument.instagramUrl },
@@ -627,7 +629,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
     { label: "Reverb", href: instrument.reverbUrl },
     { label: "Shop", href: instrument.shopUrl },
     ...(instrument.customLinks || []).map((link) => ({ label: link.label, href: link.url }))
-  ].filter((link) => link.href);
+  ].map((link) => ({ ...link, href: cleanProfileSupportingUrl(link.href) })).filter((link) => link.href && !isPurchaseProfileLink(link.label));
   const officialBrandLogoUrl = instrument.brand ? brandLogos[normalizeBrandLogoKey(instrument.brand)] || "" : "";
 
   return (
@@ -670,10 +672,18 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
               className={styles["profile-hero-badges"]}
               ownerCollection={instrument.publicCollection}
             />
-            {purchaseLink || instrument.publicCollection ? <div className={styles["profile-member-actions"]}>
-              {purchaseLink ? <a className={styles["profile-purchase-link"]} href={purchaseLink.href} target="_blank" rel="ugc nofollow noopener noreferrer">
-                <span><strong>{ui("ui.app.i.code.ProfileClient.shopItem", "Shop this item")}</strong><small>{purchaseLink.host}</small></span><ArrowUpRight size={19} aria-hidden="true" />
-              </a> : instrument.publicCollection ? <SellerWebsiteLink {...instrument.publicCollection} /> : null}
+            {saleOffer ? <section className={styles["profile-sale-area"]} aria-label={ui("ui.app.i.code.ProfileClient.saleDetails", "Sale details")}>
+              <div className={styles["profile-sale-price"]}>
+                <span>{ui("ui.app.i.code.ProfileClient.askingPrice", "Asking price")}</span>
+                {saleOffer.price ? <strong>{saleOffer.price}</strong> : <span>{purchaseLink ? ui("ui.app.i.code.ProfileClient.priceAtStore", "Price at {{store}}", { store: saleOffer.storeName }) : ui("ui.app.i.code.ProfileClient.noPrice", "Price not provided")}</span>}
+              </div>
+              {purchaseLink ? <a className={styles["profile-purchase-link"]} href={purchaseLink.href} target="_blank" rel="ugc nofollow noopener noreferrer" aria-label={ui("ui.app.i.code.ProfileClient.buyFromStoreAccessible", "Buy from {{store}} (opens in a new tab)", { store: saleOffer.storeName })}>
+                <span><strong>{ui("ui.app.i.code.ProfileClient.buyFromStore", "Buy from {{store}}", { store: saleOffer.storeName })}</strong><small>{purchaseLink.host}</small></span><ArrowUpRight size={19} aria-hidden="true" />
+              </a> : <p>{ui("ui.app.i.code.ProfileClient.noPurchaseLink", "Purchase details unavailable.")}</p>}
+              {purchaseLink ? <p className={styles["profile-sale-note"]}>{ui("ui.app.i.code.ProfileClient.storeConfirms", "Store confirms price and availability.")}</p> : null}
+            </section> : null}
+            {instrument.publicCollection ? <div className={styles["profile-member-actions"]}>
+              {!saleOffer ? <SellerWebsiteLink {...instrument.publicCollection} /> : null}
               {instrument.publicCollection?.allowMessages ? <MemberMessageLink className={styles["profile-message-link"]} handle={instrument.publicCollection.handle} profileCode={instrument.qrCode} label={ui("ui.app.i.code.ProfileClient.577c10d6f210", "Message {{value1}}", { value1: instrument.publicCollection.publicName })} /> : null}
             </div> : null}
 
@@ -902,7 +912,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
               label={ui("ui.app.i.code.ProfileClient.7812959f873a", "Ownership Tools")}
               active={activeTab === "ownership"}
               onClick={() => {
-                router.push("/dashboard");
+                router.push(`/dashboard?transfer=${encodeURIComponent(instrument.qrCode)}`);
               }}
             />
           ) : null}
@@ -952,6 +962,8 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
               data-profile-tab={tab.id}
               type="button"
               role="tab"
+              id={`profile-tab-${tab.id}`}
+              aria-controls="profile-tab-panel"
               aria-selected={activeTab === tab.id}
               tabIndex={activeTab === tab.id ? 0 : -1}
               onClick={() => {
@@ -976,6 +988,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
           ))}
         </nav>
 
+        <div role="tabpanel" id="profile-tab-panel" aria-labelledby={`profile-tab-${activeTab}`} tabIndex={0}>
           <ProfilePanel
             detailsHeading={getContentValue(publicContent, "profile.details.heading")}
           activeTab={activeTab}
@@ -993,6 +1006,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
           timelineEvents={timelineEvents}
           serviceEntries={presentation?.serviceEntries || []}
         />
+        </div>
 
         {!canEdit ? <section className={styles["profile-claim-entry"]}>
           <h2>{ui("ui.app.i.code.ProfileClient.lifetimeProfile", "One Profile, for its whole life.")}</h2>
@@ -1020,14 +1034,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
 }
 
 function publicOwnerDisplay(instrument: DemoInstrument) {
-  const owner = String(instrument.owner || "").trim();
-  const personalFallback = /^(gary|greg|owner)$/i.test(owner);
-
-  if (!owner || personalFallback) {
-    return instrument.builder || instrument.brand || "Unclaimed";
-  }
-
-  return owner;
+  return String(instrument.publicCollection?.publicName || "").trim();
 }
 
 function hasMeaningfulPublicValue(value?: string) {
@@ -1160,7 +1167,7 @@ function ProfilePanel({
       <section className={styles["scan-tab-panel"]}>
         <PanelHeader icon={<Repeat2 />} label={ui("ui.app.i.code.ProfileClient.c7d3acc826a8", "Ownership")} title={ui("ui.app.i.code.ProfileClient.db60bbe2c7c2", "Brand, retailer, owner, and future buyer stay connected around the same instrument.")} />
         <div className={styles["ownership-grid"]}>
-          <span><strong>{ui("ui.app.i.code.ProfileClient.0abf1fda3294", "Current owner")}</strong>{instrument.owner || ui("ui.app.i.code.ProfileClient.f59c5e15fc31", "Unclaimed")}</span>
+          {publicOwnerDisplay(instrument) ? <span><strong>{ui("ui.app.i.code.ProfileClient.0abf1fda3294", "Current owner")}</strong>{publicOwnerDisplay(instrument)}</span> : null}
           {instrument.builder ? <span><strong>{ui("ui.app.i.code.ProfileClient.090940e73258", "Builder")}</strong>{instrument.builder}</span> : null}
           <span><strong>{ui("ui.app.i.code.ProfileClient.8dc96386f9b0", "Recorded transfers")}</strong>{ownershipTransferCount || ui("ui.app.i.code.ProfileClient.adb85cf22bfc", "None yet")}</span>
           <span><strong>{ui("ui.app.i.code.ProfileClient.7448611d5f93", "Visibility")}</strong>{instrument.visibility === "private" ? ui("ui.app.i.code.ProfileClient.5a024309a381", "Private profile") : instrument.visibility === "unlisted" ? ui("ui.app.i.code.ProfileClient.81c09a46b1f6", "Unlisted profile") : ui("ui.app.i.code.ProfileClient.eaad68e1f8c0", "Public profile")}</span>

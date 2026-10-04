@@ -21,6 +21,7 @@ const { createUiText } = load("lib/ui-text.ts");
 const { UiTextProvider, useUiText } = load("components/UiTextProvider.tsx");
 const registry = load("lib/content-registry.ts");
 const { uiTextEntries, retiredUiTextEntries } = load("lib/ui-text-registry.ts");
+const { protectedUiTextKeys } = load("lib/ui-text-protection.ts");
 
 test("every connected interface call has a unique registered key, matching default and required placeholders", () => {
   const seen = new Set(), entries = new Map(uiTextEntries.map(entry => [entry.key, entry]));
@@ -31,8 +32,14 @@ test("every connected interface call has a unique registered key, matching defau
       if (entry.isDirectory()) { walk(file); continue; }
       if (!file.endsWith(".tsx")) continue;
       const source = fs.readFileSync(file, "utf8"), ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+      const uiAliases = new Set(["ui"]);
+      function findUiAliases(node) {
+        if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer && ts.isCallExpression(node.initializer) && ["useUiText", "createUiText"].includes(node.initializer.expression.getText(ast))) uiAliases.add(node.name.text);
+        ts.forEachChild(node, findUiAliases);
+      }
+      findUiAliases(ast);
       function visit(node) {
-        if (ts.isCallExpression(node) && node.expression.getText(ast) === "ui") {
+        if (ts.isCallExpression(node) && uiAliases.has(node.expression.getText(ast))) {
           assert.ok(ts.isStringLiteral(node.arguments[0]) && ts.isStringLiteral(node.arguments[1]), `Explicit source key/default required: ${file}`);
           const key = node.arguments[0].text, original = node.arguments[1].text;
           const entry = entries.get(key); assert.ok(entry, `Missing registration: ${key}`); assert.equal(entry.text, original);
@@ -143,12 +150,55 @@ test("UI copy preview routes are real safe representatives, not fabricated recor
 });
 
  test("removed editor controls retain compatible saved values without active UI bindings", () => {
- assert.equal(retiredUiTextEntries.length,8);
+ assert.ok(retiredUiTextEntries.length >= 8, "retain the original compatibility controls as new retired controls are added");
+ assert.equal(new Set(retiredUiTextEntries.map(entry=>entry.key)).size, retiredUiTextEntries.length);
+ const originalControls = [
+ ["ui.app.edit.code.page.bf60214d782d","Edit Profile sections"],
+ ["ui.app.edit.code.page.999f23fcd7be","Identity"],
+ ["ui.app.edit.code.page.5e3147ab51e0","Photos"],
+ ["ui.app.edit.code.page.d677190e0a99","Service"],
+ ["ui.app.edit.code.page.b9920fd79715","Current section"],
+ ["ui.app.edit.code.page.c5a754da6b5d","Edit Profile section"],
+ ["ui.app.edit.code.page.4a87047e033b","Saving and returning..."],
+ ["ui.app.edit.code.page.3c53caf4d68d","Save and Return to Dashboard"]
+ ];
+ for(const [key,text] of originalControls) {
+ assert.equal(retiredUiTextEntries.find(entry=>entry.key===key)?.text,text,"preserve original retired key/default "+key);
+ }
  for(const entry of retiredUiTextEntries){
  assert.equal(uiTextEntries.some(active=>active.key===entry.key),false);
  const field=registry.contentRegistryByKey.get(entry.key); assert.ok(field);
- assert.equal(field.defaultValue,entry.text); assert.equal(field.classification,"editable-advanced");
+ assert.equal(field.defaultValue,entry.text); assert.equal(field.classification,protectedUiTextKeys.has(entry.key) ? "security-locked" : "editable-advanced");
  assert.match(field.help,/removed editor control/);
- assert.equal(registry.validateContentValues({...registry.defaultContentValues,[entry.key]:"Previously saved label"})[entry.key],undefined);
+ const variables = entry.text.match(/\{\{[^{}]+\}\}/g) || [];
+ assert.equal(registry.validateContentValues({...registry.defaultContentValues,[entry.key]:"Previously saved label "+variables.join(" ")})[entry.key],undefined);
+ if(variables.length) assert.ok(registry.validateContentValues({...registry.defaultContentValues,[entry.key]:"Missing the required application value"})[entry.key]);
  }
  });
+
+
+test("actual CMS audit writer codes render editable readable admin labels", () => {
+  const source = fs.readFileSync(path.join(root, "app/admin/page.tsx"), "utf8");
+  const ast = ts.createSourceFile("admin.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const functions = ast.statements.filter(node => ts.isFunctionDeclaration(node) && ["actionLabel", "statLabel"].includes(node.name?.text)).map(node => node.getText(ast)).join("\n");
+  const code = ts.transpileModule(functions, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
+  const { actionLabel, statLabel } = new Function(code + "\nreturn { actionLabel, statLabel }; ")();
+  const writer = fs.readFileSync(path.resolve(root, "../../supabase/migrations/20260911003500_atomic_site_editor.sql"), "utf8");
+  assert.match(writer, /v_action_name := case when v_action='save_draft' then 'site_draft_saved'/);
+  assert.match(writer, /v_action_name := 'site_content_published'/);
+  const pairs = [
+    ["site_content_published", "ui.app.admin.page.siteContentPublished", "Website content published"],
+    ["site_draft_saved", "ui.app.admin.page.siteDraftSaved", "Website draft saved"]
+  ];
+  for (const [action, key, label] of pairs) {
+    assert.equal(actionLabel(action), label, "Persisted lowercase event must have a readable default");
+    assert.equal(actionLabel(action.toUpperCase()), label, "Reviewed uppercase alias remains compatible");
+    const edited = "Edited " + label;
+    assert.equal(actionLabel(action, createUiText({ [key]: edited }, "app.admin.page")), edited);
+    assert.equal(actionLabel(action, createUiText({ [key]: edited }, "different.scope")), label);
+    assert.equal(renderToStaticMarkup(React.createElement("strong", null, actionLabel(action))), "<strong>" + label + "</strong>");
+  }
+  assert.equal(actionLabel("lock"), "Account locked");
+  assert.equal(actionLabel("user_banned"), "User banned");
+  for (const action of ["unknown_event", "Site_content_published", "customAction", ""]) assert.equal(actionLabel(action), statLabel(action));
+});

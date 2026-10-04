@@ -338,7 +338,7 @@ export function buildRecordMetadata(instrument: DemoInstrument): Metadata {
   const image = getRecordMetadataImage(instrument);
 
   return {
-    title,
+    title: { absolute: `${metadataExcerpt(fullTitle.replace(/\s*\|\s*QRguitar$/i, ""), SEARCH_TITLE_MAX_LENGTH - " | QRguitar".length)} | QRguitar` },
     description,
     robots: {
       index: instrument.visibility !== "unlisted" && instrument.visibility !== "private",
@@ -400,6 +400,8 @@ export function buildOrganizationJsonLd() {
 
 export function buildRecordJsonLd(instrument: DemoInstrument) {
   const title = normalizeMetadataText(instrumentDisplayName(instrument));
+  const brand = normalizeMetadataText(instrument.brand);
+  const model = normalizeMetadataText(instrument.model);
   const url = absoluteSiteUrl(instrument.permanentPath || `/i/${instrument.qrCode}`);
   const image = getRecordMetadataImage(instrument);
   const description = getRecordStructuredDescription(instrument);
@@ -433,7 +435,9 @@ export function buildRecordJsonLd(instrument: DemoInstrument) {
         mainEntity: { "@id": profileId }
       },
       {
-        "@type": "Thing",
+        "@type": "Product",
+        ...(brand ? { brand: { "@type": "Brand", name: brand } } : {}),
+        ...(model ? { model } : {}),
         "@id": profileId,
         name: title,
         description,

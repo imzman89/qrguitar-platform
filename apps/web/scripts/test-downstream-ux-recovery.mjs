@@ -11,8 +11,9 @@ const deferred = () => { let resolve, reject; const promise = new Promise((a, b)
 const review = { id: "review-a", status: "submitted", qrCode: "QRG-FIXTURE", profileTitle: "Fixture instrument", title: "Fixture service", requestedVisibility: "private", evidenceCount: 2, provider: {} };
 const session = { access_token: "synthetic-token", user: { id: "actor-a" } };
 const names = { service: "app/service-review/[id]/page.tsx", transfer: "app/transfer/[id]/page.tsx", messages: "components/MessagesClient.tsx" };
-const words = tree => typeof tree === "string" || typeof tree === "number" ? String(tree) : tree && typeof tree === "object" ? React.Children.toArray(tree.props?.children).map(words).join("") : "";
-function nodes(tree) { return !tree || typeof tree !== "object" ? [] : [tree, ...React.Children.toArray(tree.props?.children).flatMap(nodes)]; }
+const expand = tree => tree?.type?.name === "MessageState" ? tree.type(tree.props) : tree;
+const words = value => { const tree = expand(value); return typeof tree === "string" || typeof tree === "number" ? String(tree) : tree && typeof tree === "object" ? React.Children.toArray(tree.props?.children).map(words).join("") : ""; };
+function nodes(value) { const tree = expand(value); return !tree || typeof tree !== "object" ? [] : [tree, ...React.Children.toArray(tree.props?.children).flatMap(nodes)]; }
 
 // Execute actual route/component source with deterministic hooks and in-memory
 // response fixtures. No local service, account, customer record, or real request.
@@ -20,7 +21,8 @@ export function fixture(kind = "service", options = {}) {
   let routeId = kind === "transfer" ? "transfer-a" : "review-a";
   const values = [], effects = [], memo = [], timers = new Map(), requests = [], navigations = [];
   let cursor = 0, effectCursor = 0, memoCursor = 0, timerId = 0, dirty = true, mounted = true, tree, callback, writesAfterUnmount = 0;
-  const ui = (key, fallback) => options.content?.[key] ?? fallback;
+  let ui = (key, fallback) => options.content?.[key] ?? fallback;
+  let conversationId = options.conversationId ?? "conversation-a";
   const hooks = {
     useState(initial) {
       const index = cursor++;
@@ -33,9 +35,20 @@ export function fixture(kind = "service", options = {}) {
     useEffect(run, deps) { const index = effectCursor++, old = effects[index]; if (!old || deps.some((value, i) => !Object.is(value, old.deps[i]))) effects[index] = { run, deps, cleanup: old?.cleanup, pending: true }; }
   };
   const auth = {
-    getSession: () => options.getSession?.() ?? Promise.resolve({ data: { session }, error: null }),
+    getSession: () => options.getSession?.() ?? Promise.resolve({ data: { session: currentSession }, error: null }),
     onAuthStateChange(fn) { callback = fn; return { data: { subscription: { unsubscribe() {} } } }; }
   };
+  let currentSession = session;
+  const setTimer = (fn, ms) => { const id = ++timerId; timers.set(id, { fn, ms }); return id; };
+  const clearTimer = id => timers.delete(id);
+  const libraries = new Map();
+  function library(name) {
+    if (libraries.has(name)) return libraries.get(name);
+    const module = { exports: {} };
+    const code = ts.transpileModule(fs.readFileSync(path.join(root, "lib", name + ".ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+    new Function("require", "module", "exports", "fetch", "setTimeout", "clearTimeout", code)(modules, module, module.exports, fakeFetch, setTimer, clearTimer);
+    libraries.set(name, module.exports); return module.exports;
+  }
   const fakeFetch = async (url, init = {}) => {
     const request = { url, method: init.method || "GET", body: init.body ? JSON.parse(init.body) : undefined, signal: init.signal };
     requests.push(request);
@@ -56,28 +69,32 @@ export function fixture(kind = "service", options = {}) {
     if (name.endsWith("/Nav") || name.endsWith("/Footer")) return { Nav: () => null, Footer: () => null };
     if (name.endsWith("/content-registry")) return { getContentValue: (_, key) => ({ "serviceReview.actions.approve": "Approve", "serviceReview.actions.revise": "Request changes", "serviceReview.actions.decline": "Decline" })[key] || key };
     if (name.endsWith("/use-site-content")) return { useSiteContent: () => ({}) };
-    if (name.endsWith("/supabase-browser")) return { createBrowserSupabaseClient: () => ({ auth }), getSupabaseAccessToken: async () => "synthetic-token" };
+    if (name.endsWith("/supabase-browser")) return { createBrowserSupabaseClient: () => ({ auth, channel: () => { const channel = { on: () => channel, subscribe: () => channel }; return channel; }, removeChannel: async () => {}, storage: { from: () => ({ uploadToSignedUrl: (...args) => options.upload?.(...args) ?? Promise.resolve({ error: null }) }) } }), getSupabaseAccessToken: () => options.getToken?.() ?? Promise.resolve("synthetic-token") };
     if (name.endsWith("/use-auth-navigation")) return { useAuthNavigation: () => ({ logout: options.logout || (async () => false), signingOut: false, logoutError: options.logoutError || "" }) };
     if (name.endsWith("/local-demo")) return { transferStatusLabel: value => value.status };
     if (name.endsWith("/optional-tracking-consent")) return { optionalTrackingProductEvents: {}, dispatchOptionalTrackingProductEvent: async () => true };
-    if (name.endsWith("/member-messaging")) return { MEMBER_MEDIA_TYPES: [], MEMBER_MEDIA_COUNT_LIMIT: 4, MEMBER_MEDIA_LIMIT: 15 * 1024 * 1024 };
+    if (name.endsWith("/member-messaging")) return library("member-messaging");
+    if (name.endsWith("/message-session")) return library("message-session");
     throw new Error(`Unexpected test import: ${name}`);
   };
   const source = fs.readFileSync(path.join(root, names[kind]), "utf8");
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const module = { exports: {} };
-  new Function("require", "module", "exports", "fetch", "setTimeout", "clearTimeout", "window", code)(modules, module, module.exports, fakeFetch,
-    (fn, ms) => { const id = ++timerId; timers.set(id, { fn, ms }); return id; }, id => timers.delete(id), { location: { assign: url => navigations.push(url) } });
+  new Function("require", "module", "exports", "fetch", "setTimeout", "clearTimeout", "window", "document", code)(modules, module, module.exports, fakeFetch,
+    setTimer, clearTimer, { location: { assign: url => navigations.push(url) }, setInterval: setTimer, clearInterval: clearTimer, addEventListener() {}, removeEventListener() {}, requestAnimationFrame: fn => fn() }, { visibilityState: "visible", addEventListener() {}, removeEventListener() {} });
   const Component = kind === "messages" ? module.exports.MessagesClient : module.exports.default;
   const h = {
     requests, timers, navigations,
     route(id) { routeId = id; h.render(); },
-    render() { dirty = true; let turns = 0; while (dirty) { assert.ok(turns++ < 20, "render loop"); dirty = false; cursor = effectCursor = memoCursor = 0; tree = Component(kind === "messages" ? { conversationId: "conversation-a" } : {}); if (!options.skipEffects) for (const effect of effects) if (effect.pending) { effect.pending = false; effect.cleanup?.(); effect.cleanup = effect.run(); } } return tree; },
+    render() { dirty = true; let turns = 0; while (dirty) { assert.ok(turns++ < 20, "render loop"); dirty = false; cursor = effectCursor = memoCursor = 0; tree = Component(kind === "messages" ? { conversationId } : {}); if (!options.skipEffects) for (const effect of effects) if (effect.pending) { effect.pending = false; effect.cleanup?.(); effect.cleanup = effect.run(); } } return tree; },
+    content(patch) { ui = (key, fallback) => patch[key] ?? fallback; h.render(); },
+    conversation(id) { conversationId = id; h.render(); },
     elements() { return nodes(h.render()); },
     button(label) { const node = h.elements().find(n => n.type === "button" && words(n).trim() === label); assert.ok(node, `Missing button: ${label}`); return node; },
     text() { return words(h.render()); },
     async settle() { for (let i = 0; i < 4; i++) { await tick(); h.render(); } },
-    auth(value) { callback("SIGNED_IN", value); h.render(); },
+    auth(value) { currentSession = value; callback("SIGNED_IN", value); h.render(); },
+    authEvent(event, value, flush = true) { callback(event, value); if (flush) h.render(); },
     unmount() { for (const effect of effects) effect.cleanup?.(); mounted = false; },
     afterUnmount() { return writesAfterUnmount; },
     decisions() { return requests.filter(r => ["approve", "request_changes", "decline"].includes(r.body?.action)); },

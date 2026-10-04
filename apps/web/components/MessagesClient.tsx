@@ -30,41 +30,13 @@ import {
   type MemberConversationSummary,
   type MemberConversationThread
 } from "../lib/member-messaging";
-import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../lib/supabase-browser";
+import { createBrowserSupabaseClient } from "../lib/supabase-browser";
+import { createMessageSession, MessageRequestError, type MessageLease } from "../lib/message-session";
 import styles from "./MessagesClient.module.css";
 
 type Phase = "loading" | "ready" | "signed-out" | "error";
-type PendingSend = { operationId: string; message: string; files: File[]; uploaded: boolean };
+type PendingSend = { operationId: string; message: string; files: File[]; uploaded: boolean; uploadIds: string[]; uploads?: UploadIntent[]; nextUpload: number; uncertain: boolean };
 type UploadIntent = { uploadId: string; path: string; token: string };
-
-class MessageRequestError extends Error {
-  status: number;
-  uncertain: boolean;
-  constructor(message: string, status = 0, uncertain = false) {
-    super(message);
-    this.status = status;
-    this.uncertain = uncertain;
-  }
-}
-
-async function messageFetch<T>(url: string, init: RequestInit = {}) {
-  const token = await getSupabaseAccessToken();
-  if (!token) throw new MessageRequestError("Sign in to use QRguitar Messages.", 401);
-  try {
-    const response = await fetch(url, {
-      ...init,
-      cache: "no-store",
-      headers: { Authorization: `Bearer ${token}`, ...(init.body ? { "Content-Type": "application/json" } : {}), ...(init.headers || {}) },
-      signal: AbortSignal.timeout(15000)
-    });
-    const payload = await response.json().catch(() => null) as (T & { message?: string }) | null;
-    if (!response.ok || !payload) throw new MessageRequestError(payload?.message || "Messages could not complete that action.", response.status, response.status >= 500);
-    return payload;
-  } catch (error) {
-    if (error instanceof MessageRequestError) throw error;
-    throw new MessageRequestError("The result could not be confirmed. Check your connection and try again.", 0, true);
-  }
-}
 
 function memberRole(value: string) {
   const labels: Record<string, string> = {
@@ -115,6 +87,14 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
   const messageList = useRef<HTMLDivElement | null>(null);
   const loadingHistory = useRef(false);
   const firstThreadLoad = useRef(true);
+  const sessionScope = useRef<ReturnType<typeof createMessageSession> | null>(null);
+  const sendLock = useRef(false);
+  const inboxRevision = useRef(0), threadRevision = useRef(0);
+  const sessionError = useRef("");
+  sessionError.current = ui("ui.components.MessagesClient.sessionUnavailable", "Your sign-in could not be checked. Try again.");
+  const renderLease = sessionScope.current?.lease();
+  const currentComposer = () => Boolean(renderLease?.actorId && sessionScope.current?.live(renderLease));
+  const messageFetch = useCallback(<T,>(lease: MessageLease, url: string, init: RequestInit = {}) => sessionScope.current!.request<T>(lease, url, init), []);
 
   const handleRequestError = useCallback((reason: unknown) => {
     const failure = reason instanceof MessageRequestError ? reason : new MessageRequestError("Messages are temporarily unavailable.");
@@ -127,34 +107,43 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
   }, []);
 
   const loadInbox = useCallback(async (showLoading = true) => {
+    const scope = sessionScope.current, lease = scope?.lease(), request = ++inboxRevision.current;
+    if (!scope || !lease?.actorId) return;
     if (showLoading) setPhase("loading");
     setError("");
     try {
-      const payload = await messageFetch<{ ok: boolean } & MemberConversationPage>("/api/messages");
+      const payload = await messageFetch<{ ok: boolean } & MemberConversationPage>(lease, "/api/messages");
+      if (!scope.live(lease) || request !== inboxRevision.current) return;
       setConversations(payload.conversations || []);
       setConversationCursor(payload.nextCursor || null);
       setPhase("ready");
-    } catch (reason) { handleRequestError(reason); }
-  }, [handleRequestError]);
+    } catch (reason) { if (scope.live(lease) && request === inboxRevision.current) handleRequestError(reason); }
+  }, [handleRequestError, messageFetch]);
 
-  const loadMoreConversations = useCallback(async () => {
+  async function loadMoreConversations() {
     if (!conversationCursor || loadingMoreConversations) return;
+    const scope = sessionScope.current, lease = scope?.lease();
+    if (!scope || !lease?.actorId || !renderLease || !scope.live(renderLease)) return;
     setLoadingMoreConversations(true);
     setError("");
     try {
-      const payload = await messageFetch<{ ok: boolean } & MemberConversationPage>(`/api/messages?cursor=${encodeURIComponent(conversationCursor)}`);
+      const payload = await messageFetch<{ ok: boolean } & MemberConversationPage>(lease, `/api/messages?cursor=${encodeURIComponent(conversationCursor)}`);
+      if (!scope.live(lease)) return;
       setConversations((current) => mergeMemberConversationPages(current, payload.conversations || []));
       setConversationCursor(payload.nextCursor || null);
-    } catch (reason) { handleRequestError(reason); }
-    finally { setLoadingMoreConversations(false); }
-  }, [conversationCursor, handleRequestError, loadingMoreConversations]);
+    } catch (reason) { if (scope.live(lease)) handleRequestError(reason); }
+    finally { if (scope.live(lease)) setLoadingMoreConversations(false); }
+  }
 
   const loadThread = useCallback(async (showLoading = true) => {
     if (!conversationId) return;
+    const scope = sessionScope.current, lease = scope?.lease(), request = ++threadRevision.current;
+    if (!scope || !lease?.actorId) return;
     if (showLoading) setPhase("loading");
     setError("");
     try {
-      const payload = await messageFetch<{ ok: boolean; conversation: MemberConversationThread }>(`/api/messages/${conversationId}`);
+      const payload = await messageFetch<{ ok: boolean; conversation: MemberConversationThread }>(lease, `/api/messages/${conversationId}`);
+      if (!scope.live(lease) || request !== threadRevision.current) return;
       setThread((current) => {
         if (showLoading || !current || current.id !== payload.conversation.id) return payload.conversation;
         const currentIds = new Set(current.messages.map((message) => message.id));
@@ -168,22 +157,42 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
         };
       });
       setPhase("ready");
-      void messageFetch(`/api/messages/${conversationId}/controls`, { method: "POST", body: JSON.stringify({ action: "read" }) }).catch(() => undefined);
-    } catch (reason) { handleRequestError(reason); }
-  }, [conversationId, handleRequestError]);
+      void messageFetch(lease, `/api/messages/${conversationId}/controls`, { method: "POST", body: JSON.stringify({ action: "read" }) }).catch(() => undefined);
+    } catch (reason) { if (scope.live(lease) && request === threadRevision.current) handleRequestError(reason); }
+  }, [conversationId, handleRequestError, messageFetch]);
 
   useEffect(() => {
-    if (conversationId) void loadThread();
-    else void loadInbox();
+    // Only a mount/conversation transition restarts this privacy scope.
+    setPhase("loading"); setThread(null); setConversations([]); setDraft(""); setFiles([]);
+    setConversationCursor(null); setNotice(""); setError(""); setSending(false); setUncertainSend(false);
+    pendingSend.current = null; sendLock.current = false;
+    const scope = createMessageSession(() => createBrowserSupabaseClient().auth);
+    sessionScope.current = scope;
+    let actor: string | undefined;
+    const unsubscribe = scope.subscribe((nextActor, nextPhase) => {
+      const changed = actor !== nextActor;
+      if (changed) {
+        actor = nextActor; inboxRevision.current++; threadRevision.current++;
+        pendingSend.current = null; sendLock.current = false; loadingHistory.current = false; firstThreadLoad.current = true;
+        setConversations([]); setConversationCursor(null); setThread(null); setDraft(""); setFiles([]);
+        setSending(false); setUncertainSend(false); setLoadingMoreConversations(false); setLoadingOlderMessages(false); setNotice(""); setError(""); setConnection("Connecting");
+      }
+      if (nextPhase === "ready") { if (conversationId) void loadThread(changed); else void loadInbox(changed); }
+      else { setPhase(nextPhase); if (nextPhase === "error") setError(sessionError.current); }
+    });
+    void scope.start();
+    return () => { unsubscribe(); scope.dispose(); if (sessionScope.current === scope) sessionScope.current = null; };
   }, [conversationId, loadInbox, loadThread]);
 
   useEffect(() => {
-    if (!conversationId || phase === "signed-out") return;
+    if (!conversationId || phase !== "ready") return;
+    const scope = sessionScope.current, lease = scope?.lease();
+    if (!scope || !lease?.actorId) return;
     const supabase = createBrowserSupabaseClient();
     const channel = supabase.channel(`member-conversation:${conversationId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "member_messages", filter: `conversation_id=eq.${conversationId}` }, () => void loadThread(false))
-      .subscribe((status) => setConnection(status === "SUBSCRIBED" ? "Live" : status === "CHANNEL_ERROR" || status === "TIMED_OUT" ? "Reconnecting" : "Connecting"));
-    const refresh = () => { if (document.visibilityState === "visible") void loadThread(false); };
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "member_messages", filter: `conversation_id=eq.${conversationId}` }, () => { if (scope.live(lease)) void loadThread(false); })
+      .subscribe((status) => { if (scope.live(lease)) setConnection(status === "SUBSCRIBED" ? "Live" : status === "CHANNEL_ERROR" || status === "TIMED_OUT" ? "Reconnecting" : "Connecting"); });
+    const refresh = () => { if (scope.live(lease) && document.visibilityState === "visible") void loadThread(false); };
     const timer = window.setInterval(refresh, 12000);
     window.addEventListener("focus", refresh);
     window.addEventListener("online", refresh);
@@ -206,15 +215,19 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
   }, [thread?.messages]);
 
   async function loadOlderMessages() {
+    if (!currentComposer()) return;
     if (!thread?.nextMessageCursor || loadingOlderMessages || !conversationId) return;
+    const scope = sessionScope.current, lease = scope?.lease();
+    if (!scope || !lease?.actorId) return;
     const beforeHeight = messageList.current?.scrollHeight || 0;
     const beforeTop = messageList.current?.scrollTop || 0;
     setLoadingOlderMessages(true);
     setError("");
     try {
       const payload = await messageFetch<{ ok: boolean; conversation: MemberConversationThread }>(
-        `/api/messages/${conversationId}?cursor=${encodeURIComponent(thread.nextMessageCursor)}`
+        lease, `/api/messages/${conversationId}?cursor=${encodeURIComponent(thread.nextMessageCursor)}`
       );
+      if (!scope.live(lease)) return;
       loadingHistory.current = true;
       setThread((current) => current ? {
         ...current,
@@ -223,13 +236,14 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
         nextMessageCursor: payload.conversation.nextMessageCursor
       } : payload.conversation);
       window.requestAnimationFrame(() => {
-        if (messageList.current) messageList.current.scrollTop = messageList.current.scrollHeight - beforeHeight + beforeTop;
+        if (scope.live(lease) && messageList.current) messageList.current.scrollTop = messageList.current.scrollHeight - beforeHeight + beforeTop;
       });
-    } catch (reason) { handleRequestError(reason); }
-    finally { setLoadingOlderMessages(false); }
+    } catch (reason) { if (scope.live(lease)) handleRequestError(reason); }
+    finally { if (scope.live(lease)) setLoadingOlderMessages(false); }
   }
 
   function chooseFiles(selected: FileList | null) {
+    if (!currentComposer()) return;
     setNotice("");
     const next = [...files, ...Array.from(selected || [])];
     if (next.length > MEMBER_MEDIA_COUNT_LIMIT) return setNotice(ui("ui.components.MessagesClient.050263ed6fbc", "A message can include up to four photos or videos."));
@@ -238,44 +252,60 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
     setFiles(next);
   }
 
-  async function discardPending(attempt: PendingSend | null) {
+  async function discardPending(lease: MessageLease, attempt: PendingSend | null) {
     if (!attempt?.uploaded || !conversationId) return;
-    await messageFetch(`/api/messages/${conversationId}/uploads`, { method: "DELETE", body: JSON.stringify({ operationId: attempt.operationId }) }).catch(() => undefined);
+    await messageFetch(lease, `/api/messages/${conversationId}/uploads`, { method: "DELETE", body: JSON.stringify({ operationId: attempt.operationId }) }).catch(() => undefined);
   }
 
   async function sendMessage() {
-    if (!conversationId || sending) return;
+    const scope = sessionScope.current, lease = scope?.lease();
+    if (!conversationId || sending || sendLock.current || !scope || !lease?.actorId || !currentComposer()) return;
     const cleanDraft = draft.trim();
     if (!cleanDraft && !files.length) return setNotice(ui("ui.components.MessagesClient.082e906c9e36", "Write a message or attach a photo or video."));
-    const attempt = pendingSend.current || { operationId: crypto.randomUUID(), message: cleanDraft, files: [...files], uploaded: false };
+    const attempt = pendingSend.current || { operationId: crypto.randomUUID(), message: cleanDraft, files: [...files], uploaded: false, uploadIds: files.map(() => crypto.randomUUID()), nextUpload: 0, uncertain: false };
     pendingSend.current = attempt;
+    sendLock.current = true;
     setSending(true);
     setError("");
     setNotice("");
     try {
-      if (attempt.files.length && !attempt.uploaded) {
-        const prepared = await messageFetch<{ ok: boolean; uploads: UploadIntent[] }>(`/api/messages/${conversationId}/uploads`, {
+      if (attempt.files.length && !attempt.uploads) {
+        const prepared = await messageFetch<{ ok: boolean; uploads: UploadIntent[] }>(lease, `/api/messages/${conversationId}/uploads`, {
           method: "POST",
           body: JSON.stringify({
             operationId: attempt.operationId,
-            files: attempt.files.map((file) => ({ uploadId: crypto.randomUUID(), fileName: file.name, mimeType: file.type, fileSizeBytes: file.size }))
+            files: attempt.files.map((file, index) => ({ uploadId: attempt.uploadIds[index], fileName: file.name, mimeType: file.type, fileSizeBytes: file.size }))
           })
         });
+        if (!scope.live(lease)) return;
+        if (!Array.isArray(prepared.uploads) || prepared.uploads.length !== attempt.files.length || prepared.uploads.some((intent, i) => !intent || intent.uploadId !== attempt.uploadIds[i] || typeof intent.path !== "string" || !intent.path || typeof intent.token !== "string" || !intent.token)) throw new MessageRequestError("The attachment preparation could not be confirmed.", 0, true);
+        attempt.uploads = prepared.uploads;
         attempt.uploaded = true;
+      }
+      if (attempt.uploads) {
         const supabase = createBrowserSupabaseClient();
-        for (let index = 0; index < prepared.uploads.length; index += 1) {
-          const intent = prepared.uploads[index];
-          const uploaded = await supabase.storage.from(MEMBER_MEDIA_BUCKET).uploadToSignedUrl(intent.path, intent.token, attempt.files[index], {
+        for (let index = attempt.nextUpload; index < attempt.uploads.length; index += 1) {
+          const intent = attempt.uploads[index];
+          const uploaded = await scope.upload(lease, () => supabase.storage.from(MEMBER_MEDIA_BUCKET).uploadToSignedUrl(intent.path, intent.token, attempt.files[index], {
             contentType: attempt.files[index].type,
             cacheControl: "3600"
-          });
-          if (uploaded.error) throw new MessageRequestError(`Could not upload ${attempt.files[index].name}.`, 422);
+          }));
+          if (!scope.live(lease)) return;
+          // A protected retry cannot overwrite bytes. Existing-object conflicts
+          // still require the send API to verify the prepared type and size.
+          if (uploaded.error) {
+            const status = Number((uploaded.error as { statusCode?: string }).statusCode) || 0;
+            if (!(attempt.uncertain && status === 409)) throw new MessageRequestError(`Could not upload ${attempt.files[index].name}.`, status, !status || status >= 500 || status === 408);
+          }
+          attempt.nextUpload = index + 1;
         }
       }
-      await messageFetch(`/api/messages/${conversationId}/send`, {
+      const sent = await messageFetch<{ messageId: string }>(lease, `/api/messages/${conversationId}/send`, {
         method: "POST",
         body: JSON.stringify({ operationId: attempt.operationId, message: attempt.message })
       });
+      if (!scope.live(lease)) return;
+      if (typeof sent.messageId !== "string" || !sent.messageId) throw new MessageRequestError("The send could not be confirmed.", 0, true);
       pendingSend.current = null;
       setUncertainSend(false);
       setDraft("");
@@ -283,23 +313,26 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
       setNotice(ui("ui.components.MessagesClient.a3d34439a016", "Message sent."));
       await loadThread(false);
     } catch (reason) {
+      if (!scope.live(lease)) return;
       const failure = reason instanceof MessageRequestError ? reason : new MessageRequestError("The send could not be confirmed.", 0, true);
-      if (failure.uncertain) {
+      if (failure.uncertain || attempt.uncertain) {
+        attempt.uncertain = true;
         setUncertainSend(true);
         setError(ui("ui.components.MessagesClient.83f2c9bb85e1", "{{value1}} Retry will use the same protected send operation.", {value1: failure.message}));
       } else {
-        await discardPending(attempt);
+        await discardPending(lease, attempt);
+        if (!scope.live(lease)) return;
         pendingSend.current = null;
         setUncertainSend(false);
         setError(failure.message);
       }
-    } finally { setSending(false); }
+    } finally { if (scope.live(lease)) { sendLock.current = false; setSending(false); } }
   }
 
   const signinHref = `/login?next=${encodeURIComponent(conversationId ? `/messages/${conversationId}` : "/messages")}`;
   if (phase === "loading") return <MessageState icon={<LoaderCircle className={styles.spin} />} title={ui("ui.components.MessagesClient.a690f84ddf9a", "Opening Messages")} copy={ui("ui.components.MessagesClient.f2bb009c8d53", "Loading your private conversations.")} />;
   if (phase === "signed-out") return <MessageState icon={<MessageCircle />} title={ui("ui.components.MessagesClient.239303a784f1", "Sign in to Messages")} copy={ui("ui.components.MessagesClient.71bf7347acaa", "Private conversations are available to signed-in QRguitar members.")} action={<Link className="button" href={signinHref}>{ui("ui.components.MessagesClient.bfd402b2f6f3", "Sign in")}</Link>} />;
-  if (phase === "error" && !thread && !conversations.length) return <MessageState icon={<RefreshCw />} title={ui("ui.components.MessagesClient.5326173134ea", "Messages are unavailable")} copy={error} action={<button className="button" type="button" onClick={() => conversationId ? void loadThread() : void loadInbox()}>{ui("ui.components.MessagesClient.d8b8392e2c54", "Try again")}</button>} />;
+  if (phase === "error" && !thread && !conversations.length) return <MessageState icon={<RefreshCw />} title={ui("ui.components.MessagesClient.5326173134ea", "Messages are unavailable")} copy={error} action={<button className="button" type="button" onClick={() => { if (!sessionScope.current?.lease().actorId) void sessionScope.current?.start(); else if (conversationId) void loadThread(); else void loadInbox(); }}>{ui("ui.components.MessagesClient.d8b8392e2c54", "Try again")}</button>} />;
 
   if (!conversationId) {
     return (
@@ -358,8 +391,8 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
           </div>
           <div className={styles.composer}>
               <label htmlFor="member-message-draft">{ui("ui.components.MessagesClient.2f77668a9dfb", "Message")}</label>
-              <textarea id="member-message-draft" rows={3} maxLength={4000} value={draft} disabled={lockComposer} onChange={(event) => setDraft(event.target.value)} placeholder={ui("ui.components.MessagesClient.577c10d6f210", "Message {{value1}}", { value1: thread.member.publicName })} />
-              {files.length ? <ul className={styles.fileList}>{files.map((file, index) => <li key={`${file.name}-${file.lastModified}-${index}`}><FileImage size={15} /><span><strong>{file.name}</strong><small>{fileSize(file.size)}</small></span><button type="button" disabled={lockComposer} title={ui("ui.components.MessagesClient.d2f6b9b77710", "Remove {{value1}}", { value1: file.name })} onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={15} /></button></li>)}</ul> : null}
+              <textarea id="member-message-draft" rows={3} maxLength={4000} value={draft} disabled={lockComposer} onChange={(event) => { if (currentComposer()) setDraft(event.target.value); }} placeholder={ui("ui.components.MessagesClient.577c10d6f210", "Message {{value1}}", { value1: thread.member.publicName })} />
+              {files.length ? <ul className={styles.fileList}>{files.map((file, index) => <li key={`${file.name}-${file.lastModified}-${index}`}><FileImage size={15} /><span><strong>{file.name}</strong><small>{fileSize(file.size)}</small></span><button type="button" disabled={lockComposer} title={ui("ui.components.MessagesClient.d2f6b9b77710", "Remove {{value1}}", { value1: file.name })} onClick={() => { if (currentComposer()) setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index)); }}><X size={15} /></button></li>)}</ul> : null}
               <div className={styles.composerActions}>
                 <label className={styles.attachButton}><ImagePlus size={17} /><span>{ui("ui.components.MessagesClient.d5d5d266ceab", "Add media")}</span><input type="file" multiple accept={MEMBER_MEDIA_TYPES.join(",")} disabled={lockComposer || files.length >= 4} onChange={(event) => { chooseFiles(event.target.files); event.currentTarget.value = ""; }} /></label>
                 <span>{draft.length}/4000</span>

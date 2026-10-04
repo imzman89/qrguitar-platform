@@ -9,7 +9,6 @@ import { loadHandoutInstrument } from "../../../lib/handout-load";
 import Link from "next/link";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
 import { ArrowLeft, CheckCircle2, ExternalLink, FileText, Maximize, Printer, QrCode, RotateCcw, ShieldCheck, Siren, SlidersHorizontal, X, ZoomIn, ZoomOut } from "lucide-react";
-import QRCode from "qrcode";
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Footer } from "../../../components/Footer";
@@ -23,24 +22,29 @@ import {
 } from "../../../lib/local-demo";
 import { formatRecordLocation } from "../../../lib/record-location";
 import { createBrowserSupabaseClient } from "../../../lib/supabase-browser";
-import { resolveInstrumentPresentation } from "../../../lib/instrument-profile-contract";
+import { resolveInstrumentPresentation, sanitizePublicInstrument } from "../../../lib/instrument-profile-contract";
 import { getContentValue } from "../../../lib/content-registry";
 import { useSiteContent } from "../../../lib/use-site-content";
 import styles from "./print-suite.module.css";
 import { PrintDocument } from "./PrintDocument";
 import { publicProfileUrl } from "../../../lib/profile-url";
-import { normalizePrintOptions, printFormats as formatConfig, printGeometry, printReadiness, type PrintMode, type PrintSize, type PrintOrientation } from "../../../lib/print-layout";
+import { normalizePrintOptions, printFormats as formatConfig, printGeometry, printReadiness, printSpecifications, printPlacement, qrSideMillimeters, type PrintMode, type PrintSize, type PrintOrientation } from "../../../lib/print-layout";
+import { beginQrRender } from "../../../lib/qr-output";
+import { printQrSvg, printQrPng, qrPrintMetrics, svgDataUrl } from "../../../lib/qr-print-output";
 
 type PrintScope = "public" | "owner";
 
-const modeOrder: PrintMode[] = ["label", "hangtag", "handout", "service"];
+const modeOrder: PrintMode[] = ["handout", "hangtag", "label", "qr", "service"];
 
 
 const printSizeLabels: Record<PrintSize, string> = {
-  letter: "US Letter",
-  a4: "A4",
-  "4x6": "4 x 6",
-  compact: "3.5 x 2.25 label"
+  letter: "US Letter · 8.5 × 11 in",
+  a4: "A4 · 210 × 297 mm",
+  "4x6": "4 × 6 in",
+  compact: "3.5 × 2.25 in",
+  qr25: "25 × 25 mm (0.98 in)",
+  qr32: "32 × 32 mm (1.26 in)",
+  qr38: "38 × 38 mm (1.50 in)"
 };
 
 function formatServiceDate(entry: ServiceHistoryEntry) {
@@ -95,10 +99,13 @@ export default function HandoutPage() {
     : "handout";
   const requested = normalizePrintOptions(requestedMode, searchParams.get("size"), searchParams.get("orientation"));
   const [instrument, setInstrument] = useState<DemoInstrument | null>(null);
+  const [loadedCode, setLoadedCode] = useState("");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [loadAttempt, setLoadAttempt] = useState(0);
-  const [qrDataUrl, setQrDataUrl] = useState("");
+  const [qrRendered, setQrRendered] = useState({ key: "", url: "", error: "" });
+  const [pngRendered, setPngRendered] = useState({ key: "", url: "", error: "" });
+  const [qrRetry, setQrRetry] = useState(0);
   const [mode, setMode] = useState<PrintMode>(requestedMode);
   const [ownerAuthorized, setOwnerAuthorized] = useState(false);
   const [printScope, setPrintScope] = useState<PrintScope>("public");
@@ -122,7 +129,6 @@ export default function HandoutPage() {
   const [printNote, setPrintNote] = useState("");
   const [printTitle, setPrintTitle] = useState<string | null>(null);
   const [includeServiceDetails, setIncludeServiceDetails] = useState(true);
-  const [qrError, setQrError] = useState("");
   const [printState, setPrintState] = useState("Preparing the selected page.");
   const [printing, setPrinting] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(700);
@@ -132,6 +138,12 @@ export default function HandoutPage() {
   const renderedRevision = useRef(-1);
   const canonicalCode = instrument?.qrCode || code;
   const profileUrl = publicProfileUrl(canonicalCode);
+  const qrSideMm = qrSideMillimeters(printSize);
+  const qrRenderKey = JSON.stringify([canonicalCode, qrSideMm, qrRetry]);
+  const qrDataUrl = qrRendered.key === qrRenderKey ? qrRendered.url : "";
+  const qrError = qrRendered.key === qrRenderKey ? qrRendered.error : "";
+  const pngDataUrl = pngRendered.key === qrRenderKey ? pngRendered.url : "";
+  const pngError = pngRendered.key === qrRenderKey ? pngRendered.error : "";
 
   useEffect(() => {
     setPrintNote("");
@@ -163,6 +175,8 @@ export default function HandoutPage() {
     let cancelled = false;
     let authResolved = false;
     let currentActor: string | undefined;
+    let sessionRevision = 0;
+    let restoring = false;
     let controller: AbortController | undefined;
     const requestRevision = loadRevision;
     const visibleRevision = renderedRevision;
@@ -174,6 +188,7 @@ export default function HandoutPage() {
       setLoading(true);
       setMessage("");
       setInstrument(null);
+      setLoadedCode("");
       setOwnerAuthorized(false);
       setPrintScope("public");
       setSelectedServiceId("");
@@ -196,6 +211,7 @@ export default function HandoutPage() {
         if (!isCurrent()) return;
         visibleRevision.current = revision;
         setInstrument(result.instrument);
+        setLoadedCode(code);
         setOwnerAuthorized(result.ownerAuthorized);
         if (result.instrument.qrCode && result.instrument.qrCode !== code) {
           const query = searchParams.toString();
@@ -210,20 +226,43 @@ export default function HandoutPage() {
 
     function applySession(session: { user?: { id?: string }; access_token?: string } | null, force = false) {
       if (cancelled) return;
+      sessionRevision++;
       authResolved = true;
       window.clearTimeout(authTimeout);
       const nextActor = session?.user?.id || "";
-      if (currentActor === nextActor && !force) return;
+      const recheckOwnership = force || restoring;
+      restoring = false;
+      if (currentActor === nextActor && !recheckOwnership) return;
       currentActor = nextActor;
       invalidatePrivateState();
       void loadHandoutProfile(nextActor ? session?.access_token || "" : "");
     }
 
     // A failed or unavailable session check must still permit anonymous public printing.
-    const authTimeout = window.setTimeout(() => applySession(null), 2500);
+    let authTimeout = window.setTimeout(() => applySession(null), 2500);
     let unsubscribe: (() => void) | undefined;
+    let removeRestoreListener: (() => void) | undefined;
     try {
       const supabase = createBrowserSupabaseClient();
+      function restoreFromCache(event: PageTransitionEvent) {
+        if (!event.persisted || cancelled) return;
+        // A restored page is a memory snapshot, not a fresh ownership read.
+        authResolved = true;
+        restoring = true;
+        const revision = ++sessionRevision;
+        invalidatePrivateState();
+        window.clearTimeout(authTimeout);
+        authTimeout = window.setTimeout(() => {
+          if (!cancelled && revision === sessionRevision) applySession(null, true);
+        }, 2500);
+        void supabase.auth.getSession().then(({ data, error }) => {
+          if (!cancelled && revision === sessionRevision) applySession(error ? null : data.session, true);
+        }).catch(() => {
+          if (!cancelled && revision === sessionRevision) applySession(null, true);
+        });
+      }
+      window.addEventListener("pageshow", restoreFromCache);
+      removeRestoreListener = () => window.removeEventListener("pageshow", restoreFromCache);
       const { data: listener } = supabase.auth.onAuthStateChange((event, session) => applySession(session, event === "SIGNED_OUT"));
       unsubscribe = () => listener.subscription.unsubscribe();
       void supabase.auth.getSession().then(({ data }) => {
@@ -237,32 +276,25 @@ export default function HandoutPage() {
       visibleRevision.current = -1;
       controller?.abort();
       window.clearTimeout(authTimeout);
+      removeRestoreListener?.();
       unsubscribe?.();
     };
   }, [code, router, searchParams, loadAttempt]);
 
   useEffect(() => {
-    let cancelled = false;
-    setQrDataUrl("");
-    setQrError("");
-    QRCode.toDataURL(profileUrl, {
-      errorCorrectionLevel: "H",
-      margin: 4,
-      width: 720,
-      color: {
-        dark: "#071014",
-        light: "#ffffff"
-      }
-    }).then((url) => {
-      if (!cancelled) {
-        setQrDataUrl(url);
-      }
-    }).catch(() => { if (!cancelled) setQrError("The QR code could not be prepared. Reload the page and try again."); });
+    return beginQrRender(
+      async () => svgDataUrl(await printQrSvg(canonicalCode, qrSideMm)),
+      result => setQrRendered({ key: qrRenderKey, ...result, error: result.error ? "The QR code could not be prepared. Try again." : "" })
+    );
+  }, [canonicalCode, qrSideMm, qrRenderKey]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [profileUrl]);
+  useEffect(() => {
+    if (mode !== "qr" || !instrument || loading) return;
+    return beginQrRender(
+      () => printQrPng(canonicalCode, qrSideMm),
+      result => setPngRendered({ key: qrRenderKey, ...result, error: result.error ? "The PNG could not be prepared. Try again." : "" })
+    );
+  }, [canonicalCode, qrSideMm, qrRenderKey, mode, instrument, loading]);
 
   const title = instrument ? instrumentDisplayName(instrument) : code;
   const printedTitle = printTitle?.trim() || title;
@@ -289,23 +321,16 @@ export default function HandoutPage() {
   );
   const selectedService = printableServiceEntries.find((entry) => entry.id === selectedServiceId) || printableServiceEntries[0] || null;
   const timelineEntries = presentation?.meaningfulTimelineEvents || [];
-  const printableSpecs = instrument ? [
-    ["Type", instrument.instrumentType],
-    ["Finish", instrument.finish],
-    ["Body", instrument.bodyWood],
-    ["Neck", instrument.neckWood],
-    ["Pickups", instrument.pickups],
-    ...(instrument.customFields || []).map((field) => [field.label, field.value])
-  ].filter((entry): entry is string[] => Boolean(entry[0] && entry[1])).slice(0, 8) : [];
-  const primaryFacts = instrument ? [instrument.brand, instrument.year, location].filter(Boolean) : [];
-  const isPrivate = instrument?.visibility === "private";
+  const printableInstrument = instrument && !(printScope === "owner" && ownerAuthorized) ? sanitizePublicInstrument(instrument) : instrument;
+  const printableSpecs = printableInstrument ? printSpecifications(printableInstrument) : [];
+  const primaryFacts = instrument ? [instrument.instrumentType, instrument.brand, instrument.year, location].filter((value): value is string => Boolean(value)) : [];
   const activeFormat = formatConfig[mode];
   const availableModes = modeOrder.filter((candidate) => candidate !== "service" || printableServiceEntries.length > 0 || (loading && candidate === mode));
   const geometry = printGeometry(printSize, orientation);
   const resolvedPageDimensions = `${geometry.width}in ${geometry.height}in`;
   const previewScale = Math.min(1, Math.max(0.1, (viewportWidth - 32) / (geometry.width * 96))) * zoom / 100;
   const optionKey = JSON.stringify([mode, printSize, orientation, theme, photoUrl, photoFit, printScope, serialDisplay, includePhoto, includeLogo, includeAvailability, includeAttribution, includeSpecifications, includeTimeline, includeUrlLabel, includeScanInstruction, selectedServiceId, includeServiceDetails, printNote, printedTitle]);
-  const readyToPrint = !loading && renderedRevision.current === loadRevision.current && Boolean(instrument && qrDataUrl) && !qrError && printState === "Ready to print.";
+  const readyToPrint = loadedCode === code && !loading && renderedRevision.current === loadRevision.current && Boolean(instrument && qrDataUrl) && !qrError && printState === "Ready to print.";
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -339,7 +364,7 @@ export default function HandoutPage() {
   }, [instrument, qrDataUrl, optionKey]);
 
   function printSelectedPage() {
-    if (!readyToPrint || printing || renderedRevision.current !== loadRevision.current) return;
+    if (!readyToPrint || loadedCode !== code || printing || renderedRevision.current !== loadRevision.current) return;
     const root = canvasRef.current?.querySelector<HTMLElement>("[data-print-document]");
     if (!root) return;
     const currentReadiness = printReadiness(Array.from(root.querySelectorAll("img")), root.scrollHeight > root.clientHeight + 2 || root.scrollWidth > root.clientWidth + 2);
@@ -401,10 +426,11 @@ export default function HandoutPage() {
   }
 
   function printModeLabel(value: PrintMode) {
-    if (value === "label") return getContentValue(content, "printWorkspace.label");
-    if (value === "hangtag") return getContentValue(content, "printWorkspace.hangtag");
-    if (value === "handout") return getContentValue(content, "printWorkspace.handout");
-    return getContentValue(content, "printWorkspace.service");
+    if (value === "label") return ui("ui.app.handout.code.page.formatLabel", "Label");
+    if (value === "hangtag") return ui("ui.app.handout.code.page.formatHangTag", "Hang tag");
+    if (value === "handout") return ui("ui.app.handout.code.page.formatProfileSheet", "Profile sheet");
+    if (value === "qr") return ui("ui.app.handout.code.page.formatQrOnly", "QR only");
+    return ui("ui.app.handout.code.page.formatService", "Service summary");
   }
 
   function renderBadges() {
@@ -443,6 +469,8 @@ export default function HandoutPage() {
               <h1>{getContentValue(content, "printWorkspace.title")}</h1>
             </div>
             <div className="print-kit-toolbar-actions">
+              {mode === "qr" && readyToPrint ? <a className="button secondary" href={qrDataUrl} download={`qrguitar-${canonicalCode}-${qrSideMm}mm.svg`}>{ui("ui.app.handout.code.page.downloadSvg", "Download SVG")}</a> : null}
+              {mode === "qr" ? pngDataUrl && readyToPrint ? <a className="button secondary" href={pngDataUrl} download={`qrguitar-${canonicalCode}-${qrSideMm}mm.png`}>{ui("ui.app.handout.code.page.downloadPng", "Download PNG")}</a> : <button className="button secondary" type="button" disabled>{pngError ? "PNG unavailable" : "Preparing PNG"}</button> : null}
               <Link className={styles.profileLink} href={instrument ? ownerProfileHref(instrument) : "/dashboard"} target="_blank">
                 <ExternalLink size={16} />{ui("ui.app.handout.code.page.f9d77f6cb2f2", "Open Profile")}</Link>
               <button className="button" type="button" onClick={printSelectedPage} disabled={!readyToPrint || printing}>
@@ -482,21 +510,21 @@ export default function HandoutPage() {
                   <button type="button" aria-label={ui("ui.app.handout.code.page.f14f3c9238ed", "Close print options")} onClick={() => setMobileControlsOpen(false)}><X size={17} /></button>
                 </div>
                 <div className={styles.controlGrid}>
-                  {activeFormat.sizes.length > 1 ? <label>{ui("ui.app.handout.code.page.35045eff549e", "Paper")}<select value={printSize} onChange={(event) => setPrintSize(event.target.value as PrintSize)}>{activeFormat.sizes.map((size) => <option value={size} key={size}>{printSizeLabels[size]}</option>)}</select></label> : null}
+                  {activeFormat.sizes.length > 1 ? <label>{mode === "qr" ? ui("ui.app.handout.code.page.qrSize", "QR size") : ui("ui.app.handout.code.page.35045eff549e", "Paper")}<select value={printSize} onChange={(event) => setPrintSize(event.target.value as PrintSize)}>{activeFormat.sizes.map((size) => <option value={size} key={size}>{printSizeLabels[size]}</option>)}</select></label> : null}
                   {activeFormat.orientations.length > 1 ? <label>{ui("ui.app.handout.code.page.e3d11242200f", "Orientation")}<select value={orientation} onChange={(event) => setOrientation(event.target.value as PrintOrientation)}>{activeFormat.orientations.map((value) => <option value={value} key={value}>{value === "portrait" ? ui("ui.app.handout.code.page.f71094c30160", "Portrait") : ui("ui.app.handout.code.page.e658d3ae034a", "Landscape")}</option>)}</select></label> : null}
                 </div>
 
-                {ownerAuthorized ? (
+                {ownerAuthorized && mode !== "qr" ? (
                   <fieldset className={styles.controlSection}>
                     <legend className={styles.controlLabel}>{ui("ui.app.handout.code.page.2b4946ae1386", "Copy type")}</legend>
-                    <label className={styles.choice}><input type="radio" name="print-scope" checked={printScope === "public"} onChange={() => setPrintScope("public")} /><span><strong>{ui("ui.app.handout.code.page.ef50a2af62ff", "Public-safe copy")}</strong><small>{ui("ui.app.handout.code.page.51a370754ef7", "Includes only information allowed on the public Profile.")}</small></span></label>
-                    <label className={styles.choice}><input type="radio" name="print-scope" checked={printScope === "owner"} onChange={() => setPrintScope("owner")} /><span><strong>{ui("ui.app.handout.code.page.9732ac52e538", "Owner copy")}</strong><small>{ui("ui.app.handout.code.page.5c027d45a7ce", "May include a hidden Serial Number. Do not share this copy if it contains private information.")}</small></span></label>
+                    <label className={styles.choice}><input type="radio" name="print-scope" checked={printScope === "public"} onChange={() => setPrintScope("public")} /><span><strong>{ui("ui.app.handout.code.page.sharedCopy", "Shared copy")}</strong><small>{ui("ui.app.handout.code.page.sharedCopyDescription", "Includes the information shown on the Profile.")}</small></span></label>
+                    <label className={styles.choice}><input type="radio" name="print-scope" checked={printScope === "owner"} onChange={() => setPrintScope("owner")} /><span><strong>{ui("ui.app.handout.code.page.9732ac52e538", "Owner copy")}</strong><small>{ui("ui.app.handout.code.page.ownerCopyDescription", "May include a hidden serial number and purchase details. Keep this copy for your records.")}</small></span></label>
                   </fieldset>
                 ) : null}
 
                 {mode === "service" ? <label className={styles.controlSection}><span className={styles.controlLabel}>{ui("ui.app.handout.code.page.cd06117a4a90", "Service Entry")}</span><select value={selectedService?.id || ""} onChange={(event) => setSelectedServiceId(event.target.value)}>{printableServiceEntries.map((entry) => <option value={entry.id} key={entry.id}>{formatServiceDate(entry)} - {entry.title}</option>)}</select></label> : null}
 
-                <details className={styles.optionGroup}>
+                {mode !== "qr" ? <details className={styles.optionGroup}>
                   <summary>{ui("ui.app.handout.code.page.616f48c1db19", "Fields")}</summary>
                   <div className={styles.toggleGrid}>
                     <label><input type="checkbox" checked={includeLogo} onChange={(event) => setIncludeLogo(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.d707dc2f1936", "Logo")}</label>
@@ -507,23 +535,25 @@ export default function HandoutPage() {
                     {activeFormat.specifications && printableSpecs.length ? <label><input type="checkbox" checked={includeSpecifications} onChange={(event) => setIncludeSpecifications(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.015b4e0a76e5", "Specifications")}</label> : null}
                     {activeFormat.timeline && timelineEntries.length ? <label><input type="checkbox" checked={includeTimeline} onChange={(event) => setIncludeTimeline(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.a7a952cb15e6", "Timeline summary")}</label> : null}
                   </div>
-                </details>
+                </details> : null}
 
                 {activeFormat.photo && includePhoto && galleryImages.length ? <div className={styles.controlGrid}>
                   {galleryImages.length > 1 ? <label>{ui("ui.app.handout.code.page.bb1de9720797", "Photograph")}<select value={photoUrl} onChange={(event) => setSelectedPhoto(event.target.value)}>{galleryImages.map((url, index) => <option value={url} key={url}>{index === 0 ? ui("ui.app.handout.code.page.7cbea1608d56", "Main photograph") : ui("ui.app.handout.code.page.db641bc07db6", "Photograph {{value1}}", { value1: index + 1 })}</option>)}</select></label> : null}
                   <label>{ui("ui.app.handout.code.page.a27757d6372e", "Photo framing")}<select value={photoFit} onChange={(event) => setPhotoFit(event.target.value as "contain" | "cover")}><option value="contain">{ui("ui.app.handout.code.page.732c51dcff54", "Show whole photo")}</option><option value="cover">{ui("ui.app.handout.code.page.33d0dc3a81a2", "Fill photo area")}</option></select></label>
                 </div> : null}
                 {mode === "service" ? <label className={styles.choice}><input type="checkbox" checked={includeServiceDetails} onChange={(event) => setIncludeServiceDetails(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.b7a17f6da566", "Full service details")}</label> : null}
-                <label className={styles.controlSection}><span className={styles.controlLabel}>{ui("ui.app.handout.code.page.eaea51b2ef4f", "Title on this printout")}</span><input type="text" maxLength={120} value={printTitle ?? title} onChange={(event) => setPrintTitle(event.target.value)} /></label>
-                {mode !== "label" ? <label className={styles.controlSection}><span className={styles.controlLabel}>{ui("ui.app.handout.code.page.e100b01df2b6", "Note on this printout")}</span><textarea rows={3} maxLength={240} value={printNote} placeholder={ui("ui.app.handout.code.page.2faf4e50e727", "Care advice, collection details or a message for the recipient")} onChange={(event) => setPrintNote(event.target.value)} /><small>{printNote.length}/240</small></label> : null}
+                {mode !== "qr" ? <label className={styles.controlSection}><span className={styles.controlLabel}>{ui("ui.app.handout.code.page.eaea51b2ef4f", "Title on this printout")}</span><input type="text" maxLength={120} value={printTitle ?? title} onChange={(event) => setPrintTitle(event.target.value)} /></label> : null}
+                {mode !== "label" && mode !== "qr" ? <label className={styles.controlSection}><span className={styles.controlLabel}>{ui("ui.app.handout.code.page.e100b01df2b6", "Note on this printout")}</span><textarea rows={3} maxLength={240} value={printNote} placeholder={ui("ui.app.handout.code.page.2faf4e50e727", "Care advice, collection details or a message for the recipient")} onChange={(event) => setPrintNote(event.target.value)} /><small>{printNote.length}/240</small></label> : null}
 
-                <details className={styles.optionGroup}>
+                {mode !== "qr" ? <details className={styles.optionGroup}>
                   <summary>{ui("ui.app.handout.code.page.a439fba430a3", "QR")}</summary>
                   <div className={styles.toggleGrid}>
                     <label><input type="checkbox" checked={includeUrlLabel} onChange={(event) => setIncludeUrlLabel(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.b36c5aceb02f", "URL label")}</label>
                     <label><input type="checkbox" checked={includeScanInstruction} onChange={(event) => setIncludeScanInstruction(event.target.checked)} />{" "}{ui("ui.app.handout.code.page.eaf0a0e32cc3", "Scan instruction")}</label>
                   </div>
-                </details>
+                </details> : null}
+
+                <p className={styles.printAdvice}>{ui("ui.app.handout.code.page.placement", "{{value1}}", { value1: printPlacement(instrument.instrumentType) })}</p>
 
                 <div className={styles.controlActions}>
                   <button type="button" className={styles.resetButton} onClick={resetPrintOptions}><RotateCcw size={14} /> {getContentValue(content, "printWorkspace.reset")}</button>
@@ -548,10 +578,12 @@ export default function HandoutPage() {
               {instrument ? <div className={`${styles.validation} no-print`} role="status">
                 {readyToPrint ? <CheckCircle2 size={16} /> : <FileText size={16} />}
                 <span>{qrError || printState}</span>
+                {qrError ? <button type="button" className={styles.resetButton} onClick={() => setQrRetry(value => value + 1)}>{ui("ui.app.handout.code.page.d8b8392e2c54", "Try again")}</button> : null}
               </div> : null}
 
-              {isPrivate ? <p className={`${styles.scopeNotice} no-print`}>{ui("ui.app.handout.code.page.9db2256ef43c", "This Profile is private. The printed QR will not open for customers until you change its visibility.")}</p> : null}
-              {printScope === "owner" ? <p className={`${styles.scopeNotice} no-print`}>{ui("ui.app.handout.code.page.35e225fbf65f", "Owner copy: may contain information hidden from the public Profile.")}</p> : null}
+              {instrument ? <p className={`${styles.printAdvice} no-print`}>{ui("ui.app.handout.code.page.printScale", "Print at 100% or Actual size. Match the paper size and turn off headers and footers. Choose Save as PDF in the print dialog.")}{mode === "qr" ? <> {ui("ui.app.handout.code.page.qrDimensions", "Size includes the white border. Keep it clear; test a print before making more.")} {ui("ui.app.handout.code.page.pngPixels", "PNG: {{value1}} × {{value1}} pixels. Set the selected size when placing it; SVG includes dimensions.", { value1: qrPrintMetrics(canonicalCode, qrSideMm).pixelWidth })}</> : null}</p> : null}
+              {mode === "qr" && pngError ? <p className={`${styles.printAdvice} no-print`} role="alert">{pngError} <button type="button" className={styles.resetButton} onClick={() => setQrRetry(value => value + 1)}>{ui("ui.app.handout.code.page.d8b8392e2c54", "Try again")}</button></p> : null}
+              {mode !== "qr" && printScope === "owner" ? <p className={`${styles.scopeNotice} no-print`}>{ui("ui.app.handout.code.page.ownerCopyNotice", "Owner copy: may contain information hidden from the Profile.")}</p> : null}
               <div className={styles.canvasViewport} data-print-frame ref={viewportRef}>
                 {loading || !instrument ? (
                   <section className={`${styles.loadStatus} no-print`} role="status" aria-live="polite" aria-atomic="true">

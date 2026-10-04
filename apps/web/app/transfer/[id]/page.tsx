@@ -38,10 +38,14 @@ export default function TransferClaimPage() {
   const acceptMutation = useRef<{ revision: number } | null>(null);
   const [signedIn, setSignedIn] = useState(false);
   const [accepting, setAccepting] = useState(false);
+  const [acceptUncertain, setAcceptUncertain] = useState(false);
+  const uncertainLock = useRef(false);
+  const acceptController = useRef<AbortController | null>(null);
   const { logout: logoutForSwitch, signingOut: switchingAccount, logoutError: switchError } = useAuthNavigation();
+  const renderedAuthRevision = authRevision.current;
 
   async function switchRecipientAccount() {
-    if (accepting || acceptMutation.current || switchingAccount) return;
+    if (renderedAuthRevision !== authRevision.current || accepting || acceptMutation.current || switchingAccount) return;
     if (await logoutForSwitch()) window.location.assign(`/login?next=${encodeURIComponent(`/transfer/${transferId}`)}`);
   }
 
@@ -62,7 +66,7 @@ export default function TransferClaimPage() {
     }
     function cleanup() {
       cancelled = true; generation++; authRevision.current++;
-      clearTimeout(authTimer); controller?.abort(); unsubscribe();
+      clearTimeout(authTimer); controller?.abort(); acceptController.current?.abort(); unsubscribe();
     }
     let supabase: ReturnType<typeof createBrowserSupabaseClient>;
     try { supabase = createBrowserSupabaseClient(); }
@@ -72,6 +76,8 @@ export default function TransferClaimPage() {
       authResolved = true; clearTimeout(authTimer);
       const request = ++generation;
       authRevision.current++;
+      if (acceptMutation.current) { uncertainLock.current = true; setAcceptUncertain(true); }
+      acceptController.current?.abort();
       setAccepting(false);
       controller?.abort();
       const requestController = new AbortController();
@@ -92,9 +98,13 @@ export default function TransferClaimPage() {
         if (cancelled || request !== generation || requestController.signal.aborted) return;
         if (response.ok && payload?.requiresSignIn) {
           setRequiresAccess(true); setMessage(ui("ui.app.transfer.id.page.68c903e92912", "Use the recipient account or the current owner account to view this handoff."));
-        } else if (!response.ok || !payload?.ok || !payload.transfer) {
+        } else if (!response.ok || !payload?.ok || !payload.transfer || payload.transfer.id !== transferId || !["sent", "accepted", "cancelled"].includes(payload.transfer.status)) {
           setMessage(payload?.message || ui("ui.app.transfer.id.page.34e5b6deb1c9", "We could not load this transfer.")); setLoadError(response.status >= 500 || response.ok);
-        } else { setTransfer(payload.transfer); setMessage(""); }
+        } else {
+          setTransfer(payload.transfer); setMessage("");
+          if (!acceptMutation.current) { uncertainLock.current = false; setAcceptUncertain(false); }
+          else setLoadError(true);
+        }
       } catch {
         if (!cancelled && request === generation && !requestController.signal.aborted) {
           setLoadError(true); setMessage(ui("ui.app.transfer.id.page.66e1da988511", "We could not load this transfer. Check your connection and try again."));
@@ -125,20 +135,25 @@ export default function TransferClaimPage() {
   }, [permanentPath, transfer?.guitarQrCode]);
 
   async function acceptTransfer() {
-    if (!transfer || accepting || acceptMutation.current?.revision === authRevision.current) {
+    if (renderedAuthRevision !== authRevision.current || !signedIn || !transfer || transfer.id !== transferId || transfer.status !== "sent" || accepting || uncertainLock.current || acceptMutation.current) {
       return;
     }
 
-    const revision = authRevision.current;
+    const revision = renderedAuthRevision;
     const mutation = { revision }; acceptMutation.current = mutation;
     const feedback = ++feedbackRevision.current;
     setAccepting(true);
     setMessage("");
+    const controller = new AbortController(); acceptController.current = controller;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    let abort = () => {};
     try {
+      const payload = await Promise.race([Promise.resolve().then(async () => {
       const token = await getSupabaseAccessToken();
-      if (authRevision.current !== revision) return;
+      if (authRevision.current !== revision || controller.signal.aborted) throw new Error("Interrupted");
       const response = await fetch("/api/transfers", {
         method: "PATCH",
+        signal: controller.signal,
         headers: {
           "Content-Type": "application/json",
           authorization: `Bearer ${token}`
@@ -146,12 +161,19 @@ export default function TransferClaimPage() {
         body: JSON.stringify({ id: transfer.id, action: "accept" })
       });
       const payload = (await response.json().catch(() => null)) as TransferPayload | null;
-      if (authRevision.current !== revision) return;
-
+      if (authRevision.current !== revision || controller.signal.aborted) throw new Error("Interrupted");
+      if (response.status >= 500 || response.status === 408 || (response.ok && (!payload?.ok || payload.transfer?.id !== transfer.id || payload.transfer.status !== "accepted"))) throw new Error("Unconfirmed");
       if (!response.ok || !payload?.ok || !payload.transfer) {
         if (feedbackRevision.current === feedback) setMessage(payload?.message || ui("ui.app.transfer.id.page.d311b7c2186b", "Could not accept this transfer."));
-        return;
+        return null;
       }
+      return payload;
+      }), new Promise<never>((_, reject) => {
+        abort = () => reject(new Error("Unconfirmed"));
+        controller.signal.addEventListener("abort", abort, { once: true });
+        timeout = setTimeout(() => controller.abort(), 20000);
+      })]);
+      if (authRevision.current !== revision || controller.signal.aborted || !payload?.transfer) return;
 
       setTransfer(payload.transfer);
       setPermanentPath(payload.permanentPath || "");
@@ -164,16 +186,20 @@ export default function TransferClaimPage() {
       if (feedbackRevision.current === feedback) setMessage(payload.message || ui("ui.app.transfer.id.page.60ae02829abd", "Ownership accepted. The permanent QRguitar URL stayed the same."));
     } catch {
       if (authRevision.current !== revision) return;
+      uncertainLock.current = true; setAcceptUncertain(true);
       setLoadError(true);
       if (feedbackRevision.current === feedback) setMessage(ui("ui.app.transfer.id.page.dbf639836efe", "We could not confirm the transfer. Reload its status before trying again."));
     } finally {
+      if (timeout !== undefined) clearTimeout(timeout);
+      controller.signal.removeEventListener("abort", abort);
+      if (acceptController.current === controller) acceptController.current = null;
       if (acceptMutation.current === mutation) acceptMutation.current = null;
       if (authRevision.current === revision) setAccepting(false);
     }
   }
 
   async function copyProfileLink() {
-    if (typeof window === "undefined" || accepting || acceptMutation.current?.revision === authRevision.current) {
+    if (renderedAuthRevision !== authRevision.current || transfer?.id !== transferId || typeof window === "undefined" || accepting || acceptMutation.current?.revision === authRevision.current) {
       return;
     }
 
@@ -218,7 +244,7 @@ export default function TransferClaimPage() {
               <div className="eyebrow">{ui("ui.app.transfer.id.page.cbfa6a5b513b", "Ownership transfer")}</div>
               <h1>{loadError ? ui("ui.app.transfer.id.page.64384260ddf0", "Unable to load this transfer") : requiresAccess ? ui("ui.app.transfer.id.page.06ca975631d1", "Sign in with the recipient account") : ui("ui.app.transfer.id.page.ba00298cf2c9", "This transfer is unavailable")}</h1>
               <p>{loadError ? ui("ui.app.transfer.id.page.42c72206d5cf", "Your instrument and transfer have not been changed by this check.") : ui("ui.app.transfer.id.page.227180c6db35", "Check the link and the account you are signed in to, or ask the current owner for help.")}</p>
-              {loadError ? <button type="button" className="button" onClick={() => setLoadAttempt(value => value + 1)}>{ui("ui.app.transfer.id.page.d8b8392e2c54", "Try again")}</button> : null}
+              {loadError ? <button type="button" className="button" onClick={() => { if (renderedAuthRevision === authRevision.current) setLoadAttempt(value => value + 1); }}>{ui("ui.app.transfer.id.page.d8b8392e2c54", "Try again")}</button> : null}
               {!signedIn ? <Link className="button" href={"/login?next=" + encodeURIComponent("/transfer/" + transferId)}>{ui("ui.app.transfer.id.page.bfd402b2f6f3", "Sign in")}</Link> : null}
               {requiresAccess && signedIn ? <button type="button" className="button" disabled={switchingAccount} onClick={() => void switchRecipientAccount()}>{switchingAccount ? ui("ui.app.transfer.id.page.switchingAccount", "Signing out...") : ui("ui.app.transfer.id.page.useAnotherAccount", "Use another account")}</button> : null}
               {requiresAccess && signedIn ? <p>{ui("ui.app.transfer.id.page.switchAccountHint", "This signs you out first, then returns you to this transfer after you sign in with the recipient account.")}</p> : null}
@@ -302,14 +328,14 @@ export default function TransferClaimPage() {
                 <div className="icon"><LogIn /></div>
                 <h3>{ui("ui.app.transfer.id.page.730cc4aa8fa6", "Ready to accept.")}</h3>
                 <p>{ui("ui.app.transfer.id.page.cf41c2f3aef3", "Accepting transfers ownership of this QRguitar Profile to your signed-in account. The permanent QR URL stays unchanged.")}</p>
-                <button className="button" type="button" onClick={() => void acceptTransfer()} disabled={accepting}>
+                <button className="button" type="button" onClick={() => void acceptTransfer()} disabled={accepting || acceptUncertain}>
                   {accepting ? ui("ui.app.transfer.id.page.31409c77894f", "Accepting...") : ui("ui.app.transfer.id.page.8441cefbd0ef", "Accept Ownership")}
                 </button>
                 <Link className="button secondary" href={profileHref}>{ui("ui.app.transfer.id.page.d52572393b42", "Preview Profile First")}</Link>
               </>
             )}
             {message ? <p className="form-message" role="status">{message}</p> : null}
-            {loadError ? <button type="button" className="button secondary" onClick={() => setLoadAttempt(value => value + 1)}>{ui("ui.app.transfer.id.page.a5e2e77428e7", "Reload transfer status")}</button> : null}
+            {loadError ? <button type="button" className="button secondary" onClick={() => { if (renderedAuthRevision === authRevision.current) setLoadAttempt(value => value + 1); }}>{ui("ui.app.transfer.id.page.a5e2e77428e7", "Reload transfer status")}</button> : null}
           </section>
         </div>
       </main>

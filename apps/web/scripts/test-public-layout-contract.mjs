@@ -24,6 +24,7 @@ const contract = compile("lib/instrument-profile-contract.ts");
 const badges = compile("components/ProfileStatusBadges.tsx", { "next/link": Link, "../lib/local-demo": localDemo });
 const identity = compile("components/ProfileIdentity.tsx");
 const contentLabels = { "profile.tabs.overview": "Overview", "profile.tabs.specifications": "Details", "profile.gallery.label": "Instrument photographs", "profile.verification.title": "Verified by QRguitar", "profile.verification.body": "Record details have been reviewed.", "profile.authenticity.title": "Authenticity Confirmed", "profile.authenticity.body": "Authenticity evidence has been reviewed." };
+const sale = compile("lib/profile-sale.ts", { "./public-collections": compile("lib/public-collections.ts"), "./profile-purchase-link": compile("lib/profile-purchase-link.ts", { "./public-collections": compile("lib/public-collections.ts") }) });
 const Profile = compile("app/i/[code]/ProfileClient.tsx", {
   "next/link": Link,
   "next/navigation": { useRouter: () => ({ replace() {}, push() {} }), useSearchParams: () => new URLSearchParams() },
@@ -48,10 +49,12 @@ const Profile = compile("app/i/[code]/ProfileClient.tsx", {
   "../../../lib/optional-tracking-consent": { dispatchOptionalTrackingProductEvent() {}, optionalTrackingProductEvents: {} },
   "../../../lib/image-fallback": compile("lib/image-fallback.ts"),
   "../../../lib/public-media-variant": compile("lib/public-media-variant.ts"),
+  "../../../lib/profile-sale": sale,
   "./ProfileBreadcrumbs": { ProfileBreadcrumbs: () => null }
 }).ProfileClient;
 const record = { qrCode: "QRG-LAYOUT", name: "Twin Reverb", brand: "Fender", model: "Twin Reverb", year: "1965", instrumentType: "Amplifier", heroImageDataUrl: "/front.jpg", galleryImageDataUrls: ["/front.jpg", "/back.jpg"], verificationStatus: "verified", authenticityStatus: "confirmed", visibility: "public", serial: "PRIVATE-SERIAL-123", showSerialPublic: false, summary: "Original cabinet with documented service.", location: "Boston", documentFiles: [{ name: "Private receipt", visibility: "private", url: "/private.pdf" }, { name: "Public manual", visibility: "public", url: "/manual.pdf" }] };
 const render = (changes = {}) => renderToStaticMarkup(React.createElement(Profile, { code: record.qrCode, initialInstrument: { ...record, ...changes } }));
+export { render as renderProfileFixture };
 
 test("one Profile title and its category/year precede the gallery in the accessible DOM", () => {
   const html = render();
@@ -77,6 +80,14 @@ test("public identity uses the privacy projection and public-only document count
   assert.doesNotMatch(html, /PRIVATE-SERIAL-123|Private receipt|private\.pdf/);
   assert.match(html, /2 photos \/ 1 document/);
   assert.match(render({ showSerialPublic: true }), /PRIVATE-SERIAL-123/);
+});
+
+test("an owned instrument without a chosen collection name has no Unclaimed or personal-name caption", () => {
+  const html = render({ owner: "", publicCollection: undefined, builder: "Fixture builder" });
+  assert.doesNotMatch(html, /Unclaimed|Owned by|Current owner/);
+  const named = render({ owner: "Private account name", publicCollection: { handle: "chosen-name", publicName: "Chosen Collection", accountType: "collector" } });
+  assert.match(named, /Owned by <strong>Chosen Collection/);
+  assert.doesNotMatch(named, /Private account name|Unclaimed/);
 });
 
 test("lost or stolen status and notes appear before photos without suppressing trust disclosures", () => {
@@ -108,11 +119,32 @@ test("post-purchase ownership help follows item details while owner actions stay
 test("seller purchase action precedes the gallery only for available safe listings", () => {
   const listing = { saleStatus: "for_sale", shopUrl: "https://shop.example/item" };
   const html = render(listing);
-  assert.ok(html.indexOf("Shop this item") < html.indexOf('class="scan-hero-gallery"'));
+  assert.ok(html.indexOf("Buy from shop.example") < html.indexOf('class="scan-hero-gallery"'));
   assert.match(html, /href="https:\/\/shop.example\/item"/);
   assert.match(html, /shop.example/);
-  for (const safetyStatus of ["lost", "stolen"]) assert.doesNotMatch(render({ ...listing, safetyStatus }), /Shop this item/);
-  assert.doesNotMatch(render({ ...listing, saleStatus: "not_for_sale" }), /Shop this item/);
+  for (const safetyStatus of ["lost", "stolen"]) assert.doesNotMatch(render({ ...listing, safetyStatus }), /Buy from shop.example/);
+  assert.doesNotMatch(render({ ...listing, saleStatus: "not_for_sale" }), /Buy from shop.example/);
+});
+
+test("rendered sale area displays the explicit asking price and one exact cart action without technical mapping details", () => {
+  const customFields = Object.entries({ "Asking price": "2500.00", Currency: "USD", "Store name": "Example Guitars", "Store platform": "woocommerce", "Store item ID": "123456789", "Store cart URL": "https://store.example/cart/" }).map(([label, value]) => ({ label, value }));
+  const html = render({ saleStatus: "for_sale", customLinks: [{ label: "Shop", url: "https://store.example/product/exact-instrument" }], customFields });
+  assert.match(html, /USD\s+2,500\.00/);
+  assert.equal((html.match(/<strong>Buy from Example Guitars<\/strong>/g) || []).length, 1);
+  assert.equal((html.match(/href="https:\/\/store.example\/cart\//g) || []).length, 1);
+  assert.match(html, /href="https:\/\/store.example\/cart\/\?add-to-cart=123456789&amp;quantity=1"/);
+  assert.doesNotMatch(html, /Store item ID|Store platform|Store cart URL|Private receipt|private\.pdf|PRIVATE-SERIAL-123/);
+  assert.match(html, /Store confirms price and availability/);
+  const unavailable = render({ saleStatus: "not_for_sale", customFields, customLinks: [{ label: "Shop", url: "https://store.example/product/exact-instrument" }] });
+  assert.doesNotMatch(unavailable, /2,500|Buy from|add-to-cart|product\/exact-instrument/);
+});
+
+test("missing listing and price are honest, and unsafe sale links cannot reappear in supporting links", () => {
+  assert.match(render({ saleStatus: "for_sale" }), /Price not provided|Purchase details unavailable/);
+  const html = render({ saleStatus: "for_sale", shopUrl: "javascript:alert(1)", customLinks: [{ label: "Shop", url: "javascript:alert(2)" }] });
+  assert.doesNotMatch(html, /javascript:|Buy from/);
+  assert.match(html, /Purchase details unavailable/);
+  assert.doesNotMatch(render({ websiteUrl: 'javascript:alert(1)', customLinks: [{ label: 'Unrelated link', url: 'https://user:password@store.example/product/a' }] }), /javascript:|user:password/);
 });
 
 const { catalogFilterUrl, defaultCatalogFilters, readCatalogFilters } = compile("lib/catalog-filter-state.ts");

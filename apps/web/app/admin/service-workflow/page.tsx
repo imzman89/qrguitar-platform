@@ -1,4 +1,5 @@
 "use client";
+import { editorDeadline, editorRequest } from "../../../lib/editor-request";
 import { useUiText } from "../../../components/UiTextProvider";
 
 
@@ -83,7 +84,7 @@ function ServiceWorkflowWorkspace() {
     setPhase("loading");
     if (!options.successMessage) setMessage("");
     try {
-      const { data } = await createBrowserSupabaseClient().auth.getSession();
+      const { data } = await editorDeadline(createBrowserSupabaseClient().auth.getSession());
       const actorId = data.session?.user.id || "";
       const token = data.session?.access_token || "";
       if (revision !== loadRevision.current) return;
@@ -99,8 +100,7 @@ function ServiceWorkflowWorkspace() {
       const query = new URLSearchParams();
       if (search.trim()) query.set("search", search.trim());
       if (status !== "all") query.set("status", status);
-      const response = await fetch(`/api/admin/service-workflow?${query.toString()}`, { cache: "no-store", headers: { authorization: `Bearer ${token}` } });
-      const payload = await response.json().catch(() => null) as Payload | null;
+      const { response, payload } = await editorRequest(`/api/admin/service-workflow?${query.toString()}`, { cache: "no-store", headers: { authorization: `Bearer ${token}` } });
       if (revision !== loadRevision.current || actorRef.current !== actorId) return;
       if (!response.ok || !payload?.ok) {
         setMessage(payload?.message || ui("ui.app.admin.service.workflow.page.8a5ac97eda6c", "Service workflow could not be loaded."));
@@ -190,7 +190,7 @@ function ServiceWorkflowWorkspace() {
           <div><div className="eyebrow">{ui("ui.app.admin.service.workflow.page.1370cd33efbe", "Admin service operations")}</div><h1>{ui("ui.app.admin.service.workflow.page.02bcf9461972", "Providers and submissions.")}</h1><p>{ui("ui.app.admin.service.workflow.page.b91be765af15", "Review provider status, private evidence metadata, notification state, and the audit trail without approving on an owner's behalf.")}</p></div>
           <div className="admin-service-counts"><span><strong>{phase === "ready" ? providers.length : "—"}</strong> {providers.length === 1 ? ui("ui.app.admin.service.workflow.page.5c4c1964340a", "provider") : ui("ui.app.admin.service.workflow.page.1e19bab29bc6", "providers")}</span><span><strong>{phase === "ready" ? submissions.length : "—"}</strong> {submissions.length === 1 ? ui("ui.app.admin.service.workflow.page.293f1d2ee206", "submission") : ui("ui.app.admin.service.workflow.page.21e945ad5e3b", "submissions")}</span></div>
         </header>
-        {phase === "ready" ? <div className="admin-service-filters">
+        {phase !== "signed-out" && phase !== "unauthorized" ? <div className="admin-service-filters" aria-busy={phase === "loading"}>
           <label><Search size={15} /><input aria-label={ui("ui.app.admin.service.workflow.page.960ed4ae09e0", "Search providers and submissions")} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={ui("ui.app.admin.service.workflow.page.cfcdf881d979", "Search provider, Profile, or work")} /></label>
           <select aria-label={ui("ui.app.admin.service.workflow.page.eeb12e9125ef", "Submission status")} value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">{ui("ui.app.admin.service.workflow.page.8ee57323a6f2", "All statuses")}</option><option value="draft">{ui("ui.app.admin.service.workflow.page.ebf12ef47cf5", "Draft")}</option><option value="submitted">{ui("ui.app.admin.service.workflow.page.64900440a8c9", "Submitted")}</option><option value="changes_requested">{ui("ui.app.admin.service.workflow.page.10a92a8ad3ee", "Changes requested")}</option><option value="approved">{ui("ui.app.admin.service.workflow.page.87b42e40c2a2", "Approved")}</option><option value="declined">{ui("ui.app.admin.service.workflow.page.dce083a2c47f", "Declined")}</option><option value="cancelled">{ui("ui.app.admin.service.workflow.page.d353a99eb455", "Cancelled")}</option><option value="expired">{ui("ui.app.admin.service.workflow.page.424a2551d356", "Expired")}</option></select>
           <button className="button secondary" type="button" disabled={Boolean(busy)} onClick={() => void load()}>{ui("ui.app.admin.service.workflow.page.0e9161011702", "Refresh")}</button>

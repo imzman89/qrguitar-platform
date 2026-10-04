@@ -9,6 +9,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { ClaimOwnerReview, type OwnerClaimReview } from "../../components/ClaimOwnerReview";
 import { Footer } from "../../components/Footer";
+import { AccountAccessHelp } from "../../components/AccountAccessHelp";
 import { Nav } from "../../components/Nav";
 import { createBrowserSupabaseClient } from "../../lib/supabase-browser";
 import { getContentValue } from "../../lib/content-registry";
@@ -205,7 +206,7 @@ function OwnershipClaimContent() {
     window.requestAnimationFrame(() => document.getElementById("claim-situations")?.querySelector("button")?.focus());
   }
 
-  async function collectEvidence(files: FileList | null, response: boolean) {
+  async function collectEvidence(files: FileList | File[] | null, response: boolean) {
     const current = claimGuard.current;
     const lease = current?.lease();
     if (!files?.length || !current || !lease || evidenceRead.current || current.getState().busy) return;
@@ -228,8 +229,8 @@ function OwnershipClaimContent() {
       if (current.isCurrent(lease) && evidenceRead.current === operation) { evidenceRead.current = null; setEvidenceReading(false); }
     }
   }
-  const addEvidence = (files: FileList | null) => collectEvidence(files, false);
-  const addResponseEvidence = (files: FileList | null) => collectEvidence(files, true);
+  const addEvidence = (files: File[]) => collectEvidence(files, false);
+  const addResponseEvidence = (files: File[]) => collectEvidence(files, true);
 
   async function writeClaim(path: string, method: "POST" | "PATCH", body: Record<string, unknown>, kind: "claim" | "evidence" | "buyer", onConfirmed: (payload: Record<string, unknown>) => void) {
     const current = claimGuard.current;
@@ -358,7 +359,7 @@ function OwnershipClaimContent() {
           </header>
 
           {signedIn === null ? (
-            <section className="card" aria-live="polite"><p>{authError || ui("ui.app.ownership.claim.page.b97f2f9cee97", "Checking your sign-in session...")}</p>{authError ? <button type="button" className="button secondary" onClick={() => void claimGuard.current?.start()}>{ui("ui.app.ownership.claim.page.b72989690e0a", "Retry sign-in check")}</button> : null}</section>
+            <section className="card" aria-live="polite"><p>{authError || ui("ui.app.ownership.claim.page.b97f2f9cee97", "Checking your sign-in session...")}</p>{authError ? <button type="button" className="button secondary" onClick={() => void claimGuard.current?.start()}>{ui("ui.app.ownership.claim.page.b72989690e0a", "Retry sign-in check")}</button> : null}<AccountAccessHelp purpose="claim" returnPath={returnPath} /></section>
           ) : signedIn === false ? (
             <section className="card claim-callout"><ShieldCheck aria-hidden="true" /><div><h2>{ui("ui.app.ownership.claim.page.73c27c81d398", "Sign in to continue.")}</h2><p>{ui("ui.app.ownership.claim.page.26845d88e5fb", "Your account keeps the request, evidence, and decision attached to the correct person.")}</p><Link className="button" href={`/login?next=${encodeURIComponent(returnPath)}`}>{ui("ui.app.ownership.claim.page.bfd402b2f6f3", "Sign in")}</Link></div></section>
           ) : (
@@ -410,7 +411,7 @@ function OwnershipClaimContent() {
                         {needsChallenge ? <div className="claim-challenge"><span>{ui("ui.app.ownership.claim.page.d4b4b295ee14", "Private possession challenge")}</span><strong>{challengeCode}</strong><p>{ui("ui.app.ownership.claim.page.5e5f3a9509ad", "Write this code on paper and include it in the first current photo of the instrument. Do not edit it into an old image.")}</p></div> : null}
                         <label><span>{ui("ui.app.ownership.claim.page.c36a3c33bac5", "How and when did you acquire it?")}</span><textarea rows={4} maxLength={3000} value={acquisitionDetails} onChange={(event) => setAcquisitionDetails(event.target.value)} placeholder={ui("ui.app.ownership.claim.page.66029f39ee81", "Approximate date, seller/shop, order reference, and circumstances.")} /></label>
                         <label><span>{ui("ui.app.ownership.claim.page.9cf11b231a0a", "Ownership declaration")}</span><textarea rows={3} maxLength={1500} value={ownershipDeclaration} onChange={(event) => setOwnershipDeclaration(event.target.value)} placeholder={ui("ui.app.ownership.claim.page.edbab83e946f", "Confirm that you possess the instrument and that your information is truthful.")} /></label>
-                        <label><span>{ui("ui.app.ownership.claim.page.cabb6cb580cc", "Private evidence (1-3 files)")}</span><input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" multiple onChange={(event) => void addEvidence(event.target.files)} /><small>{needsChallenge ? ui("ui.app.ownership.claim.page.88342316aa22", "First: current challenge photo. Then add a Serial Number photo, receipt, bill of sale, marketplace record, or estate/gift document. Up to three files, 3 MB combined.") : ui("ui.app.ownership.claim.page.29cc371cad01", "Add a receipt, invoice, identifying photo, or other purchase evidence. Up to three files, 3 MB combined.")}</small></label>
+                        <label><span>{ui("ui.app.ownership.claim.page.cabb6cb580cc", "Private evidence (1-3 files)")}</span><input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" multiple onChange={(event) => { const selected = Array.from(event.currentTarget.files || []); event.currentTarget.value = ""; void addEvidence(selected); }} /><small>{needsChallenge ? ui("ui.app.ownership.claim.page.88342316aa22", "First: current challenge photo. Then add a Serial Number photo, receipt, bill of sale, marketplace record, or estate/gift document. Up to three files, 3 MB combined.") : ui("ui.app.ownership.claim.page.29cc371cad01", "Add a receipt, invoice, identifying photo, or other purchase evidence. Up to three files, 3 MB combined.")}</small></label>
                         {evidence.length ? <ul className="claim-evidence-list">{evidence.map((file, index) => <li key={`${file.name}-${index}`}><Check aria-hidden="true" /><span>{file.name}<small>{file.type.replaceAll("_", " ")}</small></span><button type="button" onClick={() => setEvidence((current) => current.filter((_, itemIndex) => itemIndex !== index))}>{ui("ui.app.ownership.claim.page.c3812fc4acb8", "Remove")}</button></li>)}</ul> : null}
                         <button type="submit" className="button" disabled={busy || signedIn !== true}>{busy ? ui("ui.app.ownership.claim.page.09e3fad17544", "Submitting securely...") : ui("ui.app.ownership.claim.page.40447e4493fb", "Submit for review")}</button>
                       </form>
@@ -453,7 +454,8 @@ function OwnershipClaimContent() {
                               <p><b>{ui("ui.app.ownership.claim.page.e9672027cf43", "QRguitar needs more information.")}</b>{claim.adminReviewNote ? ui("ui.app.ownership.claim.page.7130515d99f1", " {{value1}}", { value1: claim.adminReviewNote }) : ui("ui.app.ownership.claim.page.aa618133af62", " Add the requested private evidence below.")}</p>
                               {responseClaimId === claim.id ? (
                                 <>
-                                  <label>{ui("ui.app.ownership.claim.page.339a31e91a30", "Requested evidence (up to three files, 3 MB combined)")}<input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" multiple onChange={(event) => void addResponseEvidence(event.target.files)} /></label>
+                                  <label>{ui("ui.app.ownership.claim.page.339a31e91a30", "Requested evidence (up to three files, 3 MB combined)")}<input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" multiple onChange={(event) => { const selected = Array.from(event.currentTarget.files || []); event.currentTarget.value = ""; void addResponseEvidence(selected); }} /></label>
+                                  {responseEvidence.length ? <ul className="claim-evidence-list">{responseEvidence.map((file, index) => <li key={`${file.name}-${index}`}><Check aria-hidden="true" /><span>{file.name}<small>{file.type.replaceAll("_", " ")}</small></span><button type="button" disabled={busy || evidenceReading} onClick={() => { if (!busy && !evidenceReading && claimGuard.current?.lease()) setResponseEvidence(current => current.filter((_, itemIndex) => itemIndex !== index)); }}>{ui("ui.app.ownership.claim.page.c3812fc4acb8", "Remove")}</button></li>)}</ul> : null}
                                   {responseEvidence.length ? <small>{responseEvidence.length}{" "}{ui("ui.app.ownership.claim.page.3b9c358f36f0", "file")}{responseEvidence.length === 1 ? "" : ui("ui.app.ownership.claim.page.043a718774c5", "s")}{" "}{ui("ui.app.ownership.claim.page.b24d6d33736e", "ready")}</small> : null}
                                   <div>
                                     <button className="button" type="button" disabled={busy || !responseEvidence.length} onClick={() => void resubmitEvidence(claim.id)}>{busy ? ui("ui.app.ownership.claim.page.64115d5b9c79", "Submitting...") : ui("ui.app.ownership.claim.page.91e287e5015e", "Submit evidence")}</button>
@@ -483,7 +485,7 @@ function OwnershipClaimContent() {
 export default function OwnershipClaimPage() {
   const ui = useUiText("app.ownership.claim.page");
   return (
-    <Suspense fallback={<main className={`section claim-center-page ${workflow.claims}`}><div className="shell"><section className="card claim-callout"><div><h1>{ui("ui.app.ownership.claim.page.6109a1ebd28d", "Opening Ownership Claim Center.")}</h1><p>{ui("ui.app.ownership.claim.page.9f66e1c15c7c", "Loading your secure ownership options.")}</p></div></section></div></main>}>
+    <Suspense fallback={<><Nav /><main className={`section claim-center-page ${workflow.claims}`}><div className="shell"><section className="card claim-callout"><div><h1>{ui("ui.app.ownership.claim.page.6109a1ebd28d", "Opening Ownership Claim Center.")}</h1><p>{ui("ui.app.ownership.claim.page.9f66e1c15c7c", "Loading your secure ownership options.")}</p><AccountAccessHelp purpose="claim" returnPath="/ownership-claim" /></div></section></div></main><Footer /></>}>
       <OwnershipClaimContent />
     </Suspense>
   );

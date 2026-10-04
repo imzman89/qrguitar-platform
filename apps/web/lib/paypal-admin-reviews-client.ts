@@ -77,9 +77,9 @@ function readDelivery(value: unknown): PayPalWebhookDelivery {
 
 export type PayPalAdminReviewsState = {
   phase: "loading" | "signed-out" | "ready" | "error"; actorId: string; environment: "live" | "test" | "";
-  reviews: PayPalAdminReview[]; deliveries: PayPalWebhookDelivery[]; hasMore: boolean; busy: boolean; refreshing: boolean; message: string; pendingDecision: Decision | null;
+  reviews: PayPalAdminReview[]; deliveries: PayPalWebhookDelivery[]; hasMore: boolean; busy: boolean; refreshing: boolean; message: string; pendingDecision: Decision | null; orderId: string;
 };
-export const initialPayPalAdminReviewsState = (): PayPalAdminReviewsState => ({ phase: "loading", actorId: "", environment: "", reviews: [], deliveries: [], hasMore: false, busy: false, refreshing: false, message: "", pendingDecision: null });
+export const initialPayPalAdminReviewsState = (): PayPalAdminReviewsState => ({ phase: "loading", actorId: "", environment: "", reviews: [], deliveries: [], hasMore: false, busy: false, refreshing: false, message: "", pendingDecision: null, orderId: "" });
 
 export function createPayPalAdminReviewsClient(deps: Dependencies) {
   let state = initialPayPalAdminReviewsState(), disposed = false, attempt = 0, lock: symbol | undefined;
@@ -103,17 +103,19 @@ export function createPayPalAdminReviewsClient(deps: Dependencies) {
     if (!actorId) return;
     if (memory.has(actorId)) publish({ pendingDecision: memory.get(actorId) || null });
     else try { const value = validDecision(JSON.parse(storage().getItem(storageKey()) || "null")); if (value) publish({ pendingDecision: value }); } catch { /* Invalid or unavailable storage confers no authority. */ }
-    void Promise.resolve().then(load);
+    void Promise.resolve().then(() => load());
   });
-  async function load() {
+  async function load(orderId = state.orderId) {
     if (disposed || lock || !state.actorId) return;
-    const lease = scope.lease(), current = ++attempt; publish({ refreshing: true, message: "" });
+    const lease = scope.lease(), current = ++attempt;
+    publish({ refreshing: true, message: "", orderId, ...(orderId !== state.orderId ? { reviews: [], hasMore: false } : {}) });
     try {
-      const result = await scope.request(lease, "/api/admin/payment-reviews");
+      const result = await scope.request(lease, `/api/admin/payment-reviews${orderId ? `?orderId=${encodeURIComponent(orderId)}` : ""}`);
       if (!scope.live(lease) || current !== attempt) return;
       if (!Array.isArray(result.reviews) || result.reviews.length > 100 || !Array.isArray(result.deliveries) || result.deliveries.length > 100
         || typeof result.hasMore !== "boolean" || !["live", "test"].includes(String(result.environment))) throw new Error("The PayPal review queue could not be verified.");
       const reviews = result.reviews.map(readReview), deliveries = result.deliveries.map(readDelivery);
+      if (orderId && reviews.some(review => review.orderId !== orderId)) throw new Error("The requested order could not be verified.");
       if (new Set(reviews.map(review => review.eventId)).size !== reviews.length || new Set(deliveries.map(delivery => delivery.deliveryId)).size !== deliveries.length
         || deliveries.some(delivery => delivery.state === "completed" || delivery.rawAvailable === null || delivery.continuationAvailable === null)) throw new Error("The PayPal review queue could not be verified.");
       publish({ phase: "ready", environment: result.environment as "live" | "test", reviews, deliveries, hasMore: result.hasMore, refreshing: false });
@@ -164,6 +166,12 @@ export function createPayPalAdminReviewsClient(deps: Dependencies) {
     getState: () => state,
     subscribe(listener: (state: PayPalAdminReviewsState) => void) { listeners.add(listener); return () => listeners.delete(listener); },
     start, reload: () => state.actorId ? load() : start(),
+    findOrder(reference: string) {
+      const orderId = directOrderId(reference.trim().replace(/^QRG-/i, "").toLowerCase());
+      if (!orderId) { publish({ message: "Enter the full QRG order reference or order UUID." }); return Promise.resolve(); }
+      return load(orderId);
+    },
+    showAll: () => load(""),
     decide: (input: Omit<HoldDecision, "decisionId">) => mutate(input),
     retryDelivery: (input: Omit<DeliveryDecision, "decisionId" | "action">) => mutate({ action: "retry_delivery", ...input }),
     acknowledgeDelivery: (input: Omit<AcknowledgeDecision, "decisionId" | "action">) => mutate({ action: "acknowledge_delivery", ...input }),

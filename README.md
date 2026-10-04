@@ -6,6 +6,8 @@ For a practical walkthrough, use [customer review and safe testing](docs/CUSTOME
 
 For customer pilots, operating measures, and the data-and-media recovery gate, use the [operating pilot checklist](docs/OPERATING_PILOT.md).
 
+Optional analytics already uses GA4 and remains disabled by default. Setup requires a valid `NEXT_PUBLIC_GA4_MEASUREMENT_ID` and `NEXT_PUBLIC_OPTIONAL_TRACKING_PURPOSES=analytics`; follow [optional tracking setup and consent checks](docs/OPTIONAL_TRACKING.md) before enabling it.
+
 Standard accounts include 5 free owned Profiles. Additional nonexpiring Profile
 credits are US$12/1, US$50/10, or US$99/25 when purchases are enabled. Transfers
 are free. Existing Profiles stay available and never consume credits retroactively

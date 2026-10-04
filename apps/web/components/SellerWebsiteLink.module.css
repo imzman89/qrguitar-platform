@@ -18,3 +18,5 @@
 .link svg { flex-shrink: 0; }
 .link:hover { background: rgba(240, 161, 43, .18); }
 .link:focus-visible { outline: 3px solid #f0a12b; outline-offset: 4px; }
+
+:global(.collection-header) .link { margin-top: 0; align-self: center; }

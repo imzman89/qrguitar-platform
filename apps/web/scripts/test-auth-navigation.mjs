@@ -120,7 +120,7 @@ export function navigationFixture(component, options = {}) {
 for (const component of ['Nav', 'Footer']) {
   test(component + ': unresolved identity never renders a sign-in prompt', async () => {
     const gate = deferred(), f = navigationFixture(component, { read: () => gate.promise });
-    assert.match(f.text(), /Checking sign-in/); assert.equal(Boolean(find(f.render(), node => node.type === 'a' && node.props.href?.startsWith('/login'))), false);
+    if (component === 'Nav' || component === 'Footer') { assert.ok(find(f.render(), node => node.type === 'a' && node.props.href === '/account' && text(node) === 'Account access')); assert.doesNotMatch(f.text(), /Checking sign-in/); } else { assert.match(f.text(), /Checking sign-in/); } assert.equal(Boolean(find(f.render(), node => node.type === 'a' && node.props.href?.startsWith('/login'))), false);
     gate.resolve(result('owner-a')); await f.flush(); assert.equal(f.signedIn(), true); f.dispose();
   });
   test(component + ': transient lookup failure is retryable, not confirmed anonymous', async () => {

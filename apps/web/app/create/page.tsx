@@ -15,11 +15,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Footer } from "../../components/Footer";
 import { InstrumentPreview } from "../../components/InstrumentPreview";
+import { ProfileSaleFields } from "../../components/ProfileSaleFields";
+import { isSaleDetail, profileSaleFieldsError } from "../../lib/profile-sale";
 import { Nav } from "../../components/Nav";
 import { PhotoOrganizer, type PhotoOrganizerStatus } from "../../components/PhotoOrganizer";
 import { type CustomProfileField } from "../../lib/local-demo";
 import { defaultSiteSettings, fetchPublishedSiteSettings } from "../../lib/site-settings";
-import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../lib/supabase-browser";
+import { createBrowserSupabaseClient } from "../../lib/supabase-browser";
 import { makePreviewQrCode, qrCodeFromSerial } from "../../lib/qrguitar-id";
 import { canonicalInstrumentBrand, establishedInstrumentBrands } from "../../lib/instrument-brands";
 import { getContentValue } from "../../lib/content-registry";
@@ -80,20 +82,62 @@ function makeClientKey() {
   return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+type CreateOwner = { id: string; email?: string; user_metadata?: Record<string, unknown> };
+
 export default function CreatePage() {
+  const identity = useRef({ actor: "", epoch: 0, active: true });
+  const [owner, setOwner] = useState<CreateOwner | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  useEffect(() => {
+    identity.current.active = true;
+    let revision = 0;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const clearTimer = () => { if (timer !== undefined) clearTimeout(timer); timer = undefined; };
+    const auth = createBrowserSupabaseClient().auth;
+    const apply = (next: CreateOwner | null) => {
+      if (cancelled || !identity.current.active) return;
+      clearTimer();
+      if (identity.current.actor !== (next?.id || "")) {
+        identity.current.actor = next?.id || "";
+        identity.current.epoch++;
+      }
+      setOwner(next);
+      setAuthChecked(true);
+    };
+    const { data } = auth.onAuthStateChange((event, session) => {
+      if (event === "INITIAL_SESSION") return;
+      revision++;
+      apply(session?.user || null);
+    });
+    const readRevision = revision;
+    if (revision === 0) {
+      timer = setTimeout(() => { if (!cancelled && identity.current.active && revision === readRevision) setAuthChecked(true); }, 5000);
+      void auth.getSession().then(({ data: initial, error }) => {
+        if (!cancelled && revision === readRevision) { if (!error) apply(initial.session?.user || null); else { clearTimer(); setAuthChecked(true); } }
+      }, () => { if (!cancelled && identity.current.active && revision === readRevision) { clearTimer(); setAuthChecked(true); } });
+    }
+    return () => { cancelled = true; clearTimer(); identity.current.active = false; identity.current.epoch++; data.subscription.unsubscribe(); };
+  }, []);
+  const epoch = identity.current.epoch;
+  const actor = owner?.id || "";
+  return <CreateOwnerDraft key={epoch} user={owner} authChecked={authChecked} isCurrent={() => identity.current.active && identity.current.epoch === epoch && identity.current.actor === actor} />;
+}
+
+function CreateOwnerDraft({ user, authChecked, isCurrent }: { user: CreateOwner | null; authChecked: boolean; isCurrent: () => boolean }) {
   const ui = useUiText("app.create.page");
+  const sessionUi = useUiText("components.Nav");
   const content = useSiteContent();
   const router = useRouter();
   const uploadFileIds = useRef(new Map<string,string>());
   const saveInFlight = useRef(false);
+  const collectionNameEdited = useRef(false);
   const fileSelectionPending = useRef(false);
   const [preparingFiles, setPreparingFiles] = useState(false);
   const [photoFeedback, setPhotoFeedback] = useState("");
   const [documentFeedback, setDocumentFeedback] = useState("");
   const [message, setMessage] = useState("");
   const [honeypot, setHoneypot] = useState("");
-  const [authChecked, setAuthChecked] = useState(false);
-  const [user, setUser] = useState<{ id: string; email?: string; user_metadata?: Record<string, unknown> } | null>(null);
   const [form, setForm] = useState({
     name: "",
     brand: "",
@@ -127,6 +171,28 @@ export default function CreatePage() {
     serviceIsPublic: false,
     visibility: "public"
   });
+  const [savedCollectionName, setSavedCollectionName] = useState("");
+  useEffect(() => {
+    if (!user?.id) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 5000);
+    void (async () => {
+      const { data } = await createBrowserSupabaseClient().auth.getSession();
+      if (controller.signal.aborted || !isCurrent() || data.session?.user.id !== user.id) return;
+      const response = await fetch("/api/account", { cache: "no-store", signal: controller.signal,
+        headers: { authorization: `Bearer ${data.session.access_token}` } });
+      const payload = await response.json();
+      if (controller.signal.aborted || !isCurrent() || !response.ok || payload?.ok !== true) return;
+      const name = typeof payload.account?.publicCollection?.publicName === "string"
+        ? payload.account.publicCollection.publicName.trim() : "";
+      if (!name || collectionNameEdited.current || saveInFlight.current) return;
+      setSavedCollectionName(name);
+      setForm((current) => ({ ...current, owner: name }));
+    })().catch(() => { /* The owner can explicitly choose a collection name below. */ })
+      .finally(() => window.clearTimeout(timer));
+    return () => { controller.abort(); window.clearTimeout(timer); };
+  }, [user?.id]);
+
   const [customFields, setCustomFields] = useState<{ id: string; label: string; value: string }[]>([]);
   const [customLinks, setCustomLinks] = useState([{ id: "link-1", label: "", url: "" }]);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
@@ -175,7 +241,6 @@ export default function CreatePage() {
   );
 
   useEffect(() => {
-    const supabase = createBrowserSupabaseClient();
     let cancelled = false;
 
     void fetchPublishedSiteSettings().then((published) => {
@@ -184,35 +249,14 @@ export default function CreatePage() {
       }
     });
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (cancelled) {
-        return;
-      }
-
-      const sessionUser = data.session?.user || null;
-      setUser(sessionUser);
-      if (sessionUser) {
-        setForm((current) => ({
-          ...current,
-          owner: current.owner || String(sessionUser.user_metadata?.display_name || sessionUser.email?.split("@")[0] || "")
-        }));
-      }
-      setAuthChecked(true);
-    });
-
-    const timeout = window.setTimeout(() => {
-      if (!cancelled) {
-        setAuthChecked(true);
-      }
-    }, 5000);
-
     return () => {
       cancelled = true;
-      window.clearTimeout(timeout);
     };
   }, []);
 
   function updateField(field: keyof typeof form, value: string) {
+    if (!isCurrent()) return;
+    if (field === "owner") collectionNameEdited.current = true;
     setForm((current) => {
       if (field === "serial") {
         const firstSerialEntry = !current.serial.trim() && Boolean(value.trim());
@@ -223,6 +267,7 @@ export default function CreatePage() {
   }
 
   async function addProfilePhotos(files: FileList | null) {
+    if (!isCurrent()) return;
     if (!files?.length || saveInFlight.current || fileSelectionPending.current) return;
     fileSelectionPending.current = true;
     setPreparingFiles(true);
@@ -233,6 +278,7 @@ export default function CreatePage() {
       const selectedFiles = validation.files.slice(0, remainingSlots);
       const omittedCount = Math.max(0, validation.files.length - selectedFiles.length);
       const prepared = await prepareProfilePhotos(selectedFiles, fileToCompressedDataUrl, galleryImages);
+      if (!isCurrent()) return;
       const dataUrls = prepared.images;
       if (dataUrls.length) {
         setPhotoUploads((current) => ({ ...current, ...Object.fromEntries(dataUrls.map((url) => [url, { state: "ready" as const }])) }));
@@ -245,12 +291,15 @@ export default function CreatePage() {
       if (prepared.duplicateCount) feedback.push(ui("ui.app.create.page.duplicatePhotos", "Photos already selected were skipped."));
       setPhotoFeedback(feedback.join(" "));
     } finally {
-      fileSelectionPending.current = false;
-      setPreparingFiles(false);
+      if (isCurrent()) {
+        fileSelectionPending.current = false;
+        setPreparingFiles(false);
+      }
     }
   }
 
   async function addDocuments(files: FileList | null) {
+    if (!isCurrent()) return;
     if (!files?.length || saveInFlight.current || fileSelectionPending.current) return;
     fileSelectionPending.current = true;
     setPreparingFiles(true);
@@ -262,21 +311,26 @@ export default function CreatePage() {
         if (!["application/pdf", "image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > MAX_IMAGE_FILE_SIZE || file.size === 0) throw new Error("Unsupported document");
         return { id: makeClientKey(), name: file.name, dataUrl: await fileToDataUrl(file), visibility: "hidden" as const, documentType: "Receipt", issuerSource: "", documentDate: "", description: "", publicDescription: "", privateNotes: "" };
       }));
+      if (!isCurrent()) return;
       const nextDocs = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
       setDocuments((current) => [...current, ...nextDocs].slice(0, 10));
       const skipped = selection.length - nextDocs.length;
       setDocumentFeedback(ui("ui.app.create.page.7e22ae7ac922", "{{value1}} document{{value2}} added.", {value1: nextDocs.length, value2: nextDocs.length === 1 ? "" : "s"}) + (skipped ? " " + ui("ui.app.create.page.documentsSkipped", "{{count}} not added. Choose readable PDF, JPG, PNG, or WebP files up to 12MB each, with up to 10 documents per Profile. Your other files and details are still here.", { count: skipped }) : ""));
     } finally {
-      fileSelectionPending.current = false;
-      setPreparingFiles(false);
+      if (isCurrent()) {
+        fileSelectionPending.current = false;
+        setPreparingFiles(false);
+      }
     }
   }
 
   function selectMainPhoto(imageUrl: string) {
+    if (!isCurrent()) return;
     setForm((current) => ({ ...current, heroImageDataUrl: imageUrl }));
   }
 
   function removePhoto(imageUrl: string) {
+    if (!isCurrent()) return;
     setPhotoFeedback("");
     uploadFileIds.current.delete("image:" + imageUrl);
     const stagedPath = photoUploads[imageUrl]?.storagePath;
@@ -297,6 +351,7 @@ export default function CreatePage() {
   }
 
   function movePhoto(fromIndex: number, toIndex: number) {
+    if (!isCurrent()) return;
     setGalleryImages((current) => {
       if (fromIndex < 0 || toIndex < 0 || fromIndex >= current.length || toIndex >= current.length || fromIndex === toIndex) return current;
       const next = [...current];
@@ -306,9 +361,18 @@ export default function CreatePage() {
     });
   }
 
+  async function tokenForDraftOwner() {
+    if (!isCurrent() || !user?.id) throw new Error("Sign in again before continuing.");
+    const { data, error } = await createBrowserSupabaseClient().auth.getSession();
+    if (!isCurrent() || error || data.session?.user.id !== user.id) throw new Error("The account changed. Return to the original account before retrying.");
+    return data.session.access_token;
+  }
+
   async function cleanupStagedPaths(paths: string[]) {
-    if (!paths.length) return;
-    const token = await getSupabaseAccessToken();
+    if (!paths.length || !isCurrent()) return;
+    let token: string;
+    try { token = await tokenForDraftOwner(); } catch { return; }
+    if (!isCurrent()) return;
     await fetch("/api/instruments/uploads", {
       method: "DELETE",
       headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
@@ -317,17 +381,14 @@ export default function CreatePage() {
   }
 
   async function uploadStagedFile(kind: "image" | "document", dataUrl: string, identityKey: string) {
+    if (!isCurrent()) throw new Error("The account changed.");
     const expectedOwnerId = user?.id;
     if (!expectedOwnerId) throw new Error("Sign in again before uploading.");
     const identity = kind + ":" + identityKey;
     let fileId = uploadFileIds.current.get(identity);
     if (!fileId) { fileId = crypto.randomUUID(); uploadFileIds.current.set(identity,fileId); }
     return uploadProfileFile({file:dataUrlToProfileFile(dataUrl),uploadId,fileId,kind,expectedOwnerId,
-      tokenForOwner:async()=>{
-        const {data} = await createBrowserSupabaseClient().auth.getSession();
-        if (data.session?.user.id !== expectedOwnerId) throw new Error("The account changed. Return to the original account before retrying.");
-        return data.session.access_token;
-      }});
+      tokenForOwner: tokenForDraftOwner});
   }
 
   async function uploadWithConcurrency<T>(items: T[], worker: (item: T, index: number) => Promise<void>, concurrency = 3) {
@@ -342,37 +403,48 @@ export default function CreatePage() {
   }
 
   async function stageSelectedFiles() {
+    if (!isCurrent()) throw new Error("The account changed.");
     const photoPaths = galleryImages.map((imageUrl) => photoUploads[imageUrl]?.storagePath || "");
     const failedPhotos: string[] = [];
     await uploadWithConcurrency(galleryImages, async (imageUrl, index) => {
+      if (!isCurrent()) return;
       if (photoPaths[index]) return;
       setPhotoUploads((current) => ({ ...current, [imageUrl]: { ...current[imageUrl], state: "uploading", progress: 15 } }));
       try {
         const storagePath = await uploadStagedFile("image", imageUrl, imageUrl);
+        if (!isCurrent()) return;
         photoPaths[index] = storagePath;
         setPhotoUploads((current) => ({ ...current, [imageUrl]: { state: "uploaded", progress: 100, storagePath } }));
       } catch (error) {
+        if (!isCurrent()) return;
         const message = error instanceof Error ? error.message : "Upload failed. Retry this photo.";
         failedPhotos.push(imageUrl);
         setPhotoUploads((current) => ({ ...current, [imageUrl]: { state: "error", message } }));
       }
     });
 
+    if (!isCurrent()) throw new Error("The account changed.");
+
     const documentPaths = documents.map((document) => document.storagePath || "");
     const failedDocuments: string[] = [];
     await uploadWithConcurrency(documents, async (document, index) => {
+      if (!isCurrent()) return;
       if (documentPaths[index]) return;
       setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, uploadState: "uploading", uploadMessage: "Uploading" } : item));
       try {
         const storagePath = await uploadStagedFile("document", document.dataUrl, document.id);
+        if (!isCurrent()) return;
         documentPaths[index] = storagePath;
         setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, storagePath, uploadState: "uploaded", uploadMessage: "Uploaded" } : item));
       } catch (error) {
+        if (!isCurrent()) return;
         const message = error instanceof Error ? error.message : "Upload failed. Retry this document.";
         failedDocuments.push(document.id);
         setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, uploadState: "error", uploadMessage: message } : item));
       }
     });
+
+    if (!isCurrent()) throw new Error("The account changed.");
 
     if (failedPhotos.length || failedDocuments.length) {
       throw new Error(ui("ui.app.create.page.uploadRetry", "Some files could not be uploaded. Choose Retry safely below. Your details and successful uploads are kept."));
@@ -387,14 +459,18 @@ export default function CreatePage() {
   }
 
   async function createRecordAndRedirect(showProfile = false) {
+    if (!isCurrent()) return;
     if (savingProfile || saveInFlight.current || fileSelectionPending.current) return;
 
     try {
       const nextFieldErrors: Record<string, string> = {};
+      const saleError = profileSaleFieldsError({ saleStatus: form.saleStatus, customFields, customLinks });
+      if (saleError) { setMessage(saleError); document.getElementById("sale-details")?.scrollIntoView({ block: "center" }); return; }
       if (honeypot.trim()) nextFieldErrors.form = "Submission blocked.";
       if (!form.brand.trim()) nextFieldErrors.brand = "Choose the instrument brand.";
       if (!form.model.trim()) nextFieldErrors.model = "Enter the model or build name.";
       if (!form.instrumentType.trim()) nextFieldErrors.instrumentType = "Choose the instrument type.";
+      if (!form.owner.trim() || form.owner.trim().length > 80) nextFieldErrors.owner = "Choose a collection name of 1 to 80 characters. It does not have to be your real name.";
       if (!form.serial.trim() && !form.serialNotUsed) nextFieldErrors.serial = "Enter the Serial Number or confirm that this instrument has no serial.";
       if (!galleryImages.length) nextFieldErrors.photos = "Add at least one clear instrument photo.";
       if (galleryImages.length > 20) nextFieldErrors.photos = "Choose no more than 20 photos.";
@@ -424,6 +500,7 @@ export default function CreatePage() {
       setClaimHref("");
 
       const staged = await stageSelectedFiles();
+      if (!isCurrent()) return;
       const mainPhotoIndex = Math.max(0, galleryImages.indexOf(form.heroImageDataUrl));
 
       const payload = {
@@ -442,9 +519,9 @@ export default function CreatePage() {
           condition: form.instrumentCondition as "new" | "used",
           saleStatus: form.saleStatus as "for_sale" | "not_for_sale",
           originalityStatus: form.originalityStatus as "all_original" | "modified" | "unknown",
-          ownerName: form.owner || String(user.user_metadata?.display_name || user.email || ""),
+          ownerName: form.owner.trim(),
           location: form.location,
-          visibility: form.visibility as "public" | "private" | "unlisted",
+          visibility: "public" as const,
           summary: form.summary || "",
           heroImagePath: staged.photoPaths[mainPhotoIndex] || staged.photoPaths[0],
           photos: staged.photoPaths,
@@ -486,13 +563,15 @@ export default function CreatePage() {
           } : undefined
         };
 
-      const token = await getSupabaseAccessToken();
+      const token = await tokenForDraftOwner();
+      if (!isCurrent()) return;
       const response = await fetch("/api/instruments", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
         body: JSON.stringify(payload)
       });
       const result = (await response.json().catch(() => null)) as CreateErrorResponse | null;
+      if (!isCurrent()) return;
 
       if (!response.ok || !result?.ok) {
         if (response.status === 409 && result?.ok === false && result?.code === "upload_session_changed" && result?.resetUploads === true && result?.uncertain !== true) clearStagedPathsAfterServerCleanup();
@@ -525,20 +604,23 @@ export default function CreatePage() {
       const finalCode = result.qrCode || qrCode;
       void dispatchOptionalTrackingProductEvent({
         name: optionalTrackingProductEvents.profileCreated,
-        properties: { visibility: form.visibility as "public" | "private" | "unlisted" }
+        properties: { visibility: "public" }
       }, { dedupeKey: finalCode });
       setCreatedCode(finalCode);
       setMessage(ui("ui.app.create.page.8063b8ce1a81", "QRguitar Profile created."));
 
       if (showProfile) {
-        router.push(ownerProfileHref({ qrCode: finalCode, visibility: form.visibility as "public" | "private" }));
+        router.push(ownerProfileHref({ qrCode: finalCode, visibility: "public" }));
       }
     } catch (error) {
+      if (!isCurrent()) return;
       setLastErrorRetryable(true);
       setMessage(error instanceof Error ? error.message : ui("ui.app.create.page.7becb15765b7", "The network request failed. Your form and selected files are preserved; try again."));
     } finally {
-      saveInFlight.current = false;
-      setSavingProfile(false);
+      if (isCurrent()) {
+        saveInFlight.current = false;
+        setSavingProfile(false);
+      }
     }
   }
 
@@ -569,11 +651,11 @@ export default function CreatePage() {
           <div className={styles.success}>
             <section className={styles.successContent}>
               <div className="eyebrow">{ui("ui.app.create.page.9bb4a8d57a82", "Profile created")}</div>
-              <h1>{ui("ui.app.create.page.5e16a39b804d", "Your permanent QRguitar Profile is ready.")}</h1>
+              <h1>{ui("ui.app.create.page.5e16a39b804d", "Profile created.")}</h1>
               <p>{ui("ui.app.create.page.de62112c6b17", "The Profile can keep growing with history, media, documents, service, and ownership while its QRguitar ID and URL stay the same.")}</p>
               <div className="create-success-id"><span>{ui("ui.app.create.page.a6c8f92c19f4", "QRguitar ID")}</span><strong>{createdCode}</strong></div>
               <div className="create-success-actions">
-                <Link className="button" href={ownerProfileHref({ qrCode: createdCode, visibility: form.visibility as "public" | "private" })}>{ui("ui.app.create.page.41a634bed373", "View Profile")}</Link>
+                <Link className="button" href={ownerProfileHref({ qrCode: createdCode, visibility: "public" })}>{ui("ui.app.create.page.41a634bed373", "View Profile")}</Link>
                 <Link className="button secondary" href={`/handout/${createdCode}`}>{ui("ui.app.create.page.5ee3796350c7", "Open Print Suite")}</Link>
               </div>
               <details className={styles.moreSuccessActions}>
@@ -601,7 +683,7 @@ export default function CreatePage() {
 
 
           <div className={styles.editor}>
-            <form className={styles.form} onSubmit={(event) => event.preventDefault()} aria-busy={savingProfile || preparingFiles}>
+            <form className={styles.form} noValidate onSubmit={(event) => { event.preventDefault(); saveDraft(); }} aria-busy={savingProfile || preparingFiles}>
               <fieldset className={styles.fields} disabled={savingProfile || preparingFiles}>
               <input aria-hidden="true" autoComplete="off" name="company" style={{ display: "none" }} tabIndex={-1} value={honeypot} onChange={(event) => setHoneypot(event.target.value)} />
               <datalist id="qrguitar-known-brands">{establishedInstrumentBrands.map((brand) => <option value={brand} key={brand} />)}</datalist>
@@ -652,19 +734,19 @@ export default function CreatePage() {
                         <option value="Other">{ui("ui.app.create.page.f97e9da0e3b8", "Other")}</option>
                       </select>
                     </div>
-                    <Field label={ui("ui.app.create.page.a896221d5946", "Owner display")} id="owner" value={form.owner} onChange={(value) => updateField("owner", value)} placeholder={ui("ui.app.create.page.1db2451eea93", "Name or collection")} />
+                    <Field label={ui("ui.app.create.page.collectionName", "Collection name")} id="owner" value={form.owner} onChange={(value) => updateField("owner", value)} disabled={Boolean(savedCollectionName)} required error={fieldErrors.owner || ""} placeholder={ui("ui.app.create.page.collectionNamePlaceholder", "A name you choose")} />
+                    <p className="field-note">{ui("ui.app.create.page.collectionNameHelp", "Use a name you choose, not necessarily your real name. Change an existing collection name in Account.")} <Link href="/account?section=collection">{ui("ui.app.create.page.collectionSettings", "Collection settings")}</Link></p>
                     <div className={`field${fieldErrors.acquisitionDate ? " has-error" : ""}`}><label htmlFor="acquisitionDate">{ui("ui.app.create.page.0b0489074742", "Acquisition date")}</label><input id="acquisitionDate" type="date" value={form.acquisitionDate} onChange={(event) => updateField("acquisitionDate", event.target.value)} aria-invalid={Boolean(fieldErrors.acquisitionDate)} />{fieldErrors.acquisitionDate ? <span className="field-error">{fieldErrors.acquisitionDate}</span> : null}</div>
                     <Field label={ui("ui.app.create.page.5e553fd3aa01", "Seller / store (optional)")} id="seller" value={form.seller} onChange={(value) => updateField("seller", value)} />
                     <Field label={ui("ui.app.create.page.15b61974b270", "Location")} id="location" value={form.location} onChange={(value) => updateField("location", value)} placeholder={ui("ui.app.create.page.fef8ce3a04b7", "City, region, country")} />
                   </div>
                   </details>
-                  <div className={styles.visibility} aria-label={ui("ui.app.create.page.1c47f10cc99e", "Profile visibility")}>
-                    <div><strong>{form.visibility === "public" ? ui("ui.app.create.page.591935b15b1c", "Public") : form.visibility === "unlisted" ? ui("ui.app.create.page.bc96567e77ca", "Unlisted") : ui("ui.app.create.page.c63eb6720c6e", "Private")}</strong><span>{form.visibility === "public" ? ui("ui.app.create.page.f88c0d40c301", "Listed in the Catalog and available by QR or direct link.") : form.visibility === "unlisted" ? ui("ui.app.create.page.3d1d2fd4f39f", "Hidden from the Catalog but available by QR or direct link.") : ui("ui.app.create.page.f0d2868fe175", "Available only to the signed-in owner and authorized admin.")}</span></div>
-                    <label className="field visibility-select" htmlFor="profileVisibility"><span>{ui("ui.app.create.page.7448611d5f93", "Visibility")}</span><select id="profileVisibility" value={form.visibility} onChange={(event) => updateField("visibility", event.target.value)}><option value="public">{ui("ui.app.create.page.591935b15b1c", "Public")}</option><option value="unlisted">{ui("ui.app.create.page.bc96567e77ca", "Unlisted")}</option><option value="private">{ui("ui.app.create.page.c63eb6720c6e", "Private")}</option></select></label>
+                  <div className={styles.visibility} aria-label={ui("ui.app.create.page.catalogListing", "Catalog listing")}>
+                    <div><strong>{ui("ui.app.create.page.catalogIncluded", "Included in Catalog")}</strong><span>{ui("ui.app.create.page.catalogSavePolicy", "Saving adds this instrument and its photos to Catalog and links your collection. You choose which documents to share.")}</span></div>
                   </div>
                   <label className="toggle-field create-inline-toggle">
                     <input type="checkbox" disabled={!form.serial.trim()} checked={form.showSerialPublic && Boolean(form.serial.trim())} onChange={(event) => setForm((current) => ({ ...current, showSerialPublic: event.target.checked }))} />{ui("ui.app.create.page.ee21436940da", "Show Serial Number publicly")}</label>
-                  <p className="fine-print">{ui("ui.app.create.page.dba16601d30d", "This hides only the Serial Number field. The permanent QR ID and URL may still include the serial. Choose a private Profile to restrict access to the signed-in owner and authorized admin.")}</p>
+                  <p className="fine-print">{ui("ui.app.create.page.serialIdNotice", "This hides only the Serial Number field. The permanent QR ID and URL may still include the serial.")}</p>
                 </section>
 
 
@@ -682,12 +764,13 @@ export default function CreatePage() {
                     <Field label={ui("ui.app.create.page.14287aa826e9", "Neck profile")} id="neckProfile" value={form.neckProfile} onChange={(value) => updateField("neckProfile", value)} />
                     <Field label={ui("ui.app.create.page.b170628a88a7", "Pickups / electronics")} id="pickups" value={form.pickups} onChange={(value) => updateField("pickups", value)} />
                   </div>
+                  {form.saleStatus === "for_sale" ? <ProfileSaleFields fields={customFields} links={customLinks} onFieldsChange={setCustomFields} onLinksChange={setCustomLinks} /> : null}
                   <div className="field custom-wide"><label htmlFor="summary">{ui("ui.app.create.page.ca6f44db47d0", "Profile story")}</label><textarea id="summary" rows={5} value={form.summary} onChange={(event) => updateField("summary", event.target.value)} placeholder={ui("ui.app.create.page.0619a067e490", "What makes this instrument useful, interesting, or important?")} /></div>
                   <details className={styles.disclosure}>
                     <summary>{ui("ui.app.create.page.70c12f95c8df", "Advanced specifications and notes")}</summary>
                     <div className="field custom-wide"><label htmlFor="specsNotes">{ui("ui.app.create.page.0a0d88394619", "Specification notes")}</label><textarea id="specsNotes" rows={4} value={form.specsNotes} onChange={(event) => updateField("specsNotes", event.target.value)} placeholder={ui("ui.app.create.page.49036df3fcb1", "Hardware, wiring, neck carve, fretwire, case details, or other specifications.")} /></div>
                     <div className="custom-list">
-                      {customFields.map((field) => <div className="custom-row" key={field.id}><input aria-label={ui("ui.app.create.page.1c65310c2efa", "Specification label")} placeholder={ui("ui.app.create.page.397324160ebb", "Specification")} value={field.label} onChange={(event) => setCustomFields((current) => current.map((item) => item.id === field.id ? { ...item, label: event.target.value } : item))} /><input aria-label={ui("ui.app.create.page.b29700bd3dc8", "Specification value")} placeholder={ui("ui.app.create.page.8e37953d23da", "Value")} value={field.value} onChange={(event) => setCustomFields((current) => current.map((item) => item.id === field.id ? { ...item, value: event.target.value } : item))} /><button className="button secondary" type="button" onClick={() => setCustomFields((current) => current.filter((item) => item.id !== field.id))}>{ui("ui.app.create.page.c3812fc4acb8", "Remove")}</button></div>)}
+                      {customFields.filter((field) => form.saleStatus !== "for_sale" || !isSaleDetail(field.label)).map((field) => <div className="custom-row" key={field.id}><input aria-label={ui("ui.app.create.page.1c65310c2efa", "Specification label")} placeholder={ui("ui.app.create.page.397324160ebb", "Specification")} value={field.label} onChange={(event) => setCustomFields((current) => current.map((item) => item.id === field.id ? { ...item, label: event.target.value } : item))} /><input aria-label={ui("ui.app.create.page.b29700bd3dc8", "Specification value")} placeholder={ui("ui.app.create.page.8e37953d23da", "Value")} value={field.value} onChange={(event) => setCustomFields((current) => current.map((item) => item.id === field.id ? { ...item, value: event.target.value } : item))} /><button className="button secondary" type="button" onClick={() => setCustomFields((current) => current.filter((item) => item.id !== field.id))}>{ui("ui.app.create.page.c3812fc4acb8", "Remove")}</button></div>)}
                       <button className="button secondary" type="button" onClick={() => setCustomFields((current) => [...current, { id: `field-${Date.now()}`, label: "", value: "" }])}>{ui("ui.app.create.page.66a793b2bedd", "Add specification")}</button>
                     </div>
                   </details>
@@ -700,20 +783,20 @@ export default function CreatePage() {
                       <Field label={ui("ui.app.create.page.e54c593a4afc", "Entry title")} id="serviceTitle" value={form.serviceTitle} onChange={(value) => updateField("serviceTitle", value)} placeholder={ui("ui.app.create.page.c3fdfbe623ce", "Example: Full setup and inspection")} />
                     </div>
                     <div className="field custom-wide"><label htmlFor="servicePublicDescription">{ui("ui.app.create.page.7b004f180b64", "Service description")}</label><textarea id="servicePublicDescription" rows={3} value={form.servicePublicDescription} onChange={(event) => updateField("servicePublicDescription", event.target.value)} /></div>
-                    <div className="field custom-wide"><label htmlFor="servicePrivateNotes">{ui("ui.app.create.page.d05a6c62da13", "Private owner notes")}</label><textarea id="servicePrivateNotes" rows={3} value={form.servicePrivateNotes} onChange={(event) => updateField("servicePrivateNotes", event.target.value)} /></div>
-                    <label className="toggle-field"><input type="checkbox" checked={form.serviceIsPublic} onChange={(event) => setForm((current) => ({ ...current, serviceIsPublic: event.target.checked }))} />{ui("ui.app.create.page.782df1fdfe64", "Show this service entry on the public Timeline")}</label>
+                    <div className="field custom-wide"><label htmlFor="servicePrivateNotes">{ui("ui.app.create.page.ownerServiceNotes", "Owner notes")}</label><textarea id="servicePrivateNotes" rows={3} value={form.servicePrivateNotes} onChange={(event) => updateField("servicePrivateNotes", event.target.value)} /></div>
+                    <label className="toggle-field"><input type="checkbox" checked={form.serviceIsPublic} onChange={(event) => setForm((current) => ({ ...current, serviceIsPublic: event.target.checked }))} />{ui("ui.app.create.page.shareServiceEntry", "Show this service entry on Timeline")}</label>
                   </details>
                   <details className={styles.disclosure}>
                     <summary>{ui("ui.app.create.page.f9397a00eca8", "Links and supporting documents")}</summary>
                     <div className="custom-list">
-                      {customLinks.map((link) => <div className="custom-row" key={link.id}><input aria-label={ui("ui.app.create.page.acaa9ea6688f", "Link label")} placeholder={ui("ui.app.create.page.acaa9ea6688f", "Link label")} value={link.label} onChange={(event) => setCustomLinks((current) => current.map((item) => item.id === link.id ? { ...item, label: event.target.value } : item))} /><input data-create-link-url aria-label={ui("ui.app.create.page.9dfd0b9f8f42", "Link URL")} placeholder="https://..." value={link.url} onChange={(event) => setCustomLinks((current) => current.map((item) => item.id === link.id ? { ...item, url: event.target.value } : item))} /><button className="button secondary" type="button" onClick={() => setCustomLinks((current) => current.filter((item) => item.id !== link.id))}>{ui("ui.app.create.page.c3812fc4acb8", "Remove")}</button></div>)}
+                      {customLinks.filter((link) => form.saleStatus !== "for_sale" || link.label.trim().toLowerCase() !== "shop").map((link) => <div className="custom-row" key={link.id}><input aria-label={ui("ui.app.create.page.acaa9ea6688f", "Link label")} placeholder={ui("ui.app.create.page.acaa9ea6688f", "Link label")} value={link.label} onChange={(event) => setCustomLinks((current) => current.map((item) => item.id === link.id ? { ...item, label: event.target.value } : item))} /><input data-create-link-url aria-label={ui("ui.app.create.page.9dfd0b9f8f42", "Link URL")} placeholder="https://..." value={link.url} onChange={(event) => setCustomLinks((current) => current.map((item) => item.id === link.id ? { ...item, url: event.target.value } : item))} /><button className="button secondary" type="button" onClick={() => setCustomLinks((current) => current.filter((item) => item.id !== link.id))}>{ui("ui.app.create.page.c3812fc4acb8", "Remove")}</button></div>)}
                       <button className="button secondary" type="button" onClick={() => setCustomLinks((current) => [...current, { id: `link-${Date.now()}`, label: "", url: "" }])}>{ui("ui.app.create.page.dfe9ca4d0f96", "Add link")}</button>
                       {fieldErrors.customLinks ? <span className="field-error" role="alert">{fieldErrors.customLinks}</span> : null}
                     </div>
-                    <label className="create-photo-drop compact" htmlFor="profileDocuments"><strong>{ui("ui.app.create.page.37b809b43319", "Add documents (optional)")}</strong><span>{ui("ui.app.create.page.1dd25576bcdc", "Receipts, appraisals, invoices, build sheets, or service slips. New documents stay private by default.")}</span><input id="profileDocuments" type="file" accept="application/pdf,image/png,image/jpeg,image/webp" multiple aria-invalid={Boolean(fieldErrors.documents)} aria-describedby={fieldErrors.documents ? "document-feedback document-error" : "document-feedback"} onChange={(event) => { const files = event.currentTarget.files; void addDocuments(files); event.currentTarget.value = ""; }} /></label>
+                    <label className="create-photo-drop compact" htmlFor="profileDocuments"><strong>{ui("ui.app.create.page.37b809b43319", "Add documents (optional)")}</strong><span>{ui("ui.app.create.page.documentDefaultSharing", "Receipts, appraisals, invoices, build sheets, or service slips. New documents are not shared until you choose Share on Profile.")}</span><input id="profileDocuments" type="file" accept="application/pdf,image/png,image/jpeg,image/webp" multiple aria-invalid={Boolean(fieldErrors.documents)} aria-describedby={fieldErrors.documents ? "document-feedback document-error" : "document-feedback"} onChange={(event) => { const files = event.currentTarget.files; void addDocuments(files); event.currentTarget.value = ""; }} /></label>
                     {fieldErrors.documents ? <p id="document-error" className="field-error" role="alert">{fieldErrors.documents}</p> : null}
                     <p id="document-feedback" className={styles.photoFeedback} role="status">{documentFeedback}</p>
-                    {documents.length ? <div className="create-document-list">{documents.map((document) => <div key={document.id}><div><strong>{document.name}</strong><span>{document.uploadMessage || (document.visibility === "public" ? ui("ui.app.create.page.d60bb2d3cfea", "Public document") : ui("ui.app.create.page.899485baa668", "Private document"))}</span></div><select aria-label={ui("ui.app.create.page.a4382f496011", "{{value1}} visibility", { value1: document.name })} value={document.visibility} onChange={(event) => setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, visibility: event.target.value as "public" | "hidden" } : item))}><option value="hidden">{ui("ui.app.create.page.c63eb6720c6e", "Private")}</option><option value="public">{ui("ui.app.create.page.591935b15b1c", "Public")}</option></select><button type="button" onClick={() => { uploadFileIds.current.delete("document:" + document.id); if (document.storagePath) void cleanupStagedPaths([document.storagePath]); setDocuments((current) => current.filter((item) => item.id !== document.id)); }}>{ui("ui.app.create.page.c3812fc4acb8", "Remove")}</button></div>)}</div> : null}
+                    {documents.length ? <div className="create-document-list">{documents.map((document) => <div key={document.id}><div><strong>{document.name}</strong><span>{document.uploadMessage || (document.visibility === "public" ? ui("ui.app.create.page.documentShared", "Shared on Profile") : ui("ui.app.create.page.documentNotShared", "Not shared"))}</span></div><select aria-label={ui("ui.app.create.page.documentSharing", "{{value1}} sharing", { value1: document.name })} value={document.visibility} onChange={(event) => setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, visibility: event.target.value as "public" | "hidden" } : item))}><option value="hidden">{ui("ui.app.create.page.documentNotShared", "Not shared")}</option><option value="public">{ui("ui.app.create.page.documentShareAction", "Share on Profile")}</option></select><button type="button" onClick={() => { uploadFileIds.current.delete("document:" + document.id); if (document.storagePath) void cleanupStagedPaths([document.storagePath]); setDocuments((current) => current.filter((item) => item.id !== document.id)); }}>{ui("ui.app.create.page.c3812fc4acb8", "Remove")}</button></div>)}</div> : null}
                   </details>
                   <p className="fine-print">{ui("ui.app.create.page.03dc3eccc380", "Originality describes disclosed modification status. It does not mean QRguitar verification or authenticity confirmation.")}</p>
                 </details>
@@ -728,7 +811,7 @@ export default function CreatePage() {
                   <div className={styles.review}>
                     <div><span>{ui("ui.app.create.page.a6c8f92c19f4", "QRguitar ID")}</span><strong>{qrCode}</strong></div>
                     <div><span>{ui("ui.app.create.page.14b1b3c5b151", "Serial Number")}</span><strong>{form.serial || ui("ui.app.create.page.8ca6af960b9f", "No serial number")}</strong></div>
-                    <div><span>{ui("ui.app.create.page.7448611d5f93", "Visibility")}</span><strong>{form.visibility === "public" ? ui("ui.app.create.page.591935b15b1c", "Public") : form.visibility === "unlisted" ? ui("ui.app.create.page.bc96567e77ca", "Unlisted") : ui("ui.app.create.page.c63eb6720c6e", "Private")}</strong></div>
+                    <div><span>{ui("ui.app.create.page.catalogListing", "Catalog listing")}</span><strong>{ui("ui.app.create.page.catalogIncluded", "Included in Catalog")}</strong></div>
                     <div><span>{ui("ui.app.create.page.12f67f8539c4", "Availability")}</span><strong>{form.saleStatus === "for_sale" ? ui("ui.app.create.page.1a83dec1476e", "For Sale") : ui("ui.app.create.page.e063cbea64ad", "Not for Sale")}</strong></div>
                     <div><span>{ui("ui.app.create.page.faafda16cc4c", "Originality")}</span><strong>{form.originalityStatus === "all_original" ? ui("ui.app.create.page.8894d64075bf", "All Original") : form.originalityStatus === "modified" ? ui("ui.app.create.page.e8ce5dcaf408", "Modified") : ui("ui.app.create.page.2604d337dc13", "Not Specified")}</strong></div>
                     <div><span>{ui("ui.app.create.page.c7d3acc826a8", "Ownership")}</span><strong>{form.ownerStatus || ui("ui.app.create.page.dc12bec5d71f", "Not specified")}</strong></div>
@@ -741,7 +824,7 @@ export default function CreatePage() {
               {message ? <div className="form-message" role={fieldErrors && Object.keys(fieldErrors).length ? "alert" : "status"}><strong>{message}</strong>{existingProfileHref || claimHref ? <div className="form-actions">{existingProfileHref ? <Link className="button secondary" href={existingProfileHref}>{ui("ui.app.create.page.24ccf710b746", "View existing Profile")}</Link> : null}{claimHref ? <Link className="button secondary" href={claimHref}>{ui("ui.app.create.page.b819c86a0d98", "Request ownership")}</Link> : null}</div> : null}{billingHelp ? <div className="form-actions"><Link className="button secondary" href="/billing" target="_blank" rel="noopener noreferrer">{ui("ui.app.create.page.8090fdcc6209", "Check Profile credits in a new tab")}</Link><span>{ui("ui.app.create.page.19e972d95676", "Keep this form open, then return to create your Profile.")}</span></div> : null}{lastErrorRetryable ? <button className="button secondary" type="button" onClick={() => void createRecordAndRedirect(false)} disabled={savingProfile || preparingFiles}>{ui("ui.app.create.page.aea7359da3eb", "Retry safely")}</button> : null}</div> : null}
               <div className={styles.actions}>
                 <Link className="button secondary" href="/dashboard" aria-disabled={savingProfile || preparingFiles} onClick={(event) => { if (saveInFlight.current || fileSelectionPending.current) event.preventDefault(); }}>{ui("ui.app.create.page.19766ed6ccb2", "Cancel")}</Link>
-                <button className="button" type="button" onClick={saveDraft} disabled={savingProfile || preparingFiles}>{savingProfile ? ui("ui.app.create.page.aeb7e60a2efa", "Creating Profile...") : getContentValue(content, "create.actions.submit")}</button>
+                <button className="button" type="submit" disabled={savingProfile || preparingFiles}>{savingProfile ? ui("ui.app.create.page.aeb7e60a2efa", "Creating Profile...") : getContentValue(content, "create.actions.submit")}</button>
               </div>
             </form>
 
@@ -759,13 +842,19 @@ export default function CreatePage() {
         <div className={authStyles.layout}>
           <section className={authStyles.formPanel}>
             <div className="eyebrow">{ui("ui.app.create.page.de02ab7a9a50", "Create instrument")}</div>
-            <h1>{ui("ui.app.create.page.d7f3b884c97a", "Give your instrument a permanent home.")}</h1>
+            <h1>{ui("ui.app.create.page.d7f3b884c97a", "Sign in to create a Profile")}</h1>
+            {!authChecked ? (
+              <p role="status" aria-live="polite" aria-busy="true">{sessionUi("ui.components.Nav.checkingSignIn", "Checking sign-in...")}</p>
+            ) : (
+              <>
             <p>{ui("ui.app.create.page.325a8c093318", "Create QRguitar Profiles from your account so the QR, photos, documents, and ownership stay tied to the right owner.")}</p>
             <div className="form-actions">
               <Link className="button" href={`/login?next=${encodeURIComponent("/create")}`}>{ui("ui.app.create.page.bfd402b2f6f3", "Sign in")}</Link>
               <Link className="button secondary" href={`/login?mode=register&next=${encodeURIComponent("/create")}`}>{ui("ui.app.create.page.798ca2ce18bf", "Create account")}</Link>
               <Link className="button secondary" href="/catalog">{ui("ui.app.create.page.4d05dc6da837", "Browse catalog")}</Link>
             </div>
+              </>
+            )}
           </section>
         </div>
       </main>

@@ -17,7 +17,10 @@ function compile(file) {
   const module = { exports: {} };
   new Function('require', 'module', 'exports', compiled)(withUiTextTestContext(name => {
     if (name.endsWith('.module.css')) return new Proxy({}, { get: (_, key) => key === '__esModule' ? false : String(key) });
-    if (name.startsWith('.')) return compile(path.relative(web, path.resolve(web, path.dirname(file), `${name}.tsx`)));
+    if (name.startsWith('.')) {
+      const target = path.resolve(web, path.dirname(file), name);
+      return compile(path.relative(web, target + (fs.existsSync(target + '.ts') ? '.ts' : '.tsx')));
+    }
     return require(name);
   }), module, module.exports);
   return module.exports;
@@ -191,4 +194,18 @@ test('service summary prints only selected public work and provenance', () => {
 test('QR label contains no handout notes, service work or photographs', () => {
   const html = render({ mode: 'label', note: 'HANDOUT_ONLY', specifications: [['Pickup', 'SPEC_ONLY']] });
   assert.ok(!html.includes('HANDOUT_ONLY') && !html.includes('SPEC_ONLY') && !html.includes('/photo.jpg'));
+});
+
+test('photo-free print formats remove every named photo track in both orientations', () => {
+  const postcss = require('postcss');
+  const sheet = postcss.parse(fs.readFileSync(path.join(web, 'app/handout/[code]/print-document.module.css'), 'utf8'));
+  const properties = selector => { const result = {}; sheet.walkRules(rule => { if (rule.selector === selector) rule.walkDecls(decl => { result[decl.prop] = decl.value; }); }); return result; };
+  for (const selector of ['.tag[data-has-photo="false"]', '.document[data-orientation="landscape"] .tag[data-has-photo="false"]']) {
+    const style = properties(selector);
+    assert.ok(style['grid-template-columns']); assert.ok(style['grid-template-rows']);
+    assert.doesNotMatch(style['grid-template-areas'], /tagPhoto/);
+    for (const area of ['tagHeader','tagIdentity','tagMeta','tagNote','tagFooter']) assert.ok(style['grid-template-areas'].includes(area));
+  }
+  assert.equal(properties('.serviceIdentity[data-has-photo="false"]')['grid-template-columns'], 'minmax(0, 1fr)');
+  for (const mode of ['hangtag','service']) { const html = render({mode,photo:''}); assert.match(html,/data-has-photo="false"/); assert.doesNotMatch(html,/class="photograph"/); }
 });

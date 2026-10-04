@@ -26,6 +26,7 @@ function load(relative) {
 
 const registry = load("lib/content-registry.ts");
 const { retiredUiTextEntries } = load("lib/ui-text-registry.ts");
+const { protectedUiTextKeys } = load("lib/ui-text-protection.ts");
 const map = JSON.parse(fs.readFileSync(path.join(repoRoot, "docs", "content-studio-map.json"), "utf8"));
 
 test("content map inventories every registered field exactly once", () => {
@@ -95,9 +96,31 @@ test("retired interface controls remain inventoried without claiming a rendered 
   for (const entry of retiredUiTextEntries) {
     const surface = byKey.get(entry.key);
     assert.ok(surface, "Missing retained legacy key: " + entry.key);
-    assert.equal(surface.classification, "editable-advanced");
+    assert.equal(surface.classification, protectedUiTextKeys.has(entry.key) ? "security-locked" : "editable-advanced");
     assert.equal(surface.defaultValue, entry.text);
     assert.equal(surface.binding.status, "retired-compatible-saved-value");
     assert.deepEqual(surface.binding.sourceFiles, [entry.source]);
+  }
+});
+
+test("retired security warnings preserve independent locks and reject changed wording", () => {
+  const byKey = new Map(map.surfaces.map((entry) => [entry.key, entry]));
+  const expectedLockedKeys = [
+    "ui.app.create.page.dba16601d30d",
+    "ui.app.dashboard.page.e5d3af1efed5",
+    "ui.app.edit.code.page.a8782c988bf8",
+    "ui.app.edit.code.page.51e39f20046d",
+    "ui.app.handout.code.page.5c027d45a7ce",
+    "ui.components.ProfileQuickEdit.b281350e38d8"
+  ];
+  for (const key of expectedLockedKeys) {
+    assert.ok(retiredUiTextEntries.some((entry) => entry.key === key), "Expected retained warning: " + key);
+    assert.ok(protectedUiTextKeys.has(key), "Audited warning must stay protected: " + key);
+    assert.equal(byKey.get(key)?.classification, "security-locked", "Map must not downgrade a retired warning: " + key);
+    assert.equal(registry.contentRegistryByKey.get(key)?.classification, "security-locked");
+    const published = { ...registry.defaultContentValues, [key]: "Previously approved retained warning." };
+    assert.deepEqual(registry.validateProtectedContentValues(published, published), {});
+    const changed = { ...published, [key]: "Changed protected wording." };
+    assert.match(registry.validateProtectedContentValues(changed, published)[key], /protected wording/);
   }
 });

@@ -36,7 +36,7 @@ test('slow decoding preserves selection order',async()=>{
 const page=fs.readFileSync(new URL('../app/create/page.tsx',import.meta.url),'utf8');
 const ast=ts.createSourceFile('create.tsx',page,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX),functions=new Map();
 function walk(n){if(ts.isFunctionDeclaration(n)&&n.name)functions.set(n.name.text,n.getText(ast));ts.forEachChild(n,walk);}walk(ast);
-function compile(name,env){return new Function(...Object.keys(env),ts.transpileModule(functions.get(name),{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText+';return '+name)(...Object.values(env));}
+function compile(name,env){env={isCurrent:()=>true,...env};return new Function(...Object.keys(env),ts.transpileModule(functions.get(name),{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText+';return '+name)(...Object.values(env));}
 function harness(overrides={}){
  const state={preparingFiles:false,photoFeedback:'',photoUploads:{old:{state:'uploaded',storagePath:'saved'}},galleryImages:['old'],form:{brand:'Fender',heroImageDataUrl:'old'},fieldErrors:{photos:'Add photo',brand:'Check brand'}};
  const env={saveInFlight:{current:false},fileSelectionPending:{current:false},galleryImages:state.galleryImages,prepareProfilePhotos,validateImageFiles:input=>({files:input,message:''}),fileToCompressedDataUrl:async file=>{if(file.name==='bad.jpg')throw Error('read');return file.name;},ui,...overrides};

@@ -56,6 +56,9 @@
 .validation { padding: 11px 18px; display: flex; gap: 8px; align-items: flex-start; color: var(--text); font-size: 13px; line-height: 1.5; }
 .validation svg { flex: 0 0 auto; margin-top: 2px; }
 .scopeNotice { margin: 0; padding: 2px 18px 12px; color: var(--gold); font-size: 13px; line-height: 1.5; }
+.printAdvice { margin: 0; padding: 2px 18px 12px; color: var(--muted-strong); font-size: 12px; line-height: 1.5; }
+.controlRail .printAdvice { padding: 0; }
+.root :global(.print-kit-toolbar-actions) { flex-wrap: wrap; }
 .canvasViewport { min-width: 0; overflow: auto; overscroll-behavior-inline: contain; padding: 24px; background: var(--surface-subtle); scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 .loadStatus { display: grid; justify-items: start; gap: 12px; max-width: 640px; padding: 20px 0; color: var(--text); }
 .loadStatus > svg { width: 24px; height: 24px; color: var(--muted-strong); }
@@ -124,6 +127,17 @@
       height: auto !important;
       max-height: none !important;
       overflow: visible !important;
+    }
+    .root:global(.handout-page)[data-print-page-size^="qr"],
+    .root:global(.handout-page)[data-print-page-size^="qr"] :global(.handout-shell),
+    .root:global(.handout-page)[data-print-page-size^="qr"] [data-print-frame] {
+      width: auto !important;
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      overflow: visible !important;
+      margin: 0 !important;
+      padding: 0 !important;
     }
   }
 }

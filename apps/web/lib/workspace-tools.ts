@@ -17,12 +17,12 @@ const serviceAction = { href: "/dashboard/service", title: "Service workbench", 
 const claimAction = { href: "/ownership-claim", title: "Claim an instrument", description: "Claim an instrument you acquired and check your submitted ownership claims." };
 const handoffAction = { href: "/dashboard#saved-profiles", title: "Transfer an instrument", description: "Choose one of your saved Profiles, then open Transfer to prepare its buyer handoff." };
 const workspaces: Record<WorkspaceType, Workspace> = {
-  player: { label: "Player workspace", title: "Your instruments, in order.", description: "Keep photos, documents, service history, and ownership together for every instrument.", actions: [collectionAction, claimAction, serviceAction] },
-  collector: { label: "Collector workspace", title: "Keep the story with the instrument.", description: "Organize your collection, preserve its history, and prepare a clear ownership handoff.", actions: [collectionAction, claimAction, serviceAction] },
-  shop: { label: "Store workspace", title: "Make every instrument buyer-ready.", description: "Manage inventory Profiles, share your shop website, and handle ownership transfers from one place.", actions: [sellerAction, { href: "/dashboard/import", title: "Import inventory", description: "Prepare multiple instrument Profiles from a spreadsheet." }, serviceAction] },
-  builder: { label: "Builder / brand workspace", title: "Give every build its own record.", description: "Document new instruments, connect buyers to your website, and keep the record ready for its next owner.", actions: [sellerAction, { href: "/dashboard/import", title: "Import your builds", description: "Start Profiles for a batch of instruments from a spreadsheet." }, handoffAction] },
-  luthier: { label: "Service provider workspace", title: "Keep customer work moving.", description: "Pick up saved drafts, respond to owner feedback, and document completed work without taking ownership.", actions: [serviceAction, { href: "/installers", title: "Provider network", description: "Learn about applying to the manually reviewed provider network." }, sellerAction] },
-  other: { label: "Instrument workspace", title: "Your instruments, in order.", description: "Manage your instrument Profiles, public collection, and ownership handoffs.", actions: [collectionAction, claimAction, serviceAction] }
+  player: { label: "Player workspace", title: "Your instruments, in order.", description: "Photos, documents, service history, and ownership records.", actions: [collectionAction, claimAction, serviceAction] },
+  collector: { label: "Collector workspace", title: "Keep the story with the instrument.", description: "Collection Profiles, history, and ownership transfers.", actions: [collectionAction, claimAction, serviceAction] },
+  shop: { label: "Store workspace", title: "Make every instrument buyer-ready.", description: "Inventory Profiles, website links, and ownership transfers.", actions: [sellerAction, { href: "/dashboard/import", title: "Import inventory", description: "Prepare multiple instrument Profiles from a spreadsheet." }, serviceAction] },
+  builder: { label: "Builder / brand workspace", title: "Give every build its own record.", description: "Build Profiles, website links, and ownership transfers.", actions: [sellerAction, { href: "/dashboard/import", title: "Import your builds", description: "Start Profiles for a batch of instruments from a spreadsheet." }, handoffAction] },
+  luthier: { label: "Service provider workspace", title: "Keep customer work moving.", description: "Drafts, owner feedback, and service records without changing instrument ownership.", actions: [serviceAction, { href: "/installers", title: "Provider network", description: "Learn about applying to the manually reviewed provider network." }, sellerAction] },
+  other: { label: "Instrument workspace", title: "Your instruments, in order.", description: "Instrument Profiles, collections, and ownership transfers.", actions: [collectionAction, claimAction, serviceAction] }
 };
 
 // Workspace preferences change navigation, never account permissions or verification.
@@ -54,27 +54,27 @@ const workspaceCopyKeys: Record<string, string> = {
   "Choose one of your saved Profiles, then open Transfer to prepare its buyer handoff.": "ui.workspace.29dcf61286d4",
   "Player workspace": "ui.workspace.ac29024c4ca2",
   "Your instruments, in order.": "ui.workspace.28d82d75f61b",
-  "Keep photos, documents, service history, and ownership together for every instrument.": "ui.workspace.11c503369f69",
+  "Photos, documents, service history, and ownership records.": "ui.workspace.11c503369f69",
   "Collector workspace": "ui.workspace.a9d6689acf2c",
   "Keep the story with the instrument.": "ui.workspace.5c78caa4b190",
-  "Organize your collection, preserve its history, and prepare a clear ownership handoff.": "ui.workspace.b5efa61cb710",
+  "Collection Profiles, history, and ownership transfers.": "ui.workspace.b5efa61cb710",
   "Store workspace": "ui.workspace.3d13b890ca59",
   "Make every instrument buyer-ready.": "ui.workspace.8aa1276d62e7",
-  "Manage inventory Profiles, share your shop website, and handle ownership transfers from one place.": "ui.workspace.15aa16da501a",
+  "Inventory Profiles, website links, and ownership transfers.": "ui.workspace.15aa16da501a",
   "Import inventory": "ui.workspace.a1e4fd437a50",
   "Prepare multiple instrument Profiles from a spreadsheet.": "ui.workspace.b59faa1dfe22",
   "Builder / brand workspace": "ui.workspace.ee0dff790ddf",
   "Give every build its own record.": "ui.workspace.ecdd24d6daca",
-  "Document new instruments, connect buyers to your website, and keep the record ready for its next owner.": "ui.workspace.c110fe1e6af2",
+  "Build Profiles, website links, and ownership transfers.": "ui.workspace.c110fe1e6af2",
   "Import your builds": "ui.workspace.da4ee2a6e6ca",
   "Start Profiles for a batch of instruments from a spreadsheet.": "ui.workspace.e3fa8a500176",
   "Service provider workspace": "ui.workspace.2f5a5daaecd3",
   "Keep customer work moving.": "ui.workspace.9bd7ecf60866",
-  "Pick up saved drafts, respond to owner feedback, and document completed work without taking ownership.": "ui.workspace.93363fe59878",
+  "Drafts, owner feedback, and service records without changing instrument ownership.": "ui.workspace.93363fe59878",
   "Provider network": "ui.workspace.e84ab388534a",
   "Learn about applying to the manually reviewed provider network.": "ui.workspace.ddf0016f044b",
   "Instrument workspace": "ui.workspace.5b8d6999d0e7",
-  "Manage your instrument Profiles, public collection, and ownership handoffs.": "ui.workspace.23160d470c3a"
+  "Instrument Profiles, collections, and ownership transfers.": "ui.workspace.23160d470c3a"
 };
 
 export function workspaceOptionLabel(label: string, content: Record<string, string> = {}) { return createUiText(content, "workspace")(workspaceCopyKeys[label] || "", label); }

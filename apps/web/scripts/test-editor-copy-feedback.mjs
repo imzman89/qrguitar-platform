@@ -104,7 +104,7 @@ function browser(options) {
   };
   return { writes, downloads, timers, navigator, window, storage,
     emit(name) { for (const callback of [...events.get(name) || []]) callback({}); },
-    document: { createElement: () => ({ click() { downloads.push(true); } }) },
+    document: { createElement: () => ({ click() { downloads.push(true); } }), getElementById: id => options.focusFields?.[id] || null },
     URL: BrowserURL
   };
 }
@@ -158,8 +158,9 @@ async function editor(t, options = {}) {
 async function importer(t, options = {}) {
   const f = hookRuntime(), b = browser(options); let observe;
   b.navigator.locks = {};
-  const source = 'brand,model,serial,type,photo\nPrivate Brand,My model,No Serial,Electric Guitar,https://example.invalid/my.jpg';
-  b.storage.set(bulk.bulkDraftKey('actor-a'), JSON.stringify({ version: 2, ownerId: 'actor-a', text: source, rows: bulk.parseRows(source), columnMapping: {} }));
+  const source = options.source || 'brand,model,serial,type,photo\nPrivate Brand,My model,No Serial,Electric Guitar,https://example.invalid/my.jpg';
+  const rows = options.rows ? options.rows(bulk.parseRows(source)) : bulk.parseRows(source);
+  b.storage.set(bulk.bulkDraftKey('actor-a'), JSON.stringify({ version: 2, ownerId: 'actor-a', text: source, rows, columnMapping: {} }));
   const jsx = (type, props, key) => ({ type, props, key });
   const load = loader({
     react: f.hooks, 'react/jsx-runtime': { jsx, jsxs: jsx }, 'lucide-react': {},
@@ -457,4 +458,56 @@ test('bulk A → B → A before completion still invalidates the old copy', asyn
 });
 test('bulk unmount ignores late clipboard rejection', async t => {
   const pending = deferred(), f = await importer(t, { clipboard: () => pending.promise }); f.click('Copy template'); f.dispose(); pending.reject(Error('Denied')); await f.flush(); assert.equal(f.lateWrites(), 0);
+});
+
+test('whole-draft publish errors navigate to another page field without a publishing mutation', async t => {
+  let focused = 0;
+  const f = await editor(t, { focusFields: { 'content-home-hero-headline': { focus() { focused++; }, scrollIntoView() {} } } });
+  f.click('Content');
+  f.find(node => node.props?.id === 'content-home-hero-headline').props.onChange({ target: { value: '' } }); f.render();
+  f.click('Catalog'); f.click('Publish');
+  const dialog = f.find(node => node.props?.role === 'dialog' && node.props['aria-labelledby'] === 'cms-confirm-title');
+  nodes(dialog).find(node => node.type === 'button' && text(node).trim() === 'Confirm publish').props.onClick(); f.render(); await f.flush();
+  assert.match(f.text(), /Correct these draft fields/); assert.equal(f.mutations.length, 0);
+  f.click('Marketing / Homepage / Hero / Headline'); await f.flush();
+  assert.equal(f.find(node => node.props?.id === 'content-home-hero-headline').props.value, ''); assert.equal(focused, 1);
+});
+test('whole-draft color validation navigates to Theme and focuses the invalid control', async t => {
+  let focused = 0;
+  const f = await editor(t, { focusFields: { 'theme-color-text': { focus() { focused++; }, scrollIntoView() {} } } });
+  f.click('Theme');
+  f.find(node => node.props?.id === 'theme-color-text').props.onChange({ target: { value: settings.defaultSiteSettings.colors.background } }); f.render();
+  f.click('Content'); f.click('Publish');
+  const dialog = f.find(node => node.props?.role === 'dialog' && node.props['aria-labelledby'] === 'cms-confirm-title');
+  nodes(dialog).find(node => node.type === 'button' && text(node).trim() === 'Confirm publish').props.onClick(); f.render(); await f.flush();
+  assert.equal(f.mutations.length, 0); f.click('colors.text'); await f.flush(); assert.equal(focused, 1);
+});
+for (const view of ['Invalid', 'Needs Attention']) test('bulk '+view+' correction keeps the focused row until blur', async t => {
+  const invalid = view === 'Invalid';
+  const f = await importer(t, { source: invalid ? 'brand,model,serial,type,photo\nPrivate Brand,My model,No Serial,Electric Guitar,ftp://invalid/photo' : 'brand,model,serial,type,photo\nPrivate Brand,,No Serial,Electric Guitar,https://example.invalid/my.jpg' });
+  const field = invalid ? 'Row 2 photo URL' : 'Row 2 model', prefix = invalid ? 'https://' : 'M', completed = invalid ? 'https://example.invalid/completed.jpg' : 'My completed model';
+  f.click(view);
+  const row = f.find(node => String(node.props?.className || '').startsWith('bulk-preview-row'));
+  row.props.onFocusCapture(); f.render();
+  f.find(node => node.props?.['aria-label'] === field).props.onChange({ target: { value: prefix } }); f.render();
+  f.find(node => node.props?.['aria-label'] === field).props.onChange({ target: { value: completed } }); f.render();
+  assert.equal(f.find(node => node.props?.['aria-label'] === field).props.value, completed);
+  row.props.onBlurCapture({ currentTarget: { contains: () => false }, relatedTarget: null }); f.render();
+  assert.match(f.text(), /No rows match this view/); assert.ok(f.button('Show all rows'));
+  f.click('Show all rows'); assert.equal(f.find(node => node.props?.['aria-label'] === field).props.value, completed);
+});
+test('bulk zero-result filter has a read-only return and announces its selected filter', async t => {
+  const f = await importer(t); f.click('Created'); assert.match(f.text(), /No rows match this view/);
+  assert.equal(f.button('Created').props['aria-pressed'], true); f.click('Show all rows');
+  assert.equal(f.button('All').props['aria-pressed'], true); assert.equal(f.input().props.value, f.source);
+});
+test('bulk uncertain primary label means confirming the original immutable request', async t => {
+  const f = await importer(t, { rows: rows => rows.map(row => {
+    const attempt = { uploadId: 'fixture-upload-123', idempotencyKey: 'fixture-key-123', phase: 'uncertain' };
+    attempt.body = bulk.buildBulkRequest(row, '', attempt, 'actor-a/profile-uploads/photo.jpg');
+    return { ...row, attempt, result: 'Needs confirmation' };
+  }) });
+  assert.ok(f.button('Confirm saved import (same requests)')); assert.equal(f.button('Start new import').props.disabled, true);
+  assert.equal(f.button('Confirm saved import (same requests)').props.disabled, false);
+  f.switchActor('actor-b'); await f.flush(); assert.doesNotMatch(f.text(), /Confirm saved import/);
 });

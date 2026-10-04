@@ -26,11 +26,14 @@ const deferred = () => { let resolve, reject; const promise = new Promise((a,b) 
 let count = 0;
 async function test(name, fn) { await fn(); count++; console.log("PASS " + name); }
 function harness(fetch) {
-  const state = { loading: true, loadError: false, requiresAccess: false, transfer: null, permanentPath: "", signedIn: false, accepting: false, message: "" };
+  const state = { loading: true, loadError: false, requiresAccess: false, transfer: null, permanentPath: "", signedIn: false, accepting: false, acceptUncertain: false, message: "" };
   const revision = { current: 0 };
   let callback;
   let unsubscribed = false;
   const env = { fetch, transferId: "fixture-transfer", authRevision: revision,
+    acceptMutation: { current: null }, uncertainLock: { current: false }, acceptController: { current: null }, feedbackRevision: { current: 0 },
+    getSupabaseAccessToken: async () => "fixture-token",
+    optionalTrackingProductEvents: { ownershipTransferCompleted: "ownership_transfer_completed" }, dispatchOptionalTrackingProductEvent: async () => true,
     createBrowserSupabaseClient: () => ({ auth: {
       getSession: async () => ({ data: { session: { access_token: "owner-a", user: { id: "a" } } } }),
       onAuthStateChange: cb => { callback = cb; return { data: { subscription: { unsubscribe: () => { unsubscribed = true; } } } }; }
@@ -38,7 +41,8 @@ function harness(fetch) {
     AbortController, setTimeout, clearTimeout };
   for (const key of Object.keys(state)) env["set" + key[0].toUpperCase() + key.slice(1)] = value => { state[key] = value; };
   const dispose = compile("const effect = " + effect + ";", env, "effect")();
-  return { state, env, revision, dispose, auth: session => callback("SIGNED_IN", session), unsubscribed: () => unsubscribed };
+  return { state, env, revision, dispose, auth: session => callback("SIGNED_IN", session), unsubscribed: () => unsubscribed,
+    accept: () => compile(accept, { ...env, renderedAuthRevision: revision.current, signedIn: state.signedIn, transfer: state.transfer, accepting: state.accepting }, "acceptTransfer")() };
 }
 const record = { id: "fixture-transfer", status: "sent", guitarQrCode: "QRG-FIXTURE" };
 const response = () => Response.json({ ok: true, transfer: record });
@@ -66,7 +70,7 @@ await test("signout immediately clears prior private transfer before next respon
   delayed.resolve(Response.json({ok:false},{status:401})); await flush(); h.dispose();
 });
 await test("old account response cannot replace the next account response", async () => {
-  const delayed = deferred(); let n = 0; const second = { ...record, id: "second-account" };
+  const delayed = deferred(); let n = 0; const second = { ...record, guitarName: "Second account instrument" };
   const h = harness(async () => ++n === 1 ? delayed.promise : Response.json({ok:true,transfer:second})); await flush();
   h.auth({access_token:"owner-b",user:{id:"b"}}); await flush();
   delayed.resolve(response()); await flush(); assert.deepEqual(h.state.transfer, second); h.dispose();
@@ -84,8 +88,9 @@ await test("unmount aborts request and ignores its late response", async () => {
   delayed.resolve(response()); await flush(); assert.equal(h.state.transfer,null);
 });
 async function runAccept(fetch, during) {
-  const state={accepting:false,message:"",loadError:false,transfer:record,permanentPath:""};
-  const revision={current:1}; const env={fetch,transfer:record,authRevision:revision,feedbackRevision:{current:0},acceptMutation:{current:null},accepting:false,getSupabaseAccessToken:async()=>"fixture-token"};
+  const state={accepting:false,acceptUncertain:false,message:"",loadError:false,transfer:record,permanentPath:""};
+  const revision={current:1}; const env={fetch,transfer:record,transferId:record.id,renderedAuthRevision:1,signedIn:true,authRevision:revision,feedbackRevision:{current:0},acceptMutation:{current:null},uncertainLock:{current:false},acceptController:{current:null},accepting:false,getSupabaseAccessToken:async()=>"fixture-token",
+    AbortController,setTimeout,clearTimeout,optionalTrackingProductEvents:{ownershipTransferCompleted:"ownership_transfer_completed"},dispatchOptionalTrackingProductEvent:async()=>true};
   for(const key of Object.keys(state))env["set"+key[0].toUpperCase()+key.slice(1)] = value => {state[key]=value;};
   const pending=compile(accept,env,"acceptTransfer")(); if(during)await during(revision); await pending; return state;
 }
@@ -105,7 +110,39 @@ await test("accept response after account change cannot expose previous transfer
 });
 for(const mode of ["missing","reject","success"]) await test("clipboard "+mode+" reports the actual outcome",async()=>{
   const messages=[];const clipboard=mode==="missing"?undefined:{writeText:async value=>{assert.equal(value,"https://qrguitar.com/i/QRG-FIXTURE");if(mode==="reject")throw new Error("denied");}};
-  await compile(copy,{window:{navigator:{clipboard},location:{origin:"https://qrguitar.com"}},profileHref:"/i/QRG-FIXTURE",authRevision:{current:0},feedbackRevision:{current:0},acceptMutation:{current:null},accepting:false,setMessage:m=>messages.push(m)},"copyProfileLink")();
+  await compile(copy,{window:{navigator:{clipboard},location:{origin:"https://qrguitar.com"}},profileHref:"/i/QRG-FIXTURE",transfer:record,transferId:record.id,renderedAuthRevision:0,authRevision:{current:0},feedbackRevision:{current:0},acceptMutation:{current:null},accepting:false,setMessage:m=>messages.push(m)},"copyProfileLink")();
   assert.match(messages.at(-1), mode==="success"?/Profile link copied/:/Could not copy/);
+});
+await test("read during unresolved acceptance aborts its controller but retains mutation and uncertainty locks until later GET", async () => {
+  let writes = 0, reads = 0;
+  const h = harness(async (_url, init) => { if (init.method === "PATCH") { writes++; return Response.json({ok:false},{status:400}); } reads++; return response(); }); await flush();
+  const mutation = { revision: h.revision.current }, controller = new AbortController();
+  h.env.acceptMutation.current = mutation; h.env.acceptController.current = controller; h.state.accepting = true;
+  h.auth({access_token:"owner-a",user:{id:"a"}}); await flush();
+  assert.equal(controller.signal.aborted, true); assert.equal(h.env.acceptMutation.current, mutation);
+  assert.equal(h.state.accepting, false); assert.equal(h.state.acceptUncertain, true); assert.equal(h.env.uncertainLock.current, true);
+  assert.equal(h.state.loadError, true); assert.deepEqual(h.state.transfer, record);
+  await h.accept(); assert.equal(writes, 0);
+  h.env.acceptMutation.current = null; h.env.acceptController.current = null;
+  h.auth({access_token:"owner-a",user:{id:"a"}}); await flush();
+  assert.equal(h.state.acceptUncertain, false); assert.equal(h.env.uncertainLock.current, false);
+  assert.equal(h.state.loadError, false); assert.equal(reads, 3); assert.equal(writes, 0); h.dispose();
+});
+for (const failure of ["outage", "malformed", "wrong-id"]) await test("uncertain acceptance stays locked after " + failure + " read and unlocks only on matching authoritative GET", async () => {
+  let writes = 0, reads = 0;
+  const h = harness(async (_url, init) => {
+    if (init.method === "PATCH") { writes++; throw Error("lost acceptance"); }
+    if (++reads !== 2) return response();
+    return failure === "outage" ? Response.json({ok:false},{status:503}) : failure === "malformed" ? new Response("invalid") : Response.json({ok:true,transfer:{...record,id:"wrong-transfer"}});
+  }); await flush(); await h.accept();
+  assert.equal(h.state.accepting, false); assert.equal(h.state.acceptUncertain, true); assert.equal(h.env.uncertainLock.current, true);
+  assert.equal(h.env.acceptMutation.current, null); assert.equal(h.env.acceptController.current, null);
+  await h.accept(); assert.equal(writes, 1);
+  h.auth({access_token:"owner-a",user:{id:"a"}}); await flush();
+  assert.equal(h.state.transfer, null); assert.equal(h.state.loadError, true); assert.equal(h.env.uncertainLock.current, true); assert.equal(h.state.acceptUncertain, true);
+  await h.accept(); assert.equal(writes, 1);
+  h.auth({access_token:"owner-a",user:{id:"a"}}); await flush();
+  assert.deepEqual(h.state.transfer, record); assert.equal(h.state.loadError, false);
+  assert.equal(h.env.uncertainLock.current, false); assert.equal(h.state.acceptUncertain, false); assert.equal(writes, 1); h.dispose();
 });
 console.log(count + " transfer UI behavior cases passed; no external messages or account writes.");

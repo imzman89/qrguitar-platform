@@ -21,6 +21,9 @@
   print-color-adjust: exact;
 }
 .document[data-theme="dark"] { --paper: #142023; --ink: #f5f7f7; --muted: #c4cecf; --rule: #425154; --soft: #1b292c; --positive: #94d5a7; --negative: #f0aaa4; }
+.document[data-mode="qr"] { height: var(--print-content-height); background: #fff; }
+.qrOnly { width: 100%; height: 100%; }
+.qrOnly .qr { width: 100%; height: 100%; padding: 0; background: #fff; }
 .document *, .document *::before, .document *::after { box-sizing: border-box; letter-spacing: 0; }
 .document h2, .document h3, .document p, .document dl, .document dd { margin: 0; color: inherit; }
 .document h2 { font: 700 32px/1.12 Arial, sans-serif; overflow-wrap: anywhere; }
@@ -160,3 +163,18 @@
   .document { break-inside: avoid; page-break-inside: avoid; }
   .document, .sheet { margin: 0; }
 }
+
+/* No empty image tracks when the owner prints without a photograph. */
+.serviceIdentity[data-has-photo="false"] { grid-template-columns: minmax(0, 1fr); }
+.tag[data-has-photo="false"] { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto auto; grid-template-areas: "tagHeader" "tagIdentity" "tagMeta" "tagNote" "tagFooter"; }
+.document[data-orientation="landscape"] .tag[data-has-photo="false"] { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto minmax(0, 1fr) auto; grid-template-areas: "tagHeader tagHeader" "tagIdentity tagMeta" "tagNote tagFooter"; }
+
+.tag[data-has-photo="false"] .tagMeta { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; padding: 0.12in 0; background: var(--paper); }
+.tag[data-has-photo="false"] .tagQr { grid-row: 1; }
+.tag[data-has-photo="false"] .tagQr .qr { width: 2in; height: 2in; }
+.tag[data-has-photo="false"] .tagMeta .facts { grid-row: 2; gap: 10px 16px; }
+.tag[data-has-photo="false"] .tagMeta .facts dt { font-size: 10px; }
+.tag[data-has-photo="false"] .tagMeta .facts dd { font-size: 14px; }
+.document[data-orientation="landscape"] .tag[data-has-photo="false"] .tagQr .qr { width: 1.4in; height: 1.4in; }
+
+.document[data-orientation="landscape"] .tag[data-has-photo="false"] .tagMeta { border-top: 0; }

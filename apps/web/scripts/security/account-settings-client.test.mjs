@@ -287,20 +287,46 @@ test("authenticated metadata failure preserves self privacy intake but sign-out 
 
 test("whole-account save discloses both unsaved sections and keeps one versioned write", async () => {
   const f = await fixture().mount(), render = await accountPageUI(f, "profile");
-  f.client.setDraft({ displayName: "Updated owner", publicCollection: { ...f.client.getState().draft.publicCollection, enabled: false } });
+  f.client.setDraft({ displayName: "Updated owner", publicCollection: { ...f.client.getState().draft.publicCollection, publicName: "Chosen studio collection" } });
+  const draft = structuredClone(f.client.getState().draft);
   let tree = render(), html = renderToStaticMarkup(tree);
   assert.match(html, /Unsaved changes: Account details, Collection page/);
-  assert.match(html, /including collection visibility/);
+  assert.match(html, /Saving updates Account details and your named collection together\./);
+  assert.match(html, /Password and sign-out actions are separate\./);
+  assert.doesNotMatch(html, /including collection visibility/);
   const save = nodes(tree, node => node.type === "button" && node.props["aria-describedby"] === "account-save-scope")[0];
   assert.ok(save); assert.equal(save.props["aria-describedby"], "account-save-scope");
   assert.equal(f.writes().length, 0); await save.props.onClick();
   assert.equal(f.writes().length, 1);
   const body = JSON.parse(f.writes()[0].body);
-  assert.equal(body.displayName, "Updated owner"); assert.equal(body.publicCollection.enabled, false); assert.equal(body.expectedVersion, 0);
+  assert.deepEqual(body, JSON.parse(JSON.stringify({ ...draft, expectedVersion: 0 })));
+  assert.equal(body.displayName, "Updated owner"); assert.equal(body.publicCollection.enabled, true); assert.equal(body.expectedVersion, 0);
+  assert.equal(body.publicCollection.publicName, "Chosen studio collection");
+  assert.notEqual(body.publicCollection.publicName, body.displayName); assert.notEqual(body.publicCollection.publicName, f.accounts.a.email);
+  assert.equal(f.client.getState().account.settingsVersion, 1);
   html = renderToStaticMarkup(render()); assert.doesNotMatch(html, /Unsaved changes:/);
   nodes(render(), node => node.type === "button" && node.props.children === "Collection page")[0].props.onClick();
   assert.equal(nodes(render(), node => node.type === "button" && node.props.children === "Save account changes").length, 1);
   f.client.dispose();
+});
+
+test("collection name starts blank and is never derived from email or account details", async () => {
+  const f = fixture();
+  f.accounts.a.publicCollection = { ...f.accounts.a.publicCollection, enabled: false, handle: "", publicName: "" };
+  await f.mount(); const render = await accountPageUI(f, "collection");
+  const nameInput = () => nodes(render(), node => node.type === "input" && node.props.id === "collectionName")[0];
+  assert.equal(nameInput().props.value, ""); assert.equal(nameInput().props.placeholder, "A name you choose");
+  assert.equal(savedCollectionHref(f.client.getState().account), "");
+  nodes(render(), node => node.type === "button" && node.props.children === "Account details")[0].props.onClick();
+  nodes(render(), node => node.type === "input" && node.props.id === "displayName")[0].props.onChange({ target: { value: "Personal account details" } });
+  assert.equal(f.client.getState().draft.displayName, "Personal account details");
+  assert.equal(f.client.getState().draft.publicCollection.publicName, "");
+  nodes(render(), node => node.type === "button" && node.props.children === "Collection page")[0].props.onClick();
+  assert.equal(nameInput().props.value, "");
+  nameInput().props.onChange({ target: { value: "Workshop instruments" } });
+  assert.equal(nameInput().props.value, "Workshop instruments");
+  assert.equal(nodes(render(), node => node.type === "input" && node.props["aria-describedby"] === "collection-visibility-help").length, 0);
+  assert.equal(f.writes().length, 0); f.client.dispose();
 });
 
 test("the workspace-type preference marks Account details, not collection publication, dirty", async () => {
@@ -367,6 +393,8 @@ test("Profile and Collection preserve independently published CMS save labels wi
   assert.equal(saveButton(render()).props.children, content["account.actions.save"]);
   nodes(render(), node => node.type === "button" && node.props.children === "Collection page")[0].props.onClick();
   assert.equal(saveButton(render()).props.children, content["ui.app.account.page.a7f1e189ad7b"]);
-  assert.match(renderToStaticMarkup(render()), /including collection visibility/);
+  assert.match(renderToStaticMarkup(render()), /Saving updates Account details and your named collection together\./);
+  assert.match(renderToStaticMarkup(render()), /Password and sign-out actions are separate\./);
+  assert.doesNotMatch(renderToStaticMarkup(render()), /including collection visibility/);
   assert.equal(f.writes().length, 0); f.client.dispose();
 });

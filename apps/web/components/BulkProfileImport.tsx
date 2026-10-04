@@ -19,13 +19,14 @@ import {
 } from "../lib/bulk-import";
 
 type BulkProfileImportProps = { onComplete?: () => void; ownerName?: string };
-const template = [bulkHeaders.join("\t"), ["Fender", "Stratocaster", "ABC123", "2005", "Electric Guitar", "used", "not_for_sale", "all_original", "Cranston, RI", "private", "https://example.com/photo.jpg", "Owned since 2024", "no", "Example Shop", "2024-01-15"].join("\t")].join("\n");
+const template = [bulkHeaders.join("\t"), ["Fender", "Stratocaster", "ABC123", "2005", "Electric Guitar", "used", "not_for_sale", "all_original", "Cranston, RI", "https://example.com/photo.jpg", "Owned since 2024", "no", "Example Shop", "2024-01-15"].join("\t")].join("\n");
 const importTargets = ["", ...bulkHeaders];
 
 export function BulkProfileImport({ onComplete = () => undefined, ownerName = "" }: BulkProfileImportProps) {
   const ui = useUiText("components.BulkProfileImport");
   const content = useSiteContent();
   const [text, setText] = useState("");
+  const [collectionName, setCollectionName] = useState(ownerName);
   const [rows, setRows] = useState<BulkRow[]>([]);
   const [message, setMessage] = useState("");
   const [templateCopyState, setTemplateCopyState] = useState<"" | "copying" | "copied" | "manual">("");
@@ -33,6 +34,7 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [filter, setFilter] = useState<"all" | "ready" | "attention" | "duplicate" | "invalid" | "draft" | "created">("all");
+  const [editingRow, setEditingRow] = useState<number | null>(null);
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({});
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [ownerId, setOwnerId] = useState("");
@@ -46,7 +48,8 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
   const readyCount = useMemo(() => rows.filter((row) => !row.error && row.result !== "Created" && row.attempt?.phase !== "complete").length, [rows]);
   const controlsLocked = leaseState !== "owned" || !draftLoaded || Boolean(storageError) || saving || previewing || rows.some((row) => Boolean(row.attempt));
   const hasUncertain = rows.some(isUncertain);
-  const visibleRows = rows.filter((row) => filter === "all"
+  const previewIsPrimary = !hasUncertain && (!rows.length || readyCount === 0 || Boolean(parseError));
+  const visibleRows = rows.filter((row) => row.rowNumber === editingRow || filter === "all"
     || (filter === "ready" && !row.error && row.result !== "Created")
     || (filter === "attention" && Boolean(row.error || (row.result && row.result !== "Created")))
     || (filter === "duplicate" && Boolean(row.duplicateCode))
@@ -66,7 +69,8 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
       if (changed) setAccountGeneration((current) => current + 1);
       draftLease.current?.release(); draftLease.current = null;
       setOwnerId(nextOwner); setDraftLoaded(false); setStorageError(""); setParseError("");
-      setText(""); setRows([]); setColumnMapping({}); setMessage("");
+      setCollectionName(ownerName);
+      setText(""); setRows([]); setColumnMapping({}); setMessage(""); setEditingRow(null); setFilter("all");
       setLeaseState(nextOwner ? "waiting" : "signed-out");
       if (!nextOwner) setMessage(ui("ui.components.BulkProfileImport.ad09774ce854", "Sign in to restore your import."));
     };
@@ -216,11 +220,16 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
     if (running.current || leaseState !== "owned" || !draftLoaded || !ownerId || storageError || parseError || !rows.length) return;
     running.current = true; setSaving(true); setMessage("");
     try {
+      if (rows.some((row) => !row.attempt?.body && !row.error && row.result !== "Created")
+          && (!collectionName.trim() || collectionName.trim().length > 80)) {
+        setMessage(ui("ui.components.BulkProfileImport.collectionNameRequired", "Choose a collection name before creating instruments. Existing saved requests keep their original details; configure the collection in Account before retrying them."));
+        return;
+      }
       const checked = await checkDuplicates(rows);
       persistRows(checked);
       if (!checked.some((row) => !row.error && row.result !== "Created")) { setMessage(ui("ui.components.BulkProfileImport.c5d512d8bc14", "Fix the highlighted rows before creating Profiles.")); return; }
       const result = await runBulkImport(checked, {
-        ownerName, makeKey: createClientKey,
+        ownerName: collectionName.trim(), makeKey: createClientKey,
         persist: (nextRows) => {
           try { persistRows(nextRows); }
           catch (error) { setStorageError(error instanceof Error ? error.message : "Import progress could not be saved."); throw error; }
@@ -277,7 +286,9 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
       <header className="bulk-import-heading"><div><span className="eyebrow">{ui("ui.components.BulkProfileImport.01916f7252b9", "Bulk Import")}</span><h1>{getContentValue(content, "bulkImport.hero.headline")}</h1><p>{getContentValue(content, "bulkImport.hero.body")}</p></div><button className="button secondary" type="button" onClick={() => void copyTemplate()}><Clipboard size={16} /> {getContentValue(content, "bulkImport.actions.template")}</button></header>
       {templateCopyState ? <p className="form-message" role="status" aria-live="polite">{templateCopyState === "copying" ? ui("ui.components.BulkProfileImport.33d680f56e85", "Copying template…") : templateCopyState === "copied" ? ui("ui.components.BulkProfileImport.69bc70f7becd", "Template copied.") : ui("ui.components.BulkProfileImport.a906b8c86cc0", "Could not copy automatically. Select and copy the template below.")}</p> : null}
       {templateCopyState === "manual" ? <label className="field custom-wide"><span>{ui("ui.components.BulkProfileImport.0adf88823e4b", "Copyable import template")}</span><textarea aria-label={ui("ui.components.BulkProfileImport.73065a710672", "Bulk import template")} readOnly rows={4} value={template} spellCheck={false} onFocus={(event) => event.currentTarget.select()} /></label> : null}
-      <ol className="import-steps" aria-label={ui("ui.components.BulkProfileImport.185772fdfdfd", "Import workflow")}><li className={text ? "is-complete" : "is-active"}><b>1</b><span>{ui("ui.components.BulkProfileImport.e70643644860", "Add inventory")}</span></li><li className={rows.length ? "is-complete" : ""}><b>2</b><span>{ui("ui.components.BulkProfileImport.2778414273d9", "Map columns")}</span></li><li className={rows.length ? "is-active" : ""}><b>3</b><span>{ui("ui.components.BulkProfileImport.d14ebd741789", "Review rows")}</span></li><li><b>4</b><span>{ui("ui.components.BulkProfileImport.3e8fd54e8e35", "Create Private Profiles")}</span></li></ol>
+      <label className="field"><span>{ui("ui.components.BulkProfileImport.collectionName", "Collection name")}</span><input value={collectionName} disabled={saving || previewing || !ownerId} maxLength={80} onChange={(event) => setCollectionName(event.target.value)} placeholder={ui("ui.components.BulkProfileImport.collectionNamePlaceholder", "A name you choose")} /></label>
+      <p className="field-note">{ui("ui.components.BulkProfileImport.collectionNameHelp", "Use a name you choose, not necessarily your real name. An existing collection name is managed in Account. Saved retry requests keep their original details.")}</p>
+      <ol className="import-steps" aria-label={ui("ui.components.BulkProfileImport.185772fdfdfd", "Import workflow")}><li className={text ? "is-complete" : "is-active"}><b>1</b><span>{ui("ui.components.BulkProfileImport.e70643644860", "Add inventory")}</span></li><li className={rows.length ? "is-complete" : ""}><b>2</b><span>{ui("ui.components.BulkProfileImport.2778414273d9", "Map columns")}</span></li><li className={rows.length ? "is-active" : ""}><b>3</b><span>{ui("ui.components.BulkProfileImport.d14ebd741789", "Review rows")}</span></li><li><b>4</b><span>{ui("ui.components.BulkProfileImport.createInstruments", "Create instruments")}</span></li></ol>
       <div className="bulk-import-grid">
         <div className="bulk-import-intro">
           <h2>{ui("ui.components.BulkProfileImport.f7c46329dcb1", "1. Add inventory")}</h2>
@@ -290,11 +301,21 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
         </label>
         <div className="bulk-import-actions">
           <button className="button secondary" type="button" disabled={controlsLocked} onClick={loadExample}>{ui("ui.components.BulkProfileImport.4dbb46fc867a", "Load example")}</button>
-          <button className="button secondary" type="button" disabled={controlsLocked} onClick={() => void previewRows()}>{ui("ui.components.BulkProfileImport.ae92c9f2f0fa", "Map & preview rows")}</button>
-          <button className="button" type="button" onClick={() => void createProfiles()} disabled={leaseState !== "owned" || saving || previewing || !draftLoaded || Boolean(storageError) || Boolean(parseError) || !rows.length || readyCount === 0}>
-            <Upload size={16} /> {saving ? ui("ui.components.BulkProfileImport.def70944c9bb", "Creating...") : ui("ui.components.BulkProfileImport.3e8fd54e8e35", "Create Private Profiles")}
+          <button className={previewIsPrimary ? "button" : "button secondary"} type="button" disabled={controlsLocked} onClick={() => void previewRows()}>{ui("ui.components.BulkProfileImport.ae92c9f2f0fa", "Map & preview rows")}</button>
+          <button className={previewIsPrimary ? "button secondary" : "button"} type="button" aria-describedby="bulk-import-next-step" onClick={() => void createProfiles()} disabled={leaseState !== "owned" || saving || previewing || !draftLoaded || Boolean(storageError) || Boolean(parseError) || !rows.length || readyCount === 0}>
+            <Upload size={16} /> {saving ? ui("ui.components.BulkProfileImport.def70944c9bb", "Creating...") : hasUncertain ? ui("ui.components.BulkProfileImport.confirmSavedImport", "Confirm saved import (same requests)") : ui("ui.components.BulkProfileImport.createInstruments", "Create instruments")}
           </button>
           <button className="button secondary" type="button" disabled={leaseState !== "owned" || !draftLoaded || saving || previewing || hasUncertain || Boolean(storageError)} onClick={startNewImport}>{ui("ui.components.BulkProfileImport.eabc7445dbc1", "Start new import")}</button>
+        </div>
+        <div id="bulk-import-feedback">
+          <p className="field-note" id="bulk-import-next-step">{!rows.length
+            ? ui("ui.components.BulkProfileImport.previewBeforeCreate", "Add your inventory, then choose Map & preview rows. No Profiles are created during preview.")
+            : previewIsPrimary ? ui("ui.components.BulkProfileImport.correctBeforeCreate", "Correct the highlighted rows and preview again. Profiles can be created when at least one row is ready.")
+              : ui("ui.components.BulkProfileImport.catalogReviewBeforeCreate", "Review the ready rows before creating. Saved instruments and photos appear in Catalog. Seller/source and acquisition details stay off the Profile; your saved progress is kept.")}</p>
+          {leaseState === "waiting" && ownerId ? <p className="form-message" role="status" aria-live="polite">{ui("ui.components.BulkProfileImport.f95735cf3428", "Waiting to open this account’s import. Close its other import tab; saved progress will load here automatically.")}</p> : null}
+          {message ? <p className="form-message" role="status" aria-live="polite">{message}</p> : null}
+          {parseError ? <p className="form-message" role="alert">{parseError}</p> : null}
+          {storageError ? <p className="form-message" role="alert">{storageError}{" "}{ui("ui.components.BulkProfileImport.040a5f495622", "Reload after resolving the storage issue; the saved draft has been kept.")}</p> : null}
         </div>
         {sourceHeaders.length ? (
           <div className="bulk-preview-workspace">
@@ -311,12 +332,13 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
                 ))}
               </div>
             </div>
-            <div className="bulk-preview-toolbar"><strong>{readyCount}{" "}{ui("ui.components.BulkProfileImport.62156aa9442a", "ready /")}{" "}{rows.length}{" "}{ui("ui.components.BulkProfileImport.11239872d178", "total")}</strong><div>{(["all", "ready", "attention", "duplicate", "invalid", "draft", "created"] as const).map((item) => <button className={filter === item ? "is-active" : ""} key={item} type="button" onClick={() => setFilter(item)}>{item === "attention" ? ui("ui.components.BulkProfileImport.63cdbf0ebd1d", "Needs Attention") : item.charAt(0).toUpperCase() + item.slice(1)}</button>)}</div></div>
+            <div className="bulk-preview-toolbar"><strong>{readyCount}{" "}{ui("ui.components.BulkProfileImport.62156aa9442a", "ready /")}{" "}{rows.length}{" "}{ui("ui.components.BulkProfileImport.11239872d178", "total")}</strong><div>{(["all", "ready", "attention", "duplicate", "invalid", "draft", "created"] as const).map((item) => <button className={filter === item ? "is-active" : ""} aria-pressed={filter === item} key={item} type="button" onClick={() => { setEditingRow(null); setFilter(item); }}>{item === "attention" ? ui("ui.components.BulkProfileImport.63cdbf0ebd1d", "Needs Attention") : item.charAt(0).toUpperCase() + item.slice(1)}</button>)}</div></div>
           <div className="bulk-preview-list" aria-label={ui("ui.components.BulkProfileImport.27cd21ba8e71", "Bulk import results")}>
+            {!visibleRows.length ? <div role="status"><p>{ui("ui.components.BulkProfileImport.emptyFilteredView", "No rows match this view. Your other rows are kept.")}</p><button className="button secondary" type="button" onClick={() => setFilter("all")}>{ui("ui.components.BulkProfileImport.showAllRows", "Show all rows")}</button></div> : null}
             {visibleRows.map((row) => (
-              <div className={row.error || (row.result && row.result !== "Created") ? "bulk-preview-row has-error" : "bulk-preview-row"} key={row.rowNumber}>
+              <div className={row.error || (row.result && row.result !== "Created") ? "bulk-preview-row has-error" : "bulk-preview-row"} key={row.rowNumber} onFocusCapture={() => setEditingRow(row.rowNumber)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setEditingRow(null); }}>
                 <strong>{ui("ui.components.BulkProfileImport.95110d74c4c0", "Row")}{" "}{row.rowNumber}: {row.brand || ui("ui.components.BulkProfileImport.29bf024f43da", "Missing brand")} {row.model || ui("ui.components.BulkProfileImport.fefe7f33d18d", "Missing model")}</strong>
-                <span>{[row.year, row.serial || "No Serial Number", row.serial ? qrCodeFromSerial(row.serial) : "QRguitar ID assigned at creation", "Private on creation", row.photo ? "Photo ready" : "Photo missing"].filter(Boolean).join(" / ")}</span>
+                <span>{[row.year, row.serial || "No Serial Number", row.serial ? qrCodeFromSerial(row.serial) : "QRguitar ID assigned at creation", "Included in Catalog", row.photo ? "Photo ready" : "Photo missing"].filter(Boolean).join(" / ")}</span>
                 {row.result !== "Created" ? <fieldset disabled={leaseState !== "owned" || saving || previewing || Boolean(row.attempt)} className="bulk-row-editor" style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }} aria-label={ui("ui.components.BulkProfileImport.3bb8703eff27", "Edit row {{value1}}", { value1: row.rowNumber })}><input aria-label={ui("ui.components.BulkProfileImport.eeb091b0f05d", "Row {{value1}} brand", { value1: row.rowNumber })} value={row.brand} onChange={(event) => updateRow(row.rowNumber, "brand", event.target.value)} placeholder={ui("ui.components.BulkProfileImport.090ed4316f1d", "Brand")} /><input aria-label={ui("ui.components.BulkProfileImport.f33cdf26f0b0", "Row {{value1}} model", { value1: row.rowNumber })} value={row.model} onChange={(event) => updateRow(row.rowNumber, "model", event.target.value)} placeholder={ui("ui.components.BulkProfileImport.5e2c614c23f0", "Model")} /><input aria-label={ui("ui.components.BulkProfileImport.011f43f57b88", "Row {{value1}} Serial Number", { value1: row.rowNumber })} value={row.serialNotUsed ? "No Serial" : row.serial} onChange={(event) => updateRow(row.rowNumber, "serial", event.target.value)} placeholder={ui("ui.components.BulkProfileImport.733b7358d78a", "Serial Number or No Serial")} /><input aria-label={ui("ui.components.BulkProfileImport.5bcbc6403d90", "Row {{value1}} type", { value1: row.rowNumber })} value={row.instrumentType} onChange={(event) => updateRow(row.rowNumber, "instrumentType", event.target.value)} placeholder={ui("ui.components.BulkProfileImport.baaddf70fb5d", "Type")} /><input aria-label={ui("ui.components.BulkProfileImport.97e11dbd32a2", "Row {{value1}} photo URL", { value1: row.rowNumber })} value={row.photo} onChange={(event) => updateRow(row.rowNumber, "photo", event.target.value)} placeholder="https:// photo URL" /></fieldset> : null}
                 <small>{bulkRowStatus(row)}{row.error || row.result ? ui("ui.components.BulkProfileImport.80b025432964", ": {{value1}}", { value1: row.error || row.result }) : ""}</small>
                 {row.attempt?.phase === "complete" && row.attempt.qrCode ? <a href={`/edit/${encodeURIComponent(row.attempt.qrCode)}`}>{ui("ui.components.BulkProfileImport.96b49b37db1c", "Open created Profile")}</a> : null}
@@ -326,12 +348,8 @@ export function BulkProfileImport({ onComplete = () => undefined, ownerName = ""
           </div>
           </div>
         ) : null}
-        {leaseState === "waiting" && ownerId ? <p className="form-message" role="status" aria-live="polite">{ui("ui.components.BulkProfileImport.f95735cf3428", "Waiting to open this account’s import. Close its other import tab; saved progress will load here automatically.")}</p> : null}
-        {message ? <p className="form-message" role="status" aria-live="polite">{message}</p> : null}
-        {parseError ? <p className="form-message" role="alert">{parseError}</p> : null}
-        {storageError ? <p className="form-message" role="alert">{storageError}{" "}{ui("ui.components.BulkProfileImport.040a5f495622", "Reload after resolving the storage issue; the saved draft has been kept.")}</p> : null}
         {hasUncertain ? <p className="fine-print">{ui("ui.components.BulkProfileImport.9e79ebbdd071", "Retry confirms the original request. Keep this draft until its result is known.")}</p> : null}
-        <p className="fine-print">{ui("ui.components.BulkProfileImport.ede0997eebfc", "Import up to 50 rows per batch. Imported Profiles start Private, and Serial Numbers stay hidden unless show_serial explicitly says yes. Review each Profile before publishing it.")}</p>
+        <p className="fine-print">{ui("ui.components.BulkProfileImport.catalogImportHelp", "Import up to 50 rows per batch. Saved instruments and photos appear in Catalog and link your collection. Seller/source and acquisition details stay off the Profile. Serial Numbers stay hidden unless show_serial explicitly says yes.")}</p>
       </div>
     </section>
   );

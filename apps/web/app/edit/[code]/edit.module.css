@@ -109,3 +109,16 @@
   .layout :global(.qr-customizer) { padding: 8px 0; }
   .layout :global(.editor-save-bar) { position: static; }
 }
+/* Compact only the owner editor's small-phone organizer, not Create or desktop. */
+@media (max-width: 520px) {
+  .photoSection :global(.photo-organizer) { padding: 0; gap: 12px; }
+  .photoSection :global(.photo-organizer-grid) { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 10px; }
+  .photoSection :global(.photo-organizer-tile > img) { height: 96px; aspect-ratio: auto; object-fit: contain; }
+  .photoSection :global(.photo-organizer-header > div) { display: grid; gap: 4px; }
+  .photoSection :global(.photo-organizer-header > div > span) { display: block; line-height: 1.5; overflow-wrap: anywhere; }
+  .photoSection :global(.photo-organizer-key) { display: inline-flex; }
+  .photoSection :global(.photo-organizer-status) { white-space: normal; overflow-wrap: anywhere; }
+  .photoSection :global(.photo-organizer-menu summary), .photoSection :global(.photo-organizer-menu button) { min-height: 44px; height: auto; white-space: normal; overflow-wrap: anywhere; }
+  .photoSection :global(.photo-organizer-menu button) { padding: 8px; }
+  .photoSection :global(.photo-organizer-menu summary:focus-visible), .photoSection :global(.photo-organizer-menu button:focus-visible) { outline: 2px solid var(--action); outline-offset: -3px; }
+}

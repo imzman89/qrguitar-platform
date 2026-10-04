@@ -67,3 +67,10 @@
   .memberFilters { grid-template-columns:repeat(2,minmax(0,1fr)); padding:16px; gap:14px; }.memberFilters > label:first-child { grid-column:1/-1; }
   .memberFilterFields,.profileGrid { grid-template-columns:minmax(0,1fr); }.memberPage .actionRow { width:auto; max-width:100%; }.memberPage .actionRow a { width:auto; max-width:100%; }
 }
+
+.exampleCollection { margin-top:32px; padding-top:16px; border-top:1px solid var(--line); }
+.exampleCollection > summary { min-height:44px; align-content:center; width:fit-content; max-width:100%; cursor:pointer; font-size:14px; color:var(--text); }
+.exampleCollection > summary:focus-visible { outline:2px solid var(--action); outline-offset:4px; }
+.exampleCollection section { padding-top:16px; min-width:0; }
+.exampleCollection h2 { margin:0 0 8px; font-size:22px; line-height:1.3; letter-spacing:0; }
+.exampleCollection p { margin:0 0 20px; max-width:65ch; font-size:14px; line-height:1.6; color:var(--muted); }

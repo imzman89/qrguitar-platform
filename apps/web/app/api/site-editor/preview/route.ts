@@ -12,7 +12,12 @@ function cookieOptions(request: Request, maxAge: number) {
 }
 function crossOrigin(request: Request) {
   const origin = request.headers.get("origin");
-  return request.headers.get("sec-fetch-site") === "cross-site" || Boolean(origin && origin !== new URL(request.url).origin);
+  const requestUrl = new URL(request.url);
+  const host = request.headers.get("host");
+  const port = requestUrl.port ? `:${requestUrl.port}` : "";
+  // NextRequest normalizes loopback URLs; restore the exact Host, not an alias whitelist.
+  if (requestUrl.hostname === "localhost" && (host === `127.0.0.1${port}` || host === `[::1]${port}`)) requestUrl.host = host;
+  return request.headers.get("sec-fetch-site") === "cross-site" || Boolean(origin && origin !== requestUrl.origin);
 }
 export async function POST(request: Request) {
   if (crossOrigin(request)) return NextResponse.json({ ok: false, message: "Same-origin preview request required." }, { status: 403, headers: noStoreHeaders });

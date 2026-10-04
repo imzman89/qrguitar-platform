@@ -10,6 +10,13 @@ import type {
 
 export type InstrumentSpecLike = { label: string; value: string };
 
+// Reserved owner purchase fields written by Create and Bulk Import. A Profile
+// being listed does not make acquisition/contact metadata part of its public specs.
+const OWNER_ONLY_SPEC_LABELS = new Set(["seller / source", "acquired"]);
+export function isOwnerOnlyInstrumentSpec(label: string) {
+  return OWNER_ONLY_SPEC_LABELS.has(label.trim().toLowerCase().replace(/\s+/g, " "));
+}
+
 const MANAGED_SPEC_LABELS = new Set([
   "condition",
   "type",
@@ -311,6 +318,10 @@ export function sanitizePublicInstrument(instrument: DemoInstrument): DemoInstru
   if (publicInstrument.showSerialPublic !== true) {
     delete (publicInstrument as Partial<DemoInstrument>).serial;
   }
+
+  publicInstrument.owner = publicInstrument.publicCollection?.publicName || "Collection";
+  publicInstrument.customFields = (publicInstrument.customFields || [])
+    .filter((field) => !isOwnerOnlyInstrumentSpec(field.label));
 
   publicInstrument.documentFiles = (publicInstrument.documentFiles || [])
     .filter((document) => document.visibility === "public")

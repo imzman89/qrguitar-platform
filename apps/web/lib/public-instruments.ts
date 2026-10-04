@@ -4,7 +4,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import { supabaseHttpsJson } from "./supabase-http";
 import { supabasePagedRows, supabaseRowsByValues } from "./supabase-pagination";
 import { isEligiblePublicProfile, isRetiredPublicProfileCode, normalizePublicProfileCode } from "./public-profile-eligibility";
-import { cleanPublicCollection, publicCollectionOwnerKey, type PublicCollectionSettings } from "./public-collections";
+import { cleanPublicCollection, publicCollectionHandleKey, publicCollectionOwnerKey, type PublicCollectionSettings } from "./public-collections";
 import { publicFileUrl } from "./public-file-url";
 import {
   availabilityFromSpecs,
@@ -282,7 +282,7 @@ function mapRecord({
     safetyStatusUpdatedAt: guitar.safety_status_updated_at || "",
     instrumentType: type,
     builder: guitar.builder || "",
-    owner: ownerName || guitar.builder || "Unclaimed",
+    owner: ownerName || "Collection",
     publicCollection,
     location: guitar.location || "",
     visibility: guitar.visibility === "private" ? "private" : guitar.visibility === "unlisted" ? "unlisted" : "public",
@@ -412,11 +412,18 @@ async function loadRelated(guitars: GuitarRow[], serviceRole = true) {
     profiles.set(row.id, row);
   }
 
+  const collectionHandles = collectionRows.map((row) => cleanPublicCollection(row.content_value).handle).filter(Boolean);
+  const handleRows = await supabaseRowsByValues<PublicCollectionSiteRow>(
+    "/rest/v1/site_content?select=content_key,content_value&order=content_key.asc",
+    "content_key", collectionHandles.map(publicCollectionHandleKey), { serviceRole: true }
+  );
+  const bindingOwners = new Map(handleRows.map((row) => [row.content_key, row.content_value?.ownerId]));
   const collections = new Map<string, NonNullable<DemoInstrument["publicCollection"]>>();
   for (const row of collectionRows) {
     const ownerId = row.content_key.replace(/^public_collection_owner:/, "");
     const collection = cleanPublicCollection({ ...(row.content_value || {}), ownerId });
-    if (collection.enabled && collection.handle && collection.publicName) {
+    if (row.content_value?.ownerId === ownerId && collection.enabled && collection.handle.length >= 3
+        && row.content_value?.handle === collection.handle && collection.publicName && bindingOwners.get(publicCollectionHandleKey(collection.handle)) === ownerId) {
       collections.set(ownerId, {
         handle: collection.handle,
         publicName: collection.publicName,
@@ -482,7 +489,7 @@ export async function getPublicInstruments(ownerId?: string) {
           createdAt: item.created_at
         })),
         specs: related.specs.get(guitar.id) || [],
-        ownerName: related.profiles.get(guitar.owner_id || "")?.display_name || guitar.builder || "",
+        ownerName: related.collections.get(guitar.owner_id || "")?.publicName || "Collection",
         publicCollection: related.collections.get(guitar.owner_id || ""),
         trust: trustByCode.get(guitar.qr_code.toUpperCase())
       }));
@@ -541,7 +548,7 @@ export async function getPublicInstrumentByCode(code: string) {
       createdAt: item.created_at
     })),
     specs: related.specs.get(data.id) || [],
-    ownerName: related.profiles.get(data.owner_id || "")?.display_name || data.builder || "Unclaimed",
+    ownerName: related.collections.get(data.owner_id || "")?.publicName || "Collection",
     publicCollection: related.collections.get(data.owner_id || ""),
     trust: trustByCode.get(data.qr_code.toUpperCase())
   }));

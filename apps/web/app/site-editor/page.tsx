@@ -1,4 +1,5 @@
 "use client";
+import { trapVisibleFocus } from "../../lib/modal-focus";
 import { useUiText } from "../../components/UiTextProvider";
 
 
@@ -206,13 +207,7 @@ const focusableSelector = [
 ].join(",");
 
 function trapFocus(container: HTMLElement | null, event: KeyboardEvent) {
-  if (event.key !== "Tab" || !container) return;
-  const focusable = Array.from(container.querySelectorAll<HTMLElement>(focusableSelector))
-    .filter((element) => !element.hidden && element.getAttribute("aria-hidden") !== "true");
-  if (!focusable.length) { event.preventDefault(); container.focus(); return; }
-  const first = focusable[0], last = focusable[focusable.length - 1];
-  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  trapVisibleFocus(container, event);
 }
 
 function validateEditorSettings(settings: EditableSiteSettings, rawBrandLogos: unknown = settings.brandLogos) {
@@ -297,6 +292,8 @@ function SiteEditorWorkspace() {
   const [showCompare, setShowCompare] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const pendingTextField = useRef<ContentRegistryEntry | null>(null);
+  const pendingSettingFocus = useRef("");
+  const [compositionErrorTarget, setCompositionErrorTarget] = useState<{ key: string } | null>(null);
   const loaded = useRef(false);
   const lastServerDraft = useRef("");
   const sidebarTriggerRef = useRef<HTMLButtonElement>(null);
@@ -359,6 +356,42 @@ function SiteEditorWorkspace() {
   useEffect(() => {
     setEditingSurface("content");
   }, [selected.area, selected.page]);
+  useEffect(() => {
+    const id = pendingSettingFocus.current;
+    if (!id) return;
+    const field = document.getElementById(id);
+    if (field) { field.focus(); field.scrollIntoView({ block: "center" }); pendingSettingFocus.current = ""; }
+  });
+
+  function revealError(key: string) {
+    setQuery(""); setAllTextQuery(""); setSidebarOpen(false); setEditingSurface("content"); setCompositionErrorTarget(null);
+    const entry = contentRegistry.find(item => item.key === (key === "brandName" ? "global.brand.name" : key));
+    if (entry) {
+      pendingTextField.current = entry;
+      setEditorMode(["Emails", "SEO"].includes(entry.area) ? "advanced" : "content");
+      setSelected({ area: entry.area, page: entry.page }); setOpenFieldSection(entry.section);
+      return;
+    }
+    const compositionPages: Record<string, SelectedPage> = {
+      home: { area: "Marketing", page: "Homepage" }, howItWorks: { area: "Marketing", page: "How It Works" },
+      catalog: { area: "Marketing", page: "Catalog" }, installers: { area: "Marketing", page: "Installers" }, footer: { area: "Global", page: "Footer" }
+    };
+    if (key.startsWith("composition.") && compositionPages[key.split(".")[1]]) {
+      setEditorMode("content"); setSelected(compositionPages[key.split(".")[1]]); setCompositionErrorTarget({ key }); return;
+    }
+    if (key.startsWith("colors.")) {
+      setEditorMode("content"); setSelected({ area: "Design", page: "Theme" }); pendingSettingFocus.current = `theme-color-${key.split(".")[1]}`;
+    } else if (key.startsWith("seo.")) {
+      setEditorMode("advanced"); setSelected({ area: "SEO", page: "Global SEO" }); pendingSettingFocus.current = "seo-canonical-url";
+    } else if (key.startsWith("brandLogos")) {
+      setEditorMode("content"); setSelected({ area: "Design", page: "Brand assets" }); pendingSettingFocus.current = "brand-logo-name";
+    } else {
+      setEditorMode("advanced"); setSelected({ area: "Advanced", page: "Advanced JSON" }); pendingSettingFocus.current = "cms-settings-json";
+    }
+  }
+  useEffect(() => {
+    if (compositionErrorTarget && compositionPageKey === compositionErrorTarget.key.split(".")[1]) setEditingSurface("arrangement");
+  }, [compositionErrorTarget, compositionPageKey, selected]);
 
   useEffect(() => {
     setEmailTestFeedback(null);
@@ -886,6 +919,7 @@ function SiteEditorWorkspace() {
       {compositionPageKey && editingSurface === "arrangement" ? (
         <SiteCompositionEditor
           pageKey={compositionPageKey}
+          focusError={compositionErrorTarget}
           sections={settings.composition[compositionPageKey].sections}
           errors={errors}
           onChange={(sections) => setSettings((current) => ({
@@ -1219,7 +1253,7 @@ function SiteEditorWorkspace() {
         <strong>{advancedUnlocked ? ui("ui.app.site.editor.page.44eb00ce43f1", "Editing unlocked") : ui("ui.app.site.editor.page.0a7338b94362", "Read-only by default")}</strong>
         <span>{advancedUnlocked ? ui("ui.app.site.editor.page.c9f0664d6ce5", "Validate before loading. Publishing still requires the normal Publish action.") : ui("ui.app.site.editor.page.c376a71aa874", "Download a backup before unlocking an advanced import.")}</span>
       </div>
-      <textarea className="cms-json" value={advancedJson} onChange={(event) => setAdvancedJson(event.target.value)} rows={26} spellCheck={false} readOnly={!advancedUnlocked} aria-readonly={!advancedUnlocked} />
+      <textarea id="cms-settings-json" className="cms-json" value={advancedJson} onChange={(event) => setAdvancedJson(event.target.value)} rows={26} spellCheck={false} readOnly={!advancedUnlocked} aria-readonly={!advancedUnlocked} />
       <div className="form-actions">
         <button type="button" className="button secondary" onClick={downloadSettingsBackup}><Save size={16} />{" "}{ui("ui.app.site.editor.page.669211280b63", "Download backup")}</button>
         <button type="button" className="button secondary" onClick={() => setAdvancedUnlocked((value) => !value)}>{advancedUnlocked ? <LockKeyhole size={16} /> : <UnlockKeyhole size={16} />} {advancedUnlocked ? ui("ui.app.site.editor.page.d4e86bd24e4e", "Lock editor") : ui("ui.app.site.editor.page.bc879a375fab", "Unlock editor")}</button>
@@ -1297,6 +1331,13 @@ function SiteEditorWorkspace() {
               <button type="button" className="button secondary cms-review-changes" onClick={() => setShowCompare((value) => !value)} disabled={!changeCount} aria-expanded={showCompare} aria-controls="cms-change-review"><Clock3 size={16} /> {changeCount ? ui("ui.app.site.editor.page.7109f299864f", "Review {{value1}} {{value2}}", { value1: changeCount, value2: changeCount === 1 ? "change" : "changes" }) : ui("ui.app.site.editor.page.c699aa00b26d", "No changes")}</button>
             </div>
             <p className={styles.publishScope}>{ui("ui.app.site.editor.page.ae75c788f381", "Drafts save automatically. Publishing applies all changes across the site.")}</p>
+            {Object.values(errors).some(Boolean) ? <section className="cms-validation-error" aria-label={ui("ui.app.site.editor.page.errorNavigation", "Draft errors across the site")} aria-live="polite">
+              <h2>{ui("ui.app.site.editor.page.fixDraftErrors", "Correct these draft fields before publishing")}</h2>
+              <ul>{Object.entries(errors).filter(([, message]) => message).map(([key, message]) => {
+                const entry = contentRegistry.find(item => item.key === key);
+                return <li key={key}><button type="button" onClick={() => revealError(key)}>{entry ? `${entry.area} / ${entry.page} / ${entry.section} / ${entry.label}` : key}</button>: {message}</li>;
+              })}</ul>
+            </section> : null}
             {showCompare ? (
               <section className="cms-compare" id="cms-change-review" aria-label={ui("ui.app.site.editor.page.860cbf1a2ef2", "Draft changes compared with published settings")}>
                 <header><strong>{ui("ui.app.site.editor.page.45d1bd82d4cd", "Draft compared with published")}</strong><button type="button" onClick={() => setShowCompare(false)} aria-label={ui("ui.app.site.editor.page.f066504404d5", "Close comparison")}><X size={16} /></button></header>

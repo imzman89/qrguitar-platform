@@ -1,5 +1,286 @@
+import { catalogPolicyUiTextEntries } from "./catalog-policy-ui-text";
+import { ownerDashboardPolicyUiTextEntries } from "./owner-dashboard-policy-ui-text";
 // Stable site-authored presentation entries. Existing CMS keys remain unchanged.
 export const uiTextEntries: Array<{ key: string; scope: string; text: string; area: string; page: string; section: string; source: string }> = [
+  {
+    "key": "ui.app.handout.code.page.formatLabel",
+    "scope": "app.handout.code.page",
+    "text": "Label",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.page.formatHangTag",
+    "scope": "app.handout.code.page",
+    "text": "Hang tag",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.page.formatProfileSheet",
+    "scope": "app.handout.code.page",
+    "text": "Profile sheet",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.page.formatQrOnly",
+    "scope": "app.handout.code.page",
+    "text": "QR only",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.page.formatService",
+    "scope": "app.handout.code.page",
+    "text": "Service summary",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.page.downloadSvg",
+    "scope": "app.handout.code.page",
+    "text": "Download SVG",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.page.downloadPng",
+    "scope": "app.handout.code.page",
+    "text": "Download PNG",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.page.qrSize",
+    "scope": "app.handout.code.page",
+    "text": "QR size",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.page.sharedCopy",
+    "scope": "app.handout.code.page",
+    "text": "Shared copy",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.page.sharedCopyDescription",
+    "scope": "app.handout.code.page",
+    "text": "Includes the information shown on the Profile.",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.page.ownerCopyDescription",
+    "scope": "app.handout.code.page",
+    "text": "May include a hidden serial number and purchase details. Keep this copy for your records.",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.page.placement",
+    "scope": "app.handout.code.page",
+    "text": "{{value1}}",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.page.printScale",
+    "scope": "app.handout.code.page",
+    "text": "Print at 100% or Actual size. Match the paper size and turn off headers and footers. Choose Save as PDF in the print dialog.",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.page.qrDimensions",
+    "scope": "app.handout.code.page",
+    "text": "Size includes the white border. Keep it clear; test a print before making more.",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.page.pngPixels",
+    "scope": "app.handout.code.page",
+    "text": "PNG: {{value1}} × {{value1}} pixels. Set the selected size when placing it; SVG includes dimensions.",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.page.ownerCopyNotice",
+    "scope": "app.handout.code.page",
+    "text": "Owner copy: may contain information hidden from the Profile.",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.PrintDocument.serviceEvidenceNotice",
+    "scope": "app.handout.code.PrintDocument",
+    "text": "Unshared documents and internal notes are not included.",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/PrintDocument.tsx"
+  },
+
+  ...catalogPolicyUiTextEntries,
+  ...ownerDashboardPolicyUiTextEntries,
+  {"key":"ui.app.i.code.ProfileClient.saleDetails","scope":"app.i.code.ProfileClient","text":"Sale details","area":"Product","page":"Public Profile","section":"Sale details","source":"app/i/[code]/ProfileClient.tsx"},
+  {"key":"ui.app.i.code.ProfileClient.askingPrice","scope":"app.i.code.ProfileClient","text":"Asking price","area":"Product","page":"Public Profile","section":"Sale details","source":"app/i/[code]/ProfileClient.tsx"},
+  {"key":"ui.app.i.code.ProfileClient.priceAtStore","scope":"app.i.code.ProfileClient","text":"Price at {{store}}","area":"Product","page":"Public Profile","section":"Sale details","source":"app/i/[code]/ProfileClient.tsx"},
+  {"key":"ui.app.i.code.ProfileClient.noPrice","scope":"app.i.code.ProfileClient","text":"Price not provided","area":"Product","page":"Public Profile","section":"Sale details","source":"app/i/[code]/ProfileClient.tsx"},
+  {"key":"ui.app.i.code.ProfileClient.buyFromStoreAccessible","scope":"app.i.code.ProfileClient","text":"Buy from {{store}} (opens in a new tab)","area":"Product","page":"Public Profile","section":"Sale details","source":"app/i/[code]/ProfileClient.tsx"},
+  {"key":"ui.app.i.code.ProfileClient.buyFromStore","scope":"app.i.code.ProfileClient","text":"Buy from {{store}}","area":"Product","page":"Public Profile","section":"Sale details","source":"app/i/[code]/ProfileClient.tsx"},
+  {"key":"ui.app.i.code.ProfileClient.noPurchaseLink","scope":"app.i.code.ProfileClient","text":"Purchase details unavailable.","area":"Product","page":"Public Profile","section":"Sale details","source":"app/i/[code]/ProfileClient.tsx"},
+  {"key":"ui.app.i.code.ProfileClient.storeConfirms","scope":"app.i.code.ProfileClient","text":"Store confirms price and availability.","area":"Product","page":"Public Profile","section":"Sale details","source":"app/i/[code]/ProfileClient.tsx"},
+  {"key":"ui.components.ProfileSaleFields.title","scope":"components.ProfileSaleFields","text":"Sale details","area":"Product","page":"Edit Profile","section":"Sale details","source":"components/ProfileSaleFields.tsx"},
+  {"key":"ui.components.ProfileSaleFields.price","scope":"components.ProfileSaleFields","text":"Asking price","area":"Product","page":"Edit Profile","section":"Sale details","source":"components/ProfileSaleFields.tsx"},
+  {"key":"ui.components.ProfileSaleFields.currency","scope":"components.ProfileSaleFields","text":"Currency","area":"Product","page":"Edit Profile","section":"Sale details","source":"components/ProfileSaleFields.tsx"},
+  {"key":"ui.components.ProfileSaleFields.chooseCurrency","scope":"components.ProfileSaleFields","text":"Choose currency","area":"Product","page":"Edit Profile","section":"Sale details","source":"components/ProfileSaleFields.tsx"},
+  {"key":"ui.components.ProfileSaleFields.store","scope":"components.ProfileSaleFields","text":"Store name (optional)","area":"Product","page":"Edit Profile","section":"Sale details","source":"components/ProfileSaleFields.tsx"},
+  {"key":"ui.components.ProfileSaleFields.item","scope":"components.ProfileSaleFields","text":"This instrument’s store page","area":"Product","page":"Edit Profile","section":"Sale details","source":"components/ProfileSaleFields.tsx"},
+  {"key":"ui.components.ProfileSaleFields.destination","scope":"components.ProfileSaleFields","text":"Purchase destination","area":"Product","page":"Edit Profile","section":"Sale details","source":"components/ProfileSaleFields.tsx"},
+  {"key":"ui.components.ProfileSaleFields.listing","scope":"components.ProfileSaleFields","text":"Instrument page at the store","area":"Product","page":"Edit Profile","section":"Sale details","source":"components/ProfileSaleFields.tsx"},
+  {"key":"ui.components.ProfileSaleFields.woo","scope":"components.ProfileSaleFields","text":"WooCommerce cart","area":"Product","page":"Edit Profile","section":"Sale details","source":"components/ProfileSaleFields.tsx"},
+  {"key":"ui.components.ProfileSaleFields.cart","scope":"components.ProfileSaleFields","text":"Store cart page URL","area":"Product","page":"Edit Profile","section":"Sale details","source":"components/ProfileSaleFields.tsx"},
+  {"key":"ui.components.ProfileSaleFields.itemId","scope":"components.ProfileSaleFields","text":"Product or variation ID","area":"Product","page":"Edit Profile","section":"Sale details","source":"components/ProfileSaleFields.tsx"},
+  {"key":"ui.components.ProfileSaleFields.help","scope":"components.ProfileSaleFields","text":"Review the instrument page and item mapping before offering it for sale. The buyer completes the purchase at your store.","area":"Product","page":"Edit Profile","section":"Sale details","source":"components/ProfileSaleFields.tsx"},
+  {"key":"ui.components.ProfileSaleFields.wooHelp","scope":"components.ProfileSaleFields","text":"Use this store’s cart page and the product or variation ID for this instrument. The link adds one item. Test it with an existing cart before sharing.","area":"Product","page":"Edit Profile","section":"Sale details","source":"components/ProfileSaleFields.tsx"},
+  {"key":"ui.app.dashboard.page.sessionUnavailable","scope":"app.dashboard.page","text":"Account access is temporarily unavailable. Please reload.","area":"Product","page":"Dashboard","section":"Session recovery","source":"app/dashboard/page.tsx"},
+  {"key":"ui.app.dashboard.page.sessionCheckFailed","scope":"app.dashboard.page","text":"Could not check your session. Please reload.","area":"Product","page":"Dashboard","section":"Session recovery","source":"app/dashboard/page.tsx"},
+  {"key":"ui.components.Nav.installers","scope":"components.Nav","text":"Installers","area":"Global","page":"Shared Navigation","section":"Public navigation and discovery","source":"components/Nav.tsx"},
+  {"key":"ui.components.Footer.installers","scope":"components.Footer","text":"Installer program","area":"Global","page":"Shared Footer","section":"Public navigation and discovery","source":"components/Footer.tsx"},
+  {"key":"ui.components.Footer.accountAccess","scope":"components.Footer","text":"Account access","area":"Global","page":"Shared Footer","section":"Public navigation and discovery","source":"components/Footer.tsx"},
+  {"key":"ui.components.Footer.copyright","scope":"components.Footer","text":"Copyright {{year}} QRguitar. All rights reserved.","area":"Global","page":"Shared Footer","section":"Public navigation and discovery","source":"components/Footer.tsx"},
+  {"key":"ui.components.HomePageClient.installerProgram","scope":"components.HomePageClient","text":"Explore the Installer program","area":"Marketing","page":"Homepage","section":"Public navigation and discovery","source":"components/HomePageClient.tsx"},
+  {"key":"ui.app.contact.page.draftHeading","scope":"app.contact.page","text":"Contact support","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.draftIntro","scope":"app.contact.page","text":"Send a message here or use your email app.","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.draftName","scope":"app.contact.page","text":"Name","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.draftEmail","scope":"app.contact.page","text":"Email","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.draftTopic","scope":"app.contact.page","text":"Topic","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.draftMessage","scope":"app.contact.page","text":"Message","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.draftSubject","scope":"app.contact.page","text":"QRguitar support","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.draftGeneral","scope":"app.contact.page","text":"General support","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.draftPrepare","scope":"app.contact.page","text":"Use email instead","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.draftPrepared","scope":"app.contact.page","text":"Draft prepared on this device. Opening it does not send email. Review and send it in your email app.","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.draftOpen","scope":"app.contact.page","text":"Open email draft","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.draftManual","scope":"app.contact.page","text":"If your email app does not open, select and copy the text below into a new email to","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.draftLong","scope":"app.contact.page","text":"This draft is too long for a reliable email link. Copy the complete text below into your email app.","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.draftNoScript","scope":"app.contact.page","text":"The draft helper needs JavaScript. You can still email support directly using the address above.","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.draftRequired","scope":"app.contact.page","text":"Enter your name, email, and message.","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.draftInvalidEmail","scope":"app.contact.page","text":"Enter a valid email address.","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.draftTooLong","scope":"app.contact.page","text":"Shorten the name, email, topic, or message and try again.","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.contactSend","scope":"app.contact.page","text":"Send to support","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.contactSending","scope":"app.contact.page","text":"Sending request…","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.contactAccepted","scope":"app.contact.page","text":"Your message was accepted for delivery. Your text is still here if you need to keep a copy.","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.contactUnconfirmed","scope":"app.contact.page","text":"We couldn’t confirm delivery. Your message is still here. Please check before sending it again.","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.contactRejected","scope":"app.contact.page","text":"Your message wasn’t accepted. Check the details and try again, or use your email app.","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.contactUnavailable","scope":"app.contact.page","text":"Messages can’t be sent from this page right now. Your text is still here. Use your email app instead.","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.contactLimited","scope":"app.contact.page","text":"Too many attempts. Please wait before trying again. Your message is still here.","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.contact.page.contactWebsite","scope":"app.contact.page","text":"Leave this field empty","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
+  {"key":"ui.app.installers.page.applicationEmailGuidance","scope":"app.installers.page","text":"Complete these six details, review your email, and send it to support@qrguitar.com. Opening a draft does not submit an application. Applications are reviewed manually; applying does not approve or publish your business. Do not include passwords, payment-card numbers, reset links, or unrelated personal documents.","area":"Support & Legal","page":"Installers","section":"Application email","source":"app/installers/page.tsx"},
+  {"key":"ui.app.installers.page.applicationEmailSubject","scope":"app.installers.page","text":"QRguitar Provider Network Application","area":"Support & Legal","page":"Installers","section":"Application email","source":"app/installers/page.tsx"},
+  {"key":"ui.components.AccountAccessHelp.billing","scope":"components.AccountAccessHelp","text":"Start with 5 free Profiles. Sign in to see your balance and buy additional permanent Profile credits. Ownership transfers are free.","area":"Global","page":"Account Access","section":"Static account access and credit pricing","source":"components/AccountAccessHelp.tsx"},
+  {"key":"ui.components.AccountAccessHelp.claim","scope":"components.AccountAccessHelp","text":"Use your account to submit evidence, follow a request, or review one sent to you. Submitting a request does not change the Profile’s owner.","area":"Global","page":"Account Access","section":"Static account access and credit pricing","source":"components/AccountAccessHelp.tsx"},
+  {"key":"ui.components.AccountAccessHelp.javascript","scope":"components.AccountAccessHelp","text":"Enable JavaScript to sign in and use account tools.","area":"Global","page":"Account Access","section":"Static account access and credit pricing","source":"components/AccountAccessHelp.tsx"},
+  {"key":"ui.components.AccountAccessHelp.access","scope":"components.AccountAccessHelp","text":"Sign in to continue","area":"Global","page":"Account Access","section":"Static account access and credit pricing","source":"components/AccountAccessHelp.tsx"},
+  {"key":"ui.components.PublicCreditPricing.title","scope":"components.PublicCreditPricing","text":"Permanent Profile credit prices","area":"Marketing","page":"Home Page Client","section":"Static account access and credit pricing","source":"components/PublicCreditPricing.tsx"},
+  {"key":"ui.components.PublicCreditPricing.terms","scope":"components.PublicCreditPricing","text":"Your first 5 Profiles are free. Additional credits are one-time purchases in USD, never expire, and are used after your free allowance. Ownership transfers are free.","area":"Marketing","page":"Home Page Client","section":"Static account access and credit pricing","source":"components/PublicCreditPricing.tsx"},
+  {"key":"ui.components.PublicCreditPricing.single","scope":"components.PublicCreditPricing","text":"1 Profile credit","area":"Marketing","page":"Home Page Client","section":"Static account access and credit pricing","source":"components/PublicCreditPricing.tsx"},
+  {"key":"ui.components.PublicCreditPricing.pack","scope":"components.PublicCreditPricing","text":"{{credits}} Profile credits","area":"Marketing","page":"Home Page Client","section":"Static account access and credit pricing","source":"components/PublicCreditPricing.tsx"},
+  {"key":"ui.components.PublicCreditPricing.availability","scope":"components.PublicCreditPricing","text":"Standard prices in USD. Sign in to manage credits and see any eligible offers.","area":"Marketing","page":"Home Page Client","section":"Static account access and credit pricing","source":"components/PublicCreditPricing.tsx"},
+  {"key":"ui.components.Nav.staticAccountAccess","scope":"components.Nav","text":"Account access","area":"Global","page":"Nav","section":"Static account access and credit pricing","source":"components/Nav.tsx"},
+  {"key":"ui.app.admin.page.siteContentPublished","scope":"app.admin.page","text":"Website content published","area":"Product","page":"Admin","section":"Audit history","source":"app/admin/page.tsx"},
+  {"key":"ui.app.admin.page.siteDraftSaved","scope":"app.admin.page","text":"Website draft saved","area":"Product","page":"Admin","section":"Audit history","source":"app/admin/page.tsx"},
+  {"key":"ui.app.edit.code.page.uploadsSettling","text":"Waiting for active uploads to settle. Queued files are kept for your next explicit save; no Profile change has been sent.","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.components.MessagesClient.sessionUnavailable","scope":"components.MessagesClient","text":"Your sign-in could not be checked. Try again.","area":"Product","page":"Messages","section":"Recovery","source":"components/MessagesClient.tsx"},
+  {"key":"ui.app.service.review.id.page.evidenceLinkExpiry","scope":"app.service.review.id.page","text":"Private file links expire after five minutes. Refresh the links here if a file no longer opens.","area":"Product","page":"Service review","section":"Evidence","source":"app/service-review/[id]/page.tsx"},
+  {"key":"ui.app.service.review.id.page.refreshEvidence","scope":"app.service.review.id.page","text":"Refresh evidence links","area":"Product","page":"Service review","section":"Evidence","source":"app/service-review/[id]/page.tsx"},
+  {"key":"ui.app.billing.DirectBillingPage.recoveryHeading","scope":"app.billing.DirectBillingPage","text":"Check an earlier payment.","area":"Product","page":"Profile credits","section":"Recovery","source":"app/billing/DirectBillingPage.tsx"},
+  {"key":"ui.app.billing.DirectBillingPage.recoveryIntro","scope":"app.billing.DirectBillingPage","text":"This page checks existing payment requests only. It does not start a new payment.","area":"Product","page":"Profile credits","section":"Recovery","source":"app/billing/DirectBillingPage.tsx"},
+  {"key":"ui.app.billing.PayPalBillingPage.cancelWithoutOrder","scope":"app.billing.PayPalBillingPage","text":"You’re back from checkout. Returning here does not confirm or cancel a charge. Only a pending payment confirmed by the server can be resumed.","area":"Product","page":"Profile credits","section":"Recovery","source":"app/billing/PayPalBillingPage.tsx"},
+  {"key":"ui.app.billing.BillingPage.cancelWithoutOrder","scope":"app.billing.BillingPage","text":"Returning here does not cancel or confirm a payment. No resumable checkout has been confirmed for this page. Refresh the status if you already paid.","area":"Product","page":"Profile credits","section":"Recovery","source":"app/billing/BillingPage.tsx"},
+  {"key":"ui.app.catalog.CatalogClient.loadUnavailable","scope":"app.catalog.CatalogClient","text":"The catalog could not be refreshed. Try again.","page":"Catalog","source":"app/catalog/CatalogClient.tsx","area":"Product","section":"Load recovery"},
+  {"key":"ui.app.catalog.CatalogClient.retryLoad","scope":"app.catalog.CatalogClient","text":"Retry","page":"Catalog","source":"app/catalog/CatalogClient.tsx","area":"Product","section":"Load recovery"},
+  {"key":"ui.components.LatestPublicRecord.unavailable","scope":"components.LatestPublicRecord","text":"The Profile example is temporarily unavailable.","page":"Homepage","source":"components/LatestPublicRecord.tsx","area":"Product","section":"Load recovery"},
+  {"key":"ui.components.LatestPublicRecord.retry","scope":"components.LatestPublicRecord","text":"Retry","page":"Homepage","source":"components/LatestPublicRecord.tsx","area":"Product","section":"Load recovery"},
+  {"key":"ui.app.edit.code.page.recoveryStorageFailed","text":"The recovery lock could not be cleared. Your saved result and draft are kept; resolve browser storage before another change.","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.filesReadFailed","text":"The selected files could not be read. Your existing draft is kept. Try selecting the files again.","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.admin.page.retryClaims","text":"Retry ownership claims","section":"Recovery and navigation","source":"app/admin/page.tsx","scope":"app.admin.page","area":"Product","page":"Admin"},
+  {"key":"ui.app.admin.page.checkNotConfirmed","text":"Not confirmed","section":"Recovery and navigation","source":"app/admin/page.tsx","scope":"app.admin.page","area":"Product","page":"Admin"},
+  {"key":"ui.app.admin.payments.PayPalReviewQueue.findOrderLabel","text":"Find a held order by full reference","section":"Recovery and navigation","source":"app/admin/payments/PayPalReviewQueue.tsx","scope":"app.admin.payments.PayPalReviewQueue","area":"Product","page":"Admin"},
+  {"key":"ui.app.admin.payments.PayPalReviewQueue.findOrder","text":"Find order (read only)","section":"Recovery and navigation","source":"app/admin/payments/PayPalReviewQueue.tsx","scope":"app.admin.payments.PayPalReviewQueue","area":"Product","page":"Admin"},
+  {"key":"ui.app.admin.payments.PayPalReviewQueue.filteredOrder","text":"Showing holds for","section":"Recovery and navigation","source":"app/admin/payments/PayPalReviewQueue.tsx","scope":"app.admin.payments.PayPalReviewQueue","area":"Product","page":"Admin"},
+  {"key":"ui.app.admin.payments.PayPalReviewQueue.backToQueue","text":"Back to all holds","section":"Recovery and navigation","source":"app/admin/payments/PayPalReviewQueue.tsx","scope":"app.admin.payments.PayPalReviewQueue","area":"Product","page":"Admin"},
+  {"key":"ui.app.admin.payments.PayPalReviewQueue.lookupHelp","text":"Lookup does not release or change a hold. Use it to find older retained cases outside the first 100 results.","section":"Recovery and navigation","source":"app/admin/payments/PayPalReviewQueue.tsx","scope":"app.admin.payments.PayPalReviewQueue","area":"Product","page":"Admin"},
+  {"key":"ui.app.admin.payments.PayPalReviewQueue.moreHoldsLookup","text":"More active holds exist. Find an older case by its full order reference above; no hold needs to be released to navigate.","section":"Recovery and navigation","source":"app/admin/payments/PayPalReviewQueue.tsx","scope":"app.admin.payments.PayPalReviewQueue","area":"Product","page":"Admin"},
+  {"key":"ui.app.admin.promotions.PromoCodesPage.invalidCode","text":"Code must contain 3–32 letters, numbers, dashes or underscores and start with a letter or number.","section":"Recovery and navigation","source":"app/admin/promotions/PromoCodesPage.tsx","scope":"app.admin.promotions.PromoCodesPage","area":"Product","page":"Admin"},
+  {"key":"ui.app.admin.promotions.PromoCodesPage.missingName","text":"Enter a promo name.","section":"Recovery and navigation","source":"app/admin/promotions/PromoCodesPage.tsx","scope":"app.admin.promotions.PromoCodesPage","area":"Product","page":"Admin"},
+  {"key":"ui.app.admin.promotions.PromoCodesPage.missingPacks","text":"Select at least one eligible pack.","section":"Recovery and navigation","source":"app/admin/promotions/PromoCodesPage.tsx","scope":"app.admin.promotions.PromoCodesPage","area":"Product","page":"Admin"},
+  {"key":"ui.app.admin.promotions.PromoCodesPage.invalidDiscount","text":"Enter a positive discount. Percent cannot exceed 100%; a fixed total must be at least $0.30 and below every selected pack price.","section":"Recovery and navigation","source":"app/admin/promotions/PromoCodesPage.tsx","scope":"app.admin.promotions.PromoCodesPage","area":"Product","page":"Admin"},
+  {"key":"ui.app.admin.promotions.PromoCodesPage.invalidMinimum","text":"The minimum price must be nonnegative and allow at least one selected pack.","section":"Recovery and navigation","source":"app/admin/promotions/PromoCodesPage.tsx","scope":"app.admin.promotions.PromoCodesPage","area":"Product","page":"Admin"},
+  {"key":"ui.app.admin.promotions.PromoCodesPage.invalidLimit","text":"Usage limits must be positive whole numbers or blank.","section":"Recovery and navigation","source":"app/admin/promotions/PromoCodesPage.tsx","scope":"app.admin.promotions.PromoCodesPage","area":"Product","page":"Admin"},
+  {"key":"ui.app.admin.promotions.PromoCodesPage.limitOrder","text":"The per-account limit cannot exceed the total limit.","section":"Recovery and navigation","source":"app/admin/promotions/PromoCodesPage.tsx","scope":"app.admin.promotions.PromoCodesPage","area":"Product","page":"Admin"},
+  {"key":"ui.app.admin.promotions.PromoCodesPage.scheduleOrder","text":"Use valid dates with the end after the start.","section":"Recovery and navigation","source":"app/admin/promotions/PromoCodesPage.tsx","scope":"app.admin.promotions.PromoCodesPage","area":"Product","page":"Admin"},
+  {"key":"ui.app.edit.code.page.resultUnconfirmed","text":"The saved result is not fully confirmed. Your draft is kept. Check the saved result before making another change.","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.changeRejected","text":"This change was not accepted. Correct the draft before trying again.","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.changeNotStarted","text":"This change could not be started. Check your session and recovery storage, then try again.","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.mediaReadFailed","text":"Saved media could not be loaded. This is not an empty list.","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.mediaPartiallyMoved","text":"The first media position was saved; the second was not confirmed. Check saved media before changing the order again.","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.historyReadFailed","text":"Saved history could not be loaded. This is not an empty list.","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.resultChecked","text":"The saved result is displayed. No change was sent again. Review it before allowing another change.","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.resultCheckFailed","text":"The saved result could not be checked. Your draft and recovery lock are kept. Try checking again.","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.trustPartial","text":"Profile details were saved. Trust settings were not confirmed; safety was not sent. Your draft is kept. Check the saved result before another save.","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.safetyPartial","text":"Profile details and trust settings were saved. Safety status was not confirmed. Your draft is kept. Check the saved result before another save.","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.recoveryTitle","text":"Saved-result recovery","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.savedDetails","text":"Profile details, trust and safety","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.savedMedia","text":"Media","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.savedHistory","text":"History","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.checkSaved","text":"Check saved result","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.reviewedSaved","text":"I reviewed the saved result and will not add or send a duplicate change. Allow another change.","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.savedSnapshot","text":"Saved Profile result (your draft is unchanged)","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.retryMediaRead","text":"Retry saved-media read","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.retryHistoryRead","text":"Retry saved-history read","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.loadUnavailable","text":"Profile temporarily unavailable","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.edit.code.page.retryLoad","text":"Retry Profile load","section":"Recovery and navigation","source":"app/edit/[code]/page.tsx","scope":"app.edit.code.page","area":"Product","page":"Edit Profile"},
+  {"key":"ui.app.site.editor.page.errorNavigation","text":"Draft errors across the site","section":"Recovery and navigation","source":"app/site-editor/page.tsx","scope":"app.site.editor.page","area":"Product","page":"Site Editor"},
+  {"key":"ui.app.site.editor.page.fixDraftErrors","text":"Correct these draft fields before publishing","section":"Recovery and navigation","source":"app/site-editor/page.tsx","scope":"app.site.editor.page","area":"Product","page":"Site Editor"},
+  {"key":"ui.components.BulkProfileImport.confirmSavedImport","text":"Confirm saved import (same requests)","section":"Recovery and navigation","source":"components/BulkProfileImport.tsx","scope":"components.BulkProfileImport","area":"Product","page":"Dashboard"},
+  {"key":"ui.components.BulkProfileImport.emptyFilteredView","text":"No rows match this view. Your other rows are kept.","section":"Recovery and navigation","source":"components/BulkProfileImport.tsx","scope":"components.BulkProfileImport","area":"Product","page":"Dashboard"},
+  {"key":"ui.components.BulkProfileImport.showAllRows","text":"Show all rows","section":"Recovery and navigation","source":"components/BulkProfileImport.tsx","scope":"components.BulkProfileImport","area":"Product","page":"Dashboard"},
   { key: "ui.app.edit.code.page.choosePhotos", scope: "app.edit.code.page", text: "Choose photos", area: "Product", page: "Edit Profile", section: "Photos", source: "app/edit/[code]/page.tsx" },
   {"key":"ui.app.service.review.id.page.decisionSaved","scope":"app.service.review.id.page","text":"Your decision has been saved. The review status is updated.","area":"Product","page":"Service review","section":"Recovery","source":"app/service-review/[id]/page.tsx"},
   {"key":"ui.app.service.review.id.page.decisionUnconfirmed","scope":"app.service.review.id.page","text":"Your decision could not be confirmed. Check the saved review status before trying again.","area":"Product","page":"Service review","section":"Recovery","source":"app/service-review/[id]/page.tsx"},
@@ -16,7 +297,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {"key":"ui.app.transfer.id.page.useAnotherAccount","scope":"app.transfer.id.page","text":"Use another account","area":"Product","page":"Ownership transfer","section":"Account recovery","source":"app/transfer/[id]/page.tsx"},
   {"key":"ui.app.transfer.id.page.switchAccountHint","scope":"app.transfer.id.page","text":"This signs you out first, then returns you to this transfer after you sign in with the recipient account.","area":"Product","page":"Ownership transfer","section":"Account recovery","source":"app/transfer/[id]/page.tsx"},
   {"key":"ui.app.transfer.id.page.completedAccountHint","scope":"app.transfer.id.page","text":"The new owner can manage this Profile from their Dashboard. Previous owners no longer have access to its private details.","area":"Product","page":"Ownership transfer","section":"Completion","source":"app/transfer/[id]/page.tsx"},
-  { key: "ui.app.account.page.sharedSaveScope", scope: "app.account.page", text: "Saving updates Account details and your collection settings together, including collection visibility. Password and sign-out actions are separate.", area: "Product", page: "Account", section: "Save status", source: "app/account/page.tsx" },
   { key: "ui.app.account.page.unsavedSections", scope: "app.account.page", text: "Unsaved changes: {{value1}}. Nothing is applied until you save.", area: "Product", page: "Account", section: "Save status", source: "app/account/page.tsx" },
   {"key":"ui.app.edit.code.page.mediaSaveHint","scope":"app.edit.code.page","text":"Media changes save immediately using the controls in this section. Save Changes does not add an unfinished media entry.","area":"Product","page":"Edit Profile","section":"Media","source":"app/edit/[code]/page.tsx"},
   {"key":"ui.app.edit.code.page.historySaveHint","scope":"app.edit.code.page","text":"History entries save separately when you add or update an entry. Save Changes does not add an unfinished history entry.","area":"Product","page":"Edit Profile","section":"History","source":"app/edit/[code]/page.tsx"},
@@ -108,13 +388,11 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   { key: "ui.components.StartConversation.sessionChanged", scope: "components.StartConversation", text: "Your sign-in session changed. Try again to continue with your current account.", area: "Product", page: "Member Messaging", section: "Session status", source: "components/StartConversation.tsx" },
   { key: "ui.components.StartConversation.openingTimedOut", scope: "components.StartConversation", text: "Opening the conversation timed out. Check your connection and try again.", area: "Product", page: "Member Messaging", section: "Session status", source: "components/StartConversation.tsx" },
   { key: "ui.components.StartConversation.openRetryFailure", scope: "components.StartConversation", text: "The conversation could not be opened. Please try again.", area: "Product", page: "Member Messaging", section: "Session status", source: "components/StartConversation.tsx" },
-  { key: "ui.components.Nav.checkingSignIn", scope: "components.Nav", text: "Checking sign-in...", area: "Product", page: "Shared Navigation", section: "Session status", source: "components/Nav.tsx" },
+  { key: "ui.components.Nav.checkingSignIn", scope: "components.Nav", text: "Checking sign-in...", area: "Product", page: "Shared Navigation", section: "Session status", source: "app/create/page.tsx" },
   { key: "ui.components.Nav.retrySignIn", scope: "components.Nav", text: "Retry sign-in check", area: "Product", page: "Shared Navigation", section: "Session status", source: "components/Nav.tsx" },
   { key: "ui.components.Nav.signInCheckFailure", scope: "components.Nav", text: "Your sign-in could not be checked. Retry without signing in again.", area: "Product", page: "Shared Navigation", section: "Session status", source: "components/Nav.tsx" },
-  { key: "ui.components.Footer.checkingSignIn", scope: "components.Footer", text: "Checking sign-in...", area: "Product", page: "Shared Footer", section: "Session status", source: "components/Footer.tsx" },
   { key: "ui.components.Footer.retrySignIn", scope: "components.Footer", text: "Retry sign-in check", area: "Product", page: "Shared Footer", section: "Session status", source: "components/Footer.tsx" },
   { key: "ui.components.Footer.signInCheckFailure", scope: "components.Footer", text: "Your sign-in could not be checked. Retry without signing in again.", area: "Product", page: "Shared Footer", section: "Session status", source: "components/Footer.tsx" },
-  { key: "ui.app.dashboard.page.managePublicCollection", scope: "app.dashboard.page", text: "Manage public collection", area: "Product", page: "Dashboard", section: "Page text", source: "app/dashboard/page.tsx" },
   { key: "ui.app.site.editor.page.previewUnavailableForSelection", scope: "app.site.editor.page", text: "This selection needs a real permitted record or does not have a standalone page to preview.", area: "Product", page: "Site Composition Editor", section: "Preview", source: "app/site-editor/page.tsx" },
   { key: "ui.app.site.editor.page.previewRouteUnavailable", scope: "app.site.editor.page", text: "Not available for this selection", area: "Product", page: "Site Composition Editor", section: "Preview", source: "app/site-editor/page.tsx" },
   { key: "ui.app.site.editor.page.emailDeliveryBoundary", scope: "app.site.editor.page", text: "Published application templates supply workflow emails when delivery is enabled. Only Service / Submitted supports an admin test email. Supabase Auth templates require separate provider setup; design previews have no delivery trigger.", area: "Product", page: "Site Composition Editor", section: "Emails", source: "app/site-editor/page.tsx" },
@@ -153,7 +431,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {"key":"ui.app.dashboard.page.1127784eea0a","scope":"app.dashboard.page","text":"Ownership transfers could not be checked. Reload your collection first.","page":"Dashboard","area":"Product","section":"Page text","source":"app/dashboard/page.tsx"},
   {"key":"ui.app.dashboard.page.f3ccb68e0839","scope":"app.dashboard.page","text":"No ownership transfers need your attention.","page":"Dashboard","area":"Product","section":"Page text","source":"app/dashboard/page.tsx"},
   {"key":"ui.app.dashboard.page.ab405a433d94","scope":"app.dashboard.page","text":"waiting on recipient","page":"Dashboard","area":"Product","section":"Page text","source":"app/dashboard/page.tsx"},
-  { key: "ui.app.i.code.ProfileClient.shopItem", scope: "app.i.code.ProfileClient", text: "Shop this item", area: "Product", page: "Public Profile", section: "Seller actions", source: "app/i/[code]/ProfileClient.tsx" },
   { key: "ui.app.i.code.ProfileClient.lifetimeProfile", scope: "app.i.code.ProfileClient", text: "One Profile, for its whole life.", area: "Product", page: "Public Profile", section: "Ownership", source: "app/i/[code]/ProfileClient.tsx" },
   { key: "ui.app.i.code.ProfileClient.afterPurchase", scope: "app.i.code.ProfileClient", text: "After you buy it, ask the seller to transfer this Profile to you for free. Its photos, specifications and history stay together.", area: "Product", page: "Public Profile", section: "Ownership", source: "app/i/[code]/ProfileClient.tsx" },
   { key: "ui.app.i.code.ProfileClient.alreadyOwn", scope: "app.i.code.ProfileClient", text: "Already own it?", area: "Product", page: "Public Profile", section: "Ownership", source: "app/i/[code]/ProfileClient.tsx" },
@@ -169,7 +446,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   { key: "ui.app.dashboard.page.noHandoff", scope: "app.dashboard.page", text: "No handoff started. Choose a method below when you are ready.", area: "Product", page: "Dashboard", section: "Page text", source: "app/dashboard/page.tsx" },
   { key: "ui.app.dashboard.page.handoffCompleted", scope: "app.dashboard.page", text: "Handoff completed. The next owner accepted the Profile.", area: "Product", page: "Dashboard", section: "Page text", source: "app/dashboard/page.tsx" },
   { key: "ui.app.dashboard.page.handoffCancelled", scope: "app.dashboard.page", text: "Handoff cancelled. Start a new transfer if needed.", area: "Product", page: "Dashboard", section: "Page text", source: "app/dashboard/page.tsx" },
-  { key: "ui.app.dashboard.page.buyerActionRequired", scope: "app.dashboard.page", text: "Give the private buyer code to the recipient. You remain the owner until they accept.", area: "Product", page: "Dashboard", section: "Page text", source: "app/dashboard/page.tsx" },
   { key: "ui.app.dashboard.page.recipientActionRequired", scope: "app.dashboard.page", text: "Recipient action required. The next owner must sign in and accept the Profile. You remain the owner until then.", area: "Product", page: "Dashboard", section: "Page text", source: "app/dashboard/page.tsx" },
   {
     "key": "ui.workspace.faae0c421967",
@@ -336,7 +612,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.workspace.11c503369f69",
     "scope": "workspace",
-    "text": "Keep photos, documents, service history, and ownership together for every instrument.",
+    "text": "Photos, documents, service history, and ownership records.",
     "area": "Product",
     "page": "Workspace guidance",
     "section": "Roles and navigation",
@@ -363,7 +639,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.workspace.b5efa61cb710",
     "scope": "workspace",
-    "text": "Organize your collection, preserve its history, and prepare a clear ownership handoff.",
+    "text": "Collection Profiles, history, and ownership transfers.",
     "area": "Product",
     "page": "Workspace guidance",
     "section": "Roles and navigation",
@@ -390,7 +666,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.workspace.15aa16da501a",
     "scope": "workspace",
-    "text": "Manage inventory Profiles, share your shop website, and handle ownership transfers from one place.",
+    "text": "Inventory Profiles, website links, and ownership transfers.",
     "area": "Product",
     "page": "Workspace guidance",
     "section": "Roles and navigation",
@@ -435,7 +711,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.workspace.c110fe1e6af2",
     "scope": "workspace",
-    "text": "Document new instruments, connect buyers to your website, and keep the record ready for its next owner.",
+    "text": "Build Profiles, website links, and ownership transfers.",
     "area": "Product",
     "page": "Workspace guidance",
     "section": "Roles and navigation",
@@ -480,7 +756,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.workspace.93363fe59878",
     "scope": "workspace",
-    "text": "Pick up saved drafts, respond to owner feedback, and document completed work without taking ownership.",
+    "text": "Drafts, owner feedback, and service records without changing instrument ownership.",
     "area": "Product",
     "page": "Workspace guidance",
     "section": "Roles and navigation",
@@ -516,7 +792,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.workspace.23160d470c3a",
     "scope": "workspace",
-    "text": "Manage your instrument Profiles, public collection, and ownership handoffs.",
+    "text": "Instrument Profiles, collections, and ownership transfers.",
     "area": "Product",
     "page": "Workspace guidance",
     "section": "Roles and navigation",
@@ -721,24 +997,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/account/page.tsx"
   },
   {
-    "key": "ui.app.account.page.591935b15b1c",
-    "scope": "app.account.page",
-    "text": "Public",
-    "page": "Account",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/account/page.tsx"
-  },
-  {
-    "key": "ui.app.account.page.658ed7b26eff",
-    "scope": "app.account.page",
-    "text": "Private or unlisted",
-    "page": "Account",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/account/page.tsx"
-  },
-  {
     "key": "ui.app.account.page.73949bb1bdba",
     "scope": "app.account.page",
     "text": "Profile details",
@@ -766,27 +1024,9 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/account/page.tsx"
   },
   {
-    "key": "ui.app.account.page.8ca6da5bcd1b",
-    "scope": "app.account.page",
-    "text": "Public collection",
-    "page": "Account",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/account/page.tsx"
-  },
-  {
     "key": "ui.app.account.page.a5b70b30efb9",
     "scope": "app.account.page",
-    "text": "Your saved collection is ready to share.",
-    "page": "Account",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/account/page.tsx"
-  },
-  {
-    "key": "ui.app.account.page.e7a081e4c5a2",
-    "scope": "app.account.page",
-    "text": "Bring your public Profiles together on one page.",
+    "text": "Collection page enabled.",
     "page": "Account",
     "area": "Product",
     "section": "Page text",
@@ -883,27 +1123,9 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/account/page.tsx"
   },
   {
-    "key": "ui.app.account.page.d034a5030b9c",
-    "scope": "app.account.page",
-    "text": "Shown on private tools and used as your default owner/shop label.",
-    "page": "Account",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/account/page.tsx"
-  },
-  {
     "key": "ui.app.account.page.6fb83029b2c0",
     "scope": "app.account.page",
-    "text": "How you use QRguitar",
-    "page": "Account",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/account/page.tsx"
-  },
-  {
-    "key": "ui.app.account.page.17c18130884e",
-    "scope": "app.account.page",
-    "text": "Choose the daily tools shown on your dashboard. You can save this preference with your public collection turned off. Provider verification is reviewed separately.",
+    "text": "Dashboard tools",
     "page": "Account",
     "area": "Product",
     "section": "Page text",
@@ -931,33 +1153,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.account.page.d5e138183dc3",
     "scope": "app.account.page",
     "text": "Give people one link to your instruments, with your name and a short introduction.",
-    "page": "Account",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/account/page.tsx"
-  },
-  {
-    "key": "ui.app.account.page.390ed0ea84e0",
-    "scope": "app.account.page",
-    "text": "Enable my collection page",
-    "page": "Account",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/account/page.tsx"
-  },
-  {
-    "key": "ui.app.account.page.collectionVisibilityHelp",
-    "scope": "app.account.page",
-    "text": "Only Public Profiles appear here. Your page joins Member Collections once it has a Public Profile. Turning this off hides the collection page, without changing any Profile’s visibility.",
-    "page": "Account",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/account/page.tsx"
-  },
-  {
-    "key": "ui.app.account.page.8bb1664e67fa",
-    "scope": "app.account.page",
-    "text": "Page name",
     "page": "Account",
     "area": "Product",
     "section": "Page text",
@@ -1011,7 +1206,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.account.page.42e359637e9e",
     "scope": "app.account.page",
-    "text": "What you collect, build, repair, or sell.",
+    "text": "A short description.",
     "page": "Account",
     "area": "Product",
     "section": "Labels and help",
@@ -1021,15 +1216,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.account.page.5fec9267ba07",
     "scope": "app.account.page",
     "text": "Your website (optional)",
-    "page": "Account",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/account/page.tsx"
-  },
-  {
-    "key": "ui.app.account.page.2a5191a8ca1b",
-    "scope": "app.account.page",
-    "text": "Use the full HTTPS address. When your public collection is enabled, visitors can open this website from the collection and its instrument Profiles. Purchases and bookings take place on your website.",
     "page": "Account",
     "area": "Product",
     "section": "Page text",
@@ -1066,15 +1252,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.account.page.bf5f93866b44",
     "scope": "app.account.page",
     "text": "Allow signed-in members to message you in QRguitar",
-    "page": "Account",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/account/page.tsx"
-  },
-  {
-    "key": "ui.app.account.page.a9fc610e616e",
-    "scope": "app.account.page",
-    "text": "Your email stays private. Conversations stay inside QRguitar and can include up to four photos or short videos per message.",
     "page": "Account",
     "area": "Product",
     "section": "Page text",
@@ -1264,15 +1441,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.account.page.a4f145526932",
     "scope": "app.account.page",
     "text": "Profile controls",
-    "page": "Account",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/account/page.tsx"
-  },
-  {
-    "key": "ui.app.account.page.ff8634e1b9dd",
-    "scope": "app.account.page",
-    "text": "Each Profile controls visibility, private documents, service history, Serial Number display, and QR downloads from its editor.",
     "page": "Account",
     "area": "Product",
     "section": "Page text",
@@ -3943,15 +4111,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/admin/page.tsx"
   },
   {
-    "key": "ui.app.admin.page.5cbd26b5d984",
-    "scope": "app.admin.page",
-    "text": "Search users, Profiles, or IDs",
-    "page": "Admin",
-    "area": "Product",
-    "section": "Accessibility",
-    "source": "app/admin/page.tsx"
-  },
-  {
     "key": "ui.app.admin.page.3c86be3eae40",
     "scope": "app.admin.page",
     "text": "Temporarily unavailable",
@@ -5359,15 +5518,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.admin.payments.PayPalReviewQueue.7e1b0d5641f2",
     "scope": "app.admin.payments.PayPalReviewQueue",
     "text": "Account",
-    "page": "Admin",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/admin/payments/PayPalReviewQueue.tsx"
-  },
-  {
-    "key": "ui.app.admin.payments.PayPalReviewQueue.673b7a226b63",
-    "scope": "app.admin.payments.PayPalReviewQueue",
-    "text": "More active holds exist. Resolve the visible cases, then refresh the queue.",
     "page": "Admin",
     "area": "Product",
     "section": "Page text",
@@ -10128,7 +10278,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.catalog.CatalogClient.1fbba5113528",
     "scope": "app.catalog.CatalogClient",
-    "text": "Browse member collections",
+    "text": "Collections",
     "page": "Catalog",
     "area": "Marketing",
     "section": "Page text",
@@ -10531,15 +10681,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/catalog/CatalogClient.tsx"
   },
   {
-    "key": "ui.app.catalog.CatalogClient.5aeec66681b7",
-    "scope": "app.catalog.CatalogClient",
-    "text": "No profiles found",
-    "page": "Catalog",
-    "area": "Marketing",
-    "section": "Page text",
-    "source": "app/catalog/CatalogClient.tsx"
-  },
-  {
     "key": "ui.app.catalog.error.1ab7aa5950e4",
     "scope": "app.catalog.error",
     "text": "The catalog is temporarily unavailable.",
@@ -10578,16 +10719,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.collections.CollectionsDirectoryClient.8bf60f64c1e2",
     "scope": "app.collections.CollectionsDirectoryClient",
-    "text": "The first public collection starts with you.",
-    "page": "Public Collections",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/collections/CollectionsDirectoryClient.tsx"
-  },
-  {
-    "key": "ui.app.collections.CollectionsDirectoryClient.639391c50bae",
-    "scope": "app.collections.CollectionsDirectoryClient",
-    "text": "Turn on your public collection and make at least one instrument Profile public to appear here. Private and unlisted Profiles stay hidden.",
+    "text": "No collections yet.",
     "page": "Public Collections",
     "area": "Product",
     "section": "Page text",
@@ -10596,7 +10728,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.collections.CollectionsDirectoryClient.82a7887fd1d5",
     "scope": "app.collections.CollectionsDirectoryClient",
-    "text": "Set up your collection",
+    "text": "Collection settings",
     "page": "Public Collections",
     "area": "Product",
     "section": "Page text",
@@ -10605,7 +10737,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.collections.CollectionsDirectoryClient.f507fb6c23a7",
     "scope": "app.collections.CollectionsDirectoryClient",
-    "text": "Browse instrument Profiles",
+    "text": "Catalog",
     "page": "Public Collections",
     "area": "Product",
     "section": "Page text",
@@ -10614,7 +10746,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.collections.CollectionsDirectoryClient.76e4997eae2f",
     "scope": "app.collections.CollectionsDirectoryClient",
-    "text": "Find a member or business",
+    "text": "Search",
     "page": "Public Collections",
     "area": "Product",
     "section": "Page text",
@@ -10623,7 +10755,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.collections.CollectionsDirectoryClient.a274dd64efe8",
     "scope": "app.collections.CollectionsDirectoryClient",
-    "text": "Public name, collection handle, or role",
+    "text": "Name or handle",
     "page": "Public Collections",
     "area": "Product",
     "section": "Labels and help",
@@ -10651,15 +10783,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.collections.CollectionsDirectoryClient.a48c498b8725",
     "scope": "app.collections.CollectionsDirectoryClient",
     "text": "{{value1}} of {{value2}}",
-    "page": "Public Collections",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/collections/CollectionsDirectoryClient.tsx"
-  },
-  {
-    "key": "ui.app.collections.CollectionsDirectoryClient.efa1f375d761",
-    "scope": "app.collections.CollectionsDirectoryClient",
-    "text": "public",
     "page": "Public Collections",
     "area": "Product",
     "section": "Page text",
@@ -10722,16 +10845,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.collections.CollectionsDirectoryClient.0baf1df98cbe",
     "scope": "app.collections.CollectionsDirectoryClient",
-    "text": "No collections match these filters.",
-    "page": "Public Collections",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/collections/CollectionsDirectoryClient.tsx"
-  },
-  {
-    "key": "ui.app.collections.CollectionsDirectoryClient.436430aa14d8",
-    "scope": "app.collections.CollectionsDirectoryClient",
-    "text": "Try another public name or collection type.",
+    "text": "No collections found.",
     "page": "Public Collections",
     "area": "Product",
     "section": "Page text",
@@ -10740,7 +10854,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.collections.CollectionsDirectoryClient.a73e9c9ae150",
     "scope": "app.collections.CollectionsDirectoryClient",
-    "text": "Show all collections",
+    "text": "Clear filters",
     "page": "Public Collections",
     "area": "Product",
     "section": "Page text",
@@ -10819,41 +10933,15 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/collections/not-found.tsx"
   },
   {
-    "key": "ui.app.collections.page.2595f0c366bf",
-    "scope": "app.collections.page",
-    "text": "Member collections",
-    "page": "Public Collections",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/collections/page.tsx"
-  },
-  {
     "key": "ui.app.collections.page.9fa7b03bfc1e",
     "scope": "app.collections.page",
-    "text": "Meet the people behind the instruments.",
+    "text": "Collections",
     "page": "Public Collections",
     "area": "Product",
     "section": "Page text",
     "source": "app/collections/page.tsx"
   },
-  {
-    "key": "ui.app.collections.page.f34365151941",
-    "scope": "app.collections.page",
-    "text": "Explore public collections from players, collectors, stores, builders, brands, and repair shops. Open a collection to view that member’s public instrument Profiles.",
-    "page": "Public Collections",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/collections/page.tsx"
-  },
-  {
-    "key": "ui.app.collections.page.82a7887fd1d5",
-    "scope": "app.collections.page",
-    "text": "Set up your collection",
-    "page": "Public Collections",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/collections/page.tsx"
-  },
+  
   {
     "key": "ui.app.collections.page.aa8729a8a143",
     "scope": "app.collections.page",
@@ -10866,7 +10954,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.collections.page.f507fb6c23a7",
     "scope": "app.collections.page",
-    "text": "Browse instrument Profiles",
+    "text": "Catalog",
     "page": "Public Collections",
     "area": "Product",
     "section": "Page text",
@@ -10875,7 +10963,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.collections.page.5ca6750bbc16",
     "scope": "app.collections.page",
-    "text": "Your collection settings",
+    "text": "Collection settings",
     "page": "Public Collections",
     "area": "Product",
     "section": "Page text",
@@ -10884,16 +10972,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.collections.handle.CollectionsClient.ac53f9376264",
     "scope": "app.collections.handle.CollectionsClient",
-    "text": "No public instrument Profiles yet.",
-    "page": "Public Collections",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/collections/[handle]/CollectionsClient.tsx"
-  },
-  {
-    "key": "ui.app.collections.handle.CollectionsClient.af746895fcef",
-    "scope": "app.collections.handle.CollectionsClient",
-    "text": "This member hasn’t added any instruments to their public collection yet.",
+    "text": "No Profiles yet.",
     "page": "Public Collections",
     "area": "Product",
     "section": "Page text",
@@ -10902,7 +10981,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.collections.handle.CollectionsClient.2cbb876d08c4",
     "scope": "app.collections.handle.CollectionsClient",
-    "text": "Explore other collections",
+    "text": "All collections",
     "page": "Public Collections",
     "area": "Product",
     "section": "Page text",
@@ -11091,7 +11170,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.collections.handle.CollectionsClient.a3da4386e1c1",
     "scope": "app.collections.handle.CollectionsClient",
-    "text": "Show all public Profiles",
+    "text": "Clear filters",
     "page": "Public Collections",
     "area": "Product",
     "section": "Page text",
@@ -11134,36 +11213,9 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/collections/[handle]/page.tsx"
   },
   {
-    "key": "ui.app.collections.handle.page.f28aefd26929",
-    "scope": "app.collections.handle.page",
-    "text": "QRguitar member",
-    "page": "Public Collections",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/collections/[handle]/page.tsx"
-  },
-  {
     "key": "ui.app.collections.handle.page.799272298625",
     "scope": "app.collections.handle.page",
     "text": " / {{value1}}",
-    "page": "Public Collections",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/collections/[handle]/page.tsx"
-  },
-  {
-    "key": "ui.app.collections.handle.page.bb23eaeeafa6",
-    "scope": "app.collections.handle.page",
-    "text": "Explore this member's public QRguitar Profiles.",
-    "page": "Public Collections",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/collections/[handle]/page.tsx"
-  },
-  {
-    "key": "ui.app.collections.handle.page.591935b15b1c",
-    "scope": "app.collections.handle.page",
-    "text": "Public",
     "page": "Public Collections",
     "area": "Product",
     "section": "Page text",
@@ -11343,7 +11395,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.create.page.5e16a39b804d",
     "scope": "app.create.page",
-    "text": "Your permanent QRguitar Profile is ready.",
+    "text": "Profile created.",
     "page": "Create Profile",
     "area": "Product",
     "section": "Page text",
@@ -11629,24 +11681,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/create/page.tsx"
   },
   {
-    "key": "ui.app.create.page.a896221d5946",
-    "scope": "app.create.page",
-    "text": "Owner display",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Labels and help",
-    "source": "app/create/page.tsx"
-  },
-  {
-    "key": "ui.app.create.page.1db2451eea93",
-    "scope": "app.create.page",
-    "text": "Name or collection",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Labels and help",
-    "source": "app/create/page.tsx"
-  },
-  {
     "key": "ui.app.create.page.0b0489074742",
     "scope": "app.create.page",
     "text": "Acquisition date",
@@ -11683,90 +11717,9 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/create/page.tsx"
   },
   {
-    "key": "ui.app.create.page.1c47f10cc99e",
-    "scope": "app.create.page",
-    "text": "Profile visibility",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Accessibility",
-    "source": "app/create/page.tsx"
-  },
-  {
-    "key": "ui.app.create.page.591935b15b1c",
-    "scope": "app.create.page",
-    "text": "Public",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/create/page.tsx"
-  },
-  {
-    "key": "ui.app.create.page.bc96567e77ca",
-    "scope": "app.create.page",
-    "text": "Unlisted",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/create/page.tsx"
-  },
-  {
-    "key": "ui.app.create.page.c63eb6720c6e",
-    "scope": "app.create.page",
-    "text": "Private",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/create/page.tsx"
-  },
-  {
-    "key": "ui.app.create.page.f88c0d40c301",
-    "scope": "app.create.page",
-    "text": "Listed in the Catalog and available by QR or direct link.",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/create/page.tsx"
-  },
-  {
-    "key": "ui.app.create.page.3d1d2fd4f39f",
-    "scope": "app.create.page",
-    "text": "Hidden from the Catalog but available by QR or direct link.",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/create/page.tsx"
-  },
-  {
-    "key": "ui.app.create.page.f0d2868fe175",
-    "scope": "app.create.page",
-    "text": "Available only to the signed-in owner and authorized admin.",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/create/page.tsx"
-  },
-  {
-    "key": "ui.app.create.page.7448611d5f93",
-    "scope": "app.create.page",
-    "text": "Visibility",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/create/page.tsx"
-  },
-  {
     "key": "ui.app.create.page.ee21436940da",
     "scope": "app.create.page",
     "text": "Show Serial Number publicly",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/create/page.tsx"
-  },
-  {
-    "key": "ui.app.create.page.dba16601d30d",
-    "scope": "app.create.page",
-    "text": "This hides only the Serial Number field. The permanent QR ID and URL may still include the serial. Choose a private Profile to restrict access to the signed-in owner and authorized admin.",
     "page": "Create Profile",
     "area": "Product",
     "section": "Page text",
@@ -12142,24 +12095,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/create/page.tsx"
   },
   {
-    "key": "ui.app.create.page.d05a6c62da13",
-    "scope": "app.create.page",
-    "text": "Private owner notes",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/create/page.tsx"
-  },
-  {
-    "key": "ui.app.create.page.782df1fdfe64",
-    "scope": "app.create.page",
-    "text": "Show this service entry on the public Timeline",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/create/page.tsx"
-  },
-  {
     "key": "ui.app.create.page.f9397a00eca8",
     "scope": "app.create.page",
     "text": "Links and supporting documents",
@@ -12202,42 +12137,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "page": "Create Profile",
     "area": "Product",
     "section": "Page text",
-    "source": "app/create/page.tsx"
-  },
-  {
-    "key": "ui.app.create.page.1dd25576bcdc",
-    "scope": "app.create.page",
-    "text": "Receipts, appraisals, invoices, build sheets, or service slips. New documents stay private by default.",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/create/page.tsx"
-  },
-  {
-    "key": "ui.app.create.page.d60bb2d3cfea",
-    "scope": "app.create.page",
-    "text": "Public document",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/create/page.tsx"
-  },
-  {
-    "key": "ui.app.create.page.899485baa668",
-    "scope": "app.create.page",
-    "text": "Private document",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/create/page.tsx"
-  },
-  {
-    "key": "ui.app.create.page.a4382f496011",
-    "scope": "app.create.page",
-    "text": "{{value1}} visibility",
-    "page": "Create Profile",
-    "area": "Product",
-    "section": "Labels and help",
     "source": "app/create/page.tsx"
   },
   {
@@ -12351,7 +12250,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.create.page.d7f3b884c97a",
     "scope": "app.create.page",
-    "text": "Give your instrument a permanent home.",
+    "text": "Sign in to create a Profile",
     "page": "Create Profile",
     "area": "Product",
     "section": "Page text",
@@ -12457,15 +12356,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/dashboard/page.tsx"
   },
   {
-    "key": "ui.app.dashboard.page.81321b8462a6",
-    "scope": "app.dashboard.page",
-    "text": "Private inventory",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
     "key": "ui.app.dashboard.page.f0f8d70e904e",
     "scope": "app.dashboard.page",
     "text": "QR downloads",
@@ -12523,15 +12413,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.dashboard.page.3880eee7e45c",
     "scope": "app.dashboard.page",
     "text": "Add your own instrument",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.page.e4ecedd588e1",
-    "scope": "app.dashboard.page",
-    "text": "Set up public collection",
     "page": "Dashboard",
     "area": "Product",
     "section": "Page text",
@@ -12682,69 +12563,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/dashboard/page.tsx"
   },
   {
-    "key": "ui.app.dashboard.page.efa1f375d761",
-    "scope": "app.dashboard.page",
-    "text": "public",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.page.43cc23fa52b8",
-    "scope": "app.dashboard.page",
-    "text": "document",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.page.9b16b44d0e0a",
-    "scope": "app.dashboard.page",
-    "text": "documents",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.page.1bef30db15b5",
-    "scope": "app.dashboard.page",
-    "text": ", {{value1}} private",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.page.c63eb6720c6e",
-    "scope": "app.dashboard.page",
-    "text": "Private",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.page.bc96567e77ca",
-    "scope": "app.dashboard.page",
-    "text": "Unlisted",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.page.591935b15b1c",
-    "scope": "app.dashboard.page",
-    "text": "Public",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
     "key": "ui.app.dashboard.page.9b7e3e571ecb",
     "scope": "app.dashboard.page",
     "text": "Profile identity",
@@ -12817,15 +12635,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/dashboard/page.tsx"
   },
   {
-    "key": "ui.app.dashboard.page.9f7551ac4715",
-    "scope": "app.dashboard.page",
-    "text": "Try a different search or visibility filter.",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
     "key": "ui.app.dashboard.page.8157452810db",
     "scope": "app.dashboard.page",
     "text": "Show All Profiles",
@@ -12880,36 +12689,9 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/dashboard/page.tsx"
   },
   {
-    "key": "ui.app.dashboard.page.073f22d50013",
-    "scope": "app.dashboard.page",
-    "text": "Publish your public Profiles together and control member inquiries",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Labels and help",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
     "key": "ui.app.dashboard.page.2c8274b24de5",
     "scope": "app.dashboard.page",
     "text": "Collection & inquiries",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.page.b64ac05f17e6",
-    "scope": "app.dashboard.page",
-    "text": "Live",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.page.4da10f1fbb17",
-    "scope": "app.dashboard.page",
-    "text": "Set up",
     "page": "Dashboard",
     "area": "Product",
     "section": "Page text",
@@ -12937,15 +12719,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.dashboard.page.eb95c24a9590",
     "scope": "app.dashboard.page",
     "text": "Authenticity Confirmed",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.page.ba59e2d4a5e3",
-    "scope": "app.dashboard.page",
-    "text": "Clear filter",
     "page": "Dashboard",
     "area": "Product",
     "section": "Page text",
@@ -12991,24 +12764,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.dashboard.page.25b1fe3f0719",
     "scope": "app.dashboard.page",
     "text": " · {{value1}}",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.page.af263b67ec8c",
-    "scope": "app.dashboard.page",
-    "text": "private evidence file",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.page.043a718774c5",
-    "scope": "app.dashboard.page",
-    "text": "s",
     "page": "Dashboard",
     "area": "Product",
     "section": "Page text",
@@ -13132,24 +12887,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/dashboard/page.tsx"
   },
   {
-    "key": "ui.app.dashboard.page.3538d701131e",
-    "scope": "app.dashboard.page",
-    "text": "Privacy & safety",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.page.e5d3af1efed5",
-    "scope": "app.dashboard.page",
-    "text": "Hiding the serial field does not change the permanent QR ID or URL, which may contain the serial. Use private visibility to restrict access.",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
     "key": "ui.app.dashboard.page.c43c36e3acf6",
     "scope": "app.dashboard.page",
     "text": "Hide Serial Number",
@@ -13162,15 +12899,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.dashboard.page.7e8e1732f6a0",
     "scope": "app.dashboard.page",
     "text": "Show Serial Number",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.page.91d623e6ce72",
-    "scope": "app.dashboard.page",
-    "text": "Visibility & safety",
     "page": "Dashboard",
     "area": "Product",
     "section": "Page text",
@@ -13207,15 +12935,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.dashboard.page.5f74589ff706",
     "scope": "app.dashboard.page",
     "text": "Ownership handoff",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.page.5989eea16b52",
-    "scope": "app.dashboard.page",
-    "text": "Prepare a private code for an in-person buyer.",
     "page": "Dashboard",
     "area": "Product",
     "section": "Page text",
@@ -13261,15 +12980,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.dashboard.page.91c5b0010aa1",
     "scope": "app.dashboard.page",
     "text": "Email invitation",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.page.c0bba41e5ae5",
-    "scope": "app.dashboard.page",
-    "text": "Private buyer code",
     "page": "Dashboard",
     "area": "Product",
     "section": "Page text",
@@ -13510,15 +13220,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/dashboard/page.tsx"
   },
   {
-    "key": "ui.app.dashboard.page.17b626d63a07",
-    "scope": "app.dashboard.page",
-    "text": "Private buyer handoff prepared",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
     "key": "ui.app.dashboard.page.5d2356016d09",
     "scope": "app.dashboard.page",
     "text": "Claim link created",
@@ -13546,15 +13247,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/dashboard/page.tsx"
   },
   {
-    "key": "ui.app.dashboard.page.53f58d61b305",
-    "scope": "app.dashboard.page",
-    "text": "The private code is never stored in readable form. Revoke and prepare a new handoff if it was not copied.",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/page.tsx"
-  },
-  {
     "key": "ui.app.dashboard.page.18ed36f2100f",
     "scope": "app.dashboard.page",
     "text": "Pending transfer",
@@ -13562,15 +13254,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "area": "Product",
     "section": "Page text",
     "source": "app/dashboard/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.profile.code.OwnerProfileClient.9b28be3dc6ed",
-    "scope": "app.dashboard.profile.code.OwnerProfileClient",
-    "text": "Your collection",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/profile/[code]/OwnerProfileClient.tsx"
   },
   {
     "key": "ui.app.dashboard.profile.code.OwnerProfileClient.ffad3e64048f",
@@ -13612,24 +13295,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.dashboard.profile.code.OwnerProfileClient.f6b6e188e29b",
     "scope": "app.dashboard.profile.code.OwnerProfileClient",
     "text": "Checking your account and loading the instrument.",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/profile/[code]/OwnerProfileClient.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.profile.code.OwnerProfileClient.4537aa12687c",
-    "scope": "app.dashboard.profile.code.OwnerProfileClient",
-    "text": "Private Profiles are available only to their owner.",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/profile/[code]/OwnerProfileClient.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.profile.code.OwnerProfileClient.820aa22dc0e6",
-    "scope": "app.dashboard.profile.code.OwnerProfileClient",
-    "text": "This Profile is not available to this account. Check that you are signed in to the account that owns it.",
     "page": "Dashboard",
     "area": "Product",
     "section": "Page text",
@@ -13719,7 +13384,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.dashboard.service.page.3ab05f868d78",
     "scope": "app.dashboard.service.page",
-    "text": "Pick up a draft, track owner review, and keep the work you performed connected to the instrument.",
+    "text": "Manage drafts, owner reviews, and completed work.",
     "page": "Dashboard",
     "area": "Product",
     "section": "Page text",
@@ -13738,15 +13403,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.dashboard.service.page.d677c4c20422",
     "scope": "app.dashboard.service.page",
     "text": "Checking your sign-in…",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/service/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.service.page.1baa4ff16741",
-    "scope": "app.dashboard.service.page",
-    "text": "Your private service work will appear here.",
     "page": "Dashboard",
     "area": "Product",
     "section": "Page text",
@@ -13801,15 +13457,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.dashboard.service.page.8a366259b6c3",
     "scope": "app.dashboard.service.page",
     "text": "Start a service record",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/service/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.service.page.1956b220efa1",
-    "scope": "app.dashboard.service.page",
-    "text": "Enter the instrument’s QRguitar ID. Private Profiles require the owner to grant your provider account access.",
     "page": "Dashboard",
     "area": "Product",
     "section": "Page text",
@@ -13962,25 +13609,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.dashboard.service.page.06e51c1a6440",
     "scope": "app.dashboard.service.page",
-    "text": "Your first service record starts here",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/service/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.service.page.b90ff6b8cd21",
-    "scope": "app.dashboard.service.page",
-    "text": "Enter a QRguitar ID above to document completed work. Save a private draft, attach evidence, then send it to the owner for review.",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/service/page.tsx"
-  },
-  {
-    "key": "ui.app.dashboard.service.page.abb835ab195b",
-    "scope": "app.dashboard.service.page",
-    "text": "Approval and visibility are decided by the Profile owner.",
+    "text": "No service requests yet.",
     "page": "Dashboard",
     "area": "Product",
     "section": "Page text",
@@ -14113,15 +13742,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/dashboard/service/page.tsx"
   },
   {
-    "key": "ui.app.dashboard.service.page.d9f533ca8b8b",
-    "scope": "app.dashboard.service.page",
-    "text": "Private evidence",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/service/page.tsx"
-  },
-  {
     "key": "ui.app.dashboard.service.page.3b9c358f36f0",
     "scope": "app.dashboard.service.page",
     "text": "file",
@@ -14212,15 +13832,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/dashboard/service/page.tsx"
   },
   {
-    "key": "ui.app.dashboard.service.page.1c4cb6f2a379",
-    "scope": "app.dashboard.service.page",
-    "text": "Evidence remains private. A sent email does not mean the owner has approved the work.",
-    "page": "Dashboard",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/dashboard/service/page.tsx"
-  },
-  {
     "key": "ui.app.edit.code.page.2f0a4b105931",
     "scope": "app.edit.code.page",
     "text": "This Profile was not found for your account.",
@@ -14248,15 +13859,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/edit/[code]/page.tsx"
   },
   {
-    "key": "ui.app.edit.code.page.a60687ec3498",
-    "scope": "app.edit.code.page",
-    "text": "Could not add media.",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Feedback",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
     "key": "ui.app.edit.code.page.39e3cbd0722a",
     "scope": "app.edit.code.page",
     "text": "Media added.",
@@ -14266,27 +13868,9 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/edit/[code]/page.tsx"
   },
   {
-    "key": "ui.app.edit.code.page.d09487f73f3b",
-    "scope": "app.edit.code.page",
-    "text": "Could not remove media.",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Feedback",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
     "key": "ui.app.edit.code.page.90fb34ab44a1",
     "scope": "app.edit.code.page",
     "text": "Media removed.",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Feedback",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.94de5baedf39",
-    "scope": "app.edit.code.page",
-    "text": "Could not update media.",
     "page": "Edit Profile",
     "area": "Product",
     "section": "Feedback",
@@ -14311,27 +13895,9 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/edit/[code]/page.tsx"
   },
   {
-    "key": "ui.app.edit.code.page.5f2daa5a67f7",
-    "scope": "app.edit.code.page",
-    "text": "Could not save service entry.",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Feedback",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
     "key": "ui.app.edit.code.page.6cb9aa0fcb13",
     "scope": "app.edit.code.page",
     "text": "Service entry saved. The permanent QRguitar URL stayed the same.",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Feedback",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.a858c19c2e1d",
-    "scope": "app.edit.code.page",
-    "text": "Could not delete service entry.",
     "page": "Edit Profile",
     "area": "Product",
     "section": "Feedback",
@@ -14401,24 +13967,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/edit/[code]/page.tsx"
   },
   {
-    "key": "ui.app.edit.code.page.b60a79b1ba9d",
-    "scope": "app.edit.code.page",
-    "text": "Trust settings failed: {{value1}}",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Feedback",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.dd99fa7bf17d",
-    "scope": "app.edit.code.page",
-    "text": "Safety status failed: {{value1}}",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Feedback",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
     "key": "ui.app.edit.code.page.7dbbf757ae78",
     "scope": "app.edit.code.page",
     "text": "Saved as {{value1}}. Previous QR links still open this profile.",
@@ -14476,105 +14024,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.edit.code.page.379e7e78d21e",
     "scope": "app.edit.code.page",
     "text": "When a Serial Number exists, the QRguitar ID uses the format QRG-SERIAL. Previous QR links remain active after approved corrections.",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.1c47f10cc99e",
-    "scope": "app.edit.code.page",
-    "text": "Profile visibility",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Accessibility",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.c6e88acaaf6f",
-    "scope": "app.edit.code.page",
-    "text": "Public catalog",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.b94392a1943c",
-    "scope": "app.edit.code.page",
-    "text": "Unlisted direct link",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.d666dd40b98c",
-    "scope": "app.edit.code.page",
-    "text": "Private owner only",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.c1acbedb643a",
-    "scope": "app.edit.code.page",
-    "text": "Shows on the live homepage feed and catalog.",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.2bfd63b89729",
-    "scope": "app.edit.code.page",
-    "text": "Hidden from browsing, but anyone with the permanent link can view it.",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.44692a3804f6",
-    "scope": "app.edit.code.page",
-    "text": "Hidden from public browsing and direct public access.",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.7448611d5f93",
-    "scope": "app.edit.code.page",
-    "text": "Visibility",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.591935b15b1c",
-    "scope": "app.edit.code.page",
-    "text": "Public",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.c63eb6720c6e",
-    "scope": "app.edit.code.page",
-    "text": "Private",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.bc96567e77ca",
-    "scope": "app.edit.code.page",
-    "text": "Unlisted",
     "page": "Edit Profile",
     "area": "Product",
     "section": "Page text",
@@ -14815,24 +14264,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/edit/[code]/page.tsx"
   },
   {
-    "key": "ui.app.edit.code.page.6456778444bd",
-    "scope": "app.edit.code.page",
-    "text": "Show Serial Number on public Profile",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.a8782c988bf8",
-    "scope": "app.edit.code.page",
-    "text": "This hides only the Serial Number field. The permanent QR ID and URL may still include the serial. Choose a private Profile to restrict access. No-serial records require QRguitar approval before verification or authenticity confirmation.",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
     "key": "ui.app.edit.code.page.50cccc48b0dc",
     "scope": "app.edit.code.page",
     "text": "Originality is an owner-stated modification status for search and disclosure. It is not QRguitar authentication or verification.",
@@ -14887,15 +14318,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/edit/[code]/page.tsx"
   },
   {
-    "key": "ui.app.edit.code.page.a896221d5946",
-    "scope": "app.edit.code.page",
-    "text": "Owner display",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Labels and help",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
     "key": "ui.app.edit.code.page.74d91b61ae60",
     "scope": "app.edit.code.page",
     "text": "Owner status",
@@ -14911,15 +14333,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "page": "Edit Profile",
     "area": "Product",
     "section": "Labels and help",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.7b364544e11f",
-    "scope": "app.edit.code.page",
-    "text": "Public story",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
     "source": "app/edit/[code]/page.tsx"
   },
   {
@@ -15058,15 +14471,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/edit/[code]/page.tsx"
   },
   {
-    "key": "ui.app.edit.code.page.d7aea5f0f7db",
-    "scope": "app.edit.code.page",
-    "text": "Upload up to 20 photos, 12MB each. Pick one as the main image for dashboard cards, catalog listings, and the public profile hero.",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
     "key": "ui.app.edit.code.page.aaa80d91c45c",
     "scope": "app.edit.code.page",
     "text": "Store receipts, invoices, build sheets, service slips, appraisal notes, and authenticity evidence with the QRguitar Profile. Up to 10 files, 12MB each.",
@@ -15082,15 +14486,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "page": "Edit Profile",
     "area": "Product",
     "section": "Accessibility",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.61008da8ad24",
-    "scope": "app.edit.code.page",
-    "text": "/10 files. Private documents can support QRguitar verification and authenticity review.",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
     "source": "app/edit/[code]/page.tsx"
   },
   {
@@ -15202,60 +14597,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/edit/[code]/page.tsx"
   },
   {
-    "key": "ui.app.edit.code.page.05a15f069975",
-    "scope": "app.edit.code.page",
-    "text": "Public description",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.75652484cfdf",
-    "scope": "app.edit.code.page",
-    "text": "Optional public context if this document is shared.",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Labels and help",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.72ff78fb2fd5",
-    "scope": "app.edit.code.page",
-    "text": "Private notes",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.7f4f8adde79a",
-    "scope": "app.edit.code.page",
-    "text": "Owner-only document notes. Never shown on the public Profile.",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Labels and help",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.ffab73178509",
-    "scope": "app.edit.code.page",
-    "text": "Make Private",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.24139936d627",
-    "scope": "app.edit.code.page",
-    "text": "Make Public",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
     "key": "ui.app.edit.code.page.ed077f3d8125",
     "scope": "app.edit.code.page",
     "text": "Open",
@@ -15358,15 +14699,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.edit.code.page.50f38c2c40b0",
     "scope": "app.edit.code.page",
     "text": "Preview link",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.7bcb38b3067a",
-    "scope": "app.edit.code.page",
-    "text": "Show Publicly",
     "page": "Edit Profile",
     "area": "Product",
     "section": "Page text",
@@ -15913,27 +15245,9 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/edit/[code]/page.tsx"
   },
   {
-    "key": "ui.app.edit.code.page.118e1524b882",
-    "scope": "app.edit.code.page",
-    "text": "Public verification note",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
     "key": "ui.app.edit.code.page.010edcad212d",
     "scope": "app.edit.code.page",
     "text": "Internal authenticity note",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.42af0e4ee0c2",
-    "scope": "app.edit.code.page",
-    "text": "Public authenticity note",
     "page": "Edit Profile",
     "area": "Product",
     "section": "Page text",
@@ -15952,15 +15266,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.edit.code.page.a678af9b1c0a",
     "scope": "app.edit.code.page",
     "text": "Show authenticity status publicly",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.51e39f20046d",
-    "scope": "app.edit.code.page",
-    "text": "Authenticity is confirmed, but the public badge is currently hidden. Turn this on and use Save Changes to publish it.",
     "page": "Edit Profile",
     "area": "Product",
     "section": "Page text",
@@ -16039,33 +15344,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/edit/[code]/page.tsx"
   },
   {
-    "key": "ui.app.edit.code.page.2f02e4974dd6",
-    "scope": "app.edit.code.page",
-    "text": "No public safety alert",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.44c111b254e9",
-    "scope": "app.edit.code.page",
-    "text": "No public safety alert is shown while status is No Alert.",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.804f3c9e9556",
-    "scope": "app.edit.code.page",
-    "text": "Public safety note",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
     "key": "ui.app.edit.code.page.3b9415ed93f2",
     "scope": "app.edit.code.page",
     "text": "Reported Lost: This instrument has been marked lost by the current owner.",
@@ -16090,15 +15368,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "page": "Edit Profile",
     "area": "Product",
     "section": "Labels and help",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.5816362f2633",
-    "scope": "app.edit.code.page",
-    "text": "Private/internal note",
-    "page": "Edit Profile",
-    "area": "Product",
-    "section": "Page text",
     "source": "app/edit/[code]/page.tsx"
   },
   {
@@ -16426,36 +15695,9 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/handout/[code]/page.tsx"
   },
   {
-    "key": "ui.app.handout.code.page.ef50a2af62ff",
-    "scope": "app.handout.code.page",
-    "text": "Public-safe copy",
-    "page": "Print Workspace",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/handout/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.handout.code.page.51a370754ef7",
-    "scope": "app.handout.code.page",
-    "text": "Includes only information allowed on the public Profile.",
-    "page": "Print Workspace",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/handout/[code]/page.tsx"
-  },
-  {
     "key": "ui.app.handout.code.page.9732ac52e538",
     "scope": "app.handout.code.page",
     "text": "Owner copy",
-    "page": "Print Workspace",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/handout/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.handout.code.page.5c027d45a7ce",
-    "scope": "app.handout.code.page",
-    "text": "May include a hidden Serial Number. Do not share this copy if it contains private information.",
     "page": "Print Workspace",
     "area": "Product",
     "section": "Page text",
@@ -16720,24 +15962,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "page": "Print Workspace",
     "area": "Product",
     "section": "Accessibility",
-    "source": "app/handout/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.handout.code.page.9db2256ef43c",
-    "scope": "app.handout.code.page",
-    "text": "This Profile is private. The printed QR will not open for customers until you change its visibility.",
-    "page": "Print Workspace",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/handout/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.handout.code.page.35e225fbf65f",
-    "scope": "app.handout.code.page",
-    "text": "Owner copy: may contain information hidden from the public Profile.",
-    "page": "Print Workspace",
-    "area": "Product",
-    "section": "Page text",
     "source": "app/handout/[code]/page.tsx"
   },
   {
@@ -17026,15 +16250,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "page": "Print Workspace",
     "area": "Product",
     "section": "Accessibility",
-    "source": "app/handout/[code]/PrintDocument.tsx"
-  },
-  {
-    "key": "ui.app.handout.code.PrintDocument.abd1353daca2",
-    "scope": "app.handout.code.PrintDocument",
-    "text": "Private evidence and internal notes are not included.",
-    "page": "Print Workspace",
-    "area": "Product",
-    "section": "Page text",
     "source": "app/handout/[code]/PrintDocument.tsx"
   },
   {
@@ -17866,15 +17081,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "app/i/[code]/ProfileClient.tsx"
   },
   {
-    "key": "ui.app.i.code.ProfileClient.f59c5e15fc31",
-    "scope": "app.i.code.ProfileClient",
-    "text": "Unclaimed",
-    "page": "Public Profile",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/i/[code]/ProfileClient.tsx"
-  },
-  {
     "key": "ui.app.i.code.ProfileClient.090940e73258",
     "scope": "app.i.code.ProfileClient",
     "text": "Builder",
@@ -18484,7 +17690,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "page": "Shared CTAs and states",
     "area": "Product",
     "section": "Labels and help",
-    "source": "app/not-found.tsx"
+    "source": "app/NotFoundClient.tsx"
   },
   {
     "key": "ui.app.not.found.82d8e08c8d46",
@@ -18493,7 +17699,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "page": "Shared CTAs and states",
     "area": "Product",
     "section": "Labels and help",
-    "source": "app/not-found.tsx"
+    "source": "app/NotFoundClient.tsx"
   },
   {
     "key": "ui.app.not.found.004ca2d8b070",
@@ -18502,7 +17708,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "page": "Shared CTAs and states",
     "area": "Product",
     "section": "Page text",
-    "source": "app/not-found.tsx"
+    "source": "app/NotFoundClient.tsx"
   },
   {
     "key": "ui.app.not.found.76c5505ff2e2",
@@ -18511,7 +17717,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "page": "Shared CTAs and states",
     "area": "Product",
     "section": "Page text",
-    "source": "app/not-found.tsx"
+    "source": "app/NotFoundClient.tsx"
   },
   {
     "key": "ui.app.ownership.claim.page.40c5fdba5671",
@@ -23482,15 +22688,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "components/BulkProfileImport.tsx"
   },
   {
-    "key": "ui.components.BulkProfileImport.3e8fd54e8e35",
-    "scope": "components.BulkProfileImport",
-    "text": "Create Private Profiles",
-    "page": "Bulk Profile Import",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/BulkProfileImport.tsx"
-  },
-  {
     "key": "ui.components.BulkProfileImport.f7c46329dcb1",
     "scope": "components.BulkProfileImport",
     "text": "1. Add inventory",
@@ -23824,15 +23021,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "components/BulkProfileImport.tsx"
   },
   {
-    "key": "ui.components.BulkProfileImport.ede0997eebfc",
-    "scope": "components.BulkProfileImport",
-    "text": "Import up to 50 rows per batch. Imported Profiles start Private, and Serial Numbers stay hidden unless show_serial explicitly says yes. Review each Profile before publishing it.",
-    "page": "Bulk Profile Import",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/BulkProfileImport.tsx"
-  },
-  {
     "key": "ui.components.CollectionInquiryForm.f5b9e421b518",
     "scope": "components.CollectionInquiryForm",
     "text": "Member message",
@@ -24051,7 +23239,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.components.HomePageClient.ecbcf256c14d",
     "scope": "components.HomePageClient",
-    "text": "One permanent identity",
+    "text": "Permanent Profile",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
@@ -24060,7 +23248,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.components.HomePageClient.bc615fcc90ab",
     "scope": "components.HomePageClient",
-    "text": "The same Profile. Every chapter.",
+    "text": "One permanent link.",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
@@ -24069,7 +23257,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.components.HomePageClient.eb341bf13357",
     "scope": "components.HomePageClient",
-    "text": "Your privacy, your choice",
+    "text": "Documents",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
@@ -24078,7 +23266,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.components.HomePageClient.a4c1dff0c2e1",
     "scope": "components.HomePageClient",
-    "text": "Public, unlisted, or just for you.",
+    "text": "Choose which documents to share.",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
@@ -24087,7 +23275,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.components.HomePageClient.f5ab906e49d7",
     "scope": "components.HomePageClient",
-    "text": "A history that carries forward",
+    "text": "Service history",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
@@ -24096,16 +23284,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.components.HomePageClient.104c2472352a",
     "scope": "components.HomePageClient",
-    "text": "Service and ownership, connected.",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
-    "key": "ui.components.HomePageClient.72cdbf43eb3a",
-    "scope": "components.HomePageClient",
-    "text": "PUBLIC PROFILES",
+    "text": "Keep service records with the Profile.",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
@@ -24114,16 +23293,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.components.HomePageClient.3b67d76945bd",
     "scope": "components.HomePageClient",
-    "text": "See what's already documented.",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
-    "key": "ui.components.HomePageClient.5c75e88902f3",
-    "scope": "components.HomePageClient",
-    "text": "Browse real QRguitar Profiles from the public Catalog.",
+    "text": "Profiles",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
@@ -24132,7 +23302,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.components.HomePageClient.025320721b82",
     "scope": "components.HomePageClient",
-    "text": "View all Profiles",
+    "text": "Catalog",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
@@ -24202,18 +23372,9 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "components/HomePageClient.tsx"
   },
   {
-    "key": "ui.components.HomePageClient.34165e2cdda6",
-    "scope": "components.HomePageClient",
-    "text": "SERVICE & OWNERSHIP",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
     "key": "ui.components.HomePageClient.b655c5fb6426",
     "scope": "components.HomePageClient",
-    "text": "The history stays with the instrument.",
+    "text": "Service and ownership",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
@@ -24222,7 +23383,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.components.HomePageClient.9a4346833f50",
     "scope": "components.HomePageClient",
-    "text": "Approved service and completed ownership transfers update the same Profile. The QRguitar ID and link do not change.",
+    "text": "Approved service and completed transfers keep the same Profile and QR link.",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
@@ -24231,7 +23392,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.components.HomePageClient.7bf7f24c48ad",
     "scope": "components.HomePageClient",
-    "text": "See How It Works",
+    "text": "How it works",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
@@ -24240,16 +23401,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.components.HomePageClient.b575d2660321",
     "scope": "components.HomePageClient",
-    "text": "Start with one instrument.",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
-    "key": "ui.components.HomePageClient.9dae741a1b7c",
-    "scope": "components.HomePageClient",
-    "text": "Create the Profile now. Add the rest over time.",
+    "text": "Create a Profile",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
@@ -24267,7 +23419,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.components.HomePageClient.004ca2d8b070",
     "scope": "components.HomePageClient",
-    "text": "Explore the Catalog",
+    "text": "Catalog",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
@@ -25336,42 +24488,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "components/ProfileQuickEdit.tsx"
   },
   {
-    "key": "ui.components.ProfileQuickEdit.7448611d5f93",
-    "scope": "components.ProfileQuickEdit",
-    "text": "Visibility",
-    "page": "Profile Quick Edit",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/ProfileQuickEdit.tsx"
-  },
-  {
-    "key": "ui.components.ProfileQuickEdit.591935b15b1c",
-    "scope": "components.ProfileQuickEdit",
-    "text": "Public",
-    "page": "Profile Quick Edit",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/ProfileQuickEdit.tsx"
-  },
-  {
-    "key": "ui.components.ProfileQuickEdit.bc96567e77ca",
-    "scope": "components.ProfileQuickEdit",
-    "text": "Unlisted",
-    "page": "Profile Quick Edit",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/ProfileQuickEdit.tsx"
-  },
-  {
-    "key": "ui.components.ProfileQuickEdit.c63eb6720c6e",
-    "scope": "components.ProfileQuickEdit",
-    "text": "Private",
-    "page": "Profile Quick Edit",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/ProfileQuickEdit.tsx"
-  },
-  {
     "key": "ui.components.ProfileQuickEdit.12f67f8539c4",
     "scope": "components.ProfileQuickEdit",
     "text": "Availability",
@@ -25471,24 +24587,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "components/ProfileQuickEdit.tsx"
   },
   {
-    "key": "ui.components.ProfileQuickEdit.22765505d8f2",
-    "scope": "components.ProfileQuickEdit",
-    "text": "Show Serial Number on the public Profile",
-    "page": "Profile Quick Edit",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/ProfileQuickEdit.tsx"
-  },
-  {
-    "key": "ui.components.ProfileQuickEdit.b281350e38d8",
-    "scope": "components.ProfileQuickEdit",
-    "text": "Hides only the serial field. The permanent QR ID and URL may still include the serial. Use private visibility to restrict access.",
-    "page": "Profile Quick Edit",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/ProfileQuickEdit.tsx"
-  },
-  {
     "key": "ui.components.ProfileQuickEdit.32cf4596244a",
     "scope": "components.ProfileQuickEdit",
     "text": "Lost / stolen status",
@@ -25528,15 +24626,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.components.ProfileQuickEdit.37ce0a91ee27",
     "scope": "components.ProfileQuickEdit",
     "text": "Recovered",
-    "page": "Profile Quick Edit",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/ProfileQuickEdit.tsx"
-  },
-  {
-    "key": "ui.components.ProfileQuickEdit.5919565fba50",
-    "scope": "components.ProfileQuickEdit",
-    "text": "Public alert note",
     "page": "Profile Quick Edit",
     "area": "Global",
     "section": "Page text",
@@ -28547,11 +27636,201 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "area": "Product",
     "section": "Page text",
     "source": "lib/account-deletion/admin-ui/AdminIntakeQueue.tsx"
+  },
+{
+  "key": "ui.app.reset.password.page.minimumPassword",
+  "text": "Use at least 8 characters.",
+  "section": "Recovery and navigation",
+  "source": "app/reset-password/page.tsx",
+  "scope": "app.reset.password.page",
+  "area": "Product",
+  "page": "Reset Password"
+},
+{
+  "key": "ui.app.reset.password.page.passwordMismatch",
+  "text": "Passwords do not match.",
+  "section": "Recovery and navigation",
+  "source": "app/reset-password/page.tsx",
+  "scope": "app.reset.password.page",
+  "area": "Product",
+  "page": "Reset Password"
+},
+{
+  "key": "ui.components.BulkProfileImport.previewBeforeCreate",
+  "text": "Add your inventory, then choose Map & preview rows. No Profiles are created during preview.",
+  "section": "Recovery and navigation",
+  "source": "components/BulkProfileImport.tsx",
+  "scope": "components.BulkProfileImport",
+  "area": "Product",
+  "page": "Bulk Import"
+},
+{
+  "key": "ui.components.BulkProfileImport.correctBeforeCreate",
+  "text": "Correct the highlighted rows and preview again. Profiles can be created when at least one row is ready.",
+  "section": "Recovery and navigation",
+  "source": "components/BulkProfileImport.tsx",
+  "scope": "components.BulkProfileImport",
+  "area": "Product",
+  "page": "Bulk Import"
+},
+  {
+    "key": "ui.app.service.review.id.page.savedReviewHeading",
+    "scope": "app.service.review.id.page",
+    "text": "Saved review details",
+    "area": "Product",
+    "page": "Service review",
+    "section": "Saved review outcome",
+    "source": "app/service-review/[id]/page.tsx"
+  },
+  {
+    "key": "ui.app.service.review.id.page.changesRequestedNext",
+    "scope": "app.service.review.id.page",
+    "text": "Changes requested. The provider can revise and resubmit this request. You can review it again after resubmission.",
+    "area": "Product",
+    "page": "Service review",
+    "section": "Saved review outcome",
+    "source": "app/service-review/[id]/page.tsx"
+  },
+  {
+    "key": "ui.app.service.review.id.page.declinedNext",
+    "scope": "app.service.review.id.page",
+    "text": "This request was declined. No approval can be sent from this review.",
+    "area": "Product",
+    "page": "Service review",
+    "section": "Saved review outcome",
+    "source": "app/service-review/[id]/page.tsx"
+  },
+  {
+    "key": "ui.app.service.review.id.page.expiredNext",
+    "scope": "app.service.review.id.page",
+    "text": "This request expired. No approval can be sent from this review.",
+    "area": "Product",
+    "page": "Service review",
+    "section": "Saved review outcome",
+    "source": "app/service-review/[id]/page.tsx"
+  },
+  {
+    "key": "ui.app.service.review.id.page.cancelledNext",
+    "scope": "app.service.review.id.page",
+    "text": "This request was cancelled. No approval can be sent from this review.",
+    "area": "Product",
+    "page": "Service review",
+    "section": "Saved review outcome",
+    "source": "app/service-review/[id]/page.tsx"
+  },
+  {
+    "key": "ui.app.service.review.id.page.notReviewableNext",
+    "scope": "app.service.review.id.page",
+    "text": "This request is not awaiting an owner decision. Its saved details are shown below.",
+    "area": "Product",
+    "page": "Service review",
+    "section": "Saved review outcome",
+    "source": "app/service-review/[id]/page.tsx"
+  },
+  {
+    "key": "ui.app.service.review.id.page.savedVisibility",
+    "scope": "app.service.review.id.page",
+    "text": "Saved visibility choice",
+    "area": "Product",
+    "page": "Service review",
+    "section": "Saved review outcome",
+    "source": "app/service-review/[id]/page.tsx"
+  },
+  {
+    "key": "ui.app.service.review.id.page.noSavedOwnerNote",
+    "scope": "app.service.review.id.page",
+    "text": "No saved owner note.",
+    "area": "Product",
+    "page": "Service review",
+    "section": "Saved review outcome",
+    "source": "app/service-review/[id]/page.tsx"
   }
 ];
 
 // Compatibility only: retained for saved CMS snapshots; these removed controls are not displayed.
 export const retiredUiTextEntries = [
+  { key: "ui.components.Footer.checkingSignIn", scope: "components.Footer", text: "Checking sign-in...", area: "Product", page: "Shared Footer", section: "Session status", source: "components/Footer.tsx" },
+  {
+    "key": "ui.app.admin.page.5cbd26b5d984",
+    "scope": "app.admin.page",
+    "text": "Search users, Profiles, or IDs",
+    "page": "Admin",
+    "area": "Product",
+    "section": "Accessibility",
+    "source": "app/admin/page.tsx"
+  },
+  {
+    "key": "ui.app.admin.payments.PayPalReviewQueue.673b7a226b63",
+    "scope": "app.admin.payments.PayPalReviewQueue",
+    "text": "More active holds exist. Resolve the visible cases, then refresh the queue.",
+    "page": "Admin",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/admin/payments/PayPalReviewQueue.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.a60687ec3498",
+    "scope": "app.edit.code.page",
+    "text": "Could not add media.",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Feedback",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.d09487f73f3b",
+    "scope": "app.edit.code.page",
+    "text": "Could not remove media.",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Feedback",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.94de5baedf39",
+    "scope": "app.edit.code.page",
+    "text": "Could not update media.",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Feedback",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.5f2daa5a67f7",
+    "scope": "app.edit.code.page",
+    "text": "Could not save service entry.",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Feedback",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.a858c19c2e1d",
+    "scope": "app.edit.code.page",
+    "text": "Could not delete service entry.",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Feedback",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.b60a79b1ba9d",
+    "scope": "app.edit.code.page",
+    "text": "Trust settings failed: {{value1}}",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Feedback",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.dd99fa7bf17d",
+    "scope": "app.edit.code.page",
+    "text": "Safety status failed: {{value1}}",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Feedback",
+    "source": "app/edit/[code]/page.tsx"
+  },
 {
     "key": "ui.app.edit.code.page.bf60214d782d",
     "scope": "app.edit.code.page",
@@ -28623,5 +27902,1130 @@ export const retiredUiTextEntries = [
     "area": "Product",
     "section": "Page text",
     "source": "app/edit/[code]/page.tsx"
-  }
+  },
+{
+  "key": "ui.app.collections.page.82a7887fd1d5",
+  "scope": "app.collections.page",
+  "text": "Set up your collection",
+  "page": "Public Collections",
+  "area": "Product",
+  "section": "Page text",
+  "source": "app/collections/page.tsx"
+},
+  {
+    "key": "ui.app.collections.page.2595f0c366bf",
+    "scope": "app.collections.page",
+    "text": "Member collections",
+    "page": "Public Collections",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/collections/page.tsx"
+  },
+  {
+    "key": "ui.app.collections.page.f34365151941",
+    "scope": "app.collections.page",
+    "text": "Explore public collections from players, collectors, stores, builders, brands, and repair shops. Open a collection to view that member’s public instrument Profiles.",
+    "page": "Public Collections",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/collections/page.tsx"
+  },
+  {"key":"ui.app.collections.page.exampleLabel","scope":"app.collections.page","text":"Example collection","area":"Product","page":"Collections","section":"Public navigation and discovery","source":"app/collections/page.tsx"},
+  {"key":"ui.app.collections.page.exampleHeading","scope":"app.collections.page","text":"Guitars, amplifiers, and more","area":"Product","page":"Collections","section":"Public navigation and discovery","source":"app/collections/page.tsx"},
+  {"key":"ui.app.collections.page.exampleDisclosure","scope":"app.collections.page","text":"Illustrative layout using real public Profiles. This is not a published member collection or one person’s collection.","area":"Product","page":"Collections","section":"Public navigation and discovery","source":"app/collections/page.tsx"},
+  {
+    "key": "ui.app.collections.CollectionsDirectoryClient.639391c50bae",
+    "scope": "app.collections.CollectionsDirectoryClient",
+    "text": "Turn on your public collection and make at least one instrument Profile public to appear here. Private and unlisted Profiles stay hidden.",
+    "page": "Public Collections",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/collections/CollectionsDirectoryClient.tsx"
+  },
+  {
+    "key": "ui.app.collections.CollectionsDirectoryClient.436430aa14d8",
+    "scope": "app.collections.CollectionsDirectoryClient",
+    "text": "Try another public name or collection type.",
+    "page": "Public Collections",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/collections/CollectionsDirectoryClient.tsx"
+  },
+  {
+    "key": "ui.app.collections.CollectionsDirectoryClient.efa1f375d761",
+    "scope": "app.collections.CollectionsDirectoryClient",
+    "text": "public",
+    "page": "Public Collections",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/collections/CollectionsDirectoryClient.tsx"
+  },
+  {
+    "key": "ui.components.HomePageClient.72cdbf43eb3a",
+    "scope": "components.HomePageClient",
+    "text": "PUBLIC PROFILES",
+    "page": "Home Page Client",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/HomePageClient.tsx"
+  },
+  {
+    "key": "ui.components.HomePageClient.5c75e88902f3",
+    "scope": "components.HomePageClient",
+    "text": "Browse real QRguitar Profiles from the public Catalog.",
+    "page": "Home Page Client",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/HomePageClient.tsx"
+  },
+  {"key":"ui.components.HomePageClient.publicProof","scope":"components.HomePageClient","text":"Real instruments, documented by their owners. Explore the photos and history in these public Profiles.","area":"Marketing","page":"Homepage","section":"Public navigation and discovery","source":"components/HomePageClient.tsx"},
+  {
+    "key": "ui.components.HomePageClient.34165e2cdda6",
+    "scope": "components.HomePageClient",
+    "text": "SERVICE & OWNERSHIP",
+    "page": "Home Page Client",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/HomePageClient.tsx"
+  },
+  {
+    "key": "ui.components.HomePageClient.9dae741a1b7c",
+    "scope": "components.HomePageClient",
+    "text": "Create the Profile now. Add the rest over time.",
+    "page": "Home Page Client",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/HomePageClient.tsx"
+  },
+  {
+    "key": "ui.app.catalog.CatalogClient.5aeec66681b7",
+    "scope": "app.catalog.CatalogClient",
+    "text": "No profiles found",
+    "page": "Catalog",
+    "area": "Marketing",
+    "section": "Page text",
+    "source": "app/catalog/CatalogClient.tsx"
+  },
+  {
+    "key": "ui.app.collections.handle.page.f28aefd26929",
+    "scope": "app.collections.handle.page",
+    "text": "QRguitar member",
+    "page": "Public Collections",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/collections/[handle]/page.tsx"
+  },
+  {
+    "key": "ui.app.collections.handle.page.bb23eaeeafa6",
+    "scope": "app.collections.handle.page",
+    "text": "Explore this member's public QRguitar Profiles.",
+    "page": "Public Collections",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/collections/[handle]/page.tsx"
+  },
+  {
+    "key": "ui.app.collections.handle.page.591935b15b1c",
+    "scope": "app.collections.handle.page",
+    "text": "Public",
+    "page": "Public Collections",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/collections/[handle]/page.tsx"
+  },
+  {
+    "key": "ui.app.collections.handle.CollectionsClient.af746895fcef",
+    "scope": "app.collections.handle.CollectionsClient",
+    "text": "This member hasn’t added any instruments to their public collection yet.",
+    "page": "Public Collections",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/collections/[handle]/CollectionsClient.tsx"
+  },
+  { key: "ui.app.i.code.ProfileClient.shopItem", scope: "app.i.code.ProfileClient", text: "Shop this item", area: "Product", page: "Public Profile", section: "Seller actions", source: "app/i/[code]/ProfileClient.tsx" },
+  {
+    "key": "ui.app.i.code.ProfileClient.f59c5e15fc31",
+    "scope": "app.i.code.ProfileClient",
+    "text": "Unclaimed",
+    "page": "Public Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/i/[code]/ProfileClient.tsx"
+  },
+
+  { key: "ui.app.account.page.sharedSaveScope", scope: "app.account.page", text: "Saving updates Account details and your collection settings together, including collection visibility. Password and sign-out actions are separate.", area: "Product", page: "Account", section: "Save status", source: "app/account/page.tsx" },
+  { key: "ui.app.dashboard.page.managePublicCollection", scope: "app.dashboard.page", text: "Manage public collection", area: "Product", page: "Dashboard", section: "Page text", source: "app/dashboard/page.tsx" },
+  { key: "ui.app.dashboard.page.buyerActionRequired", scope: "app.dashboard.page", text: "Give the private buyer code to the recipient. You remain the owner until they accept.", area: "Product", page: "Dashboard", section: "Page text", source: "app/dashboard/page.tsx" },
+  {
+    "key": "ui.app.account.page.591935b15b1c",
+    "scope": "app.account.page",
+    "text": "Public",
+    "page": "Account",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/account/page.tsx"
+  },
+  {
+    "key": "ui.app.account.page.658ed7b26eff",
+    "scope": "app.account.page",
+    "text": "Private or unlisted",
+    "page": "Account",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/account/page.tsx"
+  },
+  {
+    "key": "ui.app.account.page.8ca6da5bcd1b",
+    "scope": "app.account.page",
+    "text": "Public collection",
+    "page": "Account",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/account/page.tsx"
+  },
+  {
+    "key": "ui.app.account.page.e7a081e4c5a2",
+    "scope": "app.account.page",
+    "text": "Bring your public Profiles together on one page.",
+    "page": "Account",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/account/page.tsx"
+  },
+  {
+    "key": "ui.app.account.page.d034a5030b9c",
+    "scope": "app.account.page",
+    "text": "Shown on private tools and used as your default owner/shop label.",
+    "page": "Account",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/account/page.tsx"
+  },
+  {
+    "key": "ui.app.account.page.17c18130884e",
+    "scope": "app.account.page",
+    "text": "Choose the daily tools shown on your dashboard. You can save this preference with your public collection turned off. Provider verification is reviewed separately.",
+    "page": "Account",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/account/page.tsx"
+  },
+  {
+    "key": "ui.app.account.page.390ed0ea84e0",
+    "scope": "app.account.page",
+    "text": "Enable my collection page",
+    "page": "Account",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/account/page.tsx"
+  },
+  {
+    "key": "ui.app.account.page.collectionVisibilityHelp",
+    "scope": "app.account.page",
+    "text": "Only Public Profiles appear here. Your page joins Member Collections once it has a Public Profile. Turning this off hides the collection page, without changing any Profile’s visibility.",
+    "page": "Account",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/account/page.tsx"
+  },
+  {
+    "key": "ui.app.account.page.8bb1664e67fa",
+    "scope": "app.account.page",
+    "text": "Page name",
+    "page": "Account",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/account/page.tsx"
+  },
+  {
+    "key": "ui.app.account.page.2a5191a8ca1b",
+    "scope": "app.account.page",
+    "text": "Use the full HTTPS address. When your public collection is enabled, visitors can open this website from the collection and its instrument Profiles. Purchases and bookings take place on your website.",
+    "page": "Account",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/account/page.tsx"
+  },
+  {
+    "key": "ui.app.account.page.a9fc610e616e",
+    "scope": "app.account.page",
+    "text": "Your email stays private. Conversations stay inside QRguitar and can include up to four photos or short videos per message.",
+    "page": "Account",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/account/page.tsx"
+  },
+  {
+    "key": "ui.app.account.page.ff8634e1b9dd",
+    "scope": "app.account.page",
+    "text": "Each Profile controls visibility, private documents, service history, Serial Number display, and QR downloads from its editor.",
+    "page": "Account",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/account/page.tsx"
+  },
+  {
+    "key": "ui.app.create.page.a896221d5946",
+    "scope": "app.create.page",
+    "text": "Owner display",
+    "page": "Create Profile",
+    "area": "Product",
+    "section": "Labels and help",
+    "source": "app/create/page.tsx"
+  },
+  {
+    "key": "ui.app.create.page.1db2451eea93",
+    "scope": "app.create.page",
+    "text": "Name or collection",
+    "page": "Create Profile",
+    "area": "Product",
+    "section": "Labels and help",
+    "source": "app/create/page.tsx"
+  },
+  {
+    "key": "ui.app.create.page.1c47f10cc99e",
+    "scope": "app.create.page",
+    "text": "Profile visibility",
+    "page": "Create Profile",
+    "area": "Product",
+    "section": "Accessibility",
+    "source": "app/create/page.tsx"
+  },
+  {
+    "key": "ui.app.create.page.591935b15b1c",
+    "scope": "app.create.page",
+    "text": "Public",
+    "page": "Create Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/create/page.tsx"
+  },
+  {
+    "key": "ui.app.create.page.bc96567e77ca",
+    "scope": "app.create.page",
+    "text": "Unlisted",
+    "page": "Create Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/create/page.tsx"
+  },
+  {
+    "key": "ui.app.create.page.c63eb6720c6e",
+    "scope": "app.create.page",
+    "text": "Private",
+    "page": "Create Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/create/page.tsx"
+  },
+  {
+    "key": "ui.app.create.page.f88c0d40c301",
+    "scope": "app.create.page",
+    "text": "Listed in the Catalog and available by QR or direct link.",
+    "page": "Create Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/create/page.tsx"
+  },
+  {
+    "key": "ui.app.create.page.3d1d2fd4f39f",
+    "scope": "app.create.page",
+    "text": "Hidden from the Catalog but available by QR or direct link.",
+    "page": "Create Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/create/page.tsx"
+  },
+  {
+    "key": "ui.app.create.page.f0d2868fe175",
+    "scope": "app.create.page",
+    "text": "Available only to the signed-in owner and authorized admin.",
+    "page": "Create Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/create/page.tsx"
+  },
+  {
+    "key": "ui.app.create.page.7448611d5f93",
+    "scope": "app.create.page",
+    "text": "Visibility",
+    "page": "Create Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/create/page.tsx"
+  },
+  {
+    "key": "ui.app.create.page.dba16601d30d",
+    "scope": "app.create.page",
+    "text": "This hides only the Serial Number field. The permanent QR ID and URL may still include the serial. Choose a private Profile to restrict access to the signed-in owner and authorized admin.",
+    "page": "Create Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/create/page.tsx"
+  },
+  {
+    "key": "ui.app.create.page.d05a6c62da13",
+    "scope": "app.create.page",
+    "text": "Private owner notes",
+    "page": "Create Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/create/page.tsx"
+  },
+  {
+    "key": "ui.app.create.page.782df1fdfe64",
+    "scope": "app.create.page",
+    "text": "Show this service entry on the public Timeline",
+    "page": "Create Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/create/page.tsx"
+  },
+  {
+    "key": "ui.app.create.page.1dd25576bcdc",
+    "scope": "app.create.page",
+    "text": "Receipts, appraisals, invoices, build sheets, or service slips. New documents stay private by default.",
+    "page": "Create Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/create/page.tsx"
+  },
+  {
+    "key": "ui.app.create.page.d60bb2d3cfea",
+    "scope": "app.create.page",
+    "text": "Public document",
+    "page": "Create Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/create/page.tsx"
+  },
+  {
+    "key": "ui.app.create.page.899485baa668",
+    "scope": "app.create.page",
+    "text": "Private document",
+    "page": "Create Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/create/page.tsx"
+  },
+  {
+    "key": "ui.app.create.page.a4382f496011",
+    "scope": "app.create.page",
+    "text": "{{value1}} visibility",
+    "page": "Create Profile",
+    "area": "Product",
+    "section": "Labels and help",
+    "source": "app/create/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.81321b8462a6",
+    "scope": "app.dashboard.page",
+    "text": "Private inventory",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.e4ecedd588e1",
+    "scope": "app.dashboard.page",
+    "text": "Set up public collection",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.efa1f375d761",
+    "scope": "app.dashboard.page",
+    "text": "public",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.43cc23fa52b8",
+    "scope": "app.dashboard.page",
+    "text": "document",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.9b16b44d0e0a",
+    "scope": "app.dashboard.page",
+    "text": "documents",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.1bef30db15b5",
+    "scope": "app.dashboard.page",
+    "text": ", {{value1}} private",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.c63eb6720c6e",
+    "scope": "app.dashboard.page",
+    "text": "Private",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.bc96567e77ca",
+    "scope": "app.dashboard.page",
+    "text": "Unlisted",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.591935b15b1c",
+    "scope": "app.dashboard.page",
+    "text": "Public",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.9f7551ac4715",
+    "scope": "app.dashboard.page",
+    "text": "Try a different search or visibility filter.",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.073f22d50013",
+    "scope": "app.dashboard.page",
+    "text": "Publish your public Profiles together and control member inquiries",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Labels and help",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.b64ac05f17e6",
+    "scope": "app.dashboard.page",
+    "text": "Live",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.4da10f1fbb17",
+    "scope": "app.dashboard.page",
+    "text": "Set up",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.ba59e2d4a5e3",
+    "scope": "app.dashboard.page",
+    "text": "Clear filter",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.af263b67ec8c",
+    "scope": "app.dashboard.page",
+    "text": "private evidence file",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.043a718774c5",
+    "scope": "app.dashboard.page",
+    "text": "s",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.3538d701131e",
+    "scope": "app.dashboard.page",
+    "text": "Privacy & safety",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.e5d3af1efed5",
+    "scope": "app.dashboard.page",
+    "text": "Hiding the serial field does not change the permanent QR ID or URL, which may contain the serial. Use private visibility to restrict access.",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.91d623e6ce72",
+    "scope": "app.dashboard.page",
+    "text": "Visibility & safety",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.5989eea16b52",
+    "scope": "app.dashboard.page",
+    "text": "Prepare a private code for an in-person buyer.",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.c0bba41e5ae5",
+    "scope": "app.dashboard.page",
+    "text": "Private buyer code",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.17b626d63a07",
+    "scope": "app.dashboard.page",
+    "text": "Private buyer handoff prepared",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.53f58d61b305",
+    "scope": "app.dashboard.page",
+    "text": "The private code is never stored in readable form. Revoke and prepare a new handoff if it was not copied.",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.profile.code.OwnerProfileClient.9b28be3dc6ed",
+    "scope": "app.dashboard.profile.code.OwnerProfileClient",
+    "text": "Your collection",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/profile/[code]/OwnerProfileClient.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.profile.code.OwnerProfileClient.4537aa12687c",
+    "scope": "app.dashboard.profile.code.OwnerProfileClient",
+    "text": "Private Profiles are available only to their owner.",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/profile/[code]/OwnerProfileClient.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.profile.code.OwnerProfileClient.820aa22dc0e6",
+    "scope": "app.dashboard.profile.code.OwnerProfileClient",
+    "text": "This Profile is not available to this account. Check that you are signed in to the account that owns it.",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/profile/[code]/OwnerProfileClient.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.service.page.1baa4ff16741",
+    "scope": "app.dashboard.service.page",
+    "text": "Your private service work will appear here.",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/service/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.service.page.1956b220efa1",
+    "scope": "app.dashboard.service.page",
+    "text": "Enter the instrument’s QRguitar ID. Private Profiles require the owner to grant your provider account access.",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/service/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.service.page.b90ff6b8cd21",
+    "scope": "app.dashboard.service.page",
+    "text": "Enter a QRguitar ID above to document completed work. Save a private draft, attach evidence, then send it to the owner for review.",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/service/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.service.page.abb835ab195b",
+    "scope": "app.dashboard.service.page",
+    "text": "Approval and visibility are decided by the Profile owner.",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/service/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.service.page.d9f533ca8b8b",
+    "scope": "app.dashboard.service.page",
+    "text": "Private evidence",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/service/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.service.page.1c4cb6f2a379",
+    "scope": "app.dashboard.service.page",
+    "text": "Evidence remains private. A sent email does not mean the owner has approved the work.",
+    "page": "Dashboard",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/dashboard/service/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.1c47f10cc99e",
+    "scope": "app.edit.code.page",
+    "text": "Profile visibility",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Accessibility",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.c6e88acaaf6f",
+    "scope": "app.edit.code.page",
+    "text": "Public catalog",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.b94392a1943c",
+    "scope": "app.edit.code.page",
+    "text": "Unlisted direct link",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.d666dd40b98c",
+    "scope": "app.edit.code.page",
+    "text": "Private owner only",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.c1acbedb643a",
+    "scope": "app.edit.code.page",
+    "text": "Shows on the live homepage feed and catalog.",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.2bfd63b89729",
+    "scope": "app.edit.code.page",
+    "text": "Hidden from browsing, but anyone with the permanent link can view it.",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.44692a3804f6",
+    "scope": "app.edit.code.page",
+    "text": "Hidden from public browsing and direct public access.",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.7448611d5f93",
+    "scope": "app.edit.code.page",
+    "text": "Visibility",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.591935b15b1c",
+    "scope": "app.edit.code.page",
+    "text": "Public",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.c63eb6720c6e",
+    "scope": "app.edit.code.page",
+    "text": "Private",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.bc96567e77ca",
+    "scope": "app.edit.code.page",
+    "text": "Unlisted",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.6456778444bd",
+    "scope": "app.edit.code.page",
+    "text": "Show Serial Number on public Profile",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.a8782c988bf8",
+    "scope": "app.edit.code.page",
+    "text": "This hides only the Serial Number field. The permanent QR ID and URL may still include the serial. Choose a private Profile to restrict access. No-serial records require QRguitar approval before verification or authenticity confirmation.",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.a896221d5946",
+    "scope": "app.edit.code.page",
+    "text": "Owner display",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Labels and help",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.7b364544e11f",
+    "scope": "app.edit.code.page",
+    "text": "Public story",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.d7aea5f0f7db",
+    "scope": "app.edit.code.page",
+    "text": "Upload up to 20 photos, 12MB each. Pick one as the main image for dashboard cards, catalog listings, and the public profile hero.",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.61008da8ad24",
+    "scope": "app.edit.code.page",
+    "text": "/10 files. Private documents can support QRguitar verification and authenticity review.",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.05a15f069975",
+    "scope": "app.edit.code.page",
+    "text": "Public description",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.75652484cfdf",
+    "scope": "app.edit.code.page",
+    "text": "Optional public context if this document is shared.",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Labels and help",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.72ff78fb2fd5",
+    "scope": "app.edit.code.page",
+    "text": "Private notes",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.7f4f8adde79a",
+    "scope": "app.edit.code.page",
+    "text": "Owner-only document notes. Never shown on the public Profile.",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Labels and help",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.ffab73178509",
+    "scope": "app.edit.code.page",
+    "text": "Make Private",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.24139936d627",
+    "scope": "app.edit.code.page",
+    "text": "Make Public",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.7bcb38b3067a",
+    "scope": "app.edit.code.page",
+    "text": "Show Publicly",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.118e1524b882",
+    "scope": "app.edit.code.page",
+    "text": "Public verification note",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.42af0e4ee0c2",
+    "scope": "app.edit.code.page",
+    "text": "Public authenticity note",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.51e39f20046d",
+    "scope": "app.edit.code.page",
+    "text": "Authenticity is confirmed, but the public badge is currently hidden. Turn this on and use Save Changes to publish it.",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.2f02e4974dd6",
+    "scope": "app.edit.code.page",
+    "text": "No public safety alert",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.44c111b254e9",
+    "scope": "app.edit.code.page",
+    "text": "No public safety alert is shown while status is No Alert.",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.804f3c9e9556",
+    "scope": "app.edit.code.page",
+    "text": "Public safety note",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.5816362f2633",
+    "scope": "app.edit.code.page",
+    "text": "Private/internal note",
+    "page": "Edit Profile",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.page.ef50a2af62ff",
+    "scope": "app.handout.code.page",
+    "text": "Public-safe copy",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.page.51a370754ef7",
+    "scope": "app.handout.code.page",
+    "text": "Includes only information allowed on the public Profile.",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.page.5c027d45a7ce",
+    "scope": "app.handout.code.page",
+    "text": "May include a hidden Serial Number. Do not share this copy if it contains private information.",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.page.9db2256ef43c",
+    "scope": "app.handout.code.page",
+    "text": "This Profile is private. The printed QR will not open for customers until you change its visibility.",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.page.35e225fbf65f",
+    "scope": "app.handout.code.page",
+    "text": "Owner copy: may contain information hidden from the public Profile.",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.handout.code.PrintDocument.abd1353daca2",
+    "scope": "app.handout.code.PrintDocument",
+    "text": "Private evidence and internal notes are not included.",
+    "page": "Print Workspace",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/handout/[code]/PrintDocument.tsx"
+  },
+  {
+    "key": "ui.components.BulkProfileImport.3e8fd54e8e35",
+    "scope": "components.BulkProfileImport",
+    "text": "Create Private Profiles",
+    "page": "Bulk Profile Import",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/BulkProfileImport.tsx"
+  },
+  {
+    "key": "ui.components.BulkProfileImport.ede0997eebfc",
+    "scope": "components.BulkProfileImport",
+    "text": "Import up to 50 rows per batch. Imported Profiles start Private, and Serial Numbers stay hidden unless show_serial explicitly says yes. Review each Profile before publishing it.",
+    "page": "Bulk Profile Import",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/BulkProfileImport.tsx"
+  },
+  {
+    "key": "ui.components.ProfileQuickEdit.7448611d5f93",
+    "scope": "components.ProfileQuickEdit",
+    "text": "Visibility",
+    "page": "Profile Quick Edit",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/ProfileQuickEdit.tsx"
+  },
+  {
+    "key": "ui.components.ProfileQuickEdit.591935b15b1c",
+    "scope": "components.ProfileQuickEdit",
+    "text": "Public",
+    "page": "Profile Quick Edit",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/ProfileQuickEdit.tsx"
+  },
+  {
+    "key": "ui.components.ProfileQuickEdit.bc96567e77ca",
+    "scope": "components.ProfileQuickEdit",
+    "text": "Unlisted",
+    "page": "Profile Quick Edit",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/ProfileQuickEdit.tsx"
+  },
+  {
+    "key": "ui.components.ProfileQuickEdit.c63eb6720c6e",
+    "scope": "components.ProfileQuickEdit",
+    "text": "Private",
+    "page": "Profile Quick Edit",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/ProfileQuickEdit.tsx"
+  },
+  {
+    "key": "ui.components.ProfileQuickEdit.22765505d8f2",
+    "scope": "components.ProfileQuickEdit",
+    "text": "Show Serial Number on the public Profile",
+    "page": "Profile Quick Edit",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/ProfileQuickEdit.tsx"
+  },
+  {
+    "key": "ui.components.ProfileQuickEdit.b281350e38d8",
+    "scope": "components.ProfileQuickEdit",
+    "text": "Hides only the serial field. The permanent QR ID and URL may still include the serial. Use private visibility to restrict access.",
+    "page": "Profile Quick Edit",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/ProfileQuickEdit.tsx"
+  },
+  {
+    "key": "ui.components.ProfileQuickEdit.5919565fba50",
+    "scope": "components.ProfileQuickEdit",
+    "text": "Public alert note",
+    "page": "Profile Quick Edit",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/ProfileQuickEdit.tsx"
+  },
+  {
+  "key": "ui.components.BulkProfileImport.reviewBeforeCreate",
+  "text": "Review the ready rows before creating. Every imported Profile starts private; your saved progress is kept.",
+  "section": "Recovery and navigation",
+  "source": "components/BulkProfileImport.tsx",
+  "scope": "components.BulkProfileImport",
+  "area": "Product",
+  "page": "Bulk Import"
+},
 ];

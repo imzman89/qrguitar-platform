@@ -4,6 +4,7 @@ import { useUiText } from "../../../components/UiTextProvider";
 import type { ReactNode } from "react";
 import { BrandLogo } from "../../../components/BrandLogo";
 import type { PrintMode, PrintOrientation, PrintSize } from "../../../lib/print-layout";
+import { hangTagSpecifications } from "../../../lib/print-layout";
 import styles from "./print-document.module.css";
 
 type Fact = [string, string];
@@ -66,16 +67,16 @@ export function PrintDocument(props: Props) {
     data-orientation={props.orientation}
     data-theme={props.theme}
     className={styles.document}
-    aria-label={ui("ui.app.handout.code.PrintDocument.ebda169628a4", "Printable {{value1}} for {{value2}}", { value1: mode === "handout" ? "customer handout" : mode === "service" ? "service summary" : mode === "hangtag" ? "display card" : "QR label", value2: title })}
+    aria-label={ui("ui.app.handout.code.PrintDocument.ebda169628a4", "Printable {{value1}} for {{value2}}", { value1: mode === "handout" ? "Profile sheet" : mode === "service" ? "service summary" : mode === "hangtag" ? "hang tag" : mode === "qr" ? "QR only" : "label", value2: title })}
   >
-    {mode === "label" ? <div className={styles.label}>
+    {mode === "qr" ? <div className={styles.qrOnly}>{qr}</div> : mode === "label" ? <div className={styles.label}>
       <div className={styles.labelQr}>{qr}{props.includeInstruction ? <span>{ui("ui.app.handout.code.PrintDocument.8db3ef5c5d2f", "Scan Profile")}</span> : null}</div>
       <div className={styles.labelInfo}>{brand}<h2>{title}</h2><strong>{code}</strong>{serial ? <p>{ui("ui.app.handout.code.PrintDocument.1631e4a6b7d7", "Serial Number:")}{" "}{serial}</p> : null}{props.includeUrl ? <span>{profileUrl}</span> : null}</div>
-    </div> : mode === "hangtag" ? <div className={styles.tag}>
+    </div> : mode === "hangtag" ? <div className={styles.tag} data-has-photo={Boolean(photo)}>
       <header className={styles.tagHeader}>{brand}<strong>{code}</strong></header>
       {photograph ? <div className={styles.tagPhoto}>{photograph}</div> : null}
       <section className={styles.tagIdentity}><span className={styles.sectionLabel}>{ui("ui.app.handout.code.PrintDocument.4538b821a0d6", "QRguitar Profile")}</span><h2>{title}</h2><p>{props.facts.join(" / ")}</p>{props.badges}</section>
-      <section className={styles.tagMeta}><Facts facts={[...identity, ...props.details].slice(0, 6)} /><div className={styles.tagQr}>{qr}{props.includeInstruction ? <span>{ui("ui.app.handout.code.PrintDocument.8db3ef5c5d2f", "Scan Profile")}</span> : null}</div></section>
+      <section className={styles.tagMeta}><Facts facts={[...identity, ...props.details, ...hangTagSpecifications(props.specifications)].slice(0, 9)} /><div className={styles.tagQr}>{qr}{props.includeInstruction ? <span>{ui("ui.app.handout.code.PrintDocument.8db3ef5c5d2f", "Scan Profile")}</span> : null}</div></section>
       {props.note ? <p className={styles.tagNote}>{props.note}</p> : null}
       <footer className={styles.tagFooter}>{props.includeUrl ? <span>{profileUrl}</span> : null}<span>{ui("ui.app.handout.code.PrintDocument.1a719f6a72dd", "qrguitar.com")}</span></footer>
     </div> : <div className={`${styles.sheet} ${mode === "service" ? styles.serviceSheet : ""}`}>
@@ -83,7 +84,7 @@ export function PrintDocument(props: Props) {
         {brand}
         {mode === "handout" ? <div className={styles.documentMeta}><span>{ui("ui.app.handout.code.PrintDocument.a6c8f92c19f4", "QRguitar ID")}</span><strong>{code}</strong></div> : <div className={styles.documentMeta}><span>{ui("ui.app.handout.code.PrintDocument.a734981c99b6", "Service history")}</span><strong>{ui("ui.app.handout.code.PrintDocument.ce86d91e272a", "Service Summary")}</strong></div>}
       </header>
-      <section className={mode === "service" ? styles.serviceIdentity : styles.identity}>
+      <section className={mode === "service" ? styles.serviceIdentity : styles.identity} data-has-photo={Boolean(photo)}>
         {mode === "service" ? photograph : null}
         <div>{mode === "handout" ? <span className={styles.identityEyebrow}>{ui("ui.app.handout.code.PrintDocument.3ec29e5e7860", "Registered Profile")}</span> : <span className={styles.identityEyebrow}>{ui("ui.app.handout.code.PrintDocument.d696a35bdd18", "Profile")}</span>}<h2>{title}</h2><p className={styles.primaryFacts}>{props.facts.join(" / ")}</p>{props.badges}{mode === "service" ? <Facts facts={[...identity, ...props.details]} /> : null}</div>
       </section>
@@ -114,7 +115,7 @@ export function PrintDocument(props: Props) {
       {props.timeline.length ? <section className={styles.timeline} aria-label={ui("ui.app.handout.code.PrintDocument.aba8db7131dc", "Recent history")}><h3>{ui("ui.app.handout.code.PrintDocument.aba8db7131dc", "Recent history")}</h3>{props.timeline.map((entry, index) => <p key={index}>{entry}</p>)}</section> : null}
       {mode === "service" ? serviceScan : null}
       {props.note && mode !== "service" ? <section className={styles.note}><p>{props.note}</p></section> : null}
-      <footer className={styles.sheetFooter}><span>{mode === "service" ? ui("ui.app.handout.code.PrintDocument.abd1353daca2", "Private evidence and internal notes are not included.") : ui("ui.app.handout.code.PrintDocument.6af5e1108227", "Keep this sheet with the gear.")}</span><span>{ui("ui.app.handout.code.PrintDocument.1a719f6a72dd", "qrguitar.com")}</span></footer>
+      <footer className={styles.sheetFooter}><span>{mode === "service" ? ui("ui.app.handout.code.PrintDocument.serviceEvidenceNotice", "Unshared documents and internal notes are not included.") : ui("ui.app.handout.code.PrintDocument.6af5e1108227", "Keep this sheet with the gear.")}</span><span>{ui("ui.app.handout.code.PrintDocument.1a719f6a72dd", "qrguitar.com")}</span></footer>
     </div>}
   </article>;
 }

@@ -1,5 +1,6 @@
 
 import { createUiText } from "../../lib/ui-text";
+import { buildInstallerEmailDraft, supportEmailAddress } from "../../lib/support-email-draft";
 import Link from "next/link";
 import styles from "./installers.module.css";
 import type { CSSProperties } from "react";
@@ -34,6 +35,9 @@ export default async function InstallersPage() {
     return { order: index < 0 ? 99 : index, display: sections[index]?.visible === false ? "none" : undefined };
   };
   const vettingSteps = sections.find((section) => section.id === "process")?.blocks.filter((block) => block.visible) || [];
+  const applicationGuidance = ui("ui.app.installers.page.applicationEmailGuidance", "Complete these six details, review your email, and send it to support@qrguitar.com. Opening a draft does not submit an application. Applications are reviewed manually; applying does not approve or publish your business. Do not include passwords, payment-card numbers, reset links, or unrelated personal documents.");
+  const applicationDraft = buildInstallerEmailDraft(ui("ui.app.installers.page.applicationEmailSubject", "QRguitar Provider Network Application"), providerRequirements, applicationGuidance);
+  const applicationHref = applicationDraft.href || `mailto:${supportEmailAddress}`;
   return (
     <>
       <Nav />
@@ -45,7 +49,7 @@ export default async function InstallersPage() {
               <h1>{getContentValue(content, "installers.hero.headline")}</h1>
               <p>{getContentValue(content, "installers.hero.body")}</p>
               <div className="hero-actions">
-                <Link className="button" href="mailto:support@qrguitar.com?subject=QRguitar%20Provider%20Network%20Application">
+                <Link className="button" href={applicationHref}>
                   {getContentValue(content, "installers.actions.apply")}
                 </Link>
               </div>
@@ -76,9 +80,11 @@ export default async function InstallersPage() {
               <ul>
                 {providerRequirements.map((requirement) => <li key={requirement}>{requirement}</li>)}
               </ul>
-              <Link className="button" href="mailto:support@qrguitar.com?subject=QRguitar%20Provider%20Network%20Application">
+              <Link className="button" href={applicationHref}>
                 {getContentValue(content, "installers.actions.apply")}
               </Link>
+              <p className="fine-print">{applicationGuidance}</p>
+              <a href={`mailto:${supportEmailAddress}`}>{supportEmailAddress}</a>
             </div>
           </div>
         </section>

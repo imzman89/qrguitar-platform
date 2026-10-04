@@ -1,5 +1,6 @@
 "use client";
 import { useUiText } from "./UiTextProvider";
+import { focusDialog, trapDialogTab } from "../lib/dialog-focus";
 
 
 import { X } from "lucide-react";
@@ -18,6 +19,10 @@ export function ActionDrawer({ children, eyebrow, onClose, returnFocusTo, title 
   const ui = useUiText("components.ActionDrawer");
   const [mounted, setMounted] = useState(false);
   const panelRef = useRef<HTMLElement>(null);
+  const closeRef = useRef(onClose);
+  const returnRef = useRef(returnFocusTo);
+  closeRef.current = onClose;
+  returnRef.current = returnFocusTo;
 
   useEffect(() => setMounted(true), []);
 
@@ -31,30 +36,18 @@ export function ActionDrawer({ children, eyebrow, onClose, returnFocusTo, title 
       document.body.style.paddingRight = `${currentPaddingRight + scrollbarWidth}px`;
     }
     document.body.style.overflow = "hidden";
-    panelRef.current?.focus();
+    focusDialog(panelRef.current);
 
     function handleKeyDown(event: KeyboardEvent) {
       // A native child dialog owns its keyboard interaction, including Escape.
       if (event.defaultPrevented || (event.target instanceof HTMLElement && event.target.closest("dialog[open]"))) return;
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        closeRef.current();
         return;
       }
       if (event.key !== "Tab" || !panelRef.current) return;
-      const focusable = Array.from(panelRef.current.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      ));
-      if (!focusable.length) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
+      trapDialogTab(event, panelRef.current);
     }
 
     document.addEventListener("keydown", handleKeyDown);
@@ -62,9 +55,9 @@ export function ActionDrawer({ children, eyebrow, onClose, returnFocusTo, title 
       document.body.style.overflow = previousOverflow;
       document.body.style.paddingRight = previousPaddingRight;
       document.removeEventListener("keydown", handleKeyDown);
-      returnFocusTo?.focus();
+      returnRef.current?.focus();
     };
-  }, [mounted, onClose, returnFocusTo]);
+  }, [mounted]);
 
   if (!mounted) return null;
   return createPortal(

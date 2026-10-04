@@ -29,7 +29,7 @@ export function HomeProfileShowcase({ record }: { record: DemoInstrument }) {
       <div className={styles.details}>
         <div className={styles.identity}>
           <span className={styles.kicker}>{ui("ui.components.HomeProfileShowcase.1dd0ddc0cf78", "QRguitar Profile ·")}{" "}{card.typeLabel}</span>
-          <h2><Link href={card.profileUrl}>{card.title}<ArrowUpRight size={19} aria-hidden="true" /></Link></h2>
+          <h3><Link href={card.profileUrl}>{card.title}<ArrowUpRight size={19} aria-hidden="true" /></Link></h3>
           {card.factLine ? <p>{card.factLine}</p> : null}
         </div>
         {photos.length ? <button className={styles.galleryLink} type="button" onClick={() => setViewerOpen(true)} aria-label={(photos.length < card.photoCount ? "View available photos of " : "View all photos of ") + card.title}><Camera size={16} aria-hidden="true" />{photos.length} {photos.length === 1 ? ui("ui.components.HomeProfileShowcase.55c64d0fcd6f", "photo") : ui("ui.components.HomeProfileShowcase.84a6dae49cf0", "photos")}{photos.length < card.photoCount ? ui("ui.components.HomeProfileShowcase.033eefff7069", " available") : ""}</button> : null}

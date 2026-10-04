@@ -1,4 +1,5 @@
 import { unstable_noStore as noStore } from "next/cache";
+import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { createServerSupabaseClient } from "./supabase-server";
 import { defaultSiteSettings, mergeSiteSettings, publishedSiteSettingsKey, type EditableSiteSettings } from "./site-settings";
@@ -22,7 +23,7 @@ async function draftPreviewRequested() {
   }
 }
 
-export async function loadSiteSettingsRequest(): Promise<LoadedSiteSettings> {
+export const loadSiteSettingsRequest = cache(async (): Promise<LoadedSiteSettings> => {
   noStore();
   const supabase = createServerSupabaseClient();
   if (!supabase) {
@@ -49,7 +50,7 @@ export async function loadSiteSettingsRequest(): Promise<LoadedSiteSettings> {
 
   if (published.error || !published.data?.content_value) return { settings: defaultSiteSettings, source: "published" };
   return { settings: mergeSiteSettings(published.data.content_value), source: "published" };
-}
+});
 
 export async function loadPublishedSiteSettings() {
   return (await loadSiteSettingsRequest()).settings;

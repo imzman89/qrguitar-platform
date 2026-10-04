@@ -1,0 +1,12 @@
+.pricing { margin:24px 0; padding:0; color:var(--text); }
+.pricing h3 { margin:0 0 8px; font-size:18px; line-height:1.5; }
+.pricing p { margin:8px 0; line-height:1.6; }
+.packs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin:20px 0; }
+.packs div { min-width:0; }
+.packs dt { font-size:14px; line-height:1.5; }
+.packs dd { margin:4px 0 0; font-size:26px; font-weight:600; }
+.pricing .note { font-size:14px; }
+@media(max-width:520px) { .packs { grid-template-columns:1fr; gap:12px; } .packs div { display:flex; align-items:baseline; justify-content:space-between; gap:12px; } }
+
+.compact { margin:16px 0 0; }
+.compact .packs { max-width:720px; margin:0 0 12px; }

@@ -147,8 +147,9 @@ function acceptanceHandlers(copy, fetch) {
   const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX), selected = [];
   function visit(node) { if (ts.isFunctionDeclaration(node) && ['acceptTransfer', 'copyProfileLink'].includes(node.name?.text)) selected.push(node.getText(ast)); ts.forEachChild(node, visit); }
   visit(ast); assert.equal(selected.length, 2);
-  const state = { message: '', accepting: false, transfer: { ...transfer }, permanentPath: '', loadError: false, tracking: [] };
+  const state = { message: '', accepting: false, acceptUncertain: false, transfer: { ...transfer }, permanentPath: '', loadError: false, tracking: [] };
   const env = { ui: useUiText("app.transfer.id.page"), transfer: state.transfer, accepting: false, authRevision: { current: 1 }, feedbackRevision: { current: 0 }, acceptMutation: { current: null },
+    uncertainLock: { current: false }, acceptController: { current: null }, AbortController, setTimeout, clearTimeout,
     window: { navigator: { clipboard: { writeText: copy } }, location: { origin: 'https://www.qrguitar.com' } }, profileHref: '/i/QRG-A', getSupabaseAccessToken: async () => 'synthetic-token', fetch,
     optionalTrackingProductEvents: { ownershipTransferCompleted: 'ownership_transfer_completed' },
     dispatchOptionalTrackingProductEvent: async event => { state.tracking.push(event); return true; } };

@@ -17,6 +17,7 @@ type Props = {
   pageKey: EditorialPageKey;
   sections: EditorialSection[];
   errors?: Record<string, string>;
+  focusError?: { key: string } | null;
   onChange: (sections: EditorialSection[]) => void;
 };
 
@@ -45,12 +46,32 @@ function controlId(path: string) {
   return `composition-input-${path.replace(/[^a-z0-9]+/gi, "-")}`;
 }
 
-export function SiteCompositionEditor({ pageKey, sections, errors = {}, onChange }: Props) {
+export function SiteCompositionEditor({ pageKey, sections, errors = {}, focusError, onChange }: Props) {
   const ui = useUiText("components.SiteCompositionEditor");
   const defaults = defaultEditorialComposition[pageKey].sections;
   const [openSectionId, setOpenSectionId] = useState(sections[0]?.id || "");
   const [focusedBlockId, setFocusedBlockId] = useState(sections[0]?.blocks[0]?.id || "");
   const previousPageKey = useRef(pageKey);
+  const errorSections = useRef(sections); errorSections.current = sections;
+  const pendingErrorFocus = useRef("");
+  useEffect(() => {
+    if (!focusError?.key.startsWith(`composition.${pageKey}`)) return;
+    const sections = errorSections.current;
+    const parts = focusError.key.split(".");
+    const section = sections.find(item => item.id === parts[2]);
+    if (section) { setOpenSectionId(section.id); setFocusedBlockId(section.blocks.find(item => item.id === parts[3])?.id || section.blocks[0]?.id || ""); }
+    pendingErrorFocus.current = focusError.key;
+  }, [focusError, pageKey]);
+  useEffect(() => {
+    if (!pendingErrorFocus.current) return;
+    const parts = pendingErrorFocus.current.split(".");
+    const section = errorSections.current.find(item => item.id === parts[2]);
+    if (section && openSectionId !== section.id) return;
+    const block = section?.blocks.find(item => item.id === parts[3]);
+    if (block && focusedBlockId !== block.id) return;
+    const field = document.getElementById(controlId(pendingErrorFocus.current)) || document.getElementById(`composition-canvas-${pageKey}`);
+    if (field) { field.focus(); field.scrollIntoView({ block: "center" }); pendingErrorFocus.current = ""; }
+  }, [focusError, openSectionId, focusedBlockId, pageKey]);
   const dragSequence = useRef(0);
   const drag = useRef<{
     kind: "section" | "block";
@@ -192,7 +213,7 @@ export function SiteCompositionEditor({ pageKey, sections, errors = {}, onChange
   }
 
   return (
-    <section className="cms-field-group cms-composition-editor" aria-label={ui("ui.components.SiteCompositionEditor.4904a0d50cf7", "{{value1}} section arrangement", { value1: editorialPageLabels[pageKey] })}>
+    <section id={`composition-canvas-${pageKey}`} tabIndex={-1} className="cms-field-group cms-composition-editor" aria-label={ui("ui.components.SiteCompositionEditor.4904a0d50cf7", "{{value1}} section arrangement", { value1: editorialPageLabels[pageKey] })}>
       <header>
         <div><span>{ui("ui.components.SiteCompositionEditor.783dc516d32b", "Page sections")}</span><h2>{ui("ui.components.SiteCompositionEditor.d557a972ab06", "Arrange")}{" "}{editorialPageLabels[pageKey]}</h2></div>
         <span>{sections.length}{" "}{ui("ui.components.SiteCompositionEditor.4697ef322d1b", "sections")}</span>

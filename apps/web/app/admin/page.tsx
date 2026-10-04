@@ -1,4 +1,5 @@
 "use client";
+import { editorDeadline, editorRequest } from "../../lib/editor-request";
 import { useUiText } from "../../components/UiTextProvider";
 
 import { createEditorMutationController, type EditorMutationPayload } from "../../lib/site-editor-client";
@@ -355,8 +356,10 @@ function userRoleChipValue(user: AdminUser) {
   return "user";
 }
 
-function actionLabel(action: string) {
+function actionLabel(action: string, ui: ReturnType<typeof useUiText> = (_key, source) => source) {
   const labels: Record<string, string> = {
+    site_content_published: ui("ui.app.admin.page.siteContentPublished", "Website content published"),
+    site_draft_saved: ui("ui.app.admin.page.siteDraftSaved", "Website draft saved"),
     lock: "Account locked",
     unlock: "Account unlocked",
     ban: "User banned",
@@ -383,7 +386,8 @@ function actionLabel(action: string) {
     record_removed_from_collection: "Profile deleted from dashboard",
     record_restored_to_collection: "Historical recovery event"
   };
-  return labels[action] || statLabel(action);
+  const labelKey = action === "SITE_CONTENT_PUBLISHED" || action === "SITE_DRAFT_SAVED" ? action.toLowerCase() : action;
+  return labels[labelKey] || statLabel(action);
 }
 
 function fileSizeLabel(value?: number | null) {
@@ -401,6 +405,7 @@ function AdminWorkspace() {
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [ownershipClaims, setOwnershipClaims] = useState<AdminOwnershipClaim[]>([]);
   const [claimsError, setClaimsError] = useState("");
+  const [healthCheckedAt, setHealthCheckedAt] = useState<Date | null>(null);
   const [userFilter, setUserFilter] = useState("");
   const [recordFilter, setRecordFilter] = useState("");
   const [transferFilter, setTransferFilter] = useState("");
@@ -424,6 +429,10 @@ function AdminWorkspace() {
   const [navOpen, setNavOpen] = useState(false);
   const navButtonRef = useRef<HTMLButtonElement | null>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
+  const sectionHeadingRef = useRef<HTMLHeadingElement | null>(null);
+  const commandBarRef = useRef<HTMLDivElement | null>(null);
+  const sectionFocusVersion = useRef(0);
+  const pendingSectionFocus = useRef<{ section: SectionId; actorId: string; version: number } | null>(null);
   const entityDrawerRef = useRef<HTMLElement | null>(null);
   const modalRef = useRef<HTMLElement | null>(null);
   const busyRef = useRef(busy);
@@ -454,6 +463,10 @@ function AdminWorkspace() {
   }, []);
 
   function goToSection(section: SectionId, filter = "", options: { search?: string } = {}) {
+    const actorId = adminActorRef.current;
+    pendingSectionFocus.current = section !== activeSection && adminAuthorized && adminDataReady && actorId
+      ? { section, actorId, version: ++sectionFocusVersion.current }
+      : null;
     setActiveSection(section);
     setAdminSearch(options.search || "");
     setSortKey("created-desc");
@@ -484,6 +497,8 @@ function AdminWorkspace() {
     const activeOverlay = overlay;
 
     const returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusVersionRef = sectionFocusVersion;
+    const returnVersion = focusVersionRef.current;
     const fallbackFocus = navButtonRef.current;
     const previousOverflow = document.body.style.overflow;
     const focusableSelector = [
@@ -545,18 +560,38 @@ function AdminWorkspace() {
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
       window.setTimeout(() => {
+        if (returnVersion !== focusVersionRef.current) return;
         if (returnFocus?.isConnected) returnFocus.focus();
         else if (fallbackFocus?.isConnected) fallbackFocus.focus();
       }, 0);
     };
   }, [overlayKind]);
 
+  useEffect(() => {
+    const request = pendingSectionFocus.current;
+    if (!request) return;
+    if (!adminAuthorized || !adminDataReady || overlayKind || activeSection !== request.section || adminActorRef.current !== request.actorId) {
+      pendingSectionFocus.current = null;
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      const heading = sectionHeadingRef.current;
+      if (pendingSectionFocus.current !== request || sectionFocusVersion.current !== request.version || adminActorRef.current !== request.actorId || !heading?.isConnected) return;
+      pendingSectionFocus.current = null;
+      heading.focus({ preventScroll: true });
+      const toolbarHeight = commandBarRef.current?.offsetHeight || 0;
+      const top = heading.getBoundingClientRect().top + window.scrollY - toolbarHeight - 16;
+      window.scrollTo({ top: Math.max(0, top), behavior: "auto" });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [activeSection, overlayKind, adminAuthorized, adminDataReady]);
+
   const loadAdmin = useCallback(async (options: { successMessage?: string } = {}) => {
     const requestRevision = ++adminLoadRevision.current;
     setLoading(true);
     if (!options.successMessage) setMessage("");
     try {
-      const session = await readAdminSession();
+      const session = await editorDeadline(readAdminSession());
       if (requestRevision !== adminLoadRevision.current) return;
       if (!session.token || !session.actorId) {
         adminActorRef.current = "";
@@ -589,26 +624,21 @@ function AdminWorkspace() {
       adminActorRef.current = session.actorId;
 
       const headers = { Authorization: `Bearer ${session.token}` };
-      const [overviewResponse, usersResponse, recordsResponse, auditResponse, claimsResponse] = await Promise.all([
-        fetch("/api/admin/overview", { headers, cache: "no-store" }),
-        fetch("/api/admin/users", { headers, cache: "no-store" }),
-        fetch("/api/admin/records", { headers, cache: "no-store" }),
-        fetch("/api/admin/audit", { headers, cache: "no-store" }),
-        fetch("/api/ownership-claims", { headers, cache: "no-store" })
+      const reads = await Promise.all([
+        editorRequest("/api/admin/overview", { headers, cache: "no-store" }),
+        editorRequest("/api/admin/users", { headers, cache: "no-store" }),
+        editorRequest("/api/admin/records", { headers, cache: "no-store" }),
+        editorRequest("/api/admin/audit", { headers, cache: "no-store" }),
+        editorRequest("/api/ownership-claims", { headers, cache: "no-store" })
       ]);
-
-      const [overviewJson, usersJson, recordsJson, auditJson, claimsJson] = await Promise.all([
-        overviewResponse.json().catch(() => ({})),
-        usersResponse.json().catch(() => ({})),
-        recordsResponse.json().catch(() => ({})),
-        auditResponse.json().catch(() => ({})),
-        claimsResponse.json().catch(() => ({}))
-      ]);
+      const [overviewResponse, usersResponse, recordsResponse, auditResponse, claimsResponse] = reads.map(read => read.response);
+      const [overviewJson, usersJson, recordsJson, auditJson, claimsJson] = reads.map(read => read.payload || {});
       if (requestRevision !== adminLoadRevision.current || adminActorRef.current !== session.actorId) return;
 
       const nextUsers = Array.isArray(usersJson.users) ? usersJson.users as AdminUser[] : [];
       const nextRecords = Array.isArray(recordsJson.records) ? recordsJson.records as AdminRecord[] : [];
       const overviewAuthorized = overviewResponse.ok && overviewJson.ok === true;
+      setHealthCheckedAt(overviewAuthorized ? new Date() : null);
       const coreReady = overviewAuthorized
         && usersResponse.ok && usersJson.ok === true
         && recordsResponse.ok && recordsJson.ok === true
@@ -772,7 +802,7 @@ function AdminWorkspace() {
 
   function exportAuditLog() {
     const safeEvents = filteredAudit.map((event) => ({
-      action: actionLabel(event.action),
+      action: actionLabel(event.action, ui),
       targetType: event.target_type || "",
       targetId: event.target_id || "",
       reason: event.reason || "",
@@ -806,7 +836,7 @@ function AdminWorkspace() {
       user,
       action,
       extra,
-      title: options.title || actionLabel(action),
+      title: options.title || actionLabel(action, ui),
       target: user.email || user.id,
       reason: "",
       note: options.includeNote ? user.adminNotes || "" : undefined,
@@ -879,7 +909,7 @@ function AdminWorkspace() {
       record,
       action,
       extra,
-      title: options.title || actionLabel(action),
+      title: options.title || actionLabel(action, ui),
       target: `${record.qrCode} - ${record.title}`,
       reason: "",
       includeTrustNotes: options.includeTrustNotes,
@@ -1403,7 +1433,7 @@ function AdminWorkspace() {
               <strong>{ui("ui.app.admin.page.008b427f44ee", "Recent admin actions")}</strong>
               {auditEvents.slice(0, 4).map((event) => (
                 <button type="button" key={event.id} onClick={() => goToSection("audit")}>
-                  {actionLabel(event.action)} - {formatDate(event.created_at)}
+                  {actionLabel(event.action, ui)} - {formatDate(event.created_at)}
                 </button>
               ))}
             </div>
@@ -1601,7 +1631,7 @@ function AdminWorkspace() {
             </div>
           </div>
           <div className="admin-table">
-            {claimsError ? <p className="admin-empty" role="alert">{claimsError}</p> : ownershipClaims.length ? ownershipClaims.map((claim) => (
+            {claimsError ? <div className="admin-empty" role="alert"><p>{claimsError}</p><button type="button" disabled={loading} onClick={() => void loadAdmin()}>{ui("ui.app.admin.page.retryClaims", "Retry ownership claims")}</button></div> : ownershipClaims.length ? ownershipClaims.map((claim) => (
               <div className="admin-row" key={claim.id}>
                 <div>
                   <strong>{claim.profileTitle}</strong>
@@ -1863,7 +1893,7 @@ function AdminWorkspace() {
                 <div><dt>{ui("ui.app.admin.page.61d81254336e", "Recent audit events")}</dt><dd>{Array.isArray(auditEvents) ? auditEvents.length : ui("ui.app.admin.page.b764cdc0eab7", "Unknown")}</dd></div>
                 <div><dt>{ui("ui.app.admin.page.9639382ac623", "Content publishing")}</dt><dd>{ui("ui.app.admin.page.35194ad54b90", "Shared server-backed source")}</dd></div>
                 <div><dt>{ui("ui.app.admin.page.96f34bd1021a", "Required migrations")}</dt><dd>{health?.migrations?.adminFoundation && health?.migrations?.serviceWorkflow ? ui("ui.app.admin.page.5fa7aac5375c", "Ready") : ui("ui.app.admin.page.aff0766a5290", "Review")}</dd></div>
-                <div><dt>{ui("ui.app.admin.page.c982b23dfadd", "Last check")}</dt><dd>{new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</dd></div>
+                <div><dt>{ui("ui.app.admin.page.c982b23dfadd", "Last check")}</dt><dd>{healthCheckedAt ? healthCheckedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ui("ui.app.admin.page.checkNotConfirmed", "Not confirmed")}</dd></div>
               </dl>
             </section>
           </div>
@@ -1886,7 +1916,7 @@ function AdminWorkspace() {
           {filteredAudit.length ? filteredAudit.map((event) => (
             <div className="admin-row" key={event.id}>
               <div>
-                <strong>{actionLabel(event.action)}</strong>
+                <strong>{actionLabel(event.action, ui)}</strong>
                 <span>{ui("ui.app.admin.page.cd560284860f", "Admin operator -")}{" "}{event.target_type || ui("ui.app.admin.page.34a04005bcaf", "target")} {event.target_id || ""}</span>
                 <small>{formatDate(event.created_at)} - {event.reason || ui("ui.app.admin.page.789bc6410570", "No reason listed")}</small>
                 {event.metadata ? (
@@ -1945,9 +1975,9 @@ function AdminWorkspace() {
     <>
       <Nav />
       <main className={`admin-page ${styles.admin}`}>
-        <div className="admin-command-bar">
+        <div ref={commandBarRef} className="admin-command-bar">
           <div>{adminAuthorized && adminDataReady ? <button ref={navButtonRef} type="button" className="admin-mobile-nav" onClick={() => setNavOpen(true)} aria-label={ui("ui.app.admin.page.ab4aa617a9a8", "Open admin navigation")} aria-controls="admin-primary-navigation" aria-expanded={navOpen}><Menu size={18} /></button> : null}<div><span>{ui("ui.app.admin.page.2b06d01c3eba", "QRguitar / Admin")}</span><strong>{activeSectionMeta.label}</strong></div></div>
-          {adminAuthorized && adminDataReady ? <label className="admin-global-search"><Search size={16} /><input aria-label={ui("ui.app.admin.page.5cbd26b5d984", "Search users, Profiles, or IDs")} value={adminSearch} onChange={(event) => setAdminSearch(event.target.value)} placeholder={ui("ui.app.admin.page.5cbd26b5d984", "Search users, Profiles, or IDs")} /></label> : null}
+          {/* Each searchable section owns one accurately labelled search below. */}
           <div className="admin-command-meta"><span>{ui("ui.app.admin.page.d006c3740e41", "Admin access")}</span><strong>{adminAuthorized ? overview?.admin?.email || ui("ui.app.admin.page.abe20ea47cc7", "Authorized admin") : adminAccessState === "unavailable" ? ui("ui.app.admin.page.3c86be3eae40", "Temporarily unavailable") : adminAccessState === "checking" ? ui("ui.app.admin.page.0dfe1d63c9d8", "Checking") : ui("ui.app.admin.page.255346f25669", "Sign in required")}</strong></div>
         </div>
         <div className={adminAuthorized && adminDataReady ? "admin-shell" : "admin-shell is-locked"}>
@@ -1968,7 +1998,7 @@ function AdminWorkspace() {
             </section>
           ) : (
             <>
-              <div className="admin-main-heading"><ActiveSectionIcon size={22} /><div><span>{activeSectionMeta.group}</span><h1>{activeSectionMeta.label}</h1></div></div>
+              <div className="admin-main-heading"><ActiveSectionIcon size={22} /><div><span>{activeSectionMeta.group}</span><h1 ref={sectionHeadingRef} tabIndex={-1}>{activeSectionMeta.label}</h1></div></div>
               {adminDataReady && message ? <div className="admin-message">{message}</div> : null}
               {!adminDataReady ? <section className="card admin-panel-card" role="alert"><h2>{ui("ui.app.admin.page.4b9ba740f352", "Admin data is temporarily unavailable.")}</h2><p>{message || ui("ui.app.admin.page.c1265c4bbbf8", "QRguitar could not load all required admin data.")}</p><button type="button" disabled={loading} onClick={() => void loadAdmin()}>{loading ? ui("ui.app.admin.page.a16c8b1c9595", "Retrying…") : ui("ui.app.admin.page.343aad82ce4d", "Retry admin data")}</button></section> : null}
             </>

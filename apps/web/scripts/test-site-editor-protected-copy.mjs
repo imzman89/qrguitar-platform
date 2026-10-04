@@ -25,13 +25,13 @@ function compile(file, imports) {
 }
 
 const registry = compile("lib/content-registry.ts");
-const { uiTextEntries } = compile("lib/ui-text-registry.ts");
+const { uiTextEntries, retiredUiTextEntries } = compile("lib/ui-text-registry.ts");
 const { protectedUiTextKeys } = compile("lib/ui-text-protection.ts");
 const lockedKey = "ui.app.ownership.claim.page.fead057ffd73";
 const ordinaryKey = "ui.app.account.page.73949bb1bdba";
 
 test("audited UI protection keys exist and are locked in Content Studio", () => {
-  const registered = new Set(uiTextEntries.map((entry) => entry.key));
+  const registered = new Set([...uiTextEntries, ...retiredUiTextEntries].map((entry) => entry.key));
   for (const key of protectedUiTextKeys) {
     assert.ok(registered.has(key), `Missing audited key ${key}`);
     assert.equal(registry.contentRegistryByKey.get(key)?.classification, "security-locked", key);

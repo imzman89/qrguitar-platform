@@ -46,7 +46,7 @@ test("canonical metadata and discovery files always use the www production origi
     NEXT_PUBLIC_SITE_URL: "https://qrguitar.com"
   });
   const body = await robots.GET().text();
-  assert.match(body, /^Host: https:\/\/www\.qrguitar\.com$/m);
+  assert.doesNotMatch(body, /^Host:/m);
   assert.match(body, /^Sitemap: https:\/\/www\.qrguitar\.com\/sitemap\.xml$/m);
   assert.doesNotMatch(body, /^Disallow:/m);
 });
@@ -181,7 +181,9 @@ test("metadata excerpts normalize whitespace and remain word and Unicode safe", 
     visibility: "public"
   };
   const metadata = seo.buildRecordMetadata(instrument);
-  assert.ok(Array.from(metadata.title).length <= seo.SEARCH_TITLE_MAX_LENGTH);
+  assert.equal(typeof metadata.title.absolute, "string");
+  assert.match(metadata.title.absolute, / \| QRguitar$/);
+  assert.ok(Array.from(metadata.title.absolute).length <= seo.SEARCH_TITLE_MAX_LENGTH);
   assert.ok(Array.from(metadata.description).length <= seo.SEARCH_DESCRIPTION_MAX_LENGTH);
   assert.ok(Array.from(metadata.openGraph.title).length <= seo.SOCIAL_TITLE_MAX_LENGTH);
   assert.ok(Array.from(metadata.openGraph.description).length <= seo.SOCIAL_DESCRIPTION_MAX_LENGTH);
@@ -189,9 +191,11 @@ test("metadata excerpts normalize whitespace and remain word and Unicode safe", 
 
   const graph = seo.buildRecordJsonLd(instrument)["@graph"];
   const page = graph.find(item => item["@type"] === "ItemPage");
-  const profile = graph.find(item => item["@type"] === "Thing");
+  const profile = graph.find(item => item["@type"] === "Product");
   const breadcrumb = graph.find(item => item["@type"] === "BreadcrumbList");
-  assert.equal(graph.some(item => item["@type"] === "Product"), false);
+  assert.equal(graph.filter(item => item["@type"] === "Product").length, 1);
+  assert.deepEqual(profile.brand, { "@type": "Brand", name: instrument.brand });
+  assert.equal(profile.model, instrument.model);
   assert.equal(graph.some(item => Object.hasOwn(item, "offers")), false);
   assert.deepEqual(page.mainEntity, { "@id": "https://www.qrguitar.com/i/QRG-LONG#profile" });
   assert.match(profile.description, /Additional provenance remains visible in structured data\.(?: Additional provenance remains visible in structured data\.){7}/);
@@ -223,10 +227,10 @@ test("Profile structured data never invents a Product offer from availability al
       summary: "A permanent identity and history Profile.",
       saleStatus
     })["@graph"];
-    assert.equal(graph.some(item => item["@type"] === "Product"), false, saleStatus);
+    assert.equal(graph.filter(item => item["@type"] === "Product").length, 1, saleStatus);
     assert.equal(graph.some(item => Object.hasOwn(item, "offers")), false, saleStatus);
     assert.equal(graph.find(item => item["@type"] === "ItemPage").mainEntity["@id"], "https://www.qrguitar.com/i/" + code + "#profile");
-    assert.equal(graph.find(item => item["@type"] === "Thing").identifier[1].value, "SERIAL-1");
+    assert.equal(graph.find(item => item["@type"] === "Product").identifier[1].value, "SERIAL-1");
   }
 });
 
@@ -342,4 +346,11 @@ test("public Profile loader requests and exposes updated_at for stable sitemap d
   assert.ok(guitarSelects.length >= 3);
   assert.ok(guitarSelects.every(select => select.includes("updated_at")));
   assert.match(source, /updatedAt:\s*guitar\.updated_at\s*\|\|\s*undefined/);
+});
+
+test("sparse Product schema omits absent brand, model, hidden serial and commercial claims", () => {
+ const graph=seo.buildRecordJsonLd({qrCode:"QRG-SPARSE",name:"Owner documented instrument",visibility:"public"})["@graph"];
+ const entity=graph.find(item=>item["@type"]==="Product"); assert.ok(entity);
+ for(const key of ["brand","model","offers","aggregateRating","review","gtin","mpn"]) assert.equal(Object.hasOwn(entity,key),false);
+ assert.deepEqual(entity.identifier,[{"@type":"PropertyValue",propertyID:"QRguitar Profile",value:"QRG-SPARSE"}]);
 });

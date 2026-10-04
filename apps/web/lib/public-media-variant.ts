@@ -1,4 +1,4 @@
-export const publicMediaVariantWidths = [160, 640, 1200] as const;
+export const publicMediaVariantWidths = [160, 400, 640, 1200] as const;
 export type PublicMediaVariantWidth = typeof publicMediaVariantWidths[number];
 
 const allowedWidths = new Set<number>(publicMediaVariantWidths);

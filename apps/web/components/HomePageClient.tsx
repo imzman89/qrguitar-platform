@@ -11,11 +11,12 @@ import { Footer } from "./Footer";
 import { EditorialIcon } from "./EditorialIcon";
 import { LatestPublicRecord } from "./LatestPublicRecord";
 import { Nav } from "./Nav";
+import { PublicCreditPricing } from "./PublicCreditPricing";
 import { siteCopy } from "../content/site-copy";
 import type { DemoInstrument } from "../lib/local-demo";
 import { getProfilePhotoUrls } from "../lib/instrument-profile-contract";
 import { publicMediaVariantSrcSet, publicMediaVariantUrl } from "../lib/public-media-variant";
-import { buildEditableHomeCopy, fetchPublishedSiteSettings, type EditableSiteSettings } from "../lib/site-settings";
+import { buildEditableHomeCopy, fetchPublishedSiteSettings, mergeSiteSettings, type EditableSiteSettings } from "../lib/site-settings";
 
 import { selectHomeFeaturedProfile } from "../lib/home-featured-profile";
 import { getContentValue } from "../lib/content-registry";
@@ -29,8 +30,8 @@ export function HomePageClient({
   initialSettings: EditableSiteSettings;
 }) {
   const ui = useUiText("components.HomePageClient");
-  const [settings, setSettings] = useState<EditableSiteSettings | null>(initialSettings);
-  const [activeAudience, setActiveAudience] = useState(0);
+  const [settings, setSettings] = useState<EditableSiteSettings | null>(() => mergeSiteSettings(initialSettings));
+  const [activeAudienceId, setActiveAudienceId] = useState<string | null>(null);
   const [failedRecordPhotos, setFailedRecordPhotos] = useState<string[]>([]);
 
   useEffect(() => {
@@ -105,14 +106,15 @@ export function HomePageClient({
   const homeSections = settings?.composition.home.sections || [];
   const sectionBlocks = (sectionId: string) => homeSections.find((section) => section.id === sectionId)?.blocks.filter((block) => block.visible) || [];
   const audienceBlocks = sectionBlocks("roles");
-  const selectedAudience = audienceBlocks[activeAudience] || audienceBlocks[0];
+  const activeAudience = Math.max(0, audienceBlocks.findIndex(block => block.id === activeAudienceId));
+  const selectedAudience = audienceBlocks[activeAudience];
+  const setActiveAudience = (index: number) => setActiveAudienceId(audienceBlocks[index]?.id || null);
 
   const renderedSections: Record<string, ReactNode> = {
     hero: (
       <section className="hero">
         <div className="shell hero-grid">
           <div className="hero-copy">
-            <div className="eyebrow">{copy.hero.eyebrow}</div>
             <h1>{copy.hero.headline}</h1>
             <p>{copy.hero.body}</p>
             <div className="hero-actions">
@@ -124,9 +126,9 @@ export function HomePageClient({
           <div className={styles.heroShowcase}><LatestPublicRecord initialRecord={initialLatestRecord} content={settings?.content} presentation="showcase" /></div>
         </div>
         <div className={"shell " + styles.valueStrip} aria-label={ui("ui.components.HomePageClient.bec4c56fb4cb", "What stays with your instrument")}>
-          <div><Fingerprint size={24} strokeWidth={1.4} aria-hidden="true" /><span><strong>{ui("ui.components.HomePageClient.ecbcf256c14d", "One permanent identity")}</strong><small>{ui("ui.components.HomePageClient.bc615fcc90ab", "The same Profile. Every chapter.")}</small></span></div>
-          <div><ShieldCheck size={24} strokeWidth={1.4} aria-hidden="true" /><span><strong>{ui("ui.components.HomePageClient.eb341bf13357", "Your privacy, your choice")}</strong><small>{ui("ui.components.HomePageClient.a4c1dff0c2e1", "Public, unlisted, or just for you.")}</small></span></div>
-          <div><RefreshCw size={24} strokeWidth={1.4} aria-hidden="true" /><span><strong>{ui("ui.components.HomePageClient.f5ab906e49d7", "A history that carries forward")}</strong><small>{ui("ui.components.HomePageClient.104c2472352a", "Service and ownership, connected.")}</small></span></div>
+          <div><Fingerprint size={24} strokeWidth={1.4} aria-hidden="true" /><span><strong>{ui("ui.components.HomePageClient.ecbcf256c14d", "Permanent Profile")}</strong><small>{ui("ui.components.HomePageClient.bc615fcc90ab", "One permanent link.")}</small></span></div>
+          <div><ShieldCheck size={24} strokeWidth={1.4} aria-hidden="true" /><span><strong>{ui("ui.components.HomePageClient.eb341bf13357", "Documents")}</strong><small>{ui("ui.components.HomePageClient.a4c1dff0c2e1", "Choose which documents to share.")}</small></span></div>
+          <div><RefreshCw size={24} strokeWidth={1.4} aria-hidden="true" /><span><strong>{ui("ui.components.HomePageClient.f5ab906e49d7", "Service history")}</strong><small>{ui("ui.components.HomePageClient.104c2472352a", "Keep service records with the Profile.")}</small></span></div>
         </div>
       </section>
     ),
@@ -135,12 +137,10 @@ export function HomePageClient({
         <div className="shell home-archive">
             <div className="home-archive-heading">
               <div>
-                <div className="eyebrow">{settings?.content["home.archive.eyebrow"] || ui("ui.components.HomePageClient.72cdbf43eb3a", "PUBLIC PROFILES")}</div>
-                <h2>{settings?.content["home.archive.heading"] || ui("ui.components.HomePageClient.3b67d76945bd", "See what's already documented.")}</h2>
-                <p>{settings?.content["home.archive.body"] || ui("ui.components.HomePageClient.5c75e88902f3", "Browse real QRguitar Profiles from the public Catalog.")}</p>
+                <h2>{settings?.content["home.archive.heading"] || ui("ui.components.HomePageClient.3b67d76945bd", "Profiles")}</h2>
               </div>
               <div className="home-archive-actions">
-                <Link className="text-link" href="/catalog">{settings?.content["home.archive.viewAll"] || ui("ui.components.HomePageClient.025320721b82", "View all Profiles")}</Link>
+                <Link className="text-link" href="/catalog">{settings?.content["home.archive.viewAll"] || ui("ui.components.HomePageClient.025320721b82", "Catalog")}</Link>
               </div>
             </div>
             <div className="home-archive-rail" aria-label={ui("ui.components.HomePageClient.230cdd8c2e80", "Explore additional QRguitar Profiles")}>
@@ -160,9 +160,7 @@ export function HomePageClient({
       <section className="section home-lifecycle-section">
         <div className="shell">
           <div className="section-header">
-            <div className="eyebrow">{copy.workflow.eyebrow}</div>
             <h2>{copy.workflow.headline}</h2>
-            <p>{copy.workflow.body}</p>
           </div>
           <div className="grid three">
             {sectionBlocks("lifecycle").map((item) => <Card key={item.id} icon={<EditorialIcon name={item.icon} size={30} />} title={item.title} copy={item.body} />)}
@@ -174,10 +172,9 @@ export function HomePageClient({
       <section className="section record-holds-section">
         <div className="shell record-holds-layout">
           <div className="record-holds-copy">
-            <div className="eyebrow">{copy.customization.eyebrow}</div>
             <h2>{copy.customization.headline}</h2>
             <p>{copy.customization.body}</p>
-            <div className="inline-cta-row"><Link className="button" href={supportingRecord ? `/i/${encodeURIComponent(supportingRecord.qrCode)}` : "/catalog"}>{copy.customization.cta}</Link></div>
+            <div className="inline-cta-row"><Link className="button" href={supportingRecord ? `/i/${encodeURIComponent(supportingRecord.qrCode)}` : "/catalog"}>{supportingRecord ? copy.customization.cta : copy.hero.secondaryCta}</Link></div>
           </div>
           <div className="record-holds-visual" aria-label={ui("ui.components.HomePageClient.4c90147fd5f7", "A QRguitar Profile keeps the instrument and its history together")}>
             <div className="record-holds-photo">
@@ -196,7 +193,7 @@ export function HomePageClient({
     roles: (
       <section className="section home-roles-section">
         <div className="shell">
-          <div className="section-header"><div className="eyebrow">{copy.audiences.eyebrow}</div><h2>{copy.audiences.headline}</h2>{copy.audiences.body ? <p>{copy.audiences.body}</p> : null}</div>
+          <div className="section-header"><h2>{copy.audiences.headline}</h2>{copy.audiences.body ? <p>{copy.audiences.body}</p> : null}</div>
           <div className="audience-switcher">
             <div className="audience-tabs" role="tablist" aria-label={ui("ui.components.HomePageClient.5545daa79d3d", "Choose how you use QRguitar")} onKeyDown={(event) => {
               const next = event.key === "ArrowRight" ? (activeAudience + 1) % audienceBlocks.length : event.key === "ArrowLeft" ? (activeAudience - 1 + audienceBlocks.length) % audienceBlocks.length : event.key === "Home" ? 0 : event.key === "End" ? audienceBlocks.length - 1 : null;
@@ -204,7 +201,7 @@ export function HomePageClient({
             }}>
               {audienceBlocks.map((item, index) => <button className={index === activeAudience ? "is-active" : ""} key={item.id} type="button" role="tab" id={`home-audience-${index}`} aria-controls="home-audience-panel" tabIndex={index === activeAudience ? 0 : -1} aria-selected={index === activeAudience} onClick={() => setActiveAudience(index)}>{item.title}</button>)}
             </div>
-            {selectedAudience ? <article className="audience-panel" role="tabpanel" id="home-audience-panel" aria-labelledby={`home-audience-${activeAudience}`}><div className="icon"><EditorialIcon name={selectedAudience.icon} size={30} /></div><div><h3>{selectedAudience.title}</h3><p>{selectedAudience.body}</p></div><Link className="button secondary" href={selectedAudience.ctaUrl || "/how-it-works"}>{selectedAudience.ctaLabel || ui("ui.components.HomePageClient.cd7d731ce76a", "See the workflow")}</Link></article> : null}
+            {selectedAudience ? <article className="audience-panel" role="tabpanel" id="home-audience-panel" aria-labelledby={`home-audience-${activeAudience}`}><div className="icon"><EditorialIcon name={selectedAudience.icon} size={30} /></div><div><h3>{selectedAudience.title}</h3><p>{selectedAudience.body}</p>{["home-role-shop", "home-role-builder", "home-role-provider"].includes(selectedAudience.id) ? <Link className={styles.creditLink} href="/installers">{ui("ui.components.HomePageClient.installerProgram", "Explore the Installer program")}<ArrowRight size={16} aria-hidden="true" /></Link> : null}</div><Link className="button secondary" href={selectedAudience.ctaUrl || "/how-it-works"}>{selectedAudience.ctaLabel || ui("ui.components.HomePageClient.cd7d731ce76a", "See the workflow")}</Link></article> : null}
           </div>
         </div>
       </section>
@@ -213,10 +210,9 @@ export function HomePageClient({
       <section className="section continuity-section">
         <div className="shell continuity-layout">
           <div className="continuity-intro">
-            <div className="eyebrow">{settings?.content["home.continuity.eyebrow"] || ui("ui.components.HomePageClient.34165e2cdda6", "SERVICE & OWNERSHIP")}</div>
-            <h2>{settings?.content["home.continuity.headline"] || ui("ui.components.HomePageClient.b655c5fb6426", "The history stays with the instrument.")}</h2>
-            <p>{settings?.content["home.continuity.body"] || ui("ui.components.HomePageClient.9a4346833f50", "Approved service and completed ownership transfers update the same Profile. The QRguitar ID and link do not change.")}</p>
-            <Link className="text-link" href="/how-it-works">{settings?.content["home.continuity.cta"] || ui("ui.components.HomePageClient.7bf7f24c48ad", "See How It Works")}</Link>
+            <h2>{settings?.content["home.continuity.headline"] || ui("ui.components.HomePageClient.b655c5fb6426", "Service and ownership")}</h2>
+            <p>{settings?.content["home.continuity.body"] || ui("ui.components.HomePageClient.9a4346833f50", "Approved service and completed transfers keep the same Profile and QR link.")}</p>
+            <Link className="text-link" href="/how-it-works">{settings?.content["home.continuity.cta"] || ui("ui.components.HomePageClient.7bf7f24c48ad", "How it works")}</Link>
           </div>
           <div className="continuity-list">
             {sectionBlocks("continuity").map((item, index) => (
@@ -235,17 +231,18 @@ export function HomePageClient({
         <div className="shell">
           <div className="section-header"><div className="eyebrow">{copy.pricing.eyebrow}</div><h2>{copy.pricing.headline}</h2>{copy.pricing.body ? <p>{copy.pricing.body}</p> : null}</div>
           <div className="pricing-grid">
-            {sectionBlocks("pricing").map((plan) => <PricingCard key={plan.id} primary={plan.id === "home-price-beta"} name={plan.title} price={plan.label || ""} copy={plan.body} features={plan.items || []} cta={plan.ctaLabel} href={plan.ctaUrl} />)}
+            {sectionBlocks("pricing").map((plan) => <PricingCard key={plan.id} primary={plan.id === "home-price-beta"} name={plan.title} price={plan.label || ""} copy={plan.body} features={plan.items || []} cta={plan.ctaLabel} href={plan.ctaUrl} secondaryHref={plan.id === "home-price-commercial" && plan.ctaUrl !== "/installers" ? "/installers" : undefined} secondaryCta={plan.id === "home-price-commercial" && plan.ctaUrl !== "/installers" ? ui("ui.components.HomePageClient.installerProgram", "Explore the Installer program") : undefined} />)}
           </div>
           <div className={styles.creditNote}><div><h3>{getContentValue(settings?.content || {}, "home.pricing.creditsTitle")}</h3><p>{getContentValue(settings?.content || {}, "home.pricing.creditsBody")}</p></div><Link className={styles.creditLink} href="/billing">{getContentValue(settings?.content || {}, "home.pricing.creditsCta")}<ArrowRight size={16} aria-hidden="true" /></Link></div>
+          <PublicCreditPricing compact />
         </div>
       </section>
     ),
     finalCta: (
       <section className="section home-final-cta">
         <div className="shell">
-          <div className="section-header">{settings?.content["home.finalCta.eyebrow"] ? <div className="eyebrow">{settings.content["home.finalCta.eyebrow"]}</div> : null}<h2>{settings?.content["home.finalCta.headline"] || ui("ui.components.HomePageClient.b575d2660321", "Start with one instrument.")}</h2><p>{settings?.content["home.finalCta.body"] || ui("ui.components.HomePageClient.9dae741a1b7c", "Create the Profile now. Add the rest over time.")}</p></div>
-          <div className="section-cta"><Link className="button" href="/create">{settings?.content["home.finalCta.primaryCta"] || ui("ui.components.HomePageClient.8088497eb587", "Create a Profile")}</Link><Link className="button secondary" href="/catalog">{settings?.content["home.finalCta.secondaryCta"] || ui("ui.components.HomePageClient.004ca2d8b070", "Explore the Catalog")}</Link></div>
+          <div className="section-header">{settings?.content["home.finalCta.eyebrow"] ? <div className="eyebrow">{settings.content["home.finalCta.eyebrow"]}</div> : null}<h2>{settings?.content["home.finalCta.headline"] || ui("ui.components.HomePageClient.b575d2660321", "Create a Profile")}</h2></div>
+          <div className="section-cta"><Link className="button" href="/create">{settings?.content["home.finalCta.primaryCta"] || ui("ui.components.HomePageClient.8088497eb587", "Create a Profile")}</Link><Link className="button secondary" href="/catalog">{settings?.content["home.finalCta.secondaryCta"] || ui("ui.components.HomePageClient.004ca2d8b070", "Catalog")}</Link></div>
         </div>
       </section>
     )
@@ -280,7 +277,9 @@ function PricingCard({
   badge,
   features,
   cta,
-  href
+  href,
+  secondaryHref,
+  secondaryCta
 }: {
   primary?: boolean;
   name: string;
@@ -290,6 +289,8 @@ function PricingCard({
   features: string[];
   cta?: string;
   href?: string;
+  secondaryHref?: string;
+  secondaryCta?: string;
 }) {
   const normalizedName = name.trim().toLowerCase();
   const freePlan = primary || normalizedName === "for owners and collectors" || normalizedName === "free public beta";
@@ -309,9 +310,12 @@ function PricingCard({
           <li key={feature}><Check size={16} aria-hidden="true" /><span>{feature}</span></li>
         ))}
       </ul>
+      <div className={styles.pricingActions}>
       <Link className={primary ? "button" : "button secondary"} href={resolvedHref}>
         {resolvedCta}<ArrowRight size={16} aria-hidden="true" />
       </Link>
+        {secondaryHref && secondaryCta ? <Link className={styles.creditLink} href={secondaryHref}>{secondaryCta}</Link> : null}
+      </div>
     </article>
   );
 }

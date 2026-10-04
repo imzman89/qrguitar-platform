@@ -10,6 +10,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Footer } from "../../../components/Footer";
 import { InstrumentPreview } from "../../../components/InstrumentPreview";
+import { ProfileSaleFields } from "../../../components/ProfileSaleFields";
+import { isSaleDetail, profileSaleFieldsError } from "../../../lib/profile-sale";
 import { EditorTimelineEntry } from "../../../components/EditorTimelineEntry";
 import { Nav } from "../../../components/Nav";
 import { PhotoOrganizer, type PhotoOrganizerStatus } from "../../../components/PhotoOrganizer";
@@ -28,6 +30,7 @@ import { createBrowserSupabaseClient, getSupabaseAccessToken } from "../../../li
 import { qrCodeFromSerial } from "../../../lib/qrguitar-id";
 import { canonicalInstrumentBrand, establishedInstrumentBrands } from "../../../lib/instrument-brands";
 import { useSiteContent } from "../../../lib/use-site-content";
+import { editorDeadline, editorRequest } from "../../../lib/editor-request";
 import styles from "./edit.module.css";
 
 const emptyForm = {
@@ -226,6 +229,98 @@ export default function EditInstrumentPage() {
   const [externalMedia, setExternalMedia] = useState<ExternalMediaItem[]>([]);
   const [mediaForm, setMediaForm] = useState(emptyMediaForm);
   const [savingMedia, setSavingMedia] = useState(false);
+  const scope = useRef({ actor: "", generation: 0, active: true });
+  const operationLocks = useRef(new Set<string>());
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [unavailable, setUnavailable] = useState(false);
+  const [readErrors, setReadErrors] = useState({ media: "", history: "" });
+  const [recovery, setRecovery] = useState<Record<string, { checked: boolean; code: string }>>({});
+  const [savedSnapshot, setSavedSnapshot] = useState<DemoInstrument | null>(null);
+  const recoveryRef = useRef(recovery);
+  recoveryRef.current = recovery;
+  // This lease belongs to the rendered controls, not whichever actor happens
+  // to be current when an old queued handler eventually runs (including A→B→A).
+  const renderedOperation = { ...scope.current, actor: ownerId };
+
+  function currentOperation() { return { ...scope.current }; }
+  function isCurrent(operation: ReturnType<typeof currentOperation>) {
+    return scope.current.active && operation.generation === scope.current.generation && operation.actor === scope.current.actor;
+  }
+  async function editorToken(operation = currentOperation()) {
+    const { data } = await editorDeadline(createBrowserSupabaseClient().auth.getSession());
+    if (!isCurrent(operation) || !data.session || data.session.user.id !== operation.actor) throw new Error("The account changed.");
+    return data.session.access_token;
+  }
+  function markRecovery(kind: string, qrCode: string) {
+    // Persist before dispatch so reloading cannot silently permit a duplicate POST.
+    window.sessionStorage.setItem(`qrguitar.editor.pending.${scope.current.actor}.${code}.${kind}`, qrCode);
+    recoveryRef.current = { ...recoveryRef.current, [kind]: { checked: false, code: qrCode } };
+    setRecovery(recoveryRef.current);
+  }
+  function clearRecovery(kind: string) {
+    try { window.sessionStorage.removeItem(`qrguitar.editor.pending.${scope.current.actor}.${code}.${kind}`); }
+    catch { setMessage(ui("ui.app.edit.code.page.recoveryStorageFailed", "The recovery lock could not be cleared. Your saved result and draft are kept; resolve browser storage before another change.")); return false; }
+    const next = { ...recoveryRef.current }; delete next[kind];
+    recoveryRef.current = next; setRecovery(next);
+    return true;
+  }
+  function recoveryMessage() {
+    return ui("ui.app.edit.code.page.resultUnconfirmed", "The saved result is not fully confirmed. Your draft is kept. Check the saved result before making another change.");
+  }
+  async function immediateWrite(kind: "media" | "history", url: string, init: RequestInit, accept: (payload: any) => boolean) {
+    if (!original || !isCurrent(renderedOperation) || operationLocks.current.has(kind) || recoveryRef.current[kind]) return false;
+    const operation = currentOperation();
+    operationLocks.current.add(kind);
+    (kind === "media" ? setSavingMedia : setSavingService)(true); setMessage("");
+    let dispatched = false;
+    try {
+      const token = await editorToken(operation);
+      markRecovery(kind, original.qrCode);
+      dispatched = true;
+      const { response, payload } = await editorRequest(url, { ...init, headers: { "content-type": "application/json", authorization: `Bearer ${token}` } });
+      if (!isCurrent(operation)) return false;
+      if (!response.ok || !payload?.ok) {
+        // Only an explicit rejection is a negative receipt. A missing/5xx receipt
+        // may follow a committed write and must not permit automatic retry.
+        if (response.status >= 400 && response.status < 500 && payload?.ok === false) {
+          clearRecovery(kind); setMessage(payload.message || ui("ui.app.edit.code.page.changeRejected", "This change was not accepted. Correct the draft before trying again."));
+        } else setMessage(recoveryMessage());
+        return false;
+      }
+      if (!accept(payload)) throw new Error("Missing saved result.");
+      return clearRecovery(kind);
+    } catch {
+      if (isCurrent(operation)) setMessage(dispatched ? recoveryMessage() : ui("ui.app.edit.code.page.changeNotStarted", "This change could not be started. Check your session and recovery storage, then try again."));
+      return false;
+    } finally {
+      if (isCurrent(operation)) { operationLocks.current.delete(kind); (kind === "media" ? setSavingMedia : setSavingService)(false); }
+    }
+  }
+  // Same-actor retries retain drafts. Actor changes invalidate late callbacks
+  // and hide every prior-actor private field before a new read is allowed.
+  useEffect(() => {
+    scope.current.active = true;
+    setOriginal(null); setReady(false); setUnavailable(false); setForbidden(false);
+    // A retained component can change QR code without changing account. Retire
+    // the old route's transient work; its persisted recovery receipt stays put.
+    operationLocks.current.clear(); setSavingMedia(false); setSavingService(false); setSavingSafety(false); setRecordSaveAction(null);
+    setMessage(""); setReadErrors({ media: "", history: "" }); setRecovery({}); recoveryRef.current = {}; setSavedSnapshot(null);
+    const { data } = createBrowserSupabaseClient().auth.onAuthStateChange((_event, session) => {
+      const actor = session?.user.id || "";
+      if (actor === scope.current.actor) return;
+      scope.current = { actor, generation: scope.current.generation + 1, active: true };
+      setOriginal(null); setOwnerId(actor); setReady(false); setForbidden(false); setUnavailable(false);
+      setForm(emptyForm); setCustomFields([]); setCustomLinks([]); setGalleryImages([]); setDocuments([]);
+      setPhotoUploads({}); uploadFileIds.current.clear(); setServiceEvents([]); setExternalMedia([]);
+      setServiceForm(emptyServiceForm); setEditingServiceId(""); setMediaForm(emptyMediaForm);
+      setInternalVerificationNote(""); setPublicVerificationNote(""); setInternalAuthenticityNote(""); setPublicAuthenticityNote("");
+      setSafetyNote(""); setPublicSafetyNote(""); setCanManageVerification(false);
+      operationLocks.current.clear(); setSavingMedia(false); setSavingService(false); setSavingSafety(false); setRecordSaveAction(null);
+      setMessage(""); setReadErrors({ media: "", history: "" }); setRecovery({}); recoveryRef.current = {}; setSavedSnapshot(null);
+      setLoadAttempt(value => value + 1);
+    });
+    return () => { scope.current.active = false; scope.current.generation++; data.subscription.unsubscribe(); };
+  }, [code]);
 
   useEffect(() => {
     const syncSectionFromHash = () => {
@@ -257,24 +352,33 @@ export default function EditInstrumentPage() {
     });
 
     async function loadInstrument() {
+      const generation = scope.current.generation;
       try {
         const supabase = createBrowserSupabaseClient();
-        const sessionResult = await supabase.auth.getSession();
+        const sessionResult = await editorDeadline(supabase.auth.getSession());
+        if (cancelled || generation !== scope.current.generation) return;
+        if (sessionResult.error) throw sessionResult.error;
         if (!sessionResult.data.session?.user) {
           if (!cancelled) {
             setReady(true);
           }
           return;
         }
-        if (!cancelled) setOwnerId(sessionResult.data.session.user.id);
+        scope.current.actor = sessionResult.data.session.user.id;
+        const operation = currentOperation();
+        if (!cancelled) setOwnerId(operation.actor);
+        const pending: typeof recovery = {};
+        for (const kind of ["media", "history", "details"]) {
+          const pendingCode = window.sessionStorage.getItem(`qrguitar.editor.pending.${operation.actor}.${code}.${kind}`);
+          if (pendingCode) pending[kind] = { checked: false, code: pendingCode };
+        }
+        recoveryRef.current = pending; setRecovery(pending);
 
-        const token = await getSupabaseAccessToken();
-        const response = await fetch(`/api/instruments?scope=mine&code=${encodeURIComponent(code)}`, {
+        const token = sessionResult.data.session.access_token;
+        const { response, payload } = await editorRequest(`/api/instruments?scope=mine&code=${encodeURIComponent(code)}`, {
           headers: { authorization: `Bearer ${token}` }
         });
-        const payload = (await response.json().catch(() => null)) as
-          | { ok?: boolean; instrument?: DemoInstrument; message?: string; canManageVerification?: boolean }
-          | null;
+        if (cancelled || !isCurrent(operation)) return;
 
         if (response.ok && payload?.ok && payload.instrument) {
           const instrument = payload.instrument;
@@ -302,7 +406,7 @@ export default function EditInstrumentPage() {
               summary: instrument.summary || "",
               specsNotes: readManagedField(instrument, "Specs notes"),
               serviceNotes: readManagedField(instrument, "Service notes"),
-              visibility: instrument.visibility || "public"
+              visibility: "public"
             });
             setCustomFields(normalizeCustomFields(instrument));
             setCustomLinks(normalizeCustomLinks(instrument));
@@ -335,11 +439,13 @@ export default function EditInstrumentPage() {
 
         if (!cancelled) {
           setForbidden(response.status === 403 || response.status === 404);
+          setUnavailable(response.status !== 401 && response.status !== 403 && response.status !== 404);
           setMessage(payload?.message || ui("ui.app.edit.code.page.2f0a4b105931", "This Profile was not found for your account."));
           setReady(true);
         }
       } catch {
-        if (!cancelled) {
+        if (!cancelled && generation === scope.current.generation) {
+          setUnavailable(true);
           setMessage(ui("ui.app.edit.code.page.e58b3c4b0eeb", "Could not load this Profile. Check your connection and try again."));
           setReady(true);
         }
@@ -351,104 +457,81 @@ export default function EditInstrumentPage() {
     return () => {
       cancelled = true;
     };
-  }, [code, router]);
+  }, [code, router, loadAttempt]);
 
   const profileHref = useMemo(() => {
     return original ? ownerProfileHref(original) : "/dashboard/profile/" + encodeURIComponent(code);
   }, [code, original]);
 
   function updateField(field: keyof typeof form, value: string) {
+    if (!isCurrent(renderedOperation)) return;
     setForm((current) => ({ ...current, [field]: value }));
   }
 
   function updateQrStyle(field: keyof QrStyle, value: string | boolean) {
+    if (!isCurrent(renderedOperation)) return;
     setQrStyle((current) => ({ ...current, [field]: value }));
   }
 
   function updateServiceField(field: keyof typeof serviceForm, value: string | boolean) {
+    if (!isCurrent(renderedOperation)) return;
     setServiceForm((current) => ({ ...current, [field]: value }));
   }
 
   async function refreshExternalMedia(qrCode: string) {
-    const token = await getSupabaseAccessToken();
-    const response = await fetch(`/api/external-media?scope=owner&code=${encodeURIComponent(qrCode)}`, {
-      cache: "no-store",
-      headers: { authorization: `Bearer ${token}` }
-    });
-    const payload = await response.json().catch(() => null) as { ok?: boolean; mediaItems?: ExternalMediaItem[] } | null;
-    if (response.ok && payload?.ok) setExternalMedia(payload.mediaItems || []);
+    const operation = currentOperation();
+    try {
+      const token = await editorToken(operation);
+      const { response, payload } = await editorRequest(`/api/external-media?scope=owner&code=${encodeURIComponent(qrCode)}`, {
+        cache: "no-store", headers: { authorization: `Bearer ${token}` }
+      });
+      if (!isCurrent(operation)) return false;
+      if (!response.ok || !payload?.ok || !Array.isArray(payload.mediaItems)) throw new Error("Media read failed.");
+      setExternalMedia(payload.mediaItems); setReadErrors(current => ({ ...current, media: "" })); return true;
+    } catch {
+      if (isCurrent(operation)) setReadErrors(current => ({ ...current, media: ui("ui.app.edit.code.page.mediaReadFailed", "Saved media could not be loaded. This is not an empty list.") }));
+      return false;
+    }
   }
 
   async function addExternalMedia() {
+    if (!isCurrent(renderedOperation)) return;
     if (!original) return;
     if (!mediaForm.url.trim() || !mediaForm.title.trim()) {
       setMessage(ui("ui.app.edit.code.page.8c23311d31e4", "Media URL and title are required."));
       return;
     }
-    setSavingMedia(true);
-    setMessage("");
-    try {
-      const token = await getSupabaseAccessToken();
-      const response = await fetch("/api/external-media", {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-        body: JSON.stringify({ qrCode: original.qrCode, ...mediaForm, sortOrder: externalMedia.length })
-      });
-      const payload = await response.json().catch(() => null) as { ok?: boolean; mediaItem?: ExternalMediaItem; message?: string } | null;
-      if (!response.ok || !payload?.ok || !payload.mediaItem) {
-        setMessage(payload?.message || ui("ui.app.edit.code.page.a60687ec3498", "Could not add media."));
-        return;
-      }
+    await immediateWrite("media", "/api/external-media", {
+      method: "POST", body: JSON.stringify({ qrCode: original.qrCode, ...mediaForm, sortOrder: externalMedia.length })
+    }, payload => {
+      if (!payload.mediaItem) return false;
       setExternalMedia((current) => [...current, payload.mediaItem as ExternalMediaItem]);
       setMediaForm(emptyMediaForm);
       setMessage(payload.message || ui("ui.app.edit.code.page.39e3cbd0722a", "Media added."));
-    } finally {
-      setSavingMedia(false);
-    }
+      return true;
+    });
   }
 
   async function removeExternalMedia(item: ExternalMediaItem) {
+    if (!isCurrent(renderedOperation)) return;
     if (!original || !window.confirm(`Remove ${item.title}?`)) return;
-    setSavingMedia(true);
-    try {
-      const token = await getSupabaseAccessToken();
-      const response = await fetch(`/api/external-media?code=${encodeURIComponent(original.qrCode)}&id=${encodeURIComponent(item.id)}`, {
-        method: "DELETE",
-        headers: { authorization: `Bearer ${token}` }
-      });
-      const payload = await response.json().catch(() => null) as { ok?: boolean; message?: string } | null;
-      if (!response.ok || !payload?.ok) {
-        setMessage(payload?.message || ui("ui.app.edit.code.page.d09487f73f3b", "Could not remove media."));
-        return;
-      }
+    await immediateWrite("media", `/api/external-media?code=${encodeURIComponent(original.qrCode)}&id=${encodeURIComponent(item.id)}`, { method: "DELETE" }, () => {
       setExternalMedia((current) => current.filter((entry) => entry.id !== item.id));
       setMessage(ui("ui.app.edit.code.page.90fb34ab44a1", "Media removed."));
-    } finally {
-      setSavingMedia(false);
-    }
+      return true;
+    });
   }
 
   async function updateExternalMedia(item: ExternalMediaItem, changes: Partial<Pick<ExternalMediaItem, "isPublic" | "sortOrder">>) {
-    if (!original) return;
-    setSavingMedia(true);
-    setMessage("");
-    try {
-      const token = await getSupabaseAccessToken();
-      const response = await fetch("/api/external-media", {
-        method: "PATCH",
-        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-        body: JSON.stringify({ qrCode: original.qrCode, id: item.id, ...changes })
-      });
-      const payload = await response.json().catch(() => null) as { ok?: boolean; mediaItem?: ExternalMediaItem; message?: string } | null;
-      if (!response.ok || !payload?.ok || !payload.mediaItem) {
-        setMessage(payload?.message || ui("ui.app.edit.code.page.94de5baedf39", "Could not update media."));
-        return;
-      }
+    if (!original) return false;
+    return immediateWrite("media", "/api/external-media", {
+      method: "PATCH", body: JSON.stringify({ qrCode: original.qrCode, id: item.id, ...changes })
+    }, payload => {
+      if (!payload.mediaItem) return false;
       setExternalMedia((current) => current.map((entry) => entry.id === item.id ? payload.mediaItem as ExternalMediaItem : entry).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)));
       setMessage(payload.message || ui("ui.app.edit.code.page.50e60486b114", "Media updated."));
-    } finally {
-      setSavingMedia(false);
-    }
+      return true;
+    });
   }
 
   async function moveExternalMedia(item: ExternalMediaItem, direction: -1 | 1) {
@@ -457,9 +540,13 @@ export default function EditInstrumentPage() {
     if (index < 0 || !target) return;
     const currentOrder = item.sortOrder ?? index;
     const targetOrder = target.sortOrder ?? index + direction;
-    await updateExternalMedia(item, { sortOrder: targetOrder });
-    await updateExternalMedia(target, { sortOrder: currentOrder });
-    await refreshExternalMedia(original?.qrCode || "");
+    const operation = currentOperation();
+    if (!await updateExternalMedia(item, { sortOrder: targetOrder }) || !isCurrent(operation)) return;
+    if (!await updateExternalMedia(target, { sortOrder: currentOrder }) && isCurrent(operation)) {
+      markRecovery("media", original?.qrCode || code);
+      setMessage(ui("ui.app.edit.code.page.mediaPartiallyMoved", "The first media position was saved; the second was not confirmed. Check saved media before changing the order again."));
+    }
+    if (isCurrent(operation)) await refreshExternalMedia(original?.qrCode || "");
   }
 
   function normalizeQrStyle(style?: QrStyle): QrStyle {
@@ -493,21 +580,23 @@ export default function EditInstrumentPage() {
       return;
     }
 
-    const token = await getSupabaseAccessToken();
-    const response = await fetch(`/api/service-events?scope=owner&code=${encodeURIComponent(qrCode)}`, {
-      cache: "no-store",
-      headers: { authorization: `Bearer ${token}` }
-    });
-    const payload = (await response.json().catch(() => null)) as
-      | { ok?: boolean; serviceEvents?: ServiceHistoryEntry[]; message?: string }
-      | null;
-
-    if (response.ok && payload?.ok) {
-      setServiceEvents(payload.serviceEvents || []);
+    const operation = currentOperation();
+    try {
+      const token = await editorToken(operation);
+      const { response, payload } = await editorRequest(`/api/service-events?scope=owner&code=${encodeURIComponent(qrCode)}`, {
+        cache: "no-store", headers: { authorization: `Bearer ${token}` }
+      });
+      if (!isCurrent(operation)) return false;
+      if (!response.ok || !payload?.ok || !Array.isArray(payload.serviceEvents)) throw new Error("History read failed.");
+      setServiceEvents(payload.serviceEvents); setReadErrors(current => ({ ...current, history: "" })); return true;
+    } catch {
+      if (isCurrent(operation)) setReadErrors(current => ({ ...current, history: ui("ui.app.edit.code.page.historyReadFailed", "Saved history could not be loaded. This is not an empty list.") }));
+      return false;
     }
   }
 
   function editServiceEvent(entry: ServiceHistoryEntry) {
+    if (!isCurrent(renderedOperation)) return;
     setEditingServiceId(entry.id);
     setServiceForm({
       serviceDate: entry.serviceDate || "",
@@ -534,6 +623,7 @@ export default function EditInstrumentPage() {
   }
 
   async function saveServiceEntry() {
+    if (!isCurrent(renderedOperation)) return;
     if (!original) {
       return;
     }
@@ -543,37 +633,19 @@ export default function EditInstrumentPage() {
       return;
     }
 
-    setSavingService(true);
-    setMessage("");
-    try {
-      const token = await getSupabaseAccessToken();
-      const response = await fetch("/api/service-events", {
-        method: editingServiceId ? "PATCH" : "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          id: editingServiceId,
-          qrCode: original.qrCode,
-          ...serviceForm
-        })
-      });
-      const payload = (await response.json().catch(() => null)) as
-        | { ok?: boolean; serviceEvent?: ServiceHistoryEntry; message?: string }
-        | null;
-
-      if (!response.ok || !payload?.ok || !payload.serviceEvent) {
-        setMessage(payload?.message || ui("ui.app.edit.code.page.5f2daa5a67f7", "Could not save service entry."));
-        return;
-      }
-
+    await immediateWrite("history", "/api/service-events", {
+      method: editingServiceId ? "PATCH" : "POST",
+      body: JSON.stringify({ id: editingServiceId, qrCode: original.qrCode, ...serviceForm })
+    }, payload => {
+      if (!payload.serviceEvent) return false;
       setServiceEvents((current) => {
         const next = [payload.serviceEvent as ServiceHistoryEntry, ...current.filter((item) => item.id !== payload.serviceEvent?.id)];
         return sortServiceEvents(next);
       });
       resetServiceForm();
       setMessage(payload.message || ui("ui.app.edit.code.page.6cb9aa0fcb13", "Service entry saved. The permanent QRguitar URL stayed the same."));
-    } finally {
-      setSavingService(false);
-    }
+      return true;
+    });
   }
 
   async function deleteServiceEntry(entry: ServiceHistoryEntry) {
@@ -581,32 +653,51 @@ export default function EditInstrumentPage() {
       return;
     }
 
-    setSavingService(true);
-    setMessage("");
-    try {
-      const token = await getSupabaseAccessToken();
-      const response = await fetch(`/api/service-events?code=${encodeURIComponent(original.qrCode)}&id=${encodeURIComponent(entry.id)}`, {
-        method: "DELETE",
-        headers: { authorization: `Bearer ${token}` }
-      });
-      const payload = (await response.json().catch(() => null)) as { ok?: boolean; message?: string } | null;
-
-      if (!response.ok || !payload?.ok) {
-        setMessage(payload?.message || ui("ui.app.edit.code.page.a858c19c2e1d", "Could not delete service entry."));
-        return;
-      }
-
+    await immediateWrite("history", `/api/service-events?code=${encodeURIComponent(original.qrCode)}&id=${encodeURIComponent(entry.id)}`, { method: "DELETE" }, payload => {
       setServiceEvents((current) => current.filter((item) => item.id !== entry.id));
       if (editingServiceId === entry.id) {
         resetServiceForm();
       }
       setMessage(payload.message || ui("ui.app.edit.code.page.fef49344ff0b", "Service entry deleted."));
-    } finally {
-      setSavingService(false);
-    }
+      return true;
+    });
+  }
+
+  async function checkSavedResult(kind: string) {
+    if (!isCurrent(renderedOperation)) return;
+    const pending = recoveryRef.current[kind];
+    if (!pending || operationLocks.current.has(kind)) return;
+    const operation = currentOperation();
+    operationLocks.current.add(kind);
+    try {
+      let checked = false;
+      if (kind === "media") checked = await refreshExternalMedia(pending.code);
+      else if (kind === "history") checked = Boolean(await refreshServiceEvents(pending.code));
+      else {
+        const token = await editorToken(operation);
+        const { response, payload } = await editorRequest(`/api/instruments?scope=mine&code=${encodeURIComponent(pending.code)}`, { cache: "no-store", headers: { authorization: `Bearer ${token}` } });
+        if (!isCurrent(operation)) return;
+        if (response.ok && payload?.ok && payload.instrument) {
+          // Show a saved snapshot separately; never overwrite the retained draft.
+          setSavedSnapshot(payload.instrument); checked = true;
+        }
+      }
+      if (!isCurrent(operation)) return;
+      if (checked) {
+        recoveryRef.current = { ...recoveryRef.current, [kind]: { ...pending, checked: true } };
+        setRecovery(recoveryRef.current);
+        setMessage(ui("ui.app.edit.code.page.resultChecked", "The saved result is displayed. No change was sent again. Review it before allowing another change."));
+        if (kind === "media") scrollToEditorSection("media");
+        if (kind === "history") scrollToEditorSection("timeline");
+      } else setMessage(ui("ui.app.edit.code.page.resultCheckFailed", "The saved result could not be checked. Your draft and recovery lock are kept. Try checking again."));
+    } catch {
+      if (isCurrent(operation)) setMessage(ui("ui.app.edit.code.page.resultCheckFailed", "The saved result could not be checked. Your draft and recovery lock are kept. Try checking again."));
+    } finally { if (isCurrent(operation)) operationLocks.current.delete(kind); }
   }
 
   async function addProfilePhotos(files: FileList | null) {
+    if (!isCurrent(renderedOperation)) return;
+    const operation = currentOperation();
     if (!files?.length) {
       return;
     }
@@ -619,7 +710,10 @@ export default function EditInstrumentPage() {
       return;
     }
 
-    const dataUrls = await Promise.all(validation.files.map(fileToCompressedDataUrl));
+    let dataUrls: string[];
+    try { dataUrls = await editorDeadline(Promise.all(validation.files.map(fileToCompressedDataUrl))); }
+    catch { if (isCurrent(operation)) setMessage(ui("ui.app.edit.code.page.filesReadFailed", "The selected files could not be read. Your existing draft is kept. Try selecting the files again.")); return; }
+    if (!isCurrent(operation)) return;
 
     setPhotoUploads((current) => {
       const next = { ...current };
@@ -636,6 +730,8 @@ export default function EditInstrumentPage() {
   }
 
   async function addDocuments(files: FileList | null) {
+    if (!isCurrent(renderedOperation)) return;
+    const operation = currentOperation();
     if (!files?.length) {
       return;
     }
@@ -647,7 +743,7 @@ export default function EditInstrumentPage() {
       setMessage(validation.message);
       return;
     }
-    const nextDocs = await Promise.all(
+    const nextDocs = await editorDeadline(Promise.all(
       validation.files.map(async (file, index) => ({
         id: `doc-${Date.now()}-${index}`,
         name: file.name,
@@ -665,7 +761,9 @@ export default function EditInstrumentPage() {
         relatedTimelineEventId: "",
         relatedServiceEventId: ""
       }))
-    );
+    )).catch(() => null);
+    if (!isCurrent(operation)) return;
+    if (!nextDocs) { setMessage(ui("ui.app.edit.code.page.filesReadFailed", "The selected files could not be read. Your existing draft is kept. Try selecting the files again.")); return; }
 
     setDocuments((current) => [...current, ...nextDocs].slice(0, 10));
     setMessage(ui("ui.app.edit.code.page.fb7a2f840893", "{{value1}} document{{value2}} added.{{value3}}", {value1: nextDocs.length, value2: nextDocs.length === 1 ? "" : "s", value3: validation.message ? ` ${validation.message}` : ""}));
@@ -715,6 +813,7 @@ export default function EditInstrumentPage() {
   }
 
   async function uploadStagedFile(kind: "image" | "document", dataUrl: string) {
+    const operation = currentOperation();
     const targetGuitarId = original?.recordId;
     if (!ownerId || !targetGuitarId) throw new Error("Reload this Profile before uploading files.");
     const identity = `${kind}:${dataUrl}`;
@@ -726,54 +825,62 @@ export default function EditInstrumentPage() {
     return uploadProfileFile({
       file: dataUrlToProfileFile(dataUrl), uploadId, fileId, kind, expectedOwnerId: ownerId, targetGuitarId,
       tokenForOwner: async () => {
-        const { data } = await createBrowserSupabaseClient().auth.getSession();
-        if (data.session?.user.id !== ownerId) throw new Error("The account changed. Return to the original account before retrying.");
-        return data.session.access_token;
+        return editorToken(operation);
       }
     });
   }
 
-  async function uploadWithConcurrency<T>(items: T[], worker: (item: T, index: number) => Promise<void>, concurrency = 3) {
+  async function uploadWithConcurrency<T>(items: T[], worker: (item: T, index: number) => Promise<void>, canStart: () => boolean, concurrency = 3) {
     let cursor = 0;
     async function run() {
-      while (cursor < items.length) {
+      while (cursor < items.length && canStart()) {
         const index = cursor++;
         await worker(items[index], index);
       }
     }
-    await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, run));
+    // A rejected worker must not release the batch while its siblings still run.
+    const results = await Promise.allSettled(Array.from({ length: Math.min(concurrency, items.length) }, run));
+    const failed = results.find((result) => result.status === "rejected");
+    if (failed?.status === "rejected") throw failed.reason;
   }
 
-  async function stageSelectedFiles() {
+  async function stageSelectedFiles(canStart: () => boolean) {
+    const operation = currentOperation();
     const photoPaths = galleryImages.map((imageUrl) => /^data:/i.test(imageUrl) ? photoUploads[imageUrl]?.storagePath || "" : imageUrl);
     const failedPhotos: string[] = [];
     await uploadWithConcurrency(galleryImages, async (imageUrl, index) => {
+      if (!isCurrent(operation)) throw new Error("The account changed.");
       if (photoPaths[index]) return;
       setPhotoUploads((current) => ({ ...current, [imageUrl]: { ...current[imageUrl], state: "uploading", progress: 15 } }));
       try {
         const storagePath = await uploadStagedFile("image", imageUrl);
+        if (!isCurrent(operation)) throw new Error("The account changed.");
         photoPaths[index] = storagePath;
         setPhotoUploads((current) => ({ ...current, [imageUrl]: { state: "uploaded", progress: 100, storagePath } }));
       } catch (error) {
+        if (!isCurrent(operation)) throw error;
         failedPhotos.push(imageUrl);
         setPhotoUploads((current) => ({ ...current, [imageUrl]: { state: "error", message: error instanceof Error ? error.message : "Upload failed. Retry this photo." } }));
       }
-    });
+    }, canStart);
 
     const documentPaths = documents.map((document) => document.storagePath || (/^data:/i.test(document.dataUrl) ? "" : document.dataUrl));
     const failedDocuments: string[] = [];
     await uploadWithConcurrency(documents, async (document, index) => {
+      if (!isCurrent(operation)) throw new Error("The account changed.");
       if (documentPaths[index]) return;
       setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, uploadState: "uploading", uploadMessage: "Uploading" } : item));
       try {
         const storagePath = await uploadStagedFile("document", document.dataUrl);
+        if (!isCurrent(operation)) throw new Error("The account changed.");
         documentPaths[index] = storagePath;
         setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, storagePath, uploadState: "uploaded", uploadMessage: "Uploaded" } : item));
       } catch (error) {
+        if (!isCurrent(operation)) throw error;
         failedDocuments.push(document.id);
         setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, uploadState: "error", uploadMessage: error instanceof Error ? error.message : "Upload failed. Retry this document." } : item));
       }
-    });
+    }, canStart);
     if (failedPhotos.length || failedDocuments.length) {
       scrollToEditorSection(failedPhotos.length ? "photos" : "documents");
       throw new Error("Some files could not be uploaded. Retry the files marked in red; successful uploads are preserved.");
@@ -812,7 +919,7 @@ export default function EditInstrumentPage() {
       owner: form.owner,
       location: form.location,
       summary: form.summary,
-      visibility: form.visibility === "private" ? "private" : "public",
+      visibility: "public",
       galleryImageDataUrls: galleryImages,
       heroImageDataUrl: form.heroImageDataUrl || galleryImages[0] || "",
       customFields: [
@@ -844,6 +951,22 @@ export default function EditInstrumentPage() {
   }
 
   async function saveChanges(preview = false) {
+    if (!isCurrent(renderedOperation) || operationLocks.current.has("details") || recoveryRef.current.details) return;
+    const operation = currentOperation();
+    const versionPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/;
+    if (typeof original?.updatedAt !== "string" || !versionPattern.test(original.updatedAt) || !Number.isFinite(Date.parse(original.updatedAt))) {
+      setMessage(ui("ui.app.edit.code.page.d0c04254acb6", "Profile details failed: {{value1}}", { value1: "Reload this Profile before saving again." }));
+      return;
+    }
+    const documentIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!Array.isArray(original.documentFiles) || original.documentFiles.some((document) =>
+        !document || typeof document.id !== "string" || !documentIdPattern.test(document.id) ||
+        typeof document.updatedAt !== "string" || !versionPattern.test(document.updatedAt) || !Number.isFinite(Date.parse(document.updatedAt)))) {
+      setMessage(ui("ui.app.edit.code.page.d0c04254acb6", "Profile details failed: {{value1}}", { value1: "Reload this Profile and its documents before saving again." }));
+      return;
+    }
+    const saleError = profileSaleFieldsError({ saleStatus: form.saleStatus, customFields, customLinks });
+    if (saleError) { setMessage(saleError); revealEditorTarget("sale-details"); return; }
     const validationMessage = validateInstrumentSubmission(form, honeypot);
     if (validationMessage) {
       setMessage(validationMessage);
@@ -867,7 +990,9 @@ export default function EditInstrumentPage() {
     }
 
     setRecordSaveAction(preview ? "view" : "save");
+    operationLocks.current.add("details");
     setMessage("");
+    let dispatched = false, detailsSaved = false, trustSaved = false;
 
     try {
       if (!form.heroImageDataUrl && !galleryImages.length) {
@@ -876,14 +1001,33 @@ export default function EditInstrumentPage() {
         return;
       }
 
-      const staged = await stageSelectedFiles();
+      // This signal only closes the queue's start gate; it never aborts the
+      // already-dispatched Storage workers or discards their confirmed paths.
+      const stagingLease = new AbortController();
+      const staging = stageSelectedFiles(() => !stagingLease.signal.aborted && isCurrent(operation));
+      let staged: Awaited<typeof staging>;
+      try { staged = await editorDeadline(staging, 30000, stagingLease); }
+      catch (error) {
+        if (stagingLease.signal.aborted && isCurrent(operation)) {
+          setMessage(ui("ui.app.edit.code.page.uploadsSettling", "Waiting for active uploads to settle. Queued files are kept for your next explicit save; no Profile change has been sent."));
+        }
+        // The deadline does not cancel Storage workers. Keep this save locked
+        // until they settle, retaining successful paths and stable file IDs.
+        // A timed-out batch never continues into a Profile write automatically.
+        await staging.catch(() => undefined);
+        throw error;
+      }
+      if (!isCurrent(operation)) return;
       const mainPhotoIndex = Math.max(0, galleryImages.indexOf(form.heroImageDataUrl));
-      const token = await getSupabaseAccessToken();
-      const response = await fetch("/api/instruments", {
+      const token = await editorToken(operation);
+      markRecovery("details", original?.qrCode || code); dispatched = true;
+      const { response, payload } = await editorRequest("/api/instruments", {
         method: "PATCH",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
         body: JSON.stringify({
           uploadId,
+          expectedUpdatedAt: original?.updatedAt,
+          expectedDocuments: original.documentFiles.map(({ id, updatedAt }) => ({ id, updatedAt })),
           qrCode: original?.qrCode || code,
           name: form.name.trim() || [form.brand, form.model].filter(Boolean).join(" "),
           brand: form.brand,
@@ -899,7 +1043,7 @@ export default function EditInstrumentPage() {
           originalityStatus: form.originalityStatus as "all_original" | "modified" | "unknown",
           ownerName: form.owner || "",
           location: form.location,
-          visibility: form.visibility as "public" | "private" | "unlisted",
+          visibility: "public" as const,
           summary: form.summary || "",
           heroImagePath: staged.photoPaths[mainPhotoIndex] || staged.photoPaths[0],
           photos: staged.photoPaths,
@@ -930,64 +1074,70 @@ export default function EditInstrumentPage() {
             .map((link) => ({ label: link.label.trim(), url: link.url.trim() }))
         })
       });
-      const payload = (await response.json().catch(() => null)) as { ok?: boolean; qrCode?: string; permanentPath?: string; message?: string } | null;
+      if (!isCurrent(operation)) return;
 
       if (!response.ok || !payload?.ok) {
-        setMessage(ui("ui.app.edit.code.page.d0c04254acb6", "Profile details failed: {{value1}}", {value1: payload?.message || "Could not save the Profile."}));
+        if (response.status >= 400 && response.status < 500 && payload?.ok === false) {
+          clearRecovery("details");
+          setMessage(ui("ui.app.edit.code.page.d0c04254acb6", "Profile details failed: {{value1}}", {value1: payload?.message || "Could not save the Profile."}));
+        } else setMessage(recoveryMessage());
         return;
       }
 
+      if (typeof payload.updatedAt !== "string" || !versionPattern.test(payload.updatedAt) || !Number.isFinite(Date.parse(payload.updatedAt))) {
+        setMessage(recoveryMessage());
+        return;
+      }
       const savedQrCode = payload.qrCode || original?.qrCode || code;
-      const trustResult = await saveVerificationSettings(token || "", savedQrCode);
+      detailsSaved = true; markRecovery("details", savedQrCode);
+      const trustResult = await saveVerificationSettings(token || "", savedQrCode, operation);
+      if (!isCurrent(operation)) return;
       if (!trustResult.ok) {
-        setMessage(ui("ui.app.edit.code.page.b60a79b1ba9d", "Trust settings failed: {{value1}}", {value1: trustResult.message}));
+        setMessage(ui("ui.app.edit.code.page.trustPartial", "Profile details were saved. Trust settings were not confirmed; safety was not sent. Your draft is kept. Check the saved result before another save."));
         scrollToEditorSection("trust-verification");
         return;
       }
 
-      const safetyResult = await saveSafetySettings(token || "", savedQrCode);
+      trustSaved = true;
+      const safetyResult = await saveSafetySettings(token || "", savedQrCode, operation);
+      if (!isCurrent(operation)) return;
       if (!safetyResult.ok) {
-        setMessage(ui("ui.app.edit.code.page.dd99fa7bf17d", "Safety status failed: {{value1}}", {value1: safetyResult.message}));
+        setMessage(ui("ui.app.edit.code.page.safetyPartial", "Profile details and trust settings were saved. Safety status was not confirmed. Your draft is kept. Check the saved result before another save."));
         scrollToEditorSection("privacy-safety");
         return;
       }
 
-      const freshRecord = await fetch(`/api/instruments?scope=mine&code=${encodeURIComponent(savedQrCode)}`, {
+      const freshRecord = await editorRequest(`/api/instruments?scope=mine&code=${encodeURIComponent(savedQrCode)}`, {
         cache: "no-store",
         headers: {
           "Cache-Control": "no-cache",
           authorization: `Bearer ${token}`
         }
       })
-        .then((result) => result.json())
+        .then((result) => result.response.ok ? result.payload : null)
         .catch(() => null) as { ok?: boolean; instrument?: DemoInstrument } | null;
 
-      const savedInstrument = freshRecord?.ok && freshRecord.instrument
-        ? { ...freshRecord.instrument, qrStyle: normalizeQrStyle(freshRecord.instrument.qrStyle) }
-        : {
-          ...instrument,
-          verificationStatus,
-          authenticityStatus,
-          showVerificationBadge,
-          showAuthenticityBadge,
-          showSerialPublic,
-          serialExceptionApproved,
-          internalVerificationNote,
-          publicVerificationNote,
-          internalAuthenticityNote,
-          publicAuthenticityNote,
-          safetyStatus,
-          publicSafetyNote,
-          safetyNote
-        };
+      if (!isCurrent(operation)) return;
+      if (!freshRecord?.ok || !freshRecord.instrument ||
+          typeof freshRecord.instrument.updatedAt !== "string" || !versionPattern.test(freshRecord.instrument.updatedAt) || !Number.isFinite(Date.parse(freshRecord.instrument.updatedAt)) ||
+          !Array.isArray(freshRecord.instrument.documentFiles) || freshRecord.instrument.documentFiles.some((document) =>
+            !document || typeof document.id !== "string" || !documentIdPattern.test(document.id) ||
+            typeof document.updatedAt !== "string" || !versionPattern.test(document.updatedAt) || !Number.isFinite(Date.parse(document.updatedAt)))) {
+        // New documents receive server IDs. Never advance a snapshot using local placeholder IDs.
+        setMessage(recoveryMessage());
+        return;
+      }
+      const savedInstrument = { ...freshRecord.instrument, qrStyle: normalizeQrStyle(freshRecord.instrument.qrStyle) };
+      clearRecovery("details");
 
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("qrguitar:catalog-updated"));
       }
-      await fetch(`/api/instruments?code=${encodeURIComponent(savedQrCode)}`, {
+      await editorRequest(`/api/instruments?code=${encodeURIComponent(savedQrCode)}`, {
         cache: "no-store",
         headers: { "Cache-Control": "no-cache" }
       }).catch(() => null);
+      if (!isCurrent(operation)) return;
       router.refresh();
 
       if (preview) {
@@ -1003,19 +1153,25 @@ export default function EditInstrumentPage() {
         router.replace(`/edit/${savedQrCode}`);
       }
     } catch (error) {
-      setMessage(ui("ui.app.edit.code.page.d0c04254acb6", "Profile details failed: {{value1}}", {value1: error instanceof Error ? error.message : "Check your connection and file sizes, then try again."}));
+      if (isCurrent(operation)) setMessage(trustSaved
+        ? ui("ui.app.edit.code.page.safetyPartial", "Profile details and trust settings were saved. Safety status was not confirmed. Your draft is kept. Check the saved result before another save.")
+        : detailsSaved
+          ? ui("ui.app.edit.code.page.trustPartial", "Profile details were saved. Trust settings were not confirmed; safety was not sent. Your draft is kept. Check the saved result before another save.")
+          : dispatched ? recoveryMessage()
+            : ui("ui.app.edit.code.page.d0c04254acb6", "Profile details failed: {{value1}}", {value1: error instanceof Error ? error.message : "Check your connection and file sizes, then try again."}));
     } finally {
-      setRecordSaveAction(null);
+      if (isCurrent(operation)) { operationLocks.current.delete("details"); setRecordSaveAction(null); }
     }
   }
 
-  async function saveVerificationSettings(token: string, recordQrCode = original?.qrCode || code) {
+  async function saveVerificationSettings(token: string, recordQrCode = original?.qrCode || code, operation = currentOperation()) {
     if (!original) {
       return { ok: false, message: "Profile was not loaded." };
     }
 
     try {
-      const response = await fetch("/api/instruments", {
+      token = await editorToken(operation);
+      const { response, payload } = await editorRequest("/api/instruments", {
         method: "PATCH",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -1033,20 +1189,7 @@ export default function EditInstrumentPage() {
           publicAuthenticityNote
         })
       });
-      const payload = (await response.json().catch(() => null)) as {
-        ok?: boolean;
-        message?: string;
-        verificationStatus?: "verified" | "unverified";
-        authenticityStatus?: "confirmed" | "unconfirmed";
-        showVerificationBadge?: boolean;
-        showAuthenticityBadge?: boolean;
-        showSerialPublic?: boolean;
-        serialExceptionApproved?: boolean;
-        internalVerificationNote?: string;
-        publicVerificationNote?: string;
-        internalAuthenticityNote?: string;
-        publicAuthenticityNote?: string;
-      } | null;
+      if (!isCurrent(operation)) return { ok: false, message: "The account changed." };
 
       if (!response.ok || !payload?.ok) {
         return { ok: false, message: payload?.message || "Could not update verification." };
@@ -1064,8 +1207,8 @@ export default function EditInstrumentPage() {
       setPublicVerificationNote(payload.publicVerificationNote || "");
       setInternalAuthenticityNote(payload.internalAuthenticityNote || "");
       setPublicAuthenticityNote(payload.publicAuthenticityNote || "");
-      setOriginal({
-        ...original,
+      setOriginal(current => current && ({
+        ...current,
         verificationStatus: nextVerification,
         authenticityStatus: nextAuthenticity,
         showVerificationBadge: payload.showVerificationBadge !== false,
@@ -1076,21 +1219,22 @@ export default function EditInstrumentPage() {
         publicVerificationNote: payload.publicVerificationNote || "",
         internalAuthenticityNote: payload.internalAuthenticityNote || "",
         publicAuthenticityNote: payload.publicAuthenticityNote || ""
-      });
+      }));
       return { ok: true, message: "Trust settings saved." };
     } catch {
       return { ok: false, message: "Could not update verification. Check your connection and try again." };
     }
   }
 
-  async function saveSafetySettings(token: string, recordQrCode = original?.qrCode || code) {
+  async function saveSafetySettings(token: string, recordQrCode = original?.qrCode || code, operation = currentOperation()) {
     if (!original) {
       return { ok: false, message: "Profile was not loaded." };
     }
 
     setSavingSafety(true);
     try {
-      const response = await fetch("/api/safety-status", {
+      token = await editorToken(operation);
+      const { response, payload } = await editorRequest("/api/safety-status", {
         method: "PATCH",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -1100,9 +1244,7 @@ export default function EditInstrumentPage() {
           safetyNote
         })
       });
-      const payload = (await response.json().catch(() => null)) as
-        | { ok?: boolean; message?: string; safetyStatus?: "clear" | "lost" | "stolen" | "recovered"; publicSafetyNote?: string; safetyStatusUpdatedAt?: string }
-        | null;
+      if (!isCurrent(operation)) return { ok: false, message: "The account changed." };
 
       if (!response.ok || !payload?.ok) {
         return { ok: false, message: payload?.message || "Could not update safety status." };
@@ -1111,24 +1253,26 @@ export default function EditInstrumentPage() {
       const nextSafetyStatus = payload.safetyStatus || safetyStatus;
       setSafetyStatus(nextSafetyStatus);
       setPublicSafetyNote(payload.publicSafetyNote || "");
-      setOriginal({
-        ...original,
+      setOriginal(current => current && ({
+        ...current,
         safetyStatus: nextSafetyStatus,
         publicSafetyNote: payload.publicSafetyNote || "",
         safetyStatusUpdatedAt: payload.safetyStatusUpdatedAt || ""
-      });
+      }));
       return { ok: true, message: "Safety status saved." };
     } catch {
       return { ok: false, message: "Could not update safety status. Check your connection and try again." };
     } finally {
-      setSavingSafety(false);
+      if (isCurrent(operation)) setSavingSafety(false);
     }
   }
 
   return ready && original && !forbidden ? (
     <>
       <Nav />
-      <main className={`${styles.page} section create-page`} aria-label={ui("ui.app.edit.code.page.fec2ac0f4cf1", "Edit Profile")}>
+      <main className={`${styles.page} section create-page`} aria-label={ui("ui.app.edit.code.page.fec2ac0f4cf1", "Edit Profile")}
+        onClickCapture={event => { if (!isCurrent(renderedOperation)) { event.preventDefault(); event.stopPropagation(); } }}
+        onChangeCapture={event => { if (!isCurrent(renderedOperation)) { event.preventDefault(); event.stopPropagation(); } }}>
         <div className={`${styles.layout} shell create-layout`}>
           <div>
             <Link className={styles.backLink} href="/dashboard">{ui("ui.app.edit.code.page.97ba1d394fab", "Back to Dashboard")}</Link>
@@ -1136,11 +1280,18 @@ export default function EditInstrumentPage() {
             <p>{getContentValue(content, "edit.hero.body")}</p>
             <div className={styles.saveBar}>
               {message ? <p className="form-message" role="status" aria-live="polite">{message}</p> : null}
+              {Object.entries(recovery).map(([kind, pending]) => <section className="card" key={kind} aria-label={ui("ui.app.edit.code.page.recoveryTitle", "Saved-result recovery")}>
+                <strong>{kind === "details" ? ui("ui.app.edit.code.page.savedDetails", "Profile details, trust and safety") : kind === "media" ? ui("ui.app.edit.code.page.savedMedia", "Media") : ui("ui.app.edit.code.page.savedHistory", "History")}</strong>
+                <p>{recoveryMessage()}</p>
+                <button className="button secondary" type="button" disabled={savingRecord || savingMedia || savingService} onClick={() => void checkSavedResult(kind)}>{ui("ui.app.edit.code.page.checkSaved", "Check saved result")}</button>
+                {pending.checked ? <label className="toggle-field"><input type="checkbox" onChange={event => { if (event.target.checked && isCurrent(renderedOperation)) clearRecovery(kind); }} />{ui("ui.app.edit.code.page.reviewedSaved", "I reviewed the saved result and will not add or send a duplicate change. Allow another change.")}</label> : null}
+                {kind === "details" && savedSnapshot ? <details><summary>{ui("ui.app.edit.code.page.savedSnapshot", "Saved Profile result (your draft is unchanged)")}</summary><pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{JSON.stringify(savedSnapshot, null, 2)}</pre></details> : null}
+              </section>)}
               <div className="form-actions editor-save-bar">
-                <button className="button" type="button" onClick={() => void saveChanges(false)} disabled={savingRecord || savingSafety} aria-busy={recordSaveAction === "save"}>
+                <button className="button" type="button" onClick={() => void saveChanges(false)} disabled={savingRecord || savingSafety || Boolean(recovery.details)} aria-busy={recordSaveAction === "save"}>
                   {recordSaveAction === "save" ? ui("ui.app.edit.code.page.86c6e0d74cc9", "Saving changes...") : getContentValue(content, "edit.actions.save")}
                 </button>
-                <button className="button secondary" type="button" onClick={() => void saveChanges(true)} disabled={savingRecord || savingSafety} aria-busy={recordSaveAction === "view"}>
+                <button className="button secondary" type="button" onClick={() => void saveChanges(true)} disabled={savingRecord || savingSafety || Boolean(recovery.details)} aria-busy={recordSaveAction === "view"}>
                   {recordSaveAction === "view"
                     ? ui("ui.app.edit.code.page.caae18bd705d", "Saving and opening...")
                     : getContentValue(content, "edit.actions.saveView")}
@@ -1162,31 +1313,9 @@ export default function EditInstrumentPage() {
                 </summary>
                 <small>{ui("ui.app.edit.code.page.379e7e78d21e", "When a Serial Number exists, the QRguitar ID uses the format QRG-SERIAL. Previous QR links remain active after approved corrections.")}</small>
               </details>
-              <div className="privacy-toggle" aria-label={ui("ui.app.edit.code.page.1c47f10cc99e", "Profile visibility")}>
-                <div>
-                  <strong>
-                    {form.visibility === "public"
-                      ? ui("ui.app.edit.code.page.c6e88acaaf6f", "Public catalog")
-                      : form.visibility === "unlisted"
-                        ? ui("ui.app.edit.code.page.b94392a1943c", "Unlisted direct link")
-                        : ui("ui.app.edit.code.page.d666dd40b98c", "Private owner only")}
-                  </strong>
-                  <span>
-                    {form.visibility === "public"
-                      ? ui("ui.app.edit.code.page.c1acbedb643a", "Shows on the live homepage feed and catalog.")
-                      : form.visibility === "unlisted"
-                        ? ui("ui.app.edit.code.page.2bfd63b89729", "Hidden from browsing, but anyone with the permanent link can view it.")
-                        : ui("ui.app.edit.code.page.44692a3804f6", "Hidden from public browsing and direct public access.")}
-                  </span>
-                </div>
-                <label className="field visibility-field">
-                  <span>{ui("ui.app.edit.code.page.7448611d5f93", "Visibility")}</span>
-                  <select value={form.visibility} onChange={(event) => updateField("visibility", event.target.value)}>
-                    <option value="public">{ui("ui.app.edit.code.page.591935b15b1c", "Public")}</option>
-                    <option value="private">{ui("ui.app.edit.code.page.c63eb6720c6e", "Private")}</option>
-                    <option value="unlisted">{ui("ui.app.edit.code.page.bc96567e77ca", "Unlisted")}</option>
-                  </select>
-                </label>
+              <div className="privacy-toggle" aria-label={ui("ui.app.edit.code.page.catalogListing", "Catalog listing")}>
+                <div><strong>{ui("ui.app.edit.code.page.catalogIncluded", "Included in Catalog")}</strong>
+                  <span>{ui("ui.app.edit.code.page.catalogSavePolicy", "Saving adds this instrument and its photos to Catalog and links your collection. You choose which documents to share.")}</span></div>
               </div>
             <form className="card form" id="identity">
               <input
@@ -1263,6 +1392,7 @@ export default function EditInstrumentPage() {
               <datalist id="qrguitar-known-brands">
                 {establishedInstrumentBrands.map((brand) => <option value={brand} key={brand} />)}
               </datalist>
+              {form.saleStatus === "for_sale" ? <ProfileSaleFields fields={customFields} links={customLinks} onFieldsChange={setCustomFields} onLinksChange={setCustomLinks} /> : null}
               <div className="form-grid compact">
                 <label className="toggle-field">
                   <input
@@ -1277,15 +1407,15 @@ export default function EditInstrumentPage() {
                     }
                   />{ui("ui.app.edit.code.page.bc2663d3963d", "This instrument does not use a Serial Number")}</label>
                 <label className="toggle-field">
-                  <input type="checkbox" checked={showSerialPublic} onChange={(event) => setShowSerialPublic(event.target.checked)} />{ui("ui.app.edit.code.page.6456778444bd", "Show Serial Number on public Profile")}</label>
+                  <input type="checkbox" checked={showSerialPublic} onChange={(event) => setShowSerialPublic(event.target.checked)} />{ui("ui.app.edit.code.page.serialShareLabel", "Show Serial Number on Profile")}</label>
               </div>
-              <p className="fine-print">{ui("ui.app.edit.code.page.a8782c988bf8", "This hides only the Serial Number field. The permanent QR ID and URL may still include the serial. Choose a private Profile to restrict access. No-serial records require QRguitar approval before verification or authenticity confirmation.")}</p>
+              <p className="fine-print">{ui("ui.app.edit.code.page.serialIdNotice", "This hides only the Serial Number field. The permanent QR ID and URL may still include the serial. No-serial records require QRguitar approval before verification or authenticity confirmation.")}</p>
               <p className="fine-print">{ui("ui.app.edit.code.page.50cccc48b0dc", "Originality is an owner-stated modification status for search and disclosure. It is not QRguitar authentication or verification.")}</p>
               <section className={styles.photoSection} id="photos">
                 <div className="field photo-field">
                   <label id="profile-photos-label" htmlFor="profilePhotos">{ui("ui.app.edit.code.page.215ed206acf2", "Profile photos")}</label>
                   <label className={styles.photoPicker} htmlFor="profilePhotos">
-                  <span id="profile-photos-help" className={styles.photoHelp}>{ui("ui.app.edit.code.page.d7aea5f0f7db", "Upload up to 20 photos, 12MB each. Pick one as the main image for dashboard cards, catalog listings, and the public profile hero.")}</span>
+                  <span id="profile-photos-help" className={styles.photoHelp}>{ui("ui.app.edit.code.page.catalogPhotosHelp", "Upload up to 20 photos, 12MB each. Pick one as the main image for collection cards, Catalog listings, and the Profile hero.")}</span>
                   <span className={styles.photoChoose}>{ui("ui.app.edit.code.page.choosePhotos", "Choose photos")}</span>
                   <input
                     className={styles.photoInput}
@@ -1319,12 +1449,13 @@ export default function EditInstrumentPage() {
                   <Field label={ui("ui.app.edit.code.page.cf846c3fbd33", "Builder (optional)")} id="builder" value={form.builder} onChange={(value) => updateField("builder", value)} />
                   <Field label={ui("ui.app.edit.code.page.a6c7a84baa67", "Finish")} id="finish" value={form.finish} onChange={(value) => updateField("finish", value)} />
                   <Field label={ui("ui.app.edit.code.page.81d27ef6d503", "Weight")} id="weight" value={form.weight} onChange={(value) => updateField("weight", value)} />
-                  <Field label={ui("ui.app.edit.code.page.a896221d5946", "Owner display")} id="owner" value={form.owner} onChange={(value) => updateField("owner", value)} />
+                  <Field label={ui("ui.app.edit.code.page.collectionName", "Collection name")} id="owner" value={form.owner} onChange={(value) => updateField("owner", value)} disabled={Boolean(original?.publicCollection?.publicName)} />
+                  <p className="field-note">{ui("ui.app.edit.code.page.collectionNameHelp", "Use a name you choose, not necessarily your real name. An existing collection name is managed in Account.")} <Link href="/account?section=collection">{ui("ui.app.edit.code.page.collectionSettings", "Collection settings")}</Link></p>
                   <Field label={ui("ui.app.edit.code.page.74d91b61ae60", "Owner status")} id="ownerStatus" value={form.ownerStatus} onChange={(value) => updateField("ownerStatus", value)} />
                   <Field label={ui("ui.app.edit.code.page.15b61974b270", "Location")} id="location" value={form.location} onChange={(value) => updateField("location", value)} />
                 </div>
                 <div className="field custom-wide">
-                  <label htmlFor="summary">{ui("ui.app.edit.code.page.7b364544e11f", "Public story")}</label>
+                  <label htmlFor="summary">{ui("ui.app.edit.code.page.profileStory", "Profile story")}</label>
                   <textarea
                     id="summary"
                     name="summary"
@@ -1355,7 +1486,7 @@ export default function EditInstrumentPage() {
               <section className="advanced-panel">
                 <h3>{ui("ui.app.edit.code.page.814602d348e0", "Add Any Details")}</h3>
                 <div className="custom-list">
-                  {customFields.map((field) => (
+                  {customFields.filter((field) => form.saleStatus !== "for_sale" || !isSaleDetail(field.label)).map((field) => (
                     <div className="custom-row" key={field.id}>
                       <input
                         aria-label={ui("ui.app.edit.code.page.8f5e3a6a7a8a", "Field label")}
@@ -1386,7 +1517,7 @@ export default function EditInstrumentPage() {
               <section className="advanced-panel">
                 <h3>{ui("ui.app.edit.code.page.5482252391a3", "Add Website or Social Links")}</h3>
                 <div className="custom-list">
-                  {customLinks.map((link) => (
+                  {customLinks.filter((link) => form.saleStatus !== "for_sale" || link.label.trim().toLowerCase() !== "shop").map((link) => (
                     <div className="custom-row" key={link.id}>
                       <input
                         aria-label={ui("ui.app.edit.code.page.acaa9ea6688f", "Link label")}
@@ -1433,7 +1564,7 @@ export default function EditInstrumentPage() {
                 <section className="photo-manager proof-vault" aria-label={ui("ui.app.edit.code.page.fe07a483e3c2", "Proof Vault document manager")}>
                   <div className="photo-manager-header">
                     <strong>{ui("ui.app.edit.code.page.b4e929d8bcfe", "Documents")}</strong>
-                    <span>{documents.length}{ui("ui.app.edit.code.page.61008da8ad24", "/10 files. Private documents can support QRguitar verification and authenticity review.")}</span>
+                    <span>{documents.length}{ui("ui.app.edit.code.page.documentReviewHelp", "/10 files. Unshared documents can support QRguitar verification and authenticity review.")}</span>
                   </div>
                   <div className="proof-vault-list">
                     {documents.map((document) => (
@@ -1441,7 +1572,7 @@ export default function EditInstrumentPage() {
                         <div className="proof-vault-item-header">
                           <strong>{document.name || ui("ui.app.edit.code.page.9f6d7cb28b64", "Untitled document")}</strong>
                           <span className={document.visibility === "public" ? "status-pill verified-pill" : "status-pill neutral-pill"}>
-                            {document.uploadState === "uploading" ? ui("ui.app.edit.code.page.8b898ca34ce7", "Uploading") : document.uploadState === "error" ? ui("ui.app.edit.code.page.6efc5d27f30b", "Upload failed") : document.visibility === "public" ? ui("ui.app.edit.code.page.591935b15b1c", "Public") : ui("ui.app.edit.code.page.c63eb6720c6e", "Private")}
+                            {document.uploadState === "uploading" ? ui("ui.app.edit.code.page.8b898ca34ce7", "Uploading") : document.uploadState === "error" ? ui("ui.app.edit.code.page.6efc5d27f30b", "Upload failed") : document.visibility === "public" ? ui("ui.app.edit.code.page.documentShared", "Shared on Profile") : ui("ui.app.edit.code.page.documentNotShared", "Not shared")}
                           </span>
                         </div>
                         <div className="form-grid compact">
@@ -1502,25 +1633,25 @@ export default function EditInstrumentPage() {
                           </select>
                         </div>
                         <div className="field">
-                          <label htmlFor={`${document.id}-public-description`}>{ui("ui.app.edit.code.page.05a15f069975", "Public description")}</label>
+                          <label htmlFor={`${document.id}-public-description`}>{ui("ui.app.edit.code.page.sharedDescription", "Profile description")}</label>
                           <textarea
                             id={`${document.id}-public-description`}
                             value={document.publicDescription}
                             onChange={(event) =>
                               setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, publicDescription: event.target.value } : item))
                             }
-                            placeholder={ui("ui.app.edit.code.page.75652484cfdf", "Optional public context if this document is shared.")}
+                            placeholder={ui("ui.app.edit.code.page.sharedDocumentContext", "Optional context shown when this document is shared.")}
                           />
                         </div>
                         <div className="field">
-                          <label htmlFor={`${document.id}-private-notes`}>{ui("ui.app.edit.code.page.72ff78fb2fd5", "Private notes")}</label>
+                          <label htmlFor={`${document.id}-private-notes`}>{ui("ui.app.edit.code.page.ownerNotes", "Owner notes")}</label>
                           <textarea
                             id={`${document.id}-private-notes`}
                             value={document.privateNotes}
                             onChange={(event) =>
                               setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, privateNotes: event.target.value } : item))
                             }
-                            placeholder={ui("ui.app.edit.code.page.7f4f8adde79a", "Owner-only document notes. Never shown on the public Profile.")}
+                            placeholder={ui("ui.app.edit.code.page.ownerDocumentNotesHelp", "Owner document notes are not shared on Profile.")}
                           />
                         </div>
                         <div className="proof-vault-actions">
@@ -1537,7 +1668,7 @@ export default function EditInstrumentPage() {
                               )
                             }
                           >
-                            {document.visibility === "public" ? ui("ui.app.edit.code.page.ffab73178509", "Make Private") : ui("ui.app.edit.code.page.24139936d627", "Make Public")}
+                            {document.visibility === "public" ? ui("ui.app.edit.code.page.documentStopSharing", "Stop sharing") : ui("ui.app.edit.code.page.documentShareAction", "Share on Profile")}
                           </button>
                           {document.dataUrl ? (
                             <a className="button secondary" href={document.dataUrl} target="_blank" rel="noreferrer">{ui("ui.app.edit.code.page.ed077f3d8125", "Open")}</a>
@@ -1576,7 +1707,8 @@ export default function EditInstrumentPage() {
                   </div>
                   <label className="toggle-field">
                     <input type="checkbox" checked={mediaForm.isPublic} onChange={(event) => setMediaForm((current) => ({ ...current, isPublic: event.target.checked }))} />{ui("ui.app.edit.code.page.1b163a070bcb", "Show this media on the QRguitar Profile")}</label>
-                  <button className="button" type="button" onClick={() => void addExternalMedia()} disabled={savingMedia}>
+                  {readErrors.media ? <p role="alert">{readErrors.media}<button type="button" className="button secondary" onClick={() => void refreshExternalMedia(original.qrCode)}>{ui("ui.app.edit.code.page.retryMediaRead", "Retry saved-media read")}</button></p> : null}
+                  <button className="button" type="button" onClick={() => void addExternalMedia()} disabled={savingMedia || Boolean(recovery.media)}>
                     {savingMedia ? ui("ui.app.edit.code.page.dc85af8f2b1d", "Saving...") : ui("ui.app.edit.code.page.a078fb55c65a", "Add Media")}
                   </button>
                 </div>
@@ -1584,15 +1716,15 @@ export default function EditInstrumentPage() {
                   <div className="timeline-list">
                     {externalMedia.map((item, index) => (
                       <article className="timeline-item" key={item.id}>
-                        <span>{item.provider} / {item.isPublic ? ui("ui.app.edit.code.page.591935b15b1c", "Public") : ui("ui.app.edit.code.page.c63eb6720c6e", "Private")}</span>
+                        <span>{item.provider} / {item.isPublic ? ui("ui.app.edit.code.page.mediaShared", "Shared on Profile") : ui("ui.app.edit.code.page.mediaNotShared", "Not shared")}</span>
                         <h3>{item.title}</h3>
                         {item.caption ? <p>{item.caption}</p> : null}
                         <a href={item.canonicalUrl} target="_blank" rel="noreferrer">{ui("ui.app.edit.code.page.50f38c2c40b0", "Preview link")}</a>
                         <div className="form-actions">
-                          <button className="button secondary" type="button" onClick={() => void updateExternalMedia(item, { isPublic: !item.isPublic })} disabled={savingMedia}>{item.isPublic ? ui("ui.app.edit.code.page.ffab73178509", "Make Private") : ui("ui.app.edit.code.page.7bcb38b3067a", "Show Publicly")}</button>
-                          <button className="button secondary" type="button" onClick={() => void moveExternalMedia(item, -1)} disabled={savingMedia || index === 0} aria-label={ui("ui.app.edit.code.page.740ebe32a73f", "Move {{value1}} up", { value1: item.title })}>{ui("ui.app.edit.code.page.1359626e7b69", "Move Up")}</button>
-                          <button className="button secondary" type="button" onClick={() => void moveExternalMedia(item, 1)} disabled={savingMedia || index === externalMedia.length - 1} aria-label={ui("ui.app.edit.code.page.a1ae739bcef6", "Move {{value1}} down", { value1: item.title })}>{ui("ui.app.edit.code.page.b58330ac2505", "Move Down")}</button>
-                          <button className="button secondary" type="button" onClick={() => void removeExternalMedia(item)} disabled={savingMedia}>{ui("ui.app.edit.code.page.c3812fc4acb8", "Remove")}</button>
+                          <button className="button secondary" type="button" onClick={() => void updateExternalMedia(item, { isPublic: !item.isPublic })} disabled={savingMedia || Boolean(recovery.media)}>{item.isPublic ? ui("ui.app.edit.code.page.mediaStopSharing", "Stop sharing") : ui("ui.app.edit.code.page.mediaShareAction", "Share on Profile")}</button>
+                          <button className="button secondary" type="button" onClick={() => void moveExternalMedia(item, -1)} disabled={savingMedia || Boolean(recovery.media) || index === 0} aria-label={ui("ui.app.edit.code.page.740ebe32a73f", "Move {{value1}} up", { value1: item.title })}>{ui("ui.app.edit.code.page.1359626e7b69", "Move Up")}</button>
+                          <button className="button secondary" type="button" onClick={() => void moveExternalMedia(item, 1)} disabled={savingMedia || Boolean(recovery.media) || index === externalMedia.length - 1} aria-label={ui("ui.app.edit.code.page.a1ae739bcef6", "Move {{value1}} down", { value1: item.title })}>{ui("ui.app.edit.code.page.b58330ac2505", "Move Down")}</button>
+                          <button className="button secondary" type="button" onClick={() => void removeExternalMedia(item)} disabled={savingMedia || Boolean(recovery.media)}>{ui("ui.app.edit.code.page.c3812fc4acb8", "Remove")}</button>
                         </div>
                       </article>
                     ))}
@@ -1609,13 +1741,14 @@ export default function EditInstrumentPage() {
                   <p>{ui("ui.app.edit.code.page.bb53b6bbcc71", "Add the history you know - purchases, ownership, service, modifications, restoration, and important milestones.")}</p>
                   <p className="fine-print">{ui("ui.app.edit.code.page.historySaveHint", "History entries save separately when you add or update an entry. Save Changes does not add an unfinished history entry.")}</p>
                 </div>
+                {readErrors.history ? <p role="alert">{readErrors.history}<button type="button" className="button secondary" onClick={() => void refreshServiceEvents(original.qrCode)}>{ui("ui.app.edit.code.page.retryHistoryRead", "Retry saved-history read")}</button></p> : null}
                 {serviceEvents.length ? (
                   <div className="timeline-list">
                     {serviceEvents.map((entry) => (
-                      <EditorTimelineEntry key={entry.id} entry={entry} saving={savingService} onEdit={editServiceEvent} onDelete={(event) => void deleteServiceEntry(event)} />
+                      <EditorTimelineEntry key={entry.id} entry={entry} saving={savingService || Boolean(recovery.history)} onEdit={editServiceEvent} onDelete={(event) => void deleteServiceEntry(event)} />
                     ))}
                   </div>
-                ) : (
+                ) : readErrors.history ? null : (
                   <div className="photo-manager empty">
                     <strong>{ui("ui.app.edit.code.page.e4c12bc75682", "No timeline entries yet")}</strong>
                     <span>{ui("ui.app.edit.code.page.e3fe0f1dad4c", "Add known ownership, purchases, service, repairs, modifications, restoration, and milestones.")}</span>
@@ -1686,17 +1819,17 @@ export default function EditInstrumentPage() {
                     <textarea id="serviceMeasurements" rows={2} value={serviceForm.setupMeasurements} onChange={(event) => updateServiceField("setupMeasurements", event.target.value)} />
                   </div>
                   <div className="field custom-wide">
-                    <label htmlFor="servicePublicDescription">{ui("ui.app.edit.code.page.05a15f069975", "Public description")}</label>
+                    <label htmlFor="servicePublicDescription">{ui("ui.app.edit.code.page.sharedDescription", "Profile description")}</label>
                     <textarea id="servicePublicDescription" rows={3} value={serviceForm.publicDescription} onChange={(event) => updateServiceField("publicDescription", event.target.value)} />
                   </div>
                   <div className="field custom-wide">
-                    <label htmlFor="servicePrivateNotes">{ui("ui.app.edit.code.page.72ff78fb2fd5", "Private notes")}</label>
+                    <label htmlFor="servicePrivateNotes">{ui("ui.app.edit.code.page.ownerNotes", "Owner notes")}</label>
                     <textarea id="servicePrivateNotes" rows={3} value={serviceForm.privateNotes} onChange={(event) => updateServiceField("privateNotes", event.target.value)} />
                   </div>
                   <label className="toggle-field">
                     <input type="checkbox" checked={serviceForm.isPublic} onChange={(event) => updateServiceField("isPublic", event.target.checked)} />{ui("ui.app.edit.code.page.0b8658a6a0c1", "Show this service entry on the QRguitar Profile")}</label>
                   <div className="form-actions">
-                    <button className="button" type="button" onClick={() => void saveServiceEntry()} disabled={savingService}>
+                    <button className="button" type="button" onClick={() => void saveServiceEntry()} disabled={savingService || Boolean(recovery.history)}>
                       {savingService ? ui("ui.app.edit.code.page.dc85af8f2b1d", "Saving...") : editingServiceId ? ui("ui.app.edit.code.page.c1fa1a200083", "Update Timeline Entry") : ui("ui.app.edit.code.page.d9cf5b8885ab", "Add Timeline Entry")}
                     </button>
                     {editingServiceId ? (
@@ -1791,7 +1924,7 @@ export default function EditInstrumentPage() {
                       <textarea id="internalVerificationNote" rows={3} value={internalVerificationNote} onChange={(event) => setInternalVerificationNote(event.target.value)} />
                     </div>
                     <div className="field custom-wide">
-                      <label htmlFor="publicVerificationNote">{ui("ui.app.edit.code.page.118e1524b882", "Public verification note")}</label>
+                      <label htmlFor="publicVerificationNote">{ui("ui.app.edit.code.page.profileVerificationNote", "Profile verification note")}</label>
                       <textarea id="publicVerificationNote" rows={3} value={publicVerificationNote} onChange={(event) => setPublicVerificationNote(event.target.value)} />
                     </div>
                     <div className="field custom-wide">
@@ -1799,7 +1932,7 @@ export default function EditInstrumentPage() {
                       <textarea id="internalAuthenticityNote" rows={3} value={internalAuthenticityNote} onChange={(event) => setInternalAuthenticityNote(event.target.value)} />
                     </div>
                     <div className="field custom-wide">
-                      <label htmlFor="publicAuthenticityNote">{ui("ui.app.edit.code.page.42af0e4ee0c2", "Public authenticity note")}</label>
+                      <label htmlFor="publicAuthenticityNote">{ui("ui.app.edit.code.page.profileAuthenticityNote", "Profile authenticity note")}</label>
                       <textarea id="publicAuthenticityNote" rows={3} value={publicAuthenticityNote} onChange={(event) => setPublicAuthenticityNote(event.target.value)} />
                     </div>
                     </>
@@ -1808,7 +1941,7 @@ export default function EditInstrumentPage() {
                     <input type="checkbox" checked={showVerificationBadge} onChange={(event) => setShowVerificationBadge(event.target.checked)} />{ui("ui.app.edit.code.page.ebb5eff4953a", "Show verification badge publicly")}</label>
                   <label className="toggle-field">
                     <input type="checkbox" checked={showAuthenticityBadge} onChange={(event) => setShowAuthenticityBadge(event.target.checked)} />{ui("ui.app.edit.code.page.a678af9b1c0a", "Show authenticity status publicly")}</label>
-                  {authenticityStatus === "confirmed" && !showAuthenticityBadge ? <p className="field-note custom-wide">{ui("ui.app.edit.code.page.51e39f20046d", "Authenticity is confirmed, but the public badge is currently hidden. Turn this on and use Save Changes to publish it.")}</p> : null}
+                  {authenticityStatus === "confirmed" && !showAuthenticityBadge ? <p className="field-note custom-wide">{ui("ui.app.edit.code.page.authenticityBadgeHelp", "Authenticity is confirmed, but its Profile badge is currently hidden. Turn this on and use Save Changes to show it.")}</p> : null}
                 </div>
               </section>
               </details>
@@ -1836,12 +1969,12 @@ export default function EditInstrumentPage() {
                   </div>
                   {safetyStatus === "clear" ? (
                     <div className="field custom-wide">
-                      <label>{ui("ui.app.edit.code.page.2f02e4974dd6", "No public safety alert")}</label>
-                      <span className="fine-print">{ui("ui.app.edit.code.page.44c111b254e9", "No public safety alert is shown while status is No Alert.")}</span>
+                      <label>{ui("ui.app.edit.code.page.noSafetyAlert", "No safety alert")}</label>
+                      <span className="fine-print">{ui("ui.app.edit.code.page.noSafetyAlertHelp", "No safety alert is shown on Profile while status is No Alert.")}</span>
                     </div>
                   ) : (
                     <div className="field custom-wide">
-                      <label htmlFor="publicSafetyNote">{ui("ui.app.edit.code.page.804f3c9e9556", "Public safety note")}</label>
+                      <label htmlFor="publicSafetyNote">{ui("ui.app.edit.code.page.profileSafetyNote", "Profile safety note")}</label>
                       <textarea
                         id="publicSafetyNote"
                         rows={3}
@@ -1852,7 +1985,7 @@ export default function EditInstrumentPage() {
                     </div>
                   )}
                   <div className="field custom-wide">
-                    <label htmlFor="safetyNote">{ui("ui.app.edit.code.page.5816362f2633", "Private/internal note")}</label>
+                    <label htmlFor="safetyNote">{ui("ui.app.edit.code.page.internalSafetyNote", "Internal note")}</label>
                     <textarea
                       id="safetyNote"
                       rows={3}
@@ -1905,7 +2038,7 @@ export default function EditInstrumentPage() {
         <div className="shell">
           <section className="card auth-card">
             <div className="eyebrow">{ui("ui.app.edit.code.page.3cbc146d86cb", "Edit instrument")}</div>
-            <h2>{!ready ? ui("ui.app.edit.code.page.4e0d5600059d", "Checking account...") : forbidden ? ui("ui.app.edit.code.page.3d8a710de98a", "Owner access required.") : ui("ui.app.edit.code.page.b2a4948798a5", "Sign in to edit this Profile.")}</h2>
+            <h2>{!ready ? ui("ui.app.edit.code.page.4e0d5600059d", "Checking account...") : unavailable ? ui("ui.app.edit.code.page.loadUnavailable", "Profile temporarily unavailable") : forbidden ? ui("ui.app.edit.code.page.3d8a710de98a", "Owner access required.") : ui("ui.app.edit.code.page.b2a4948798a5", "Sign in to edit this Profile.")}</h2>
             <p>
               {!ready
                 ? ui("ui.app.edit.code.page.4e2bce183e1c", "Checking your Supabase session now.")
@@ -1913,7 +2046,7 @@ export default function EditInstrumentPage() {
                   ? message || ui("ui.app.edit.code.page.c2321cba55d7", "Only the profile owner can edit this profile.")
                   : message || ui("ui.app.edit.code.page.4bfdf5db3c0d", "Sign in with the account that owns this QRguitar Profile.")}
             </p>
-            {!ready ? null : forbidden ? (
+            {!ready ? null : unavailable ? <button className="button" type="button" onClick={() => { setReady(false); setUnavailable(false); setMessage(""); setLoadAttempt(value => value + 1); }}>{ui("ui.app.edit.code.page.retryLoad", "Retry Profile load")}</button> : forbidden ? (
               <Link className="button" href="/dashboard">{ui("ui.app.edit.code.page.97ba1d394fab", "Back to Dashboard")}</Link>
             ) : (
               <Link className="button" href={`/login?next=${encodeURIComponent(`/edit/${code}`)}`}>{ui("ui.app.edit.code.page.bfd402b2f6f3", "Sign in")}</Link>
@@ -2095,7 +2228,8 @@ function Field({
   onChange,
   placeholder,
   list,
-  onBlur
+  onBlur,
+  disabled = false
 }: {
   label: string;
   id: string;
@@ -2104,6 +2238,7 @@ function Field({
   placeholder?: string;
   list?: string;
   onBlur?: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="field">
@@ -2114,6 +2249,7 @@ function Field({
         value={value}
         placeholder={placeholder}
         list={list}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         onBlur={(event) => onBlur?.(event.target.value)}
       />

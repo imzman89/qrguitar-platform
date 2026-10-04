@@ -93,3 +93,6 @@
 }
 @media(max-width:520px) { .home :global(.home-archive-rail) { grid-template-columns:1fr; }.home :global(.home-final-cta .section-cta) { flex-wrap:wrap; }.home :global(.hero-actions) { display:grid; grid-template-columns:1fr 1fr; }.home :global(.hero-actions .button) { min-width:0; font-size:13px; gap:6px; padding:10px 8px; } }
 @media(max-width:360px) { .home :global(.hero-actions) { grid-template-columns:1fr; }.home :global(.hero-actions .button) { width:100%; min-height:48px; justify-content:center; padding-inline:16px; font-size:14px; } }
+
+.pricingActions { display:flex; align-items:center; flex-wrap:wrap; gap:8px 16px; margin-top:auto; }
+.home p.proofNote { font-size:14px; line-height:1.6; color:var(--muted); max-width:65ch; }

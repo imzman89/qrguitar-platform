@@ -3,20 +3,18 @@ import { useUiText } from "./UiTextProvider";
 
 
 import { Globe2 } from "lucide-react";
+import { requestPublicProfiles } from "../lib/public-profile-request";
 import { useEffect, useState } from "react";
 import type { DemoInstrument } from "../lib/local-demo";
 import { CollectibleRecordCard } from "./CollectibleRecordCard";
 import { selectHomeFeaturedProfile } from "../lib/home-featured-profile";
 import { HomeProfileShowcase } from "./HomeProfileShowcase";
 
-type InstrumentsResponse = {
-  ok?: boolean;
-  instruments?: DemoInstrument[];
-};
-
 export function LatestPublicRecord({ initialRecord = null, content, presentation = "card" }: { initialRecord?: DemoInstrument | null; content?: Record<string, string>; presentation?: "card" | "showcase" }) {
   const ui = useUiText("components.LatestPublicRecord");
   const [latest, setLatest] = useState<DemoInstrument | null>(initialRecord);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState(Boolean(initialRecord));
 
   useEffect(() => {
@@ -24,16 +22,12 @@ export function LatestPublicRecord({ initialRecord = null, content, presentation
 
     async function loadLatestProfile() {
       try {
-        const response = await fetch("/api/instruments", {
-          cache: "no-store",
-          headers: { "Cache-Control": "no-cache" }
-        });
-        const payload = (await response.json().catch(() => null)) as InstrumentsResponse | null;
-        const newest = payload?.ok && Array.isArray(payload.instruments) ? (presentation === "showcase" ? selectHomeFeaturedProfile(payload.instruments) : payload.instruments[0] || null) : null;
+        const records = await requestPublicProfiles();
+        const newest = presentation === "showcase" ? selectHomeFeaturedProfile(records) : records[0] || null;
+        if (active) { setLatest(newest); setFailed(false); }
 
-        if (active && payload?.ok && Array.isArray(payload.instruments)) setLatest(newest);
       } catch {
-        if (active && !initialRecord) setLatest(null);
+        if (active) setFailed(true);
       } finally {
         if (active) setLoaded(true);
       }
@@ -43,11 +37,16 @@ export function LatestPublicRecord({ initialRecord = null, content, presentation
     return () => {
       active = false;
     };
-  }, [initialRecord, presentation]);
+  }, [initialRecord, presentation, attempt]);
 
   if (!loaded) {
     return <div className="latest-record-card--skeleton" aria-label={ui("ui.components.LatestPublicRecord.feef6ffa93b4", "Loading latest QRguitar Profile")} aria-busy="true" />;
   }
+
+  if (!latest && failed) return <article className="latest-record-message" role="alert">
+    <span>{ui("ui.components.LatestPublicRecord.unavailable", "The Profile example is temporarily unavailable.")}</span>
+    <button className="button secondary" type="button" onClick={() => { setLoaded(false); setAttempt(current => current + 1); }}>{ui("ui.components.LatestPublicRecord.retry", "Retry")}</button>
+  </article>;
 
   if (!latest) {
     return (

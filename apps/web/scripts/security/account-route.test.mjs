@@ -54,7 +54,7 @@ await test("thrown GET transport error returns a retryable response", async () =
   const f = fixture({ before() { throw new Error("network unavailable"); } });
   assert.equal((await f.routes.GET(new Request("https://test.invalid/api/account"))).status, 503);
 });
-for (const body of [{ displayName: "x", publicCollection: collection }, { displayName: "Valid name", publicCollection: { enabled: true, handle: "x" } }, { displayName: "Valid name", publicCollection: [] }, { displayName: "Valid name", publicCollection: null }, { displayName: { object: "wrong type" } }]) await test("invalid request validates before database/Auth writes: " + JSON.stringify(body), async () => {
+for (const body of [{ displayName: "x", publicCollection: collection }, { displayName: "Valid name", publicCollection: { enabled: true, handle: "x", publicName: "Explicit collection" } }, { displayName: "Valid name", publicCollection: [] }, { displayName: "Valid name", publicCollection: null }, { displayName: { object: "wrong type" } }]) await test("invalid request validates before database/Auth writes: " + JSON.stringify(body), async () => {
   const f = fixture();
   assert.equal((await f.routes.PATCH(req(body))).status, 400);
   assert.equal(f.rpcCalls.length, 0); assert.equal(f.metadataCalls.length, 0); assert.equal(f.db.calls.length, 0);
@@ -121,13 +121,32 @@ await test("pasted HTTPS website whitespace is normalized before the atomic save
   assert.equal(f.rpcCalls[0].args.p_collection.websiteUrl, "https://shop.example/store?category=guitars");
   assert.equal((await response.json()).account.publicCollection.websiteUrl, "https://shop.example/store?category=guitars");
 });
-await test("workspace preference and website can be saved without publishing a collection", async () => {
+await test("workspace preference and website are saved with the explicitly named collection", async () => {
   const f = fixture();
-  const response = await f.routes.PATCH(req({ displayName: "Valid name", publicCollection: { enabled: false, accountType: "luthier", websiteUrl: "https://repairs.example" } }));
-  assert.equal(response.status, 200);
-  assert.equal(f.rpcCalls[0].args.p_collection.enabled, false);
+  const response = await f.routes.PATCH(req({ displayName: "Valid name", publicCollection: { ...collection, enabled: false, publicName: "  Repair   Workshop  ", ownerId: "victim", accountType: "luthier", websiteUrl: "https://repairs.example" } }));
+  const result = await response.json();
+  assert.equal(response.status, 200); assert.equal(result.committed, true);
+  assert.equal(f.rpcCalls.length, 1); assert.equal(f.rpcCalls[0].name, "save_account_settings");
+  assert.deepEqual(Object.keys(f.rpcCalls[0].args).sort(), ["p_collection", "p_display_name", "p_expected_version", "p_user_id"]);
+  assert.equal(f.rpcCalls[0].args.p_user_id, user.id); assert.equal(f.rpcCalls[0].args.p_collection.ownerId, user.id);
+  assert.equal(f.rpcCalls[0].args.p_expected_version, 0); assert.equal(result.account.settingsVersion, 1);
+  assert.equal(f.rpcCalls[0].args.p_collection.enabled, true);
+  assert.equal(f.rpcCalls[0].args.p_collection.publicName, "Repair Workshop");
+  assert.equal(f.rpcCalls[0].args.p_collection.handle, collection.handle);
   assert.equal(f.rpcCalls[0].args.p_collection.accountType, "luthier");
   assert.equal(f.rpcCalls[0].args.p_collection.websiteUrl, "https://repairs.example/");
+  assert.equal(result.account.publicCollection.enabled, true);
+  assert.equal(result.account.publicCollection.publicName, "Repair Workshop");
+  assert.equal(result.account.publicCollection.accountType, "luthier");
+  assert.equal(result.account.publicCollection.websiteUrl, "https://repairs.example/");
+  assert.deepEqual(JSON.parse(JSON.stringify(f.metadataCalls)), [[user.id, { user_metadata: { display_name: "Valid name" } }]]);
+  assert.equal(f.db.calls.filter((item) => item.operation !== "select").length, 0);
+});
+for (const publicName of [undefined, null, "", "   "]) await test("missing chosen collection name is rejected before writes: " + JSON.stringify(publicName), async () => {
+  const f = fixture();
+  const response = await f.routes.PATCH(req({ displayName: "Valid name", publicCollection: { ...collection, publicName, enabled: false, accountType: "luthier", websiteUrl: "https://repairs.example" } }));
+  assert.equal(response.status, 400); assert.match((await response.json()).message, /Choose a collection name/);
+  assert.equal(f.rpcCalls.length, 0); assert.equal(f.metadataCalls.length, 0); assert.equal(f.db.calls.length, 0);
 });
 await test("GET returns a coherent versioned account snapshot", async () => {
   const f = fixture(); f.tables.profiles[0].account_settings_version = 7;

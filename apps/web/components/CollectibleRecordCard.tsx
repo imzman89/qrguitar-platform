@@ -26,6 +26,8 @@ type CollectibleRecordCardProps = {
   record: DemoInstrument;
   variant?: "latest" | "catalog" | "spotlight" | "archive";
   prioritizeLeadImage?: boolean;
+  compactMobilePhotos?: boolean;
+  deferAdjacentPhotos?: boolean;
   eyebrow?: string;
   createdLabel?: string;
   ctaLabel?: string;
@@ -34,10 +36,24 @@ type CollectibleRecordCardProps = {
   content?: Record<string, string>;
 };
 
+type CardGalleryState = {
+  key: string;
+  activeImageIndex: number;
+  loadedImages: number[];
+  failedImages: number[];
+  adjacentPhotosReady: boolean;
+};
+
+function freshCardGallery(key: string): CardGalleryState {
+  return { key, activeImageIndex: 0, loadedImages: [], failedImages: [], adjacentPhotosReady: false };
+}
+
 export function CollectibleRecordCard({
   record,
   variant = "catalog",
   prioritizeLeadImage = false,
+  compactMobilePhotos = false,
+  deferAdjacentPhotos = false,
   eyebrow = "",
   createdLabel = "",
   ctaLabel = "Open Profile",
@@ -47,48 +63,70 @@ export function CollectibleRecordCard({
   const router = useRouter();
   const card = useMemo(() => resolveCollectibleCard(record), [record]);
   const [viewerOpen, setViewerOpen] = useState(false);
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const [failedImages, setFailedImages] = useState<number[]>([]);
-  const [loadedImages, setLoadedImages] = useState<number[]>([]);
+  const galleryKey = JSON.stringify([record.qrCode, card.images]);
+  const [storedGallery, setStoredGallery] = useState(() => freshCardGallery(galleryKey));
+  // New records never reuse an old gallery's selection or loading state.
+  if (storedGallery.key !== galleryKey) setStoredGallery(freshCardGallery(galleryKey));
+  const gallery = storedGallery.key === galleryKey ? storedGallery : freshCardGallery(galleryKey);
+  const { activeImageIndex, failedImages, loadedImages } = gallery;
+  const adjacentPhotosReady = variant !== "catalog" || !deferAdjacentPhotos || gallery.adjacentPhotosReady;
+  const updateGallery = useCallback((change: (current: CardGalleryState) => CardGalleryState) => {
+    setStoredGallery((current) => current.key === galleryKey ? change(current) : current);
+  }, [galleryKey]);
+  const unlockAdjacentPhotos = useCallback(() => {
+    updateGallery((current) => current.adjacentPhotosReady ? current : { ...current, adjacentPhotosReady: true });
+  }, [updateGallery]);
+  const selectGalleryPhoto = useCallback((index: number) => {
+    updateGallery((current) => ({ ...current, activeImageIndex: index, adjacentPhotosReady: true }));
+  }, [updateGallery]);
+  const markImageFailed = useCallback((index: number) => {
+    updateGallery((current) => current.failedImages.includes(index) && current.adjacentPhotosReady ? current : {
+      ...current, failedImages: current.failedImages.includes(index) ? current.failedImages : [...current.failedImages, index], adjacentPhotosReady: true
+    });
+  }, [updateGallery]);
   const railRef = useRef<HTMLDivElement | null>(null);
-  const dragState = useRef({ pointerId: -1, startX: 0, scrollLeft: 0, moved: false });
+  const dragState = useRef({ galleryKey, pointerId: -1, startX: 0, scrollLeft: 0, moved: false, userScrollPending: false });
   const previewOnly = variant === "archive" || variant === "latest";
   const galleryImages = previewOnly ? card.images.slice(0, 1) : card.images;
   const showSecondaryAction = variant !== "latest" && secondaryHref && secondaryLabel;
   const showSecondaryText = variant !== "latest" && !secondaryHref && secondaryLabel;
   const summary = variant === "latest" || variant === "archive" ? "" : card.summary;
   const showGalleryControls = galleryImages.length > 1;
-  const gallerySourceKey = card.images.join("\u001f");
-
   useEffect(() => {
-    setActiveImageIndex(0);
-    setFailedImages([]);
-    setLoadedImages([]);
-    railRef.current?.scrollTo({ left: 0, behavior: "instant" });
-  }, [record.qrCode, gallerySourceKey]);
+    const rail = railRef.current;
+    rail?.scrollTo({ left: 0, behavior: "instant" });
+    const pointerId = dragState.current.pointerId;
+    if (pointerId >= 0 && rail?.hasPointerCapture?.(pointerId)) rail.releasePointerCapture(pointerId);
+    dragState.current = { galleryKey, pointerId: -1, startX: 0, scrollLeft: 0, moved: false, userScrollPending: false };
+  }, [galleryKey]);
 
   const markImageReady = useCallback((index: number, node: HTMLImageElement | null) => {
     if (!node?.complete) return;
     if (node.naturalWidth > 0) {
-      setLoadedImages((current) => current.includes(index) ? current : [...current, index]);
+      updateGallery((current) => current.loadedImages.includes(index) && current.adjacentPhotosReady ? current : {
+        ...current, loadedImages: current.loadedImages.includes(index) ? current.loadedImages : [...current.loadedImages, index], adjacentPhotosReady: true
+      });
       return;
     }
-    setFailedImages((current) => current.includes(index) ? current : [...current, index]);
-  }, []);
+    markImageFailed(index);
+  }, [markImageFailed, updateGallery]);
 
   function moveGallery(direction: -1 | 1) {
     const rail = railRef.current;
     if (!rail || galleryImages.length < 2) return;
     const next = (activeImageIndex + direction + galleryImages.length) % galleryImages.length;
     rail.scrollTo({ left: next * rail.clientWidth, behavior: "smooth" });
-    setActiveImageIndex(next);
+    selectGalleryPhoto(next);
   }
 
   function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
-    if (event.pointerType !== "mouse") return;
+    if (event.pointerType !== "mouse") {
+      dragState.current = { galleryKey, pointerId: -1, startX: 0, scrollLeft: 0, moved: false, userScrollPending: true };
+      return;
+    }
     const rail = railRef.current;
     if (!rail) return;
-    dragState.current = { pointerId: event.pointerId, startX: event.clientX, scrollLeft: rail.scrollLeft, moved: false };
+    dragState.current = { galleryKey, pointerId: event.pointerId, startX: event.clientX, scrollLeft: rail.scrollLeft, moved: false, userScrollPending: false };
     rail.setPointerCapture(event.pointerId);
   }
 
@@ -96,21 +134,24 @@ export function CollectibleRecordCard({
     if (event.pointerType !== "mouse") return;
     const rail = railRef.current;
     const drag = dragState.current;
-    if (!rail || drag.pointerId !== event.pointerId) return;
+    if (!rail || drag.galleryKey !== galleryKey || drag.pointerId !== event.pointerId) return;
     const distance = event.clientX - drag.startX;
     if (Math.abs(distance) > 8) drag.moved = true;
-    if (drag.moved) rail.scrollLeft = drag.scrollLeft - distance;
+    if (drag.moved) {
+      unlockAdjacentPhotos();
+      rail.scrollLeft = drag.scrollLeft - distance;
+    }
   }
 
   function handlePointerEnd(event: PointerEvent<HTMLDivElement>) {
     if (event.pointerType !== "mouse") return;
     const rail = railRef.current;
-    if (!rail || dragState.current.pointerId !== event.pointerId) return;
+    if (!rail || dragState.current.galleryKey !== galleryKey || dragState.current.pointerId !== event.pointerId) return;
     if (rail.hasPointerCapture?.(event.pointerId)) rail.releasePointerCapture(event.pointerId);
     dragState.current.pointerId = -1;
     const next = Math.max(0, Math.min(galleryImages.length - 1, Math.round(rail.scrollLeft / Math.max(1, rail.clientWidth))));
     rail.scrollTo({ left: next * rail.clientWidth, behavior: "smooth" });
-    setActiveImageIndex(next);
+    selectGalleryPhoto(next);
   }
 
   function handleRailClick() {
@@ -118,6 +159,7 @@ export function CollectibleRecordCard({
       dragState.current.moved = false;
       return;
     }
+    unlockAdjacentPhotos();
     if (card.images.length) setViewerOpen(true);
   }
 
@@ -129,12 +171,14 @@ export function CollectibleRecordCard({
   function handleWheel(event: WheelEvent<HTMLDivElement>) {
     if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
     event.preventDefault();
+    unlockAdjacentPhotos();
     railRef.current?.scrollBy({ left: event.deltaX, behavior: "auto" });
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
+      unlockAdjacentPhotos();
       if (card.images.length) setViewerOpen(true);
       return;
     }
@@ -163,7 +207,9 @@ export function CollectibleRecordCard({
             onKeyDown={handleKeyDown}
             onScroll={(event) => {
               const rail = event.currentTarget;
-              setActiveImageIndex(Math.max(0, Math.min(galleryImages.length - 1, Math.round(rail.scrollLeft / Math.max(1, rail.clientWidth)))));
+              const next = Math.max(0, Math.min(galleryImages.length - 1, Math.round(rail.scrollLeft / Math.max(1, rail.clientWidth))));
+              const userScroll = dragState.current.galleryKey === galleryKey && (dragState.current.moved || dragState.current.userScrollPending);
+              if (next !== activeImageIndex && (adjacentPhotosReady || userScroll)) selectGalleryPhoto(next);
             }}
           >
             {galleryImages.length ? (
@@ -171,9 +217,13 @@ export function CollectibleRecordCard({
                 <div className={styles["collectible-card-media-slide"]} key={`${imageUrl}-${index}`} aria-hidden={index !== activeImageIndex}>
                   {failedImages.includes(index) ? (
                     <div className={styles["collectible-card-empty-media"]}><span>QRguitar</span><strong>Photo unavailable</strong></div>
-                  ) : Math.abs(index - activeImageIndex) <= 1 ? (
+                  ) : Math.abs(index - activeImageIndex) <= 1 && (index === activeImageIndex || adjacentPhotosReady) ? (
                     <>
                       {!loadedImages.includes(index) ? <div className={styles["collectible-card-loading-media"]} aria-hidden="true">Loading photo...</div> : null}
+                      <picture style={{ display: "contents" }}>
+                        {compactMobilePhotos && publicMediaVariantUrl(imageUrl, 400) !== imageUrl ? (
+                          <source media="(max-width: 430px) and (max-resolution: 1dppx)" srcSet={publicMediaVariantUrl(imageUrl, 400)} />
+                        ) : null}
                       <img
                         ref={(node) => markImageReady(index, node)}
                         className={styles["collectible-card-image"]}
@@ -187,8 +237,9 @@ export function CollectibleRecordCard({
                         referrerPolicy="no-referrer"
                         draggable={false}
                         onLoad={(event) => markImageReady(index, event.currentTarget)}
-                        onError={() => setFailedImages((current) => current.includes(index) ? current : [...current, index])}
+                        onError={() => markImageFailed(index)}
                       />
+                      </picture>
                     </>
                   ) : <div className={styles["collectible-card-loading-media"]} aria-hidden="true" />}
                 </div>

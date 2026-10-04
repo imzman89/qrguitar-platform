@@ -12,7 +12,7 @@ function compile(file, imports = {}) {
   new Function("require", "module", "exports", code)(name => Object.hasOwn(imports, name) ? imports[name] : require(name), module, module.exports);
   return module.exports;
 }
-const qrOutput = compile("lib/qr-output.ts"), profileUrl = compile("lib/profile-url.ts");
+const qrOutput = compile("lib/qr-output.ts"), profileUrl = compile("lib/profile-url.ts"), dialogFocus = compile("lib/dialog-focus.ts");
 const initialStyle = { foreground: "#071014", background: "#f8f6f2", includeLabel: true, labelText: "Initial label", shape: "classic" };
 const same = (a, b) => a && b && a.length === b.length && a.every((value, i) => Object.is(value, b[i]));
 function nodes(node, predicate) {
@@ -131,6 +131,9 @@ function previewDom() {
   const documentListeners = new Set(), drawerCleanups = [];
   class Element {
     isConnected = true;
+    tabIndex = 0;
+    matches() { return false; }
+    getClientRects() { return [{}]; }
     open = false;
     focus() { document.activeElement = this; }
     showModal() { this.open = true; shown += 1; }
@@ -165,10 +168,10 @@ function previewDom() {
       const { ActionDrawer } = compile("components/ActionDrawer.tsx", {
         react: {
           useState: () => [true, () => {}],
-          useRef: () => ({ current: panel }),
+          useRef: initial => ({ current: initial === null ? panel : initial }),
           useEffect(run) { const cleanup = run(); if (cleanup) drawerCleanups.push(cleanup); }
         },
-        "react-dom": { createPortal: children => children }
+        "react-dom": { createPortal: children => children }, "../lib/dialog-focus": dialogFocus
       });
       ActionDrawer({ title: "Synthetic Profile", children: null, returnFocusTo: opener, onClose: () => { drawerCloses += 1; } });
       opener.focus();

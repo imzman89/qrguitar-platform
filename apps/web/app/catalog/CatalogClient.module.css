@@ -9,9 +9,9 @@
 .catalog-filters label, .catalog-filter-grid label { display: flex; flex-direction: column; gap: 7px; min-width: 0; color: var(--muted); font-size: 12px; font-weight: 450; }
 .catalog-filters select, .catalog-filter-grid select { width: 100%; height: 46px; min-height: 46px; padding: 0 34px 0 13px; border: 1px solid transparent; border-radius: 9px; color: var(--text); background: var(--surface); font: inherit; font-size: 14px; text-transform: none; }
 .catalog-search > span { display: flex; align-items: center; gap: 10px; height: 46px; padding-left: 14px; border-radius: 9px; background: var(--surface); }
-.catalog-search input { min-width: 0; width: 100%; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 0; outline-offset: 0; background: transparent; box-shadow: none; color: var(--text); font: inherit; font-size: 14px; }
+.catalog-search input { min-width: 0; flex: 1; width: 100%; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 0; outline-offset: 0; background: transparent; box-shadow: none; color: var(--text); font: inherit; font-size: 14px; }
 .catalog-search input::placeholder { color: var(--muted); }
-.catalog-exact-search { display: grid; place-items: center; align-self: stretch; flex: 0 0 44px; min-width: 44px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--text); cursor: pointer; }
+.catalog-exact-search { display: grid; place-items: center; align-self: stretch; flex: 0 0 auto; min-width: 44px; min-height: 44px; padding: 0 12px; white-space: nowrap; font-size: 12px; border: 0; border-radius: 8px; background: transparent; color: var(--text); cursor: pointer; }
 .catalog-exact-search:disabled { opacity: .45; cursor: wait; }
 .catalog-refinements { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 20px; margin: 8px 0 18px; }
 .catalog-more-filters { margin: 0; }

@@ -99,6 +99,42 @@ test("HTTP boundary rejects cross-origin, invalid queries, non-JSON and oversize
 
 const session = id => id ? { access_token: `token-${id}`, user: { id } } : null;
 const until = async predicate => { for (let i = 0; i < 300; i++) { if (predicate()) return; await new Promise(resolve => setTimeout(resolve, 1)); } assert.ok(predicate(), "condition did not settle"); };
+
+test("older retained hold beyond 100 is retrieved by a validated GET without any financial operation", async t => {
+  const older = "66666666-6666-4666-8666-666666666666", calls = [];
+  const retained = { action: "retain_hold", reason: "Provider dispute remains unresolved.", createdAt: "2026-09-29T12:00:00Z" };
+  const auth = { getSession: async () => ({ data: { session: session(ADMIN) } }), onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } }; } };
+  const client = createPayPalAdminReviewsClient({ auth: () => auth, storage: () => ({ getItem: () => null, setItem() {}, removeItem() {} }),
+    fetch: async (url, init) => {
+      calls.push([url, init.method]); assert.equal(init.method, "GET", "lookup must not decide or advance anything");
+      return Response.json({ ok: true, environment: "test", deliveries: [], hasMore: !String(url).includes("?"),
+        reviews: String(url).includes("?") ? [review({ orderId: older, reference: "QRG-"+older, lastDecision: retained })]
+          : Array.from({ length: 100 }, (_, i) => review({ eventId: "retained:hold:"+i, lastDecision: retained })) });
+    } });
+  t.after(() => client.dispose()); await client.start(); await until(() => client.getState().phase === "ready");
+  assert.equal(client.getState().reviews.length, 100); assert.equal(client.getState().hasMore, true);
+  await client.findOrder("QRG-"+older); assert.equal(client.getState().reviews[0].orderId, older); assert.equal(client.getState().orderId, older);
+  assert.equal(calls.at(-1)[0], "/api/admin/payment-reviews?orderId="+older);
+  const before = calls.length; await client.findOrder("not-an-order"); assert.equal(calls.length, before); assert.match(client.getState().message, /full QRG order reference/);
+  await client.showAll(); assert.equal(client.getState().orderId, ""); assert.equal(client.getState().reviews.length, 100);
+});
+test("late order lookup cannot expose the previous actor's holds or lookup scope", async t => {
+  let actor = ADMIN, observe, resolve; const pending = new Promise(r => { resolve = r; });
+  const auth = { getSession: async () => ({ data: { session: session(actor) } }), onAuthStateChange(fn) { observe = fn; return { data: { subscription: { unsubscribe() {} } } }; } };
+  const client = createPayPalAdminReviewsClient({ auth: () => auth, storage: () => ({ getItem: () => null, setItem() {}, removeItem() {} }),
+    fetch: async (url) => String(url).includes("?") ? pending : Response.json({ ok: true, environment: "test", reviews: [], deliveries: [], hasMore: false }) });
+  t.after(() => client.dispose()); await client.start(); await until(() => client.getState().phase === "ready");
+  const lookup = client.findOrder(ORDER); actor = OWNER; observe("SIGNED_IN", session(actor)); await until(() => client.getState().actorId === OWNER && client.getState().phase === "ready");
+  resolve(Response.json({ ok: true, environment: "test", reviews: [review()], deliveries: [], hasMore: false })); await lookup;
+  assert.equal(client.getState().orderId, ""); assert.deepEqual(client.getState().reviews, []);
+});
+test("order lookup rejects a mismatched successful server result instead of showing another order", async t => {
+  const auth = { getSession: async () => ({ data: { session: session(ADMIN) } }), onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } }; } };
+  const client = createPayPalAdminReviewsClient({ auth: () => auth, storage: () => ({ getItem: () => null, setItem() {}, removeItem() {} }),
+    fetch: async () => Response.json({ ok: true, environment: "test", reviews: [review()], deliveries: [], hasMore: false }) });
+  t.after(() => client.dispose()); await client.start(); await until(() => client.getState().phase === "ready");
+  await client.findOrder("66666666-6666-4666-8666-666666666666"); assert.equal(client.getState().phase, "error"); assert.deepEqual(client.getState().reviews, []);
+});
 test("client preserves an uncertain decision identity and retries it exactly", async t => {
   let current = session(ADMIN), callback, lose = true; const stored = new Map(), posts = [];
   const auth = { getSession: async () => ({ data: { session: current } }), onAuthStateChange(fn) { callback = fn; return { data: { subscription: { unsubscribe() {} } } }; } };
@@ -146,7 +182,7 @@ test("admin UI exposes only retain/release controls and never renders raw provid
   const ready = { ...initialPayPalAdminReviewsState(), phase: "ready", actorId: ADMIN, environment: "live", reviews: [review()], deliveries: [delivery()], hasMore: false };
   const compiled = ts.transpileModule(fs.readFileSync(path.join(web, "app/admin/payments/PayPalReviewQueue.tsx"), "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   new Function("require", "module", "exports", compiled)(specifier => {
-    if (specifier === "react") return { ...React, useEffect() {}, useRef: () => ({ current: null }), useState(initial) { const index = stateIndex++; const values = [ready, { actorId: ADMIN, eventId: review().eventId }, { actorId: ADMIN, deliveryId: DELIVERY }, "Reviewed delivery retry", true, "retain_hold", "Reviewed provider evidence", true]; return [values[index] ?? (typeof initial === "function" ? initial() : initial), () => {}]; } };
+    if (specifier === "react") return { ...React, useEffect() {}, useRef: () => ({ current: null }), useState(initial) { const index = stateIndex++; const values = [ready, { actorId: ADMIN, eventId: review().eventId }, { actorId: ADMIN, deliveryId: DELIVERY }, "", "Reviewed delivery retry", true, "retain_hold", "Reviewed provider evidence", true]; return [values[index] ?? (typeof initial === "function" ? initial() : initial), () => {}]; } };
     if (specifier.endsWith("supabase-browser")) return { createBrowserSupabaseClient() { throw new Error("no browser auth during static render"); } };
     if (specifier.endsWith("paypal-admin-reviews-client")) return clientModule;
     if (specifier.endsWith(".module.css")) return { __esModule: true, default: new Proxy({}, { get: (_target, key) => String(key) }) };

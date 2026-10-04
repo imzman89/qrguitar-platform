@@ -43,6 +43,12 @@ export default function ResetPasswordPage() {
   const [safeNext, setSafeNext] = useState("/dashboard");
   const [authError, setAuthError] = useState(false);
   const [authAttempt, setAuthAttempt] = useState(0);
+  const [invalidField, setInvalidField] = useState<"password" | "confirmPassword" | "">("");
+  const passwordInput = useRef<HTMLInputElement>(null);
+  const confirmPasswordInput = useRef<HTMLInputElement>(null);
+  const renderedIdentity = { actor: lifetime.current.actor, revision: lifetime.current.revision, epoch: lifetime.current.epoch };
+  const renderedCurrent = () => lifetime.current.active && lifetime.current.actor === renderedIdentity.actor
+    && lifetime.current.revision === renderedIdentity.revision && lifetime.current.epoch === renderedIdentity.epoch;
 
   const applyIdentity = useCallback((actor: string) => {
     const life = lifetime.current;
@@ -50,6 +56,7 @@ export default function ResetPasswordPage() {
     if (actor !== life.actor) {
       life.revision++;
       setPassword(""); setConfirmPassword(""); setStatus(""); setIsComplete(false);
+      setInvalidField("");
       window.clearTimeout(redirectTimer.current); redirectTimer.current = undefined;
     }
     life.known = true; life.actor = actor;
@@ -100,25 +107,29 @@ export default function ResetPasswordPage() {
 
   async function savePassword() {
     const supabase = client.current, life = lifetime.current;
-    if (!life.active || pending.current) return;
+    if (!renderedCurrent() || pending.current) return;
     if (!hasSession || !life.actor || !supabase || authError) {
       setStatus("Open the password reset link from your email to continue.");
       return;
     }
 
     if (password.length < 8) {
-      setStatus("Use at least 8 characters.");
+      setInvalidField("password");
+      setStatus(ui("ui.app.reset.password.page.minimumPassword", "Use at least 8 characters."));
+      passwordInput.current?.focus();
       return;
     }
 
     if (password !== confirmPassword) {
-      setStatus("Passwords do not match.");
+      setInvalidField("confirmPassword");
+      setStatus(ui("ui.app.reset.password.page.passwordMismatch", "Passwords do not match."));
+      confirmPasswordInput.current?.focus();
       return;
     }
 
     const operation = Symbol("password-update"), actor = life.actor, revision = life.revision, epoch = life.epoch;
     const current = () => life.active && life.epoch === epoch && life.actor === actor && life.revision === revision;
-    pending.current = operation; setIsWorking(true); setStatus("");
+    pending.current = operation; setIsWorking(true); setStatus(""); setInvalidField("");
     let timer: number | undefined, dispatched = false;
     try {
       const before = await readAuthSession(supabase);
@@ -203,29 +214,41 @@ export default function ResetPasswordPage() {
             ) : null}
 
             {authChecked && !authError && !isComplete && hasSession ? (
-              <form method="post" onSubmit={(event) => { event.preventDefault(); void savePassword(); }} aria-busy={isWorking}>
+              <form method="post" noValidate onSubmit={(event) => { event.preventDefault(); void savePassword(); }} aria-busy={isWorking}>
                 <div className="field">
                   <label htmlFor="password">{ui("ui.app.reset.password.page.3dd9df4441fb", "New password")}</label>
                   <input
                     id="password"
+                    ref={passwordInput}
                     type="password"
+                    required
+                    minLength={8}
+                    aria-invalid={invalidField === "password"}
+                    aria-describedby={invalidField === "password" ? "reset-password-error" : undefined}
                     value={password}
-                    onChange={(event) => setPassword(event.target.value)}
+                    onChange={(event) => { if (!renderedCurrent()) return; setPassword(event.target.value); if (invalidField) { setInvalidField(""); setStatus(""); } }}
                     autoComplete="new-password"
                     placeholder={ui("ui.app.reset.password.page.977f3b2676a9", "At least 8 characters")}
                   />
+                  {invalidField === "password" ? <p id="reset-password-error" className="field-error" role="alert">{status}</p> : null}
                 </div>
 
                 <div className="field">
                   <label htmlFor="confirmPassword">{ui("ui.app.reset.password.page.5ac265f396a2", "Confirm password")}</label>
                   <input
                     id="confirmPassword"
+                    ref={confirmPasswordInput}
                     type="password"
+                    required
+                    minLength={8}
+                    aria-invalid={invalidField === "confirmPassword"}
+                    aria-describedby={invalidField === "confirmPassword" ? "reset-confirm-password-error" : undefined}
                     value={confirmPassword}
-                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    onChange={(event) => { if (!renderedCurrent()) return; setConfirmPassword(event.target.value); if (invalidField) { setInvalidField(""); setStatus(""); } }}
                     autoComplete="new-password"
                     placeholder={ui("ui.app.reset.password.page.6bf1430d8550", "Re-enter new password")}
                   />
+                  {invalidField === "confirmPassword" ? <p id="reset-confirm-password-error" className="field-error" role="alert">{status}</p> : null}
                 </div>
 
                 <div className="form-actions">
@@ -237,7 +260,7 @@ export default function ResetPasswordPage() {
               </form>
             ) : null}
 
-            {status && !authError && (!authChecked || hasSession) ? <p className="form-message error-message" role="status">{status}</p> : null}
+            {status && !invalidField && !authError && (!authChecked || hasSession) ? <p className="form-message error-message" role="status">{status}</p> : null}
           </section>
         </div>
       </main>

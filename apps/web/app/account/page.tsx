@@ -39,6 +39,7 @@ function accountValidationTarget(message: string): { section: "profile" | "colle
   if (/^Display name must be/.test(message)) return { section: "profile", id: "displayName" };
   if (/^Use a complete website address/.test(message)) return { section: "collection", id: "collectionWebsite" };
   if (/^(Choose a collection handle|That public collection handle)/.test(message)) return { section: "collection", id: "collectionHandle" };
+  if (/^Choose a collection name/.test(message)) return { section: "collection", id: "collectionName" };
   if (/^Invalid public collection settings/.test(message)) return { section: "collection", id: "public-collection" };
   return null;
 }
@@ -197,7 +198,7 @@ function AccountSettingsPage() {
             {activeSection === "overview" ? <PwaInstall /> : null}
 
             {(activeSection === "profile" || activeSection === "collection" || dirtySections.length > 0) ? <div className={styles.saveFeedback}>
-            {(activeSection === "profile" || activeSection === "collection" || dirtySections.length > 0) ? <p className="field-note" id="account-save-scope">{ui("ui.app.account.page.sharedSaveScope", "Saving updates Account details and your collection settings together, including collection visibility. Password and sign-out actions are separate.")}</p> : null}
+            {(activeSection === "profile" || activeSection === "collection" || dirtySections.length > 0) ? <p className="field-note" id="account-save-scope">{ui("ui.app.account.page.catalogSaveScope", "Saving updates Account details and your named collection together. Password and sign-out actions are separate.")}</p> : null}
             {dirtySections.length > 0 ? <p className="field-note" role="status" aria-live="polite">{ui("ui.app.account.page.unsavedSections", "Unsaved changes: {{value1}}. Nothing is applied until you save.", { value1: dirtySectionNames })}</p> : null}
             </div> : null}
 
@@ -210,12 +211,10 @@ function AccountSettingsPage() {
                 </div>
                 <div className={styles.metrics} aria-label={ui("ui.app.account.page.c8c1af060b0c", "Collection summary")}>
                   <div><strong>{stats.records}</strong><span>{ui("ui.app.account.page.535e52e4a261", "Profiles")}</span></div>
-                  <div><strong>{stats.publicRecords}</strong><span>{ui("ui.app.account.page.591935b15b1c", "Public")}</span></div>
-                  <div><strong>{stats.privateRecords + stats.unlistedRecords}</strong><span>{ui("ui.app.account.page.658ed7b26eff", "Private or unlisted")}</span></div>
                 </div>
                 <div className={styles.overviewRows}>
                   <div><span><b>{ui("ui.app.account.page.73949bb1bdba", "Profile details")}</b><small>{ui("ui.app.account.page.53babca0609e", "Your name and the tools you use.")}</small></span><button type="button" className="button secondary" onClick={() => navigateSection("profile")}>{ui("ui.app.account.page.fd9c61ac500e", "Edit details")}</button></div>
-                  <div><span><b>{ui("ui.app.account.page.8ca6da5bcd1b", "Public collection")}</b><small>{publishedHref ? ui("ui.app.account.page.a5b70b30efb9", "Your saved collection is ready to share.") : ui("ui.app.account.page.e7a081e4c5a2", "Bring your public Profiles together on one page.")}</small></span><button type="button" className="button secondary" onClick={() => navigateSection("collection")}>{publishedHref ? ui("ui.app.account.page.b751505accb1", "Manage collection") : ui("ui.app.account.page.67aa727721b2", "Set up collection")}</button></div>
+                  <div><span><b>{ui("ui.app.account.page.namedCollection", "Collection page")}</b><small>{publishedHref ? ui("ui.app.account.page.a5b70b30efb9", "Collection page enabled.") : ui("ui.app.account.page.namedCollectionSetup", "Choose the name and introduction linked from your instruments.")}</small></span><button type="button" className="button secondary" onClick={() => navigateSection("collection")}>{publishedHref ? ui("ui.app.account.page.b751505accb1", "Manage collection") : ui("ui.app.account.page.67aa727721b2", "Set up collection")}</button></div>
                   <div><span><b>{ui("ui.app.account.page.3386f588f0c2", "Account access")}</b><small>{ui("ui.app.account.page.9880be836d93", "Manage your password and active sign-in.")}</small></span><button type="button" className="button secondary" onClick={() => navigateSection("security")}>{ui("ui.app.account.page.8f6fb4eb7f42", "Security")}</button></div>
                 </div>
                 <Link className={styles.textLink} href="/dashboard">{ui("ui.app.account.page.a1464d30c916", "Open your collection")}{" "}<span aria-hidden="true">↗</span></Link>
@@ -237,13 +236,13 @@ function AccountSettingsPage() {
               <div className="field">
                 <label htmlFor="displayName">{ui("ui.app.account.page.2b7f6a84de91", "Display name")}</label>
                 <input id="displayName" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder={ui("ui.app.account.page.b4412569c09e", "Owner, shop, or builder name")} />
-                <p className="field-note">{ui("ui.app.account.page.d034a5030b9c", "Shown on private tools and used as your default owner/shop label.")}</p>
+                <p className="field-note">{ui("ui.app.account.page.accountDisplayHelp", "Used in your signed-in workspace. Your instruments show the collection name you choose separately.")}</p>
               </div>
 
               <div className="field">
-                <label htmlFor="workspaceType">{ui("ui.app.account.page.6fb83029b2c0", "How you use QRguitar")}</label>
+                <label htmlFor="workspaceType">{ui("ui.app.account.page.6fb83029b2c0", "Dashboard tools")}</label>
                 <select id="workspaceType" value={publicCollection.accountType} onChange={(event) => setPublicCollection((current) => ({ ...current, accountType: event.target.value as PublicCollectionSettings["accountType"] }))}>{WORKSPACE_OPTIONS.map((option) => <option value={option.value} key={option.value}>{workspaceOptionLabel(option.label, content)}</option>)}</select>
-                <p className="field-note">{ui("ui.app.account.page.17c18130884e", "Choose the daily tools shown on your dashboard. You can save this preference with your public collection turned off. Provider verification is reviewed separately.")}</p>
+                <p className="field-note">{ui("ui.app.account.page.workspaceTypeHelp", "Choose the daily tools shown in My collection. Provider verification is reviewed separately.")}</p>
               </div>
 
               <div className="form-actions">
@@ -259,16 +258,14 @@ function AccountSettingsPage() {
               </div>
               <p className={styles.copy}>{ui("ui.app.account.page.d5e138183dc3", "Give people one link to your instruments, with your name and a short introduction.")}</p>
               <div className={styles.preferenceGroup}>
-              <label className="toggle-field">
-                <input type="checkbox" checked={publicCollection.enabled} aria-describedby="collection-visibility-help" onChange={(event) => setPublicCollection((current) => ({ ...current, enabled: event.target.checked }))} />{ui("ui.app.account.page.390ed0ea84e0", "Enable my collection page")}</label>
-              <p className="field-note" id="collection-visibility-help">{ui("ui.app.account.page.collectionVisibilityHelp", "Only Public Profiles appear here. Your page joins Member Collections once it has a Public Profile. Turning this off hides the collection page, without changing any Profile’s visibility.")}</p>
+              <p className="field-note" id="collection-visibility-help">{ui("ui.app.account.page.automaticCollectionHelp", "Every saved instrument links this collection. Your collection joins Member Collections automatically after an instrument is saved.")}</p>
               </div>
               <div className="form-grid compact">
-                <label className="field"><span>{ui("ui.app.account.page.8bb1664e67fa", "Page name")}</span><input value={publicCollection.publicName} onChange={(event) => setPublicCollection((current) => ({ ...current, publicName: event.target.value }))} placeholder={displayName} /></label>
+                <label className="field"><span>{ui("ui.app.account.page.collectionName", "Collection name")}</span><input id="collectionName" value={publicCollection.publicName} onChange={(event) => setPublicCollection((current) => ({ ...current, publicName: event.target.value }))} placeholder={ui("ui.app.account.page.collectionNamePlaceholder", "A name you choose")} maxLength={80} /></label>
                 <label className="field"><span>{ui("ui.app.account.page.178b790b1cb2", "Custom link")}</span><input id="collectionHandle" aria-describedby="collection-url-preview" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={publicCollection.handle} onChange={(event) => setPublicCollection((current) => ({ ...current, handle: event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") }))} placeholder={ui("ui.app.account.page.6f61c615337a", "my-collection")} /><small className={styles.urlPreview} id="collection-url-preview">{PUBLIC_SITE_ORIGIN}/collections/{cleanCollectionHandle(publicCollection.handle) || "your-link-name"}</small></label>
                 <label className="field"><span>{ui("ui.app.account.page.9dc1bb315851", "Location (optional)")}</span><input value={publicCollection.location} onChange={(event) => setPublicCollection((current) => ({ ...current, location: event.target.value }))} placeholder={ui("ui.app.account.page.fef8ce3a04b7", "City, region, country")} /></label>
-                <label className="field custom-wide"><span>{ui("ui.app.account.page.81aa4ccb029d", "About you or your collection")}</span><textarea rows={3} value={publicCollection.bio} onChange={(event) => setPublicCollection((current) => ({ ...current, bio: event.target.value }))} placeholder={ui("ui.app.account.page.42e359637e9e", "What you collect, build, repair, or sell.")} /></label>
-                <label className="field"><span>{ui("ui.app.account.page.5fec9267ba07", "Your website (optional)")}</span><input id="collectionWebsite" type="url" aria-describedby="collection-website-help" value={publicCollection.websiteUrl} onChange={(event) => setPublicCollection((current) => ({ ...current, websiteUrl: event.target.value }))} placeholder="https://your-website.com" maxLength={500} /><small id="collection-website-help" className="field-note">{ui("ui.app.account.page.2a5191a8ca1b", "Use the full HTTPS address. When your public collection is enabled, visitors can open this website from the collection and its instrument Profiles. Purchases and bookings take place on your website.")}</small></label>
+                <label className="field custom-wide"><span>{ui("ui.app.account.page.81aa4ccb029d", "About you or your collection")}</span><textarea rows={3} value={publicCollection.bio} onChange={(event) => setPublicCollection((current) => ({ ...current, bio: event.target.value }))} placeholder={ui("ui.app.account.page.42e359637e9e", "A short description.")} /></label>
+                <label className="field"><span>{ui("ui.app.account.page.5fec9267ba07", "Your website (optional)")}</span><input id="collectionWebsite" type="url" aria-describedby="collection-website-help" value={publicCollection.websiteUrl} onChange={(event) => setPublicCollection((current) => ({ ...current, websiteUrl: event.target.value }))} placeholder="https://your-website.com" maxLength={500} /><small id="collection-website-help" className="field-note">{ui("ui.app.account.page.collectionWebsiteHelp", "Use the full HTTPS address. Visitors can open this website from your collection and its instruments. Purchases and bookings take place on your website.")}</small></label>
                 <label className="field"><span>{ui("ui.app.account.page.ea3c6074a51b", "Profile photo link (optional)")}</span><input type="url" value={publicCollection.avatarUrl} onChange={(event) => setPublicCollection((current) => ({ ...current, avatarUrl: event.target.value }))} placeholder="https://" /></label>
               </div>
               <div className={styles.preferenceGroup}>
@@ -278,7 +275,7 @@ function AccountSettingsPage() {
               <div className={styles.preferenceGroup}>
               <label className="toggle-field">
                 <input type="checkbox" checked={publicCollection.allowMessages} onChange={(event) => setPublicCollection((current) => ({ ...current, allowMessages: event.target.checked }))} />{ui("ui.app.account.page.bf5f93866b44", "Allow signed-in members to message you in QRguitar")}</label>
-              <p className="field-note">{ui("ui.app.account.page.a9fc610e616e", "Your email stays private. Conversations stay inside QRguitar and can include up to four photos or short videos per message.")}</p>
+              <p className="field-note">{ui("ui.app.account.page.contactProtectionHelp", "Your email is not shown on your collection or instruments. Conversations stay inside QRguitar and can include up to four photos or short videos per message.")}</p>
               </div>
               <div className="form-actions">
                 <button className="button" type="button" onClick={saveAccount} disabled={isWorking} aria-describedby="account-save-scope">{isWorking ? ui("ui.app.account.page.dc85af8f2b1d", "Saving...") : ui("ui.app.account.page.a7f1e189ad7b", "Save account changes")}</button>
@@ -339,7 +336,7 @@ function AccountSettingsPage() {
                 <span>{ui("ui.app.account.page.ade3e28bc653", "Privacy & Data")}</span>
                 <strong><ShieldCheck size={18} aria-hidden="true" />{" "}{ui("ui.app.account.page.a4f145526932", "Profile controls")}</strong>
               </div>
-              <p className={styles.copy}>{ui("ui.app.account.page.ff8634e1b9dd", "Each Profile controls visibility, private documents, service history, Serial Number display, and QR downloads from its editor.")}</p>
+              <p className={styles.copy}>{ui("ui.app.account.page.instrumentSharingHelp", "Every saved instrument appears in Catalog. Its editor controls document sharing, service history, Serial Number display, and QR downloads.")}</p>
               <div className="form-actions">
                 <Link className="button secondary" href="/dashboard">{ui("ui.app.account.page.98f4a6a50399", "Manage Profiles")}</Link>
                 <Link className="button secondary" href="/contact">{ui("ui.app.account.page.eb39d7ae9ff5", "Get support")}</Link>

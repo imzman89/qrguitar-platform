@@ -21,6 +21,7 @@ function collect(node) {
 }
 collect(ast);
 function compile(name, env = {}) {
+  env = { isCurrent: () => true, tokenForDraftOwner: async () => 'synthetic', ...env };
   const body = functions.get(name);
   assert.ok(body, `Missing actual handler ${name}`);
   const js = ts.transpileModule(body, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;

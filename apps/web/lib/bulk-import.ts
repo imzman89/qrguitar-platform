@@ -1,13 +1,13 @@
 import { canonicalInstrumentBrand } from "./instrument-brands";
 
-export const bulkHeaders = ["brand", "model", "serial", "year", "type", "condition", "sale_status", "originality", "location", "visibility", "photo", "summary", "show_serial", "seller", "acquisition_date"];
+export const bulkHeaders = ["brand", "model", "serial", "year", "type", "condition", "sale_status", "originality", "location", "photo", "summary", "show_serial", "seller", "acquisition_date"];
 export const MAX_BULK_ROWS = 50;
 export type ColumnMapping = Record<string, string>;
 export type BulkRequest = {
   name: string; brand: string; model: string; serial: string; serialNotUsed: boolean;
   year: string; instrumentType: string; condition: "new" | "used";
   saleStatus: "for_sale" | "not_for_sale"; originalityStatus: "all_original" | "modified" | "unknown";
-  ownerName: string; location: string; visibility: "private"; summary: string;
+  ownerName: string; location: string; visibility: "public" | "private"; summary: string;
   heroImageDataUrl: string; photos: string[]; uploadId: string; idempotencyKey: string;
   showSerialPublic: boolean; documents: never[]; customFields: Array<{ label: string; value: string }>;
 };
@@ -20,7 +20,7 @@ export type BulkRow = {
   rowNumber: number; brand: string; model: string; serial: string; serialNotUsed: boolean;
   year: string; instrumentType: string; condition: "new" | "used";
   saleStatus: "for_sale" | "not_for_sale"; originalityStatus: "all_original" | "modified" | "unknown";
-  location: string; visibility: "private"; photo: string; summary: string; seller: string;
+  location: string; visibility: "public" | "private"; photo: string; summary: string; seller: string;
   acquisitionDate: string; showSerialPublic: boolean; error: string; result: string; duplicateCode: string;
   attempt?: BulkAttempt;
 };
@@ -135,7 +135,7 @@ export function parseRows(source: string, mapping: ColumnMapping = {}): BulkRow[
       year: value("year"), instrumentType: value("type"), condition: value("condition").toLowerCase() === "new" ? "new" : "used",
       saleStatus: value("sale_status").toLowerCase().replace(/[\s-]+/g, "_") === "for_sale" ? "for_sale" : "not_for_sale",
       originalityStatus: originality === "all_original" || originality === "modified" ? originality : "unknown",
-      location: value("location"), visibility: "private", photo: value("photo"), summary: value("summary"),
+      location: value("location"), visibility: "public", photo: value("photo"), summary: value("summary"),
       seller: value("seller"), acquisitionDate: value("acquisition_date"),
       showSerialPublic: Boolean(serial) && ["yes", "true", "1", "public"].includes(value("show_serial").toLowerCase()),
       error: "", result: "", duplicateCode: ""
@@ -158,7 +158,7 @@ export function buildBulkRequest(row: BulkRow, ownerName: string, attempt: BulkA
     name: [row.brand, row.model].filter(Boolean).join(" "), brand: row.brand, model: row.model,
     serial: row.serial, serialNotUsed: row.serialNotUsed, year: row.year, instrumentType: row.instrumentType,
     condition: row.condition, saleStatus: row.saleStatus, originalityStatus: row.originalityStatus,
-    ownerName, location: row.location, visibility: "private", summary: row.summary,
+    ownerName, location: row.location, visibility: "public", summary: row.summary,
     heroImageDataUrl: storagePath, photos: [storagePath], uploadId: attempt.uploadId, idempotencyKey: attempt.idempotencyKey,
     showSerialPublic: Boolean(row.serial) && row.showSerialPublic, documents: [],
     customFields: [row.seller ? { label: "Seller / source", value: row.seller } : null,
@@ -240,13 +240,13 @@ export function readBulkDraft(serialized: string, ownerId: string): BulkDraft {
   if (value.version !== 2 || value.ownerId !== ownerId || typeof value.text !== "string" || !Array.isArray(value.rows) || !value.columnMapping || typeof value.columnMapping !== "object") throw new Error("This saved import could not be restored safely. Keep the saved draft and contact QRguitar before retrying it.");
   const strings = ["brand", "model", "serial", "year", "instrumentType", "location", "photo", "summary", "seller", "acquisitionDate", "error", "result", "duplicateCode"] as const;
   for (const row of value.rows) {
-    if (!row || !Number.isInteger(row.rowNumber) || strings.some((key) => typeof row[key] !== "string") || typeof row.serialNotUsed !== "boolean" || typeof row.showSerialPublic !== "boolean" || row.visibility !== "private") throw new Error("The saved import contains an invalid row. Keep the draft and contact QRguitar before retrying it.");
+    if (!row || !Number.isInteger(row.rowNumber) || strings.some((key) => typeof row[key] !== "string") || typeof row.serialNotUsed !== "boolean" || typeof row.showSerialPublic !== "boolean" || (row.visibility !== "private" && row.visibility !== "public")) throw new Error("The saved import contains an invalid row. Keep the draft and contact QRguitar before retrying it.");
     if (row.attempt) {
       const { attempt } = row;
       if (attempt.uploadGeneration !== undefined && (!Number.isSafeInteger(attempt.uploadGeneration) || attempt.uploadGeneration < 0 || attempt.uploadGeneration >= Number.MAX_SAFE_INTEGER)) throw new Error("The saved upload retry identity is invalid. Keep this draft before retrying.");
       if (!/^[a-zA-Z0-9-]{12,80}$/.test(attempt.uploadId) || !/^[a-zA-Z0-9-]{12,100}$/.test(attempt.idempotencyKey) || !["prepared", "submitting", "uncertain", "failed", "complete"].includes(attempt.phase)) throw new Error("The saved import is missing a valid retry identity. Keep the draft and contact QRguitar before retrying it.");
       if ((isUncertain(row) || attempt.phase === "complete") && !attempt.body) throw new Error("A submitted row is missing its original request. Keep the draft and contact QRguitar before retrying it.");
-      if (attempt.body && (attempt.body.uploadId !== attempt.uploadId || attempt.body.idempotencyKey !== attempt.idempotencyKey || attempt.body.visibility !== "private")) throw new Error("The saved request identity does not match its row. Keep the draft and contact QRguitar before retrying it.");
+      if (attempt.body && (attempt.body.uploadId !== attempt.uploadId || attempt.body.idempotencyKey !== attempt.idempotencyKey || (attempt.body.visibility !== "private" && attempt.body.visibility !== "public"))) throw new Error("The saved request identity does not match its row. Keep the draft and contact QRguitar before retrying it.");
     }
   }
   return value as BulkDraft;

@@ -33,7 +33,7 @@ export function CollectionsClient({ records, content }: { records: DemoInstrumen
     return true;
   }).sort((first, second) => sort === "Oldest" ? Date.parse(first.createdAt) - Date.parse(second.createdAt) : sort === "Title" ? first.name.localeCompare(second.name) : Date.parse(second.createdAt) - Date.parse(first.createdAt));
 
-  if (!records.length) return <div className="empty-state"><h2>{ui("ui.app.collections.handle.CollectionsClient.ac53f9376264", "No public instrument Profiles yet.")}</h2><p>{ui("ui.app.collections.handle.CollectionsClient.af746895fcef", "This member hasn’t added any instruments to their public collection yet.")}</p><Link className="button secondary" href="/collections">{ui("ui.app.collections.handle.CollectionsClient.2cbb876d08c4", "Explore other collections")}</Link></div>;
+  if (!records.length) return <div className="empty-state"><h2>{ui("ui.app.collections.handle.CollectionsClient.ac53f9376264", "No Profiles yet.")}</h2><Link className="button secondary" href="/collections">{ui("ui.app.collections.handle.CollectionsClient.2cbb876d08c4", "All collections")}</Link></div>;
 
   return <>
     <div className={styles.memberFilters} aria-label={ui("ui.app.collections.handle.CollectionsClient.06981cabadd7", "Collection filters")}>
@@ -59,8 +59,7 @@ export function CollectionsClient({ records, content }: { records: DemoInstrumen
     {!visible.length ? (
       <div className="empty-state">
         <h2>{getContentValue(content, "collections.empty.filteredTitle")}</h2>
-        <p>{getContentValue(content, "collections.empty.filteredBody")}</p>
-        <button className="button secondary" type="button" onClick={clearFilters}>{ui("ui.app.collections.handle.CollectionsClient.a3da4386e1c1", "Show all public Profiles")}</button>
+        <button className="button secondary" type="button" onClick={clearFilters}>{ui("ui.app.collections.handle.CollectionsClient.a3da4386e1c1", "Clear filters")}</button>
       </div>
     ) : null}
   </>;

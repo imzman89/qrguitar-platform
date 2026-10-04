@@ -1,4 +1,5 @@
 import { PUT as mutateEditor } from "../site-editor/route";
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { revalidatePath, unstable_noStore as noStore } from "next/cache";
 import { createServerSupabaseClient, createServerSupabaseClientWithTimeout, getSupabaseEnvStatus } from "../../../lib/supabase-server";
@@ -6,6 +7,11 @@ import { defaultSiteSettings, mergeSiteSettings, publishedSiteSettingsKey, type 
 import { getAdminContext } from "../../../lib/admin-auth";
 import { isSitePreviewAuthorized } from "../../../lib/site-preview-server";
 import { sitePreviewTokenFromCookie, sitePreviewDraftKey } from "../../../lib/site-preview";
+import { defaultContentValues } from "../../../lib/content-registry";
+import { compactSiteSettingsForClient } from "../../../lib/client-site-settings";
+
+const CONTENT_DEFAULTS_HASH = createHash("sha256")
+  .update(JSON.stringify(defaultContentValues)).digest("hex");
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -31,6 +37,9 @@ function noStoreJson<T>(body: T, init: ResponseInit = {}) {
 
 export async function GET(request: Request) {
   noStore();
+  const compact = new URL(request.url).searchParams.get("defaults") === CONTENT_DEFAULTS_HASH;
+  const project = (settings: EditableSiteSettings) =>
+    compact ? compactSiteSettingsForClient(settings) : settings;
   const supabase = createServerSupabaseClientWithTimeout(3000);
   if (!supabase) {
     const status = getSupabaseEnvStatus();
@@ -51,7 +60,7 @@ export async function GET(request: Request) {
       .maybeSingle<SiteContentRow>();
     const draftContent = (draft.data?.content_value as { settings?: Partial<EditableSiteSettings> } | null)?.settings || null;
     if (!draft.error && draftContent) {
-      return noStoreJson({ ok: true, preview: "draft", settings: mergeSiteSettings(draftContent) });
+      return noStoreJson({ ok: true, preview: "draft", settings: project(mergeSiteSettings(draftContent)) });
     }
   }
 
@@ -65,7 +74,7 @@ export async function GET(request: Request) {
     return noStoreJson({ ok: false, settings: defaultSiteSettings, message: "Published site settings are unavailable." });
   }
 
-  return noStoreJson({ ok: true, preview: "published", settings: published.data?.content_value ? mergeSiteSettings(published.data.content_value) : defaultSiteSettings });
+  return noStoreJson({ ok: true, preview: "published", settings: project(published.data?.content_value ? mergeSiteSettings(published.data.content_value) : defaultSiteSettings) });
 }
 
 export async function PUT(request: Request) {

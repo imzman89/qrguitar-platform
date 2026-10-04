@@ -1,5 +1,6 @@
 "use client";
 import { useUiText } from "./UiTextProvider";
+import { focusDialog, trapDialogTab } from "../lib/dialog-focus";
 
 
 import { AlertTriangle, X } from "lucide-react";
@@ -58,7 +59,7 @@ export function ProfileQuickEdit({ record, onClose, onSaved, isSessionCurrent }:
       document.body.style.paddingRight = `${currentPaddingRight + scrollbarWidth}px`;
     }
     document.body.style.overflow = "hidden";
-    dialogRef.current?.focus();
+    focusDialog(dialogRef.current);
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -67,19 +68,7 @@ export function ProfileQuickEdit({ record, onClose, onSaved, isSessionCurrent }:
         return;
       }
       if (event.key !== "Tab" || !dialogRef.current) return;
-      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
-      ));
-      if (!focusable.length) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
+      trapDialogTab(event, dialogRef.current);
     }
 
     document.addEventListener("keydown", handleKeyDown);
@@ -112,6 +101,12 @@ export function ProfileQuickEdit({ record, onClose, onSaved, isSessionCurrent }:
     setSaving(true);
     setMessage("");
     try {
+      const versionPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/;
+      if (typeof record.updatedAt !== "string" || !versionPattern.test(record.updatedAt) || !Number.isFinite(Date.parse(record.updatedAt))) throw new Error("Reload this Profile before saving again.");
+      const documentIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!Array.isArray(record.documentFiles) || record.documentFiles.some((document) =>
+          !document || typeof document.id !== "string" || !documentIdPattern.test(document.id) ||
+          typeof document.updatedAt !== "string" || !versionPattern.test(document.updatedAt) || !Number.isFinite(Date.parse(document.updatedAt)))) throw new Error("Reload this Profile and its documents before saving again.");
       const token = await getSupabaseAccessToken();
       if (!isCurrent()) return;
       if (!token) throw new Error("Sign in again before saving.");
@@ -120,6 +115,8 @@ export function ProfileQuickEdit({ record, onClose, onSaved, isSessionCurrent }:
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
         body: JSON.stringify({
           qrCode: record.qrCode,
+          expectedUpdatedAt: record.updatedAt,
+          expectedDocuments: record.documentFiles.map(({ id, updatedAt }) => ({ id, updatedAt })),
           name: form.name,
           brand: record.brand,
           model: record.model,
@@ -134,7 +131,7 @@ export function ProfileQuickEdit({ record, onClose, onSaved, isSessionCurrent }:
           originalityStatus: record.originalityStatus || "unknown",
           ownerName: record.owner,
           location: form.location,
-          visibility: form.visibility,
+          visibility: "public",
           summary: form.summary,
           heroImageDataUrl: form.heroImageDataUrl,
           photos,
@@ -146,9 +143,9 @@ export function ProfileQuickEdit({ record, onClose, onSaved, isSessionCurrent }:
           customLinks: record.customLinks || []
         })
       });
-      const payload = await response.json().catch(() => null) as { ok?: boolean; qrCode?: string; message?: string } | null;
+      const payload = await response.json().catch(() => null) as { ok?: boolean; qrCode?: string; updatedAt?: string; message?: string } | null;
       if (!isCurrent()) return;
-      if (!response.ok || payload?.ok !== true || payload.qrCode !== record.qrCode) throw new Error(payload?.message || "Could not save Quick Edit changes.");
+      if (!response.ok || payload?.ok !== true || payload.qrCode !== record.qrCode || typeof payload.updatedAt !== "string" || !versionPattern.test(payload.updatedAt) || !Number.isFinite(Date.parse(payload.updatedAt))) throw new Error(payload?.message || "Could not save Quick Edit changes.");
 
       if (form.safetyStatus !== (record.safetyStatus || "clear") || form.publicSafetyNote !== (record.publicSafetyNote || "")) {
         if (!isCurrent()) return;
@@ -166,8 +163,10 @@ export function ProfileQuickEdit({ record, onClose, onSaved, isSessionCurrent }:
       setSavedForm(form);
       onSaved({
         ...record,
+        updatedAt: payload.updatedAt,
+        documentFiles: record.documentFiles.map((document) => ({ ...document, updatedAt: payload.updatedAt })),
         name: form.name,
-        visibility: form.visibility,
+        visibility: "public",
         showSerialPublic: Boolean(record.serial) && form.showSerialPublic,
         saleStatus: form.saleStatus,
         instrumentCondition: form.condition,
@@ -196,15 +195,15 @@ export function ProfileQuickEdit({ record, onClose, onSaved, isSessionCurrent }:
         </header>
         <div className="quick-edit-grid">
           <label className="field"><span>{ui("ui.components.ProfileQuickEdit.8d615ba766e1", "Profile title")}</span><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
-          <label className="field"><span>{ui("ui.components.ProfileQuickEdit.7448611d5f93", "Visibility")}</span><select value={form.visibility} onChange={(event) => setForm({ ...form, visibility: event.target.value as QuickEditForm["visibility"] })}><option value="public">{ui("ui.components.ProfileQuickEdit.591935b15b1c", "Public")}</option><option value="unlisted">{ui("ui.components.ProfileQuickEdit.bc96567e77ca", "Unlisted")}</option><option value="private">{ui("ui.components.ProfileQuickEdit.c63eb6720c6e", "Private")}</option></select></label>
+          <p className="field-note">{ui("ui.components.ProfileQuickEdit.catalogSavePolicy", "Saving adds this instrument to Catalog and links your collection. Choose document sharing in the full editor.")}</p>
           <label className="field"><span>{ui("ui.components.ProfileQuickEdit.12f67f8539c4", "Availability")}</span><select value={form.saleStatus} onChange={(event) => setForm({ ...form, saleStatus: event.target.value as QuickEditForm["saleStatus"] })}><option value="not_for_sale">{ui("ui.components.ProfileQuickEdit.323d22588945", "Not for sale")}</option><option value="for_sale">{ui("ui.components.ProfileQuickEdit.aedf56fc02b4", "For sale")}</option></select></label>
           <label className="field"><span>{ui("ui.components.ProfileQuickEdit.39b36d38d6eb", "Condition")}</span><select value={form.condition} onChange={(event) => setForm({ ...form, condition: event.target.value as QuickEditForm["condition"] })}><option value="used">{ui("ui.components.ProfileQuickEdit.ae7d8dfac9ff", "Used")}</option><option value="new">{ui("ui.components.ProfileQuickEdit.18fdd549b2ed", "New")}</option></select></label>
           <label className="field"><span>{ui("ui.components.ProfileQuickEdit.15b61974b270", "Location")}</span><input value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} /></label>
           <label className="field"><span>{ui("ui.components.ProfileQuickEdit.14b29400712f", "Main photo")}</span><select value={form.heroImageDataUrl} onChange={(event) => setForm({ ...form, heroImageDataUrl: event.target.value })}>{photos.map((photo, index) => <option value={photo} key={photo}>{ui("ui.components.ProfileQuickEdit.d84eebada93e", "Photo")}{" "}{index + 1}{photo === record.heroImageDataUrl ? ui("ui.components.ProfileQuickEdit.15ed202dfc23", " (current)") : ""}</option>)}</select></label>
           <label className="field quick-edit-wide"><span>{ui("ui.components.ProfileQuickEdit.ca6f44db47d0", "Profile story")}</span><textarea rows={4} value={form.summary} onChange={(event) => setForm({ ...form, summary: event.target.value })} /></label>
-          {record.serial ? <div className="quick-edit-wide"><label className="toggle-field"><input type="checkbox" checked={form.showSerialPublic} onChange={(event) => setForm({ ...form, showSerialPublic: event.target.checked })} />{" "}{ui("ui.components.ProfileQuickEdit.22765505d8f2", "Show Serial Number on the public Profile")}</label><p className="fine-print">{ui("ui.components.ProfileQuickEdit.b281350e38d8", "Hides only the serial field. The permanent QR ID and URL may still include the serial. Use private visibility to restrict access.")}</p></div> : null}
+          {record.serial ? <div className="quick-edit-wide"><label className="toggle-field"><input type="checkbox" checked={form.showSerialPublic} onChange={(event) => setForm({ ...form, showSerialPublic: event.target.checked })} />{" "}{ui("ui.components.ProfileQuickEdit.serialShareLabel", "Show Serial Number on Profile")}</label><p className="fine-print">{ui("ui.components.ProfileQuickEdit.serialIdNotice", "Hides only the serial field. The permanent QR ID and URL may still include the serial.")}</p></div> : null}
           <label className="field"><span>{ui("ui.components.ProfileQuickEdit.32cf4596244a", "Lost / stolen status")}</span><select value={form.safetyStatus} onChange={(event) => setForm({ ...form, safetyStatus: event.target.value as QuickEditForm["safetyStatus"] })}><option value="clear">{ui("ui.components.ProfileQuickEdit.d1af410eb4d0", "No alert")}</option><option value="lost">{ui("ui.components.ProfileQuickEdit.3f1cf9ff5a13", "Reported lost")}</option><option value="stolen">{ui("ui.components.ProfileQuickEdit.f616a2b55136", "Reported stolen")}</option><option value="recovered">{ui("ui.components.ProfileQuickEdit.37ce0a91ee27", "Recovered")}</option></select></label>
-          {form.safetyStatus !== "clear" ? <label className="field"><span>{ui("ui.components.ProfileQuickEdit.5919565fba50", "Public alert note")}</span><textarea rows={3} value={form.publicSafetyNote} onChange={(event) => setForm({ ...form, publicSafetyNote: event.target.value })} /></label> : null}
+          {form.safetyStatus !== "clear" ? <label className="field"><span>{ui("ui.components.ProfileQuickEdit.profileAlertNote", "Profile alert note")}</span><textarea rows={3} value={form.publicSafetyNote} onChange={(event) => setForm({ ...form, publicSafetyNote: event.target.value })} /></label> : null}
         </div>
         <aside className="quick-edit-identity"><AlertTriangle size={16} /><span>{ui("ui.components.ProfileQuickEdit.a6c8f92c19f4", "QRguitar ID")}{" "}<b>{record.qrCode}</b>{" "}{ui("ui.components.ProfileQuickEdit.f8eb11bf748c", "and the permanent URL cannot be changed here.")}</span></aside>
         {message ? <p className="form-message">{message}</p> : null}
@@ -217,7 +216,7 @@ export function ProfileQuickEdit({ record, onClose, onSaved, isSessionCurrent }:
 function toForm(record: DemoInstrument, photos: string[]): QuickEditForm {
   return {
     name: record.name || `${record.brand} ${record.model}`.trim(),
-    visibility: record.visibility || "private",
+    visibility: "public",
     showSerialPublic: record.showSerialPublic === true,
     saleStatus: record.saleStatus || "not_for_sale",
     condition: getInstrumentCondition(record),

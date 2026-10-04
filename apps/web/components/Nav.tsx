@@ -82,6 +82,7 @@ export function Nav() {
     { href: "/catalog", label: getContentValue(content, "global.navigation.catalog") },
     { href: "/collections", label: ui("ui.components.Nav.collections", "Collections") },
     { href: "/how-it-works", label: getContentValue(content, "global.navigation.howItWorks") },
+    { href: "/installers", label: ui("ui.components.Nav.installers", "Installers") },
     { href: "/create", label: getContentValue(content, "global.navigation.create"), primary: true }
   ];
   const signInHref = `/login?next=${encodeURIComponent(signInReturnPath(pathname, typeof window === "undefined" ? "" : window.location.search, typeof window === "undefined" ? "" : window.location.hash))}`;
@@ -123,8 +124,10 @@ export function Nav() {
             </div>
           ) : isSignedIn === false ? <Link href={signInHref} onClick={() => setIsOpen(false)}>{ui("ui.components.Nav.bfd402b2f6f3", "Sign in")}</Link>
             : authError ? <button className={styles.accountButton} type="button" onClick={retrySession}>{ui("ui.components.Nav.retrySignIn", "Retry sign-in check")}</button>
-            : <span className={styles.sessionStatus} role="status" aria-busy="true">{ui("ui.components.Nav.checkingSignIn", "Checking sign-in...")}</span>}
+            : <Link className={styles.sessionStatus} href="/account" onClick={() => setIsOpen(false)}>{ui("ui.components.Nav.staticAccountAccess", "Account access")}</Link>}
+          <noscript><Link className={styles.staticAccess} href="/account">{ui("ui.components.Nav.staticAccountAccess", "Account access")}</Link></noscript>
         </nav>
+        <noscript><style>{`#primary-navigation { display:flex; flex-wrap:wrap; gap:8px; } #primary-navigation .${styles.sessionStatus} { display:none; } .${styles.toggle} { display:none; } @media(max-width:960px) { #primary-navigation { flex-direction:column; align-items:stretch; } }`}</style></noscript>
       </div>
       {!isSignedIn && logoutError ? <div className="shell"><p className={styles.sessionNotice} role="alert">{logoutError}</p></div> : null}
       {authError ? <div className="shell"><p className={styles.sessionNotice} role="alert">{ui("ui.components.Nav.signInCheckFailure", "Your sign-in could not be checked. Retry without signing in again.")}</p></div> : null}

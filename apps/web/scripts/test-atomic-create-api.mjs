@@ -95,7 +95,7 @@ await test("legacy ambiguous pending requests say review required instead of ret
 await test("create success is returned only from committed RPC receipt",async()=>{
  const backend=db(),result=await request(body(),backend);
  assert.equal(result.status,200);assert.equal(result.body.ok,true);assert.equal(backend.calls.rpc.length,1);
- assert.equal(backend.calls.rpc[0].name,"create_instrument_profile");assert.equal(backend.calls.rpc[0].args.p_owner_id,owner);
+ assert.equal(backend.calls.rpc[0].name,"create_catalog_instrument_profile");assert.equal(backend.calls.rpc[0].args.p_owner_id,owner);
  assert.equal(backend.calls.rpc[0].args.p_payload.owner_name,"");assert.equal(backend.calls.rpc[0].args.p_owner_display_name,"Current fallback");
 });
 await test("removed registered upload returns definitive no-commit reset contract",async()=>{

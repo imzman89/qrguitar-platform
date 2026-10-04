@@ -1,4 +1,5 @@
 import { HomePageClient } from "../components/HomePageClient";
+import { compactSiteSettingsForClient } from "../lib/client-site-settings";
 import type { DemoInstrument } from "../lib/local-demo";
 import { getPublicInstruments } from "../lib/public-instruments";
 import { loadPublishedSiteSettings } from "../lib/site-settings-server";
@@ -54,7 +55,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     icons: {
       icon: favicon,
-      apple: favicon
+      apple: [{ url: "/app-icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }]
     },
     robots: resolveManagedPageRobots("home", getContentValue(publishedSettings.content, "seo.home.indexing")),
     openGraph: {
@@ -89,5 +90,5 @@ export default async function HomePage() {
     publicRecordsWithFastFallback()
   ]);
 
-  return <HomePageClient initialRecords={initialRecords} initialSettings={publishedSettings} />;
+  return <HomePageClient initialRecords={initialRecords} initialSettings={compactSiteSettingsForClient(publishedSettings)} />;
 }

@@ -94,9 +94,13 @@ export async function PATCH(request: Request) {
       return json({ ok: false, message: "Use a complete website address starting with https://, or leave Website blank." }, { status: 400 });
     }
     publicCollection = cleanPublicCollection({ ...body.publicCollection,
-      publicName: body.publicCollection.publicName || (body.publicCollection.enabled ? displayName : ""),
+      enabled: true,
+      publicName: body.publicCollection.publicName,
       ownerId: auth.user.id
     });
+    if (!publicCollection.publicName) {
+      return json({ ok: false, message: "Choose a collection name. It does not have to be your real name." }, { status: 400 });
+    }
     if (publicCollection.enabled && publicCollection.handle.length < 3) {
       return json({ ok: false, message: "Choose a collection handle with at least 3 letters or numbers." }, { status: 400 });
     }

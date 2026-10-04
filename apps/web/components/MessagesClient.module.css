@@ -55,6 +55,7 @@
 .composerActions > span { margin-left: auto; color: var(--muted); font-size: 10px; }
 .attachButton { position: relative; min-height: 44px; display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 5px; padding: 8px 11px; color: var(--muted-strong) !important; font-size: 12px !important; text-transform: none !important; cursor: pointer; }
 .attachButton input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
+.attachButton:focus-within { outline: 2px solid var(--action); outline-offset: 3px; }
 .fileList { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
 .fileList li { min-width: 0; display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 9px; border: 1px solid var(--line); border-radius: 5px; padding: 8px 10px; background: var(--surface); }
 .fileList span { min-width: 0; display: grid; }
