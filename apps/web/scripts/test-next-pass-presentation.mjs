@@ -20,6 +20,17 @@ function billing(name, state, props) {
     if (specifier === "next/navigation") return { useSearchParams: () => new URLSearchParams() };
     if (specifier === "lucide-react") return new Proxy({}, { get: () => () => null });
     if (specifier.endsWith("UiTextProvider")) return { useUiText: () => ui };
+    const actualModulePaths = { "/AccountAccessHelp": "components/AccountAccessHelp.tsx", "/PublicCreditPricing": "components/PublicCreditPricing.tsx", "/direct-payments": "lib/direct-payments.ts" };
+    const actualModule = Object.entries(actualModulePaths).find(([suffix]) => specifier.endsWith(suffix));
+    if (actualModule) {
+      const dependency = { exports: {} };
+      const actual = fs.readFileSync(path.join(root, actualModule[1]), "utf8");
+      const compiled = ts.transpileModule(actual, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
+      new Function("require", "exports", "module", compiled)(modules, dependency.exports, dependency);
+      if (specifier.endsWith("/direct-payments")) assert.ok(Array.isArray(dependency.exports.DIRECT_OFFERS), "Actual approved offers must load");
+      else assert.equal(typeof dependency.exports[actualModule[0].slice(1)], "function", "Actual informational component export must load");
+      return dependency.exports;
+    }
     if (specifier.endsWith(".module.css")) return { __esModule: true, default: new Proxy({}, { get: (_, key) => key }) };
     if (specifier.endsWith("/Nav") || specifier.endsWith("/Footer")) return { Nav: () => null, Footer: () => null };
     if (specifier.endsWith("/direct-payments-client")) return { directOrderId: () => "", initialDirectPaymentsState: {} };
