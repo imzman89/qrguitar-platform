@@ -52,7 +52,8 @@ try {
  const ready=(await db.query('select public.qrguitar_release_readiness() result')).rows[0].result;
  assert.equal(ready.ready,true,JSON.stringify(ready));
  assert.equal(ready.releaseVersion,'2026-09-23.1');
- fs.writeFileSync(path.join(repo,'supabase/migrations/20260923121000_release_readiness.sql'),generated);
- fs.writeFileSync(path.join(repo,'apps/web/scripts/release-readiness-manifest.json'),JSON.stringify(manifest,null,2)+'\n');
- console.log('Generated and verified five-free readiness contract.');
+ // Historical verification only: never rewrite old migrations or the active manifest.
+ assert.equal(read('supabase/migrations/20260923121000_release_readiness.sql'),generated);
+ assert.deepEqual(JSON.parse(read('apps/web/scripts/release-readiness-manifest-20260923.json')),manifest);
+ console.log('Verified historical 2026-09-23.1 five-free contract; not current release acceptance.');
 }catch(error){console.error(error.message,error.code);process.exitCode=1;}finally{await db.close();}

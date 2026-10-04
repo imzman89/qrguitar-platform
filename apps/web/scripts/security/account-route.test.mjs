@@ -130,12 +130,12 @@ await test("workspace preference and website are saved with the explicitly named
   assert.deepEqual(Object.keys(f.rpcCalls[0].args).sort(), ["p_collection", "p_display_name", "p_expected_version", "p_user_id"]);
   assert.equal(f.rpcCalls[0].args.p_user_id, user.id); assert.equal(f.rpcCalls[0].args.p_collection.ownerId, user.id);
   assert.equal(f.rpcCalls[0].args.p_expected_version, 0); assert.equal(result.account.settingsVersion, 1);
-  assert.equal(f.rpcCalls[0].args.p_collection.enabled, true);
+  assert.equal(f.rpcCalls[0].args.p_collection.enabled, false);
   assert.equal(f.rpcCalls[0].args.p_collection.publicName, "Repair Workshop");
   assert.equal(f.rpcCalls[0].args.p_collection.handle, collection.handle);
   assert.equal(f.rpcCalls[0].args.p_collection.accountType, "luthier");
   assert.equal(f.rpcCalls[0].args.p_collection.websiteUrl, "https://repairs.example/");
-  assert.equal(result.account.publicCollection.enabled, true);
+  assert.equal(result.account.publicCollection.enabled, false);
   assert.equal(result.account.publicCollection.publicName, "Repair Workshop");
   assert.equal(result.account.publicCollection.accountType, "luthier");
   assert.equal(result.account.publicCollection.websiteUrl, "https://repairs.example/");
@@ -144,7 +144,7 @@ await test("workspace preference and website are saved with the explicitly named
 });
 for (const publicName of [undefined, null, "", "   "]) await test("missing chosen collection name is rejected before writes: " + JSON.stringify(publicName), async () => {
   const f = fixture();
-  const response = await f.routes.PATCH(req({ displayName: "Valid name", publicCollection: { ...collection, publicName, enabled: false, accountType: "luthier", websiteUrl: "https://repairs.example" } }));
+  const response = await f.routes.PATCH(req({ displayName: "Valid name", publicCollection: { ...collection, publicName, enabled: true, accountType: "luthier", websiteUrl: "https://repairs.example" } }));
   assert.equal(response.status, 400); assert.match((await response.json()).message, /Choose a collection name/);
   assert.equal(f.rpcCalls.length, 0); assert.equal(f.metadataCalls.length, 0); assert.equal(f.db.calls.length, 0);
 });
@@ -196,5 +196,21 @@ for (const settingsVersion of [undefined, 0, 2, "1"]) await test("invalid commit
   const response = await f.routes.PATCH(req({ displayName: "New name" }));
   assert.equal(response.status, 503); assert.equal((await response.json()).commitStatus, "unknown"); assert.equal(f.metadataCalls.length, 0);
 });
+for (const enabled of [false,true]) await test("full Account draft preserves enabled=" + enabled, async () => {
+ const f=fixture();f.tables.site_content[0].content_value={...collection,enabled};
+ const result=await (await f.routes.PATCH(req({displayName:"Valid name",publicCollection:{...collection,enabled}}))).json();
+ assert.equal(result.committed,true);assert.equal(result.account.publicCollection.enabled,enabled);
+ assert.equal(f.rpcCalls[0].args.p_collection.enabled,enabled);assert.equal(result.account.settingsVersion,1);
+});
+await test("disabled blank collection is valid and stays disabled", async () => {
+ const f=fixture(),result=await (await f.routes.PATCH(req({displayName:"Valid name",publicCollection:{...collection,enabled:false,handle:"",publicName:""}}))).json();
+ assert.equal(result.committed,true);assert.equal(f.rpcCalls[0].args.p_collection.enabled,false);
+ assert.equal(f.rpcCalls[0].args.p_collection.handle,"");assert.equal(f.rpcCalls[0].args.p_collection.publicName,"");
+});
+for (const enabled of [undefined,null,"true",1]) await test("invalid/missing collection enabled rejects before writes: " + enabled, async () => {
+ const f=fixture(),response=await f.routes.PATCH(req({displayName:"Valid name",publicCollection:{...collection,enabled}}));
+ assert.equal(response.status,400);assert.equal(f.rpcCalls.length,0);assert.equal(f.metadataCalls.length,0);
+});
+
 console.log(passes + " mocked account route tests passed.");
 

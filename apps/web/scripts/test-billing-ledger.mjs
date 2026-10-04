@@ -53,7 +53,60 @@ async function snapshot(){return (await db.query("select jsonb_build_object('ord
 let passed=0;async function test(name,fn){await db.exec('begin');try{await fn();passed++;console.log('PASS '+name);}finally{await db.exec('rollback');}}
 // Provision fixture-only Price IDs; this performs no provider or live operation.
 await db.exec('begin');for(const env of ['test','live'])for(const n of [1,10,25])await rpc('billing_register_offer',[env,offer(n,env)]);await db.exec('commit');
+// Privacy regressions reuse this existing disposable PGlite fixture and its actor/profile/credit helpers.
+// These cases exercise the actual installed successor wrappers, not a mocked publication rule.
+const catalogCreate=f=>rpc('create_catalog_instrument_profile',[f.owner,f.key,f.upload,f.payload,false,'Synthetic owner','live']);
+async function privacyState(owner=actor){
+ return (await db.query("select jsonb_build_object('version',(select account_settings_version from profiles where id=$1),'displayName',(select display_name from profiles where id=$1),'moderation',(select jsonb_build_object('status',account_status,'hidden',hide_public_content) from profiles where id=$1),'collection',(select jsonb_agg(to_jsonb(s) order by content_key) from site_content s where content_key='public_collection_owner:'||$1::text or content_key='public_collection_handle:public-shop')) value",[owner])).rows[0].value;
+}
+async function chosenCollection(state){
+ if(state==='absent')return;
+ const settings={enabled:state==='enabled',handle:'public-shop',publicName:'Public Shop',accountType:'shop',ownerId:actor,allowIndexing:false,allowMessages:false};
+ await db.query("insert into site_content(content_key,content_value) values($1,$2::jsonb)",['public_collection_owner:'+actor,settings]);
+ if(settings.enabled)await db.query("insert into site_content(content_key,content_value) values('public_collection_handle:public-shop',$1::jsonb)",[{ownerId:actor}]);
+}
 try{
+for(const visibility of ['private','unlisted','public'])for(const collection of ['absent','disabled','enabled'])await test('fresh Catalog create honors '+visibility+' and preserves '+collection+' collection',async()=>{
+ await chosenCollection(collection);const f=await profile();f.payload.guitar.visibility=visibility;
+ const canonical=JSON.stringify(f.payload),before=await privacyState(),result=await catalogCreate(f);
+ assert.equal(result.ok,true);assert.equal(result.alreadyCreated,false);assert.equal(JSON.stringify(f.payload),canonical);
+ const g=(await db.query('select to_jsonb(g) value from guitars g where qr_code=$1',[result.qrCode])).rows[0].value;
+ assert.equal(g.visibility,visibility);assert.equal(g.owner_id,actor);assert.deepEqual(await privacyState(),before);
+ assert.equal((await status()).paidConsumed,0);
+});
+for(const visibility of ['private','unlisted','public'])for(const collection of ['absent','disabled','enabled'])for(const hidden of [false,true])await test('ordinary Catalog save preserves '+visibility+'/'+collection+'/hidden='+hidden+' despite public client',async()=>{
+ await chosenCollection(collection);const f=await profile();f.payload.guitar.visibility=visibility;const created=await catalogCreate(f);
+ await db.query('update profiles set hide_public_content=$2 where id=$1',[actor,hidden]);
+ const g=(await db.query('select to_jsonb(g) value from guitars g where qr_code=$1',[created.qrCode])).rows[0].value;
+ const media=(await db.query('select id,storage_path,alt,sort_order from guitar_media where guitar_id=$1 order by id',[g.id])).rows;
+ const before=await privacyState(),credits=await status(),p={...f.payload,
+  guitar:{...f.payload.guitar,qr_code:g.qr_code,name:'Updated synthetic details',visibility:'public'},
+  media,expected_media:media.map(({id,storage_path,sort_order})=>({id,storage_path,sort_order})),expected_documents:[]};
+ const result=await rpc('save_catalog_instrument_profile',[g.id,actor,g.updated_at,p]);
+ assert.equal(result.ok,true);
+ const saved=(await db.query('select to_jsonb(g) value from guitars g where id=$1',[g.id])).rows[0].value;
+ assert.equal(saved.visibility,visibility);assert.equal(saved.owner_id,actor);assert.equal(saved.name,'Updated synthetic details');
+ assert.deepEqual(await privacyState(),before);assert.equal((await status()).paidConsumed,credits.paidConsumed);
+ // Unhiding is not a publication action either; no collection or item intent was rewritten.
+ await db.query('update profiles set hide_public_content=false where id=$1',[actor]);
+ assert.equal((await db.query('select visibility from guitars where id=$1',[g.id])).rows[0].visibility,visibility);
+ assert.deepEqual((await privacyState()).collection,before.collection);
+});
+await test('paid Catalog first create charges once; exact and changed-key upload replay preserve privacy/version/credits',async()=>{
+ await chosenCollection('disabled');await owned(5);await grant(10);const f=await profile(),before=await privacyState();
+ const first=await catalogCreate(f),committed=await snapshot();assert.equal((await status()).paidConsumed,1);
+ assert.equal((await catalogCreate(f)).alreadyCreated,true);
+ assert.equal((await catalogCreate({...f,key:'create-'+randomUUID()})).qrCode,first.qrCode);
+ assert.deepEqual(await snapshot(),committed);assert.deepEqual(await privacyState(),before);assert.equal((await status()).paidConsumed,1);
+});
+await test('historical Catalog replay after ownership change does not publish, enable, rename or recharge',async()=>{
+ await chosenCollection('disabled');const f=await profile(),created=await catalogCreate(f);
+ await db.query("update guitars set owner_id=$2,visibility='unlisted' where qr_code=$1",[created.qrCode,other]);
+ await db.query("update profiles set display_name='Historical chosen name' where id=$1",[actor]);
+ const before=await snapshot(),accountBefore=await privacyState(),replay=await catalogCreate(f);
+ assert.equal(replay.alreadyCreated,true);assert.equal(replay.qrCode,created.qrCode);
+ assert.deepEqual(await snapshot(),before);assert.deepEqual(await privacyState(),accountBefore);
+});
 await test('all private billing tables deny direct reads and writes to API roles',async()=>{
  const tables=(await db.query("select tablename from pg_tables where schemaname='public' and tablename like 'billing_%'")).rows.map(r=>r.tablename);
  const required=['billing_instance_config','billing_offers','billing_customers','billing_orders','billing_receipts','billing_credit_grants','billing_credit_consumptions','billing_credit_holds','billing_review_decisions'];

@@ -124,5 +124,23 @@ await test("explicitly isolated test creation uses the environment-bound SQL ove
  const backend=db(),result=await request(body(),backend);assert.equal(result.status,200);assert.equal(backend.calls.rpc[0].args.p_billing_environment,"test");
  }finally{route.setDatabaseUrl("https://qvoruycxxrbarlafvhbi.supabase.co");if(old===undefined)delete process.env.STRIPE_ENVIRONMENT;else process.env.STRIPE_ENVIRONMENT=old;if(oldUrl===undefined)delete process.env.QRGUITAR_BILLING_TEST_DATABASE_URL;else process.env.QRGUITAR_BILLING_TEST_DATABASE_URL=oldUrl;}
 });
+for (const visibility of ["public", "private", "unlisted"]) await test("create honors explicit " + visibility + " without changing canonical payload", async () => {
+ const input=body({visibility}),backend=db(),result=await request(input,backend);
+ assert.equal(result.status,200);assert.equal(backend.calls.rpc.length,1);
+ assert.equal(backend.calls.rpc[0].name,"create_catalog_instrument_profile");
+ assert.deepEqual(backend.calls.rpc[0].args.p_payload,payload(input));
+ assert.equal(backend.calls.rpc[0].args.p_payload.guitar.visibility,visibility);
+ assert.equal(backend.calls.rpc[0].args.p_payload.documents[0].is_public,false);assert.equal(backend.calls.deletes,0);
+});
+await test("omitted fresh-create visibility keeps automatic Catalog public default", async () => {
+ const input=body(),backend=db();assert.equal((await request(input,backend)).status,200);
+ assert.equal(backend.calls.rpc[0].args.p_payload.guitar.visibility,"public");
+ assert.deepEqual(backend.calls.rpc[0].args.p_payload,payload(input));
+});
+for (const visibility of [null,"PUBLIC","",true]) await test("invalid create visibility fails before RPC: " + JSON.stringify(visibility), async () => {
+ const backend=db(),result=await request(body({visibility}),backend);
+ assert.equal(result.status,400);assert.equal(backend.calls.rpc.length,0);assert.equal(backend.calls.deletes,0);
+});
+
 console.log("Completed "+passed+" create payload/route tests.");
 

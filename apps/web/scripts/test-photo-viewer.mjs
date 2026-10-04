@@ -56,7 +56,7 @@ function fixture(options = {}) {
     if (name === "react") return hooks;
     if (name.includes("image-fallback")) return imageFallback;
     if (name.includes("public-media-variant")) return variants;
-    if (name.endsWith(".css")) return { default: new Proxy({}, { get: (_, prop) => String(prop) }) };
+    if (name.endsWith(".css")) return { __esModule: true, default: new Proxy({}, { get: (_, prop) => String(prop) }) };
     return require(name);
   }).PhotoViewer;
   const props = { images: ["/first.jpg", "/second.jpg", "/third.jpg"], title: "Fender amplifier", onClose: () => { closes += 1; }, onImageError: (src) => errors.push(src), onIndexChange: (index) => selected.push(index), ...options };

@@ -89,16 +89,19 @@ export async function PATCH(request: Request) {
     if (!body.publicCollection || typeof body.publicCollection !== "object" || Array.isArray(body.publicCollection)) {
       return json({ ok: false, message: "Invalid public collection settings." }, { status: 400 });
     }
+    if (typeof body.publicCollection.enabled !== "boolean") {
+      return json({ ok: false, message: "Choose whether this collection is enabled." }, { status: 400 });
+    }
     const website = body.publicCollection.websiteUrl;
     if (website !== undefined && (typeof website !== "string" || (website.trim() && !cleanCollectionWebsite(website)))) {
       return json({ ok: false, message: "Use a complete website address starting with https://, or leave Website blank." }, { status: 400 });
     }
     publicCollection = cleanPublicCollection({ ...body.publicCollection,
-      enabled: true,
+      enabled: body.publicCollection.enabled,
       publicName: body.publicCollection.publicName,
       ownerId: auth.user.id
     });
-    if (!publicCollection.publicName) {
+    if (publicCollection.enabled && !publicCollection.publicName) {
       return json({ ok: false, message: "Choose a collection name. It does not have to be your real name." }, { status: 400 });
     }
     if (publicCollection.enabled && publicCollection.handle.length < 3) {

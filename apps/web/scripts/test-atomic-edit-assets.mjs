@@ -92,14 +92,14 @@ assert.ok(patchStart>=0 && tailStart>patchStart,"Atomic edit handler must exist 
 const tail=actualRoute.slice(tailStart);
 fs.writeFileSync(path.join(runtime,"route-tail.mjs"),ts.transpileModule(prelude+tail,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText);
 const {run}=await import(pathToFileURL(path.join(runtime,"route-tail.mjs")).href);
-function mockDb({readError=false,rpcError=null,rpcData={ok:true,qrCode:"QRG-ORIGINAL123",permanentPath:"/i/QRG-ORIGINAL123",updatedAt:"2026-01-02T00:00:01.123456Z"}}={}){
-  const calls={rpc:0};
+function mockDb({visibility="public",readError=false,rpcError=null,rpcData={ok:true,qrCode:"QRG-ORIGINAL123",permanentPath:"/i/QRG-ORIGINAL123",updatedAt:"2026-01-02T00:00:01.123456Z"}}={}){
+  const calls={rpc:0,sent:null};
   return {calls,
-    from(table){const result=table==="guitars"?{data:{id:guitar,owner_id:owner,serial_number:"ORIGINAL123",hero_image_path:mediaPath,updated_at:"2026-01-02T00:00:00Z"},error:null}:
+    from(table){const result=table==="guitars"?{data:{id:guitar,owner_id:owner,visibility,serial_number:"ORIGINAL123",hero_image_path:mediaPath,updated_at:"2026-01-02T00:00:00Z"},error:null}:
       table==="guitar_media"?{data:[media],error:null}:{data:[doc],error:readError?{message:"injected read failure"}:null};
       const builder={select(){return builder},eq(){return builder},maybeSingle(){return Promise.resolve(result)},then(resolve,reject){return Promise.resolve(result).then(resolve,reject)}};
       return builder;},
-    async rpc(){calls.rpc++;return {data:rpcData,error:rpcError};}
+    async rpc(name,args){calls.rpc++;calls.sent={name,args};return {data:rpcData,error:rpcError};}
   };
 }
 const edit=(extra={})=>({expectedDocuments:[{id:doc.id,updatedAt:doc.updated_at}],expectedUpdatedAt:"2026-01-02T00:00:00Z",qrCode:"QRG-ORIGINAL123",brand:"Fender",model:"Strat",serial:"ORIGINAL123",instrumentType:"Electric Guitar",photos:[mediaPath],...extra});
@@ -360,6 +360,44 @@ await test("child snapshot actual Full Edit requires a fenced authoritative relo
   assert.ok(nodes[0].thenStatement.getText(tree).includes("return;"));
   assert.ok(guardIndex<source.indexOf('clearRecovery("details")',guardIndex));
   assert.ok(source.indexOf("setOriginal(savedInstrument)",guardIndex)>guardIndex);
+});
+
+for (const stored of ["private","unlisted","public"]) for (const supplied of [undefined,"public","private","unlisted"]) await test("ordinary edit uses stored " + stored + ", incoming " + supplied, async () => {
+ const db=mockDb({visibility:stored}),result=await run(edit({visibility:supplied}),db);
+ assert.equal(result.status,200);assert.equal(db.calls.rpc,1);assert.equal(db.calls.sent.name,"save_catalog_instrument_profile");
+ assert.equal(db.calls.sent.args.p_payload.guitar.visibility,stored);
+ assert.equal(db.calls.sent.args.p_payload.documents[0].is_public,false);
+ assert.equal(db.calls.sent.args.p_expected_updated_at,"2026-01-02T00:00:00Z");
+});
+for (const visibility of [null,"PUBLIC","",true]) await test("invalid edit visibility fails before full-save read/RPC: " + JSON.stringify(visibility), async () => {
+ const db=mockDb();db.from=()=>{throw new Error("Invalid visibility must reject before reads");};
+ const result=await run(edit({visibility}),db);
+ assert.equal(result.status,400);assert.equal(result.body.code,"profile_visibility_invalid");assert.equal(db.calls.rpc,0);
+});
+for (const visibility of [null,"invalid"]) await test("invalid stored visibility fails closed: " + visibility, async () => {
+ const db=mockDb({visibility}),result=await run(edit(),db);assert.equal(result.status,502);assert.equal(db.calls.rpc,0);
+});
+
+for(const visibility of ["private","unlisted","public"])await test("actual Full/Quick Edit hydration/request/result expressions preserve "+visibility,async()=>{
+ for(const relative of ["apps/web/app/edit/[code]/page.tsx","apps/web/components/ProfileQuickEdit.tsx"]){
+  const {tree,nodes}=sourceNodes(relative,(node,tree)=>ts.isPropertyAssignment(node)&&node.name.getText(tree)==="visibility");
+  const wired=nodes.filter(node=>["instrument.visibility","form.visibility"].includes(node.initializer.getText(tree)) ||
+   (relative.includes("ProfileQuickEdit")&&node.initializer.getText(tree).startsWith('record.visibility === "public"')));
+  assert.equal(wired.length,3,relative+" must bind hydration, outgoing/preview and saved visibility");
+  for(const node of wired)assert.equal(evaluateSourceExpression(node.initializer.getText(tree),{instrument:{visibility},record:{visibility},form:{visibility}}),visibility);
+ }
+});
+for(const [relative,variable]of [["apps/web/app/edit/[code]/page.tsx","instrument"],["apps/web/components/ProfileQuickEdit.tsx","record"]])await test("actual "+variable+" visibility guard fails closed rather than inventing public",async()=>{
+ const {tree,nodes}=sourceNodes(relative,(node,tree)=>ts.isIfStatement(node)&&node.expression.getText(tree).includes(variable+'.visibility !== "public"'));
+ assert.equal(nodes.length,1);const guard=nodes[0];
+ for(const visibility of [undefined,null,"invalid"])assert.equal(evaluateSourceExpression(guard.expression.getText(tree),{[variable]:{visibility}}),true);
+ for(const visibility of ["private","unlisted","public"])assert.equal(evaluateSourceExpression(guard.expression.getText(tree),{[variable]:{visibility}}),false);
+ assert.ok(guard.thenStatement.getText(tree).includes("throw new Error"));
+});
+await test("Save Changes and Save-and-View retain ordinary-save calls without inferred publication action",async()=>{
+ const relative="apps/web/app/edit/[code]/page.tsx";
+ const {tree,nodes}=sourceNodes(relative,(node,tree)=>ts.isCallExpression(node)&&node.expression.getText(tree)==="saveChanges");
+ assert.deepEqual(nodes.map(node=>node.arguments[0].getText(tree)).sort(),["false","true"]);
 });
 
 console.log(`Completed ${passed} asset and route failure-path tests.`);

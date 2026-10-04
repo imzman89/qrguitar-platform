@@ -325,7 +325,9 @@ test("collection name starts blank and is never derived from email or account de
   assert.equal(nameInput().props.value, "");
   nameInput().props.onChange({ target: { value: "Workshop instruments" } });
   assert.equal(nameInput().props.value, "Workshop instruments");
-  assert.equal(nodes(render(), node => node.type === "input" && node.props["aria-describedby"] === "collection-visibility-help").length, 0);
+  const publication = nodes(render(), node => node.type === "input" && node.props.id === "collectionEnabled");
+  assert.equal(publication.length, 1); assert.equal(publication[0].props.checked, false);
+  assert.equal(publication[0].props["aria-describedby"], "collection-visibility-help");
   assert.equal(f.writes().length, 0); f.client.dispose();
 });
 
@@ -397,4 +399,33 @@ test("Profile and Collection preserve independently published CMS save labels wi
   assert.match(renderToStaticMarkup(render()), /Password and sign-out actions are separate\./);
   assert.doesNotMatch(renderToStaticMarkup(render()), /including collection visibility/);
   assert.equal(f.writes().length, 0); f.client.dispose();
+});
+
+test("collection publication is an explicit saved choice, preserved by unrelated edits and reload", async () => {
+  const f = fixture();
+  f.accounts.a.publicCollection = { ...f.accounts.a.publicCollection, enabled: false, handle: "", publicName: "" };
+  await f.mount(); const render = await accountPageUI(f, "collection");
+  const input = id => nodes(render(), node => node.type === "input" && node.props.id === id)[0];
+  const save = () => nodes(render(), node => node.type === "button" && node.props["aria-describedby"] === "account-save-scope")[0];
+  assert.equal(input("collectionEnabled").props.checked, false); assert.equal(f.writes().length, 0);
+  f.client.setDraft({ displayName: "An unrelated account edit" }); await save().props.onClick();
+  assert.equal(f.writes().length, 1); assert.equal(JSON.parse(f.writes()[0].body).publicCollection.enabled, false);
+  await f.client.reload(); assert.equal(input("collectionEnabled").props.checked, false); assert.equal(savedCollectionHref(f.client.getState().account), "");
+  input("collectionName").props.onChange({ target: { value: "Workshop instruments" } });
+  input("collectionHandle").props.onChange({ target: { value: "workshop-instruments" } });
+  input("collectionEnabled").props.onChange({ target: { checked: true } });
+  assert.equal(input("collectionEnabled").props.checked, true); assert.equal(f.writes().length, 1);
+  assert.equal(savedCollectionHref(f.client.getState().account), "", "Unsaved publication must not expose a public link");
+  await save().props.onClick(); assert.equal(f.writes().length, 2);
+  const published = JSON.parse(f.writes()[1].body);
+  assert.equal(published.expectedVersion, 1); assert.equal(published.publicCollection.enabled, true);
+  assert.equal(published.publicCollection.publicName, "Workshop instruments"); assert.equal(published.publicCollection.handle, "workshop-instruments");
+  await f.client.reload(); assert.equal(input("collectionEnabled").props.checked, true);
+  assert.equal(savedCollectionHref(f.client.getState().account), "/collections/workshop-instruments");
+  assert.deepEqual(f.client.getState().account.stats, { records: 3, publicRecords: 1, privateRecords: 1, unlistedRecords: 1 });
+  input("collectionEnabled").props.onChange({ target: { checked: false } }); await save().props.onClick();
+  assert.equal(f.writes().length, 3); assert.equal(JSON.parse(f.writes()[2].body).expectedVersion, 2);
+  assert.equal(JSON.parse(f.writes()[2].body).publicCollection.enabled, false);
+  await f.client.reload(); assert.equal(input("collectionEnabled").props.checked, false); assert.equal(savedCollectionHref(f.client.getState().account), "");
+  f.client.dispose();
 });

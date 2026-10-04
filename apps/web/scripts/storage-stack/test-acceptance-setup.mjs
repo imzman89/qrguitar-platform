@@ -83,7 +83,7 @@ test('fresh full repository schema needs exactly two operator-provisioned privat
     const before = await readiness();
     assert.equal(before.ready, false);
     const manifest = JSON.parse(fs.readFileSync(path.join(repo, 'apps/web/scripts/release-readiness-manifest.json'), 'utf8'));
-    assert.equal(manifest.releaseVersion, '2026-09-23.1', 'Review the fixed diagnostic vocabulary when the schema contract changes');
+    assert.equal(manifest.releaseVersion, '2026-10-04.1', 'Review the fixed diagnostic vocabulary when the schema contract changes');
     const beforeProjection = readinessProjection(before, manifest);
     assert.equal(beforeProjection.ready, false);
     assert.equal(beforeProjection.exactCheckSet, true);

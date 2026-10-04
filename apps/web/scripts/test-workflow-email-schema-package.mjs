@@ -22,7 +22,8 @@ async function fingerprint(){return one("select jsonb_build_object('tables',(sel
 try{
  assert.equal(await one("select count(*)::int from pg_tables where schemaname='public'"),0,'Harness refuses nonempty databases');
  if(native){assert.equal(await one("select current_setting('cron.launch_active_jobs')"),'off');await db.exec('create extension pgcrypto');}
- await installRepositorySchema(db,root);await db.exec('alter table auth.users add column email_confirmed_at timestamptz');
+ // This old workflow bundle pins the September base; current readiness has its separate full-chain gate.
+ await installRepositorySchema(db,root,'20260923121100');await db.exec('alter table auth.users add column email_confirmed_at timestamptz');
  // Same private bucket configuration as the repository's global-readiness fixture.
  await db.exec("insert into storage.buckets(id,name,public) values('instrument-media','instrument-media',false),('instrument-documents','instrument-documents',false),('service-evidence','service-evidence',false) on conflict(id) do update set public=false");
  if(native)await db.exec('update cron.job set active=false');
@@ -31,7 +32,7 @@ try{
  await db.query("insert into guitars(id,owner_id,qr_code,permanent_path,name,brand,visibility) values($1,$2,'QRG-SYNTHETIC-PREFLIGHT','/i/QRG-SYNTHETIC-PREFLIGHT','Synthetic','Synthetic','private')",[guitar,actor]);
  await db.query("insert into service_submissions(id,guitar_id,owner_user_id,provider_user_id,status,title) values($1,$2,$3,$4,'submitted','Existing work')",[submission,guitar,actor,provider]);
  await db.query("insert into ownership_claims(id,guitar_id,current_owner_id,claimant_user_id,claim_type,status) values($1,$2,$3,$4,'store_purchase','awaiting_owner')",[claim,guitar,actor,provider]);
- const baseline=await one('select qrguitar_release_readiness()');assert.equal(baseline.ready,true,JSON.stringify(baseline));assert.equal(baseline.releaseVersion,'2026-09-23.1');pass('existing populated base release readiness passes all fourteen checks');
+ const baseline=await one('select qrguitar_release_readiness()');assert.equal(baseline.ready,true,JSON.stringify(baseline));assert.equal(baseline.releaseVersion,'2026-09-23.1');pass('historical 2026-09-23.1 workflow base passes all fourteen checks; not current acceptance');
  const original=await fingerprint(),cronBefore=native?await one('select count(*)::int from cron.job'):0;
  await db.exec(fs.readFileSync(path.join(root,'supabase/proposals/workflow-email-preflight.sql'),'utf8'));assert.deepEqual(await fingerprint(),original);pass('read-only preflight leaves populated schema unchanged');
  const bundle=buildWorkflowSchemaBundle(root),hash=createHash('sha256').update(bundle.sql).digest('hex');assert.equal(bundle.manifest.length,6);assert.equal((bundle.sql.match(/^commit;$/gm)||[]).length,1);pass('bundle pins six reviewed source files with one final commit');

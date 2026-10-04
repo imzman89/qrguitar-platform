@@ -26,13 +26,20 @@ assert.deepEqual(manifest.profileEditUploadFunctionSignatures,[
   'public.consume_staged_instrument_edit_upload()',
   'public.register_staged_instrument_edit_upload(uuid,text,uuid,text,text)'
 ]);
+assert.equal(manifest.releaseVersion,'2026-10-04.1');
+assert.equal(manifest.catalogPolicySourceSha256,migrationSha('supabase/migrations/20261002180000_catalog_save_policy.sql'));
+assert.equal(manifest.transferOfferSourceSha256,migrationSha('supabase/migrations/20261002181000_transfer_closes_previous_offer.sql'));
+assert.equal(manifest.memberMessageUploadReplaySourceSha256,migrationSha('supabase/migrations/20260930010000_member_message_upload_replay.sql'));
+assert.equal(manifest.fingerprints.find(f=>f.signature==='public.complete_ownership_transfer(uuid,uuid,text,text,boolean,text)').source_hash,'ee851211fa2dcd5dc4038852e1b2d9e8e3cc6a6af6408c33476a1f021a593ed9');
+assert.deepEqual(manifest.catalogFunctionSignatures,["public.create_catalog_instrument_profile(uuid,text,text,jsonb,boolean,text,text)","public.save_catalog_instrument_profile(uuid,uuid,timestamp with time zone,jsonb)"]);
+assert.deepEqual(manifest.forbiddenCatalogFunctionNames,['_ensure_saved_instrument_collection']);
 const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite');
 const {installRepositorySchema}=await import(pathToFileURL(path.join(repo,'apps/web/scripts/security/postgres-fixture.mjs')));
 const db=new PGlite();await installRepositorySchema(db,repo,overlay?'20260917190000':undefined);
 if(overlay)for(const file of fs.readdirSync(path.join(source,'supabase/migrations')).filter(file=>file.endsWith('.sql')&&file>='20260917190000').sort())await db.exec(fs.readFileSync(path.join(source,'supabase/migrations',file),'utf8').replaceAll('\r\n','\n'));await db.exec("insert into storage.buckets(id,name,public)values('instrument-media','instrument-media',false),('instrument-documents','instrument-documents',false),('service-evidence','service-evidence',false) on conflict(id)do update set public=false;");
 const ready=async()=> (await db.query('select public.qrguitar_release_readiness() result')).rows[0].result;
 let passed=0;async function test(name,fn){await db.exec('begin');try{await fn();console.log('PASS '+name);passed++;}finally{await db.exec('rollback');}}
-function assertShape(result){assert.deepEqual(Object.keys(result).sort(),['checks','ready','releaseVersion']);assert.equal(result.releaseVersion,'2026-09-23.1');assert.equal(typeof result.ready,'boolean');assert.deepEqual(result.checks.map(c=>c.name),manifest.checks);assert.equal(new Set(result.checks.map(c=>c.name)).size,manifest.checks.length);for(const check of result.checks){assert.deepEqual(Object.keys(check).sort(),['name','ok']);assert.equal(typeof check.ok,'boolean');}}
+function assertShape(result){assert.deepEqual(Object.keys(result).sort(),['checks','ready','releaseVersion']);assert.equal(result.releaseVersion,'2026-10-04.1');assert.equal(typeof result.ready,'boolean');assert.deepEqual(result.checks.map(c=>c.name),manifest.checks);assert.equal(new Set(result.checks.map(c=>c.name)).size,manifest.checks.length);for(const check of result.checks){assert.deepEqual(Object.keys(check).sort(),['name','ok']);assert.equal(typeof check.ok,'boolean');}}
 async function expectFalse(name){const result=await ready();assertShape(result);assert.equal(result.ready,false);assert.equal(result.checks.find(c=>c.name===name)?.ok,false);}
 await test('complete schema returns exact version and all14 checks true',async()=>{const result=await ready();assertShape(result);assert.equal(result.ready,true,JSON.stringify(result));assert.equal(result.checks.length,14);assert.ok(result.checks.every(c=>c.ok));});
 await test('readiness pins the five-free database contract',async()=>{
@@ -244,4 +251,30 @@ await test('missing irreversible actor fingerprint uniqueness blocks release',as
 await test('unreviewed deletion fulfillment overload cannot bypass reviewed protocol',async()=>{
   await db.exec("create function public.prepare_account_deletion_fulfillment(uuid) returns jsonb language sql as $$select '{}'::jsonb$$");await expectFalse('function_security');
 });
+// Current-contract regressions use only this existing fresh in-memory fixture.
+const catalogBefore=JSON.parse(fs.readFileSync(path.join(source,'apps/web/scripts/fixtures/release-readiness-catalog-before-20261002.json'),'utf8'));
+const currentDefinition=async signature=>(await db.query('select pg_get_functiondef($1::regprocedure) definition',[signature])).rows[0].definition;
+await test('privacy successor contains no collection-enabling helper overload',async()=>{
+ assert.equal((await db.query("select count(*)::int count from pg_proc where pronamespace='public'::regnamespace and proname='_ensure_saved_instrument_collection'")).rows[0].count,0);assert.equal((await ready()).ready,true);
+});
+for(const [signature,key]of [[manifest.catalogFunctionSignatures[0],'createDefinition'],[manifest.catalogFunctionSignatures[1],'saveDefinition']])await test('unsafe predecessor Catalog body is rejected: '+signature,async()=>{
+ await db.exec(catalogBefore[key].replace(/^create function/i,'create or replace function'));await expectFalse('function_security');
+});
+await test('pre-offer transfer body cannot pass current contract',async()=>{
+ const migration=fs.readFileSync(path.join(source,'supabase/migrations/20261002181000_transfer_closes_previous_offer.sql'),'utf8').replaceAll('\r\n','\n');
+ const before=migration.match(/\$old_block\$([\s\S]*?)\$old_block\$/)[1],after=migration.match(/\$first_acceptance\$([\s\S]*?)\$first_acceptance\$/)[1];
+ const definition=await currentDefinition('public.complete_ownership_transfer(uuid,uuid,text,text,boolean,text)');assert.equal(definition.split(after).length,2);await db.exec(definition.replace(after,before));await expectFalse('function_security');
+});
+const currentServiceFunctions=manifest.currentFunctionSignatures.filter(signature=>manifest.serviceFunctions.includes(signature));assert.equal(currentServiceFunctions.length,4);
+for(const signature of currentServiceFunctions)await test('missing current RPC blocks release: '+signature,async()=>{await db.exec('drop function '+signature);await expectFalse('required_functions');});
+for(const signature of currentServiceFunctions)for(const role of['public','anon','authenticated'])await test(role+' current RPC grant drift fails: '+signature,async()=>{await db.exec('grant execute on function '+signature+' to '+role);await expectFalse('function_security');});
+for(const signature of currentServiceFunctions)await test('current service grant remains mandatory: '+signature,async()=>{await db.exec('revoke execute on function '+signature+' from service_role');await expectFalse('function_security');});
+for(const signature of currentServiceFunctions)await test('non-owner current EXECUTE WITH GRANT OPTION fails: '+signature,async()=>{await db.exec('grant execute on function '+signature+' to service_role with grant option');await expectFalse('function_security');});
+for(const signature of manifest.currentFunctionSignatures)await test('unreviewed current-family role grant fails: '+signature,async()=>{await db.exec('create role unexpected_current_contract_reader;grant execute on function '+signature+' to unexpected_current_contract_reader');await expectFalse('function_security');});
+for(const signature of manifest.currentFunctionSignatures)await test('current body drift fails: '+signature,async()=>{const definition=await currentDefinition(signature);assert.ok(definition.includes('AS $function$'));await db.exec(definition.replace('AS $function$','AS $function$\n-- unreviewed current implementation'));await expectFalse('function_security');});
+for(const name of manifest.currentFunctionNames)await test('unreviewed current overload/helper fails: '+name,async()=>{await db.exec("create function public."+name+"(uuid) returns jsonb language sql as $$select '{}'::jsonb$$");await expectFalse('function_security');});
+for(const signature of currentServiceFunctions)for(const role of['anon','authenticated','service_role'])await test('API-owned current function fails: '+signature+' '+role,async()=>{await db.exec('alter function '+signature+' owner to '+role);await expectFalse('function_security');});
+for(const signature of currentServiceFunctions)for(const alteration of['set search_path=public','security invoker','stable'])await test('current metadata drift fails: '+signature+' '+alteration,async()=>{await db.exec('alter function '+signature+' '+alteration);await expectFalse('function_security');});
+await test('Catalog default-argument drift fails with unchanged body',async()=>{const definition=await currentDefinition(manifest.catalogFunctionSignatures[0]);assert.ok(definition.includes('DEFAULT false'));await db.exec(definition.replace('DEFAULT false','DEFAULT true'));await expectFalse('function_security');});
+await test('historical five-free readiness is not final-chain current acceptance',async()=>{await db.exec(fs.readFileSync(path.join(source,'supabase/migrations/20260923121000_release_readiness.sql'),'utf8'));const old=await ready();assert.equal(old.releaseVersion,'2026-09-23.1');assert.equal(old.ready,false);assert.equal(old.checks.find(c=>c.name==='function_security').ok,false);});
 console.log('Completed '+passed+' actual PostgreSQL readiness tests.');await db.close();

@@ -54,7 +54,7 @@ const emptyForm = {
   summary: "",
   specsNotes: "",
   serviceNotes: "",
-  visibility: "public"
+  visibility: "public" as NonNullable<DemoInstrument["visibility"]>
 };
 
 const managedFieldLabels = new Set(["instrument type", "builder", "finish", "weight", "owner status", "specs notes", "service notes", "sale status", "originality"]);
@@ -382,6 +382,9 @@ export default function EditInstrumentPage() {
 
         if (response.ok && payload?.ok && payload.instrument) {
           const instrument = payload.instrument;
+          if (instrument.visibility !== "public" && instrument.visibility !== "private" && instrument.visibility !== "unlisted") {
+            throw new Error("Reload this Profile before saving again.");
+          }
 
           if (!cancelled) {
             setOriginal(instrument);
@@ -406,7 +409,7 @@ export default function EditInstrumentPage() {
               summary: instrument.summary || "",
               specsNotes: readManagedField(instrument, "Specs notes"),
               serviceNotes: readManagedField(instrument, "Service notes"),
-              visibility: "public"
+              visibility: instrument.visibility
             });
             setCustomFields(normalizeCustomFields(instrument));
             setCustomLinks(normalizeCustomLinks(instrument));
@@ -919,7 +922,7 @@ export default function EditInstrumentPage() {
       owner: form.owner,
       location: form.location,
       summary: form.summary,
-      visibility: "public",
+      visibility: form.visibility,
       galleryImageDataUrls: galleryImages,
       heroImageDataUrl: form.heroImageDataUrl || galleryImages[0] || "",
       customFields: [
@@ -1043,7 +1046,7 @@ export default function EditInstrumentPage() {
           originalityStatus: form.originalityStatus as "all_original" | "modified" | "unknown",
           ownerName: form.owner || "",
           location: form.location,
-          visibility: "public" as const,
+          visibility: form.visibility,
           summary: form.summary || "",
           heroImagePath: staged.photoPaths[mainPhotoIndex] || staged.photoPaths[0],
           photos: staged.photoPaths,
@@ -1314,8 +1317,8 @@ export default function EditInstrumentPage() {
                 <small>{ui("ui.app.edit.code.page.379e7e78d21e", "When a Serial Number exists, the QRguitar ID uses the format QRG-SERIAL. Previous QR links remain active after approved corrections.")}</small>
               </details>
               <div className="privacy-toggle" aria-label={ui("ui.app.edit.code.page.catalogListing", "Catalog listing")}>
-                <div><strong>{ui("ui.app.edit.code.page.catalogIncluded", "Included in Catalog")}</strong>
-                  <span>{ui("ui.app.edit.code.page.catalogSavePolicy", "Saving adds this instrument and its photos to Catalog and links your collection. You choose which documents to share.")}</span></div>
+                <div><strong>{ui("ui.app.edit.code.page.savedVisibility", "Profile visibility")}: {form.visibility}</strong>
+                  <span>{ui("ui.app.edit.code.page.savePreservesVisibility", "Saving updates this instrument without changing its visibility or publishing your collection. You choose which documents to share.")}</span></div>
               </div>
             <form className="card form" id="identity">
               <input

@@ -742,7 +742,7 @@ function CreateOwnerDraft({ user, authChecked, isCurrent }: { user: CreateOwner 
                   </div>
                   </details>
                   <div className={styles.visibility} aria-label={ui("ui.app.create.page.catalogListing", "Catalog listing")}>
-                    <div><strong>{ui("ui.app.create.page.catalogIncluded", "Included in Catalog")}</strong><span>{ui("ui.app.create.page.catalogSavePolicy", "Saving adds this instrument and its photos to Catalog and links your collection. You choose which documents to share.")}</span></div>
+                    <div><strong>{ui("ui.app.create.page.catalogIncluded", "Included in Catalog")}</strong><span>{ui("ui.app.create.page.catalogCreatePolicy", "New instrument facts and photos enter Catalog. Documents are shared only when you choose. Saving does not publish your collection.")}</span></div>
                   </div>
                   <label className="toggle-field create-inline-toggle">
                     <input type="checkbox" disabled={!form.serial.trim()} checked={form.showSerialPublic && Boolean(form.serial.trim())} onChange={(event) => setForm((current) => ({ ...current, showSerialPublic: event.target.checked }))} />{ui("ui.app.create.page.ee21436940da", "Show Serial Number publicly")}</label>

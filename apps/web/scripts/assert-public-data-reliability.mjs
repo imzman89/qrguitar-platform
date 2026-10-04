@@ -137,6 +137,7 @@ function fixtures(count = 163) {
     if (i < 81) {
       db.profiles.push({ id: owner, display_name: "Owner " + i, hide_public_content: i === 80, account_status: i === 79 ? "banned" : "active" });
       db.site_content.push({ content_key: "public_collection_owner:" + owner, content_value: { enabled: true, handle: owner, publicName: "Collection " + i, allowIndexing: i !== 78, ownerId: owner } });
+      db.site_content.push({ content_key: "public_collection_handle:" + owner, content_value: { ownerId: owner } });
     }
     db.site_content.push({ content_key: "record_trust:" + code, content_value: { showSerialPublic: i === 162, authenticityStatus: i === 162 ? "confirmed" : "unconfirmed" } });
     for (let n = 2; n >= 0; n--) {
@@ -273,7 +274,9 @@ test("legacy timeline fallback remains paginated and optional missing media rela
 
 test("sitemap includes all eligible profiles and only indexable nonempty collections without owner refetches", async () => {
   const db = fixtures();
+  db.profiles.push({ id: "empty-owner", display_name: "Empty", hide_public_content: false, account_status: "active" });
   db.site_content.push({ content_key: "public_collection_owner:empty-owner", content_value: { enabled: true, handle: "empty-owner", publicName: "Empty", ownerId: "empty-owner" } });
+  db.site_content.push({ content_key: "public_collection_handle:empty-owner", content_value: { ownerId: "empty-owner" } });
   const app = runtime(mockDatabase(db));
   const response = await app.load("apps/web/app/sitemap.xml/route.ts").GET();
   assert.equal(response.status, 200);
@@ -342,3 +345,26 @@ test("catalog error view offers a working retry without exposing internal error 
 });
 
 
+
+for (const state of ["missing", "foreign", "disabled"]) test("collection binding privacy: " + state, async () => {
+  const db = fixtures(1);
+  const settings = db.site_content.find(row => row.content_key === "public_collection_owner:owner-000");
+  settings.content_value.websiteUrl = "https://private-collection.example";
+  if (state === "missing") db.site_content = db.site_content.filter(row => row.content_key !== "public_collection_handle:owner-000");
+  if (state === "foreign") db.site_content.find(row => row.content_key === "public_collection_handle:owner-000").content_value.ownerId = "another-owner";
+  if (state === "disabled") settings.content_value.enabled = false;
+  const app = runtime(mockDatabase(db));
+  const loader = app.load("apps/web/lib/public-instruments.ts");
+  const record = await loader.getPublicInstrumentByCode("QRG-TEST0000");
+  assert.ok(record, "The public instrument remains available independently of collection access");
+  assert.equal(record.publicCollection, undefined);
+  const catalog = await loader.getPublicInstruments();
+  assert.equal(catalog.length, 1);
+  assert.equal(catalog[0].publicCollection, undefined);
+  assert.doesNotMatch(JSON.stringify([record, catalog]), /private-collection\.example/);
+  const response = await app.load("apps/web/app/sitemap.xml/route.ts").GET();
+  assert.equal(response.status, 200);
+  const xml = await response.text();
+  assert.match(xml, /\/i\/QRG-TEST0000/);
+  assert.doesNotMatch(xml, /\/collections\/owner-000/);
+});

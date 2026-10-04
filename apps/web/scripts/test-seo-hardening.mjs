@@ -30,7 +30,10 @@ const seo = loadTypeScript("lib/seo.ts", {
   }
 });
 const contentRegistry = loadTypeScript("lib/content-registry.ts", {
-  "./ui-text-registry": loadTypeScript("lib/ui-text-registry.ts"),
+  "./ui-text-registry": loadTypeScript("lib/ui-text-registry.ts", {
+    "./catalog-policy-ui-text": loadTypeScript("lib/catalog-policy-ui-text.ts"),
+    "./owner-dashboard-policy-ui-text": loadTypeScript("lib/owner-dashboard-policy-ui-text.ts")
+  }),
   "./ui-text-protection": loadTypeScript("lib/ui-text-protection.ts")
 });
 const indexing = loadTypeScript("lib/search-indexing.ts");

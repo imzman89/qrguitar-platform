@@ -130,14 +130,18 @@ function render(items, overrides = {}) {
   }, "ServiceWorkbenchPage");
   return renderToStaticMarkup(React.createElement(component));
 }
-await test("rendered requests separate lifecycle, private evidence and review email", async () => {
+await test("rendered requests separate lifecycle, authorized attachments and review email", async () => {
   const html = render([item("changes_requested", { emailDeliveryStatus: "failed" })]);
-  assert.match(html, /Changes requested/); assert.match(html, /Private evidence/); assert.match(html, /2 files/); assert.match(html, /Review email/); assert.match(html, /Delivery failed/);
+  assert.match(html, /Changes requested/); assert.match(html, /Review attachments/);
+  assert.match(html, /Attachments are available only to authorized accounts\./);
+  assert.match(html, /A sent email does not mean the owner has approved the work\./); assert.match(html, /2 files/); assert.match(html, /Review email/); assert.match(html, /Delivery failed/);
   assert.match(html, /Resume Fret dress/); assert.match(html, /submission=draft-one/); assert.match(html, /Showing 1 of 1 loaded requests/);
 });
 await test("closed statuses offer View and initial errors never look like an empty workbench", async () => {
   for (const status of ["submitted", "approved", "declined", "cancelled", "expired"]) assert.match(render([item(status)]), /View Fret dress/);
-  const html = render(null, { 6: "Unavailable" }); assert.match(html, /Unavailable/); assert.doesNotMatch(html, /Your first service record starts here|Requests loaded/);
-  assert.match(render([]), /Your first service record starts here/);
+  const html = render(null, { 6: "Unavailable" }); assert.match(html, /Unavailable/); assert.doesNotMatch(html, /Your first service record starts here|No service requests yet\.|Requests loaded/);
+  const empty = render([]);
+  assert.match(empty, /No service requests yet\./);
+  assert.match(empty, /The Profile owner decides whether to approve and share the service entry\./);
 });
 console.log(`${passes} provider workbench behavior cases passed.`);

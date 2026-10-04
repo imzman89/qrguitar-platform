@@ -258,7 +258,8 @@ function AccountSettingsPage() {
               </div>
               <p className={styles.copy}>{ui("ui.app.account.page.d5e138183dc3", "Give people one link to your instruments, with your name and a short introduction.")}</p>
               <div className={styles.preferenceGroup}>
-              <p className="field-note" id="collection-visibility-help">{ui("ui.app.account.page.automaticCollectionHelp", "Every saved instrument links this collection. Your collection joins Member Collections automatically after an instrument is saved.")}</p>
+              <label className="toggle-field"><input id="collectionEnabled" type="checkbox" aria-describedby="collection-visibility-help" checked={publicCollection.enabled} onChange={(event) => setPublicCollection((current) => ({ ...current, enabled: event.target.checked }))} />{" "}{ui("ui.app.account.page.collectionPublicationChoice", "Make my collection page public")}</label>
+              <p className="field-note" id="collection-visibility-help">{ui("ui.app.account.page.collectionPublicationHelp", "Only your public Profiles appear here. Private and unlisted Profiles stay off this page. Save to apply your choice.")}</p>
               </div>
               <div className="form-grid compact">
                 <label className="field"><span>{ui("ui.app.account.page.collectionName", "Collection name")}</span><input id="collectionName" value={publicCollection.publicName} onChange={(event) => setPublicCollection((current) => ({ ...current, publicName: event.target.value }))} placeholder={ui("ui.app.account.page.collectionNamePlaceholder", "A name you choose")} maxLength={80} /></label>
@@ -336,7 +337,7 @@ function AccountSettingsPage() {
                 <span>{ui("ui.app.account.page.ade3e28bc653", "Privacy & Data")}</span>
                 <strong><ShieldCheck size={18} aria-hidden="true" />{" "}{ui("ui.app.account.page.a4f145526932", "Profile controls")}</strong>
               </div>
-              <p className={styles.copy}>{ui("ui.app.account.page.instrumentSharingHelp", "Every saved instrument appears in Catalog. Its editor controls document sharing, service history, Serial Number display, and QR downloads.")}</p>
+              <p className={styles.copy}>{ui("ui.app.account.page.savedInstrumentPrivacyHelp", "New Profiles enter Catalog. Existing Private and Unlisted access is preserved when you edit. Collection visibility and document sharing remain separate.")}</p>
               <div className="form-actions">
                 <Link className="button secondary" href="/dashboard">{ui("ui.app.account.page.98f4a6a50399", "Manage Profiles")}</Link>
                 <Link className="button secondary" href="/contact">{ui("ui.app.account.page.eb39d7ae9ff5", "Get support")}</Link>

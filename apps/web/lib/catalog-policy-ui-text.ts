@@ -55,15 +55,6 @@ export const catalogPolicyUiTextEntries = [
     "source": "app/create/page.tsx"
   },
   {
-    "key": "ui.app.create.page.catalogSavePolicy",
-    "scope": "app.create.page",
-    "text": "Saving adds this instrument and its photos to Catalog and links your collection. You choose which documents to share.",
-    "area": "Product",
-    "page": "Create Profile",
-    "section": "Catalog and document sharing",
-    "source": "app/create/page.tsx"
-  },
-  {
     "key": "ui.app.create.page.serialIdNotice",
     "scope": "app.create.page",
     "text": "This hides only the Serial Number field. The permanent QR ID and URL may still include the serial.",
@@ -139,24 +130,6 @@ export const catalogPolicyUiTextEntries = [
     "key": "ui.app.edit.code.page.catalogListing",
     "scope": "app.edit.code.page",
     "text": "Catalog listing",
-    "area": "Product",
-    "page": "Edit Profile",
-    "section": "Catalog and document sharing",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.catalogIncluded",
-    "scope": "app.edit.code.page",
-    "text": "Included in Catalog",
-    "area": "Product",
-    "page": "Edit Profile",
-    "section": "Catalog and document sharing",
-    "source": "app/edit/[code]/page.tsx"
-  },
-  {
-    "key": "ui.app.edit.code.page.catalogSavePolicy",
-    "scope": "app.edit.code.page",
-    "text": "Saving adds this instrument and its photos to Catalog and links your collection. You choose which documents to share.",
     "area": "Product",
     "page": "Edit Profile",
     "section": "Catalog and document sharing",
@@ -451,15 +424,6 @@ export const catalogPolicyUiTextEntries = [
     "source": "app/account/page.tsx"
   },
   {
-    "key": "ui.app.account.page.automaticCollectionHelp",
-    "scope": "app.account.page",
-    "text": "Every saved instrument links this collection. Your collection joins Member Collections automatically after an instrument is saved.",
-    "area": "Product",
-    "page": "Account",
-    "section": "Catalog and document sharing",
-    "source": "app/account/page.tsx"
-  },
-  {
     "key": "ui.app.account.page.collectionName",
     "scope": "app.account.page",
     "text": "Collection name",
@@ -490,15 +454,6 @@ export const catalogPolicyUiTextEntries = [
     "key": "ui.app.account.page.contactProtectionHelp",
     "scope": "app.account.page",
     "text": "Your email is not shown on your collection or instruments. Conversations stay inside QRguitar and can include up to four photos or short videos per message.",
-    "area": "Product",
-    "page": "Account",
-    "section": "Catalog and document sharing",
-    "source": "app/account/page.tsx"
-  },
-  {
-    "key": "ui.app.account.page.instrumentSharingHelp",
-    "scope": "app.account.page",
-    "text": "Every saved instrument appears in Catalog. Its editor controls document sharing, service history, Serial Number display, and QR downloads.",
     "area": "Product",
     "page": "Account",
     "section": "Catalog and document sharing",
@@ -568,15 +523,6 @@ export const catalogPolicyUiTextEntries = [
     "source": "components/BulkProfileImport.tsx"
   },
   {
-    "key": "ui.components.ProfileQuickEdit.catalogSavePolicy",
-    "scope": "components.ProfileQuickEdit",
-    "text": "Saving adds this instrument to Catalog and links your collection. Choose document sharing in the full editor.",
-    "area": "Product",
-    "page": "Quick Edit",
-    "section": "Catalog and document sharing",
-    "source": "components/ProfileQuickEdit.tsx"
-  },
-  {
     "key": "ui.components.ProfileQuickEdit.serialShareLabel",
     "scope": "components.ProfileQuickEdit",
     "text": "Show Serial Number on Profile",
@@ -602,5 +548,68 @@ export const catalogPolicyUiTextEntries = [
     "page": "Quick Edit",
     "section": "Catalog and document sharing",
     "source": "components/ProfileQuickEdit.tsx"
-  }
+  },
+  {
+    "scope": "app.account.page",
+    "area": "Product",
+    "page": "Account",
+    "section": "Catalog and document sharing",
+    "source": "app/account/page.tsx",
+    "key": "ui.app.account.page.collectionPublicationChoice",
+    "text": "Make my collection page public"
+  },
+  {
+    "scope": "app.account.page",
+    "area": "Product",
+    "page": "Account",
+    "section": "Catalog and document sharing",
+    "source": "app/account/page.tsx",
+    "key": "ui.app.account.page.collectionPublicationHelp",
+    "text": "Only your public Profiles appear here. Private and unlisted Profiles stay off this page. Save to apply your choice."
+  },
+  {
+    "scope": "app.account.page",
+    "area": "Product",
+    "page": "Account",
+    "section": "Catalog and document sharing",
+    "source": "app/account/page.tsx",
+    "key": "ui.app.account.page.savedInstrumentPrivacyHelp",
+    "text": "New Profiles enter Catalog. Existing Private and Unlisted access is preserved when you edit. Collection visibility and document sharing remain separate."
+  },
+  {
+    "scope": "app.create.page",
+    "area": "Product",
+    "page": "Create Profile",
+    "section": "Catalog and document sharing",
+    "source": "app/create/page.tsx",
+    "key": "ui.app.create.page.catalogCreatePolicy",
+    "text": "New instrument facts and photos enter Catalog. Documents are shared only when you choose. Saving does not publish your collection."
+  },
+  {
+    "scope": "app.edit.code.page",
+    "area": "Product",
+    "page": "Edit Profile",
+    "section": "Catalog and document sharing",
+    "source": "app/edit/[code]/page.tsx",
+    "key": "ui.app.edit.code.page.savedVisibility",
+    "text": "Profile visibility"
+  },
+  {
+    "scope": "app.edit.code.page",
+    "area": "Product",
+    "page": "Edit Profile",
+    "section": "Catalog and document sharing",
+    "source": "app/edit/[code]/page.tsx",
+    "key": "ui.app.edit.code.page.savePreservesVisibility",
+    "text": "Saving updates this instrument without changing its visibility or publishing your collection. You choose which documents to share."
+  },
+  {
+    "scope": "components.ProfileQuickEdit",
+    "area": "Product",
+    "page": "Quick Edit",
+    "section": "Catalog and document sharing",
+    "source": "components/ProfileQuickEdit.tsx",
+    "key": "ui.components.ProfileQuickEdit.savePreservesVisibility",
+    "text": "Saving keeps this Profile’s visibility and does not publish your collection. Choose document sharing in the full editor."
+  },
 ];

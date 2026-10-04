@@ -115,16 +115,16 @@ for (const outcome of ['success', 'failure']) test('dashboard: confirmed cancell
 });
 test('dashboard: copy during resend cannot suppress the mutation result', async () => {
   const request = deferred(); const f = await ready('dashboard', { latestTransfer: null, fetch: async input => input.body?.action === 'resend' ? request.promise : Response.json({ ok: true, transfer: { ...transfer, handoffPrepared: true }, buyerCode: 'SYNTHETIC-BUYER-CODE' }) });
-  f.click('Private buyer code'); f.click('Prepare for Buyer'); await tick(); f.render();
+  f.click('Buyer code'); f.click('Prepare for Buyer'); await tick(); f.render();
   const beforeRenderCopy = f.button('Copy Buyer Code');
   f.button('Resend Sign-in Email').props.onClick(); beforeRenderCopy.props.onClick();
   assert.equal(f.button('Copy Buyer Code').props.disabled, true); f.click('Copy Buyer Code'); await tick(); assert.equal(f.copies.length, 0);
   request.resolve(Response.json({ ok: true, message: 'Invitation resent.' })); await tick(); assert.equal(f.message(), 'Invitation resent.');
-  f.click('Copy Buyer Code'); await tick(); assert.equal(f.message(), 'Private buyer code copied.'); f.unmount();
+  f.click('Copy Buyer Code'); await tick(); assert.equal(f.message(), 'Buyer code copied. Share it only with the recipient.'); f.unmount();
 });
 test('dashboard: a newer resend operation suppresses earlier buyer-code feedback', async () => {
   const d = deferred(), f = await ready('dashboard', { latestTransfer: null, copy: () => d.promise });
-  f.click('Private buyer code'); f.click('Prepare for Buyer'); await tick(); f.render(); f.click('Copy Buyer Code'); f.click('Resend Sign-in Email'); await tick();
+  f.click('Buyer code'); f.click('Prepare for Buyer'); await tick(); f.render(); f.click('Copy Buyer Code'); f.click('Resend Sign-in Email'); await tick();
   assert.equal(f.message(), 'Invitation resent.'); d.resolve(); await tick(); assert.equal(f.message(), 'Invitation resent.'); assert.deepEqual(f.copies, ['SYNTHETIC-BUYER-CODE']); f.unmount();
 });
 test('dashboard: immediate parent account revision invalidates copy before rerender', async () => {
@@ -142,20 +142,20 @@ for (const change of ['auth', 'route']) test('transfer: ' + change + ' reload in
   assert.equal(f.message(), ''); d.resolve(); await tick(); assert.equal(f.message(), ''); f.unmount();
 });
 
-function acceptanceHandlers(copy, fetch) {
+function acceptanceHandlers(copy, fetch, options = {}) {
   const file = 'app/transfer/[id]/page.tsx', source = fs.readFileSync(path.join(sourceRoot, 'apps/web', file), 'utf8');
   const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX), selected = [];
   function visit(node) { if (ts.isFunctionDeclaration(node) && ['acceptTransfer', 'copyProfileLink'].includes(node.name?.text)) selected.push(node.getText(ast)); ts.forEachChild(node, visit); }
   visit(ast); assert.equal(selected.length, 2);
   const state = { message: '', accepting: false, acceptUncertain: false, transfer: { ...transfer }, permanentPath: '', loadError: false, tracking: [] };
-  const env = { ui: useUiText("app.transfer.id.page"), transfer: state.transfer, accepting: false, authRevision: { current: 1 }, feedbackRevision: { current: 0 }, acceptMutation: { current: null },
+  const env = { ui: useUiText("app.transfer.id.page"), transfer: state.transfer, accepting: false, renderedAuthRevision: 1, signedIn: true, transferId: options.transferId ?? transfer.id, authRevision: { current: 1 }, feedbackRevision: { current: 0 }, acceptMutation: { current: null },
     uncertainLock: { current: false }, acceptController: { current: null }, AbortController, setTimeout, clearTimeout,
     window: { navigator: { clipboard: { writeText: copy } }, location: { origin: 'https://www.qrguitar.com' } }, profileHref: '/i/QRG-A', getSupabaseAccessToken: async () => 'synthetic-token', fetch,
     optionalTrackingProductEvents: { ownershipTransferCompleted: 'ownership_transfer_completed' },
     dispatchOptionalTrackingProductEvent: async event => { state.tracking.push(event); return true; } };
   for (const key of Object.keys(state)) env['set' + key[0].toUpperCase() + key.slice(1)] = value => { state[key] = value; };
   const js = ts.transpileModule(selected.join('\n'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
-  return { state, ...new Function(...Object.keys(env), js + '\nreturn {acceptTransfer, copyProfileLink};')(...Object.values(env)) };
+  return { state, authRevision: env.authRevision, ...new Function(...Object.keys(env), js + '\nreturn {acceptTransfer, copyProfileLink};')(...Object.values(env)) };
 }
 test('transfer: acceptance started after a copy retains its confirmed outcome', async () => {
   const d = deferred(), h = acceptanceHandlers(() => d.promise, async () => Response.json({ ok: true, transfer: { ...transfer, status: 'accepted' }, message: 'Ownership accepted.' }));
@@ -169,4 +169,13 @@ test('transfer: same-tick copy during acceptance cannot steal feedback or delay 
   const accepting = h.acceptTransfer(); await h.copyProfileLink(); assert.equal(copies, 0);
   d.resolve(Response.json({ ok: true, transfer: { ...transfer, status: 'accepted' }, message: 'Ownership accepted.' })); await accepting;
   assert.equal(h.state.message, 'Ownership accepted.'); await h.copyProfileLink(); assert.equal(copies, 1); assert.equal(h.state.message, 'Profile link copied.');
+});
+
+for (const boundary of ["auth", "route"]) test("transfer: extracted stale " + boundary + " handlers cannot copy or accept", async () => {
+  let copies = 0, requests = 0;
+  const h = acceptanceHandlers(async () => { copies++; }, async () => { requests++; throw Error("stale handler dispatched"); }, boundary === "route" ? { transferId: "transfer-b" } : {});
+  if (boundary === "auth") h.authRevision.current++;
+  await h.copyProfileLink(); await h.acceptTransfer();
+  assert.equal(copies, 0); assert.equal(requests, 0); assert.equal(h.state.message, "");
+  assert.equal(h.state.accepting, false); assert.deepEqual(h.state.tracking, []);
 });

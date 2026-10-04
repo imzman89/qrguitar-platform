@@ -1757,6 +1757,9 @@ export async function PATCH(request: Request) {
       throw new ProfileSaveError("Reload this Profile and its documents before saving again.", 400, "profile_document_versions_required");
     }
     const expectedDocuments = documentSnapshot.map(({ id, updatedAt }) => ({ id, updated_at: updatedAt }));
+    if (body.visibility !== undefined && body.visibility !== "public" && body.visibility !== "private" && body.visibility !== "unlisted") {
+      throw new ProfileSaveError("Invalid Profile visibility.", 400, "profile_visibility_invalid");
+    }
     const input = {
       qrCode: String(body.qrCode || "").trim().toUpperCase(),
       name: String(body.name || "").trim(), brand: String(body.brand || "").trim(),
@@ -1807,13 +1810,18 @@ export async function PATCH(request: Request) {
     input.brand = brandResolution.brand;
     const ownerUser = auth.user;
     const existing = await supabase.from("guitars")
-      .select("id,owner_id,status,hero_image_path,serial_number,qr_code,permanent_path,updated_at")
+      .select("id,owner_id,status,hero_image_path,serial_number,qr_code,permanent_path,updated_at,visibility")
       .eq("qr_code", input.qrCode)
       .maybeSingle<GuitarRow & { updated_at: string }>();
     if (existing.error) throw new ProfileSaveError("Could not read this Profile. Try again.", 502);
     if (!existing.data) throw new ProfileSaveError("QRguitar Profile was not found.", 404);
     const guitar = existing.data;
     if (guitar.owner_id !== ownerUser.id) throw new ProfileSaveError("Only the owner can edit this Profile.", 403);
+    if (guitar.visibility !== "public" && guitar.visibility !== "private" && guitar.visibility !== "unlisted") {
+      throw new ProfileSaveError("Reload this Profile before saving again.", 502, "profile_visibility_unavailable");
+    }
+    // An ordinary edit does not select publication, including a stale client sending public.
+    input.visibility = guitar.visibility;
     const currentSerialNormalized = normalizeSerialBuildId(guitar.serial_number || "");
     const nextSerialNormalized = normalizeSerialBuildId(input.serial);
     // Removing a serial is an identity correction too; it cannot bypass admin approval.

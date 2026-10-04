@@ -149,7 +149,8 @@ test("directory controls filter and reset the rendered member links", () => {
   let tree = f.render(CollectionsDirectoryClient, props);
   nodes(tree, (node) => node.props?.id === "collection-search")[0].props.onChange({ target: { value: "missing" } });
   tree = f.render(CollectionsDirectoryClient, props);
-  assert.match(renderToStaticMarkup(tree), /No collections match/);
+  assert.match(renderToStaticMarkup(tree), /No collections found\./);
+  assert.match(renderToStaticMarkup(tree), /0 of 1 collection/);
   assert.doesNotMatch(renderToStaticMarkup(tree), /href="\/collections\/public-shop"/);
   nodes(tree, (node) => node.type === "button")[0].props.onClick();
   assert.match(renderToStaticMarkup(f.render(CollectionsDirectoryClient, props)), /href="\/collections\/public-shop"/);
@@ -158,9 +159,13 @@ test("directory controls filter and reset the rendered member links", () => {
 test("empty public collection does not suggest filtering could reveal private instruments", () => {
   const f = fixture();
   const { CollectionsClient } = f.load("apps/web/app/collections/[handle]/CollectionsClient");
-  const html = renderToStaticMarkup(f.render(CollectionsClient, { records: [], content: {} }));
-  assert.match(html, /No public instrument Profiles yet/); assert.match(html, /href="\/collections"/);
+  const tree = f.render(CollectionsClient, { records: [], content: {} });
+  const html = renderToStaticMarkup(tree);
+  assert.match(html, /No Profiles yet\./); assert.match(html, /href="\/collections"/);
   assert.doesNotMatch(html, /Collection filters|Show all public Profiles/);
+  assert.equal(nodes(tree, (node) => ["input", "select", "button"].includes(node.type)).length, 0);
+  assert.doesNotMatch(html, /<(?:input|select|button)\b/i);
+  assert.doesNotMatch(html, /href="\/i\//);
 });
 
 test("a filtered collection can reset to its original public Profiles", () => {

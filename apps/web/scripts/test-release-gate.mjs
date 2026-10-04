@@ -1,3 +1,6 @@
+import {spawnSync} from "node:child_process";
+import path from "node:path";
+import {fileURLToPath} from "node:url";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { RELEASE_CHECKS, RELEASE_VERSION, REQUIRED_DATABASE_CHECKS, checkBackendReadiness, runReleaseChecks, validateReadiness, verifyProduction } from "../../../scripts/release-policy.mjs";
@@ -12,6 +15,12 @@ for(let i=0;i<RELEASE_CHECKS.length;i++)test("failed local gate "+i+" prevents l
  assert.deepEqual(calls,RELEASE_CHECKS.slice(0,i+1));
 });
 test("all exact current readiness checks pass",()=>assert.equal(validateReadiness(valid()).ready,true));
+test('historical five-free response cannot satisfy current release gate',()=>{assert.throws(()=>validateReadiness({...valid(),releaseVersion:'2026-09-23.1'}));});
+for(const child of ['','.qr4-rejected-export'])test('current verifier rejects candidate export root: '+(child||'exact repo'),()=>{
+ const repo=fileURLToPath(new URL('../../../',import.meta.url)),generator=fileURLToPath(new URL('./generate-current-release-readiness.mjs',import.meta.url));
+ const result=spawnSync(process.execPath,[generator,'--repo',repo,'--output-root',path.resolve(repo,child)],{encoding:'utf8'});
+ assert.equal(result.status,1);assert.match(result.stderr,/Verification only; --output-root is unsupported/);
+});
 for(const [name,mutate] of [
  ["version mismatch",v=>v.releaseVersion="old"],["false readiness",v=>v.ready=false],
  ["empty checks",v=>v.checks=[]],["missing check",v=>v.checks.pop()],

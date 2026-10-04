@@ -56,7 +56,10 @@ await test("the PATCH route turns the bounded-reader result into a predictable 4
 await test("the edit client stages bytes first and its PATCH contains paths instead of data URLs", async () => {
   const page = readRepo("apps/web/app/edit/[code]/page.tsx");
   const save = page.slice(page.indexOf("async function saveChanges"), page.indexOf("async function saveVerificationSettings"));
-  assert.ok(save.indexOf("await stageSelectedFiles()") < save.indexOf('fetch("/api/instruments"'));
+  const stageStart = save.indexOf("const staging = stageSelectedFiles(");
+  const stageSettled = save.indexOf("await editorDeadline(staging, 30000, stagingLease)");
+  const dispatch = save.indexOf('await editorRequest("/api/instruments"');
+  assert.ok(stageStart >= 0 && stageSettled > stageStart && dispatch > stageSettled);
   assert.match(save, /heroImagePath: staged\.photoPaths/);
   assert.match(save, /photos: staged\.photoPaths/);
   assert.match(save, /storagePath: staged\.documentPaths\[index\]/);

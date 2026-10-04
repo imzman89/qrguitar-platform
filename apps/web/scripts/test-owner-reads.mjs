@@ -20,6 +20,7 @@ const compile=(source, bindings={}, file='fixture.ts')=>{
 const helpers=compile(read('apps/web/lib/owner-record-read.ts'));
 const contract=compile(read('apps/web/lib/instrument-profile-contract.ts'));
 const trust=compile(read('apps/web/lib/record-trust.ts'));
+const {cleanPublicCollection,publicCollectionOwnerKey}=compile(read('apps/web/lib/public-collections.ts'));
 const route=read('apps/web/app/api/instruments/route.ts');
 const ast=ts.createSourceFile('route.ts',route,ts.ScriptTarget.Latest,true);
 const names=['isRenderablePublicMediaSource','publicSummary','instrumentConditionFromSpec','saleStatusFromSpec','originalityStatusFromSpec','mapInstrumentRow','mapServiceEvent','loadRecordsForUser','GET'];
@@ -52,7 +53,7 @@ function database(tables={}, {cap=7,failTable='',rejectTable=''}={}) {
 const guitar=(id='g0', extra={})=>({id,owner_id:owner.id,qr_code:id.toUpperCase(),permanent_path:`/i/${id.toUpperCase()}`,name:id,brand:'Fender',model:'Telecaster',year:'1962',serial_number:`serial-${id}`,summary:'Original description',status:'verified',visibility:'private',hero_image_path:null,owner_removed_at:null,created_at:'2026-09-01',...extra});
 function fixture(db,{sign=async(bucket,source)=>`https://storage.test/${bucket}/${source}?signed=yes`,user=owner,configured=true}={}) {
   return compile(functions,{
-    ...helpers,...contract,...trust,defaultQrStyle:{},MEDIA_BUCKET:'instrument-media',DOCUMENT_BUCKET:'instrument-documents',PUBLIC_MEDIA_SIGNED_URL_TTL_SECONDS:86400,
+    ...helpers,...contract,...trust,cleanPublicCollection,publicCollectionOwnerKey,defaultQrStyle:{},MEDIA_BUCKET:'instrument-media',DOCUMENT_BUCKET:'instrument-documents',PUBLIC_MEDIA_SIGNED_URL_TTL_SECONDS:86400,
     supabaseSignedStorageUrl:sign,createServerSupabaseClient:()=>configured?db:null,
     getAuthenticatedUser:async()=>({user,error:user?'':'Sign in required.'}),canManageRecordVerification:async()=>false,
     noStore:()=>{},noStoreJson:(body,init={})=>({body,status:init.status||200,headers:init.headers||{}})
@@ -105,7 +106,11 @@ test('owner code lookup filters before related reads; another owner and removed 
   const removed=await get(api,'scope=mine&code=g3&includeRemoved=1');assert.equal(removed.status,200);assert.equal(removed.body.instrument.collectionRemovedAt,'2026-09-02');
 });
 test('empty collection is a complete successful read with no related queries',async()=>{
-  const db=database({});const res=await get(fixture(db));assert.equal(res.status,200);assert.deepEqual(res.body,{ok:true,instruments:[],count:0});assert.ok(db.calls.every(q=>['profiles','guitars'].includes(q.table)));
+  const db=database({});const res=await get(fixture(db));assert.equal(res.status,200);assert.deepEqual(res.body,{ok:true,instruments:[],count:0});
+  const collectionReads=db.calls.filter(q=>q.table==='site_content');
+  assert.equal(collectionReads.length,1);
+  assert.deepEqual(collectionReads[0],{table:'site_content',filters:[['eq','content_key',publicCollectionOwnerKey(owner.id)]],orders:[],columns:'content_value',from:undefined,to:undefined});
+  assert.ok(db.calls.filter(q=>q.table!=='site_content').every(q=>['profiles','guitars'].includes(q.table)));
 });
 for(const table of ['profiles','guitars','guitar_media','guitar_specs','guitar_documents','guitar_timeline_events','ownership_transfers','site_content']) {
   test(`owner ${table} error yields retryable 503 instead of a misleading empty or partial result`,async()=>{

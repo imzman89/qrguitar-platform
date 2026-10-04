@@ -101,6 +101,7 @@ export function ProfileQuickEdit({ record, onClose, onSaved, isSessionCurrent }:
     setSaving(true);
     setMessage("");
     try {
+      if (record.visibility !== "public" && record.visibility !== "private" && record.visibility !== "unlisted") throw new Error("Reload this Profile before saving again.");
       const versionPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/;
       if (typeof record.updatedAt !== "string" || !versionPattern.test(record.updatedAt) || !Number.isFinite(Date.parse(record.updatedAt))) throw new Error("Reload this Profile before saving again.");
       const documentIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -131,7 +132,7 @@ export function ProfileQuickEdit({ record, onClose, onSaved, isSessionCurrent }:
           originalityStatus: record.originalityStatus || "unknown",
           ownerName: record.owner,
           location: form.location,
-          visibility: "public",
+          visibility: form.visibility,
           summary: form.summary,
           heroImageDataUrl: form.heroImageDataUrl,
           photos,
@@ -166,7 +167,7 @@ export function ProfileQuickEdit({ record, onClose, onSaved, isSessionCurrent }:
         updatedAt: payload.updatedAt,
         documentFiles: record.documentFiles.map((document) => ({ ...document, updatedAt: payload.updatedAt })),
         name: form.name,
-        visibility: "public",
+        visibility: form.visibility,
         showSerialPublic: Boolean(record.serial) && form.showSerialPublic,
         saleStatus: form.saleStatus,
         instrumentCondition: form.condition,
@@ -195,7 +196,7 @@ export function ProfileQuickEdit({ record, onClose, onSaved, isSessionCurrent }:
         </header>
         <div className="quick-edit-grid">
           <label className="field"><span>{ui("ui.components.ProfileQuickEdit.8d615ba766e1", "Profile title")}</span><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
-          <p className="field-note">{ui("ui.components.ProfileQuickEdit.catalogSavePolicy", "Saving adds this instrument to Catalog and links your collection. Choose document sharing in the full editor.")}</p>
+          <p className="field-note">{ui("ui.components.ProfileQuickEdit.savePreservesVisibility", "Saving keeps this Profile’s visibility and does not publish your collection. Choose document sharing in the full editor.")}</p>
           <label className="field"><span>{ui("ui.components.ProfileQuickEdit.12f67f8539c4", "Availability")}</span><select value={form.saleStatus} onChange={(event) => setForm({ ...form, saleStatus: event.target.value as QuickEditForm["saleStatus"] })}><option value="not_for_sale">{ui("ui.components.ProfileQuickEdit.323d22588945", "Not for sale")}</option><option value="for_sale">{ui("ui.components.ProfileQuickEdit.aedf56fc02b4", "For sale")}</option></select></label>
           <label className="field"><span>{ui("ui.components.ProfileQuickEdit.39b36d38d6eb", "Condition")}</span><select value={form.condition} onChange={(event) => setForm({ ...form, condition: event.target.value as QuickEditForm["condition"] })}><option value="used">{ui("ui.components.ProfileQuickEdit.ae7d8dfac9ff", "Used")}</option><option value="new">{ui("ui.components.ProfileQuickEdit.18fdd549b2ed", "New")}</option></select></label>
           <label className="field"><span>{ui("ui.components.ProfileQuickEdit.15b61974b270", "Location")}</span><input value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} /></label>
@@ -216,7 +217,7 @@ export function ProfileQuickEdit({ record, onClose, onSaved, isSessionCurrent }:
 function toForm(record: DemoInstrument, photos: string[]): QuickEditForm {
   return {
     name: record.name || `${record.brand} ${record.model}`.trim(),
-    visibility: "public",
+    visibility: record.visibility === "public" || record.visibility === "unlisted" ? record.visibility : "private",
     showSerialPublic: record.showSerialPublic === true,
     saleStatus: record.saleStatus || "not_for_sale",
     condition: getInstrumentCondition(record),

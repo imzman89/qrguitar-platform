@@ -29028,4 +29028,58 @@ export const retiredUiTextEntries = [
   "area": "Product",
   "page": "Bulk Import"
 },
+  {
+    "key": "ui.app.create.page.catalogSavePolicy",
+    "scope": "app.create.page",
+    "text": "Saving adds this instrument and its photos to Catalog and links your collection. You choose which documents to share.",
+    "area": "Product",
+    "page": "Create Profile",
+    "section": "Catalog and document sharing",
+    "source": "app/create/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.catalogIncluded",
+    "scope": "app.edit.code.page",
+    "text": "Included in Catalog",
+    "area": "Product",
+    "page": "Edit Profile",
+    "section": "Catalog and document sharing",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.edit.code.page.catalogSavePolicy",
+    "scope": "app.edit.code.page",
+    "text": "Saving adds this instrument and its photos to Catalog and links your collection. You choose which documents to share.",
+    "area": "Product",
+    "page": "Edit Profile",
+    "section": "Catalog and document sharing",
+    "source": "app/edit/[code]/page.tsx"
+  },
+  {
+    "key": "ui.app.account.page.automaticCollectionHelp",
+    "scope": "app.account.page",
+    "text": "Every saved instrument links this collection. Your collection joins Member Collections automatically after an instrument is saved.",
+    "area": "Product",
+    "page": "Account",
+    "section": "Catalog and document sharing",
+    "source": "app/account/page.tsx"
+  },
+  {
+    "key": "ui.app.account.page.instrumentSharingHelp",
+    "scope": "app.account.page",
+    "text": "Every saved instrument appears in Catalog. Its editor controls document sharing, service history, Serial Number display, and QR downloads.",
+    "area": "Product",
+    "page": "Account",
+    "section": "Catalog and document sharing",
+    "source": "app/account/page.tsx"
+  },
+  {
+    "key": "ui.components.ProfileQuickEdit.catalogSavePolicy",
+    "scope": "components.ProfileQuickEdit",
+    "text": "Saving adds this instrument to Catalog and links your collection. Choose document sharing in the full editor.",
+    "area": "Product",
+    "page": "Quick Edit",
+    "section": "Catalog and document sharing",
+    "source": "components/ProfileQuickEdit.tsx"
+  },
 ];

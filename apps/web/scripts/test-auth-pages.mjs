@@ -70,7 +70,9 @@ function fixture(page, options = {}) {
   const router = { replace: href => f.navigations.push(href) };
   const location = new URL('https://www.qrguitar.com/' + page + (options.search || '?next=%2Fdashboard'));
   location.replace = href => f.documentNavigations.push(href);
+  f.document = { title: '' };
   const globals = {
+    document: f.document,
     window: { location, history: { replaceState(_state, _title, href) { f.history.push(href); } }, setTimeout: setTimer, clearTimeout: clearTimer, dispatchEvent() {} },
     setTimeout: setTimer, clearTimeout: clearTimer, CustomEvent: class { constructor(type) { this.type = type; } },
   };
@@ -131,6 +133,7 @@ test('login: tab keyboard activation updates focus, one tab stop and labelled pa
   const focused = [];
   for (const mode of ['login', 'register']) f.node(node => node.props?.id === 'auth-' + mode + '-tab').props.ref.current = { focus: () => focused.push(mode) };
   const check = mode => {
+    assert.equal(f.document.title, mode === 'register' ? 'Create your QRguitar account' : 'Sign in to QRguitar');
     for (const candidate of ['login', 'register']) {
       const tab = f.node(node => node.props?.id === 'auth-' + candidate + '-tab');
       assert.equal(tab.props['aria-selected'], candidate === mode);
@@ -163,6 +166,7 @@ test('login: pending authentication ignores tab keyboard activation and preserve
   const tab = f.node(node => node.props?.id === 'auth-login-tab');
   f.node(node => node.props?.id === 'auth-register-tab').props.ref.current = { focus() { assert.fail('Pending request must not move to another tab'); } };
   assert.equal(tab.props.disabled, true);
+  assert.equal(f.document.title, 'Sign in to QRguitar');
   for (const key of ['ArrowRight', 'End']) tab.props.onKeyDown({ key, preventDefault() {} }); f.render();
   assert.equal(f.node(node => node.props?.id === 'auth-login-tab').props['aria-selected'], true);
   assert.equal(f.node(node => node.props?.id === 'password').props.value, 'new-password-123');
@@ -172,9 +176,11 @@ test('login: pending authentication ignores tab keyboard activation and preserve
 
 test('login: password reset has no orphan tab semantics and returns to the sign-in panel', async () => {
   const f = fixture('login', { search: '?mode=reset&next=%2Faccount' }); await f.flush(); f.input('email', 'owner@example.test');
+  assert.equal(f.document.title, 'Reset your QRguitar password');
   assert.equal(f.node(node => node.props?.role === 'tablist'), undefined);
   assert.equal(f.node(node => node.props?.role === 'tabpanel'), undefined);
   f.click('Back to sign in');
+  assert.equal(f.document.title, 'Sign in to QRguitar');
   assert.equal(f.node(node => node.props?.id === 'auth-login-tab').props.tabIndex, 0);
   assert.equal(f.node(node => node.props?.role === 'tabpanel').props['aria-labelledby'], 'auth-login-tab');
   assert.equal(f.node(node => node.props?.id === 'email').props.value, 'owner@example.test');

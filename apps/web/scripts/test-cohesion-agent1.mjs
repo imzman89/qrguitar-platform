@@ -39,7 +39,7 @@ function fixture(t, relative, options={}) {
     setTimeout(fn,delay){timers.set(++timer,{fn,delay});return timer;},clearTimeout(id){timers.delete(id);},matchMedia:()=>({matches:false,addEventListener(){},removeEventListener(){}})};
   const doc={activeElement:null,body:{style:{}},documentElement:{clientWidth:1280},getElementById:()=>null,querySelector:()=>null,
     addEventListener(){},removeEventListener(){},createElement:()=>({click(){}})};
-  const record={recordId:"11111111-1111-4111-8111-111111111111",qrCode:"FIXTURE",name:"Saved instrument",brand:"Fender",model:"Stratocaster",serial:"ABC123",instrumentType:"Electric Guitar",condition:"used",visibility:"private",heroImageDataUrl:"https://fixture.invalid/photo.jpg",galleryImages:["https://fixture.invalid/photo.jpg"],customFields:[],customLinks:[],serviceEvents:[],documentFiles:[],ownerId:"actor-a",createdAt:"2026-09-01"};
+  const record={recordId:"11111111-1111-4111-8111-111111111111",qrCode:"FIXTURE",name:"Saved instrument",brand:"Fender",model:"Stratocaster",serial:"ABC123",instrumentType:"Electric Guitar",condition:"used",visibility:"private",heroImageDataUrl:"https://fixture.invalid/photo.jpg",galleryImages:["https://fixture.invalid/photo.jpg"],customFields:[],customLinks:[],serviceEvents:[],documentFiles:[],ownerId:"actor-a",createdAt:"2026-09-01",updatedAt:"2026-09-01T00:00:00.000Z"};
   const fetcher=async(url,init={})=>{const request={url:String(url),method:init.method||"GET",body:init.body?JSON.parse(init.body):undefined,signal:init.signal};requests.push(request);
     const custom=options.fetch?.(request);if(custom!==undefined)return custom;
     if(request.url.startsWith("/api/instruments?"))return Response.json({ok:true,instrument:{...record,qrCode:routeCode,ownerId:session?.user.id},canManageVerification:true});
@@ -49,6 +49,10 @@ function fixture(t, relative, options={}) {
     if(request.url==="/api/ownership-claims")return Response.json({ok:true,claims:[]});
     if(request.url==="/api/admin/overview")return Response.json({ok:true,stats:{},health:{systems:[],migrations:{}}});
     if(request.url.startsWith("/api/admin/"))return Response.json({ok:true,users:[],records:[],auditEvents:[]});
+    if(request.url==="/api/instruments"&&request.method==="PATCH"&&!request.body?.verificationOnly){
+      record.updatedAt=new Date(Date.parse(record.updatedAt)+1000).toISOString();
+      return Response.json({ok:true,qrCode:request.body.qrCode,updatedAt:record.updatedAt});
+    }
     return Response.json({ok:true,qrCode:"FIXTURE",verificationStatus:"unverified",authenticityStatus:"unconfirmed",safetyStatus:"clear"});
   };
   const cache=new Map(), icons=new Proxy({}, {get:()=>"icon"}), jsx=(type,props,key)=>({type,props,key});
@@ -113,8 +117,10 @@ test("Edit pending write and returning actor cannot overwrite or silently unlock
   f.actor("actor-a");await f.flush();assert.equal(f.button("Add Media").props.disabled,true);assert.ok(f.button("Check saved result"));assert.equal(writeCount(f),1);
 });
 for(const stage of ["trust","safety"]) test("Edit confirmed details followed by "+stage+" failure has an honest partial receipt",async t=>{
-  const f=edit(t,{fetch:r=>r.method==="PATCH"&&((stage==="trust"&&r.body?.verificationOnly)||(stage==="safety"&&r.url==="/api/safety-status"))?Promise.reject(Error("lost stage")):undefined});await f.flush();f.change("summary","Retained new draft");
+  const f=edit(t,{fetch:r=>r.method==="PATCH"&&((stage==="trust"&&r.body?.verificationOnly)||(stage==="safety"&&r.url==="/api/safety-status"))?Promise.reject(Error("lost stage")):undefined});await f.flush();const observedUpdatedAt=f.record.updatedAt;f.change("summary","Retained new draft");
   f.click("Save Changes");await f.flush();assert.match(f.text(),stage==="trust"?/Profile details were saved.*Trust settings were not confirmed; safety was not sent/:/Profile details and trust settings were saved.*Safety status was not confirmed/);
+  const details=f.requests.find(r=>r.url==="/api/instruments"&&r.method==="PATCH"&&!r.body?.verificationOnly);assert.ok(details);
+  assert.equal(details.body.expectedUpdatedAt,observedUpdatedAt);assert.deepEqual(details.body.expectedDocuments,[]);
   assert.doesNotMatch(f.text(),/Profile details failed:/);assert.equal(f.button("Save Changes").props.disabled,true);
   if(stage==="trust")assert.equal(f.requests.some(r=>r.url==="/api/safety-status"),false);
   const before=writeCount(f);f.click("Check saved result");await f.flush();assert.equal(writeCount(f),before);assert.equal(f.find(n=>n.props?.id==="summary").props.value,"Retained new draft");assert.match(f.text(),/Saved Profile result/);
@@ -343,4 +349,26 @@ test("Admin explicit section navigation applies only the most recent section req
   const f=fixture(t,"app/admin/page.tsx",{component:"AdminWorkspace"});await f.flush();const nav=connectAdminHeading(f);
   f.click("Audit Log");f.click("Profiles");nav.zero();
   assert.equal(nav.focused.length,1);assert.equal(nav.scrolled.length,1);assert.equal(nav.query.at(-1),"/admin?section=records");assert.equal(writeCount(f),0);
+});
+
+for (const updatedAt of [undefined, "not-a-version"]) test("Edit absent or malformed observed revision blocks staging and all writes: " + String(updatedAt), async t => {
+  let uploads = 0;
+  const f = edit(t, { fetch: r => r.url.startsWith("/api/instruments?") ? Response.json({ ok: true, instrument: { ...f.record, updatedAt }, canManageVerification: true }) : undefined,
+    imports: { "../../../lib/profile-upload-client": { dataUrlToProfileFile: v => v, uploadProfileFile: async () => { uploads++; return "unexpected-upload-path"; } } } });
+  await f.flush(); f.change("summary", "Retained revision-blocked draft"); await selectFixtureDocuments(f);
+  f.click("Save Changes"); await f.flush();
+  assert.match(f.text(), /Profile details failed: Reload this Profile before saving again\./);
+  assert.equal(uploads, 0); assert.equal(writeCount(f), 0);
+  assert.equal(f.find(n => n.props?.id === "summary").props.value, "Retained revision-blocked draft");
+});
+test("Edit successful details response without a revision stays unconfirmed and sends no trust or safety", async t => {
+  const f = edit(t, { fetch: r => r.url === "/api/instruments" && r.method === "PATCH" && !r.body?.verificationOnly ? Response.json({ ok: true, qrCode: "FIXTURE" }) : undefined });
+  await f.flush(); f.change("summary", "Retained unconfirmed draft"); f.click("Save Changes"); await f.flush();
+  const details = f.requests.filter(r => r.url === "/api/instruments" && r.method === "PATCH" && !r.body?.verificationOnly);
+  assert.equal(details.length, 1); assert.equal(details[0].body.expectedUpdatedAt, "2026-09-01T00:00:00.000Z");
+  assert.deepEqual(details[0].body.expectedDocuments, []);
+  assert.match(f.text(), /saved result is not fully confirmed/);
+  assert.equal(f.button("Save Changes").props.disabled, true); assert.equal(writeCount(f), 1);
+  assert.equal(f.requests.some(r => r.body?.verificationOnly || r.url === "/api/safety-status"), false);
+  assert.equal(f.find(n => n.props?.id === "summary").props.value, "Retained unconfirmed draft");
 });

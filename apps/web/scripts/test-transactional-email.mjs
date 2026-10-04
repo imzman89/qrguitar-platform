@@ -26,7 +26,10 @@ function compile(relativePath, imports = {}) {
 const renderer = compile("lib/transactional-email-renderer.ts");
 const boundary = compile("lib/email-template-boundary.ts");
 const contentRegistry = compile("lib/content-registry.ts", {
-  "./ui-text-registry": compile("lib/ui-text-registry.ts"),
+  "./ui-text-registry": compile("lib/ui-text-registry.ts", {
+    "./catalog-policy-ui-text": compile("lib/catalog-policy-ui-text.ts"),
+    "./owner-dashboard-policy-ui-text": compile("lib/owner-dashboard-policy-ui-text.ts")
+  }),
   "./ui-text-protection": compile("lib/ui-text-protection.ts")
 });
 const emailEntries = new Map([

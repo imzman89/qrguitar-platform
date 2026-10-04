@@ -25,6 +25,9 @@ function date(value: unknown) {
 }
 // Normalize once so identical retries have an identical canonical JSONB fingerprint.
 export function buildCreateProfilePayload(body: Record<string,unknown>, canonicalBrand: string, _ownerName: string, linkLabel: (value:string)=>string) {
+  if (body.visibility !== undefined && body.visibility !== "public" && body.visibility !== "private" && body.visibility !== "unlisted") {
+    throw new CreateProfileError("Invalid Profile visibility.");
+  }
   const brand=text(canonicalBrand,200,"Brand"), model=text(body.model,200,"Model");
   const serial=optional(body.serial,200,"Serial Number");
   if(!brand||!model||!text(body.instrumentType,200,"Instrument type")||(!serial&&body.serialNotUsed!==true)) throw new CreateProfileError("Brand, model, instrument type and Serial Number are required unless no serial is used.");

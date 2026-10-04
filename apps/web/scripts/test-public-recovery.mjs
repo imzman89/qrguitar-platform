@@ -10,7 +10,33 @@ test('failed refresh retains the actual last catalog snapshot and gives recovery
 test('an older catalog reply cannot overwrite a newer retry and an unmounted reply is ignored',async()=>{const one=deferred(),two=deferred();let calls=0;const h=catalogHarness(()=>++calls===1?one.promise:two.promise);const a=h.run(),b=h.run();two.resolve([{qrCode:'QRG-NEW'}]);await b;one.resolve([{qrCode:'QRG-OLD'}]);await a;assert.equal(h.state.records[0].qrCode,'QRG-NEW');const late=deferred();const k=catalogHarness(()=>late.promise);const c=k.run();k.env.recordsActive.current=false;k.env.recordsRevision.current++;late.resolve([{qrCode:'QRG-LATE'}]);await c;assert.equal(k.state.records[0].qrCode,'QRG-LAST');});
 function latestHarness(request,initialRecord=null){const {sf}=ast('components/LatestPublicRecord.tsx');let expression;function walk(n){if(ts.isCallExpression(n)&&n.expression.getText(sf)==='useEffect')expression=n.arguments[0].getText(sf);ts.forEachChild(n,walk);}walk(sf);assert.ok(expression);const state={latest:initialRecord,failed:false,loaded:false};const env={requestPublicProfiles:request,initialRecord,presentation:'card',selectHomeFeaturedProfile:records=>records[0]||null,setLatest:v=>state.latest=v,setFailed:v=>state.failed=v,setLoaded:v=>state.loaded=v};const dispose=new Function(...Object.keys(env),js('const effect='+expression+';')+'\nreturn effect();')(...Object.values(env));return{state,dispose};}
 test('homepage example failure is unavailable, retains an existing photo and never implies no Profiles',async()=>{const initial={qrCode:'QRG-EXISTING'};const h=latestHarness(async()=>{throw Error('offline');},initial);await tick();assert.equal(h.state.failed,true);assert.equal(h.state.loaded,true);assert.equal(h.state.latest,initial);h.dispose();const k=latestHarness(async()=>[]);await tick();assert.equal(k.state.failed,false);assert.equal(k.state.latest,null);k.dispose();});
-test('the actual guide page renders when only its optional example fails',async()=>{const settings={content:{}};const {default:Page}=mod('app/how-it-works/page.tsx',{'../../lib/public-instruments':{getPublicInstruments:async()=>{throw Error('offline');}},'../../lib/home-featured-profile':{selectHomeFeaturedProfile:r=>r[0]||null},'next/cache':{unstable_noStore(){}},'../../lib/site-settings-server':{loadPublishedSiteSettings:async()=>settings},'./HowItWorksClient':{HowItWorksClient:()=>null}});const result=await Page();assert.equal(result.props.settings,settings);assert.equal(result.props.example,null);});
+function pureExport(file,name){
+  const {sf}=ast(file);
+  const declaration=sf.statements.find(node=>ts.isFunctionDeclaration(node)&&node.name?.text===name);
+  assert.ok(declaration,name+' source export');
+  const exports={};
+  new Function('exports',js(declaration.getText(sf)))(exports);
+  return exports;
+}
+test('the actual guide page renders when only its optional example fails',async()=>{
+  const settings={content:{},composition:{howItWorks:{sections:[]}}};
+  const HowItWorksClient=()=>null;
+  const {default:Page}=mod('app/how-it-works/page.tsx',{
+    '../../lib/public-instruments':{getPublicInstruments:async()=>{throw Error('offline');}},
+    '../../lib/home-featured-profile':{selectHomeFeaturedProfile:r=>r[0]||null},
+    'next/cache':{unstable_noStore(){}},
+    '../../lib/site-settings-server':{loadPublishedSiteSettings:async()=>settings},
+    '../../lib/site-settings':pureExport('lib/site-settings.ts','resolveVisibleEditorialSections'),
+    '../../lib/seo':pureExport('lib/seo.ts','serializeJsonLd'),
+    '../../lib/site-metadata':{buildManagedPageMetadata(){assert.fail('Guide rendering must not call metadata generation');}},
+    './HowItWorksClient':{HowItWorksClient}
+  });
+  const result=await Page();
+  const clients=require('react').Children.toArray(result.props.children).filter(node=>node.type===HowItWorksClient);
+  assert.equal(clients.length,1,'actual guide client occurs once');
+  assert.equal(clients[0].props.settings,settings);
+  assert.equal(clients[0].props.example,null);
+});
 
 test('ownership context opens only a fresh owned Profile; delayed prior-actor effects cannot reopen private state',()=>{
   const {sf}=ast('app/dashboard/page.tsx');let expression;function walk(n){if(ts.isCallExpression(n)&&n.expression.getText(sf)==='useEffect'&&n.arguments[0]?.getText(sf).includes('transferLinkOpened.current'))expression=n.arguments[0].getText(sf);ts.forEachChild(n,walk);}walk(sf);assert.ok(expression);

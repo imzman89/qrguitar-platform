@@ -15,7 +15,7 @@ test("healthy deployed app checks its own service database and reveals only read
  const res=await route(db).GET();assert.equal(res.status,200);assert.equal(call.name,"qrguitar_release_readiness");assert.ok(call.signal instanceof AbortSignal);
  assert.deepEqual(await res.json(),{status:"ready",releaseVersion:contract.RELEASE_VERSION});assert.match(res.headers.get("cache-control"),/no-store/);
 });
-for(const [name,result]of [["missing migration",{error:{code:"PGRST202",message:"private server detail"}}],["false readiness",{data:{...valid(),ready:false}}],["missing check",{data:{...valid(),checks:[]}}],["bad version",{data:{...valid(),releaseVersion:"old"}}]])test("health fails closed for "+name,async()=>{
+for(const [name,result]of [["missing migration",{error:{code:"PGRST202",message:"private server detail"}}],["historical five-free version",{data:{...valid(),releaseVersion:"2026-09-23.1"}}],["false readiness",{data:{...valid(),ready:false}}],["missing check",{data:{...valid(),checks:[]}}],["bad version",{data:{...valid(),releaseVersion:"old"}}]])test("health fails closed for "+name,async()=>{
  const res=await route({rpc:()=>({abortSignal:async()=>result})}).GET();assert.equal(res.status,503);assert.equal(res.headers.get("retry-after"),"30");assert.deepEqual(await res.json(),{status:"unavailable",releaseVersion:contract.RELEASE_VERSION});
 });
 test("missing configuration and database transport outage return sanitized503",async()=>{
