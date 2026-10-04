@@ -895,6 +895,11 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
 
 
 
+        <div className={styles["scan-actions"]}>
+          <Link className={styles["profile-action"]} href={"/handout/" + encodeURIComponent(instrument.qrCode)}>
+            <FileText size={16} aria-hidden="true" /> {getContentValue(publicContent, "printWorkspace.title")}
+          </Link>
+        </div>
         {canEdit ? (
         <section className={styles["scan-actions"]} aria-label={ui("ui.app.i.code.ProfileClient.bfeb7617d7e2", "Owner profile actions")}>
           {canEdit ? (

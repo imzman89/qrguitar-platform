@@ -23,7 +23,7 @@ const localDemo = { instrumentDisplayName: (record) => record.name || [record.br
 const contract = compile("lib/instrument-profile-contract.ts");
 const badges = compile("components/ProfileStatusBadges.tsx", { "next/link": Link, "../lib/local-demo": localDemo });
 const identity = compile("components/ProfileIdentity.tsx");
-const contentLabels = { "profile.tabs.overview": "Overview", "profile.tabs.specifications": "Details", "profile.gallery.label": "Instrument photographs", "profile.verification.title": "Verified by QRguitar", "profile.verification.body": "Record details have been reviewed.", "profile.authenticity.title": "Authenticity Confirmed", "profile.authenticity.body": "Authenticity evidence has been reviewed." };
+const contentLabels = { "printWorkspace.title": "Print Suite", "profile.tabs.overview": "Overview", "profile.tabs.specifications": "Details", "profile.gallery.label": "Instrument photographs", "profile.verification.title": "Verified by QRguitar", "profile.verification.body": "Record details have been reviewed.", "profile.authenticity.title": "Authenticity Confirmed", "profile.authenticity.body": "Authenticity evidence has been reviewed." };
 const sale = compile("lib/profile-sale.ts", { "./public-collections": compile("lib/public-collections.ts"), "./profile-purchase-link": compile("lib/profile-purchase-link.ts", { "./public-collections": compile("lib/public-collections.ts") }) });
 const Profile = compile("app/i/[code]/ProfileClient.tsx", {
   "next/link": Link,
@@ -104,6 +104,31 @@ test("confirmed trust explanations appear once and saved badge visibility remain
   assert.equal((html.match(/Verified by QRguitar/g) || []).length, 1);
   assert.equal((html.match(/Authenticity Confirmed/g) || []).length, 1);
   assert.doesNotMatch(render({ showVerificationBadge: false, showAuthenticityBadge: false }), /Verified by QRguitar|Authenticity Confirmed/);
+});
+
+test("public Profile offers one styled Print Suite action without exposing owner controls or hidden fields", () => {
+  const html = render();
+  const actions = html.match(/<a\b[^>]*href="\/handout\/QRG-LAYOUT"[^>]*>[\s\S]*?<\/a>/g) || [];
+  assert.equal(actions.length, 1);
+  assert.match(actions[0], /class="profile-action"/);
+  assert.match(actions[0], /> Print Suite<\/a>/);
+  assert.doesNotMatch(html, /Owner profile actions|Edit Profile|Ownership Tools|PRIVATE-SERIAL-123|Private receipt|private\.pdf/);
+});
+
+test("Print discovery uses the instrument canonical code and the editable CMS label", () => {
+  const previous = contentLabels["printWorkspace.title"];
+  contentLabels["printWorkspace.title"] = "Make a tag";
+  try {
+    const html = renderToStaticMarkup(React.createElement(Profile, { code: "qrg-legacy/x y", initialInstrument: { ...record, qrCode: "QRG-LEGACY/X Y" } }));
+    assert.match(html, /href="\/handout\/QRG-LEGACY%2FX%20Y"/);
+    assert.match(html, /> Make a tag<\/a>/);
+    assert.doesNotMatch(html, /> Print Suite<\/a>/);
+  } finally { contentLabels["printWorkspace.title"] = previous; }
+});
+
+test("a missing Profile does not expose a Print action", () => {
+  const html = renderToStaticMarkup(React.createElement(Profile, { code: record.qrCode, initialInstrument: null }));
+  assert.doesNotMatch(html, /href="\/handout\//);
 });
 
 test("post-purchase ownership help follows item details while owner actions stay absent", () => {
