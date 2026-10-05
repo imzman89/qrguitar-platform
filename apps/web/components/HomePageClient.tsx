@@ -115,6 +115,7 @@ export function HomePageClient({
       <section className="hero">
         <div className="shell hero-grid">
           <div className="hero-copy">
+            {copy.hero.eyebrow ? <div className="eyebrow">{copy.hero.eyebrow}</div> : null}
             <h1>{copy.hero.headline}</h1>
             <p>{copy.hero.body}</p>
             <div className="hero-actions">
@@ -137,7 +138,9 @@ export function HomePageClient({
         <div className="shell home-archive">
             <div className="home-archive-heading">
               <div>
+                {settings?.content["home.archive.eyebrow"] ? <div className="eyebrow">{settings.content["home.archive.eyebrow"]}</div> : null}
                 <h2>{settings?.content["home.archive.heading"] || ui("ui.components.HomePageClient.3b67d76945bd", "Profiles")}</h2>
+                {settings?.content["home.archive.body"] ? <p>{settings.content["home.archive.body"]}</p> : null}
               </div>
               <div className="home-archive-actions">
                 <Link className="text-link" href="/catalog">{settings?.content["home.archive.viewAll"] || ui("ui.components.HomePageClient.025320721b82", "Catalog")}</Link>
@@ -160,7 +163,9 @@ export function HomePageClient({
       <section className="section home-lifecycle-section">
         <div className="shell">
           <div className="section-header">
+            {copy.workflow.eyebrow ? <div className="eyebrow">{copy.workflow.eyebrow}</div> : null}
             <h2>{copy.workflow.headline}</h2>
+            {copy.workflow.body ? <p>{copy.workflow.body}</p> : null}
           </div>
           <div className="grid three">
             {sectionBlocks("lifecycle").map((item) => <Card key={item.id} icon={<EditorialIcon name={item.icon} size={30} />} title={item.title} copy={item.body} />)}
@@ -172,6 +177,7 @@ export function HomePageClient({
       <section className="section record-holds-section">
         <div className="shell record-holds-layout">
           <div className="record-holds-copy">
+            {copy.customization.eyebrow ? <div className="eyebrow">{copy.customization.eyebrow}</div> : null}
             <h2>{copy.customization.headline}</h2>
             <p>{copy.customization.body}</p>
             <div className="inline-cta-row"><Link className="button" href={supportingRecord ? `/i/${encodeURIComponent(supportingRecord.qrCode)}` : "/catalog"}>{supportingRecord ? copy.customization.cta : copy.hero.secondaryCta}</Link></div>
@@ -193,7 +199,7 @@ export function HomePageClient({
     roles: (
       <section className="section home-roles-section">
         <div className="shell">
-          <div className="section-header"><h2>{copy.audiences.headline}</h2>{copy.audiences.body ? <p>{copy.audiences.body}</p> : null}</div>
+          <div className="section-header">{copy.audiences.eyebrow ? <div className="eyebrow">{copy.audiences.eyebrow}</div> : null}<h2>{copy.audiences.headline}</h2>{copy.audiences.body ? <p>{copy.audiences.body}</p> : null}</div>
           <div className="audience-switcher">
             <div className="audience-tabs" role="tablist" aria-label={ui("ui.components.HomePageClient.5545daa79d3d", "Choose how you use QRguitar")} onKeyDown={(event) => {
               const next = event.key === "ArrowRight" ? (activeAudience + 1) % audienceBlocks.length : event.key === "ArrowLeft" ? (activeAudience - 1 + audienceBlocks.length) % audienceBlocks.length : event.key === "Home" ? 0 : event.key === "End" ? audienceBlocks.length - 1 : null;
@@ -210,6 +216,7 @@ export function HomePageClient({
       <section className="section continuity-section">
         <div className="shell continuity-layout">
           <div className="continuity-intro">
+            {settings?.content["home.continuity.eyebrow"] ? <div className="eyebrow">{settings.content["home.continuity.eyebrow"]}</div> : null}
             <h2>{settings?.content["home.continuity.headline"] || ui("ui.components.HomePageClient.b655c5fb6426", "Service and ownership")}</h2>
             <p>{settings?.content["home.continuity.body"] || ui("ui.components.HomePageClient.9a4346833f50", "Approved service and completed transfers keep the same Profile and QR link.")}</p>
             <Link className="text-link" href="/how-it-works">{settings?.content["home.continuity.cta"] || ui("ui.components.HomePageClient.7bf7f24c48ad", "How it works")}</Link>
@@ -241,7 +248,7 @@ export function HomePageClient({
     finalCta: (
       <section className="section home-final-cta">
         <div className="shell">
-          <div className="section-header">{settings?.content["home.finalCta.eyebrow"] ? <div className="eyebrow">{settings.content["home.finalCta.eyebrow"]}</div> : null}<h2>{settings?.content["home.finalCta.headline"] || ui("ui.components.HomePageClient.b575d2660321", "Create a Profile")}</h2></div>
+          <div className="section-header">{settings?.content["home.finalCta.eyebrow"] ? <div className="eyebrow">{settings.content["home.finalCta.eyebrow"]}</div> : null}<h2>{settings?.content["home.finalCta.headline"] || ui("ui.components.HomePageClient.b575d2660321", "Create a Profile")}</h2>{settings?.content["home.finalCta.body"] ? <p>{settings.content["home.finalCta.body"]}</p> : null}</div>
           <div className="section-cta"><Link className="button" href="/create">{settings?.content["home.finalCta.primaryCta"] || ui("ui.components.HomePageClient.8088497eb587", "Create a Profile")}</Link><Link className="button secondary" href="/catalog">{settings?.content["home.finalCta.secondaryCta"] || ui("ui.components.HomePageClient.004ca2d8b070", "Catalog")}</Link></div>
         </div>
       </section>
