@@ -642,6 +642,7 @@ export const defaultContentValues: Record<string, string> = Object.fromEntries(
 );
 
 const legacyContentDefaults: Record<string, string[]> = {
+  "ui.app.site.editor.page.emailApplicationDelivery": ["Application delivery · Brevo"],
   "ui.app.dashboard.page.b90f83fb529f": ["Recipient not email-bound"],
   "ui.components.OwnerNameConsentSection.empty": ["You have no eligible outgoing ownership events."],
   "ui.app.edit.code.page.4e2bce183e1c": [

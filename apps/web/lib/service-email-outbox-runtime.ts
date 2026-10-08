@@ -11,7 +11,7 @@ export const serviceEmailSweep = createServiceEmailSweepHandler({
     if (!database) throw new Error("Database unavailable");
     try {
       const readiness = await database.rpc("service_email_outbox_readiness").abortSignal(AbortSignal.timeout(5000));
-      if (readiness.error || readiness.data?.ready !== true || readiness.data?.version !== "2026-09-26.service-email.1") throw new Error("Outbox is not ready");
+      if (readiness.error || readiness.data?.ready !== true || readiness.data?.version !== "2026-09-26.service-email.2") throw new Error("Outbox is not ready");
       const worker = createServiceEmailOutboxWorker({
         store: createServiceEmailOutboxStore({ rpc: async (name, args) => database.rpc(name, args).abortSignal(AbortSignal.timeout(5000)) }),
         origin: "https://www.qrguitar.com",

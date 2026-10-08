@@ -18,11 +18,22 @@ create table public.action_email_intents (
   attempt_count integer not null default 0 check(attempt_count between 0 and 6),
   lease_token uuid, locked_until timestamptz,
   next_attempt_at timestamptz not null default now(),
-  provider_message_id text, outcome_code text,
+  provider_message_id text, relay_acceptance jsonb, outcome_code text,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
   check((claim_id is not null and submission_id is null and event_type in ('claim.ownerReview','claim.moreInfo'))
      or (claim_id is null and submission_id is not null and event_type='service.revisionRequested')),
-  unique(claim_id,source_version),unique(submission_id,source_version)
+  unique(claim_id,source_version),unique(submission_id,source_version),
+  constraint action_email_nonaccepted_no_relay
+    check(state='accepted' or relay_acceptance is null),
+  constraint action_email_accepted_receipt_check check (
+    state <> 'accepted'
+    or (nullif(btrim(provider_message_id),'') is not null
+      and length(provider_message_id)<=300
+      and provider_message_id !~ '[[:cntrl:]]'
+      and relay_acceptance is null)
+    or (provider_message_id is null and relay_acceptance is not null
+      and relay_acceptance='{"schema":"qrguitar-zoho-smtp-acceptance/v1","provider":"zoho-smtp","responseCode":250}'::jsonb)
+  )
 );
 create index action_email_ready_idx on public.action_email_intents(next_attempt_at,created_at) where state in ('queued','retry');
 alter table public.action_email_control enable row level security;
@@ -189,16 +200,23 @@ begin
     'subjectId',coalesce(claim,submission),'qrCode',case when submission is not null then g.qr_code else null end);
 end;$$;
 
-create function public.settle_action_email(p_intent_id uuid,p_lease_token uuid,p_state text,p_provider_message_id text default null,p_retry_after_seconds integer default 60) returns boolean
+drop function if exists public.settle_action_email(uuid,uuid,text,text,integer);
+create function public.settle_action_email(p_intent_id uuid,p_lease_token uuid,p_state text,p_provider_message_id text default null,p_relay_acceptance jsonb default null,p_retry_after_seconds integer default 60) returns boolean
 language plpgsql security definer set search_path=pg_catalog,public as $$
 declare i public.action_email_intents;final_state text;
 begin
   if p_state is null or p_state not in('accepted','retry','failed','unknown') or p_retry_after_seconds is null or p_retry_after_seconds not between 60 and 21600
-    or (p_state='accepted' and (nullif(btrim(p_provider_message_id),'') is null or length(p_provider_message_id)>300 or p_provider_message_id ~ '[[:cntrl:]]')) then raise exception 'Invalid outcome.';end if;
+    or (p_state='accepted' and not (
+      (nullif(btrim(p_provider_message_id),'') is not null and length(p_provider_message_id)<=300
+        and p_provider_message_id !~ '[[:cntrl:]]' and p_relay_acceptance is null)
+      or (p_provider_message_id is null and p_relay_acceptance is not null
+        and p_relay_acceptance='{"schema":"qrguitar-zoho-smtp-acceptance/v1","provider":"zoho-smtp","responseCode":250}'::jsonb)))
+    or (p_state<>'accepted' and p_relay_acceptance is not null) then raise exception 'Invalid outcome.';end if;
   select * into i from public.action_email_intents where id=p_intent_id for update;
   if not found or i.state<>'dispatching' or p_lease_token is null or i.lease_token is distinct from p_lease_token or i.locked_until<=clock_timestamp() then raise exception 'Dispatch receipt is no longer current.';end if;
   final_state:=case when p_state='retry' and i.attempt_count>=6 then 'failed' else p_state end;
   update public.action_email_intents set state=final_state,provider_message_id=case when final_state='accepted' then p_provider_message_id else null end,
+    relay_acceptance=case when final_state='accepted' then p_relay_acceptance else null end,
     outcome_code=case when final_state='accepted' then 'provider_accepted' when final_state='unknown' then 'provider_acceptance_unknown' when p_state='retry' and final_state='failed' then 'retry_budget_exhausted' else 'provider_rejected' end,
     next_attempt_at=case when final_state='retry' then clock_timestamp()+make_interval(secs=>greatest(p_retry_after_seconds,least(21600,(60*power(2,i.attempt_count-1))::integer))) else next_attempt_at end,
     lease_token=null,locked_until=null,updated_at=clock_timestamp() where id=i.id;
@@ -335,6 +353,6 @@ end;$$;
 revoke all on function public.deny_ownership_claim_current(uuid,uuid,text,boolean) from public,anon,authenticated;
 grant execute on function public.deny_ownership_claim_current(uuid,uuid,text,boolean) to service_role;
 revoke all on function public.version_claim_action_email(),public.complete_claim_action_email(),public.capture_claim_action_email(),public.version_service_action_email(),public.capture_service_action_email() from public,anon,authenticated,service_role;
-revoke all on function public.claim_action_email(uuid),public.begin_action_email(uuid,uuid),public.settle_action_email(uuid,uuid,text,text,integer),public.action_email_status() from public,anon,authenticated;
-grant execute on function public.claim_action_email(uuid),public.begin_action_email(uuid,uuid),public.settle_action_email(uuid,uuid,text,text,integer),public.action_email_status() to service_role;
+revoke all on function public.claim_action_email(uuid),public.begin_action_email(uuid,uuid),public.settle_action_email(uuid,uuid,text,text,jsonb,integer),public.action_email_status() from public,anon,authenticated;
+grant execute on function public.claim_action_email(uuid),public.begin_action_email(uuid,uuid),public.settle_action_email(uuid,uuid,text,text,jsonb,integer),public.action_email_status() to service_role;
 commit;

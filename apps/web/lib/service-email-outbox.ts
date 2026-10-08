@@ -1,14 +1,20 @@
 import { randomUUID } from "node:crypto";
+import { confirmedEmailAcceptance, type RelayAcceptance } from "./email-acceptance";
 
 export type ServiceEmailIntent = { id: string; leaseToken: string };
 export type ServiceEmailDispatch = { to: string; profileTitle: string; providerName: string; submissionId: string };
 export type ServiceEmailOutcome = {
   outcome: "accepted" | "rejected" | "unknown";
   providerMessageId?: string;
+  relayAcceptance?: RelayAcceptance;
   retryable?: boolean;
   retryAfterSeconds?: number;
 };
-export type ServiceEmailReceipt = { state: "accepted" | "retry" | "failed" | "unknown"; providerMessageId?: string; retryAfterSeconds?: number };
+export type ServiceEmailReceipt =
+  | { state: "accepted"; providerMessageId: string; relayAcceptance?: never; retryAfterSeconds?: never }
+  | { state: "accepted"; relayAcceptance: RelayAcceptance; providerMessageId?: never; retryAfterSeconds?: never }
+  | { state: "retry"; retryAfterSeconds?: number; providerMessageId?: never; relayAcceptance?: never }
+  | { state: "failed" | "unknown"; providerMessageId?: never; relayAcceptance?: never; retryAfterSeconds?: never };
 export type ServiceEmailOutboxStore = {
   claim(leaseToken: string): Promise<ServiceEmailIntent | null>;
   begin(intent: ServiceEmailIntent): Promise<ServiceEmailDispatch | null>;
@@ -70,8 +76,9 @@ export function createServiceEmailOutboxWorker(deps: {
               idempotencyKey: intent.id
             }, signal), deps.sendTimeoutMs ?? 12000);
           } catch { result = { outcome: "unknown" }; }
-          const messageId = typeof result?.providerMessageId === "string" && result.providerMessageId.length <= 300 && !/[\r\n\x00-\x1f]/.test(result.providerMessageId) ? result.providerMessageId : undefined;
-          if (result?.outcome === "accepted" && messageId) receipt = { state: "accepted", providerMessageId: messageId };
+          const acceptance = confirmedEmailAcceptance(result);
+          if (acceptance?.kind === "provider") receipt = { state: "accepted", providerMessageId: acceptance.providerMessageId };
+          else if (acceptance?.kind === "relay") receipt = { state: "accepted", relayAcceptance: acceptance.relayAcceptance };
           else if (result?.outcome === "rejected") receipt = result.retryable ? {
             state: "retry", retryAfterSeconds: Number.isFinite(result.retryAfterSeconds) ? Math.min(21600, Math.max(60, Math.ceil(result.retryAfterSeconds!))) : 60
           } : { state: "failed" };
@@ -108,7 +115,8 @@ export function createServiceEmailOutboxStore(database: { rpc(name: string, args
     },
     async settle(intent, receipt) {
       const result = await rpc("settle_service_email_intent", { p_intent_id: intent.id, p_lease_token: intent.leaseToken,
-        p_state: receipt.state, p_provider_message_id: receipt.providerMessageId || null, p_retry_after_seconds: receipt.retryAfterSeconds ?? 60 });
+        p_state: receipt.state, p_provider_message_id: receipt.providerMessageId || null,
+        p_relay_acceptance: receipt.relayAcceptance || null, p_retry_after_seconds: receipt.retryAfterSeconds ?? 60 });
       if (result !== true) throw new Error("Service email outcome could not be confirmed.");
     }
   };

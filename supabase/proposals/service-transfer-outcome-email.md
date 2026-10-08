@@ -7,7 +7,7 @@ Install only through a separately authorized database change after, in order:
 
 The extension locks both control singletons and requires the intact, disabled, unbound
 `.2` predecessor. It updates six existing function hashes, registers five new private
-functions, validates nine triggers, and advances readiness to `2026-09-27.action-email.3`.
+functions, validates nine triggers, and advances readiness to `2026-09-27.action-email.4`.
 It does not enable capture, dispatch, a scheduler, a provider, secrets, or historical backfill.
 The worker/operator release and this schema must be compatible before any cutover.
 

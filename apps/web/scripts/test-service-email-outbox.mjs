@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url), ts = require('typescript');
+const require = createRequire("C:/Users/mrgar/Documents/Codex/2026-09-10/loo/work/release-home-content-frozen-20261005/package.json"), ts = require('typescript');
 const root = path.resolve(import.meta.dirname, '..');
+const acceptanceModule={exports:{}};new Function('module','exports',ts.transpileModule(fs.readFileSync(path.join(root,'lib/email-acceptance.ts'),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText)(acceptanceModule,acceptanceModule.exports);const acceptance=acceptanceModule.exports;
 const source = fs.readFileSync(path.join(root, 'lib/service-email-outbox.ts'), 'utf8');
 const exports = {};
-new Function('require', 'exports', ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText)(require, exports);
+new Function('require', 'exports', ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText)(name=>name==='./email-acceptance'?acceptance:require(name), exports);
 const { createServiceEmailOutboxWorker: worker, createServiceEmailOutboxStore: adapter } = exports;
 const id = '11111111-1111-4111-8111-111111111111', lease = '22222222-2222-4222-8222-222222222222', submissionId = '33333333-3333-4333-8333-333333333333';
 const delivery = { to: 'synthetic@example.invalid', profileTitle: 'Synthetic Profile', providerName: 'Synthetic provider', submissionId };
@@ -67,3 +68,7 @@ await test('SQL proposal remains inert, server-only, atomic and no-backfill by c
   assert.match(sql, /values\(true,false\)/); assert.match(sql, /after insert or update on public.service_submissions/); assert.match(sql, /unique\(submission_id,event_sequence\)/); assert.match(sql, /for update skip locked/); assert.match(sql, /when i.state='dispatching' then 'unknown'/); assert.match(sql, /g.owner_id is distinct from s.owner_user_id/); assert.match(sql, /s.expires_at<=clock_timestamp\(\)/); assert.match(sql, /enable row level security/); assert.match(sql, /from public,anon,authenticated,service_role/); assert.doesNotMatch(sql, /insert into public.service_email_intents[^;]+select[^;]+from public.service_submissions/is); assert.match(sql,/active:=false/);
 });
 console.log(JSON.stringify({ passed: count, databaseExecution: 'This suite checks SQL text only; run test-service-email-outbox-db.mjs for independent PGlite execution. No shared backend used.' }));
+
+const relay={schema:"qrguitar-zoho-smtp-acceptance/v1",provider:"zoho-smtp",responseCode:250};
+await test("service SMTP receipt remains relay evidence",async()=>{const h=fixture({send:async()=>({outcome:"accepted",relayAcceptance:relay})});assert.equal((await h.worker.run()).accepted,1);assert.equal(h.receipts[0].receipt.providerMessageId,undefined);assert.deepEqual(h.receipts[0].receipt.relayAcceptance,relay);assert.equal(h.calls.filter(x=>x==="send").length,1);});
+await test("service contradictory evidence stays unknown",async()=>{const h=fixture({send:async()=>({outcome:"accepted",providerMessageId:"id",relayAcceptance:relay})});assert.equal((await h.worker.run()).unknown,1);assert.equal(h.receipts[0].receipt.state,"unknown");assert.equal(h.calls.filter(x=>x==="send").length,1);});

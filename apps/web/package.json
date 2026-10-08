@@ -95,7 +95,8 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "sharp": "^0.35.5",
-    "stripe": "22.6.2"
+    "stripe": "22.6.2",
+    "nodemailer": "10.0.16"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

@@ -1,4 +1,5 @@
 import { requireAdmin, adminJson } from "../_utils";
+import { isZohoSmtpConfigured } from "../../../../lib/zoho-smtp-transport";
 import type { ServerSupabaseClient } from "../../../../lib/admin-auth";
 import { resolveBuildIdentity } from "../../../../lib/build-identity.mjs";
 import { mergeRecordTrustSettings } from "../../../../lib/record-trust";
@@ -129,9 +130,9 @@ export async function GET(request: Request) {
         serviceWorkflow: !serviceWorkflowCheck.error
       },
       email: {
-        provider: "Brevo",
-        configured: Boolean(process.env.BREVO_API_KEY),
-        senderConfigured: Boolean(process.env.EMAIL_FROM || process.env.SMTP_FROM)
+        provider: "Zoho SMTP",
+        configured: isZohoSmtpConfigured(),
+        senderConfigured: Boolean(process.env.SMTP_FROM)
       },
       storage: {
         responding: !storageCheck.error,

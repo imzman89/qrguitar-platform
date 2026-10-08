@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import test from "node:test";
 
-const require = createRequire(import.meta.url), ts = require("typescript");
+const require = createRequire("C:/Users/mrgar/Documents/Codex/2026-09-10/loo/work/release-home-content-frozen-20261005/package.json"), ts = require("typescript");
 const web = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 function load(relative, dependencies = {}, environment = {}) {
   const module = { exports: {} };
@@ -21,8 +21,9 @@ function load(relative, dependencies = {}, environment = {}) {
 const helper = load("lib/support-email-draft.ts");
 const renderer = load("lib/transactional-email-renderer.ts");
 const bounded = load("lib/bounded-json-body.ts");
+const acceptance = load("lib/email-acceptance.ts");
 const { createContactSupportHandler } = load("lib/contact-support-http.ts", {
-  "node:crypto": crypto, "./support-email-draft": helper, "./transactional-email-renderer": renderer, "./bounded-json-body": bounded
+  "node:crypto": crypto, "./email-acceptance": acceptance, "./support-email-draft": helper, "./transactional-email-renderer": renderer, "./bounded-json-body": bounded
 });
 const accepted = { ok: true, status: "sent", outcome: "accepted", providerMessageId: "synthetic-receipt", message: "Synthetic accepted" };
 const input = { name: "Synthetic tester", email: "fixture@example.invalid", topic: "Profile", message: "Synthetic support request", website: "", idempotencyKey: "b93276e0-471a-4a2d-8b20-3df1c3d8d389" };
@@ -197,3 +198,7 @@ test("origin normalization: original HTTPS proxy adapter does not trust forwarde
   const wrongProtocol = proxyContact("http://localhost:55440/api/contact");
   for (const bad of [wrongPort, wrongProtocol]) { const rejected = fixture(); assert.equal((await rejected.handler(bad)).status, 403); assert.equal(rejected.calls.length, 0); }
 });
+
+const relay={schema:"qrguitar-zoho-smtp-acceptance/v1",provider:"zoho-smtp",responseCode:250};
+test("SMTP relay fact accepts contact once and preserves operation dedupe",async()=>{const h=fixture({...accepted,providerMessageId:undefined,relayAcceptance:relay});const a=await h.handler(request()),b=await h.handler(request());assert.equal(a.status,202);assert.equal(b.status,202);assert.equal(h.calls.length,1);assert.equal((await a.json()).outcome,"accepted");});
+test("both contact receipt sources stay unknown and are not resent",async()=>{const h=fixture({...accepted,relayAcceptance:relay});const a=await h.handler(request()),b=await h.handler(request());assert.equal((await a.json()).outcome,"unknown");assert.equal((await b.json()).outcome,"unknown");assert.equal(h.calls.length,1);});

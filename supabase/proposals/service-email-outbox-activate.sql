@@ -9,7 +9,7 @@ declare ready jsonb; job bigint; secrets integer;
 begin
   if current_setting('qrguitar.service_email_cutover_confirmed',true) is distinct from 'new-runtime-only' then raise exception 'Cutover preconditions have not been confirmed.'; end if;
   ready:=public.service_email_outbox_readiness();
-  if ready->>'version'<>'2026-09-26.service-email.1' or (ready->>'ready')::boolean is not true then raise exception 'Outbox readiness failed.'; end if;
+  if ready->>'version'<>'2026-09-26.service-email.2' or (ready->>'ready')::boolean is not true then raise exception 'Outbox readiness failed.'; end if;
   if to_regclass('cron.job') is null or to_regclass('vault.decrypted_secrets') is null then raise exception 'Scheduler or Vault unavailable.'; end if;
   select count(*) into secrets from vault.decrypted_secrets where name='qrguitar_service_email_cron_secret'
     and octet_length(decrypted_secret) between 32 and 256 and decrypted_secret !~ '[[:space:][:cntrl:]]';

@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import ts from 'typescript';
+
 import { createRequire } from 'node:module';
-const require=createRequire(import.meta.url),root=path.resolve(import.meta.dirname,'..');
+const require=createRequire("C:/Users/mrgar/Documents/Codex/2026-09-10/loo/work/release-home-content-frozen-20261005/package.json"),ts=require('typescript'),root=path.resolve(import.meta.dirname,'..');
+const acceptanceModule={exports:{}};new Function('module','exports',ts.transpileModule(fs.readFileSync(path.join(root,'lib/email-acceptance.ts'),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText)(acceptanceModule,acceptanceModule.exports);const acceptance=acceptanceModule.exports;
+
 const source=fs.readFileSync(path.join(root,'lib/action-required-email.ts'),'utf8');
-const module={exports:{}};new Function('module','exports','require',ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText)(module,module.exports,require);
+const module={exports:{}};new Function('module','exports','require',ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText)(module,module.exports,name=>name==='./email-acceptance'?acceptance:require(name));
 const {createActionEmailWorker,actionEmailInput}=module.exports;
 const id='10000000-0000-4000-8000-000000000001',subject='20000000-0000-4000-8000-000000000002',lease='30000000-0000-4000-8000-000000000003';
 const payload={event:'claim.ownerReview',to:'owner@example.invalid',profileTitle:'Synthetic Profile',subjectId:subject};
@@ -62,3 +64,7 @@ await test('preflight failure is definite no-send retry',async()=>{const f=fixtu
 await test('late preflight resolution is aborted and never invokes transport closure',async()=>{let resolve,transport=0,signal;const f=fixture({prepare:async(_,s)=>{signal=s;return new Promise(r=>{resolve=r;});}});assert.equal((await f.worker.run()).retry,1);assert.equal(signal.aborted,true);resolve(async()=>{transport++;return{outcome:'accepted',providerMessageId:'too-late'};});await new Promise(r=>setTimeout(r,25));assert.equal(transport,0);assert.equal(f.sent.length,0);});
 await test('prepared provider timeout is still unknown, never a preflight retry',async()=>{let transport=0;const f=fixture({prepare:async()=>async()=>{transport++;return new Promise(()=>{});}});assert.equal((await f.worker.run()).unknown,1);assert.equal(transport,1);});
 console.log(JSON.stringify({passed,scope:'actual TypeScript worker with synthetic transport and DB receipts; no runtime launch/provider'}));
+
+const relay={schema:"qrguitar-zoho-smtp-acceptance/v1",provider:"zoho-smtp",responseCode:250};
+await test("action SMTP acceptance persists separate relay evidence",async()=>{const f=fixture({result:{outcome:"accepted",relayAcceptance:relay}});assert.equal((await f.worker.run()).accepted,1);const a=f.calls.find(c=>c.name==="settle_action_email").args;assert.equal(a.p_provider_message_id,null);assert.deepEqual(a.p_relay_acceptance,relay);assert.equal(f.sent.length,1);});
+await test("action both evidence sources remain unknown without retry",async()=>{const f=fixture({result:{outcome:"accepted",providerMessageId:"id",relayAcceptance:relay}});assert.equal((await f.worker.run()).unknown,1);const a=f.calls.find(c=>c.name==="settle_action_email").args;assert.equal(a.p_state,"unknown");assert.equal(a.p_provider_message_id,null);assert.equal(a.p_relay_acceptance,null);assert.equal(f.sent.length,1);});

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { supportDraftLimits, supportEmailAddress, type SupportEmailFields } from "./support-email-draft";
 import { renderBrandedTransactionalEmail, type TransactionalEmailDocument } from "./transactional-email-renderer";
 import type { EmailResult } from "./transactional-email";
+import { confirmedEmailAcceptance } from "./email-acceptance";
 import { readBoundedJsonBody } from "./bounded-json-body";
 
 type ContactInput = SupportEmailFields & { website: string; idempotencyKey: string };
@@ -108,11 +109,11 @@ export function createContactSupportHandler(dependencies: Dependencies) {
       const response = Promise.resolve().then(async () => {
         try {
           const result = await dependencies.deliver(supportEmailAddress, document, { successMessage: "Provider accepted contact request.", failureMessage: "Provider did not accept contact request", idempotencyKey: input.idempotencyKey, signal: request.signal });
-          if (result.ok && result.status === "sent" && result.outcome === "accepted" && typeof result.providerMessageId === "string" && result.providerMessageId.trim()) {
+          if (result.ok && result.status === "sent" && confirmedEmailAcceptance(result)) {
             return { status: 202, result: { ok: true, code: "provider_accepted", outcome: "accepted", requestId: input.idempotencyKey } as PublicResult };
           }
           if (result.outcome === "rejected") {
-            const missingConfig = ["Brevo delivery is not configured for application messages.", "Email delivery configuration is invalid."].includes(result.message);
+            const missingConfig = ["Zoho SMTP delivery is not configured for application messages.", "Email delivery configuration is invalid."].includes(result.message);
             return { status: missingConfig ? 503 : 502, result: { ok: false, code: missingConfig ? "delivery_unavailable" : "provider_rejected", outcome: "rejected", requestId: input.idempotencyKey } as PublicResult };
           }
         } catch { /* Provider may have accepted before a network/transport failure. */ }

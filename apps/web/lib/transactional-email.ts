@@ -1,6 +1,8 @@
 import { contentRegistryByKey, getContentValue, validateVariables } from "./content-registry";
 import { renderBrandedTransactionalEmail, renderServiceReviewEmailDocument, type TransactionalEmailDocument } from "./transactional-email-renderer";
 import { loadPublishedSiteSettings } from "./site-settings-server";
+import type { RelayAcceptance } from "./email-acceptance";
+import { deliverZohoSmtpEmail } from "./zoho-smtp-transport";
 
 export type EmailResult = {
   ok: boolean;
@@ -8,12 +10,12 @@ export type EmailResult = {
   outcome: "accepted" | "rejected" | "unknown";
   message: string;
   providerMessageId?: string;
+  relayAcceptance?: RelayAcceptance;
   retryable?: boolean;
   retryAfterSeconds?: number;
 };
 
 type DeliveryOptions = {
-  fetcher?: typeof fetch;
   timeoutMs?: number;
   idempotencyKey?: string;
   signal?: AbortSignal;
@@ -21,100 +23,21 @@ type DeliveryOptions = {
   failureMessage: string;
 };
 
-const BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email";
-const DEFAULT_DELIVERY_TIMEOUT_MS = 10_000;
-
-function cleanEmailAddress(value: string) {
-  const address = String(value || "").replace(/^.*<([^>]+)>.*$/, "$1").trim();
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address) ? address : "";
-}
-
-function senderAddress() {
-  return cleanEmailAddress(process.env.SMTP_FROM || process.env.EMAIL_FROM || "");
-}
-
-function replyAddress() {
-  return cleanEmailAddress(process.env.SMTP_REPLY_TO || "support@qrguitar.com");
-}
-
 function approvedApplicationOrigins() {
   return [process.env.NEXT_PUBLIC_SITE_URL || "", "https://www.qrguitar.com", "https://qrguitar.com"];
 }
 
-function retryAfterSeconds(response: Response) {
-  const value = response.headers.get("retry-after");
-  if (!value) return undefined;
-  const seconds = Number(value);
-  if (Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds);
-  const date = Date.parse(value);
-  if (!Number.isFinite(date)) return undefined;
-  return Math.max(0, Math.ceil((date - Date.now()) / 1000));
-}
-
-export async function deliverBrevoEmail(
+export async function deliverApplicationEmail(
   to: string,
   document: TransactionalEmailDocument,
   options: DeliveryOptions
 ): Promise<EmailResult> {
-  const apiKey = String(process.env.BREVO_API_KEY || "").trim();
-  if (!apiKey) return { ok: false, status: "failed", outcome: "rejected", message: "Brevo delivery is not configured for application messages." };
-
-  const recipient = cleanEmailAddress(to);
-  const sender = senderAddress();
-  const replyTo = replyAddress();
-  if (!recipient || !sender || !replyTo) {
-    return { ok: false, status: "failed", outcome: "rejected", message: "Email delivery configuration is invalid." };
-  }
+  // This is a local durable intent identifier, not relay-side deduplication.
   const idempotencyKey = String(options.idempotencyKey || "").trim();
   if (idempotencyKey && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idempotencyKey)) {
-    return { ok: false, status: "failed", outcome: "rejected", message: "Email delivery idempotency key is invalid." };
+    return { ok: false, status: "failed", outcome: "rejected", retryable: false, message: "Email delivery idempotency key is invalid." };
   }
-
-  const controller = new AbortController();
-  const abortFromCaller = () => controller.abort();
-  if (options.signal?.aborted) controller.abort();
-  else options.signal?.addEventListener("abort", abortFromCaller, { once: true });
-  const timer = setTimeout(() => controller.abort(), Math.max(1, options.timeoutMs || DEFAULT_DELIVERY_TIMEOUT_MS));
-  try {
-    const response = await (options.fetcher || fetch)(BREVO_ENDPOINT, {
-      method: "POST",
-      headers: { "api-key": apiKey, "content-type": "application/json", accept: "application/json" },
-      body: JSON.stringify({
-        sender: { name: "QRguitar", email: sender },
-        replyTo: { email: replyTo },
-        to: [{ email: recipient }],
-        subject: document.subject,
-        htmlContent: document.htmlContent,
-        textContent: document.textContent,
-        ...(idempotencyKey ? { headers: { idempotencyKey } } : {})
-      }),
-      cache: "no-store",
-      redirect: "error",
-      signal: controller.signal
-    });
-    const payload = await response.json().catch(() => ({})) as { messageId?: string };
-    if (!response.ok) {
-      const retryable = response.status === 408 || response.status === 429 || response.status >= 500;
-      return {
-        ok: false,
-        status: "failed",
-        outcome: "rejected",
-        message: `${options.failureMessage} (${response.status}).`,
-        retryable,
-        retryAfterSeconds: retryable ? retryAfterSeconds(response) : undefined
-      };
-    }
-    if (!payload.messageId) {
-      return { ok: false, status: "failed", outcome: "unknown", message: `${options.failureMessage} (provider receipt missing).`, retryable: false };
-    }
-    return { ok: true, status: "sent", outcome: "accepted", message: options.successMessage, providerMessageId: payload.messageId };
-  } catch (error) {
-    const suffix = error instanceof Error && error.name === "AbortError" ? " (delivery timed out)" : "";
-    return { ok: false, status: "failed", outcome: "unknown", message: `${options.failureMessage}${suffix}.`, retryable: false };
-  } finally {
-    clearTimeout(timer);
-    options.signal?.removeEventListener("abort", abortFromCaller);
-  }
+  return deliverZohoSmtpEmail(to, document, { ...options, idempotencyKey });
 }
 
 export async function sendAdminTemplateTestEmail(input: {
@@ -146,7 +69,7 @@ export async function sendAdminTemplateTestEmail(input: {
     return { ok: false, status: "failed", outcome: "rejected", message: "The test email contains an invalid or unsafe field." };
   }
 
-  return deliverBrevoEmail(input.to, document, {
+  return deliverApplicationEmail(input.to, document, {
     successMessage: "Application-rendered test email accepted by the email provider for the authenticated admin.",
     failureMessage: "The application-rendered test email was not accepted by the email provider"
   });
@@ -185,13 +108,13 @@ export async function sendServiceReviewEmail(input: {
     return { ok: false, status: "failed", outcome: "rejected", message: "Owner notification created, but the email template or review link is invalid." };
   }
 
-  const result = await deliverBrevoEmail(input.to, document, {
+  const result = await deliverApplicationEmail(input.to, document, {
     successMessage: "Owner notification created; review email accepted by the email provider.",
     failureMessage: "Owner notification created, but email provider acceptance was not confirmed",
     idempotencyKey: input.idempotencyKey,
     signal: input.signal
   });
-  if (!result.ok && result.message === "Brevo delivery is not configured for application messages.") {
+  if (!result.ok && result.message === "Zoho SMTP delivery is not configured for application messages.") {
     return { ...result, message: "Owner notification created, but email delivery is not configured for application messages." };
   }
   return result;

@@ -1,7 +1,7 @@
 export type EmailTemplateDeliveryBoundary =
   | {
       kind: "application";
-      owner: "qrguitar-brevo";
+      owner: "qrguitar-zoho-smtp";
       canSendApplicationTest: boolean;
       providerTemplate: null;
       providerArtifact: null;
@@ -62,7 +62,7 @@ export function emailTemplateDeliveryBoundary(templatePrefix: string): EmailTemp
   if (applicationFamilies.has(templatePrefix)) {
     return {
       kind: "application",
-      owner: "qrguitar-brevo",
+      owner: "qrguitar-zoho-smtp",
       canSendApplicationTest: templatePrefix === "email.service.submitted",
       providerTemplate: null,
       providerArtifact: null
@@ -90,7 +90,7 @@ export function createEmailTemplateSetupExport(templatePrefix: string, fields: R
       providerArtifact: boundary.providerArtifact,
       applicationTestAvailable: boundary.canSendApplicationTest,
       note: boundary.kind === "application"
-        ? "Published fields for this family are used by QRguitar workflow delivery through Brevo when its runtime and delivery controls are enabled. This export does not enable delivery or verify inbox receipt."
+        ? "Published fields for this family are used by QRguitar workflow delivery through Zoho SMTP when its runtime and delivery controls are enabled. This export does not enable delivery or verify inbox receipt."
         : boundary.kind === "provider"
           ? "This CMS copy is a review reference and is not synchronized to Supabase Auth. Review and install the named provider artifact through the provider change process."
           : "No production trigger or delivery integration is registered for this design-only family."

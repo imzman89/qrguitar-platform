@@ -67,8 +67,8 @@ already owns its transaction; do not select only part of the file in the SQL edi
 
 The intermediate .1/.2 readiness preconditions execute inside the same transaction, see the
 preceding DDL, and require disabled/unbound state. Final postconditions require unchanged base
-readiness, service readiness `2026-09-26.service-email.1`, action schema readiness
-`2026-09-27.action-email.3`, disabled controls, null release/database bindings, empty queues,
+readiness, service readiness `2026-09-26.service-email.2`, action schema readiness
+`2026-09-27.action-email.4`, disabled controls, null release/database bindings, empty queues,
 and exactly two inactive schedules when cron/net are available.
 
 On any error, issue `ROLLBACK` in a still-open session and inspect the receipt. Do not continue

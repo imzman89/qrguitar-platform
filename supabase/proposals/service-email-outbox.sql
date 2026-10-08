@@ -31,12 +31,24 @@ create table public.service_email_intents (
   lease_token uuid,
   locked_until timestamptz,
   provider_message_id text check(length(provider_message_id) <= 300),
+  relay_acceptance jsonb,
   outcome_code text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique(submission_id,event_sequence),
   check((state in ('leased','dispatching') and lease_token is not null and locked_until is not null)
-    or (state not in ('leased','dispatching') and lease_token is null and locked_until is null))
+    or (state not in ('leased','dispatching') and lease_token is null and locked_until is null)),
+  constraint service_email_nonaccepted_no_relay
+    check(state='accepted' or relay_acceptance is null),
+  constraint service_email_accepted_receipt_check check (
+    state <> 'accepted'
+    or (nullif(btrim(provider_message_id),'') is not null
+      and length(provider_message_id)<=300
+      and provider_message_id !~ '[[:cntrl:]]'
+      and relay_acceptance is null)
+    or (provider_message_id is null and relay_acceptance is not null
+      and relay_acceptance='{"schema":"qrguitar-zoho-smtp-acceptance/v1","provider":"zoho-smtp","responseCode":250}'::jsonb)
+  )
 );
 create index service_email_intents_due on public.service_email_intents(state,next_attempt_at,created_at);
 alter table public.service_email_outbox_control enable row level security;
@@ -201,20 +213,26 @@ begin
   return true;
 end;$$;
 
+drop function if exists public.settle_service_email_intent(uuid,uuid,text,text,integer);
 create function public.settle_service_email_intent(p_intent_id uuid,p_lease_token uuid,p_state text,
-  p_provider_message_id text default null,p_retry_after_seconds integer default 60) returns boolean
+  p_provider_message_id text default null,p_relay_acceptance jsonb default null,p_retry_after_seconds integer default 60) returns boolean
 language plpgsql security definer set search_path=pg_catalog,public as $$
 declare r public.service_email_intents; final_state text; delay_seconds integer;
 begin
   if p_state is null or p_state not in ('accepted','retry','failed','unknown') or p_retry_after_seconds is null or p_retry_after_seconds not between 60 and 21600
-    or (p_state='accepted' and nullif(p_provider_message_id,'') is null)
-    or length(p_provider_message_id)>300 then raise exception 'Invalid delivery outcome.'; end if;
+    or (p_state='accepted' and not (
+      (nullif(btrim(p_provider_message_id),'') is not null and length(p_provider_message_id)<=300
+        and p_provider_message_id !~ '[[:cntrl:]]' and p_relay_acceptance is null)
+      or (p_provider_message_id is null and p_relay_acceptance is not null
+        and p_relay_acceptance='{"schema":"qrguitar-zoho-smtp-acceptance/v1","provider":"zoho-smtp","responseCode":250}'::jsonb)))
+    or (p_state<>'accepted' and p_relay_acceptance is not null) then raise exception 'Invalid delivery outcome.'; end if;
   perform 1 from public.service_submissions where id=(select submission_id from public.service_email_intents where id=p_intent_id) for update;
   select * into r from public.service_email_intents where id=p_intent_id for update;
   if not found or r.state<>'dispatching' or r.lease_token is distinct from p_lease_token or r.locked_until<=clock_timestamp() then raise exception 'Email dispatch is not current.'; end if;
   final_state:=case when p_state='retry' and r.attempt_count>=6 then 'failed' else p_state end;
   delay_seconds:=greatest(p_retry_after_seconds,least(21600,(60*power(2,r.attempt_count-1))::integer));
   update public.service_email_intents set state=final_state,provider_message_id=case when final_state='accepted' then p_provider_message_id else null end,
+    relay_acceptance=case when final_state='accepted' then p_relay_acceptance else null end,
     outcome_code=case when p_state='retry' and final_state='failed' then 'retry_budget_exhausted'
       when final_state='unknown' then 'provider_acceptance_unknown' when final_state='accepted' then 'provider_accepted' else 'provider_rejected' end,
     next_attempt_at=case when final_state='retry' then clock_timestamp()+make_interval(secs=>delay_seconds) else next_attempt_at end,
@@ -261,9 +279,9 @@ language sql stable security definer set search_path=pg_catalog,public as $$
 $$;
 revoke all on function public.protect_service_email_cutover(),public.mark_service_email_mode(),public.capture_service_email_intent() from public,anon,authenticated,service_role;
 revoke all on function public.claim_service_email_intent(uuid),public.begin_service_email_dispatch(uuid,uuid),
-  public.settle_service_email_intent(uuid,uuid,text,text,integer),public.service_email_outbox_status() from public,anon,authenticated;
+  public.settle_service_email_intent(uuid,uuid,text,text,jsonb,integer),public.service_email_outbox_status() from public,anon,authenticated;
 grant execute on function public.claim_service_email_intent(uuid),public.begin_service_email_dispatch(uuid,uuid),
-  public.settle_service_email_intent(uuid,uuid,text,text,integer),public.service_email_outbox_status() to service_role;
+  public.settle_service_email_intent(uuid,uuid,text,text,jsonb,integer),public.service_email_outbox_status() to service_role;
 revoke all on function public.service_email_intent_status(uuid),public.service_email_submission_status(uuid),public.service_email_statuses(uuid[]),public.retry_service_email_intent(uuid,uuid,boolean,text,text,text),
   public.service_email_worker_heartbeat(boolean),public.service_email_admin_status(integer) from public,anon,authenticated;
 grant execute on function public.service_email_intent_status(uuid),public.service_email_submission_status(uuid),public.service_email_statuses(uuid[]),public.retry_service_email_intent(uuid,uuid,boolean,text,text,text),
@@ -292,7 +310,7 @@ begin
 end;$scheduler$;
 create function public.service_email_outbox_readiness() returns jsonb
 language sql stable security definer set search_path=pg_catalog,public as $$
-  select jsonb_build_object('version','2026-09-26.service-email.1','ready',
+  select jsonb_build_object('version','2026-09-26.service-email.2','ready',
     (select count(*)=2 and bool_and(c.relrowsecurity
       and not has_table_privilege('anon',c.oid,'SELECT,INSERT,UPDATE,DELETE')
       and not has_table_privilege('authenticated',c.oid,'SELECT,INSERT,UPDATE,DELETE'))

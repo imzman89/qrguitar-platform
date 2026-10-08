@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { confirmedEmailAcceptance } from "./email-acceptance";
 import type { ServiceEmailOutcome, ServiceEmailReceipt } from "./service-email-outbox";
 
 export type ActionEmailFamily = "claim.ownerReview" | "claim.moreInfo" | "claim.approved" | "claim.declined" | "claim.expired" | "service.revisionRequested" | "service.approved" | "service.declined" | "service.cancelled" | "ownership.transferAccepted" | "ownership.transferCancelled";
@@ -88,13 +89,14 @@ export function createActionEmailWorker(deps: {
         let result: ServiceEmailOutcome;
         try { result = await bounded(prepared, deps.sendTimeoutMs ?? 12000); }
         catch { result = { outcome: "unknown" }; }
-        const messageId = typeof result?.providerMessageId === "string" && result.providerMessageId.trim() && result.providerMessageId.length <= 300 && !/[\x00-\x1f]/.test(result.providerMessageId) ? result.providerMessageId : undefined;
-        if (result?.outcome === "accepted" && messageId) receipt = { state: "accepted", providerMessageId: messageId };
+        const acceptance = confirmedEmailAcceptance(result);
+        if (acceptance?.kind === "provider") receipt = { state: "accepted", providerMessageId: acceptance.providerMessageId };
+        else if (acceptance?.kind === "relay") receipt = { state: "accepted", relayAcceptance: acceptance.relayAcceptance };
         else if (result?.outcome === "rejected") receipt = result.retryable ? { state: "retry", retryAfterSeconds: Number.isFinite(result.retryAfterSeconds) ? Math.min(21600, Math.max(60, Math.ceil(result.retryAfterSeconds!))) : 60 } : { state: "failed" };
         else receipt = { state: "unknown" };
         }
       }
-      const saved = await rpc("settle_action_email", { p_intent_id: intent.id, p_lease_token: lease, p_state: receipt.state, p_provider_message_id: receipt.providerMessageId || null, p_retry_after_seconds: receipt.retryAfterSeconds || 60 });
+      const saved = await rpc("settle_action_email", { p_intent_id: intent.id, p_lease_token: lease, p_state: receipt.state, p_provider_message_id: receipt.providerMessageId || null, p_relay_acceptance: receipt.relayAcceptance || null, p_retry_after_seconds: receipt.retryAfterSeconds || 60 });
       if (saved !== true) throw new Error("Action email receipt unavailable; do not resend.");
       counts[receipt.state]++;
     }

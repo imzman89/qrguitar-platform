@@ -1,6 +1,6 @@
 import { createServerSupabaseClient } from "./supabase-server";
 import { createActionRequiredEmailPipeline } from "./action-required-email-delivery";
-import { deliverBrevoEmail } from "./transactional-email";
+import { deliverApplicationEmail } from "./transactional-email";
 import { publishedSiteSettingsKey } from "./site-settings";
 import { actionEmailAdmission, actionEmailOperationsVersion, createActionEmailSweepHandler } from "./action-email-sweep-http";
 
@@ -31,7 +31,7 @@ export const actionEmailSweep = createActionEmailSweepHandler({
           if (!live || live.projectUrl !== admission.projectUrl || live.release !== admission.release || options.signal.aborted) {
             return { ok: false, status: "failed", outcome: "rejected", retryable: true, message: "Transport admission changed; nothing sent." };
           }
-          return deliverBrevoEmail(to, document, options);
+          return deliverApplicationEmail(to, document, options);
         }
       });
       const result = await pipeline.run();

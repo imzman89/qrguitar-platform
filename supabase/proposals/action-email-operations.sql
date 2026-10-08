@@ -20,7 +20,7 @@ insert into public.action_email_function_manifest
 select signature,md5(pg_get_functiondef(signature::regprocedure)) from unnest(array[
  'public.version_claim_action_email()','public.complete_claim_action_email()','public.capture_claim_action_email()',
  'public.version_service_action_email()','public.capture_service_action_email()',
- 'public.claim_action_email(uuid)','public.begin_action_email(uuid,uuid)','public.settle_action_email(uuid,uuid,text,text,integer)',
+ 'public.claim_action_email(uuid)','public.begin_action_email(uuid,uuid)','public.settle_action_email(uuid,uuid,text,text,jsonb,integer)',
  'public.action_email_status()','public.action_email_retry_eligible(uuid)','public.action_email_intent_status(uuid)',
  'public.action_email_admin_status(integer)','public.reconcile_action_email(uuid,uuid,boolean,text,text,text,timestamptz)',
  'public.deny_ownership_claim_current(uuid,uuid,text,boolean)','public.guard_claim_completion_intent()',

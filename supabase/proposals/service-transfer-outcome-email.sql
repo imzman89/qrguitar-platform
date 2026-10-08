@@ -291,7 +291,7 @@ begin
    left join pg_trigger t on t.tgrelid=to_regclass(e.rel) and t.tgname=e.name);
  bound:=ops.project_url is not null and ops.approved_commit is not null and ops.project_url=p_project_url and ops.approved_commit=p_release_sha;
  select capture_enabled and dispatch_enabled into controls from public.action_email_control where singleton;
- return jsonb_build_object('version','2026-09-27.action-email.3','ready',coalesce(schema_ready and bound and controls,false),
+ return jsonb_build_object('version','2026-09-27.action-email.4','ready',coalesce(schema_ready and bound and controls,false),
    'schemaReady',coalesce(schema_ready,false),'destinationBound',coalesce(bound,false),'dispatchEnabled',coalesce(controls,false),
    'lastSuccessAt',ops.last_success_at,'lastFailureAt',ops.last_failure_at);
 end;$$;
