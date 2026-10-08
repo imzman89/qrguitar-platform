@@ -143,7 +143,7 @@ function fixtures(count = 163) {
     for (let n = 2; n >= 0; n--) {
       db.guitar_media.push({ id: id + "-media-" + n, guitar_id: id, storage_path: "/photos/" + id + "-" + n + ".jpg", sort_order: n });
       db.guitar_specs.push({ id: id + "-spec-" + n, guitar_id: id, label: n === 0 ? "Finish" : n === 1 ? "Pickup" : "Neck", value: n === 0 ? "Cherry Sunburst" : n === 1 ? "P.A.F." : "Original", sort_order: n });
-      db.guitar_documents.push({ id: id + "-doc-" + n, guitar_id: id, name: "Document " + n, storage_path: "/docs/" + id + "-" + n + ".pdf", is_public: n !== 2, created_at: date });
+      db.guitar_documents.push({ id: id + "-doc-" + n, guitar_id: id, name: "Document " + n, storage_path: "/docs/" + id + "-" + n + ".pdf", is_public: n !== 2, retained_private: false, created_at: date });
       db.guitar_timeline_events.push({ id: id + "-event-" + n, guitar_id: id, title: "Service " + n, event_date: "2026-09-01", created_at: date, is_public: n !== 2 });
       db.guitar_external_media.push({ id: id + "-external-" + n, guitar_id: id, provider: "youtube", canonical_url: "https://www.youtube.com/watch?v=test" + n, title: "Demo " + n, caption: "", is_public: n !== 2, sort_order: n, created_at: date });
     }
@@ -346,6 +346,144 @@ test("catalog error view offers a working retry without exposing internal error 
 
 
 
+function serviceDateFixture(date, precision = "day", overrides = {}) {
+  return {
+    id: "service-" + date, guitar_id: "g-0000", event_date: date, date_precision: precision,
+    event_type: "repair", category: "Repair", source_kind: "owner_reported",
+    is_public: false, is_system: false, title: "PRIVATE_REPORT", description: "PRIVATE_DESCRIPTION",
+    shop_name: "PRIVATE_SHOP", provider_user_id: "PRIVATE_PERSON", related_document_id: "PRIVATE_DOCUMENT",
+    parts_installed: "PRIVATE_PARTS", setup_measurements: "PRIVATE_MEASUREMENTS",
+    created_at: "2026-10-01T12:00:00Z", updated_at: "2026-10-02T12:00:00Z", ...overrides
+  };
+}
+
+function serviceDateRuntime(rows) {
+  const db = fixtures(1);
+  db.guitar_timeline_events = rows;
+  const database = mockDatabase(db, 2);
+  const app = runtime(async (url, options) => {
+    const response = await database(url, options);
+    if (url.pathname.endsWith("/guitar_timeline_events") && !url.searchParams.has("is_public")) {
+      const columns = url.searchParams.get("select")?.split(",");
+      assert.deepEqual(columns, ["guitar_id", "event_date", "date_precision", "event_type", "category", "source_kind", "is_system"]);
+      assert.equal(url.searchParams.get("is_system"), "eq.false");
+      assert.equal(options.headers.apikey, "mock-service");
+      response.body = response.body.map(row => Object.fromEntries(columns.map(key => [key, row[key]])));
+    }
+    return response;
+  });
+  return app;
+}
+
+for (const [stored, precision, expected] of [
+  ["2024-09-23", "day", "2024-09-23"],
+  ["2024-09-01", "month", "2024-09"],
+  ["2024-01-01", "year", "2024"]
+]) test("public last service preserves private recorded " + precision + " without private payload", async () => {
+  const app = serviceDateRuntime([serviceDateFixture(stored, precision)]);
+  const loader = app.load("apps/web/lib/public-instruments.ts");
+  const profile = await loader.getPublicInstrumentByCode("QRG-TEST0000");
+  const catalog = await loader.getPublicInstruments();
+  for (const record of [profile, catalog[0]]) {
+    assert.equal(record.latestServiceDate, expected);
+    assert.equal(record.latestServiceDatePrecision, precision);
+    assert.equal(record.timelineEvents.length, 0);
+    assert.equal(record.serviceEvents.length, 0);
+    assert.doesNotMatch(JSON.stringify(record), /PRIVATE_/);
+  }
+  assert.ok(app.calls.some(({url}) => url.pathname.endsWith("/guitar_timeline_events") && !url.searchParams.has("is_public")), "Actual metadata projection must execute");
+  assert.ok(app.calls.filter(({url}) => url.searchParams.has("is_public") && url.pathname.endsWith("/guitar_timeline_events")).every(({url}) => url.searchParams.get("is_public") === "eq.true"));
+});
+
+test("approved service without a known event date never uses creation or approval timestamps", async () => {
+  const app = serviceDateRuntime([
+    serviceDateFixture(null, "unknown", { source_kind: "provider_submitted_owner_approved", approved_at: "2026-10-03T00:00:00Z" }),
+    serviceDateFixture("2024-09-23", null, { id: "missing-precision" })
+  ]);
+  const record = await app.load("apps/web/lib/public-instruments.ts").getPublicInstrumentByCode("QRG-TEST0000");
+  assert.equal(record.latestServiceDate, undefined);
+  assert.equal(record.latestServiceDatePrecision, undefined);
+});
+
+test("non-service events cannot supersede real service even with a Repair category", async () => {
+  const kinds = ["ownership", "purchase", "sale", "profile_created", "creation", "registration", "appraisal", "verification", "safety", "media", "documentation"];
+  const rows = kinds.map((kind, index) => serviceDateFixture("2025-09-23", "day", { id: "excluded-" + index, event_type: kind }));
+  rows.push(serviceDateFixture("2024-09-23"), serviceDateFixture("2025-09-24", "day", { id: "system", is_system: true }));
+  const app = serviceDateRuntime(rows);
+  const record = await app.load("apps/web/lib/public-instruments.ts").getPublicInstrumentByCode("QRG-TEST0000");
+  assert.equal(record.latestServiceDate, "2024-09-23");
+  const { isServiceHistoryEvent: isService } = app.load("apps/web/lib/instrument-profile-contract.ts");
+  for (const kind of kinds) {
+    assert.equal(isService({eventType: kind, category: "Repair", isSystem: false}), false, kind);
+    assert.equal(isService({eventType: "repair", category: kind, isSystem: false}), false, kind + " category");
+  }
+});
+
+test("actual service classifier includes owner work and approved provider Other, not generic owner Other", () => {
+  const { isServiceHistoryEvent: isService } = runtime(() => { throw Error("Unexpected HTTP"); }).load("apps/web/lib/instrument-profile-contract.ts");
+  for (const category of ["Service", "Setup", "Repair", "Electronics", "Fretwork", "Structural repair", "Finish work", "Amplifier service", "Modification", "Restoration", "Inspection"]) {
+    assert.equal(isService({eventType: category, category, sourceKind: "owner_reported", isSystem: false}), true, category);
+  }
+  assert.equal(isService({eventType: "Other", category: "Other", sourceKind: "provider_submitted_owner_approved", isSystem: false}), true);
+  assert.equal(isService({eventType: "Other", category: "Other", sourceKind: "owner_reported", isSystem: false}), false);
+});
+
+test("actual service date policy validates precision and retains honest overlapping periods", () => {
+  const policy = runtime(() => { throw Error("Unexpected HTTP"); }).load("apps/web/lib/instrument-profile-contract.ts");
+  assert.equal(typeof policy.getLatestRecordedServiceDate, "function", "Actual service date policy export missing");
+  const event = (date, datePrecision) => ({serviceDate: date, datePrecision, category: "Setup", eventType: "setup", isSystem: false});
+  const pair = value => value && JSON.parse(JSON.stringify(value));
+  assert.deepEqual(pair(policy.getLatestRecordedServiceDate([event("2024-09-23", "day"), event("2024-09-01", "month")])), {date: "2024-09", datePrecision: "month"});
+  assert.deepEqual(pair(policy.getLatestRecordedServiceDate([event("2024-09", "month"), event("2024", "year")])), {date: "2024", datePrecision: "year"});
+  assert.deepEqual(pair(policy.getLatestRecordedServiceDate([event("2024-09", "month"), event("2024-10-02", "day")])), {date: "2024-10-02", datePrecision: "day"});
+  for (const [date, precision] of [["2024-02-30", "day"], ["2024-13", "month"], ["0000", "year"], ["9999", "year"], ["2024-09", "day"], ["2024-09-23T00:00:00Z", "day"], ["2024-09-23", "unknown"]]) {
+    assert.equal(policy.normalizeRecordedServiceDate(date, precision), undefined, date + "/" + precision);
+  }
+  assert.equal(policy.normalizeRecordedServiceDate("2024-02-29", "day").date, "2024-02-29");
+});
+
+test("sanitizer projects date precision only while retaining explicitly public historical records", () => {
+  const {sanitizePublicInstrument: sanitize} = runtime(() => { throw Error("Unexpected HTTP"); }).load("apps/web/lib/instrument-profile-contract.ts");
+  const shared = {id: "shared", category: "Repair", eventType: "repair", title: "Shared historical work", serviceDate: "2023-09-23", datePrecision: "day", isPublic: true, sourceKind: "owner_reported"};
+  const hidden = {...shared, id: "private", title: "PRIVATE_REPORT", publicDescription: "PRIVATE_DESCRIPTION", privateNotes: "PRIVATE_NOTE", providerUserId: "PRIVATE_PERSON", relatedDocumentId: "PRIVATE_DOCUMENT", serviceDate: "2024-09-01", datePrecision: "month", isPublic: false};
+  const record = sanitize({owner: "PRIVATE_OWNER", timelineEvents: [hidden, shared]});
+  assert.equal(record.latestServiceDate, "2024-09");
+  assert.equal(record.latestServiceDatePrecision, "month");
+  assert.equal(record.timelineEvents.length, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(record.timelineEvents[0])), shared);
+  assert.doesNotMatch(JSON.stringify(record), /PRIVATE_/);
+  const invalid = sanitize({owner: "Synthetic", latestServiceDate: "2024-02-30", latestServiceDatePrecision: "day"});
+  assert.equal(Object.hasOwn(invalid, "latestServiceDate"), false);
+  assert.equal(Object.hasOwn(invalid, "latestServiceDatePrecision"), false);
+});
+
+test("actual Profile timeline formatter never falls back to registration timestamps", () => {
+  const relative = "apps/web/app/i/[code]/ProfileClient.tsx";
+  const actual = overlay && fs.existsSync(path.join(overlay, relative)) ? path.join(overlay, relative) : path.join(repo, relative);
+  const source = fs.readFileSync(actual, "utf8");
+  const match = source.match(/function formatTimelineEntryDate\(entry: ServiceHistoryEntry\) \{[\s\S]*?\r?\n\}\r?\n/);
+  assert.ok(match, "Actual Profile timeline formatter not found; update the source-bound fixture explicitly");
+  const policy = runtime(() => { throw Error("Unexpected HTTP"); }).load("apps/web/lib/instrument-profile-contract.ts");
+  const profileDate = source.match(/function formatProfileDate\(value\?: string\) \{[\s\S]*?\r?\n\}\r?\n/);
+  assert.ok(profileDate, "Actual Profile registration formatter not found");
+  const compiled = ts.transpileModule(profileDate[0] + match[0], {compilerOptions: {target: ts.ScriptTarget.ES2022}}).outputText;
+  const format = vm.runInNewContext(compiled + "\nformatTimelineEntryDate", {
+    normalizeRecordedServiceDate: policy.normalizeRecordedServiceDate,
+    formatRecordedServiceDate: policy.formatRecordedServiceDate
+  });
+  assert.equal(format({datePrecision: "unknown", serviceDate: "", isSystem: true, createdAt: "2026-10-01T00:00:00Z"}), "Date not recorded");
+  assert.equal(format({datePrecision: "year", serviceDate: "2024-01-01"}), "2024");
+  assert.equal(format({datePrecision: "month", serviceDate: "2024-09-01"}), "September 2024");
+  assert.equal(format({datePrecision: "day", serviceDate: "2024-09-23"}), "Sep 23, 2024");
+});
+
+test("date metadata upstream failure is not silently converted to an empty summary", async () => {
+  const app = runtime(mockDatabase(fixtures(1), 7, url =>
+    url.pathname.endsWith("/guitar_timeline_events") && !url.searchParams.has("is_public")
+      ? {status: 503, body: {message: "date metadata unavailable"}} : null));
+  await assert.rejects(app.load("apps/web/lib/public-instruments.ts").getPublicInstrumentByCode("QRG-TEST0000"), /date metadata unavailable/);
+});
+
 for (const state of ["missing", "foreign", "disabled"]) test("collection binding privacy: " + state, async () => {
   const db = fixtures(1);
   const settings = db.site_content.find(row => row.content_key === "public_collection_owner:owner-000");
@@ -367,4 +505,15 @@ for (const state of ["missing", "foreign", "disabled"]) test("collection binding
   const xml = await response.text();
   assert.match(xml, /\/i\/QRG-TEST0000/);
   assert.doesNotMatch(xml, /\/collections\/owner-000/);
+});
+
+test("public loader excludes retained private files even if an invalid legacy row claims public visibility", async () => {
+  const db=fixtures(1);
+  db.guitar_documents.push({id:'retained-private',guitar_id:'g-0000',name:'PRIVATE_RECEIPT',storage_path:'/private/kept.pdf',is_public:false,retained_private:true,created_at:'2026-09-02'});
+  db.guitar_documents.push({id:'retained-invalid-public',guitar_id:'g-0000',name:'INVALID_PUBLIC_RECEIPT',storage_path:'/private/invalid.pdf',is_public:true,retained_private:true,created_at:'2026-09-03'});
+  const app=runtime(mockDatabase(db)),loader=app.load('apps/web/lib/public-instruments.ts');
+  const profile=await loader.getPublicInstrumentByCode('QRG-TEST0000'),catalog=await loader.getPublicInstruments();
+  assert.equal(profile.documentFiles.length,2);assert.equal(catalog[0].documentFiles.length,2);
+  assert.doesNotMatch(JSON.stringify([profile,catalog]),/PRIVATE_RECEIPT|INVALID_PUBLIC_RECEIPT|[\/]private[\/]/);
+  assert.ok(app.calls.filter(({url})=>url.pathname.endsWith('/guitar_documents')).every(({url})=>url.searchParams.get('retained_private')==='eq.false'));
 });

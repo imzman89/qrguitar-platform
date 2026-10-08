@@ -165,12 +165,13 @@ export async function loadProviderProfile(supabase: ServerSupabaseClient, userId
   return result.data || null;
 }
 
-export async function hasPrivateProfileAccess(supabase: ServerSupabaseClient, guitarId: string, providerUserId: string) {
+export async function hasPrivateProfileAccess(supabase: ServerSupabaseClient, guitarId: string, providerUserId: string, ownerUserId: string) {
   const result = await supabase
     .from("service_provider_profile_access")
     .select("id,expires_at,revoked_at")
     .eq("guitar_id", guitarId)
     .eq("provider_user_id", providerUserId)
+    .eq("granted_by_user_id", ownerUserId)
     .is("revoked_at", null)
     .maybeSingle<{ id: string; expires_at: string | null; revoked_at: string | null }>();
   if (result.error) throw new Error(result.error.message);
@@ -180,7 +181,7 @@ export async function hasPrivateProfileAccess(supabase: ServerSupabaseClient, gu
 export async function canProviderAccessGuitar(supabase: ServerSupabaseClient, guitar: ServiceGuitarRow, user: User) {
   if (!guitar.owner_id || guitar.owner_id === user.id) return false;
   if (guitar.visibility === "public" || guitar.visibility === "unlisted") return true;
-  return hasPrivateProfileAccess(supabase, guitar.id, user.id);
+  return hasPrivateProfileAccess(supabase, guitar.id, user.id, guitar.owner_id);
 }
 
 export function mapProviderProfile(row: ServiceProviderProfileRow | null, includeInternal = false) {

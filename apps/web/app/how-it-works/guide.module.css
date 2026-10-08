@@ -1,10 +1,10 @@
 .guide { background:var(--canvas); color:var(--text); }
 .guide > :global(.section) { padding:32px 0; border:0; background:transparent; }
 .guide :global(.product-guide-hero-inner) { display:block; }
-.guide h1 { max-width:26ch; font-family:inherit; font-size:clamp(32px,3.2vw,44px); line-height:1.15; letter-spacing:-.035em; font-weight:550; margin:12px 0 16px; }
-.guide h2 { max-width:30ch; font-family:inherit; font-size:clamp(26px,2.5vw,34px); line-height:1.2; letter-spacing:-.025em; font-weight:550; margin:8px 0 16px; }
+.guide h1 { max-width:24ch; font-family:var(--font-display); font-size:clamp(40px,4.6vw,64px); line-height:1.06; letter-spacing:-.035em; font-weight:400; margin:20px 0 24px; }
+.guide h2 { max-width:30ch; font-family:var(--font-display); font-size:clamp(30px,3vw,40px); line-height:1.2; letter-spacing:-.025em; font-weight:400; margin:8px 0 24px; }
 .guide h3 { font-family:inherit; color:var(--text); font-size:19px; line-height:1.3; font-weight:550; margin:0 0 8px; }
-.guide :global(.product-guide-hero) p { max-width:70ch; font-size:17px; line-height:1.65; }
+.guide :global(.product-guide-hero) p { max-width:58ch; font-size:17px; line-height:1.65; }
 .guide :global(.product-guide-actions) { display:flex; flex-wrap:wrap; gap:12px; margin:20px 0 0; }
 .guide :global(.product-guide-principles) { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px; padding:24px 0 0; margin-top:24px; border:0; background:transparent; box-shadow:none; }
 .guide :global(.product-guide-principles > div) { display:grid; grid-template-columns:24px 1fr; gap:4px 12px; border:0; padding:0; }
@@ -13,7 +13,7 @@
 .walkthrough { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,.7fr); gap:64px; align-items:start; }
 .guide :global(.product-guide-steps) { display:grid; grid-template-columns:1fr; margin:0; padding:0; list-style:none; gap:28px; border:0; }
 .guide :global(.product-guide-steps li) { display:grid; grid-template-columns:40px minmax(0,1fr); gap:16px; padding:0; border:0; background:transparent; }
-.guide :global(.product-guide-steps li > span) { width:40px; height:40px; display:grid; place-items:center; border:0; border-radius:8px; background:var(--surface); color:var(--action); font-size:14px; font-weight:550; }
+.guide :global(.product-guide-steps li > span) { width:40px; height:40px; display:grid; place-items:center; border:0; border-radius:0; background:transparent; color:var(--muted); font-size:14px; font-weight:550; }
 .guide :global(.product-guide-steps p) { margin:0; max-width:60ch; color:var(--muted); font-size:16px; line-height:1.65; }
 .example { min-width:0; background:transparent; border-radius:0; padding:0; }
 .guide :global(.product-guide-capability-grid) { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:28px; }
@@ -23,7 +23,18 @@
 .guide :global(.product-guide-split) > div { min-width:0; }
 .serialCaveat { grid-column:2; display:block; margin-top:8px; color:var(--muted); font-size:14px; line-height:1.5; }
 .guide :global(.product-guide-ownership-list) { display:grid; gap:24px; }.guide :global(.product-guide-ownership-list article) { border:0; padding:0; background:transparent; }
-.guide :global(.product-guide-faq-list) { display:grid; gap:8px; }.guide :global(.product-guide-faq-list details) { background:var(--surface); border:0; border-radius:8px; padding:0 20px; }.guide :global(.product-guide-faq-list summary) { min-height:52px; padding:16px 0; font-size:16px; line-height:1.4; font-weight:550; }.guide :global(.product-guide-faq-list p) { font-size:15px; line-height:1.7; padding-bottom:20px; }
-.guide :global(.product-guide-cta-inner) { padding:24px; border:0; border-radius:12px; background:var(--surface); }
+.guide :global(.product-guide-faq-list) { display:grid; gap:0; }.guide :global(.product-guide-faq-list details) { background:transparent; border:0; border-bottom:1px solid var(--line); border-radius:0; padding:0; }.guide :global(.product-guide-faq-list summary) { min-height:52px; padding:16px 0; font-size:16px; line-height:1.4; font-weight:550; }.guide :global(.product-guide-faq-list p) { font-size:15px; line-height:1.7; padding-bottom:20px; }
+.guide :global(.product-guide-cta-inner) { padding:32px 0; border:0; border-top:1px solid var(--line); border-radius:0; background:transparent; }
 @media(max-width:900px) { .walkthrough { gap:32px; grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr); }.guide :global(.product-guide-split),.guide :global(.product-guide-faq-inner) { gap:32px; }.guide :global(.product-guide-capability-grid) { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-@media(max-width:700px) { .guide > :global(.section) { padding:24px 0; }.guide :global(.product-guide-principles) { grid-template-columns:1fr; gap:16px; margin-top:16px; }.walkthrough,.guide :global(.product-guide-split),.guide :global(.product-guide-faq-inner) { grid-template-columns:1fr; gap:28px; }.guide :global(.product-guide-capability-grid) { grid-template-columns:1fr; gap:24px; }.guide :global(.product-guide-steps) { gap:24px; }.guide :global(.product-guide-steps li) { grid-template-columns:36px 1fr; gap:12px; }.example { max-width:480px; }.guide :global(.product-guide-cta-inner) { padding:20px; } }
+@media(max-width:700px) { .guide > :global(.section) { padding:24px 0; }.guide :global(.product-guide-principles) { grid-template-columns:1fr; gap:16px; margin-top:16px; }.walkthrough,.guide :global(.product-guide-split),.guide :global(.product-guide-faq-inner) { grid-template-columns:1fr; gap:28px; }.guide :global(.product-guide-capability-grid) { grid-template-columns:1fr; gap:24px; }.guide :global(.product-guide-steps) { gap:24px; }.guide :global(.product-guide-steps li) { grid-template-columns:36px 1fr; gap:12px; }.example { max-width:480px; }.guide :global(.product-guide-cta-inner) { padding:24px 0; } }
+
+/* Shared editorial rhythm with discovery, while role help remains interactive. */
+.guide :global(.shell) { width:min(1240px,calc(100% - 80px)); }
+.guide :global(.product-guide-hero) { padding-block:56px 48px; }
+.guide :global(.eyebrow) { color:var(--muted); letter-spacing:.14em; font-size:10px; font-weight:500; }
+.guide :global(.product-guide-role-panel) { background:transparent; border-radius:0; padding:24px 0; border-top:1px solid var(--line); }
+.guide :global(.product-guide-role-tabs button) { border-radius:0; border-bottom:1px solid transparent; }
+.guide :global(.product-guide-role-tabs button.is-active) { color:var(--text); background:transparent; border-bottom-color:var(--text); }
+.guide :global(.button) { background:color-mix(in srgb,var(--text) 8%,var(--canvas)); color:var(--text); border:1px solid color-mix(in srgb,var(--text) 28%,var(--canvas)); border-radius:2px; font-weight:500; }
+.guide :global(.button:hover) { background:color-mix(in srgb,var(--text) 14%,var(--canvas)); color:var(--text); border-color:var(--text); }
+@media(max-width:700px) { .guide :global(.shell) { width:calc(100% - 40px); }.guide :global(.product-guide-hero) { padding-block:32px; }.guide h1 { font-size:40px; }.guide :global(.product-guide-role-panel) { grid-template-columns:24px minmax(0,1fr); padding:24px 0; } }

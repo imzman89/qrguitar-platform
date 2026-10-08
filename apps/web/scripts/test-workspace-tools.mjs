@@ -61,8 +61,8 @@ test("every supported workspace offers valid local daily actions", () => {
     }
   }
 });
-test("repair tools lead with the workbench while seller tools lead with website setup", () => {
-  assert.equal(getWorkspace("luthier").actions[0].href, "/dashboard/service");
+test("repair tools lead with private service slips while seller tools lead with website setup", () => {
+  assert.equal(getWorkspace("luthier").actions[0].href, "/dashboard/service/slips");
   for (const role of ["shop", "builder"]) assert.equal(getWorkspace(role).actions[0].title, "Connect your website");
 });
 test("unknown roles have a safe workspace fallback and legacy brands retain builder tools", () => {

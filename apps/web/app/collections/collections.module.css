@@ -36,12 +36,12 @@
 @media (max-width: 780px) { .memberHero { display: grid; grid-template-columns: 1fr; } .memberActions { min-width: 0; align-items: flex-start; } .actionRow { justify-content: flex-start; } }
 @media (max-width: 600px) { .grid, .filters { grid-template-columns: minmax(0, 1fr); } .filters { padding: 16px; gap: 14px; } .memberIdentity { grid-template-columns: 64px minmax(0,1fr); gap: 14px; } .memberIdentity > img { width: 64px; height: 64px; } .actionRow, .actionRow > a { width: 100%; } }
 
-.directory { padding:32px 0 48px; min-height:0; }.directory :global(.collection-directory-hero) { padding:0 0 12px; margin:0; border:0; }.directory h1 { max-width:24ch; font-size:clamp(32px,3.2vw,44px); font-weight:550; line-height:1.15; letter-spacing:-.03em; }.directory :global(.collection-directory-hero p) { max-width:65ch; font-size:16px; line-height:1.65; }.navigation { margin:24px 0 0; }.navigation a { min-height:44px; }.empty h2 { font-size:26px; font-weight:550; }.cardFooter { border:0; padding-top:4px; font-size:13px; }.cardBody h2 { font-weight:550; }.card > img { background:var(--canvas); }.card:focus-visible { outline:3px solid var(--action); outline-offset:4px; }
+.directory { padding:48px 0 64px; min-height:0; }.directory :global(.collection-directory-hero) { padding:0 0 12px; margin:0; border:0; }.directory h1 { max-width:24ch; font-family:var(--font-display); font-size:clamp(40px,4.6vw,60px); font-weight:400; line-height:1.06; letter-spacing:-.03em; }.directory :global(.collection-directory-hero p) { max-width:65ch; font-size:16px; line-height:1.65; }.navigation { margin:24px 0 0; }.navigation a { min-height:44px; }.empty h2 { font-size:26px; font-weight:550; }.cardFooter { border:0; padding-top:4px; font-size:13px; }.cardBody h2 { font-weight:550; }.card > img { background:var(--canvas); }.card:focus-visible { outline:3px solid var(--action); outline-offset:4px; }
 
 .memberPage { width:min(100% - 40px,1240px); margin-inline:auto; padding-block:24px 48px; min-width:0; }
 .memberPage .navigation { margin:0 0 24px; }
 .memberPage .memberHero { padding:0 0 32px; gap:24px; }
-.memberPage h1 { margin:8px 0; font-size:clamp(30px,3.2vw,44px); font-weight:600; line-height:1.15; letter-spacing:-.03em; overflow-wrap:anywhere; }
+.memberPage h1 { margin:8px 0; font-family:var(--font-display); font-size:clamp(36px,4vw,56px); font-weight:400; line-height:1.08; letter-spacing:-.03em; overflow-wrap:anywhere; }
 .memberPage :global(.collection-role) { color:var(--muted); font-size:14px; line-height:1.5; font-weight:400; text-transform:none; letter-spacing:0; }
 .memberPage :global(.collection-avatar) { display:grid; place-items:center; width:88px; height:88px; border:0; background:var(--surface); color:var(--text); font-size:28px; }
 .memberPage .memberIdentity { grid-template-columns:88px minmax(0,1fr); }
@@ -50,7 +50,7 @@
 .memberPage :global(.collection-count) { display:flex; align-items:baseline; gap:8px; font-size:24px; line-height:1.3; font-weight:550; }
 .memberPage :global(.collection-count) small { margin:0; font-size:13px; font-weight:400; text-transform:none; letter-spacing:0; color:var(--muted); }
 .memberPage .actionRow a { font-size:14px; }
-.memberFilters { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr); gap:16px; padding:20px; border:0; border-radius:12px; background:var(--surface); }
+.memberFilters { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr); gap:16px; padding:20px 0; border:0; border-radius:0; background:transparent; }
 .memberFilters label,.memberFilterFields label { display:grid; gap:8px; min-width:0; font-size:14px; color:var(--muted); }
 .memberFilters input,.memberFilters select,.memberFilterFields select { min-height:48px; width:100%; min-width:0; border:1px solid var(--border-strong); border-radius:8px; background:var(--bg); color:var(--text); font:inherit; font-size:16px; padding:10px 12px; }
 .memberFilters .search input { padding-left:40px; }
@@ -64,7 +64,7 @@
 @media(max-width:600px) {
   .memberPage { padding-top:16px; }.memberPage .memberHero { gap:20px; }.memberPage .memberIdentity { grid-template-columns:56px minmax(0,1fr); align-items:start; gap:14px; }
   .memberPage .memberIdentity > img,.memberPage :global(.collection-avatar) { width:56px;height:56px; }
-  .memberFilters { grid-template-columns:repeat(2,minmax(0,1fr)); padding:16px; gap:14px; }.memberFilters > label:first-child { grid-column:1/-1; }
+  .memberFilters { grid-template-columns:repeat(2,minmax(0,1fr)); padding:16px 0; gap:14px; }.memberFilters > label:first-child { grid-column:1/-1; }
   .memberFilterFields,.profileGrid { grid-template-columns:minmax(0,1fr); }.memberPage .actionRow { width:auto; max-width:100%; }.memberPage .actionRow a { width:auto; max-width:100%; }
 }
 
@@ -74,3 +74,37 @@
 .exampleCollection section { padding-top:16px; min-width:0; }
 .exampleCollection h2 { margin:0 0 8px; font-size:22px; line-height:1.3; letter-spacing:0; }
 .exampleCollection p { margin:0 0 20px; max-width:65ch; font-size:14px; line-height:1.6; color:var(--muted); }
+
+.profileGrid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:48px 32px; }
+@media(max-width:600px) { .directory { padding-top:28px; }.profileGrid { grid-template-columns:minmax(0,1fr); gap:32px; } }
+
+/* Existing public company identity leads; QRguitar remains the quieter platform. */
+@media screen {
+ .businessCollection .memberPage .memberIdentity { grid-template-columns:minmax(0,1fr); align-items:start; gap:20px; }
+ .businessCollection .memberPage .memberIdentity > img { width:min(100%,240px); height:128px; border-radius:0; object-fit:contain; object-position:left center; }
+ .businessCollection .memberPage :global(.collection-avatar) { width:88px; height:88px; border-radius:0; }
+ .businessCollection :global(.brand-frame a[href="/"] > img), .businessCollection :global(.brand-frame a[href="/"] > .brand-logo-fallback), .businessCollection :global(.brand-logo--footer) { width:104px; height:auto; }
+ .businessCollection :global(.brand-logo-fallback) { font-size:22px; }
+}
+@media screen and (max-width:600px) {
+ .businessCollection .memberPage .memberIdentity > img { width:min(100%,180px); height:104px; }
+}
+
+/* Open public-directory empty states without changing member collections. */
+@media screen {
+  .directory .empty { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr); align-items:start; gap:24px 40px; width:100%; min-width:0; max-width:none; margin:32px 0 0; padding:28px 0; border:0; border-top:1px solid var(--line); border-radius:0; background:transparent; box-shadow:none; color:var(--text); }
+  .directory .empty > svg[aria-hidden="true"] { display:none; }
+  .directory .empty h2 { min-width:0; max-width:30ch; margin:0; color:var(--text); font-family:var(--font-display); font-size:clamp(26px,2.8vw,36px); font-weight:500; line-height:1.2; letter-spacing:-.035em; overflow-wrap:anywhere; text-wrap:balance; }
+  .directory .empty p { min-width:0; margin:0; max-width:52ch; font-size:15px; line-height:1.65; color:var(--muted-strong); overflow-wrap:anywhere; }
+  .directory .empty :global(.form-actions) { display:flex; flex-wrap:wrap; align-items:center; align-self:center; gap:12px 22px; min-width:0; max-width:100%; margin:0; }
+  .directory .empty :global(.button) { display:inline-flex; align-items:center; justify-content:center; justify-self:start; gap:12px; width:fit-content; max-width:100%; min-width:0; min-height:52px; padding:14px 20px; border:1px solid color-mix(in srgb,var(--text) 25%,var(--canvas)); border-radius:0; background:color-mix(in srgb,var(--text) 8%,var(--canvas)); color:var(--text); box-shadow:none; font-family:var(--font-ui); font-size:14px; font-weight:600; line-height:1.45; white-space:normal; overflow-wrap:anywhere; text-decoration:none; transform:none; }
+  .directory .empty :global(.button:hover) { background:color-mix(in srgb,var(--text) 13%,var(--canvas)); color:var(--text); box-shadow:none; transform:none; }
+  .directory .empty :global(.button.secondary) { justify-content:flex-start; min-height:44px; padding:10px 0; border-color:transparent; background:transparent; color:var(--muted-strong); font-weight:500; }
+  .directory .empty :global(.button.secondary:hover) { border-color:transparent; background:transparent; color:var(--text); text-decoration:underline; text-underline-offset:4px; }
+  .directory .empty :global(.button:focus-visible) { outline:2px solid var(--action); outline-offset:4px; }
+}
+@media screen and (max-width:760px) {
+  .directory .empty { grid-template-columns:minmax(0,1fr); gap:20px; margin-top:28px; padding:24px 0; }
+  .directory .empty h2 { max-width:26ch; font-size:26px; }
+  .directory .empty :global(.form-actions) { justify-self:start; }
+}

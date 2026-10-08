@@ -134,7 +134,7 @@
 .labelInfo > span { color: var(--muted); font-size: 8px; line-height: 1.25; }
 .labelInfo p { color: var(--muted); font-size: 9px; }
 .labelInfo .brandPlate { width: 1.45in; padding: 0; }
-.tag { width: 100%; height: 100%; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 2.25in auto minmax(0, 1fr) auto auto; grid-template-areas: "tagHeader" "tagPhoto" "tagIdentity" "tagMeta" "tagNote" "tagFooter"; gap: 0.1in; background: var(--paper); }
+.tag { width: 100%; height: 100%; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(1.1in, 1fr) auto auto auto auto; grid-template-areas: "tagHeader" "tagPhoto" "tagIdentity" "tagMeta" "tagNote" "tagFooter"; gap: 0.1in; background: var(--paper); }
 .tagHeader { grid-area: tagHeader; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 8px; border-bottom: 2px solid var(--accent); }
 .tagHeader .brandPlate { width: 1.65in; }
 .tagHeader > strong { color: var(--ink); font-size: 11px; font-variant-numeric: tabular-nums; }

@@ -33,7 +33,7 @@ const { PrintDocument } = compile('app/handout/[code]/PrintDocument.tsx');
 const { sanitizePublicInstrument, resolveInstrumentPresentation, isOwnerOnlyInstrumentSpec } = compile('lib/instrument-profile-contract.ts');
 prepareZXingModule({ overrides: { wasmBinary: fs.readFileSync(require.resolve('zxing-wasm/reader/zxing_reader.wasm')) } });
 
-for (const sideMm of [25, 32, 38]) test(`${sideMm}mm: original dimensioned SVG and integer-module PNG decode to the permanent link`, async () => {
+for (const sideMm of [25, 32, 38, 38.1]) test(`${sideMm}mm: original dimensioned SVG and integer-module PNG decode to the permanent link`, async () => {
   for (const code of ['QRG-QR4-GUITAR', 'QRG-QR4-PEDAL', 'QRG-QR4-AMP', 'QRG-A/B?#']) {
     const expected = `https://www.qrguitar.com/i/${encodeURIComponent(code)}`;
     const metrics = qrPrintMetrics(code, sideMm);
@@ -73,13 +73,14 @@ for (const sideMm of [25, 32, 38]) test(`${sideMm}mm: original dimensioned SVG a
 });
 
 test('QR-only dimensions include the quiet zone without extra page margin or non-square rotation', () => {
-  assert.deepEqual(normalizePrintOptions('qr', 'letter', 'landscape'), { size: 'qr32', orientation: 'portrait' });
+  assert.deepEqual(normalizePrintOptions('qr', 'letter', 'landscape'), { size: 'qr381', orientation: 'portrait' });
   for (const sideMm of [25,32,38]) {
     const g = printGeometry(`qr${sideMm}`, 'portrait');
     assert.ok(Math.abs(g.width * 25.4 - sideMm) < 0.000001);
     assert.equal(g.width, g.height); assert.equal(g.margin, 0);
     assert.equal(g.contentWidth, g.width); assert.equal(g.contentHeight, g.height);
   }
+  assert.ok(Math.abs(printGeometry('qr381', 'portrait').width - 1.5) < 1e-9);
   assert.throws(() => qrPrintMetrics('QRG-QR4', 5), /supported/);
 });
 

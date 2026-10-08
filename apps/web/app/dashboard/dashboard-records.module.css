@@ -284,3 +284,156 @@
 @media (prefers-reduced-motion: reduce) {
   .instrumentBodyLink, .primaryActions :global(.button), .moreButton { transition: none; }
 }
+
+/* Keep saved instruments visually consistent with the public archive. */
+.instrumentRow { border: 1px solid var(--border-soft); border-radius: 16px; background: var(--surface); padding: 0 18px 18px; }
+.instrumentThumb { width: calc(100% + 36px); margin-inline: -18px; border-radius: 15px 15px 0 0; background: var(--canvas); }
+.instrumentDetails { padding-top: 20px; }
+.header { padding-block: 8px 16px; }
+.collectionControls { padding: 12px 16px; border: 1px solid var(--border-soft); border-radius: 12px; background: var(--surface); }
+.instrumentList { gap: 24px; }
+.drawerIdentity .instrumentThumb { width: 100%; margin: 0; border-radius: 10px; }
+@media (max-width:760px) { .collectionControls { padding: 12px; } .instrumentList { gap: 24px; } }
+
+/* Match the open public catalog without changing owner actions or image fit. */
+.instrumentRow { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.instrumentThumb { width: 100%; margin-inline: 0; border: 0; border-radius: 0; background: transparent; }
+.instrumentThumb:has(> span) { background: transparent; }
+.instrumentDetails { padding: 16px 0; }
+.instrumentInfo > strong { font-size: 1.25rem; }
+.collectionControls { padding: 0; border: 0; border-radius: 0; background: transparent; }
+
+
+/* v30: collection photography sets the scale; actions remain restrained. */
+.dashboard { gap:32px; }
+.dashboard .header h1 { font-family:var(--font-display); font-size:clamp(38px,4vw,52px); font-weight:400; letter-spacing:-.035em; line-height:1.08; }
+.header :global(.eyebrow) { font-size:10px; letter-spacing:.12em; text-transform:uppercase; }
+.header p { max-width:50ch; font-size:14px; line-height:1.7; }
+.headerActions { max-width:280px; gap:10px; }
+:global(body[data-product-theme]) .headerActions :global(.button) { border:1px solid var(--line); border-radius:2px; background:transparent; color:var(--text); font-weight:500; }
+:global(body[data-product-theme]) .headerActions :global(.button):first-child { border-color:color-mix(in srgb,var(--text) 30%,var(--canvas)); background:color-mix(in srgb,var(--text) 10%,var(--canvas)); color:var(--text); }
+:global(body[data-product-theme]) .headerActions :global(.button):hover { border-color:var(--text); background:var(--surface); color:var(--text); }
+.filters button { padding-inline:0; border-radius:0; }
+.filters button.filterActive, .filters button:hover { background:transparent; color:var(--text); text-decoration:underline; text-underline-offset:6px; }
+.tableHeader { margin-bottom:24px; }
+.tableHeader h3 { color:var(--muted); font-family:var(--font-ui); font-size:11px; font-weight:500; letter-spacing:.1em; text-transform:uppercase; }
+.instrumentList { grid-template-columns:repeat(2,minmax(0,1fr)); gap:40px 32px; }
+.instrumentList:has(> .instrumentRow:only-child) { grid-template-columns:minmax(0,min(100%,640px)); }
+.instrumentDetails { padding:20px 0 18px; gap:12px; }
+.instrumentInfo > strong { font-family:var(--font-display); font-size:clamp(26px,2.7vw,34px); font-weight:400; letter-spacing:-.025em; line-height:1.15; }
+.instrumentInfo > span { font-size:12px; line-height:1.6; }
+.taskPanel { border:0; border-left:2px solid var(--action); border-radius:0; background:transparent; }
+:global(body[data-product-theme]) .primaryActions :global(.button) { border:1px solid var(--line); border-radius:2px; background:transparent; color:var(--text); font-weight:500; }
+:global(body[data-product-theme]) .primaryActions .editAction { border-color:var(--text); background:transparent; color:var(--text); }
+:global(body[data-product-theme]) .primaryActions .editAction:hover { background:color-mix(in srgb,var(--text) 12%,var(--canvas)); border-color:var(--text); color:var(--text); }
+@media(max-width:1050px) { .instrumentList { grid-template-columns:minmax(0,1fr); } }
+@media(max-width:760px) { .dashboard { gap:24px; }.dashboard .header h1 { font-size:38px; }.instrumentList { gap:32px; }.instrumentInfo > strong { font-size:28px; } }
+
+/* Keep the collection section name accessible without repeating the page title visually. */
+.tableHeader { margin:0; padding:0; height:0; }
+.tableHeader h3 { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
+
+/* Screen-only seller handoff chrome; recipient checks and private-file selections stay unchanged. */
+@media screen {
+ :global(.action-drawer):has(.transferPanel) :global(.action-drawer-header h2) { font-family:var(--font-display,Georgia,serif); font-weight:400; }
+ .transferPanelBody :global(.transfer-copy > strong) { font-family:var(--font-display,Georgia,serif); font-size:clamp(24px,2.5vw,30px); font-weight:400; line-height:1.2; }
+ .transferPanelBody :global(.claim-link-box), .transferPanelBody :global(.buyer-code-box) { padding:20px 0; border:0; border-block:1px solid var(--line); border-radius:0; background:transparent; }
+ .transferPanelBody :global(.transfer-copy > .mini-eyebrow), .transferPanelBody :global(.claim-link-box > span), .transferPanelBody :global(.buyer-code-box > span) { color:var(--muted); font-weight:500; letter-spacing:0; text-transform:none; }
+ .transferPanelBody :global(.transfer-mode button) { min-height:44px; min-width:0; border:1px solid var(--line); border-radius:2px; background:transparent; color:var(--muted); font-weight:500; white-space:normal; overflow-wrap:anywhere; }
+ .transferPanelBody :global(.transfer-mode button[aria-pressed="true"]) { border-color:var(--text); background:var(--surface-subtle); color:var(--text); }
+ .transferPanelBody :global(.transfer-mode button):hover:not(:disabled) { background:var(--surface-raised); color:var(--text); }
+ .transferPanelBody :global(.button:not(.danger):not(.destructive)) { min-height:46px; max-width:100%; border:1px solid var(--border-strong); border-radius:2px; background:var(--surface-subtle); color:var(--text); font-weight:500; box-shadow:none; }
+ .transferPanelBody :global(.button.secondary:not(.danger):not(.destructive)) { background:transparent; }
+ .transferPanelBody :global(.button:not(.danger):not(.destructive)):hover:not(:disabled) { background:var(--surface-raised); }
+ .transferPanelBody :global(.button.secondary:not(.danger):not(.destructive)):hover:not(:disabled) { background:transparent; border-color:var(--text); }
+}
+
+/* Screen-only non-handoff drawer tools; QR artwork, dialogs and danger actions stay unchanged. */
+@media screen {
+ .drawerQuickEdit { border-radius:2px; background:var(--surface-subtle); font-weight:500; }
+ .drawerQuickEdit:hover:not(:disabled) { background:var(--surface-raised); }
+ .drawerSections > section:not(.drawerDanger) { padding-top:20px; border-top:1px solid var(--line); }
+ .drawerSections > section:not(.drawerDanger) > b { font-weight:500; }
+ .drawerSections > section:not(.drawerDanger) > :global(.qr-download) { padding:0; border:0; border-radius:0; background:transparent; box-shadow:none; }
+ .drawerSections > section:not(.drawerDanger) > :is(a,button), .drawerSections > section:not(.drawerDanger) :global(.qr-primary-actions) > :is(a,button), .dashboardShare :global(.record-share-button) { min-width:0; min-height:44px; width:100%; max-width:100%; border:1px solid var(--line); border-radius:2px; background:transparent; color:var(--text); box-shadow:none; font-weight:500; line-height:1.4; white-space:normal; overflow-wrap:anywhere; }
+ .drawerSections > section:not(.drawerDanger) > :is(a,button):hover:not(:disabled), .drawerSections > section:not(.drawerDanger) :global(.qr-primary-actions) > :is(a,button):hover:not(:disabled), .dashboardShare :global(.record-share-button):hover:not(:disabled) { border-color:var(--border-strong); background:var(--surface-raised); color:var(--text); }
+}
+@media screen and (max-width:760px) {
+ .drawerSections > section:not(.drawerDanger) :global(.qr-primary-actions) { grid-template-columns:minmax(0,1fr); }
+}
+
+/* A handoff follows one clear column inside the narrow instrument drawer. */
+@media screen {
+ .transferPanelBody :global(.transfer-form) { grid-template-columns:minmax(0,1fr); }
+ .transferPanelBody :global(.transfer-form > label) { min-width:0; }
+ .transferPanelBody :global(.transfer-form > fieldset) { grid-column:1 / -1; min-width:0; margin:0; padding:18px 0; border:0; border-top:1px solid var(--line); }
+}
+
+/* Private-file choices remain compact checkboxes with generous clickable rows. */
+@media screen {
+ .transferPanelBody :global(.transfer-form label) { font-weight:500; text-transform:none; }
+ .transferPanelBody :global(.transfer-form > fieldset > label) { display:flex; align-items:flex-start; gap:10px; min-width:0; min-height:44px; padding:10px 0; font-weight:400; overflow-wrap:anywhere; }
+ .transferPanelBody :global(.transfer-form input[type="checkbox"]) { flex:0 0 18px; width:18px; height:18px; min-height:18px; margin:2px 0 0; padding:0; accent-color:var(--action); }
+}
+
+/* Completed handoffs remain available without competing with the next preparation. */
+@media screen {
+ .transferPanelBody :global(.previous-handoff) { min-width:0; border-top:1px solid var(--line); padding-top:8px; }
+ .transferPanelBody :global(.previous-handoff > summary) { align-items:center; min-height:44px; gap:16px; color:var(--muted); }
+ .transferPanelBody :global(.previous-handoff > summary > span) { color:var(--muted); font-size:.875rem; font-weight:500; line-height:1.5; }
+ .transferPanelBody :global(.previous-handoff > summary > .handoff-history-marker) { flex:0 0 18px; text-align:center; }
+ .transferPanelBody :global(.handoff-history-marker)::before { content:"+"; }
+ .transferPanelBody :global(.previous-handoff[open] .handoff-history-marker)::before { content:"−"; }
+ .transferPanelBody :global(.previous-handoff > summary):focus-visible { outline:2px solid var(--action); outline-offset:4px; }
+ .transferPanelBody :global(.previous-handoff > .claim-link-box) { padding:12px 0; border:0; }
+ .transferPanelBody :global(.previous-handoff .claim-link-box > .field-note) { margin:0; }
+ .transferPanelBody :global(.previous-handoff time) { color:var(--muted); font-size:.8125rem; line-height:1.5; }
+}
+
+/* Personal collection is a working list, not a second public photo gallery. */
+@media screen {
+  .instrumentList.personalRecords,.instrumentList.personalRecords:has(> .instrumentRow:only-child) { grid-template-columns:minmax(0,1fr); gap:0; }
+  .personalRecords .instrumentRow { display:grid; grid-template-columns:minmax(0,1fr) 220px; align-items:center; gap:24px; padding:24px 0; border:0; border-bottom:1px solid var(--line); border-radius:0; background:transparent; }
+  .personalRecords .instrumentBodyLink { display:grid; grid-template-columns:144px minmax(0,1fr); align-items:start; gap:24px; min-width:0; }
+  .personalRecords .instrumentThumb { width:144px; max-width:100%; aspect-ratio:4 / 3; margin:0; border-radius:0; }
+  .personalRecords .instrumentDetails { min-width:0; padding:0; gap:10px; }
+  .personalRecords .instrumentInfo > strong { font-size:clamp(22px,2.2vw,28px); line-height:1.2; }
+  .personalRecords .qrActionColumn { display:grid; grid-template-columns:minmax(0,1fr); align-content:center; gap:8px; min-width:0; margin:0; }
+  .personalRecords .primaryActions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  :global(body[data-product-theme]) .personalRecords .primaryActions :global(.button) { min-height:44px; min-width:0; white-space:normal; overflow-wrap:anywhere; }
+  .personalRecords .moreButton { display:inline-flex; justify-content:center; align-items:center; justify-self:end; gap:8px; width:auto; max-width:100%; min-height:44px; padding:8px 10px; border:0; border-radius:0; color:var(--muted-strong); background:transparent; font-family:var(--font-ui); font-size:12px; line-height:1.4; white-space:normal; overflow-wrap:anywhere; }
+  .personalRecords .moreButton svg { flex:none; }
+  .personalRecords .moreButton:hover { color:var(--text); background:transparent; text-decoration:underline; text-underline-offset:4px; }
+  .personalRecords .moreButton:focus-visible { outline:2px solid var(--action); outline-offset:3px; }
+}
+@media screen and (max-width:1050px) {
+  .personalRecords .instrumentRow { grid-template-columns:minmax(0,1fr); gap:16px; }
+  .personalRecords .qrActionColumn { grid-template-columns:minmax(0,1fr) auto; align-items:center; width:100%; max-width:360px; justify-self:end; gap:12px; }
+}
+@media screen and (max-width:760px) {
+  .personalRecords .instrumentRow { padding:20px 0; }
+  .personalRecords .instrumentBodyLink { grid-template-columns:80px minmax(0,1fr); gap:16px; }
+  .personalRecords .instrumentThumb { width:80px; }
+  .personalRecords .instrumentInfo > strong { font-size:22px; }
+  .personalRecords .qrActionColumn { max-width:none; }
+}
+
+
+/* Personal Collection can switch presentation without changing its records or actions. */
+@media screen {
+  .collectionViewToggle { display:flex; flex-wrap:wrap; align-items:center; gap:16px; min-width:0; }
+  .collectionViewToggle button { display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding:8px 4px; border:0; border-radius:0; background:transparent; color:var(--muted-strong); font:inherit; font-size:13px; cursor:pointer; }
+  .collectionViewToggle button[aria-pressed="true"] { color:var(--text); text-decoration:underline; text-decoration-color:var(--action); text-decoration-thickness:2px; text-underline-offset:8px; }
+  .collectionViewToggle button:hover { color:var(--text); }
+  .collectionViewToggle button:focus-visible { outline:2px solid var(--action); outline-offset:4px; }
+  .personalGallery .qrActionColumn { flex-wrap:wrap; gap:12px; }
+  .personalGallery .moreButton { display:inline-flex; flex:0 0 auto; align-items:center; justify-content:center; gap:8px; width:auto; min-width:44px; min-height:44px; padding:8px 10px; border-radius:0; font-family:var(--font-ui); font-size:12px; line-height:1.4; white-space:normal; overflow-wrap:anywhere; }
+  .personalGallery .moreButton svg { flex:none; }
+}
+
+/* Keep personal Collection utilities together; professional controls keep their layout. */
+@media screen and (max-width:1120px) {
+  .collectionControls:has(> .collectionViewToggle) { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:12px 16px; }
+  .collectionControls:has(> .collectionViewToggle) > .collectionViewToggle { justify-self:end; }
+  .collectionControls:has(> .collectionViewToggle) > .search { grid-column:1 / -1; min-width:0; width:100%; }
+}

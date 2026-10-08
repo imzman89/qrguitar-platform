@@ -57,3 +57,14 @@ test('actual owner event renders the unchanged guarded native submit form instea
   const nodes=all(draft(f.props())); const form=nodes.find(n=>n.type==='form'); assert.ok(form); assert.equal(form.props.noValidate,true); assert.equal(typeof form.props.onSubmit,'function');
   assert.equal(nodes.some(n=>n.type==='a'&&String(n.props.href).startsWith('/login')),false); f.timeout(); assert.equal(f.props().user.id,'synthetic-owner'); f.cleanup();
 });
+
+test('Account owns collection naming: Create has no owner editor or requirement', () => {
+  const nodes = all(draft({
+    user: { id: 'synthetic-owner' },
+    authChecked: true
+  }));
+  assert.equal(nodes.some(n => n.props?.id === 'owner'), false);
+  assert.ok(nodes.some(n =>
+    n.type === 'a' && n.props.href === '/account?section=collection'
+  ));
+});

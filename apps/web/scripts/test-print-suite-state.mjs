@@ -35,7 +35,8 @@ async function fixture() {
   let session=owner, authCallback, renderer, printed=0, route={code:'QRG-QR4-A'}, requests=[], jobs=[], sanitizerCalls=[];
   const search=new URLSearchParams('format=qr&size=qr32'), router={replace(){}}, content={};
   const root={querySelectorAll:()=>[{complete:true,naturalWidth:121,addEventListener(){},removeEventListener(){}}],scrollWidth:121,clientWidth:121,scrollHeight:121,clientHeight:121,firstElementChild:null};
-  globalThis.window={setTimeout,clearTimeout,print(){printed++;}};
+  const pageEvents=new EventTarget();
+  globalThis.window={setTimeout,clearTimeout,addEventListener:pageEvents.addEventListener.bind(pageEvents),removeEventListener:pageEvents.removeEventListener.bind(pageEvents),print(){printed++;}};
   globalThis.document={fonts:{ready:Promise.resolve()},getElementById:()=>null};
   globalThis.ResizeObserver=class {observe(){} disconnect(){}};
   const presentation=compile('lib/instrument-profile-contract.ts');

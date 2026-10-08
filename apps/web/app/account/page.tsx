@@ -21,6 +21,7 @@ import { PUBLIC_SITE_ORIGIN } from "../../lib/profile-url";
 import { getContentValue } from "../../lib/content-registry";
 import { useSiteContent } from "../../lib/use-site-content";
 import { getWorkspace, workspaceOptionLabel, WORKSPACE_OPTIONS } from "../../lib/workspace-tools";
+import OwnerNameConsentSection from "../../components/OwnerNameConsentSection";
 import AccountDeletionSection from "../../lib/account-deletion/AccountDeletionSection";
 import { accountDeletionAuth } from "../../lib/account-deletion/account-deletion-auth";
 
@@ -30,7 +31,7 @@ function changedAccountSections(draft: AccountDraft, saved: AccountSnapshot | nu
   if (!saved) return [];
   const sections: Array<"profile" | "collection"> = [];
   if (draft.displayName !== saved.displayName || draft.publicCollection.accountType !== saved.publicCollection.accountType) sections.push("profile");
-  const collectionFields: Array<keyof PublicCollectionSettings> = ["enabled", "handle", "publicName", "bio", "location", "websiteUrl", "avatarUrl", "allowIndexing", "allowMessages"];
+  const collectionFields: Array<keyof PublicCollectionSettings> = ["enabled", "handle", "publicName", "bio", "location", "websiteUrl", "avatarUrl", "allowIndexing", "allowMessages", "allowWarrantyHelp", "warrantyHelpUrl"];
   if (collectionFields.some((key) => draft.publicCollection[key] !== saved.publicCollection[key])) sections.push("collection");
   return sections;
 }
@@ -75,6 +76,9 @@ function AccountSettingsPage() {
   const stats = state.account?.stats || { records: 0, publicRecords: 0, privateRecords: 0, unlistedRecords: 0 };
   const status = state.message;
   const isWorking = Boolean(state.busy);
+  const workspaceAccountType = state.account?.publicCollection.accountType || "player";
+  const professionalWorkspace = ["shop", "builder", "brand", "luthier"].includes(workspaceAccountType);
+  const visibleAccountSections = accountSections.filter(section => section.id !== "provider" || professionalWorkspace);
   const publishedHref = savedCollectionHref(state.account);
   const returnPath = accountReturnPath(activeSection);
   const dirtySections = changedAccountSections(state.draft, state.account);
@@ -101,8 +105,8 @@ function AccountSettingsPage() {
 
   useEffect(() => {
     const requestedSection = search.get("section");
-    setActiveSection(accountSections.some((section) => section.id === requestedSection) ? requestedSection as AccountSection : "overview");
-  }, [search]);
+    setActiveSection(accountSections.some((section) => section.id === requestedSection && (section.id !== "provider" || professionalWorkspace)) ? requestedSection as AccountSection : "overview");
+  }, [search, professionalWorkspace]);
 
   function navigateSection(section: AccountSection) {
     if (section === activeSection) return;
@@ -171,7 +175,7 @@ function AccountSettingsPage() {
   return (
     <>
       <Nav />
-      <OwnerWorkspace current="account">
+      <OwnerWorkspace current="account" accountType={workspaceAccountType}>
         <div className={styles.account}>
           <header className={styles.header}>
             <h1>{getContentValue(content, "account.hero.headline")}</h1>
@@ -179,9 +183,9 @@ function AccountSettingsPage() {
           </header>
 
           <div className={styles.settings}>
-            <label className={styles.mobileSectionNav}><span>{ui("ui.app.account.page.settingsSection", "Settings section")}</span><select aria-label={ui("ui.app.account.page.settingsSection", "Settings section")} value={activeSection} onChange={(event) => navigateSection(event.target.value as AccountSection)}>{accountSections.map((section) => <option key={section.id} value={section.id}>{(section.label === "Overview" ? ui("ui.app.account.page.d4b1ea5708dd", "Overview") : section.label === "Public Collection" ? ui("ui.app.account.page.81d7c837c3e8", "Collection page") : section.label === "Account details" ? ui("ui.app.account.page.999fcfbc4384", "Account details") : section.label === "Security" ? ui("ui.app.account.page.8f6fb4eb7f42", "Security") : section.label === "Notifications" ? ui("ui.app.account.page.788011833a5a", "Notifications") : section.label === "Provider / Business" ? ui("ui.app.account.page.963dc63cbd9f", "Provider / Business") : section.label === "Privacy & Data" ? ui("ui.app.account.page.ade3e28bc653", "Privacy & Data") : section.label)}</option>)}</select></label>
+            <label className={styles.mobileSectionNav}><span>{ui("ui.app.account.page.settingsSection", "Settings section")}</span><select aria-label={ui("ui.app.account.page.settingsSection", "Settings section")} value={activeSection} onChange={(event) => navigateSection(event.target.value as AccountSection)}>{visibleAccountSections.map((section) => <option key={section.id} value={section.id}>{(section.label === "Overview" ? ui("ui.app.account.page.d4b1ea5708dd", "Overview") : section.label === "Public Collection" ? ui("ui.app.account.page.81d7c837c3e8", "Collection page") : section.label === "Account details" ? ui("ui.app.account.page.999fcfbc4384", "Account details") : section.label === "Security" ? ui("ui.app.account.page.8f6fb4eb7f42", "Security") : section.label === "Notifications" ? ui("ui.app.account.page.788011833a5a", "Notifications") : section.label === "Provider / Business" ? ui("ui.app.account.page.963dc63cbd9f", "Provider / Business") : section.label === "Privacy & Data" ? ui("ui.app.account.page.ade3e28bc653", "Privacy & Data") : section.label)}</option>)}</select></label>
             <nav className={styles.sectionNav} aria-label={ui("ui.app.account.page.baa77cb99154", "Account sections")}>
-              {accountSections.map((section) => (
+              {visibleAccountSections.map((section) => (
                 <button
                   aria-current={activeSection === section.id ? "page" : undefined}
                   className={activeSection === section.id ? styles.active : undefined}
@@ -267,7 +271,7 @@ function AccountSettingsPage() {
                 <label className="field"><span>{ui("ui.app.account.page.9dc1bb315851", "Location (optional)")}</span><input value={publicCollection.location} onChange={(event) => setPublicCollection((current) => ({ ...current, location: event.target.value }))} placeholder={ui("ui.app.account.page.fef8ce3a04b7", "City, region, country")} /></label>
                 <label className="field custom-wide"><span>{ui("ui.app.account.page.81aa4ccb029d", "About you or your collection")}</span><textarea rows={3} value={publicCollection.bio} onChange={(event) => setPublicCollection((current) => ({ ...current, bio: event.target.value }))} placeholder={ui("ui.app.account.page.42e359637e9e", "A short description.")} /></label>
                 <label className="field"><span>{ui("ui.app.account.page.5fec9267ba07", "Your website (optional)")}</span><input id="collectionWebsite" type="url" aria-describedby="collection-website-help" value={publicCollection.websiteUrl} onChange={(event) => setPublicCollection((current) => ({ ...current, websiteUrl: event.target.value }))} placeholder="https://your-website.com" maxLength={500} /><small id="collection-website-help" className="field-note">{ui("ui.app.account.page.collectionWebsiteHelp", "Use the full HTTPS address. Visitors can open this website from your collection and its instruments. Purchases and bookings take place on your website.")}</small></label>
-                <label className="field"><span>{ui("ui.app.account.page.ea3c6074a51b", "Profile photo link (optional)")}</span><input type="url" value={publicCollection.avatarUrl} onChange={(event) => setPublicCollection((current) => ({ ...current, avatarUrl: event.target.value }))} placeholder="https://" /></label>
+                <label className="field"><span>{publicCollection.accountType === "shop" || publicCollection.accountType === "builder" ? ui("ui.app.account.page.companyLogoLink", "Company logo link (optional)") : ui("ui.app.account.page.ea3c6074a51b", "Profile photo link (optional)")}</span><input type="url" value={publicCollection.avatarUrl} onChange={(event) => setPublicCollection((current) => ({ ...current, avatarUrl: event.target.value }))} placeholder="https://" /></label>
               </div>
               <div className={styles.preferenceGroup}>
               <label className="toggle-field"><input type="checkbox" aria-describedby="collection-search-help" checked={publicCollection.allowIndexing} onChange={(event) => setPublicCollection((current) => ({ ...current, allowIndexing: event.target.checked }))} />{" "}{ui("ui.app.account.page.27f7d9074b31", "Allow search engines to list my collection page")}</label>
@@ -278,6 +282,11 @@ function AccountSettingsPage() {
                 <input type="checkbox" checked={publicCollection.allowMessages} onChange={(event) => setPublicCollection((current) => ({ ...current, allowMessages: event.target.checked }))} />{ui("ui.app.account.page.bf5f93866b44", "Allow signed-in members to message you in QRguitar")}</label>
               <p className="field-note">{ui("ui.app.account.page.contactProtectionHelp", "Your email is not shown on your collection or instruments. Conversations stay inside QRguitar and can include up to four photos or short videos per message.")}</p>
               </div>
+              {["shop", "builder"].includes(publicCollection.accountType) ? <div className={styles.preferenceGroup}>
+                <label className="toggle-field"><input type="checkbox" checked={publicCollection.allowWarrantyHelp} onChange={event => setPublicCollection(current => ({ ...current, allowWarrantyHelp: event.target.checked }))} />{ui("ui.app.account.page.allowWarrantyHelp", "Offer warranty assistance through your website")}</label>
+                <label className="field"><span>{ui("ui.app.account.page.warrantyHelpUrl", "Warranty assistance address")}</span><input type="url" maxLength={500} value={publicCollection.warrantyHelpUrl} onChange={event => setPublicCollection(current => ({ ...current, warrantyHelpUrl: event.target.value }))} placeholder="https://" /></label>
+                <p className="field-note">{ui("ui.app.account.page.warrantyHelpExplanation", "Separate from QRguitar messaging. This offers assistance, not a guarantee of coverage. Save to apply your choice.")}</p>
+              </div> : null}
               <div className="form-actions">
                 <button className="button" type="button" onClick={saveAccount} disabled={isWorking} aria-describedby="account-save-scope">{isWorking ? ui("ui.app.account.page.dc85af8f2b1d", "Saving...") : ui("ui.app.account.page.a7f1e189ad7b", "Save account changes")}</button>
                 {publishedHref ? <Link className="button secondary" href={publishedHref} target="_blank" rel="noopener noreferrer">{ui("ui.app.account.page.693b86cbac84", "View collection page")}{" "}<ExternalLink size={15} /></Link> : null}
@@ -314,7 +323,7 @@ function AccountSettingsPage() {
               <p className="field-note">{ui("ui.app.account.page.e16273f1c0f6", "Claim, transfer, service, message, deletion-request, and billing updates stay available in their QRguitar workspaces while account access exists.")}</p>
             </section> : null}
 
-            {activeSection === "provider" ? <section className={styles.panel}>
+            {activeSection === "provider" && professionalWorkspace ? <section className={styles.panel}>
               <div className={styles.panelHeading}>
                 <span>{ui("ui.app.account.page.963dc63cbd9f", "Provider / Business")}</span>
                 <strong><ShieldCheck size={18} aria-hidden="true" />{" "}{ui("ui.app.account.page.6ba0be9a0111", "Business tools")}</strong>
@@ -324,11 +333,9 @@ function AccountSettingsPage() {
                 <div><span>{ui("ui.app.account.page.fa8ed0bdabdd", "Plan")}</span><strong>{plan || ui("ui.app.account.page.ad95d5fa651b", "free")}</strong></div>
                 <div><span>{ui("ui.app.account.page.14736a2eb9f4", "Role")}</span><strong>{role || ui("ui.app.account.page.04f8996da763", "user")}</strong></div>
               </div>
-              <p className={styles.copy}>{getWorkspace(publicCollection.accountType, content).description}</p>
+              <p className={styles.copy}>{getWorkspace(workspaceAccountType, content).description}</p>
               <div className="form-actions">
-                <Link className="button" href="/dashboard/service">{ui("ui.app.account.page.61669a91a83b", "Open service workbench")}</Link>
-                <Link className="button secondary" href="/dashboard/import">{ui("ui.app.account.page.7150f79bc954", "Open Bulk Import")}</Link>
-                <Link className="button secondary" href="/installers">{ui("ui.app.account.page.78a5a284fa46", "Service Provider Network")}</Link>
+                {getWorkspace(workspaceAccountType, content).actions.map((action, index) => <Link key={action.href} className={index === 0 ? "button" : "button secondary"} href={action.href}>{action.title}</Link>)}
               </div>
             </section> : null}
 
@@ -345,7 +352,7 @@ function AccountSettingsPage() {
             </section> : null}
 
             </fieldset>
-            {activeSection === "privacy" && <AccountDeletionSection actorId={state.actorId} auth={accountDeletionAuth} />}
+            {activeSection === "privacy" && <><OwnerNameConsentSection actorId={state.actorId} auth={accountDeletionAuth} /><AccountDeletionSection actorId={state.actorId} auth={accountDeletionAuth} /></>}
             {status ? <p className="form-message" role="status">{status}</p> : null}
             {state.uncertainSave && <div className="form-message"><p>{ui("ui.app.account.page.bddc85940d45", "Reload the saved settings before editing again; reloading replaces the form with the server version.")}</p><button className="button secondary" type="button" onClick={() => void controller.current?.reload()}>{ui("ui.app.account.page.d848587486e8", "Reload saved account")}</button></div>}
             </div>

@@ -4,8 +4,8 @@ export type GuitarStatus = "verified" | "unverified" | "transferred" | "archived
 export type FieldVisibility = "public" | "private" | "transfer_only";
 export type PlanTier = "single" | "pack_10" | "pack_25" | "bulk_50" | "business" | "enterprise";
 
-/** Standard owned-Profile allowance; the server ledger enforces paid capacity. */
-export const FREE_PROFILE_ALLOWANCE = 5;
+/** Basic Profiles have no count-based purchase requirement. Optional paid reviews are separate. */
+export const FREE_PROFILE_ALLOWANCE = Number.POSITIVE_INFINITY;
 
 export type GuitarProfile = {
   id: string;

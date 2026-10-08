@@ -28,6 +28,7 @@ import { BrandLogo } from "../../../components/BrandLogo";
 import { CompactQr } from "../../../components/CompactQr";
 import { FallbackImage } from "../../../components/FallbackImage";
 import { PhotoViewer } from "../../../components/PhotoViewer";
+import { PublicServiceCorrections, OwnerServiceCorrectionLinks } from "../../../components/ServiceCorrections";
 import { buildProfileIdentityFields, ProfileIdentity } from "../../../components/ProfileIdentity";
 import { ProfileStatusBadges } from "../../../components/ProfileStatusBadges";
 import { RecordShareButton } from "../../../components/RecordShareButton";
@@ -46,7 +47,7 @@ import { formatRecordLocation } from "../../../lib/record-location";
 import { fetchPublishedSiteSettings, normalizeBrandLogoKey } from "../../../lib/site-settings";
 import { createBrowserSupabaseClient } from "../../../lib/supabase-browser";
 import { fetchOwnerProfile, OwnerProfileError } from "../../../lib/owner-profile";
-import { resolveInstrumentPresentation } from "../../../lib/instrument-profile-contract";
+import { formatRecordedServiceDate, getLatestRecordedServiceDate, normalizeRecordedServiceDate, isMeaningfulTimelineEvent, isRecordedOwnershipEvent, isServiceHistoryEvent, resolveInstrumentPresentation } from "../../../lib/instrument-profile-contract";
 import { getContentValue } from "../../../lib/content-registry";
 import { publicProfileUrl } from "../../../lib/profile-url";
 import { cleanProfileSupportingUrl, isPurchaseProfileLink } from "../../../lib/profile-purchase-link";
@@ -60,11 +61,24 @@ import styles from "./ProfileClient.module.css";
 type ProfileTab = "overview" | "specs" | "timeline" | "service" | "ownership" | "media" | "repairs" | "documents";
 const PROFILE_FETCH_TIMEOUT_MS = 28000;
 
-export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview = false }: { code: string; initialInstrument: DemoInstrument | null; ownerPreview?: boolean }) {
+function safeProfileReturnPath(value: string | null): string | null {
+  if (value === "/dashboard") return value;
+  if (value && /^\/collections\/[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(value)) return value;
+  if (!value || value.length > 2048 || !value.startsWith("/catalog") || /[\\\u0000-\u0020\u007f]/.test(value)) return null;
+  try {
+    const target = new URL(value, "https://qrguitar.invalid");
+    return target.origin === "https://qrguitar.invalid" && target.pathname === "/catalog"
+      ? target.pathname + target.search + target.hash : null;
+  } catch { return null; }
+}
+
+export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview = false, ownerWorkspaceContent }: { code: string; initialInstrument: DemoInstrument | null; ownerPreview?: boolean; ownerWorkspaceContent?: ReactNode }) {
   const ui = useUiText("app.i.code.ProfileClient");
   const searchParams = useSearchParams();
+  const catalogReturnHref = safeProfileReturnPath(searchParams.get("returnTo"));
   const router = useRouter();
   const [stored, setStored] = useState<DemoInstrument | null>(initialInstrument);
+  const publicReviewSnapshot = Boolean(initialInstrument?.publicReviewSnapshot || stored?.publicReviewSnapshot);
   const [ownerRecord, setOwnerRecord] = useState<DemoInstrument | null>(null);
   const [resolved, setResolved] = useState(true);
   const [profileLoadError, setProfileLoadError] = useState(false);
@@ -90,6 +104,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
   const code = codeParam || initialInstrument?.qrCode || "";
   const queryTab = searchParams.get("tab");
   const [currentUserEmail, setCurrentUserEmail] = useState("");
+  const [currentWorkspaceType, setCurrentWorkspaceType] = useState("");
   const trackedProfileView = useRef("");
 
   const switchTab = (tab: ProfileTab) => {
@@ -209,6 +224,8 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
     setOwnerRecord(null);
     setTransfers([]);
     setCurrentUserEmail("");
+    setCurrentWorkspaceType("");
+    if (publicReviewSnapshot) return;
     try { supabase = createBrowserSupabaseClient(); }
     catch {
       if (ownerPreview) { setStored(null); setProfileLoadError(true); setResolved(true); }
@@ -223,12 +240,23 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
       setActiveMedia(null);
       if (ownerPreview && authChanged) setStored(null);
       setCurrentUserEmail(session?.user.email?.toLowerCase() || "");
+      setCurrentWorkspaceType("");
       if (!session?.access_token) {
         if (ownerPreview) setStored(null);
         return;
       }
       const requestController = new AbortController();
       controller = requestController;
+      // Navigation preference only; the service endpoint retains its authorization.
+      void fetch("/api/account", {
+        cache: "no-store", headers: { authorization: "Bearer " + session.access_token },
+        signal: AbortSignal.any([requestController.signal, AbortSignal.timeout(5000)])
+      }).then(async response => {
+        const payload = await response.json().catch(() => null);
+        if (cancelled || request !== generation || requestController.signal.aborted) return;
+        const type = payload?.account?.publicCollection?.accountType;
+        setCurrentWorkspaceType(response.ok && payload?.ok === true && typeof type === "string" ? type : "");
+      }).catch(() => { /* Unknown workspace has no professional shortcut. */ });
       const timer = setTimeout(() => requestController.abort(), PROFILE_FETCH_TIMEOUT_MS);
       try {
         const [recordResult, transferResult] = await Promise.allSettled([
@@ -269,7 +297,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
       if (!cancelled) void loadOwnerContext(session, true);
     });
     return () => { cancelled = true; generation++; controller?.abort(); listener.subscription.unsubscribe(); };
-  }, [code, initialInstrument, ownerPreview, loadAttempt]);
+  }, [code, initialInstrument, ownerPreview, loadAttempt, publicReviewSnapshot]);
   const instrument = useMemo<DemoInstrument | null>(() => {
     const candidate = ownerRecord || stored;
     const displayRecord = candidate?.qrCode?.toUpperCase() === code.toUpperCase() ? candidate : null;
@@ -323,8 +351,8 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
     return null;
   }, [code, stored, ownerRecord]);
 
-  const canEdit = Boolean(currentUserEmail && instrument?.ownerUserEmail && currentUserEmail === instrument.ownerUserEmail.toLowerCase());
-  const canSubmitService = Boolean(currentUserEmail && instrument && !canEdit && instrument.visibility !== "private");
+  const canEdit = Boolean(!publicReviewSnapshot && currentUserEmail && instrument?.ownerUserEmail && currentUserEmail === instrument.ownerUserEmail.toLowerCase());
+  const canSubmitService = Boolean(!publicReviewSnapshot && currentUserEmail && ["shop", "luthier"].includes(currentWorkspaceType) && instrument && !canEdit && instrument.visibility !== "private");
 
   const presentation = useMemo(
     () => instrument ? resolveInstrumentPresentation(instrument, ownerPreview || ownerRecord ? "owner" : "public") : null,
@@ -339,7 +367,11 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
   const mediaIndex = Math.min(requestedMediaIndex, Math.max(0, galleryImages.length - 1));
   const documentFiles = presentation?.documents || [];
   const externalMedia = presentation?.supplementalMedia || [];
+  const latestService = instrument ? getLatestRecordedServiceDate([...(instrument.timelineEvents || []), ...(instrument.serviceEvents || [])], {
+    date: instrument.latestServiceDate, datePrecision: instrument.latestServiceDatePrecision
+  }) : undefined;
   const timelineEvents = presentation?.timelineEvents || [];
+  const publicServiceEntries = (presentation?.serviceEntries || []).filter(entry => entry.isPublic === true);
   const meaningfulTimelineEvents = presentation?.meaningfulTimelineEvents || [];
   const visibleTabs = useMemo<Array<{ id: ProfileTab; label: string; count?: number }>>(() => {
     const tabs: Array<{ id: ProfileTab; label: string; count?: number }> = [
@@ -351,7 +383,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
       tabs.push({
         id: "timeline",
         label: getContentValue(publicContent, "profile.tabs.timeline"),
-        count: meaningfulTimelineEvents.length + Number(instrument?.ownershipTransferCount || 0)
+        count: presentation.counts.timeline
       });
     }
     if (presentation?.tabs.service) {
@@ -371,6 +403,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
     instrument?.ownershipTransferCount,
     meaningfulTimelineEvents.length,
     presentation?.counts.service,
+    presentation?.counts.timeline,
     presentation?.tabs.documents,
     presentation?.tabs.media,
     presentation?.tabs.service,
@@ -388,7 +421,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
     : "Ownership can change without changing the permanent QRguitar ID tied to this instrument.";
   const latestTransfers = instrument
     ? [...transfers]
-      .filter((transfer) => transfer.guitarQrCode.toUpperCase() === instrument.qrCode.toUpperCase())
+      .filter((transfer) => transfer.status === "sent" && transfer.guitarQrCode.toUpperCase() === instrument.qrCode.toUpperCase())
       .sort((first, second) => Date.parse(second.createdAt || "") - Date.parse(first.createdAt || ""))
     : [];
   const latestTransfer = latestTransfers[0];
@@ -397,13 +430,13 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
   const shareUrl = instrumentQrCode ? publicProfileUrl(instrumentQrCode) : "";
 
   useEffect(() => {
-    if (ownerPreview || !instrumentQrCode || !instrument || instrument.visibility === "private" || trackedProfileView.current === instrumentQrCode) return;
+    if (publicReviewSnapshot || ownerPreview || !instrumentQrCode || !instrument || instrument.visibility === "private" || trackedProfileView.current === instrumentQrCode) return;
     trackedProfileView.current = instrumentQrCode;
     void dispatchOptionalTrackingProductEvent({
       name: optionalTrackingProductEvents.publicProfileViewed,
       properties: { visibility: instrument.visibility === "unlisted" ? "unlisted" : "public" }
     });
-  }, [instrument, instrumentQrCode, ownerPreview]);
+  }, [instrument, instrumentQrCode, ownerPreview, publicReviewSnapshot]);
 
   useEffect(() => {
     const activeRef = copyActiveRef;
@@ -603,9 +636,10 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
     type: instrument.instrumentType,
     availability: instrument.saleStatus === "for_sale" ? "For Sale" : "Not for Sale"
   };
-  const specs = buildProfileIdentityFields(identityValues);
+  const specs = buildProfileIdentityFields(identityValues).filter((field) => field.label !== "QRguitar ID");
 
   const optionalSpecs = [
+    ...(instrument.builder?.trim() ? [{ label: ui("ui.app.i.code.ProfileClient.recordedBuilder", "Recorded builder"), value: instrument.builder }] : []),
     ...(instrument.originalityStatus && instrument.originalityStatus !== "unknown"
       ? [{ label: "Originality", value: instrument.originalityStatus === "all_original" ? "All Original" : "Modified" }]
       : []),
@@ -619,6 +653,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
     return Boolean(value);
   });
 
+  const companyCredit = !publicReviewSnapshot && instrument.publicCollection && ["shop", "builder"].includes(instrument.publicCollection.accountType) ? instrument.publicCollection : null;
   const saleOffer = profileSaleOffer(instrument);
   const purchaseLink = saleOffer?.target;
   const profileLinks = [
@@ -635,26 +670,28 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
   return (
     <main className={styles["scan-profile"]}>
       <section className={styles["scan-shell"]}>
-        {ownerPreview && instrument ? <div className={styles["profile-refresh-notice"]} role="status"><p><strong>{ui("ui.app.i.code.ProfileClient.cca6a9866dcc", "Owner preview.")}</strong> {instrument.visibility === "private" ? ui("ui.app.i.code.ProfileClient.b1eaa5bd6fae", "This Profile is private. Visitors cannot open its QR link.") : ui("ui.app.i.code.ProfileClient.43c30bfc7680", "You are viewing this Profile from your account.")}</p><Link className="button secondary" href={"/edit/" + encodeURIComponent(instrument.qrCode)}>{ui("ui.app.i.code.ProfileClient.fec2ac0f4cf1", "Edit Profile")}</Link><Link href="/dashboard">{ui("ui.app.i.code.ProfileClient.4466f3a00b0b", "Back to collection")}</Link></div> : null}
+        {publicReviewSnapshot ? <div className={styles["profile-refresh-notice"]} role="note">{ui("ui.app.i.code.ProfileClient.localReadOnlyNotice", "Read-only local preview. You can view this Profile and its history. Ownership changes, messages and service requests are unavailable here.")}</div> : null}
+        {ownerPreview && instrument ? <div className={styles["profile-refresh-notice"]} role="status"><p><strong>{ui("ui.app.i.code.ProfileClient.cca6a9866dcc", "Your Profile.")}</strong> {instrument.visibility === "private" ? ui("ui.app.i.code.ProfileClient.b1eaa5bd6fae", "This Profile is private. Visitors cannot open its QR link.") : ui("ui.app.i.code.ProfileClient.43c30bfc7680", "You are viewing this Profile from your account.")}</p><Link className="button secondary" href={"/edit/" + encodeURIComponent(instrument.qrCode)}>{ui("ui.app.i.code.ProfileClient.fec2ac0f4cf1", "Edit Profile")}</Link><Link href="/dashboard">{ui("ui.app.i.code.ProfileClient.4466f3a00b0b", "Back to collection")}</Link></div> : null}
         {profileLoadError ? (
           <div className={styles["profile-refresh-notice"]} role="status">
             <p>{ui("ui.app.i.code.ProfileClient.6e8c3c83d96f", "This is the last loaded Profile. We could not check for updates.")}</p>
             <button type="button" className="button secondary" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>{ui("ui.app.i.code.ProfileClient.d8b8392e2c54", "Try again")}</button>
           </div>
         ) : null}
-        <ProfileBreadcrumbs current={instrumentDisplayName(instrument)} />
+        <ProfileBreadcrumbs current={instrumentDisplayName(instrument)} catalogHref={ownerPreview ? "/dashboard" : catalogReturnHref || "/catalog"} ancestorLabel={ownerPreview || catalogReturnHref === "/dashboard" || catalogReturnHref?.startsWith("/collections/") ? ui("ui.app.i.code.ProfileClient.4466f3a00b0b", "Back to collection") : undefined} />
         <div className={styles["scan-topbar"]}>
-          <button type="button" aria-label={ownerPreview ? ui("ui.app.i.code.ProfileClient.4466f3a00b0b", "Back to collection") : ui("ui.app.i.code.ProfileClient.cb35f7332137", "Back to homepage")} onClick={() => router.push(ownerPreview ? "/dashboard" : "/")}>
+          <button type="button" aria-label={ownerPreview || catalogReturnHref === "/dashboard" || catalogReturnHref?.startsWith("/collections/") ? ui("ui.app.i.code.ProfileClient.4466f3a00b0b", "Back to collection") : catalogReturnHref ? ui("ui.app.i.code.ProfileClient.backToCatalog", "Back to Catalog") : ui("ui.app.i.code.ProfileClient.cb35f7332137", "Back to homepage")} onClick={() => router.push(ownerPreview ? "/dashboard" : catalogReturnHref || "/")}>
             <ArrowLeft size={24} />
           </button>
           <BrandLogo className={styles["scan-brand"]} />
-          <RecordShareButton className={styles["scan-share-button"]} code={instrument.qrCode} title={instrumentDisplayName(instrument)} />
+          <span className={styles["profile-topbar-label"]}>Profile</span>
         </div>
 
         <section className={styles["scan-hero"]}>
           <header className={styles["profile-heading"]}>
             <p className={styles["profile-kicker"]}>{[instrument.brand, instrument.year, instrument.instrumentType].filter(Boolean).join(" · ")}</p>
             <h1>{instrumentDisplayName(instrument)}</h1>
+            {companyCredit ? <Link className={styles["profile-company-credit"]} href={"/collections/" + encodeURIComponent(companyCredit.handle)}>{companyCredit.publicName}</Link> : null}
             <p className={styles["profile-condition"]}>
               <span>{ui("ui.app.i.code.ProfileClient.conditionLabel", "Condition")}</span>
               <strong>{getInstrumentCondition(instrument) === "new"
@@ -670,7 +707,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
               includeCondition={false}
               hideConfirmedTrust={true}
               className={styles["profile-hero-badges"]}
-              ownerCollection={instrument.publicCollection}
+              ownerCollection={publicReviewSnapshot || companyCredit ? undefined : instrument.publicCollection}
             />
             {saleOffer ? <section className={styles["profile-sale-area"]} aria-label={ui("ui.app.i.code.ProfileClient.saleDetails", "Sale details")}>
               <div className={styles["profile-sale-price"]}>
@@ -682,7 +719,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
               </a> : <p>{ui("ui.app.i.code.ProfileClient.noPurchaseLink", "Purchase details unavailable.")}</p>}
               {purchaseLink ? <p className={styles["profile-sale-note"]}>{ui("ui.app.i.code.ProfileClient.storeConfirms", "Store confirms price and availability.")}</p> : null}
             </section> : null}
-            {instrument.publicCollection ? <div className={styles["profile-member-actions"]}>
+            {!publicReviewSnapshot && instrument.publicCollection ? <div className={styles["profile-member-actions"]}>
               {!saleOffer ? <SellerWebsiteLink {...instrument.publicCollection} /> : null}
               {instrument.publicCollection?.allowMessages ? <MemberMessageLink className={styles["profile-message-link"]} handle={instrument.publicCollection.handle} profileCode={instrument.qrCode} label={ui("ui.app.i.code.ProfileClient.577c10d6f210", "Message {{value1}}", { value1: instrument.publicCollection.publicName })} /> : null}
             </div> : null}
@@ -698,6 +735,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
             {isDistinctSafetyNote(instrument.publicSafetyNote, safetyStatus) ? <p>{instrument.publicSafetyNote}</p> : null}
           </section>
         ) : null}
+            {ownerPreview ? ownerWorkspaceContent : null}
           </header>
           <section
             className={styles["scan-hero-gallery"]}
@@ -856,13 +894,23 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
           </section>
           <div className={styles["scan-hero-info"]}>
             <ProfileIdentity
+              heading={ui("ui.app.i.code.ProfileClient.instrumentIdentity", "Instrument identity")}
               values={identityValues}
               excludeLabels={["Make / Model", "Year", "Type", "QRguitar ID"]}
               mediaSummary={[
                 galleryImages.length ? `${galleryImages.length} ${galleryImages.length === 1 ? "photo" : "photos"}` : "",
-                documentFiles.length ? `${documentFiles.length} ${documentFiles.length === 1 ? "document" : "documents"}` : ""
+                documentFiles.length ? `${documentFiles.length} ${documentFiles.length === 1 ? "document" : "documents"}` : "",
+                meaningfulTimelineEvents.length ? `${meaningfulTimelineEvents.length} ${meaningfulTimelineEvents.length === 1 ? "history entry" : "history entries"}` : "",
+                presentation?.counts.service ? `${presentation.counts.service} ${presentation.counts.service === 1 ? "service record" : "service records"}` : ""
               ].filter(Boolean).join(" / ")}
             >
+              {latestService ? (
+                <p className={styles["profile-sale-note"]}>
+                  {ui("ui.app.i.code.ProfileClient.latestServiceDate", "Last recorded service")}:{" "}
+                  <time dateTime={latestService.datePrecision === "year" ? undefined : latestService.date}>{formatRecordedServiceDate(latestService)}</time>
+                  {" · "}{ui("ui.app.i.code.ProfileClient.serviceDatePrivacy", "Details stay private unless shared.")}
+                </p>
+              ) : null}
               {trustItems.length ? (
                 <div className={styles["profile-trust-summary"]} aria-label={ui("ui.app.i.code.ProfileClient.66e1c9549fde", "Trust review")}>
                   {trustItems.map((item) => (
@@ -873,33 +921,10 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                   ))}
                 </div>
               ) : null}
-              <div className={styles["scan-qr"]}>
-                <ProfileQr code={instrument.qrCode} />
-                <div>
-                  <strong>{ui("ui.app.i.code.ProfileClient.5139e0f92e71", "Scan to view")}</strong>
-                  <span>{shareUrl ? shareUrl.replace(/^https?:\/\//, "") : ui("ui.app.i.code.ProfileClient.58a595439cb9", "qrguitar.com/i/{{value1}}", { value1: instrument.qrCode.toLowerCase() })}</span>
-                </div>
-                <button className="button secondary" type="button" onClick={copyProfileUrl}>
-                  <Copy size={14} />
-                  {copyStatus === "copied" ? ui("ui.app.i.code.ProfileClient.8d525e5f158b", "Copied") : ui("ui.app.i.code.ProfileClient.b26d1037f1c2", "Copy URL")}
-                </button>
-              </div>
-              {shareNotice === "failed" ? (
-                <small className={styles["scan-copy-notice"]}>{ui("ui.app.i.code.ProfileClient.0854b0c9c202", "Copy failed. You can copy the URL from your browser bar.")}</small>
-              ) : null}
             </ProfileIdentity>
           </div>
         </section>
 
-
-
-
-
-        <div className={styles["scan-actions"]}>
-          <Link className={styles["profile-action"]} href={"/handout/" + encodeURIComponent(instrument.qrCode)}>
-            <FileText size={16} aria-hidden="true" /> {getContentValue(publicContent, "printWorkspace.title")}
-          </Link>
-        </div>
         {canEdit ? (
         <section className={styles["scan-actions"]} aria-label={ui("ui.app.i.code.ProfileClient.bfeb7617d7e2", "Owner profile actions")}>
           {canEdit ? (
@@ -914,7 +939,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
           {canEdit ? (
             <Action
               icon={<Repeat2 />}
-              label={ui("ui.app.i.code.ProfileClient.7812959f873a", "Ownership Tools")}
+              label={ui("ui.app.i.code.ProfileClient.transferOwnership", "Transfer ownership")}
               active={activeTab === "ownership"}
               onClick={() => {
                 router.push(`/dashboard?transfer=${encodeURIComponent(instrument.qrCode)}`);
@@ -960,6 +985,75 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
           </section>
         ) : null}
 
+        {!ownerPreview ? <div className={styles["profile-record-body"]}>
+          <nav className={styles["profile-section-links"]} aria-label={ui("ui.app.i.code.ProfileClient.4d2046641397", "Instrument profile sections")}>
+            <a href="#profile-specifications">{getContentValue(publicContent, "profile.tabs.specifications")}</a>
+            <a href="#profile-history">{getContentValue(publicContent, "profile.tabs.timeline")}</a>
+            {publicServiceEntries.length ? <a href="#profile-service">{getContentValue(publicContent, "profile.tabs.service")}</a> : null}
+            {documentFiles.length ? <a href="#profile-documents">{getContentValue(publicContent, "profile.tabs.documents")}</a> : null}
+            {externalMedia.length ? <a href="#profile-media">{getContentValue(publicContent, "profile.tabs.media")}</a> : null}
+          </nav>
+          <ProfilePanel
+            detailsHeading={getContentValue(publicContent, "profile.details.heading")}
+          activeTab="overview"
+          instrument={instrument}
+          specs={specs}
+          optionalSpecs={optionalSpecs}
+          profileLinks={profileLinks}
+          officialBrandLogoUrl={officialBrandLogoUrl}
+          externalMedia={externalMedia}
+          documentFiles={documentFiles}
+          onDocumentView={() => setActionNotice("documents")}
+          transferMessage={transferMessage}
+          latestTransfer={latestTransfer}
+          isVerifiedRecord={isVerifiedRecord}
+          timelineEvents={timelineEvents}
+          serviceEntries={presentation?.serviceEntries || []}
+        />
+          {publicServiceEntries.length ? <div id="profile-service"><ProfilePanel
+            detailsHeading={getContentValue(publicContent, "profile.details.heading")}
+            activeTab="service" instrument={instrument} specs={specs} optionalSpecs={optionalSpecs}
+            profileLinks={profileLinks} officialBrandLogoUrl={officialBrandLogoUrl}
+            externalMedia={externalMedia} documentFiles={documentFiles}
+            onDocumentView={() => setActionNotice("documents")} transferMessage={transferMessage}
+            latestTransfer={latestTransfer} isVerifiedRecord={isVerifiedRecord}
+            timelineEvents={timelineEvents} serviceEntries={publicServiceEntries}
+          /></div> : null}
+          {documentFiles.length ? <div id="profile-documents">          <ProfilePanel
+            detailsHeading={getContentValue(publicContent, "profile.details.heading")}
+          activeTab="documents"
+          instrument={instrument}
+          specs={specs}
+          optionalSpecs={optionalSpecs}
+          profileLinks={profileLinks}
+          officialBrandLogoUrl={officialBrandLogoUrl}
+          externalMedia={externalMedia}
+          documentFiles={documentFiles}
+          onDocumentView={() => setActionNotice("documents")}
+          transferMessage={transferMessage}
+          latestTransfer={latestTransfer}
+          isVerifiedRecord={isVerifiedRecord}
+          timelineEvents={timelineEvents}
+          serviceEntries={presentation?.serviceEntries || []}
+        /></div> : null}
+          {externalMedia.length ? <div id="profile-media">          <ProfilePanel
+            detailsHeading={getContentValue(publicContent, "profile.details.heading")}
+          activeTab="media"
+          instrument={instrument}
+          specs={specs}
+          optionalSpecs={optionalSpecs}
+          profileLinks={profileLinks}
+          officialBrandLogoUrl={officialBrandLogoUrl}
+          externalMedia={externalMedia}
+          documentFiles={documentFiles}
+          onDocumentView={() => setActionNotice("documents")}
+          transferMessage={transferMessage}
+          latestTransfer={latestTransfer}
+          isVerifiedRecord={isVerifiedRecord}
+          timelineEvents={timelineEvents}
+          serviceEntries={presentation?.serviceEntries || []}
+        /></div> : null}
+        </div> : <>
         <nav className={styles["scan-tabs"]} aria-label={ui("ui.app.i.code.ProfileClient.4d2046641397", "Instrument profile sections")} role="tablist">
           {visibleTabs.map((tab) => (
             <button
@@ -1012,8 +1106,12 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
           serviceEntries={presentation?.serviceEntries || []}
         />
         </div>
+        </>}
 
-        {!canEdit ? <section className={styles["profile-claim-entry"]}>
+        {!publicReviewSnapshot && <PublicServiceCorrections qrCode={instrument.qrCode} />}
+        {!publicReviewSnapshot && canEdit && <OwnerServiceCorrectionLinks entries={[...(instrument.timelineEvents || []), ...(instrument.serviceEvents || [])]} />}
+
+        {!publicReviewSnapshot && !canEdit ? <section className={styles["profile-claim-entry"]}>
           <h2>{ui("ui.app.i.code.ProfileClient.lifetimeProfile", "One Profile, for its whole life.")}</h2>
           <p>{ui("ui.app.i.code.ProfileClient.afterPurchase", "After you buy it, ask the seller to transfer this Profile to you for free. Its photos, specifications and history stay together.")}</p>
           <details>
@@ -1022,6 +1120,25 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
             <Link href={"/ownership-claim?code=" + encodeURIComponent(instrument.qrCode)}>{ui("ui.app.i.code.ProfileClient.21f95b4c7342", "Start ownership request")} <ArrowRight size={14} aria-hidden="true" /></Link>
           </details>
         </section> : null}
+
+        <footer aria-label="Profile QR and share">
+        <div className={styles["scan-qr"]}>
+          <ProfileQr code={instrument.qrCode} />
+          <div>
+            <strong>{ui("ui.app.i.code.ProfileClient.5139e0f92e71", "Scan to view")}</strong>
+            <span>{shareUrl ? shareUrl.replace(/^https?:\/\//, "") : ui("ui.app.i.code.ProfileClient.58a595439cb9", "qrguitar.com/i/{{value1}}", { value1: instrument.qrCode.toLowerCase() })}</span>
+          </div>
+          <RecordShareButton className={styles["scan-share-button"]} code={instrument.qrCode} title={instrumentDisplayName(instrument)} />
+          <button className="button secondary" type="button" onClick={copyProfileUrl}>
+            <Copy size={14} />
+            {copyStatus === "copied" ? ui("ui.app.i.code.ProfileClient.8d525e5f158b", "Copied") : ui("ui.app.i.code.ProfileClient.b26d1037f1c2", "Copy URL")}
+          </button>
+        </div>
+        {shareNotice === "failed" ? (
+          <small className={styles["scan-copy-notice"]}>{ui("ui.app.i.code.ProfileClient.0854b0c9c202", "Copy failed. You can copy the URL from your browser bar.")}</small>
+        ) : null}
+
+        </footer>
 
         {activeMedia ? (
           <PhotoViewer
@@ -1091,67 +1208,19 @@ function ProfilePanel({
         <PanelHeader icon={<SlidersHorizontal />} label={ui("ui.app.i.code.ProfileClient.73949bb1bdba", "Profile details")} title={detailsHeading} />
         <div className={styles["profile-data-grid"]}>
           {visibleSpecs.map((spec) => (
-            <span key={spec.label}><strong>{spec.label}</strong>{spec.value}</span>
+            <span key={spec.label} data-long-value={String(spec.value).length > 96 ? "true" : undefined}><strong>{spec.label}</strong>{spec.value}</span>
           ))}
         </div>
       </section>
     );
   }
 
-  if (activeTab === "timeline") {
-    const createdDate = formatProfileDate(instrument.createdAt);
-    const transferDate = latestTransfer ? formatProfileDate(latestTransfer.createdAt) : null;
-    const publicTimelineEvents = timelineEvents.filter((entry) =>
-      entry.isPublic &&
-      !entry.isSystem &&
-      !/^(qrguitar )?profile created$/i.test(entry.title.trim()) &&
-      !serviceEntries.some((service) => service.id === entry.id)
-    );
-    const ownershipTransferCount = Math.max(0, Number(instrument.ownershipTransferCount || 0));
-
-    return (
-      <section className={styles["scan-tab-panel"]}>
-        <PanelHeader icon={<Clock3 />} label={ui("ui.app.i.code.ProfileClient.9dcff98e275f", "Timeline")} title={ui("ui.app.i.code.ProfileClient.1d88855f0d95", "Events recorded for this instrument.")} />
-        <div className={styles["timeline-list"]}>
-          {publicTimelineEvents.map((entry) => (
-            <TimelineItem
-              date={formatTimelineEntryDate(entry)}
-              title={entry.title}
-              copy={timelineEntryCopy(entry, false)}
-              key={entry.id}
-            />
-          ))}
-          {latestTransfer ? (
-            <TimelineItem
-              date={transferDate || "Pending"}
-              title={ui("ui.app.i.code.ProfileClient.15f1e13d5beb", "Ownership transfer started")}
-              copy={
-                latestTransfer.status === "accepted"
-                  ? ui("ui.app.i.code.ProfileClient.4f060ab480e4", "Ownership was accepted by {{value1}}.", {value1: latestTransfer.toName || latestTransfer.toEmail})
-                  : ui("ui.app.i.code.ProfileClient.047c40a15875", "An ownership-change claim was started for {{value1}}.", {value1: latestTransfer.toName || latestTransfer.toEmail})
-              }
-            />
-          ) : null}
-          {ownershipTransferCount > 0 && !latestTransfer ? (
-            <TimelineItem
-              date="Recorded"
-              title={ui("ui.app.i.code.ProfileClient.e4db7ca95800", "{{value1}} ownership transfer{{value2}} recorded", { value1: ownershipTransferCount, value2: ownershipTransferCount === 1 ? "" : "s" })}
-              copy={ui("ui.app.i.code.ProfileClient.514cf9382473", "QRguitar keeps the permanent profile with the instrument while prior-owner details stay private.")}
-            />
-          ) : null}
-          <div className={styles["timeline-origin-marker"]}>
-            <Clock3 aria-hidden="true" />
-            <span><strong>{ui("ui.app.i.code.ProfileClient.9bb4a8d57a82", "Profile created")}</strong>{createdDate}</span>
-          </div>
-        </div>
-      </section>
-    );
-  }
+  if (activeTab === "timeline") return <ProfileHistory instrument={instrument} latestTransfer={latestTransfer} timelineEvents={timelineEvents} serviceEntries={serviceEntries} />;
 
   if (activeTab === "service") {
     return (
       <section className={styles["scan-tab-panel"]}>
-        <PanelHeader icon={<Wrench />} label={ui("ui.app.i.code.ProfileClient.d677190e0a99", "Service")} title={ui("ui.app.i.code.ProfileClient.0da8a8f6f90b", "Owner-approved work connected to this instrument.")} />
+        <PanelHeader icon={<Wrench />} label={ui("ui.app.i.code.ProfileClient.d677190e0a99", "Service")} title={ui("ui.app.i.code.ProfileClient.serviceAttributionHeading", "Owner-reported work and owner-approved provider records.")} />
         <div className={styles["timeline-list"]}>
           {serviceEntries.map((entry) => (
             <TimelineItem
@@ -1225,7 +1294,7 @@ function ProfilePanel({
         {serviceNotes.length ? (
           <div className={styles["profile-data-grid"]}>
             {serviceNotes.map((spec) => (
-              <span key={spec.label}><strong>{spec.label}</strong>{spec.value}</span>
+              <span key={spec.label} data-long-value={String(spec.value).length > 96 ? "true" : undefined}><strong>{spec.label}</strong>{spec.value}</span>
             ))}
           </div>
         ) : (
@@ -1278,19 +1347,17 @@ function ProfilePanel({
   return (
     <section className={styles["scan-tab-panel"] + " " + styles["scan-overview"]}>
       <div>
-        {meaningfulProfileSummary(instrument.summary) ? (
-          <>
-            <h2>{ui("ui.app.i.code.ProfileClient.191c6a87f0f4", "About this")}{" "}{profileTypeLabel.toLowerCase()}</h2>
-            <p>{meaningfulProfileSummary(instrument.summary)}</p>
-          </>
-        ) : null}
-        {optionalSpecs.length ? (
-          <div className={styles["public-spec-list"]}>
-            {optionalSpecs.map((spec) => (
-              <span key={spec.label}><strong>{spec.label}</strong>{spec.value}</span>
-            ))}
+        <section id="profile-specifications" className={styles["profile-specifications"]}>
+          <PanelHeader icon={<SlidersHorizontal />} label={ui("ui.app.i.code.ProfileClient.73949bb1bdba", "Profile details")} title={detailsHeading} />
+          <div className={styles["profile-data-grid"]}>
+            {[...specs, ...optionalSpecs].filter(spec => hasMeaningfulPublicValue(spec.value)).map(spec => <span key={spec.label} data-long-value={String(spec.value).length > 96 ? "true" : undefined}><strong>{spec.label}</strong>{spec.value}</span>)}
           </div>
-        ) : null}
+        </section>
+        {meaningfulProfileSummary(instrument.summary) ? <details className={styles["profile-story"]}>
+          <summary>{ui("ui.app.i.code.ProfileClient.191c6a87f0f4", "About this")}{" "}{profileTypeLabel.toLowerCase()}</summary>
+          <p>{meaningfulProfileSummary(instrument.summary)}</p>
+        </details> : null}
+        <ProfileHistory instrument={instrument} latestTransfer={latestTransfer} timelineEvents={timelineEvents} serviceEntries={serviceEntries} />
         {profileLinks.length ? (
           <div className={styles["public-link-list"]}>
             {profileLinks.map((link) => (
@@ -1319,6 +1386,58 @@ function ProfilePanel({
   );
 }
 
+function ProfileHistory({ instrument, latestTransfer, timelineEvents, serviceEntries }: { instrument: DemoInstrument; latestTransfer?: DemoTransfer; timelineEvents: ServiceHistoryEntry[]; serviceEntries: ServiceHistoryEntry[] }) {
+  const ui = useUiText("app.i.code.ProfileClient");
+    const createdDate = formatProfileDate(instrument.createdAt);
+    const transferDate = latestTransfer ? formatProfileDate(latestTransfer.createdAt) : null;
+    const publicTimelineEvents = timelineEvents.filter((entry) =>
+      entry.isPublic &&
+      isMeaningfulTimelineEvent(entry) &&
+      !serviceEntries.some((service) => service.id === entry.id)
+    );
+    const ownershipTransferCount = Math.max(0, Number(instrument.ownershipTransferCount || 0) - publicTimelineEvents.filter(isRecordedOwnershipEvent).length);
+
+    return (
+      <section id="profile-history" aria-label={ui("ui.app.i.code.ProfileClient.historyHighlights", "History highlights")} className={styles["scan-tab-panel"] + " " + styles["profile-history-highlights"]}>
+        <PanelHeader icon={<Clock3 />} label={ui("ui.app.i.code.ProfileClient.9dcff98e275f", "Timeline")} title={ui("ui.app.i.code.ProfileClient.1d88855f0d95", "Events recorded for this instrument.")} />
+        <div className={styles["timeline-list"]}>
+          {publicTimelineEvents.map((entry) => (
+            <TimelineItem
+              date={formatTimelineEntryDate(entry)}
+              title={entry.title}
+              copy={timelineEntryCopy(entry, false)}
+              attribution={entry.previousOwnerPublicName ? ui("ui.app.i.code.ProfileClient.previousOwnerAttribution", "Previous owner: {{value1}}", {value1:entry.previousOwnerPublicName}) : undefined}
+              key={entry.id}
+            />
+          ))}
+          {latestTransfer ? (
+            <TimelineItem
+              date={transferDate || "Pending"}
+              title={ui("ui.app.i.code.ProfileClient.15f1e13d5beb", "Ownership transfer started")}
+              copy={
+                latestTransfer.status === "accepted"
+                  ? ui("ui.app.i.code.ProfileClient.4f060ab480e4", "Ownership was accepted by {{value1}}.", {value1: latestTransfer.toName || latestTransfer.toEmail})
+                  : ui("ui.app.i.code.ProfileClient.047c40a15875", "An ownership-change claim was started for {{value1}}.", {value1: latestTransfer.toName || latestTransfer.toEmail})
+              }
+            />
+          ) : null}
+          {ownershipTransferCount > 0 && !latestTransfer ? (
+            <TimelineItem
+              date="Recorded"
+              title={ui("ui.app.i.code.ProfileClient.e4db7ca95800", "{{value1}} ownership transfer{{value2}} recorded", { value1: ownershipTransferCount, value2: ownershipTransferCount === 1 ? "" : "s" })}
+              copy={ui("ui.app.i.code.ProfileClient.514cf9382473", "QRguitar keeps the permanent profile with the instrument while prior-owner details stay private.")}
+            />
+          ) : null}
+          <div className={styles["timeline-origin-marker"]}>
+            <Clock3 aria-hidden="true" />
+            <span><strong>{ui("ui.app.i.code.ProfileClient.registrationLabel", "QRguitar registration")}</strong>{createdDate}<small>{ui("ui.app.i.code.ProfileClient.registrationHelp", "Recorded history may predate registration.")}</small></span>
+          </div>
+        </div>
+      </section>
+    );
+
+}
+
 function meaningfulProfileSummary(summary?: string | null) {
   const value = String(summary || "").trim();
   if (!value || /^QRguitar Profile with photos, specs, and instrument details\.?$/i.test(value)) {
@@ -1344,12 +1463,13 @@ function PanelHeader({ icon, label, title }: { icon: ReactNode; label: string; t
   );
 }
 
-function TimelineItem({ date, title, copy }: { date: string; title: string; copy: string }) {
+function TimelineItem({ date, title, copy, attribution }: { date: string; title: string; copy: string; attribution?: string }) {
   return (
     <article className={styles["timeline-item"]}>
       <span>{date}</span>
       <h3>{title}</h3>
       <p>{copy}</p>
+      {attribution && <p>{attribution}</p>}
     </article>
   );
 }
@@ -1396,24 +1516,8 @@ function formatDocumentDate(value: string) {
 }
 
 function formatTimelineEntryDate(entry: ServiceHistoryEntry) {
-  if (entry.datePrecision === "unknown" || !entry.serviceDate) {
-    return entry.createdAt && entry.isSystem ? formatProfileDate(entry.createdAt) : "Date not recorded";
-  }
-
-  if (entry.datePrecision === "year") {
-    return entry.serviceDate.slice(0, 4);
-  }
-
-  const parsed = new Date(`${entry.serviceDate}T12:00:00`);
-  if (Number.isNaN(parsed.getTime())) {
-    return entry.serviceDate;
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: entry.datePrecision === "month" ? "long" : "short",
-    year: "numeric",
-    ...(entry.datePrecision === "day" ? { day: "numeric" } : {})
-  }).format(parsed);
+  const date = normalizeRecordedServiceDate(entry.serviceDate, entry.datePrecision);
+  return date ? formatRecordedServiceDate(date) : "Date not recorded";
 }
 
 function serviceSourceLabel(entry: ServiceHistoryEntry) {
@@ -1423,7 +1527,7 @@ function serviceSourceLabel(entry: ServiceHistoryEntry) {
     if (entry.evidenceReviewedAt) labels.push("QRguitar-reviewed evidence");
     return labels.join(" - ");
   }
-  return entry.isSystem ? "" : "Owner-reported service";
+  return entry.isSystem ? "" : isServiceHistoryEvent(entry) ? "Owner-reported service" : "Owner-reported history";
 }
 
 function timelineEntryCopy(entry: ServiceHistoryEntry, preferProvider: boolean) {

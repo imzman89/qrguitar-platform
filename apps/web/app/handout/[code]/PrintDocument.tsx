@@ -76,7 +76,7 @@ export function PrintDocument(props: Props) {
       <header className={styles.tagHeader}>{brand}<strong>{code}</strong></header>
       {photograph ? <div className={styles.tagPhoto}>{photograph}</div> : null}
       <section className={styles.tagIdentity}><span className={styles.sectionLabel}>{ui("ui.app.handout.code.PrintDocument.4538b821a0d6", "QRguitar Profile")}</span><h2>{title}</h2><p>{props.facts.join(" / ")}</p>{props.badges}</section>
-      <section className={styles.tagMeta}><Facts facts={[...identity, ...props.details, ...hangTagSpecifications(props.specifications)].slice(0, 9)} /><div className={styles.tagQr}>{qr}{props.includeInstruction ? <span>{ui("ui.app.handout.code.PrintDocument.8db3ef5c5d2f", "Scan Profile")}</span> : null}</div></section>
+      <section className={styles.tagMeta}><Facts facts={[...(serial ? [["Serial Number", serial] as Fact] : []), ...props.details, ...hangTagSpecifications(props.specifications)].slice(0, 8)} /><div className={styles.tagQr}>{qr}{props.includeInstruction ? <span>{ui("ui.app.handout.code.PrintDocument.8db3ef5c5d2f", "Scan Profile")}</span> : null}</div></section>
       {props.note ? <p className={styles.tagNote}>{props.note}</p> : null}
       <footer className={styles.tagFooter}>{props.includeUrl ? <span>{profileUrl}</span> : null}<span>{ui("ui.app.handout.code.PrintDocument.1a719f6a72dd", "qrguitar.com")}</span></footer>
     </div> : <div className={`${styles.sheet} ${mode === "service" ? styles.serviceSheet : ""}`}>

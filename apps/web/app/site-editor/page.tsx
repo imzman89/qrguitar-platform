@@ -668,11 +668,11 @@ function SiteEditorWorkspace() {
     if (!loaded.current || !authorized) return;
     try { window.localStorage.setItem(`${crashRecoveryKey}:${actorRef.current}`, JSON.stringify(settings)); } catch { /* mutation recovery is independently persisted before send */ }
     if (writeBusy || editorIssue || manualPending.current) return;
-    if (JSON.stringify(settings) !== lastServerDraft.current && hasChanges) setStatus("dirty");
+    if (JSON.stringify(settings) !== lastServerDraft.current && (hasChanges || lastServerDraft.current !== "")) setStatus("dirty");
     const timer = window.setTimeout(() => {
       if (writeTask.current || manualPending.current || issueRef.current) return;
       // Normalized equality cannot prove that a stored draft is identical. Discard requires confirmation.
-      if (hasChanges && JSON.stringify(settingsRef.current) !== lastServerDraft.current) {
+      if ((hasChanges || lastServerDraft.current !== "") && JSON.stringify(settingsRef.current) !== lastServerDraft.current) {
         void executeEditor("save_draft", { note: "Autosaved draft", area: `${selected.area} / ${selected.page}` });
       }
     }, 1800);

@@ -33,7 +33,7 @@ function fixture(kind, options = {}) {
   const values = [], effects = [], timers = new Map();
   let cursor = 0, effectCursor = 0, dirty = true, mounted = true, timerId = 0, tree, sessionCurrent = true, authCallback;
   let params = { id: 'transfer-a' };
-  let props = { className: 'transfer', bodyClassName: 'body', instrument: { qrCode: 'QRG-A' }, user: { email: 'owner@example.invalid' },
+  let props = { className: 'transfer', bodyClassName: 'body', instrument: { qrCode: 'QRG-A', updatedAt: '2026-10-01T12:00:00.000Z', documentFiles: [] }, sessionRevision: 1, user: { email: 'owner@example.invalid' },
     allowBuyerCode: true, latestTransfer: options.latestTransfer === null ? undefined : { ...transfer, ...options.latestTransfer },
     isSessionCurrent: () => sessionCurrent, onTransferCreated: value => { props.latestTransfer = value; dirty = true; }, onTransferChanged() {} };
   const f = { writes: 0, copies: [], requests: [], tracking: [], timers };
@@ -71,7 +71,7 @@ function fixture(kind, options = {}) {
     return tree;
   };
   f.button = label => { const found = all(f.render()).find(node => node.type === 'button' && words(node).trim() === label); assert.ok(found, 'Missing button: ' + label); return found; };
-  f.click = label => { f.button(label).props.onClick(); f.render(); };
+  f.click = label => { const button = f.button(label); if (button.props.type === "submit") all(f.render()).find(node => node.type === "form").props.onSubmit({ preventDefault() {} }); else button.props.onClick(); f.render(); };
   f.message = () => all(f.render()).filter(node => node.type === 'p' && node.props?.className?.includes('form-message')).map(words).join('|');
   f.props = patch => { props = { ...props, ...patch }; f.render(); };
   f.auth = () => { authCallback('SIGNED_IN', { access_token: 'synthetic-second', user: { id: 'actor-b' } }); f.render(); };
@@ -117,14 +117,14 @@ test('dashboard: copy during resend cannot suppress the mutation result', async 
   const request = deferred(); const f = await ready('dashboard', { latestTransfer: null, fetch: async input => input.body?.action === 'resend' ? request.promise : Response.json({ ok: true, transfer: { ...transfer, handoffPrepared: true }, buyerCode: 'SYNTHETIC-BUYER-CODE' }) });
   f.click('Buyer code'); f.click('Prepare for Buyer'); await tick(); f.render();
   const beforeRenderCopy = f.button('Copy Buyer Code');
-  f.button('Resend Sign-in Email').props.onClick(); beforeRenderCopy.props.onClick();
+  f.button('Resend invitation').props.onClick(); beforeRenderCopy.props.onClick();
   assert.equal(f.button('Copy Buyer Code').props.disabled, true); f.click('Copy Buyer Code'); await tick(); assert.equal(f.copies.length, 0);
   request.resolve(Response.json({ ok: true, message: 'Invitation resent.' })); await tick(); assert.equal(f.message(), 'Invitation resent.');
   f.click('Copy Buyer Code'); await tick(); assert.equal(f.message(), 'Buyer code copied. Share it only with the recipient.'); f.unmount();
 });
 test('dashboard: a newer resend operation suppresses earlier buyer-code feedback', async () => {
   const d = deferred(), f = await ready('dashboard', { latestTransfer: null, copy: () => d.promise });
-  f.click('Buyer code'); f.click('Prepare for Buyer'); await tick(); f.render(); f.click('Copy Buyer Code'); f.click('Resend Sign-in Email'); await tick();
+  f.click('Buyer code'); f.click('Prepare for Buyer'); await tick(); f.render(); f.click('Copy Buyer Code'); f.click('Resend invitation'); await tick();
   assert.equal(f.message(), 'Invitation resent.'); d.resolve(); await tick(); assert.equal(f.message(), 'Invitation resent.'); assert.deepEqual(f.copies, ['SYNTHETIC-BUYER-CODE']); f.unmount();
 });
 test('dashboard: immediate parent account revision invalidates copy before rerender', async () => {
@@ -178,4 +178,65 @@ for (const boundary of ["auth", "route"]) test("transfer: extracted stale " + bo
   await h.copyProfileLink(); await h.acceptTransfer();
   assert.equal(copies, 0); assert.equal(requests, 0); assert.equal(h.state.message, "");
   assert.equal(h.state.accepting, false); assert.deepEqual(h.state.tracking, []);
+});
+
+// Exercise the actual handoff component without real accounts, files or network writes.
+const validInstrument=files=>({qrCode:'QRG-A',updatedAt:'2026-10-01T12:00:00.000Z',documentFiles:files});
+const privateFile={id:'private-1',name:'Private receipt',updatedAt:'2026-10-01T12:00:00.000Z',visibility:'private'};
+const publicFile={...privateFile,id:'public-1',name:'Public evidence',visibility:'public'};
+test('handoff omits empty file choices for valid empty and public-only records',async()=>{
+ for(const files of [[],[publicFile]]){const f=await ready('dashboard',{latestTransfer:null});f.props({instrument:validInstrument(files)});const nodes=all(f.render());assert.equal(nodes.some(n=>n.type==='fieldset'),false);assert.equal(f.button('Send Transfer Email').props.disabled,false);assert.equal(f.requests.length,0);f.unmount();}
+});
+test('handoff retains reload guidance and blocks submission when record or file metadata is incomplete',async()=>{
+ for(const instrument of [{qrCode:'QRG-A',documentFiles:[]},validInstrument([{...publicFile,updatedAt:undefined}])]){const f=await ready('dashboard',{latestTransfer:null});f.props({instrument});const nodes=all(f.render());assert.ok(nodes.some(n=>n.type==='fieldset'&&n.props.disabled));assert.ok(nodes.some(n=>n.props?.role==='status'&&words(n).includes('Reload your collection')));assert.equal(f.button('Send Transfer Email').props.disabled,true);all(f.render()).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});await tick();assert.equal(f.requests.length,0);f.unmount();}
+});
+test('handoff preserves unchecked private choices and submits reviewed IDs once from its native form',async()=>{
+ const request=deferred(),f=await ready('dashboard',{latestTransfer:null,fetch:()=>request.promise});f.props({instrument:validInstrument([privateFile,publicFile])});
+ let nodes=all(f.render()),boxes=nodes.filter(n=>n.type==='input'&&n.props.type==='checkbox');assert.equal(boxes.length,1);assert.equal(boxes[0].props.checked,false);boxes[0].props.onChange({target:{checked:true}});f.render();
+ nodes=all(f.render());nodes.find(n=>n.type==='input'&&n.props.type==='email').props.onChange({target:{value:'buyer@example.invalid'}});f.render();
+ assert.equal(f.button('Send Transfer Email').props.type,'submit');assert.equal(f.button('Send Transfer Email').props.onClick,undefined);const submit=all(f.render()).find(n=>n.type==='form').props.onSubmit;let prevented=0;submit({preventDefault(){prevented++;}});submit({preventDefault(){prevented++;}});await tick();assert.equal(prevented,2);assert.equal(f.requests.length,1);assert.deepEqual(f.requests[0].body.selectedPrivateDocumentIds,['private-1']);assert.equal(f.requests[0].body.expectedDocuments.length,2);
+ request.resolve(Response.json({ok:true,transfer:{...transfer},message:'Transfer prepared.'}));await tick();f.render();f.props({latestTransfer:undefined,sessionRevision:2});assert.ok(all(f.render()).filter(n=>n.type==='input'&&n.props.type==='checkbox').every(n=>n.props.checked===false));f.unmount();
+});
+test('handoff email is required for an email invitation and optional for an in-person buyer code',async()=>{
+ const f=await ready('dashboard',{latestTransfer:null});assert.equal(all(f.render()).find(n=>n.type==='input'&&n.props.type==='email').props.required,true);f.click('Buyer code');assert.equal(all(f.render()).find(n=>n.type==='input'&&n.props.type==='email').props.required,false);assert.equal(f.button('Prepare for Buyer').props.type,'submit');f.unmount();
+});
+test('handoff cannot implicitly submit while an invitation is already pending',async()=>{
+ const f=await ready('dashboard');let prevented=false;all(f.render()).find(n=>n.type==='form').props.onSubmit({preventDefault(){prevented=true;}});await tick();assert.equal(prevented,true);assert.equal(f.requests.length,0);assert.ok(all(f.render()).filter(n=>n.type==='button').every(n=>n.props.type!=='submit'));f.unmount();
+});
+test('handoff outcome feedback is announced without issuing an extra request',async()=>{
+ const f=await ready('dashboard',{latestTransfer:null,fetch:async()=>{throw Error('Uncertain transport');}});all(f.render()).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});await tick();const message=all(f.render()).find(n=>n.type==='p'&&n.props.className==='form-message');assert.equal(message.props.role,'status');assert.match(words(message),/could not confirm/i);assert.equal(f.requests.length,1);f.unmount();
+});
+
+test('handoff keeps an initially empty live region mounted before announcing its outcome',async()=>{
+ const f=await ready('dashboard',{latestTransfer:null,fetch:async()=>{throw Error('uncertain');}});let status=all(f.render()).find(n=>n.type==='p'&&n.props.role==='status'&&n.props['aria-live']==='polite');assert.ok(status);assert.equal(words(status),'');assert.equal(status.props.className,'sr-only');assert.equal(status.props['aria-atomic'],'true');
+ all(f.render()).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});await tick();status=all(f.render()).find(n=>n.type==='p'&&n.props.role==='status'&&n.props['aria-live']==='polite');assert.equal(status.props.className,'form-message');assert.match(words(status),/could not confirm/i);f.unmount();
+});
+test('handoff freezes preparation inputs and prevents method changes from discarding a one-time code',async()=>{
+ const request=deferred(),f=await ready('dashboard',{latestTransfer:null,fetch:()=>request.promise});f.click('Buyer code');const staleEmailMode=f.button('Email invitation').props.onClick;all(f.render()).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});staleEmailMode();await tick();f.render();
+ assert.equal(f.button('Email invitation').props.disabled,true);assert.equal(f.button('Buyer code').props.disabled,true);assert.equal(f.button('Buyer code').props['aria-pressed'],true);assert.ok(all(f.render()).filter(n=>n.type==='input'||n.type==='select').every(n=>n.props.disabled===true));assert.equal(f.requests.length,1);assert.equal(f.requests[0].body.mode,'buyer_code');
+ request.resolve(Response.json({ok:true,transfer:{...transfer,handoffPrepared:true},buyerCode:'ONE-TIME-CODE',message:'Prepared.'}));await tick();f.render();assert.ok(all(f.render()).some(n=>n.type==='strong'&&words(n)==='ONE-TIME-CODE'));assert.equal(f.button('Copy Buyer Code').props.disabled,false);f.unmount();
+});
+
+
+for(const history of [
+ {toName:'Current buyer',toEmail:' OWNER@example.invalid ',acceptedAt:'2026-10-01T10:00:00.000Z'},
+ {toName:'Previous buyer',toEmail:'other@example.invalid',acceptedAt:'invalid-date'},
+ {toName:'',toEmail:'',handoffPrepared:true,expiresAt:'2026-10-02T10:00:00.000Z'}
+])test('accepted handoff is collapsed history, with a clear next preparation: '+JSON.stringify(history),async()=>{
+ const f=await ready('dashboard',{latestTransfer:{...history,status:'accepted'}}),tree=f.render(),nodes=all(tree),outerSummary=React.Children.toArray(tree.props.children).find(n=>n.type==='summary');
+ assert.equal(all(outerSummary).some(n=>n.type==='strong'),false);assert.match(words(nodes.find(n=>n.type==='p'&&n.props.className==='field-note')),/Start a new handoff/);
+ const past=nodes.find(n=>n.type==='details'&&n.props.className==='previous-handoff');assert.ok(past);assert.equal(past.props.open,undefined);assert.match(words(past),/Previous handoff \(completed\)/);assert.match(words(past),/Handoff completed/);
+ if(history.toEmail)assert.ok(words(past).includes(history.toEmail));else assert.match(words(past),/Recipient not email-bound/);
+ assert.equal(all(past).some(n=>n.type==='code'),false);assert.equal(all(past).some(n=>n.type==='button'),false);assert.equal(all(past).some(n=>n.type==='time'),Boolean(history.acceptedAt&&Number.isFinite(Date.parse(history.acceptedAt))));
+ assert.equal(f.button('Send Transfer Email').props.disabled,false);assert.equal(f.requests.length,0);f.unmount();
+});
+
+test('new preparation replaces completed history with the current pending invitation controls',async()=>{
+ const f=await ready('dashboard',{latestTransfer:{status:'accepted'}});assert.ok(all(f.render()).some(n=>n.type==='details'&&n.props.className==='previous-handoff'));
+ f.click('Send Transfer Email');await tick();const nodes=all(f.render());assert.equal(nodes.some(n=>n.type==='details'&&n.props.className==='previous-handoff'),false);assert.equal(f.button('Cancel Transfer').props.disabled,false);assert.equal(f.button('Resend invitation').props.disabled,false);assert.equal(f.requests.length,1);f.unmount();
+});
+
+for(const status of ['sent','cancelled'])test('non-completed '+status+' handoff keeps its existing status and receipt behavior',async()=>{
+ const f=await ready('dashboard',{latestTransfer:{status}}),tree=f.render(),nodes=all(tree),summary=React.Children.toArray(tree.props.children).find(n=>n.type==='summary');
+ assert.ok(all(summary).some(n=>n.type==='strong'&&words(n)===status));assert.equal(nodes.some(n=>n.type==='details'&&n.props.className==='previous-handoff'),false);assert.ok(nodes.some(n=>n.type==='code'&&words(n).includes('/transfer/transfer-a')));assert.equal(f.requests.length,0);f.unmount();
 });

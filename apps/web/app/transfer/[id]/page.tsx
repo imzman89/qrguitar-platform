@@ -266,7 +266,11 @@ export default function TransferClaimPage() {
         <div className="shell transfer-claim-layout">
           <section>
             <div className="eyebrow">{ui("ui.app.transfer.id.page.cbfa6a5b513b", "Ownership transfer")}</div>
-            <h1>{ui("ui.app.transfer.id.page.a8c70c41dc7c", "Accept ownership of")}{" "}{transfer.guitarName}.</h1>
+            <h1>{transfer.status === "accepted"
+              ? ui("ui.app.transfer.id.page.acceptedHeadline", "Ownership accepted for")
+              : transfer.status === "cancelled"
+                ? ui("ui.app.transfer.id.page.cancelledHeadline", "Ownership transfer cancelled for")
+                : ui("ui.app.transfer.id.page.a8c70c41dc7c", "Accept ownership of")}{" "}{transfer.guitarName}.</h1>
             <p>
               {transfer.status === "accepted"
                 ? ui("ui.app.transfer.id.page.2ff08141880b", "This transfer has already been accepted. The permanent QR link stays with the instrument.")

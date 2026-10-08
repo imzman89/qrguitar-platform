@@ -90,8 +90,7 @@ export function buildCreateProfilePayload(body: Record<string,unknown>, canonica
 }
 export function createProfileFailure(error: {code?:string;message?:string}|null): {status:number;code:string;message:string;retryable:boolean;resetUploads?:boolean} {
   if(error?.code==="PGRST202"||error?.code==="42883") return {status:503,code:"create_unavailable",message:"Profile creation is temporarily unavailable. Your form and uploads have been preserved.",retryable:true};
-  if(error?.code==="QG001") return {status:402,code:"profile_limit_reached",message:"Your 5 free Profiles are in use and no additional Profile credits are available. Your existing Profiles stay available. Check Profile credits in your account, or contact QRguitar for help.",retryable:false};
-  if(error?.code==="QG008") return {status:409,code:"billing_review_required",message:"Your paid Profile credits need a billing review. Open Profile credits in your account for the current status. Your form and uploads are preserved.",retryable:false};
+  if(error?.code==="QG001" || error?.code==="QG008") return {status:503,code:"create_policy_unavailable",message:"Profiles are free, but creation could not be completed because the account policy is out of date. Your uploaded files are retained. Contact QRguitar for help.",retryable:false};
   if(error?.code==="QG002"||error?.code==="23505") return {status:409,code:"duplicate_serial",message:"A QRguitar Profile already uses this identity. Open the existing Profile or request ownership.",retryable:false};
   if(error?.code==="QG003") return {status:409,code:"legacy_request_needs_review",message:"This older create request needs QRguitar support to review it. Existing Profiles and files have been preserved.",retryable:false};
   if(error?.code==="QG004") return {status:409,code:"create_request_conflict",message:"This request or upload session was already used with different details. Reload the result before starting a new Profile.",retryable:false};

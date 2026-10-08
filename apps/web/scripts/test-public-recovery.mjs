@@ -45,3 +45,21 @@ test('ownership context opens only a fresh owned Profile; delayed prior-actor ef
   const run=()=>new Function(...Object.keys(env),js('const effect='+expression+';')+'\nreturn effect();')(...Object.values(env));
   try{run();assert.equal(opened,record);assert.equal(context,"transfer");opened=null;env.transferLinkOpened.current='';env.accountRevision.current=2;env.sessionEmail.current='second@example.test';run();assert.equal(opened,null);env.accountRevision.current=1;env.sessionEmail.current=env.user.email;env.instruments=[];run();assert.equal(opened,null);}finally{globalThis.window=oldWindow;globalThis.document=oldDocument;}
 });
+
+function homeGalleryHarness(request, records=[]) {
+ const {sf}=ast('components/HomePageClient.tsx'); let expression;
+ function walk(n) { if(ts.isCallExpression(n)&&n.expression.getText(sf)==='useEffect'&&n.arguments[0].getText(sf).includes('requestPublicProfiles')) expression=n.arguments[0].getText(sf); ts.forEachChild(n,walk); } walk(sf); assert.ok(expression);
+ const state={records,pending:true,failed:false};
+ const env={requestPublicProfiles:request,setHomeRecords:v=>state.records=v,setGalleryFailed:v=>state.failed=v,setGalleryPending:v=>state.pending=v};
+ const dispose=new Function(...Object.keys(env),js('const effect='+expression+';')+'\nreturn effect();')(...Object.values(env));
+ return {state,dispose};
+}
+test('curated Home gallery stays pending until an authoritative response and ignores unmounted responses',async()=>{
+ const d=deferred(),h=homeGalleryHarness(()=>d.promise); assert.equal(h.state.pending,true); assert.deepEqual(h.state.records,[]); d.resolve([]); await tick(); assert.equal(h.state.pending,false); assert.equal(h.state.failed,false); h.dispose();
+ const late=deferred(),existing=[{qrCode:'EXISTING'}],k=homeGalleryHarness(()=>late.promise,existing); k.dispose(); late.resolve([{qrCode:'LATE'}]); await tick(); assert.equal(k.state.records,existing); assert.equal(k.state.pending,true);
+});
+test('failed curated Home refresh retains records and sets recovery state instead of an empty result',async()=>{
+ const existing=[{qrCode:'EXISTING'}],h=homeGalleryHarness(async()=>{throw Error('offline');},existing); await tick(); assert.equal(h.state.records,existing); assert.equal(h.state.failed,true); assert.equal(h.state.pending,false); h.dispose();
+});
+
+test('guide entry carries only a scalar audience selection without changing published settings',async()=>{const settings={composition:{howItWorks:{sections:[]}}};const HowItWorksClient=()=>null;const {default:Page}=mod('app/how-it-works/page.tsx',{'./HowItWorksClient':{HowItWorksClient},'next/cache':{unstable_noStore(){}},'../../lib/public-instruments':{getPublicInstruments:async()=>[]},'../../lib/home-featured-profile':{selectHomeFeaturedProfile:()=>null},'../../lib/site-settings-server':{loadPublishedSiteSettings:async()=>settings},'../../lib/site-settings':{resolveVisibleEditorialSections:()=>[]},'../../lib/seo':{serializeJsonLd:()=> '{}'},'../../lib/site-metadata':{buildManagedPageMetadata:()=>({})}});for(const [value,expected] of [['how-role-provider','how-role-provider'],[['how-role-provider'],'']]){const result=await Page({searchParams:Promise.resolve({audience:value})});const client=require('react').Children.toArray(result.props.children).find(node=>node.type===HowItWorksClient);assert.equal(client.props.initialAudienceId,expected);assert.equal(client.props.settings,settings);}});

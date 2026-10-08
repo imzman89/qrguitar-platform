@@ -153,12 +153,12 @@ export function bulkRowStatus(row: Pick<BulkRow, "duplicateCode" | "error" | "re
   if (!row.error) return "Ready";
   return /required|enter a Serial Number/i.test(row.error) ? "Draft" : "Invalid";
 }
-export function buildBulkRequest(row: BulkRow, ownerName: string, attempt: BulkAttempt, storagePath: string): BulkRequest {
+export function buildBulkRequest(row: BulkRow, _ownerName: string, attempt: BulkAttempt, storagePath: string): BulkRequest {
   return {
     name: [row.brand, row.model].filter(Boolean).join(" "), brand: row.brand, model: row.model,
     serial: row.serial, serialNotUsed: row.serialNotUsed, year: row.year, instrumentType: row.instrumentType,
     condition: row.condition, saleStatus: row.saleStatus, originalityStatus: row.originalityStatus,
-    ownerName, location: row.location, visibility: "public", summary: row.summary,
+    ownerName: "", location: row.location, visibility: "public", summary: row.summary,
     heroImageDataUrl: storagePath, photos: [storagePath], uploadId: attempt.uploadId, idempotencyKey: attempt.idempotencyKey,
     showSerialPublic: Boolean(row.serial) && row.showSerialPublic, documents: [],
     customFields: [row.seller ? { label: "Seller / source", value: row.seller } : null,

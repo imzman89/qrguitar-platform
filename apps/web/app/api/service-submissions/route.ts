@@ -365,13 +365,19 @@ export async function PATCH(request: Request) {
 
     if (action === "approve") {
       if (!owner) return json({ ok: false, message: "Only the current Profile owner can approve this request." }, 403);
-      const visibility = cleanServiceVisibility(body?.requestedVisibility ?? submission.owner_visibility_choice);
-      const visibilityUpdate = await supabase.from("service_submissions").update({ owner_visibility_choice: visibility, reviewed_at: now, updated_at: now }).eq("id", id).eq("owner_user_id", auth.user.id).eq("status", "submitted");
-      if (visibilityUpdate.error) return errorResponse(visibilityUpdate.error.message);
+      // Sharing is the owner's explicit choice; provider preference cannot publish the report.
+      const visibility = body?.requestedVisibility === "public" ? "public" : "private";
+      const expectedUpdatedAt = typeof body?.expectedUpdatedAt === "string" ? body.expectedUpdatedAt : null;
+      if (submission.status === "submitted" && (!expectedUpdatedAt || !Number.isFinite(Date.parse(expectedUpdatedAt)))) {
+        return json({ ok: false, message: "Reload the saved service review before confirming it." }, 409);
+      }
       const reviewToken = cleanServiceText(body?.reviewToken, 300);
-      const rpc = await supabase.rpc("approve_service_submission", { p_submission_id: id, p_owner_user_id: auth.user.id, p_token_hash: reviewToken ? hashReviewToken(reviewToken) : null });
-      if (rpc.error) return errorResponse(rpc.error.message, /expired|invalid|only|cannot/i.test(rpc.error.message) ? 409 : 500);
+      const rpc = await supabase.rpc("confirm_service_submission", { p_submission_id: id, p_owner_user_id: auth.user.id, p_token_hash: reviewToken ? hashReviewToken(reviewToken) : null, p_visibility: visibility, p_expected_updated_at: expectedUpdatedAt }).abortSignal(AbortSignal.timeout(10000));
+      if (rpc.error) return errorResponse(rpc.error.message, rpc.error.code === "PT409" || /expired|invalid|only|cannot|changed/i.test(rpc.error.message) ? 409 : 500);
       const result = Array.isArray(rpc.data) ? rpc.data[0] : rpc.data;
+      if (!result || typeof result.service_event_id !== "string" || typeof result.timeline_event_id !== "string" || typeof result.already_approved !== "boolean") {
+        return json({ ok: false, code: "unconfirmed", message: "Confirmation could not be verified. Check the saved review status before trying again." }, 503);
+      }
       await logAdminAuditEvent(supabase, { actorUserId: auth.user.id, actorEmail: auth.user.email, action: "service_submission.approved", targetType: "service_submission", targetId: id, targetUserId: submission.provider_user_id, metadata: { serviceEventId: result?.service_event_id, alreadyApproved: result?.already_approved === true } });
       revalidatePath("/"); revalidatePath("/catalog"); revalidatePath(`/i/${guitar.qr_code}`); revalidatePath(`/api/instruments?code=${guitar.qr_code}`);
       const fresh = await loadSubmission(supabase, id);

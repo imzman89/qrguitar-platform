@@ -42,7 +42,7 @@ const entries: KnowledgeEntry[] = [
     topic: "pricing",
     triggers: ["cost", "price", "pricing", "plan", "free", "beta", "paid help"],
     answer:
-      "QRguitar includes 5 free owned Profiles with photos, specs, documents, visibility settings, and QR downloads. Additional permanent Profile credits are US$12 for 1, US$50 for 10, or US$99 for 25 when purchases are available. Unused purchased credits never expire. Ownership transfers are free. Existing Profiles stay available when the free allowance changes; only a new Profile beyond the allowance needs a credit. A payment does not grant verification or business privileges. Check Profile credits in your account for the current payment options, or contact support for commercial setup.",
+      "Profiles are always free. Sign in to create and manage your instruments. Verification and authentication are optional paid services. Ownership transfers and QR downloads are free. Earlier purchased credits and payment history are retained; contact support about an earlier payment.",
     evidence: ["QRguitar launch pricing model"],
     nextSteps: ["Create a free Profile to get started.", "Email support@qrguitar.com for commercial setup, verification help, QR installs, hardware, or builder/shop onboarding."]
   },
@@ -66,7 +66,7 @@ const entries: KnowledgeEntry[] = [
     topic: "qr",
     triggers: ["download qr", "print qr", "qr code", "neck plate", "hang tag", "case card"],
     answer:
-      "A QRguitar QR should point to the permanent profile URL. Use it on a hang tag, case card, sales listing, repair intake form, certificate, shipping paperwork, or neck plate. Paid/verified profiles should be used for printable production QR work.",
+      "A QRguitar QR should point to the permanent profile URL. Use it on a hang tag, case card, sales listing, repair intake form, certificate, shipping paperwork, or neck plate. QR downloads are available for free Profiles; verification and authentication are separate reviews.",
     evidence: ["QR workflow"],
     nextSteps: ["Use a high-contrast QR style.", "Test scan before printing.", "Keep the permanent QRguitar ID unchanged."]
   },

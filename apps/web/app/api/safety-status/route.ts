@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isSafetyContentUnchanged } from "../../../lib/profile-metadata-preservation";
 import type { User } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient, getAuthenticatedUser } from "../../../lib/supabase-server";
@@ -21,6 +22,7 @@ type GuitarRow = {
   owner_id: string | null;
   qr_code: string;
   permanent_path: string | null;
+  updated_at: string;
   safety_status?: string | null;
   safety_status_updated_at?: string | null;
   public_safety_note?: string | null;
@@ -62,7 +64,7 @@ async function canAdminister(supabase: ServerSupabaseClient, user: User) {
 async function loadGuitarByCode(supabase: ServerSupabaseClient, qrCode: string) {
   const result = await supabase
     .from("guitars")
-    .select("id,owner_id,qr_code,permanent_path,safety_status,safety_status_updated_at,public_safety_note,safety_note")
+    .select("id,owner_id,qr_code,permanent_path,updated_at,safety_status,safety_status_updated_at,public_safety_note,safety_note")
     .eq("qr_code", qrCode)
     .maybeSingle<GuitarRow>();
 
@@ -147,19 +149,26 @@ export async function PATCH(request: Request) {
     }
   }
 
-  const now = new Date().toISOString();
   const safetyStatus = cleanSafetyStatus(body?.safetyStatus);
+  const nextSafety = { safetyStatus, publicSafetyNote: cleanText(body?.publicSafetyNote, 1000), safetyNote: cleanText(body?.safetyNote, 2000) };
+  if (isSafetyContentUnchanged({ safetyStatus: loaded.guitar.safety_status, publicSafetyNote: loaded.guitar.public_safety_note, safetyNote: loaded.guitar.safety_note }, nextSafety)) {
+    return json({ ok: true, committed: true, noOp: true, refreshPending: false, qrCode,
+      permanentPath: loaded.guitar.permanent_path || `/i/${qrCode}`,
+      safetyStatus: loaded.guitar.safety_status || "clear", publicSafetyNote: loaded.guitar.public_safety_note || "",
+      safetyStatusUpdatedAt: loaded.guitar.safety_status_updated_at || "", message: "Safety status unchanged." });
+  }
+  const now = new Date().toISOString();
+  const statusChanged = safetyStatus !== (loaded.guitar.safety_status || "clear");
   let update = supabase
     .from("guitars")
     .update({
       safety_status: safetyStatus,
       public_safety_note: cleanText(body?.publicSafetyNote, 1000) || null,
       safety_note: cleanText(body?.safetyNote, 2000) || null,
-      safety_status_updated_at: now,
-      safety_status_updated_by: access.user?.id || null,
+      ...(statusChanged ? { safety_status_updated_at: now, safety_status_updated_by: access.user?.id || null } : {}),
       updated_at: now
     })
-    .eq("id", loaded.guitar.id);
+    .eq("id", loaded.guitar.id).eq("updated_at", loaded.guitar.updated_at);
   if (!access.isAdmin) update = update.eq("owner_id", auth.user.id);
   const result = await update.select("qr_code,permanent_path,safety_status,safety_status_updated_at,public_safety_note")
     .maybeSingle<Pick<GuitarRow, "qr_code" | "permanent_path" | "safety_status" | "safety_status_updated_at" | "public_safety_note">>();

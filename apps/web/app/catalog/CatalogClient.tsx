@@ -24,6 +24,7 @@ import styles from "./CatalogClient.module.css";
 
 export function CatalogClient({ initialRecords, content }: { initialRecords: DemoInstrument[]; content: Record<string, string>; composition: EditorialComposition["catalog"] }) {
   const ui = useUiText("app.catalog.CatalogClient");
+  const catalogHeading = getContentValue(content, "catalog.hero.headline");
   const [records, setRecords] = useState<DemoInstrument[]>(dedupeByCodeAndDate(initialRecords));
   const recordsRevision = useRef(0);
   const recordsActive = useRef(true);
@@ -46,7 +47,9 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
     const next = { ...filters, ...patch };
     setFilters(next);
     clearSerialLookup();
-    const url = catalogFilterUrl(window.location.pathname, window.location.search, next) + window.location.hash;
+    const search = new URLSearchParams(window.location.search);
+    search.delete("exactSerial");
+    const url = catalogFilterUrl(window.location.pathname, search.toString(), next) + window.location.hash;
     if (url !== window.location.pathname + window.location.search + window.location.hash) {
       window.history[replace ? "replaceState" : "pushState"](window.history.state, "", url);
     }
@@ -54,7 +57,14 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
   function resetFilters() { updateFilters({ ...defaultCatalogFilters }); }
   useEffect(() => {
     const lookupRevisionRef = serialLookupRevision;
-    const restore = () => { setFilters(readCatalogFilters(window.location.search)); clearSerialLookup(); };
+    const restore = () => {
+      const restored = readCatalogFilters(window.location.search);
+      setFilters(restored);
+      clearSerialLookup();
+      if (new URLSearchParams(window.location.search).get("exactSerial") === "1") {
+        void searchExactSerial(restored.query);
+      }
+    };
     restore();
     window.addEventListener("popstate", restore);
     return () => { lookupRevisionRef.current++; window.removeEventListener("popstate", restore); };
@@ -174,8 +184,8 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
   const filterLabels: Record<keyof CatalogFilters, string> = { query: "Search", brand: "Brand", availability: "Availability", condition: "Condition", trust: "Trust", authenticity: "Authenticity", originality: "Originality", safety: "Safety", service: "Service", sortMode: "Sort" };
   const activeFilters = (Object.keys(filters) as Array<keyof CatalogFilters>).filter((key) => key !== "sortMode" && filters[key] !== defaultCatalogFilters[key]);
 
-  async function searchExactSerial() {
-    const serial = query.trim();
+  async function searchExactSerial(serialQuery = query) {
+    const serial = serialQuery.trim();
     if (serial.length < 4) {
       setSerialLookupMessage("Enter at least four letters or numbers for an exact serial lookup.");
       return;
@@ -195,6 +205,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
       const payload = await response.json().catch(() => null) as {
         ok?: boolean;
         match?: "public" | "none";
+        publicReviewSnapshot?: boolean;
         message?: string;
         instrument?: DemoInstrument;
       } | null;
@@ -207,10 +218,14 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
       if (payload.match === "public" && payload.instrument) {
         setRecords((current) => dedupeByCodeAndDate([payload.instrument as DemoInstrument, ...current]));
         setExactMatchCode(payload.instrument.qrCode);
-        setSerialLookupMessage("Exact serial match found. The serial remains hidden when the owner has chosen privacy.");
+        const search = new URLSearchParams(window.location.search);
+        search.set("q", serial);
+        search.set("exactSerial", "1");
+        window.history.replaceState(window.history.state, "", window.location.pathname + "?" + search.toString() + window.location.hash);
+        setSerialLookupMessage("Exact serial match found.");
         return;
       }
-      setShowOwnershipClaim(payload.match === "none");
+      if (!payload.publicReviewSnapshot) setShowOwnershipClaim(payload.match === "none");
       setSerialLookupMessage(payload.message || "No public QRguitar Profile matches that exact serial.");
     } catch {
       if (lookupRevision !== serialLookupRevision.current) return;
@@ -225,9 +240,9 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
       <Nav />
       <main className={styles["catalog-page"]}>
         <div className={styles["shell"]}>
-          <div className={styles["dashboard-hero"]}>
+          <div className={styles["dashboard-hero"]} data-long-heading={catalogHeading.trim().length > 24 ? "true" : undefined}>
             <div>
-              <h1>{getContentValue(content, "catalog.hero.headline")}</h1>
+              <h1>{catalogHeading}</h1>
             </div>
             <div className={styles["catalog-hero-actions"]}>
               <Link className="button secondary" href="/create">{getContentValue(content, "catalog.actions.create")}</Link>
@@ -350,6 +365,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
                   key={record.qrCode}
                   content={content}
                   compactMobilePhotos
+                  returnTo={catalogFilterUrl("/catalog", exactMatchCode ? "exactSerial=1" : "", filters)}
                   deferAdjacentPhotos
                   prioritizeLeadImage={index === 0}
                 />

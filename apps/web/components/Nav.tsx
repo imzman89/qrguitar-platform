@@ -78,11 +78,9 @@ export function Nav() {
   }, [isOpen, accountMenuOpen]);
 
   const navigation = [
-    ...(isSignedIn ? [{ href: "/dashboard", label: getContentValue(content, "global.navigation.dashboard") }] : []),
     { href: "/catalog", label: getContentValue(content, "global.navigation.catalog") },
     { href: "/collections", label: ui("ui.components.Nav.collections", "Collections") },
     { href: "/how-it-works", label: getContentValue(content, "global.navigation.howItWorks") },
-    { href: "/installers", label: ui("ui.components.Nav.installers", "Installers") },
     { href: "/create", label: getContentValue(content, "global.navigation.create"), primary: true }
   ];
   const signInHref = `/login?next=${encodeURIComponent(signInReturnPath(pathname, typeof window === "undefined" ? "" : window.location.search, typeof window === "undefined" ? "" : window.location.hash))}`;
@@ -116,6 +114,7 @@ export function Nav() {
                 <UserRound size={18} aria-hidden="true" /><span>{ui("ui.components.Nav.7e1b0d5641f2", "Account")}</span>
               </button>
               {accountMenuOpen ? <div className={styles.dropdown} id="account-navigation">
+                <Link href="/dashboard" onClick={() => { setIsOpen(false); setAccountMenuOpen(false); }}>{getContentValue(content, "global.navigation.dashboard")}</Link>
                 <Link href="/messages" onClick={() => { setIsOpen(false); setAccountMenuOpen(false); }}><MessageCircle size={16} aria-hidden="true" />{" "}{ui("ui.components.Nav.04d7b4833927", "Messages")}</Link>
                 <Link href="/account" onClick={() => { setIsOpen(false); setAccountMenuOpen(false); }}>{ui("ui.components.Nav.a587aa1f4ffc", "Account settings")}</Link>
                 <button type="button" disabled={signingOut} onClick={() => void logout()}><LogOut size={16} aria-hidden="true" /> {signingOut ? ui("ui.components.Nav.0436231679a0", "Signing out...") : ui("ui.components.Nav.48f0d3d397d4", "Sign out")}</button>

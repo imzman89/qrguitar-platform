@@ -52,7 +52,7 @@ test("claim links describe acquisition while builder handoffs lead to the owner'
   assert.match(transfer.description, /choose|Choose/);
 });
 test("seller and provider workspaces lead to their daily work while unknown values safely fall back", () => {
-  assert.equal(tools.getWorkspace("luthier").actions[0].href, "/dashboard/service");
+  assert.equal(tools.getWorkspace("luthier").actions[0].href, "/dashboard/service/slips");
   for (const role of ["shop", "builder"]) assert.equal(tools.getWorkspace(role).actions[0].href, "/account?section=collection");
   for (const value of ["admin", "__proto__", "constructor", {}, null, undefined]) assert.equal(tools.getWorkspace(value), tools.getWorkspace("player"));
   assert.equal(tools.getWorkspace("brand"), tools.getWorkspace("builder"));

@@ -1,0 +1,12 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body style="margin:0;background:#0a1012;color:#ece8df;font-family:Arial,sans-serif">
+<table role="presentation" style="width:100%;padding:40px 20px"><tr><td align="center"><table role="presentation" style="width:100%;max-width:520px"><tr><td>
+<p style="font-size:18px;font-weight:700;margin:0 0 40px">QR<span style="color:#d59b59">guitar</span></p>
+<p style="font-size:11px;letter-spacing:2px;color:#aaa69c;text-transform:uppercase">Your instrument. Its story.</p>
+<h1 style="font-size:30px;font-weight:500;line-height:1.2">Verify your email.</h1>
+<p style="font-size:15px;line-height:1.7;color:#c5c2ba">Use this one-time code in QRguitar. If you are accepting an instrument’s Profile, its identity and recorded history will stay with it.</p>
+<p style="font-size:32px;letter-spacing:8px;border-top:1px solid #343b3d;border-bottom:1px solid #343b3d;padding:24px 0">{{ .Token }}</p>
+{{ if .RedirectTo }}<p><a href="{{ .RedirectTo }}" style="color:#ece8df">Return to QRguitar</a></p>{{ end }}
+<p style="font-size:13px;line-height:1.7;color:#aaa69c">You can also <a href="{{ .ConfirmationURL }}" style="color:#c5c2ba">verify using this secure link</a>. Ownership changes only when you choose to accept the Profile.</p>
+<p style="font-size:12px;line-height:1.7;color:#aaa69c;margin-top:32px">Do not share this code. If you did not request this email or expect a Profile invitation, you can ignore it.</p>
+</td></tr></table></td></tr></table></body></html>

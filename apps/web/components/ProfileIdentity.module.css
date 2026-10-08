@@ -5,3 +5,12 @@
 .identity-cell { min-width: 0; }
 .identity-cell dt { color: var(--muted); font-size: 12px; line-height: 1.5; margin-bottom: 4px; }
 .identity-cell dd { margin: 0; color: var(--text); font-size: 14px; font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
+
+
+/* v30: a readable record, rather than a generic summary card. */
+.identity-card { padding:22px 0 0; border-top:1px solid var(--line); background:transparent; }
+.identity-card-header { display:grid; justify-content:start; gap:8px; margin-bottom:24px; font-family:var(--font-ui); font-size:10px; font-weight:500; letter-spacing:.12em; text-transform:uppercase; }
+.identity-media-summary { font-size:13px; letter-spacing:0; line-height:1.6; text-transform:none; }
+.identity-grid { gap:24px 32px; }
+.identity-cell dt { font-size:11px; margin-bottom:7px; }
+.identity-cell dd { font-family:var(--font-ui); font-size:16px; font-weight:500; line-height:1.45; }

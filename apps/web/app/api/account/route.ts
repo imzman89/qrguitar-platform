@@ -92,6 +92,10 @@ export async function PATCH(request: Request) {
     if (typeof body.publicCollection.enabled !== "boolean") {
       return json({ ok: false, message: "Choose whether this collection is enabled." }, { status: 400 });
     }
+    if (body.publicCollection.allowWarrantyHelp !== undefined && typeof body.publicCollection.allowWarrantyHelp !== "boolean") return json({ ok: false, message: "Choose whether warranty assistance is offered." }, { status: 400 });
+    const helpUrl = body.publicCollection.warrantyHelpUrl;
+    if (helpUrl !== undefined && (typeof helpUrl !== "string" || (helpUrl.trim() && !cleanCollectionWebsite(helpUrl)))) return json({ ok: false, message: "Use a complete warranty assistance address starting with https://, or leave it blank." }, { status: 400 });
+    if (body.publicCollection.allowWarrantyHelp === true && !cleanCollectionWebsite(helpUrl)) return json({ ok: false, message: "Add an HTTPS assistance address before offering warranty help." }, { status: 400 });
     const website = body.publicCollection.websiteUrl;
     if (website !== undefined && (typeof website !== "string" || (website.trim() && !cleanCollectionWebsite(website)))) {
       return json({ ok: false, message: "Use a complete website address starting with https://, or leave Website blank." }, { status: 400 });
@@ -111,10 +115,15 @@ export async function PATCH(request: Request) {
   const writeAccess = await assertAccountCanWrite(supabase, auth.user);
   if (!writeAccess.ok) return json({ ok: false, message: writeAccess.message }, { status: writeAccess.status });
 
+  const collectionPayload = publicCollection ? (() => {
+    const { allowWarrantyHelp, warrantyHelpUrl, ...existing } = publicCollection;
+    return { ...existing, ...(body?.publicCollection?.allowWarrantyHelp !== undefined ? { allowWarrantyHelp } : {}),
+      ...(body?.publicCollection?.warrantyHelpUrl !== undefined ? { warrantyHelpUrl } : {}) };
+  })() : null;
   let saved;
   try {
     saved = await supabase.rpc("save_account_settings", {
-      p_user_id: auth.user.id, p_display_name: displayName, p_collection: publicCollection, p_expected_version: expectedVersion
+      p_user_id: auth.user.id, p_display_name: displayName, p_collection: collectionPayload, p_expected_version: expectedVersion
     });
   } catch {
     return json({ ok: false, commitStatus: "unknown", message: "Could not confirm the save. Reload your account before trying again." }, { status: 503 });
@@ -131,7 +140,9 @@ export async function PATCH(request: Request) {
     return json({ ok: false, message }, { status });
   }
   const account = saved.data as { displayName: string; publicCollection?: Partial<PublicCollectionSettings> | null; settingsVersion?: number } | null;
-  if (!account || account.displayName !== displayName || account.settingsVersion !== Number(expectedVersion) + 1) {
+  if (!account || account.displayName !== displayName || account.settingsVersion !== Number(expectedVersion) + 1
+    || (body?.publicCollection?.allowWarrantyHelp !== undefined && account.publicCollection?.allowWarrantyHelp !== publicCollection?.allowWarrantyHelp)
+    || (body?.publicCollection?.warrantyHelpUrl !== undefined && account.publicCollection?.warrantyHelpUrl !== publicCollection?.warrantyHelpUrl)) {
     return json({ ok: false, commitStatus: "unknown", message: "Could not confirm the save. Reload your account before trying again." }, { status: 503 });
   }
 

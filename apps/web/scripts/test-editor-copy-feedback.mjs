@@ -511,3 +511,31 @@ test('bulk uncertain primary label means confirming the original immutable reque
   assert.equal(f.button('Confirm saved import (same requests)').props.disabled, false);
   f.switchActor('actor-b'); await f.flush(); assert.doesNotMatch(f.text(), /Confirm saved import/);
 });
+
+test('Bulk Import exact previous default migrates through registry and saved settings', () => {
+  const key = 'bulkImport.hero.body';
+  const previous = 'Add inventory from a CSV, TSV, or pasted spreadsheet. Incomplete rows stay drafts. New Profiles start Private.';
+  const expected = 'Add inventory from a CSV, TSV, or pasted spreadsheet. Incomplete rows stay drafts. Saved instruments and photos appear in Catalog.';
+  assert.equal(registry.defaultContentValues[key], expected);
+  assert.equal(registry.mergeContentValues({ [key]: previous })[key], expected);
+  const input = structuredClone(settings.defaultSiteSettings);
+  input.content[key] = previous;
+  const merged = settings.mergeSiteSettings(input);
+  assert.equal(merged.content[key], expected);
+  assert.equal(input.content[key], previous);
+  assert.deepEqual(settings.mergeSiteSettings(merged), merged);
+});
+test('Bulk Import distinct editorial overrides remain unchanged', () => {
+  const key = 'bulkImport.hero.body';
+  for (const custom of [
+    'Review our approved inventory before importing.',
+    'Add inventory from a CSV, TSV, or pasted spreadsheet. Incomplete rows stay drafts. New Profiles start Private. Editorial note.'
+  ]) {
+    assert.equal(registry.mergeContentValues({ [key]: custom })[key], custom);
+    const input = structuredClone(settings.defaultSiteSettings);
+    input.content[key] = custom;
+    const merged = settings.mergeSiteSettings(input);
+    assert.equal(merged.content[key], custom);
+    assert.deepEqual(settings.mergeSiteSettings(merged), merged);
+  }
+});

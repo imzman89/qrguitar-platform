@@ -1,5 +1,4 @@
-import { directPaymentsHandlers } from "../../../../../lib/direct-payments-runtime";
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const maxDuration = 60;
-export const POST = directPaymentsHandlers.checkout;
+import { retiredProfileCheckout } from "../../../../../lib/retired-profile-checkout";
+export const runtime="nodejs";
+export const dynamic="force-dynamic";
+export const POST=retiredProfileCheckout;

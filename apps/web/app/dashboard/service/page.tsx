@@ -173,6 +173,7 @@ export default function ServiceWorkbenchPage() {
         <div><p className={styles.eyebrow}>{ui("ui.app.dashboard.service.page.5e2ab5d6c101", "For luthiers & repair shops")}</p><h1>{ui("ui.app.dashboard.service.page.3f9b5c09e0a6", "Service workbench")}</h1><p>{ui("ui.app.dashboard.service.page.3ab05f868d78", "Manage drafts, owner reviews, and completed work.")}</p></div>
         <Link className={styles.secondary} href="/account?section=provider"><Wrench size={17} aria-hidden="true" />{" "}{ui("ui.app.dashboard.service.page.6ba0be9a0111", "Business tools")}</Link>
       </header>
+      <p className={styles.helper}>{ui("ui.app.dashboard.service.page.unregisteredInstrument", "Instrument without a QRguitar ID?")} <Link href="/dashboard/service/slips">{ui("ui.app.dashboard.service.page.privateServiceSlip", "Create a private service slip")}</Link></p>
 
       {!authChecked ? <section className={styles.notice} role="status"><h2>{ui("ui.app.dashboard.service.page.d677c4c20422", "Checking your sign-in…")}</h2><p>{ui("ui.app.dashboard.service.page.ownerDashboardPolicy.workLoading", "Your service work will appear here.")}</p></section>
         : authError ? <section className={styles.notice} role="alert"><h2>{ui("ui.app.dashboard.service.page.0591283e2c7f", "Sign-in check unavailable")}</h2><p>{authError}</p><button className={styles.primary} onClick={() => setAuthAttempt((value) => value + 1)}>{ui("ui.app.dashboard.service.page.d8b8392e2c54", "Try again")}</button></section>

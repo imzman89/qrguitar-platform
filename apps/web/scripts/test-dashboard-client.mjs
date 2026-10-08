@@ -25,16 +25,18 @@ for(const [name,key] of [["loadDashboardInstruments","instruments"],["loadDashbo
     });
   }
 }
-function stateSetters(state){const setters={};for(const key of Object.keys(state))setters["set"+key[0].toUpperCase()+key.slice(1)]=value=>{state[key]=typeof value==="function"?value(state[key]):value};return setters;}
+function stateSetters(state){const setters={};for(const key of new Set([...Object.keys(state),"loadingRecords"]))setters["set"+key[0].toUpperCase()+key.slice(1)]=value=>{state[key]=typeof value==="function"?value(state[key]):value};return setters;}
 const authEffect=effects.find(e=>e.includes("let authResolved"));
 const recordsEffect=effects.find(e=>e.includes("loadDashboardInstruments(token"));
 await test("late initial session cannot replace a newer account event",async()=>{
   const initial=deferred();let listener,unsubscribed=false;
-  const state={visibilityPendingCodes:[],user:null,authChecked:false,sessionError:"check-failed",dashboardMessage:"",instruments:[{private:"old"}],transfers:[{private:"old"}],serviceRequests:[],quickEditRecord:{private:"old"},actionRecord:{private:"old"},collectionHandle:"old",collectionAccountType:"shop",searchQuery:"old private serial",recordsLoaded:true,recordsError:""};
+  const state={visibilityPendingCodes:[],user:null,authChecked:false,sessionError:"check-failed",dashboardMessage:"",instruments:[{private:"old"}],transfers:[{private:"old"}],serviceRequests:[],quickEditRecord:{private:"old"},actionRecord:{private:"old"},collectionHandle:"old",collectionAccountType:"shop",workspaceStatus:"ready",searchQuery:"old private serial",recordsLoaded:true,recordsError:""};
   const env={visibilityRequests:{current:new Map()},removalRequests:{current:new Map()},...stateSetters(state),sessionEmail:{current:"old"},accountRevision:{current:0},window:{setTimeout:()=>1,clearTimeout:()=>{}},mapSupabaseUser:compile(functions.get("mapSupabaseUser"),{},"mapSupabaseUser"),createBrowserSupabaseClient:()=>({auth:{getSession:()=>initial.promise,onAuthStateChange:cb=>{listener=cb;return{data:{subscription:{unsubscribe:()=>{unsubscribed=true}}}}}}})};
   const dispose=compile("const effect="+authEffect+";",env,"effect")();
   listener("SIGNED_IN",{user:{email:"new@example.invalid"}});
-  assert.equal(state.user.email,"new@example.invalid");assert.equal(state.sessionError,"");assert.equal(state.authChecked,true);assert.deepEqual(state.instruments,[]);assert.equal(state.actionRecord,null);assert.equal(state.quickEditRecord,null);assert.equal(state.collectionHandle,"");assert.equal(state.searchQuery,"");
+  assert.equal(state.user.email,"new@example.invalid");assert.equal(state.sessionError,"");assert.equal(state.authChecked,true);assert.deepEqual(state.instruments,[]);assert.equal(state.actionRecord,null);assert.equal(state.quickEditRecord,null);assert.equal(state.collectionHandle,"");assert.equal(state.searchQuery,"");assert.equal(state.collectionAccountType,"");
+assert.equal(state.workspaceStatus,"pending");
+
   initial.resolve({data:{session:{user:{email:"old@example.invalid"}}}});await tick();assert.equal(state.user.email,"new@example.invalid");
   listener("SIGNED_OUT",null);assert.equal(state.user,null);assert.equal(state.sessionError,"");assert.deepEqual(state.transfers,[]);assert.equal(state.recordsLoaded,false);dispose();assert.equal(unsubscribed,true);
 });
@@ -92,7 +94,7 @@ await test("Profile cards keep Edit and Print Suite direct while Quick Edit live
   const cardEnd=source.indexOf('</aside>',cardStart);
   const card=source.slice(cardStart,cardEnd);
   assert.match(card,/href=\{`\/edit\/\$\{instrument\.qrCode\}`\}/);
-  assert.match(card,/href=\{`\/handout\/\$\{instrument\.qrCode\}`\}/);
+  assert.match(card,/href=\{`\/handout\/\$\{instrument\.qrCode\}\?returnTo=%2Fdashboard`\}/);
   assert.doesNotMatch(card,/setQuickEditRecord\(instrument\)/);
   assert.match(source,/className=\{styles\.drawerQuickEdit\}[\s\S]*setQuickEditRecord\(actionRecord\); setActionRecord\(null\)/);
 });
@@ -137,4 +139,102 @@ await test("ownership activity honors reduced motion and keeps feedback CMS-edit
   compile(functions.get("focusOwnershipTransfers"),env,"focusOwnershipTransfers")();assert.equal(section.options.behavior,"auto");
   env.pendingTransfers=0;compile(functions.get("focusOwnershipTransfers"),env,"focusOwnershipTransfers")();assert.deepEqual(keys,["ui.app.dashboard.page.f3ccb68e0839"]);assert.match(state.dashboardMessage,/^Edited:/);
 });
+const workspaceEffects=effects.filter(e=>e.includes('fetch("/api/account"'));
+assert.equal(workspaceEffects.length,1,"Exactly one actual workspace account effect is required");
+function workspaceHarness(options={}){
+  const state={collectionHandle:"saved",collectionAccountType:"builder",workspaceStatus:"ready",...options.state};
+  const revision={current:1},timers=new Map(),calls=[];
+  const env={...stateSetters(state),user:{email:"owner@example.invalid"},accountRevision:revision,AbortController,
+    window:{setTimeout:fn=>{timers.set(1,fn);return 1;},clearTimeout:id=>timers.delete(id)},
+    getSupabaseAccessToken:options.token||(()=>Promise.resolve("token")),
+    fetch:async(url,init)=>{calls.push({url,...init});return options.reply?options.reply():Response.json({ok:true,account:{publicCollection:{accountType:"collector",enabled:true,handle:"confirmed"}}});}};
+  const dispose=compile("const effect="+workspaceEffects[0]+";",env,"effect")();
+  return{state,revision,timers,calls,dispose,timeout:()=>{assert.equal(timers.size,1);timers.values().next().value();}};
+}
+for(const kind of ["503","rejected","malformed"])await test("workspace "+kind+" exposes failure and retains same-actor confirmed tools",async()=>{
+  const h=workspaceHarness({reply:()=>kind==="rejected"?Promise.reject(Error("offline")):Response.json(kind==="malformed"?{ok:true}:{ok:false},{status:kind==="503"?503:200})});
+  assert.equal(h.state.workspaceStatus,"pending");await tick();
+  assert.equal(h.state.workspaceStatus,"error");assert.equal(h.state.collectionAccountType,"builder");assert.equal(h.state.collectionHandle,"saved");assert.equal(h.timers.size,0);h.dispose();
+});
+await test("initial workspace failure remains unknown instead of confirming a player preference",async()=>{
+  const h=workspaceHarness({state:{collectionAccountType:"",collectionHandle:""},reply:()=>Response.json({ok:false},{status:503})});
+  await tick();assert.equal(h.state.workspaceStatus,"error");assert.equal(h.state.collectionAccountType,"");assert.equal(h.state.collectionHandle,"");h.dispose();
+});
+await test("confirmed workspace response updates saved preference and completes pending status",async()=>{
+  const h=workspaceHarness();await tick();assert.equal(h.state.workspaceStatus,"ready");assert.equal(h.state.collectionAccountType,"collector");assert.equal(h.state.collectionHandle,"confirmed");assert.equal(h.calls[0].url,"/api/account");assert.equal(h.calls[0].cache,"no-store");assert.ok(h.calls[0].signal instanceof AbortSignal);assert.equal(h.timers.size,0);h.dispose();
+});
+await test("workspace token deadline settles visibly and a late token sends no request",async()=>{
+  const gate=deferred(),h=workspaceHarness({token:()=>gate.promise});h.timeout();assert.equal(h.state.workspaceStatus,"error");
+  gate.resolve("late-token");await tick();assert.equal(h.calls.length,0);assert.equal(h.state.collectionAccountType,"builder");h.dispose();
+});
+await test("workspace deadline aborts fetch and rejects even an abort-ignoring late success",async()=>{
+  const gate=deferred(),h=workspaceHarness({reply:()=>gate.promise});await tick();h.timeout();assert.equal(h.calls[0].signal.aborted,true);assert.equal(h.state.workspaceStatus,"error");
+  gate.resolve(Response.json({ok:true,account:{publicCollection:{accountType:"player",enabled:true,handle:"late"}}}));await tick();
+  assert.equal(h.state.workspaceStatus,"error");assert.equal(h.state.collectionAccountType,"builder");assert.equal(h.state.collectionHandle,"saved");h.dispose();
+});
+await test("workspace deadline covers response JSON, not just HTTP headers",async()=>{
+  const gate=deferred(),h=workspaceHarness({reply:()=>({ok:true,json:()=>gate.promise})});await tick();h.timeout();
+  gate.resolve({ok:true,account:{publicCollection:{accountType:"player",enabled:true,handle:"late"}}});await tick();
+  assert.equal(h.state.workspaceStatus,"error");assert.equal(h.state.collectionAccountType,"builder");assert.equal(h.calls[0].signal.aborted,true);h.dispose();
+});
+await test("workspace actor switch before token resolution sends no request",async()=>{
+  const gate=deferred(),h=workspaceHarness({token:()=>gate.promise});h.revision.current++;h.state.collectionAccountType="";h.state.collectionHandle="";h.state.workspaceStatus="pending";
+  gate.resolve("old-token");await tick();assert.equal(h.calls.length,0);assert.equal(h.state.workspaceStatus,"pending");assert.equal(h.state.collectionAccountType,"");h.dispose();
+});
+for(const outcome of ["success","rejection"])await test("workspace stale actor "+outcome+" cannot replace next actor state",async()=>{
+  const gate=deferred(),h=workspaceHarness({reply:()=>gate.promise});await tick();h.revision.current++;
+  Object.assign(h.state,{collectionAccountType:"player",collectionHandle:"next",workspaceStatus:"ready"});const expected={...h.state};
+  if(outcome==="rejection")gate.reject(Error("old request"));else gate.resolve(Response.json({ok:true,account:{publicCollection:{accountType:"builder",enabled:true,handle:"old"}}}));
+  await tick();assert.deepEqual(h.state,expected);h.dispose();
+});
+await test("workspace cleanup aborts request, clears deadline and ignores late completion",async()=>{
+  const gate=deferred(),h=workspaceHarness({reply:()=>gate.promise});await tick();h.dispose();const expected={...h.state};
+  assert.equal(h.calls[0].signal.aborted,true);assert.equal(h.timers.size,0);gate.reject(Error("abort"));await tick();assert.deepEqual(h.state,expected);
+});
+await test("workspace error renders its own retry; pending announces loading; neither changes role",async()=>{
+  const expressions=[];function visitUi(n){if(ts.isJsxExpression(n)&&n.expression)expressions.push(n.expression);ts.forEachChild(n,visitUi);}visitUi(ast);
+  const state={workspaceAttempt:4};
+  function view(prefix,status){
+    const matches=expressions.filter(n=>n.getText(ast).startsWith(prefix));assert.equal(matches.length,1,"Actual workspace notice must exist once");
+    const code=ts.transpileModule("const view="+matches[0].getText(ast)+";",{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+    const jsx=(type,props)=>({type,props});
+    return new Function("require","exports","workspaceStatus","setWorkspaceAttempt","ui",code+";return view;")(
+      name=>{assert.equal(name,"react/jsx-runtime");return{jsx,jsxs:jsx};},{},status,v=>state.workspaceAttempt=v(state.workspaceAttempt),(_key,fallback)=>fallback);
+  }
+  const error=view('workspaceStatus === "error"',"error");assert.equal(error.props.role,"alert");
+  const button=error.props.children.find(n=>n.type==="button");assert.equal(button.props.type,"button");assert.equal(button.props.children,"Try again");button.props.onClick();assert.equal(state.workspaceAttempt,5);
+  const pending=view('workspaceStatus === "pending"',"pending");assert.equal(pending.props.role,"status");assert.equal(pending.props["aria-busy"],"true");
+  assert.equal(view('workspaceStatus === "error"',"ready"),null);assert.equal(view('workspaceStatus === "pending"',"ready"),null);
+  assert.match(source,/collectionAccountType \? workspace\.label : ui\(/);
+  assert.match(source,/collectionAccountType \? <WorkspaceActions accountType=\{collectionAccountType\} \/> : null/);
+});
+
+function actualCollectionView(state){
+  const expressions=[];function find(node){if(ts.isJsxExpression(node)&&node.expression)expressions.push(node.expression);ts.forEachChild(node,find);}find(ast);
+  const matches=expressions.filter(node=>ts.isConditionalExpression(node)&&node.whenTrue.getText(ast).includes('ui.app.dashboard.page.139a32beaa54')&&node.whenFalse.getText(ast).includes('Collection unavailable'));
+  assert.equal(matches.length,1,'Render the actual collection result branch');
+  const env={loadingRecords:false,recordsLoaded:false,recordsError:'',displayedInstruments:[],instruments:[],ui:(_key,fallback)=>fallback,dashboardCopy:{emptyCollectionTitle:'No instruments yet.',emptyCollectionBody:'Use a real photo.',firstRecordCtaLabel:'Register your first instrument'},Link:'a',styles:{},setSearchQuery:()=>{},...state};
+  const code=ts.transpileModule('const view='+matches[0].getText(ast)+';',{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+  const jsx=(type,props)=>({type,props});
+  return new Function('require','exports',...Object.keys(env),code+';return view;')(name=>{assert.equal(name,'react/jsx-runtime');return{jsx,jsxs:jsx};},{},...Object.values(env));
+}
+function resultText(node){if(node==null)return'';if(typeof node==='string'||typeof node==='number')return String(node);if(Array.isArray(node))return node.map(resultText).join(' ');return resultText(node.props?.children);}
+await test('an unconfirmed first collection never renders a false empty result',async()=>{
+  const view=actualCollectionView({loadingRecords:false,recordsLoaded:false});
+  assert.equal(view.props.role,'status');assert.equal(view.props['aria-busy'],'true');assert.match(resultText(view),/Loading your Profiles/);assert.doesNotMatch(resultText(view),/No instruments yet|Register your first/);
+  const refresh=actualCollectionView({loadingRecords:true,recordsLoaded:true});assert.equal(refresh.props.role,'status');assert.doesNotMatch(resultText(refresh),/No instruments yet/);
+});
+await test('confirmed empty, search miss and initial failure stay distinct',async()=>{
+  const empty=actualCollectionView({recordsLoaded:true});assert.match(resultText(empty),/No instruments yet/);assert.match(resultText(empty),/Register your first instrument/);assert.doesNotMatch(resultText(empty),/Loading your Profiles/);
+  let query='no match';const miss=actualCollectionView({recordsLoaded:true,instruments:[{qrCode:'existing-private'}],setSearchQuery:value=>query=value});assert.match(resultText(miss),/No matching Profiles/);assert.doesNotMatch(resultText(miss),/Register your first/);miss.props.children.find(node=>node.type==='button').props.onClick();assert.equal(query,'');
+  const failure=actualCollectionView({recordsLoaded:false,recordsError:'Unavailable'});assert.match(resultText(failure),/Collection unavailable/);assert.doesNotMatch(resultText(failure),/No instruments yet|Loading your Profiles/);
+});
+await test('actor arrival marks loading synchronously and sign-out clears it',async()=>{
+  const initial=deferred();let listener;
+  const state={visibilityPendingCodes:[],user:null,authChecked:false,sessionError:'',dashboardMessage:'',instruments:[{private:'old'}],transfers:[],serviceRequests:[],quickEditRecord:null,actionRecord:null,collectionHandle:'',collectionAccountType:'player',workspaceStatus:'ready',searchQuery:'',recordsLoaded:true,recordsError:'',loadingRecords:false};
+  const env={visibilityRequests:{current:new Map()},removalRequests:{current:new Map()},...stateSetters(state),sessionEmail:{current:'old@example.invalid'},accountRevision:{current:0},window:{setTimeout:()=>1,clearTimeout:()=>{}},mapSupabaseUser:compile(functions.get('mapSupabaseUser'),{},'mapSupabaseUser'),createBrowserSupabaseClient:()=>({auth:{getSession:()=>initial.promise,onAuthStateChange:cb=>{listener=cb;return{data:{subscription:{unsubscribe:()=>{}}}}}}})};
+  const dispose=compile('const effect='+authEffect+';',env,'effect')();listener('SIGNED_IN',{user:{email:'next@example.invalid'}});assert.equal(state.loadingRecords,true);assert.equal(state.recordsLoaded,false);assert.deepEqual(state.instruments,[]);assert.equal(state.collectionAccountType,'');
+  listener('SIGNED_OUT',null);assert.equal(state.loadingRecords,false);assert.equal(state.user,null);initial.resolve({data:{session:{user:{email:'old@example.invalid'}}}});await tick();assert.equal(state.user,null);assert.equal(state.loadingRecords,false);dispose();
+});
+
 console.log(count+" dashboard behavior cases passed.");

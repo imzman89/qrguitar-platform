@@ -118,7 +118,7 @@ export async function GET(
   } else {
     const documentResult = await supabase
       .from("guitar_documents")
-      .select("storage_path")
+      .select("storage_path").eq("retained_private", false)
       .eq("guitar_id", guitar.id)
       .eq("is_public", true);
     if (documentResult.error) return notFound();

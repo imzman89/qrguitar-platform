@@ -8,6 +8,7 @@ import type { DemoInstrument } from "../../../../lib/local-demo";
 import { createBrowserSupabaseClient } from "../../../../lib/supabase-browser";
 import { fetchOwnerProfile, OwnerProfileError } from "../../../../lib/owner-profile";
 import { Nav } from "../../../../components/Nav";
+import { RecordedBusinessSupport } from "../../../../components/RecordedBusinessSupport";
 import { ProfileClient } from "../../../i/[code]/ProfileClient";
 
 export function OwnerProfileClient({ code }: { code: string }) {
@@ -53,7 +54,7 @@ export function OwnerProfileClient({ code }: { code: string }) {
   }, [code, attempt]);
 
   if (status === "ready" && instrument && instrument.qrCode.toUpperCase() === code.toUpperCase()) {
-    return <ProfileClient code={code} initialInstrument={instrument} ownerPreview />;
+    return <ProfileClient code={code} initialInstrument={instrument} ownerPreview ownerWorkspaceContent={<RecordedBusinessSupport code={instrument.qrCode} />} />;
   }
   return <><Nav /><main className="owner-profile-gate">
     <span className="eyebrow">{ui("ui.app.dashboard.profile.code.OwnerProfileClient.ownerDashboardPolicy.myCollection", "My collection")}</span>

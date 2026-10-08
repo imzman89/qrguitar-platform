@@ -82,6 +82,7 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
   const [sending, setSending] = useState(false);
   const [uncertainSend, setUncertainSend] = useState(false);
   const [connection, setConnection] = useState("Connecting");
+  const [refreshAvailable, setRefreshAvailable] = useState(false);
   const pendingSend = useRef<PendingSend | null>(null);
   const messageEnd = useRef<HTMLDivElement | null>(null);
   const messageList = useRef<HTMLDivElement | null>(null);
@@ -144,6 +145,7 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
     try {
       const payload = await messageFetch<{ ok: boolean; conversation: MemberConversationThread }>(lease, `/api/messages/${conversationId}`);
       if (!scope.live(lease) || request !== threadRevision.current) return;
+      setRefreshAvailable(true);
       setThread((current) => {
         if (showLoading || !current || current.id !== payload.conversation.id) return payload.conversation;
         const currentIds = new Set(current.messages.map((message) => message.id));
@@ -158,12 +160,12 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
       });
       setPhase("ready");
       void messageFetch(lease, `/api/messages/${conversationId}/controls`, { method: "POST", body: JSON.stringify({ action: "read" }) }).catch(() => undefined);
-    } catch (reason) { if (scope.live(lease) && request === threadRevision.current) handleRequestError(reason); }
+    } catch (reason) { if (scope.live(lease) && request === threadRevision.current) { setRefreshAvailable(false); handleRequestError(reason); } }
   }, [conversationId, handleRequestError, messageFetch]);
 
   useEffect(() => {
     // Only a mount/conversation transition restarts this privacy scope.
-    setPhase("loading"); setThread(null); setConversations([]); setDraft(""); setFiles([]);
+    setPhase("loading"); setThread(null); setConversations([]); setDraft(""); setFiles([]); setRefreshAvailable(false);
     setConversationCursor(null); setNotice(""); setError(""); setSending(false); setUncertainSend(false);
     pendingSend.current = null; sendLock.current = false;
     const scope = createMessageSession(() => createBrowserSupabaseClient().auth);
@@ -175,7 +177,7 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
         actor = nextActor; inboxRevision.current++; threadRevision.current++;
         pendingSend.current = null; sendLock.current = false; loadingHistory.current = false; firstThreadLoad.current = true;
         setConversations([]); setConversationCursor(null); setThread(null); setDraft(""); setFiles([]);
-        setSending(false); setUncertainSend(false); setLoadingMoreConversations(false); setLoadingOlderMessages(false); setNotice(""); setError(""); setConnection("Connecting");
+        setSending(false); setUncertainSend(false); setLoadingMoreConversations(false); setLoadingOlderMessages(false); setNotice(""); setError(""); setConnection("Connecting"); setRefreshAvailable(false);
       }
       if (nextPhase === "ready") { if (conversationId) void loadThread(changed); else void loadInbox(changed); }
       else { setPhase(nextPhase); if (nextPhase === "error") setError(sessionError.current); }
@@ -368,7 +370,7 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
       <header className={styles.threadHeader}>
         <Link className={styles.backLink} href="/messages"><ArrowLeft size={17} />{" "}{ui("ui.components.MessagesClient.04d7b4833927", "Messages")}</Link>
         <div className={styles.threadIdentity}><MemberAvatar name={thread.member.publicName} src={thread.member.avatarUrl} /><div><h1 id="thread-title">{thread.member.publicName}</h1><p>{memberRole(thread.member.accountType)}{thread.member.location ? ui("ui.components.MessagesClient.799272298625", " / {{value1}}", { value1: thread.member.location }) : ""}</p></div></div>
-        <span className={`${styles.connection} ${connection === "Live" ? styles.live : ""}`}><i /> {connection}</span>
+        <span className={`${styles.connection} ${connection === "Live" ? styles.live : ""}`}><i /> {connection !== "Live" && refreshAvailable ? "Automatic refresh" : connection}</span>
         {thread.contextProfile ? <Link className={styles.threadContext} href={thread.contextProfile.href}>{ui("ui.components.MessagesClient.4efca0d10c5f", "About")}{" "}{thread.contextProfile.title}</Link> : null}
       </header>
       <div className={styles.threadGrid}>

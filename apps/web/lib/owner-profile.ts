@@ -1,9 +1,13 @@
 import type { DemoInstrument } from "./local-demo";
 
-export function ownerProfileHref(record: Pick<DemoInstrument, "qrCode" | "visibility"> & Partial<Pick<DemoInstrument, "permanentPath">>) {
-  return record.visibility === "private"
+export function ownerProfileHref(record: Pick<DemoInstrument, "qrCode" | "visibility"> & Partial<Pick<DemoInstrument, "permanentPath">>, returnTo?: "/dashboard") {
+  const href = returnTo === "/dashboard" || record.visibility === "private"
     ? "/dashboard/profile/" + encodeURIComponent(record.qrCode)
     : record.permanentPath || "/i/" + encodeURIComponent(record.qrCode);
+  if (returnTo !== "/dashboard") return href;
+  const url = new URL(href, "https://qrguitar.invalid");
+  url.searchParams.set("returnTo", returnTo);
+  return url.pathname + url.search + url.hash;
 }
 
 export class OwnerProfileError extends Error {

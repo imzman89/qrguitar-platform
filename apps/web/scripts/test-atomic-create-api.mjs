@@ -103,9 +103,9 @@ await test("removed registered upload returns definitive no-commit reset contrac
  assert.equal(result.status,409);assert.equal(result.body.ok,false);assert.equal(result.body.code,"upload_session_changed");
  assert.equal(result.body.resetUploads,true);assert.equal(result.body.retryable,true);assert.equal(result.body.cleanupUploads,false);
 });
-await test("paid credit hold is a clear nonretryable conflict while form/uploads remain",async()=>{
+await test("unexpected legacy credit hold reports policy mismatch while form/uploads remain",async()=>{
  const backend=db({error:{code:"QG008"}}),result=await request(body(),backend);
- assert.equal(result.status,409);assert.equal(result.body.code,"billing_review_required");assert.equal(result.body.retryable,false);
+ assert.equal(result.status,503);assert.equal(result.body.code,"create_policy_unavailable");assert.equal(result.body.retryable,false);
  assert.equal(result.body.cleanupUploads,false);assert.equal(backend.calls.deletes,0);
 });
 await test("client-selected test environment cannot alter live creation or owner",async()=>{

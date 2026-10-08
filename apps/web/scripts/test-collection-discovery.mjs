@@ -187,3 +187,16 @@ test("collection load errors provide reset without exposing exception details", 
   assert.doesNotMatch(renderToStaticMarkup(tree), /Private database detail/);
   nodes(tree, (node) => node.type === "button")[0].props.onClick(); assert.equal(retries, 1);
 });
+
+test("collection page passes its own canonical route through the actual card props", async () => {
+  const f = fixture({ records: [publicRecord()] });
+  const page = await f.load("apps/web/app/collections/[handle]/page").default({ params: Promise.resolve({ handle: "public-shop" }) });
+  const client = nodes(page, node => node.type?.name === "CollectionsClient")[0];
+  assert.ok(client);
+  assert.equal(client.props.collectionHref, "/collections/public-shop");
+  const tree = f.render(client.type, client.props);
+  const cards = nodes(tree, node => node.type?.name === "CollectibleRecordCard");
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0].props.returnTo, "/collections/public-shop");
+  assert.equal(cards[0].props.record, client.props.records[0]);
+});

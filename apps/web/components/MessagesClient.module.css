@@ -100,3 +100,18 @@
 .workspace :is(button,a,input,textarea,select):focus-visible { outline: 2px solid var(--action); outline-offset: 3px; }
 @media (max-width: 600px) { .composer textarea,.reportDialog textarea,.reportDialog select { font-size: 16px; } .message footer button { min-height: 44px; } .memberPanel { padding: 16px; } .historyNote button { min-height: 44px; } }
 @media (prefers-reduced-motion: reduce) { .messageList { scroll-behavior: auto; } .conversationCard { transition: none; } }
+
+/* Screen-only Messages chrome; conversations, controls and status semantics are unchanged. */
+@media screen {
+ .inboxHeader h1 { font-family:var(--font-display,Georgia,serif); font-weight:400; }
+ .threadPanel, .memberPanel { border-radius:0; background:transparent; }
+ .memberPanel { border-top:1px solid var(--line); }
+ .composer { background:transparent; }
+ .composer textarea { border-radius:2px; background:var(--field-surface,var(--canvas)); }
+ .inboxHeader :global(.button), .composerActions :global(.button) { border:1px solid var(--border-strong); border-radius:2px; background:var(--surface-subtle); color:var(--text); font-weight:500; box-shadow:none; }
+ .inboxHeader :global(.button):hover:not(:disabled), .composerActions :global(.button):hover:not(:disabled) { background:var(--surface-raised); }
+}
+
+@media screen {
+ .threadIdentity h1, .state :is(h1,h2) { font-family:var(--font-display,Georgia,serif); font-weight:400; letter-spacing:-.025em; }
+}

@@ -35,7 +35,7 @@ execFileSync(process.execPath, [path.join(root, "scripts/security/account-transa
 ok(collections.includes("enabled: false") && collectionPage.includes("notFound()"), "Public Collections are not opt-in");
 ok(collectionPage.includes("getPublicInstruments(ownerId)") && publicInstruments.includes("visibility=eq.public") && publicInstruments.includes("ownerId"), "Collection public-only contract missing");
 ok(!collectionPage.includes("ownerUserEmail") && !collectionPage.includes("ownerEmail"), "Collection page references private email");
-ok(collectibleCard.includes("record.publicCollection") && card.includes("ownerCollection={record.publicCollection}") && card.includes("maxBadges={3}"), "Shared card owner attribution or badge limit missing");
+execFileSync(process.execPath, ["--test", "--test-name-pattern=^public card attribution ", path.join(root, "scripts/test-public-layout-contract.mjs")], { stdio: "inherit" });
 ok(collectibleCard.includes("presentation.serialNumber") && card.includes("RecordShareButton") && card.includes("collectible-card-gallery-controls"), "Card privacy or independent controls missing");
 ok(dashboard.includes("ActionDrawer") && dashboard.includes("dashboard.card.more") && dashboard.includes("QrDownload") && dashboard.includes("updateSerialVisibility"), "Owner card actions missing");
 ok(quickEdit.includes("beforeunload") && quickEdit.includes("Save Quick Edit") && quickEdit.includes("showSerialPublic") && quickEdit.includes("safetyStatus"), "Quick Edit contract missing");

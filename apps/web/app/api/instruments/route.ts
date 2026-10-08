@@ -8,6 +8,7 @@ import { readBoundedJsonBody } from "../../../lib/bounded-json-body";
 import { MAX_PROFILE_EDIT_JSON_BYTES, cleanProfileUploadId } from "../../../lib/profile-upload-protocol";
 import { isOwnedStagedPath, removeUnreferencedStagedUploads } from "../../../lib/staged-upload-cleanup";
 import { NextResponse } from "next/server";
+import { existingProfileSpecId } from "../../../lib/profile-metadata-preservation";
 import { randomInt, randomUUID } from "node:crypto";
 import type { User } from "@supabase/supabase-js";
 import { revalidatePath, unstable_noStore as noStore } from "next/cache";
@@ -29,6 +30,7 @@ import {
   profileLinkSpecLabel,
   profileLinksFromSpecs,
   sanitizePublicInstrument,
+  sanitizePublicInstrumentWithConfirmedOwnerNames,
   specValue
 } from "../../../lib/instrument-profile-contract";
 
@@ -102,7 +104,8 @@ type CreateInstrumentRequest = {
   };
 };
 
-type UpdateInstrumentRequest = Omit<CreateInstrumentRequest, "accountPlan"> & {
+type UpdateInstrumentRequest = Omit<CreateInstrumentRequest, "accountPlan" | "customFields"> & {
+  customFields?: Array<{ id?: string; label: string; value: string }>;
   qrCode: string;
   expectedUpdatedAt?: string;
   expectedDocuments?: Array<{ id: string; updatedAt: string }>;
@@ -180,6 +183,7 @@ type GuitarRow = {
   owner_removed_by?: string | null;
   owner_removed_reason?: string | null;
   created_at: string;
+  updated_at: string;
 };
 
 type GuitarMediaRow = {
@@ -1188,7 +1192,7 @@ async function loadRecordsForUser(
     readOwnerBatches<GuitarDocumentRow & { id: string; mime_type?: string | null }>(guitarIds, (ids, from, to) => supabase
       .from("guitar_documents")
       .select("id,guitar_id,name,storage_path,is_public,document_type,public_description,private_notes,issuer_source,document_date,description,file_size_bytes,mime_type,related_timeline_event_id,related_service_event_id,created_at,updated_at")
-      .in("guitar_id", ids).order("guitar_id").order("created_at").order("id").range(from, to), (row) => row.id),
+      .eq("retained_private", false).in("guitar_id", ids).order("guitar_id").order("created_at").order("id").range(from, to), (row) => row.id),
     readOwnerBatches<GuitarTimelineRow>(guitarIds, (ids, from, to) => supabase
       .from("guitar_timeline_events")
       .select("id,guitar_id,event_date,event_type,title,description,private_notes,shop_name,location,is_public,created_at,updated_at,date_precision,category,is_system,related_document_id,related_media_id,source_kind,provider_user_id,provider_display_name,provider_verified_at_snapshot,evidence_reviewed_at,service_submission_id,work_order_reference,parts_installed,setup_measurements,who_performed")
@@ -1232,6 +1236,7 @@ async function loadRecordsForUser(
       trust: trustByCode.get(guitar.qr_code.toUpperCase()), exposeInternalTrust: true,
       ownershipTransferCount: transferCounts.get(guitar.id) || 0
     });
+    instrument.updatedAt = guitar.updated_at;
     instrument.publicCollection = publicCollection;
     instrument.documentFiles = (documentsByGuitar.get(guitar.id) || []).map((document) => ({
       id: document.id,
@@ -1410,11 +1415,11 @@ export async function GET(request: Request) {
       if (!instrument) {
         return noStoreJson({ ok: false, message: "Instrument not found." } satisfies SupabaseReadResponse, { status: 404 });
       }
-      return noStoreJson({ ok: true, instrument: stripAnonymousInstrumentFields(instrument) } satisfies SupabaseReadResponse, { status: 200 });
+      return noStoreJson({ ok: true, instrument: sanitizePublicInstrumentWithConfirmedOwnerNames(instrument) } satisfies SupabaseReadResponse, { status: 200 });
     }
     const publicRecords = await getPublicInstruments();
     return noStoreJson(
-      { ok: true, instruments: publicRecords.map(sanitizePublicInstrument), count: publicRecords.length } satisfies SupabaseReadResponse,
+      { ok: true, instruments: publicRecords.map(sanitizePublicInstrumentWithConfirmedOwnerNames), count: publicRecords.length } satisfies SupabaseReadResponse,
       { status: 200 }
     );
   } catch {
@@ -1797,7 +1802,8 @@ export async function PATCH(request: Request) {
     }
     const customFields = (body.customFields || []).map((field) => {
       if (!field || typeof field !== "object") throw new ProfileSaveError("Invalid profile detail.");
-      return { label: String(field.label || "").trim(), value: String(field.value || "").trim() };
+      if (field.id !== undefined && !existingProfileSpecId(field.id)) throw new ProfileSaveError("Invalid profile detail identity.");
+      return { ...(field.id !== undefined ? { id: existingProfileSpecId(field.id) } : {}), label: String(field.label || "").trim(), value: String(field.value || "").trim() };
     }).filter((field) => field.label && field.value);
     if (customFields.length > 89 || customFields.some((field) => field.label.length > 200 || field.value.length > 10000)) {
       throw new ProfileSaveError("There are too many profile details, or a detail is too long.");
@@ -1842,7 +1848,7 @@ export async function PATCH(request: Request) {
       supabase.from("guitar_media").select("id,storage_path,alt,sort_order").eq("guitar_id", guitar.id),
       supabase.from("guitar_documents")
         .select("id,name,storage_path,is_public,document_type,public_description,private_notes,issuer_source,document_date,description,file_size_bytes,mime_type,related_timeline_event_id,related_service_event_id,updated_at")
-        .eq("guitar_id", guitar.id)
+        .eq("retained_private", false).eq("guitar_id", guitar.id)
     ]);
     if (mediaResult.error || documentsResult.error) {
       throw new ProfileSaveError("Could not read all existing photos and documents. No profile changes were saved.", 502);

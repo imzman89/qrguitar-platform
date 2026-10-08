@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { createBrowserSupabaseClient } from "../lib/supabase-browser";
 import styles from "./MessagesClient.module.css";
 
-export function StartConversation({ handle, profileCode }: { handle: string; profileCode: string }) {
+export function StartConversation({ handle, profileCode, transferId = "" }: { handle: string; profileCode: string; transferId?: string }) {
   const ui = useUiText("components.StartConversation");
   const router = useRouter();
   const [attempt, setAttempt] = useState(0);
@@ -25,7 +25,7 @@ export function StartConversation({ handle, profileCode }: { handle: string; pro
     let awaitingAuthRecovery = false, requestStarted = false;
     let unsubscribe: (() => void) | undefined;
     const controller = new AbortController();
-    const next = `/messages/new?member=${encodeURIComponent(handle)}${profileCode ? `&profile=${encodeURIComponent(profileCode)}` : ""}`;
+    const next = `/messages/new?member=${encodeURIComponent(handle)}${transferId ? `&transfer=${encodeURIComponent(transferId)}` : profileCode ? `&profile=${encodeURIComponent(profileCode)}` : ""}`;
     setError({ kind: "" });
 
     function stop(kind: "sessionChanged" | "timeout") {
@@ -101,7 +101,7 @@ export function StartConversation({ handle, profileCode }: { handle: string; pro
           headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
           cache: "no-store",
           signal: controller.signal,
-          body: JSON.stringify({ handle, profileCode })
+          body: JSON.stringify({ handle, profileCode: transferId ? "" : profileCode, ...(transferId ? { transferId } : {}) })
         }));
         check();
         const payload = await bounded(() => response.json()) as { ok?: boolean; conversationId?: string; message?: string } | null;
@@ -125,7 +125,7 @@ export function StartConversation({ handle, profileCode }: { handle: string; pro
       clearTimeout(timer);
       unsubscribe?.();
     };
-  }, [handle, profileCode, router, attempt]);
+  }, [handle, profileCode, transferId, router, attempt]);
 
   return <div className={styles.state}>
     {error.kind ? <MessageCircle /> : <LoaderCircle className={styles.spin} />}

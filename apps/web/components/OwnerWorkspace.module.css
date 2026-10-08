@@ -27,3 +27,19 @@
   .rail nav a { font-size: .8125rem; }
   .content h1 { max-width: none; font-size: 1.875rem; }
 }
+
+
+/* v30: quiet workspace navigation on the shared product canvas. */
+.workspace { padding-top:44px; }
+.layout { grid-template-columns:156px minmax(0,1fr); gap:48px; }
+.rail nav a { border-radius:0; font-family:var(--font-ui); font-size:12px; font-weight:400; }
+.rail nav a[aria-current="page"] { background:transparent; color:var(--text); box-shadow:inset 2px 0 0 var(--text); }
+.explore { padding-inline:12px; font-size:11px; }
+.mobileNav summary { min-height:44px; }
+.mobileNav nav { padding:8px 0; background:transparent; border-radius:0; border-block:1px solid var(--line); }
+@media(max-width:1050px) { .layout { grid-template-columns:140px minmax(0,1fr); gap:32px; } }
+@media(max-width:760px) { .workspace { padding-top:16px; }.layout { grid-template-columns:minmax(0,1fr); gap:24px; } }
+
+/* Consistent editorial page identity across collection, Create and account workspaces. */
+:global(body[data-product-theme]) .content h1 { font-family:var(--font-display); font-weight:400; font-size:clamp(36px,4vw,52px); line-height:1.08; letter-spacing:-.035em; }
+@media(max-width:760px) { :global(body[data-product-theme]) .content h1 { font-size:36px; } }

@@ -121,7 +121,13 @@ export function PhotoViewer({ images, initialIndex = 0, title, onClose, onImageE
           callbacksRef.current.onClose();
         } else if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
           event.preventDefault();
-          movePhoto(event.key === "ArrowRight" ? 1 : -1);
+          const direction = event.key === "ArrowRight" ? 1 : -1;
+          const thumbnailFocused = stripRef.current?.contains(document.activeElement);
+          movePhoto(direction);
+          if (thumbnailFocused && photos.length > 1) {
+            const nextIndex = (activeIndex + direction + photos.length) % photos.length;
+            stripRef.current?.querySelectorAll<HTMLButtonElement>("button")[nextIndex]?.focus({ preventScroll: true });
+          }
         } else if (event.key === "Tab" && dialogRef.current) {
           const controls = Array.from(dialogRef.current.querySelectorAll<HTMLButtonElement>("button:not([disabled])"));
           const first = controls[0];

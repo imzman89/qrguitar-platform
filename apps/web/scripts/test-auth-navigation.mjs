@@ -131,7 +131,7 @@ for (const component of ['Nav', 'Footer']) {
   test(component + ': published navigation/footer content still loads on mount', async () => {
     const published = { content: { 'global.navigation.dashboard': 'Published collection link', 'global.footer.description': 'Published collection description' }, composition: { footer: { sections: [] } } };
     const f = navigationFixture(component, { published: async () => published });
-    await f.flush(); assert.match(f.text(), /Published collection/); f.dispose();
+    await f.flush(); if (component === 'Nav') f.openAccount(); assert.match(f.text(), /Published collection/); f.dispose();
   });
   test(component + ': confirmed anonymous sign-in link preserves an app-local return path', async () => {
     const f = navigationFixture(component, { read: async () => result('') }); await f.flush();

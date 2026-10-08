@@ -85,12 +85,12 @@ const coreContentRegistry: ContentRegistryEntry[] = [
   field("global.shared.errorBody", "Global", "Shared CTAs and states", "Errors", "Default error message", "We could not complete that request. Please try again.", { maxLength: 180 }),
 
   field("home.hero.eyebrow", "Marketing", "Homepage", "Hero", "Eyebrow", "FOR OWNERS, SHOPS, BUILDERS & COLLECTORS", { maxLength: 80, previewPath: "/", classification: "editable-advanced", required: false, help: "Retained for saved-content compatibility. Not displayed on this page." }),
-  field("home.hero.headline", "Marketing", "Homepage", "Hero", "Headline", "One Profile for the life of an instrument.", { maxLength: 110, previewPath: "/" }),
-  field("home.hero.body", "Marketing", "Homepage", "Hero", "Body", "Photos, specs, and history in one permanent Profile.", { maxLength: 320, previewPath: "/" }),
+  field("home.hero.headline", "Marketing", "Homepage", "Hero", "Headline", "Keep the story with the instrument.", { maxLength: 110, previewPath: "/" }),
+  field("home.hero.body", "Marketing", "Homepage", "Hero", "Body", "Photos, specs and documented history in one permanent Profile. Keep it current through ownership, service and sale.", { maxLength: 320, previewPath: "/" }),
   field("home.hero.primaryCta", "Marketing", "Homepage", "Hero", "Primary action", "Create a Profile", { maxLength: 40, previewPath: "/" }),
   field("home.hero.secondaryCta", "Marketing", "Homepage", "Hero", "Secondary action", "Catalog", { maxLength: 50, previewPath: "/" }),
   field("home.hero.viewProfile", "Marketing", "Homepage", "Hero", "Real Profile action", "View Profile", { maxLength: 50, previewPath: "/" }),
-  field("home.hero.accessNote", "Marketing", "Homepage", "Hero", "Access note", "5 free Profiles · No subscription", { maxLength: 100, previewPath: "/" }),
+  field("home.hero.accessNote", "Marketing", "Homepage", "Hero", "Access note", "Profiles are always free. No Profile limit.", { maxLength: 100, previewPath: "/" }),
   field("home.lifecycle.eyebrow", "Marketing", "Homepage", "How it works", "Eyebrow", "HOW IT WORKS", { maxLength: 60, previewPath: "/", classification: "editable-advanced", required: false, help: "Retained for saved-content compatibility. Not displayed on this page." }),
   field("home.lifecycle.headline", "Marketing", "Homepage", "How it works", "Section headline", "How it works", { maxLength: 130, previewPath: "/" }),
   field("home.lifecycle.body", "Marketing", "Homepage", "How it works", "Section body", "Start with the instrument. Add the history as it happens.", { maxLength: 320, previewPath: "/", classification: "editable-advanced", required: false, help: "Retained for saved-content compatibility. Not displayed on this page." }),
@@ -98,17 +98,51 @@ const coreContentRegistry: ContentRegistryEntry[] = [
   field("home.anatomy.headline", "Marketing", "Homepage", "Profile anatomy", "Headline", "Inside a Profile", { maxLength: 100, previewPath: "/" }),
   field("home.anatomy.body", "Marketing", "Homepage", "Profile anatomy", "Body", "Photos, specs, service records, and documents.", { maxLength: 240, previewPath: "/" }),
   field("home.anatomy.cta", "Marketing", "Homepage", "Profile anatomy", "Action", "View Profile", { maxLength: 40, previewPath: "/" }),
-  field("home.roles.eyebrow", "Marketing", "Homepage", "Who uses QRguitar", "Eyebrow", "WHO USES QRGUITAR", { maxLength: 60, previewPath: "/", classification: "editable-advanced", required: false, help: "Retained for saved-content compatibility. Not displayed on this page." }),
-  field("home.roles.headline", "Marketing", "Homepage", "Who uses QRguitar", "Headline", "QRguitar tools", { maxLength: 100, previewPath: "/" }),
-  field("home.roles.body", "Marketing", "Homepage", "Who uses QRguitar", "Optional body", "", { maxLength: 220, required: false, previewPath: "/" }),
+  field("home.roles.eyebrow", "Marketing", "Homepage", "Who uses QRguitar", "Eyebrow", "WHO USES QRGUITAR", { maxLength: 60, previewPath: "/#audiences", required: false }),
+  field("home.roles.headline", "Marketing", "Homepage", "Who uses QRguitar", "Headline", "Useful now. Worth coming back to.", { maxLength: 100, previewPath: "/" }),
+  field("home.roles.body", "Marketing", "Homepage", "Who uses QRguitar", "Optional body", "Keep your collection organized. Record your work. Give every instrument you sell a continuing Profile.", { maxLength: 220, required: false, previewPath: "/" }),
+  field("home.roles.other", "Marketing", "Homepage", "Who uses QRguitar", "Additional role details", "Other ways to use QRguitar", { maxLength: 90, previewPath: "/#audiences" }),
+  field("home.roles.workflowCta", "Marketing", "Homepage", "Who uses QRguitar", "Secondary workflow action", "How it works", { maxLength: 50, previewPath: "/#audiences" }),
+  field("home.roles.workshop.startCta", "Marketing", "Homepage", "Shops & luthiers", "Primary setup action", "Set up your workshop", { maxLength: 60, previewPath: "/#audiences" }),
+  field("home.roles.business.startCta", "Marketing", "Homepage", "Brands & retailers", "Primary setup action", "Set up your business", { maxLength: 60, previewPath: "/#audiences" }),
+  field("home.roles.collection.label", "Marketing", "Homepage", "Players & collectors", "Selector label", "Players & collectors", { maxLength: 50, previewPath: "/#audiences" }),
+  field("home.roles.collection.headline", "Marketing", "Homepage", "Players & collectors", "Feature headline", "Your collection. More than a list.", { maxLength: 100, previewPath: "/#audiences" }),
+  field("home.roles.collection.body", "Marketing", "Homepage", "Players & collectors", "Introduction", "Give every instrument a place for its photos, specifications and documented history. Return when you buy, service, change or pass it on.", { maxLength: 260, previewPath: "/#audiences" }),
+  field("home.roles.collection.details", "Marketing", "Homepage", "Players & collectors", "More information label", "More for owners, collectors & buyers", { maxLength: 90, previewPath: "/#audiences" }),
+  field("home.roles.collection.feature1.title", "Marketing", "Homepage", "Players & collectors", "Capability 1 title", "Know what you own", { maxLength: 80, previewPath: "/#audiences" }),
+  field("home.roles.collection.feature1.body", "Marketing", "Homepage", "Players & collectors", "Capability 1 explanation", "Keep photos, specifications and documents together for each instrument, not scattered across folders.", { maxLength: 300, previewPath: "/#audiences" }),
+  field("home.roles.collection.feature2.title", "Marketing", "Homepage", "Players & collectors", "Capability 2 title", "Add the next chapter", { maxLength: 80, previewPath: "/#audiences" }),
+  field("home.roles.collection.feature2.body", "Marketing", "Homepage", "Players & collectors", "Capability 2 explanation", "Record modifications and service as they happen. Keep personal documents and detailed service reports private.", { maxLength: 300, previewPath: "/#audiences" }),
+  field("home.roles.collection.feature3.title", "Marketing", "Homepage", "Players & collectors", "Capability 3 title", "Keep the story with it", { maxLength: 80, previewPath: "/#audiences" }),
+  field("home.roles.collection.feature3.body", "Marketing", "Homepage", "Players & collectors", "Capability 3 explanation", "Hand the same Profile to the next owner. Choose which private documents follow instead of starting the record over.", { maxLength: 300, previewPath: "/#audiences" }),
+  field("home.roles.workshop.label", "Marketing", "Homepage", "Shops & luthiers", "Selector label", "Shops & luthiers", { maxLength: 50, previewPath: "/#audiences" }),
+  field("home.roles.workshop.headline", "Marketing", "Homepage", "Shops & luthiers", "Feature headline", "The work deserves a record.", { maxLength: 100, previewPath: "/#audiences" }),
+  field("home.roles.workshop.body", "Marketing", "Homepage", "Shops & luthiers", "Introduction", "Capture a visit, document what you did, and connect completed work to an instrument’s Profile for its owner to review.", { maxLength: 260, previewPath: "/#audiences" }),
+  field("home.roles.workshop.details", "Marketing", "Homepage", "Shops & luthiers", "More information label", "More for luthiers & technicians", { maxLength: 90, previewPath: "/#audiences" }),
+  field("home.roles.workshop.feature1.title", "Marketing", "Homepage", "Shops & luthiers", "Capability 1 title", "Start with a service slip", { maxLength: 80, previewPath: "/#audiences" }),
+  field("home.roles.workshop.feature1.body", "Marketing", "Homepage", "Shops & luthiers", "Capability 1 explanation", "Take intake notes and keep job details private—even when the instrument has no QRguitar Profile.", { maxLength: 300, previewPath: "/#audiences" }),
+  field("home.roles.workshop.feature2.title", "Marketing", "Homepage", "Shops & luthiers", "Capability 2 title", "Make the record useful", { maxLength: 80, previewPath: "/#audiences" }),
+  field("home.roles.workshop.feature2.body", "Marketing", "Homepage", "Shops & luthiers", "Capability 2 explanation", "Submit completed work for owner review. Detailed notes and attachments stay private unless shared.", { maxLength: 300, previewPath: "/#audiences" }),
+  field("home.roles.workshop.feature3.title", "Marketing", "Homepage", "Shops & luthiers", "Capability 3 title", "Build a repeatable workflow", { maxLength: 80, previewPath: "/#audiences" }),
+  field("home.roles.workshop.feature3.body", "Marketing", "Homepage", "Shops & luthiers", "Capability 3 explanation", "Reuse your slip settings and prepare sheet or thermal QR layouts for the next job.", { maxLength: 300, previewPath: "/#audiences" }),
+  field("home.roles.business.label", "Marketing", "Homepage", "Brands & retailers", "Selector label", "Brands & retailers", { maxLength: 50, previewPath: "/#audiences" }),
+  field("home.roles.business.headline", "Marketing", "Homepage", "Brands & retailers", "Feature headline", "The sale shouldn’t end the record.", { maxLength: 100, previewPath: "/#audiences" }),
+  field("home.roles.business.body", "Marketing", "Homepage", "Brands & retailers", "Introduction", "Create a Profile for each instrument in your inventory. Give buyers the photos, specifications and history you make public before a sale—and a secure handoff afterward.", { maxLength: 260, previewPath: "/#audiences" }),
+  field("home.roles.business.details", "Marketing", "Homepage", "Brands & retailers", "More information label", "More for retailers, builders & brands", { maxLength: 90, previewPath: "/#audiences" }),
+  field("home.roles.business.feature1.title", "Marketing", "Homepage", "Brands & retailers", "Capability 1 title", "Give inventory an identity", { maxLength: 80, previewPath: "/#audiences" }),
+  field("home.roles.business.feature1.body", "Marketing", "Homepage", "Brands & retailers", "Capability 1 explanation", "Create or import instrument Profiles and bring them together in a collection with your business identity.", { maxLength: 300, previewPath: "/#audiences" }),
+  field("home.roles.business.feature2.title", "Marketing", "Homepage", "Brands & retailers", "Capability 2 title", "Put the instrument behind the QR", { maxLength: 80, previewPath: "/#audiences" }),
+  field("home.roles.business.feature2.body", "Marketing", "Homepage", "Brands & retailers", "Capability 2 explanation", "Prepare individual or mixed QR labels that open that instrument’s Profile—not a generic product page.", { maxLength: 300, previewPath: "/#audiences" }),
+  field("home.roles.business.feature3.title", "Marketing", "Homepage", "Brands & retailers", "Capability 3 title", "Keep a useful connection", { maxLength: 80, previewPath: "/#audiences" }),
+  field("home.roles.business.feature3.body", "Marketing", "Homepage", "Brands & retailers", "Capability 3 explanation", "Transfer the same Profile to the buyer. Offer messaging or warranty assistance only if your business enables it.", { maxLength: 300, previewPath: "/#audiences" }),
   field("home.pricing.eyebrow", "Marketing", "Homepage", "Access", "Eyebrow", "PROFILE ACCESS", { maxLength: 60, previewPath: "/" }),
-  field("home.pricing.headline", "Marketing", "Homepage", "Access", "Pricing headline", "Start free. Get help when you need it.", { maxLength: 100, previewPath: "/" }),
-  field("home.pricing.body", "Marketing", "Homepage", "Access", "Optional body", "", { maxLength: 260, required: false, previewPath: "/" }),
-  field("home.pricing.creditsTitle", "Marketing", "Homepage", "Access", "Additional credits heading", "More room, when you need it.", { maxLength: 100, previewPath: "/#pricing" }),
-  field("home.pricing.creditsBody", "Marketing", "Homepage", "Access", "Additional credits explanation", "Additional permanent Profile credits are available separately from assisted setup services. Ownership transfers are free.", { maxLength: 320, previewPath: "/#pricing" }),
-  field("home.pricing.creditsCta", "Marketing", "Homepage", "Access", "Additional credits action", "View Profile credits", { maxLength: 50, previewPath: "/#pricing" }),
-  field("home.finalCta.headline", "Marketing", "Homepage", "Closing action", "Headline", "Create a Profile", { maxLength: 120, previewPath: "/" }),
-  field("home.finalCta.body", "Marketing", "Homepage", "Closing action", "Body", "Create the Profile now. Add the rest over time.", { maxLength: 180, previewPath: "/", classification: "editable-advanced", required: false, help: "Retained for saved-content compatibility. Not displayed on this page." }),
+  field("home.pricing.headline", "Marketing", "Homepage", "Access", "Pricing headline", "Free Profiles. Optional expertise.", { maxLength: 100, previewPath: "/" }),
+  field("home.pricing.body", "Marketing", "Homepage", "Access", "Optional body", "Create and maintain Profiles for free. Verification and authentication are optional paid services.", { maxLength: 260, required: false, previewPath: "/" }),
+  field("home.pricing.creditsTitle", "Marketing", "Homepage", "Access", "Additional credits heading", "Optional expert reviews", { maxLength: 100, previewPath: "/#pricing" }),
+  field("home.pricing.creditsBody", "Marketing", "Homepage", "Access", "Additional credits explanation", "Profiles are always free, without a count limit. Verification and authentication are separate optional paid services.", { maxLength: 320, previewPath: "/#pricing" }),
+  field("home.pricing.creditsCta", "Marketing", "Homepage", "Access", "Additional credits action", "Explore optional services", { maxLength: 50, previewPath: "/#pricing" }),
+  field("home.finalCta.headline", "Marketing", "Homepage", "Closing action", "Headline", "Start with the instrument you know best.", { maxLength: 120, previewPath: "/" }),
+  field("home.finalCta.body", "Marketing", "Homepage", "Closing action", "Body", "Add the photos and details you have today. Keep building the record as its story continues.", { maxLength: 180, previewPath: "/", classification: "editable-advanced", required: false, help: "Retained for saved-content compatibility. Not displayed on this page." }),
   field("home.finalCta.eyebrow", "Marketing", "Homepage", "Closing action", "Optional eyebrow", "", { maxLength: 70, required: false, previewPath: "/" }),
   field("home.finalCta.primaryCta", "Marketing", "Homepage", "Closing action", "Primary action", "Create a Profile", { maxLength: 40, previewPath: "/" }),
   field("home.finalCta.secondaryCta", "Marketing", "Homepage", "Closing action", "Secondary action", "Catalog", { maxLength: 40, previewPath: "/" }),
@@ -123,7 +157,7 @@ const coreContentRegistry: ContentRegistryEntry[] = [
 
   field("howItWorks.hero.eyebrow", "Marketing", "How It Works", "Hero", "Eyebrow", "HOW QRGUITAR WORKS", { maxLength: 70, previewPath: "/how-it-works" }),
   field("howItWorks.hero.headline", "Marketing", "How It Works", "Hero", "Headline", "One Profile that stays with the instrument.", { maxLength: 110, previewPath: "/how-it-works" }),
-  field("howItWorks.hero.body", "Marketing", "How It Works", "Hero", "Body", "Create it once. Keep the photos, specifications, service, documents, and ownership history current as the instrument changes.", { maxLength: 280, previewPath: "/how-it-works" }),
+  field("howItWorks.hero.body", "Marketing", "How It Works", "Hero", "Body", "Profiles are always free, without a count limit. Keep photos, specifications and documented history current as the instrument changes. Verification and authentication are separate optional paid reviews.", { maxLength: 280, previewPath: "/how-it-works" }),
   field("howItWorks.lifecycle.serialHelp", "Marketing", "How It Works", "Instrument lifecycle", "Serial number guidance", "No Serial Number? Select ‘This instrument has no Serial Number’ when creating the Profile. QRguitar assigns its permanent ID.", { maxLength: 260, previewPath: "/how-it-works" }),
   field("howItWorks.lifecycle.create.title", "Marketing", "How It Works", "Instrument lifecycle", "Create step title", "Create the Profile", { maxLength: 70, previewPath: "/how-it-works" }),
   field("howItWorks.lifecycle.create.body", "Marketing", "How It Works", "Instrument lifecycle", "Create step body", "Add one real photo and the instrument details you know. A permanent QRguitar ID is assigned when no Serial Number is available.", { maxLength: 300, previewPath: "/how-it-works" }),
@@ -181,9 +215,9 @@ const coreContentRegistry: ContentRegistryEntry[] = [
   field("edit.hero.headline", "Product", "Edit Profile", "Header", "Headline", "Edit Profile", { maxLength: 90, previewPath: "/dashboard" }),
   field("edit.save.success", "Product", "Edit Profile", "Feedback", "Save success", "Profile saved.", { maxLength: 80 }),
   field("bulkImport.hero.headline", "Product", "Bulk Import", "Header", "Headline", "Bulk Import", { maxLength: 90, previewPath: "/dashboard" }),
-  field("bulkImport.hero.body", "Product", "Bulk Import", "Header", "Body", "Add inventory from a CSV, TSV, or pasted spreadsheet. Incomplete rows stay drafts. New Profiles start Private.", { maxLength: 260, previewPath: "/dashboard" }),
+  field("bulkImport.hero.body", "Product", "Bulk Import", "Header", "Body", "Add inventory from a CSV, TSV, or pasted spreadsheet. Incomplete rows stay drafts. Saved instruments and photos appear in Catalog.", { maxLength: 260, previewPath: "/dashboard" }),
   field("account.hero.headline", "Product", "Account", "Header", "Headline", "Account", { maxLength: 90, previewPath: "/account" }),
-  field("account.hero.body", "Product", "Account", "Header", "Body", "Manage your account settings.", { maxLength: 220, previewPath: "/account" }),
+  field("account.hero.body", "Product", "Account", "Header", "Body", "Manage your identity, collection, account access and privacy.", { maxLength: 220, previewPath: "/account" }),
   field("collections.hero.headline", "Product", "Public Collections", "Header", "Headline", "A collection worth sharing", { maxLength: 100, previewPath: "/account?section=collection" }),
   field("profile.help.identity", "Product", "Public Profile", "Identity", "Identity helper", "The QRguitar ID and permanent URL stay with this Profile for life.", { maxLength: 180, previewPath: "/catalog" }),
   field("printWorkspace.scanInstruction", "Product", "Print Workspace", "Handout", "Scan instruction", "Scan to open the permanent QRguitar Profile.", { maxLength: 120, previewPath: "/dashboard" }),
@@ -223,7 +257,7 @@ const coreContentRegistry: ContentRegistryEntry[] = [
 ];
 
 const completionRegistry: ContentRegistryEntry[] = [
-  field("global.announcement.text", "Global", "Announcement", "Banner", "Announcement text", "Start with five free QRguitar Profiles.", { maxLength: 160, previewPath: "/" }),
+  field("global.announcement.text", "Global", "Announcement", "Banner", "Announcement text", "QRguitar Profiles are always free.", { maxLength: 160, previewPath: "/" }),
   field("global.announcement.cta", "Global", "Announcement", "Banner", "Action label", "Learn how it works", { maxLength: 40, previewPath: "/how-it-works" }),
   field("global.shared.loadingBody", "Global", "Shared CTAs and states", "Loading", "Loading message", "Loading QRguitar…", { maxLength: 90 }),
   field("global.shared.successBody", "Global", "Shared CTAs and states", "Success", "Success message", "Your changes were saved.", { maxLength: 120 }),
@@ -238,10 +272,10 @@ const completionRegistry: ContentRegistryEntry[] = [
   field("home.lifecycle.step3.body", "Marketing", "Homepage", "How it works", "Step three body", "Transfer the same Profile when the instrument changes hands.", { maxLength: 180, previewPath: "/" }),
   field("pricing.beta.title", "Marketing", "Pricing", "Access", "Plan title", "For owners and collectors", { maxLength: 70, previewPath: "/" }),
   field("pricing.beta.price", "Marketing", "Pricing", "Access", "Price", "Free", { maxLength: 30, previewPath: "/" }),
-  field("pricing.beta.body", "Marketing", "Pricing", "Access", "Description", "Create up to 5 Profiles with photos, specifications, privacy controls, history, and downloadable QR codes.", { maxLength: 220, previewPath: "/" }),
-  field("pricing.commercial.title", "Marketing", "Pricing", "Commercial", "Plan title", "For shops, builders & brands", { maxLength: 80, previewPath: "/" }),
+  field("pricing.beta.body", "Marketing", "Pricing", "Access", "Description", "Create and maintain Profiles without a count limit, with photos, specifications, privacy controls, history and downloadable QR codes.", { maxLength: 220, previewPath: "/" }),
+  field("pricing.commercial.title", "Marketing", "Pricing", "Commercial", "Plan title", "Optional assisted setup", { maxLength: 80, previewPath: "/" }),
   field("pricing.commercial.price", "Marketing", "Pricing", "Commercial", "Price", "From $99", { maxLength: 30, previewPath: "/" }),
-  field("pricing.commercial.body", "Marketing", "Pricing", "Commercial", "Description", "Need help with bulk setup, QR hardware, verification, or a commercial rollout? We'll help you get started.", { maxLength: 240, previewPath: "/" }),
+  field("pricing.commercial.body", "Marketing", "Pricing", "Commercial", "Description", "Business Profiles are always free. Optional assisted setup covers bulk onboarding, QR hardware and print support. Verification and authentication are separate paid reviews.", { maxLength: 240, previewPath: "/" }),
   field("installers.hero.eyebrow", "Marketing", "Installers", "Hero", "Eyebrow", "FOR SHOPS & SERVICE PROVIDERS", { maxLength: 60, previewPath: "/installers" }),
   field("installers.hero.headline", "Marketing", "Installers", "Hero", "Headline", "Turn service work into a Profile customers keep.", { maxLength: 100, previewPath: "/installers" }),
   field("installers.hero.body", "Marketing", "Installers", "Hero", "Body", "Create or update QRguitar Profiles with owner approval, add documented service, print scannable handouts, and help every instrument leave your shop with a clearer history.", { maxLength: 260, previewPath: "/installers" }),
@@ -407,13 +441,13 @@ const completionRegistry: ContentRegistryEntry[] = [
   field("terms.sections.ids.heading", "Support & Legal", "Terms", "Identity", "Heading", "QRguitar IDs and Profile URLs", { maxLength: 100, previewPath: "/terms" }),
   field("terms.sections.ids.body", "Support & Legal", "Terms", "Identity", "Body", "QRguitar IDs and Profile URLs are designed to remain associated with the instrument as Profile details change. Availability can still depend on third-party networks, browsers, storage, and hosting services.", { maxLength: 700, previewPath: "/terms" }),
   field("terms.sections.verification.heading", "Support & Legal", "Terms", "Verification", "Heading", "Verification and authenticity", { maxLength: 100, previewPath: "/terms" }),
-  field("terms.sections.verification.body", "Support & Legal", "Terms", "Verification", "Body", "QRguitar may verify a Profile after reviewing its details at no charge. Authenticity confirmation is a separate paid staff review; it is never automatic with a free Profile. Both reflect only the evidence available at the time and are not an appraisal, insurance guarantee, guarantee of condition, or guarantee against undisclosed changes.", { maxLength: 700, previewPath: "/terms" }),
+  field("terms.sections.verification.body", "Support & Legal", "Terms", "Verification", "Body", "Verification and authentication are separate optional paid evidence reviews. Neither is automatic with a free Profile. Both reflect only the evidence available at the time and are not an appraisal, insurance guarantee, guarantee of condition, or guarantee against undisclosed changes.", { maxLength: 700, previewPath: "/terms" }),
   field("terms.sections.ownership.heading", "Support & Legal", "Terms", "Safety and ownership", "Heading", "Safety and ownership", { maxLength: 100, previewPath: "/terms" }),
   field("terms.sections.ownership.body", "Support & Legal", "Terms", "Safety and ownership", "Body", "Lost or stolen reports must be truthful. Ownership transfers and claims must be submitted by authorized people. QRguitar tools do not replace legal title, receipts, or independent due diligence. Abuse, fraud, impersonation, or infringing uploads may result in account restrictions.", { maxLength: 700, previewPath: "/terms" }),
   field("terms.sections.beta.heading", "Support & Legal", "Terms", "Access", "Heading", "Access and paid services", { maxLength: 100, previewPath: "/terms" }),
   field("terms.sections.beta.body", "Support & Legal", "Terms", "Access", "Body", "Features, limits, and paid services may change. No checkout or payment flow is live unless it is clearly presented inside the product when you use it.", { maxLength: 700, previewPath: "/terms" }),
-  field("terms.sections.payments.heading", "Support & Legal", "Terms", "Payments", "Heading", "Profile credits and payments", { maxLength: 100, previewPath: "/terms" }),
-  field("terms.sections.payments.body", "Support & Legal", "Terms", "Payments", "Body", "Ordinary accounts include 5 free owned Profiles. Any additional Profile-credit pack shown at checkout is a one-time purchase in U.S. dollars, not a subscription. Unused purchased credits do not expire and Profile transfers are free. PayPal processes the payment. A refund, reversal, or dispute may place related paid credits under review; contact support for payment help and any refund request.", { maxLength: 700, previewPath: "/terms" }),
+  field("terms.sections.payments.heading", "Support & Legal", "Terms", "Payments", "Heading", "Free Profiles and optional paid services", { maxLength: 100, previewPath: "/terms" }),
+  field("terms.sections.payments.body", "Support & Legal", "Terms", "Payments", "Body", "Creating and maintaining basic QRguitar Profiles and ownership transfers are free, without a Profile-count limit. Verification and authentication are optional paid services and are not included automatically. Any offered service price and payment terms must be shown before you agree. Earlier payment records and unused purchased credits remain on your account; contact QRguitar about an earlier payment or credit.", { maxLength: 700, previewPath: "/terms" }),
   field("terms.sections.support.heading", "Support & Legal", "Terms", "Support", "Heading", "Support", { maxLength: 100, previewPath: "/terms" }),
   field("terms.sections.support.body", "Support & Legal", "Terms", "Support", "Body", "Questions about these terms can be sent to support@qrguitar.com.", { maxLength: 300, previewPath: "/terms" })
 ];
@@ -608,106 +642,441 @@ export const defaultContentValues: Record<string, string> = Object.fromEntries(
 );
 
 const legacyContentDefaults: Record<string, string[]> = {
-  "ui.app.site.editor.page.emailDeliveryBoundary": ["Only Service / Submitted is sent by the application. Supabase owns password-reset and transfer sign-in delivery; the remaining templates are design previews with no production trigger."],
-  "ui.app.site.editor.page.downloadEmailSetupExport": ["Download setup export"],
-  "ui.app.account.page.b7d24faecb5a": ["Email currently covers account confirmation and recovery, transfer sign-in invitations, and service work ready for owner review. Other workflow updates stay in QRguitar; PayPal handles its own payment notices."],
-  "ui.app.account.page.c9aae06952ae": ["Connected QRguitar email"],
-  "ui.app.account.page.92c1cdfdf4cb": ["Service owner review"],
-  "global.brand.tagline": ["Permanent QRguitar Profiles for instruments, builders, shops, collectors, and future owners."],
-  "global.navigation.create": ["Create"],
-  "global.footer.description": ["Permanent QRguitar Profiles for instruments, builders, shops, collectors, and future owners."],
-  "home.hero.eyebrow": ["Permanent identity for instruments"],
-  "home.hero.headline": ["Every instrument has a story. Keep it connected."],
-  "home.hero.body": ["Create a permanent QRguitar Profile with photos, specifications, service history, ownership records, and a QR code that stays with the instrument."],
-  "home.hero.primaryCta": ["Create Profile"],
-  "home.hero.secondaryCta": ["Browse QRguitar Profiles"],
-  "home.pricing.eyebrow": ["PUBLIC BETA"],
-  "pricing.beta.price": ["$0 during public beta"],
-  "pricing.beta.body": ["Create up to 25 Profiles during public beta without a hard paywall."],
-  "global.announcement.text": ["Free QRguitar Profiles are available during public beta."],
-  "terms.hero.intro": ["QRguitar is currently in public beta. These terms explain the basic rules for creating, managing, sharing, and transferring QRguitar Profiles."],
-  "terms.sections.verification.body": ["Verification and authenticity review reflect the evidence available at the time. They are not an appraisal, insurance guarantee, guarantee of condition, or guarantee against undisclosed changes."],
-  "terms.sections.beta.heading": ["Beta and paid services"],
-  "terms.sections.beta.body": ["QRguitar is in public beta. Features, limits, and paid services may change. No checkout or payment flow is live unless it is clearly presented inside the product when you use it."],
-  "ui.app.edit.code.page.d7b92d4468d9": ["Verified Profiles are available with paid QRguitar verification. Paid verification is handled manually during beta."],
-  "ui.app.edit.code.page.9572b2a7a2c2": ["Authenticity confirmation is available as a paid review feature. Paid verification and authenticity review are handled manually during beta."],
-  "ui.app.edit.code.page.61008da8ad24": ["/10 files. Private documents can support QRguitar verification and authenticity review during beta."],
-  "ui.app.i.code.ProfileClient.2fb69e84e91b": ["Ownership tools are in beta"],
-  "ui.app.installers.page.f6d3c70532d2": ["Applications are reviewed manually during beta. QRguitar connects approved shops and owners manually, and applying never publishes your business automatically."],
-  "ui.app.account.page.e16273f1c0f6": ["Required account and ownership notices cannot be disabled during public beta."],
-  "home.roles.body": ["Choose the view that matches how you work with instruments."],
-  "home.lifecycle.headline": ["Start with the instrument. Build the history over time."],
-  "home.lifecycle.body": ["Add the facts you know today, then keep photos, service, documents, and ownership connected as the instrument changes hands."],
-  "home.pricing.headline": ["Free Profiles during public beta."],
+  "ui.app.dashboard.page.b90f83fb529f": ["Recipient not email-bound"],
+  "ui.components.OwnerNameConsentSection.empty": ["You have no eligible outgoing ownership events."],
+  "ui.app.edit.code.page.4e2bce183e1c": [
+    "Checking your Supabase session now."
+  ],
+  "ui.app.i.code.ProfileClient.cca6a9866dcc": [
+    "Owner preview."
+  ],
+  "ui.components.RecordedBusinessSupport.optedOut": [
+    "This business is not currently offering messaging or warranty assistance here."
+  ],
+  "pricing.commercial.title": [
+    "For shops, builders & brands"
+  ],
+  "pricing.commercial.body": [
+    "Need help with bulk setup, QR hardware, verification, or a commercial rollout? We'll help you get started."
+  ],
+  "home.pricing.creditsTitle": [
+    "More room, when you need it."
+  ],
+  "home.pricing.creditsBody": [
+    "Additional permanent Profile credits are available separately from assisted setup services. Ownership transfers are free."
+  ],
+  "ui.app.billing.DirectBillingPage.49f78ed770a3": [
+    "Your first 5 Profiles are free."
+  ],
+  "ui.app.billing.PayPalBillingPage.8d419aec5796": [
+    "5 free Profiles. More when you need them."
+  ],
+  "ui.app.billing.PayPalBillingPage.c3e79710e32a": [
+    "No subscription · Credits never expire · Free transfers"
+  ],
+  "ui.app.billing.PayPalBillingPage.49f78ed770a3": [
+    "Your first 5 Profiles are free."
+  ],
+  "ui.app.billing.PayPalBillingPage.6f48f1936e50": [
+    "Sign in to see your balance and add more when you need them."
+  ],
+  "ui.app.billing.PayPalBillingPage.40f0dbe67eec": [
+    "Existing Profiles and your remaining free allowance are still available."
+  ],
+  "ui.app.billing.PayPalBillingPage.5359c45c4e88": [
+    "Add another Profile pack"
+  ],
+  "ui.app.billing.PayPalBillingPage.7fc165e69dac": [
+    "Your free Profiles and existing credits are ready to use."
+  ],
+  "ui.app.billing.PayPalBillingPage.fcf8710aef5c": [
+    "Each credit creates one additional Profile after your 5 free Profiles. Unused paid credits never expire."
+  ],
+  "home.hero.accessNote": [
+    "5 free Profiles · No subscription",
+    "Profiles are always free"
+  ],
+  "home.pricing.creditsCta": [
+    "View Profile credits"
+  ],
+  "global.announcement.text": [
+    "Start with five free QRguitar Profiles.",
+    "Free QRguitar Profiles are available during public beta."
+  ],
+  "terms.sections.payments.heading": [
+    "Profile credits and payments"
+  ],
+  "terms.sections.payments.body": [
+    "Ordinary accounts include 5 free owned Profiles. Any additional Profile-credit pack shown at checkout is a one-time purchase in U.S. dollars, not a subscription. Unused purchased credits do not expire and Profile transfers are free. PayPal processes the payment. A refund, reversal, or dispute may place related paid credits under review; contact support for payment help and any refund request."
+  ],
+  "ui.app.site.editor.page.emailDeliveryBoundary": [
+    "Only Service / Submitted is sent by the application. Supabase owns password-reset and transfer sign-in delivery; the remaining templates are design previews with no production trigger."
+  ],
+  "ui.app.site.editor.page.downloadEmailSetupExport": [
+    "Download setup export"
+  ],
+  "ui.app.account.page.b7d24faecb5a": [
+    "Email currently covers account confirmation and recovery, transfer sign-in invitations, and service work ready for owner review. Other workflow updates stay in QRguitar; PayPal handles its own payment notices."
+  ],
+  "ui.app.account.page.c9aae06952ae": [
+    "Connected QRguitar email"
+  ],
+  "ui.app.account.page.92c1cdfdf4cb": [
+    "Service owner review"
+  ],
+  "global.brand.tagline": [
+    "Permanent QRguitar Profiles for instruments, builders, shops, collectors, and future owners."
+  ],
+  "global.navigation.create": [
+    "Create"
+  ],
+  "global.footer.description": [
+    "Permanent QRguitar Profiles for instruments, builders, shops, collectors, and future owners."
+  ],
+  "home.hero.eyebrow": [
+    "Permanent identity for instruments"
+  ],
+  "home.hero.headline": [
+    "Every instrument has a story. Keep it connected.",
+    "One Profile for the life of an instrument."
+  ],
+  "home.hero.body": [
+    "Create a permanent QRguitar Profile with photos, specifications, service history, ownership records, and a QR code that stays with the instrument.",
+    "Photos, specs, and history in one permanent Profile.",
+    "Keep the photos, specs, service, documents, ownership, and permanent QR with the instrument."
+  ],
+  "home.hero.primaryCta": [
+    "Create Profile"
+  ],
+  "home.hero.secondaryCta": [
+    "Browse QRguitar Profiles"
+  ],
+  "home.pricing.eyebrow": [
+    "PUBLIC BETA"
+  ],
+  "pricing.beta.price": [
+    "$0 during public beta"
+  ],
+  "pricing.beta.body": [
+    "Create up to 5 Profiles with photos, specifications, privacy controls, history, and downloadable QR codes.",
+    "Create up to 25 Profiles during public beta without a hard paywall."
+  ],
+  "terms.hero.intro": [
+    "QRguitar is currently in public beta. These terms explain the basic rules for creating, managing, sharing, and transferring QRguitar Profiles."
+  ],
+  "terms.sections.verification.body": [
+    "QRguitar may verify a Profile after reviewing its details at no charge. Authenticity confirmation is a separate paid staff review; it is never automatic with a free Profile. Both reflect only the evidence available at the time and are not an appraisal, insurance guarantee, guarantee of condition, or guarantee against undisclosed changes.",
+    "Verification and authenticity review reflect the evidence available at the time. They are not an appraisal, insurance guarantee, guarantee of condition, or guarantee against undisclosed changes."
+  ],
+  "terms.sections.beta.heading": [
+    "Beta and paid services"
+  ],
+  "terms.sections.beta.body": [
+    "QRguitar is in public beta. Features, limits, and paid services may change. No checkout or payment flow is live unless it is clearly presented inside the product when you use it."
+  ],
+  "ui.app.edit.code.page.d7b92d4468d9": [
+    "After you add a Profile, QRguitar may verify its details at no charge when the information is sufficient. Verification does not confirm authenticity.",
+    "Verified Profiles are available with paid QRguitar verification. Paid verification is handled manually during beta."
+  ],
+  "ui.app.edit.code.page.9572b2a7a2c2": [
+    "Authenticity confirmation is available as a paid review feature. Paid verification and authenticity review are handled manually during beta."
+  ],
+  "ui.app.edit.code.page.61008da8ad24": [
+    "/10 files. Private documents can support QRguitar verification and authenticity review during beta."
+  ],
+  "ui.app.i.code.ProfileClient.2fb69e84e91b": [
+    "Ownership tools are in beta"
+  ],
+  "ui.app.installers.page.f6d3c70532d2": [
+    "Applications are reviewed manually during beta. QRguitar connects approved shops and owners manually, and applying never publishes your business automatically."
+  ],
+  "ui.app.account.page.e16273f1c0f6": [
+    "Required account and ownership notices cannot be disabled during public beta."
+  ],
+  "home.roles.body": [
+    "Choose the view that matches how you work with instruments."
+  ],
+  "home.lifecycle.headline": [
+    "Start with the instrument. Build the history over time."
+  ],
+  "home.lifecycle.body": [
+    "Add the facts you know today, then keep photos, service, documents, and ownership connected as the instrument changes hands."
+  ],
+  "home.pricing.headline": [
+    "Start free. Get help when you need it.",
+    "Free Profiles during public beta."
+  ],
   "home.pricing.body": [
+    "",
     "Create and maintain QRguitar Profiles without a hard paywall while the registry grows. Paid help is available separately.",
     "Start with five free Profiles, or ask QRguitar for hands-on commercial setup."
   ],
-  "home.finalCta.headline": ["Give the next instrument a permanent place to live."],
-  "home.finalCta.body": ["Create a Profile in minutes and keep improving it for years."],
-  "home.finalCta.eyebrow": ["Ready when the instrument is", "READY TO BEGIN"],
-  "home.finalCta.primaryCta": ["Create Profile"],
-  "home.finalCta.secondaryCta": ["Browse Profiles"],
-  "home.archive.eyebrow": ["The living archive"],
-  "home.archive.heading": ["Explore the archive"],
-  "home.continuity.eyebrow": ["History that stays useful"],
-  "home.continuity.headline": ["One Profile, through the work and every handoff."],
-  "home.continuity.body": ["QRguitar keeps the instrument's identity connected while owners decide which service, documents, and history become public."],
-  "home.continuity.cta": ["See the full workflow"],
-  "howItWorks.hero.eyebrow": ["How QRguitar works"],
-  "howItWorks.hero.headline": ["One permanent Profile for every instrument."],
-  "howItWorks.hero.body": ["Create or find a QRguitar Profile, add the instrument's identity and history, then keep it connected through every owner."],
-  "howItWorks.lifecycle.heading": ["A Profile that grows with the instrument"],
-  "howItWorks.features.heading": ["Keep the useful details together"],
-  "howItWorks.privacy.heading": ["You control what the public can see"],
-  "howItWorks.roles.heading": ["Built for players, collectors, shops, and builders"],
-  "catalog.hero.eyebrow": ["The Catalog"],
-  "catalog.hero.headline": ["Browse QRguitar Profiles"],
-  "catalog.hero.body": ["Explore QRguitar Profiles by brand, category, trust status, availability, and history."],
-  "catalog.empty.body": ["Clear a filter or search for another instrument."],
-  "catalog.results.all": ["{count} Public Profiles"],
-  "catalog.actions.reset": ["Reset filters"],
-  "profile.tabs.specifications": ["Specifications"],
-  "dashboard.hero.headline": ["Owner dashboard"],
+  "home.finalCta.headline": [
+    "Give the next instrument a permanent place to live.",
+    "Create a Profile"
+  ],
+  "home.finalCta.body": [
+    "Create a Profile in minutes and keep improving it for years.",
+    "Create the Profile now. Add the rest over time."
+  ],
+  "home.finalCta.eyebrow": [
+    "Ready when the instrument is",
+    "READY TO BEGIN"
+  ],
+  "home.finalCta.primaryCta": [
+    "Create Profile"
+  ],
+  "home.finalCta.secondaryCta": [
+    "Browse Profiles"
+  ],
+  "home.archive.eyebrow": [
+    "The living archive"
+  ],
+  "home.archive.heading": [
+    "Explore the archive"
+  ],
+  "home.continuity.eyebrow": [
+    "History that stays useful"
+  ],
+  "home.continuity.headline": [
+    "One Profile, through the work and every handoff."
+  ],
+  "home.continuity.body": [
+    "QRguitar keeps the instrument's identity connected while owners decide which service, documents, and history become public."
+  ],
+  "home.continuity.cta": [
+    "See the full workflow"
+  ],
+  "howItWorks.hero.eyebrow": [
+    "How QRguitar works"
+  ],
+  "howItWorks.hero.headline": [
+    "One permanent Profile for every instrument."
+  ],
+  "howItWorks.hero.body": [
+    "Create or find a QRguitar Profile, add the instrument's identity and history, then keep it connected through every owner.",
+    "Create it once. Keep the photos, specifications, service, documents, and ownership history current as the instrument changes."
+  ],
+  "howItWorks.lifecycle.heading": [
+    "A Profile that grows with the instrument"
+  ],
+  "howItWorks.features.heading": [
+    "Keep the useful details together"
+  ],
+  "howItWorks.privacy.heading": [
+    "You control what the public can see"
+  ],
+  "howItWorks.roles.heading": [
+    "Built for players, collectors, shops, and builders"
+  ],
+  "catalog.hero.eyebrow": [
+    "The Catalog"
+  ],
+  "catalog.hero.headline": [
+    "Browse QRguitar Profiles"
+  ],
+  "catalog.hero.body": [
+    "Explore QRguitar Profiles by brand, category, trust status, availability, and history."
+  ],
+  "catalog.empty.body": [
+    "Clear a filter or search for another instrument."
+  ],
+  "catalog.results.all": [
+    "{count} Public Profiles"
+  ],
+  "catalog.actions.reset": [
+    "Reset filters"
+  ],
+  "profile.tabs.specifications": [
+    "Specifications"
+  ],
+  "dashboard.hero.headline": [
+    "Owner dashboard"
+  ],
   "dashboard.hero.body": [
     "Manage your Profiles, photos, documents, visibility, QR downloads, service, and ownership tools.",
     "Manage Profiles, photos, privacy, service, ownership, QR downloads, and print materials.",
     "Manage profiles, photos, documents, visibility, and QR downloads from your dashboard."
   ],
-  "dashboard.actions.create": ["Create a Profile"],
-  "dashboard.actions.claims": ["Claim Center"],
-  "dashboard.collection.title": ["Your collection"],
-  "account.hero.headline": ["Your QRguitar account"],
-  "account.hero.body": ["Manage your profile, security, collection identity, and account preferences in one place."],
-  "claimCenter.hero.headline": ["Claim an instrument Profile safely"],
-  "claimCenter.hero.body": ["Choose the situation that matches how you received the instrument. QR scans and Serial Numbers identify Profiles; they never prove ownership by themselves."],
-  "create.hero.headline": ["Create a QRguitar Profile"],
-  "create.hero.body": ["Start with the instrument identity and at least one real photo. You can add service, documents, and ownership history later."],
-  "create.serial.help": ["When provided, the Serial Number becomes the readable suffix of the QRguitar ID. Without one, QRguitar assigns a unique permanent ID."],
-  "create.photo.help": ["Add at least one clear, real photo of the instrument. The first photo becomes the main image until you change it."],
-  "bulkImport.hero.headline": ["Prepare multiple Profiles"],
-  "bulkImport.hero.body": ["Paste or upload a reviewed inventory, preview validation, then create only the rows that pass every requirement."],
-  "installers.hero.headline": ["Help instruments carry their Profile."],
-  "installers.hero.body": ["QRguitar is assembling a small founding group of qualified shops for QR hardware, installation, and service-linked documentation."],
-  "login.hero.headline": ["Sign in to QRguitar"],
-  "login.hero.body": ["Manage your Profiles, collection, service history, documents, and ownership tools."],
-  "contact.hero.body": ["Get help with an account, Profile, QR code, ownership handoff, verification review, or service workflow."],
-  "privacy.hero.headline": ["Privacy at QRguitar"],
-  "privacy.sections.dataCollected.heading": ["Information we collect"],
-  "privacy.sections.dataCollected.body": ["We collect account information and the instrument details you choose to add so QRguitar can provide Profiles, ownership tools, service records, and support."],
-  "privacy.sections.visibility.heading": ["Profile visibility"],
-  "privacy.sections.visibility.body": ["Public Profiles can appear in the Catalog, Unlisted Profiles require a direct link, and Private Profiles remain in the owner workspace."],
-  "privacy.sections.security.heading": ["Security and private data"],
-  "privacy.sections.security.body": ["Private notes, private documents, transfer tokens, and account authentication data are not published in public Profile responses."],
-  "terms.hero.headline": ["QRguitar terms"],
-  "terms.sections.content.heading": ["Profile content"],
-  "terms.sections.content.body": ["Add accurate instrument information and only upload media or documents you are authorized to use."],
-  "terms.sections.ownership.heading": ["Ownership tools"],
-  "terms.sections.ownership.body": ["QRguitar ownership tools organize platform records; they do not replace legal title, receipts, or independent due diligence."],
-  "dashboard.card.open": ["View Profile"],
-  "printWorkspace.title": ["QRguitar Print Kit"],
-  "printWorkspace.handout": ["Customer Handout"],
-  "printWorkspace.print": ["Print"]
+  "dashboard.actions.create": [
+    "Create a Profile"
+  ],
+  "dashboard.actions.claims": [
+    "Claim Center"
+  ],
+  "dashboard.collection.title": [
+    "Your collection"
+  ],
+  "account.hero.headline": [
+    "Your QRguitar account"
+  ],
+  "account.hero.body": [
+    "Manage your account settings.",
+    "Manage your profile, security, collection identity, and account preferences in one place."
+  ],
+  "claimCenter.hero.headline": [
+    "Claim an instrument Profile safely"
+  ],
+  "claimCenter.hero.body": [
+    "Choose the situation that matches how you received the instrument. QR scans and Serial Numbers identify Profiles; they never prove ownership by themselves."
+  ],
+  "create.hero.headline": [
+    "Create a QRguitar Profile"
+  ],
+  "create.hero.body": [
+    "Start with the instrument identity and at least one real photo. You can add service, documents, and ownership history later."
+  ],
+  "create.serial.help": [
+    "When provided, the Serial Number becomes the readable suffix of the QRguitar ID. Without one, QRguitar assigns a unique permanent ID."
+  ],
+  "create.photo.help": [
+    "Add at least one clear, real photo of the instrument. The first photo becomes the main image until you change it."
+  ],
+  "bulkImport.hero.headline": [
+    "Prepare multiple Profiles"
+  ],
+  "bulkImport.hero.body": [
+    "Paste or upload a reviewed inventory, preview validation, then create only the rows that pass every requirement.",
+    "Add inventory from a CSV, TSV, or pasted spreadsheet. Incomplete rows stay drafts. New Profiles start Private."
+  ],
+  "installers.hero.headline": [
+    "Help instruments carry their Profile."
+  ],
+  "installers.hero.body": [
+    "QRguitar is assembling a small founding group of qualified shops for QR hardware, installation, and service-linked documentation."
+  ],
+  "login.hero.headline": [
+    "Sign in to QRguitar"
+  ],
+  "login.hero.body": [
+    "Manage your Profiles, collection, service history, documents, and ownership tools."
+  ],
+  "contact.hero.body": [
+    "Get help with an account, Profile, QR code, ownership handoff, verification review, or service workflow."
+  ],
+  "privacy.hero.headline": [
+    "Privacy at QRguitar"
+  ],
+  "privacy.sections.dataCollected.heading": [
+    "Information we collect"
+  ],
+  "privacy.sections.dataCollected.body": [
+    "We collect account information and the instrument details you choose to add so QRguitar can provide Profiles, ownership tools, service records, and support."
+  ],
+  "privacy.sections.visibility.heading": [
+    "Profile visibility"
+  ],
+  "privacy.sections.visibility.body": [
+    "Public Profiles can appear in the Catalog, Unlisted Profiles require a direct link, and Private Profiles remain in the owner workspace."
+  ],
+  "privacy.sections.security.heading": [
+    "Security and private data"
+  ],
+  "privacy.sections.security.body": [
+    "Private notes, private documents, transfer tokens, and account authentication data are not published in public Profile responses."
+  ],
+  "terms.hero.headline": [
+    "QRguitar terms"
+  ],
+  "terms.sections.content.heading": [
+    "Profile content"
+  ],
+  "terms.sections.content.body": [
+    "Add accurate instrument information and only upload media or documents you are authorized to use."
+  ],
+  "terms.sections.ownership.heading": [
+    "Ownership tools"
+  ],
+  "terms.sections.ownership.body": [
+    "QRguitar ownership tools organize platform records; they do not replace legal title, receipts, or independent due diligence."
+  ],
+  "dashboard.card.open": [
+    "View Profile"
+  ],
+  "printWorkspace.title": [
+    "QRguitar Print Kit"
+  ],
+  "printWorkspace.handout": [
+    "Customer Handout"
+  ],
+  "printWorkspace.print": [
+    "Print"
+  ],
+  "home.roles.headline": [
+    "QRguitar tools"
+  ],
+  "home.roles.collection.headline": [
+    "A collection with a memory."
+  ],
+  "home.roles.collection.body": [
+    "From your first guitar to a lifetime collection, keep the instrument and its story together."
+  ],
+  "home.roles.collection.feature1.title": [
+    "Build your collection"
+  ],
+  "home.roles.collection.feature1.body": [
+    "Photos, specifications and documented history, organized around each instrument’s permanent identity."
+  ],
+  "home.roles.collection.feature2.title": [
+    "Keep your evidence private"
+  ],
+  "home.roles.collection.feature2.body": [
+    "Choose what visitors see. Purchase documents and detailed service reports stay private unless you share them."
+  ],
+  "home.roles.collection.feature3.title": [
+    "Carry the history forward"
+  ],
+  "home.roles.collection.feature3.body": [
+    "Hand the same Profile to the next owner, choosing which private documents follow. The instrument’s identity continues."
+  ],
+  "home.roles.workshop.headline": [
+    "The work matters. Keep the record."
+  ],
+  "home.roles.workshop.body": [
+    "Move from a quick intake to a lasting service history, with the owner in control of sharing."
+  ],
+  "home.roles.workshop.feature1.title": [
+    "Take any guitar in"
+  ],
+  "home.roles.workshop.feature1.body": [
+    "Create a private service slip quickly, even when the instrument does not have a QRguitar Profile."
+  ],
+  "home.roles.workshop.feature2.title": [
+    "Document the completed work"
+  ],
+  "home.roles.workshop.feature2.body": [
+    "Connect service to a registered instrument. Submit dates and private evidence for the owner to review."
+  ],
+  "home.roles.workshop.feature3.title": [
+    "Print for the way you work"
+  ],
+  "home.roles.workshop.feature3.body": [
+    "Use reusable slip settings and sheet or thermal QR layouts. Keep the paperwork connected to the instrument."
+  ],
+  "home.roles.business.headline": [
+    "Your instruments. A lasting connection."
+  ],
+  "home.roles.business.body": [
+    "Give every instrument a consistent identity that can continue from your inventory into the owner’s collection."
+  ],
+  "home.roles.business.feature1.title": [
+    "Present your inventory"
+  ],
+  "home.roles.business.feature1.body": [
+    "Create or import Profiles, and publish a collection that leads with your business identity."
+  ],
+  "home.roles.business.feature2.title": [
+    "Turn a scan into understanding"
+  ],
+  "home.roles.business.feature2.body": [
+    "Print individual or mixed batches of QR labels. Customers open the instrument’s photos, specifications and public history."
+  ],
+  "home.roles.business.feature3.title": [
+    "Continue beyond the sale"
+  ],
+  "home.roles.business.feature3.body": [
+    "Start a secure handoff to the buyer. Offer messaging or warranty assistance only when your business enables it."
+  ]
 };
 
 export const contentAreas: ContentArea[] = [

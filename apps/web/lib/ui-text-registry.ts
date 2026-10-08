@@ -1,7 +1,438 @@
+import { localPreviewUxUiTextEntries, localPreviewRetiredUiTextEntries, localPreviewRetiredUiKeys } from "./local-preview-ux-ui-text";
+import { serviceReviewPrivacyUiTextEntries } from "./service-review-privacy-ui-text";
+import { recordedBusinessSupportUiTextEntries } from "./recorded-business-support-ui-text";
 import { catalogPolicyUiTextEntries } from "./catalog-policy-ui-text";
 import { ownerDashboardPolicyUiTextEntries } from "./owner-dashboard-policy-ui-text";
+import { freeProfileUiTextEntries, freeProfileRetiredUiTextEntries, freeProfileRetiredUiKeys } from "./free-profile-ui-text";
 // Stable site-authored presentation entries. Existing CMS keys remain unchanged.
 export const uiTextEntries: Array<{ key: string; scope: string; text: string; area: string; page: string; section: string; source: string }> = [
+  ...freeProfileUiTextEntries,
+  {"key":"ui.components.OwnerNameConsentSection.heading","scope":"components.OwnerNameConsentSection","text":"Your name in ownership history","area":"Product","page":"Account","section":"Ownership history privacy","source":"components/OwnerNameConsentSection.tsx"},
+  {"key":"ui.components.OwnerNameConsentSection.help","scope":"components.OwnerNameConsentSection","text":"Ownership history stays with the instrument. Your name is optional for each event where you were the outgoing owner and can be removed. Name sharing does not publish a private Profile.","area":"Product","page":"Account","section":"Ownership history privacy","source":"components/OwnerNameConsentSection.tsx"},
+  {"key":"ui.components.OwnerNameConsentSection.loading","scope":"components.OwnerNameConsentSection","text":"Loading your ownership events…","area":"Product","page":"Account","section":"Ownership history privacy","source":"components/OwnerNameConsentSection.tsx"},
+  {"key":"ui.components.OwnerNameConsentSection.signedOut","scope":"components.OwnerNameConsentSection","text":"Sign in to manage your own name settings.","area":"Product","page":"Account","section":"Ownership history privacy","source":"components/OwnerNameConsentSection.tsx"},
+  {"key":"ui.components.OwnerNameConsentSection.changed","scope":"components.OwnerNameConsentSection","text":"Your signed-in account changed. Open the current Account page before continuing.","area":"Product","page":"Account","section":"Ownership history privacy","source":"components/OwnerNameConsentSection.tsx"},
+  {"key":"ui.components.OwnerNameConsentSection.empty","scope":"components.OwnerNameConsentSection","text":"There are no ownership changes where you can share your name.","area":"Product","page":"Account","section":"Ownership history privacy","source":"components/OwnerNameConsentSection.tsx"},
+  {"key":"ui.components.OwnerNameConsentSection.noDate","scope":"components.OwnerNameConsentSection","text":"Date not recorded","area":"Product","page":"Account","section":"Ownership history privacy","source":"components/OwnerNameConsentSection.tsx"},
+  {"key":"ui.components.OwnerNameConsentSection.checkbox","scope":"components.OwnerNameConsentSection","text":"Show my name beside this ownership event","area":"Product","page":"Account","section":"Ownership history privacy","source":"components/OwnerNameConsentSection.tsx"},
+  {"key":"ui.components.OwnerNameConsentSection.name","scope":"components.OwnerNameConsentSection","text":"Name to show publicly","area":"Product","page":"Account","section":"Ownership history privacy","source":"components/OwnerNameConsentSection.tsx"},
+  {"key":"ui.components.OwnerNameConsentSection.save","scope":"components.OwnerNameConsentSection","text":"Save public name","area":"Product","page":"Account","section":"Ownership history privacy","source":"components/OwnerNameConsentSection.tsx"},
+  {"key":"ui.components.OwnerNameConsentSection.remove","scope":"components.OwnerNameConsentSection","text":"Remove public name","area":"Product","page":"Account","section":"Ownership history privacy","source":"components/OwnerNameConsentSection.tsx"},
+  {"key":"ui.components.OwnerNameConsentSection.pending","scope":"components.OwnerNameConsentSection","text":"Updating this event…","area":"Product","page":"Account","section":"Ownership history privacy","source":"components/OwnerNameConsentSection.tsx"},
+  {"key":"ui.components.OwnerNameConsentSection.unknown","scope":"components.OwnerNameConsentSection","text":"Saved setting not confirmed. Reload before saving a public name.","area":"Product","page":"Account","section":"Ownership history privacy","source":"components/OwnerNameConsentSection.tsx"},
+  {"key":"ui.components.OwnerNameConsentSection.unsaved","scope":"components.OwnerNameConsentSection","text":"Unsaved changes. The last confirmed setting still applies. To withdraw a saved name, choose Remove public name.","area":"Product","page":"Account","section":"Ownership history privacy","source":"components/OwnerNameConsentSection.tsx"},
+  {"key":"ui.components.OwnerNameConsentSection.on","scope":"components.OwnerNameConsentSection","text":"Saved: public name enabled for this event.","area":"Product","page":"Account","section":"Ownership history privacy","source":"components/OwnerNameConsentSection.tsx"},
+  {"key":"ui.components.OwnerNameConsentSection.off","scope":"components.OwnerNameConsentSection","text":"Saved: public name disabled for this event.","area":"Product","page":"Account","section":"Ownership history privacy","source":"components/OwnerNameConsentSection.tsx"},
+  {"key":"ui.components.OwnerNameConsentSection.more","scope":"components.OwnerNameConsentSection","text":"Load more ownership events","area":"Product","page":"Account","section":"Ownership history privacy","source":"components/OwnerNameConsentSection.tsx"},
+  {"key":"ui.components.OwnerNameConsentSection.reload","scope":"components.OwnerNameConsentSection","text":"Reload saved name setting","area":"Product","page":"Account","section":"Ownership history privacy","source":"components/OwnerNameConsentSection.tsx"},
+  {"key":"ui.app.i.code.ProfileClient.previousOwnerAttribution","scope":"app.i.code.ProfileClient","text":"Previous owner: {{value1}}","area":"Product","page":"Profile","section":"Ownership history","source":"app/i/[code]/ProfileClient.tsx"},
+  {"key":"ui.app.login.page.registrationRole","scope":"app.login.page","text":"Choose your workspace","area":"Product","page":"Login","section":"Registration role","source":"app/login/page.tsx"},
+  {"key":"ui.app.login.page.registrationRoleHelp","scope":"app.login.page","text":"Choose how you use QRguitar. You can change this later in Account settings.","area":"Product","page":"Login","section":"Registration role","source":"app/login/page.tsx"},
+  {"key":"ui.app.login.page.businessName","scope":"app.login.page","text":"Business name","area":"Product","page":"Login","section":"Registration role","source":"app/login/page.tsx"},
+  {"key":"ui.app.login.page.businessDetailsLater","scope":"app.login.page","text":"Add your logo and support preferences later in Account settings.","area":"Product","page":"Login","section":"Registration role","source":"app/login/page.tsx"},
+  {"key":"ui.app.login.page.registrationContinue","scope":"app.login.page","text":"Continue","area":"Product","page":"Login","section":"Registration role","source":"app/login/page.tsx"},
+  {"key":"ui.app.login.page.registrationChange","scope":"app.login.page","text":"Change workspace","area":"Product","page":"Login","section":"Registration role","source":"app/login/page.tsx"},
+  {"key":"ui.app.dashboard.page.collectionView","scope":"app.dashboard.page","text":"Collection view","area":"Product","page":"Dashboard","section":"Collection presentation","source":"app/dashboard/page.tsx"},
+  {"key":"ui.app.dashboard.page.galleryView","scope":"app.dashboard.page","text":"Gallery","area":"Product","page":"Dashboard","section":"Collection presentation","source":"app/dashboard/page.tsx"},
+  {"key":"ui.app.dashboard.page.listView","scope":"app.dashboard.page","text":"List","area":"Product","page":"Dashboard","section":"Collection presentation","source":"app/dashboard/page.tsx"},
+  {
+    "key": "ui.components.ServiceCorrections.title",
+    "scope": "components.ServiceCorrections",
+    "text": "Corrections to approved service work",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.help",
+    "scope": "components.ServiceCorrections",
+    "text": "The original approved record and its attachments stay unchanged. A correction is a separate dated note reviewed by the current owner. It does not record new service work.",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.loading",
+    "scope": "components.ServiceCorrections",
+    "text": "Loading correction history…",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.signIn",
+    "scope": "components.ServiceCorrections",
+    "text": "Sign in to review private corrections.",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.retry",
+    "scope": "components.ServiceCorrections",
+    "text": "Retry the same correction request",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.reload",
+    "scope": "components.ServiceCorrections",
+    "text": "Reload correction history",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.original",
+    "scope": "components.ServiceCorrections",
+    "text": "Original approved record",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.serviceDate",
+    "scope": "components.ServiceCorrections",
+    "text": "Recorded service date",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.unknown",
+    "scope": "components.ServiceCorrections",
+    "text": "Not recorded",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.note",
+    "scope": "components.ServiceCorrections",
+    "text": "Correction note",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.privateDefault",
+    "scope": "components.ServiceCorrections",
+    "text": "The note is private until the owner accepts it and explicitly chooses public sharing. Original evidence is read-only; this correction does not upload or replace files.",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.propose",
+    "scope": "components.ServiceCorrections",
+    "text": "Send correction for owner review",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.submitted",
+    "scope": "components.ServiceCorrections",
+    "text": "Submitted",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.pending",
+    "scope": "components.ServiceCorrections",
+    "text": "Awaiting owner review",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.accepted",
+    "scope": "components.ServiceCorrections",
+    "text": "Accepted correction",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.rejected",
+    "scope": "components.ServiceCorrections",
+    "text": "Rejected correction",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.public",
+    "scope": "components.ServiceCorrections",
+    "text": "Public correction",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.private",
+    "scope": "components.ServiceCorrections",
+    "text": "Private correction",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.share",
+    "scope": "components.ServiceCorrections",
+    "text": "Share this correction note on the public Profile",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.shareHelp",
+    "scope": "components.ServiceCorrections",
+    "text": "Leave unchecked to keep the correction private. Sharing this note does not share the original private report or its evidence.",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.accept",
+    "scope": "components.ServiceCorrections",
+    "text": "Accept correction",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.reject",
+    "scope": "components.ServiceCorrections",
+    "text": "Reject correction",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.stale",
+    "scope": "components.ServiceCorrections",
+    "text": "Ownership or the original record changed. This request can be rejected; a new correction must be reviewed before acceptance.",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.publicTitle",
+    "scope": "components.ServiceCorrections",
+    "text": "Owner-approved service corrections",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.publicHelp",
+    "scope": "components.ServiceCorrections",
+    "text": "These dated corrections supplement the original approved record. Correction dates do not change the recorded service date.",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.ownerEntry",
+    "scope": "components.ServiceCorrections",
+    "text": "Review service corrections",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.ownerEntryLabel",
+    "scope": "components.ServiceCorrections",
+    "text": "Review corrections for",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.back",
+    "scope": "components.ServiceCorrections",
+    "text": "Back to collection",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.components.ServiceCorrections.unavailable",
+    "scope": "components.ServiceCorrections",
+    "text": "Approved service record unavailable.",
+    "area": "Product",
+    "page": "Service",
+    "section": "Approved record corrections",
+    "source": "components/ServiceCorrections.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.privateFileSelection",
+    "scope": "app.dashboard.page",
+    "text": "Private files for the next owner",
+    "area": "Product",
+    "page": "Dashboard",
+    "section": "Ownership handoff",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.privateFileSelectionHelp",
+    "scope": "app.dashboard.page",
+    "text": "Selected private files and their saved details move to the next owner. Unchecked private files stay with your account. Public files keep their current visibility.",
+    "area": "Product",
+    "page": "Dashboard",
+    "section": "Ownership handoff",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.app.dashboard.page.privateFileSelectionReload",
+    "scope": "app.dashboard.page",
+    "text": "Reload your collection before preparing this handoff.",
+    "area": "Product",
+    "page": "Dashboard",
+    "section": "Ownership handoff",
+    "source": "app/dashboard/page.tsx"
+  },
+  {
+    "key": "ui.components.RetainedPrivateDocuments.title",
+    "scope": "components.RetainedPrivateDocuments",
+    "text": "Private files you kept",
+    "area": "Product",
+    "page": "Dashboard",
+    "section": "Ownership handoff",
+    "source": "components/RetainedPrivateDocuments.tsx"
+  },
+  {
+    "key": "ui.components.RetainedPrivateDocuments.help",
+    "scope": "components.RetainedPrivateDocuments",
+    "text": "Unchecked private files stay with your account after a handoff.",
+    "area": "Product",
+    "page": "Dashboard",
+    "section": "Ownership handoff",
+    "source": "components/RetainedPrivateDocuments.tsx"
+  },
+  {
+    "key": "ui.components.RetainedPrivateDocuments.loading",
+    "scope": "components.RetainedPrivateDocuments",
+    "text": "Loading…",
+    "area": "Product",
+    "page": "Dashboard",
+    "section": "Ownership handoff",
+    "source": "components/RetainedPrivateDocuments.tsx"
+  },
+  {
+    "key": "ui.components.RetainedPrivateDocuments.empty",
+    "scope": "components.RetainedPrivateDocuments",
+    "text": "No retained private files.",
+    "area": "Product",
+    "page": "Dashboard",
+    "section": "Ownership handoff",
+    "source": "components/RetainedPrivateDocuments.tsx"
+  },
+  {
+    "key": "ui.components.RetainedPrivateDocuments.download",
+    "scope": "components.RetainedPrivateDocuments",
+    "text": "Download",
+    "area": "Product",
+    "page": "Dashboard",
+    "section": "Ownership handoff",
+    "source": "components/RetainedPrivateDocuments.tsx"
+  },
+  {
+    "key": "ui.components.RetainedPrivateDocuments.previous",
+    "scope": "components.RetainedPrivateDocuments",
+    "text": "Previous",
+    "area": "Product",
+    "page": "Dashboard",
+    "section": "Ownership handoff",
+    "source": "components/RetainedPrivateDocuments.tsx"
+  },
+  {
+    "key": "ui.components.RetainedPrivateDocuments.next",
+    "scope": "components.RetainedPrivateDocuments",
+    "text": "Next",
+    "area": "Product",
+    "page": "Dashboard",
+    "section": "Ownership handoff",
+    "source": "components/RetainedPrivateDocuments.tsx"
+  },
+  {
+    "key": "ui.components.RetainedPrivateDocuments.loadFailure",
+    "scope": "components.RetainedPrivateDocuments",
+    "text": "Private files could not be loaded. Try again later.",
+    "area": "Product",
+    "page": "Dashboard",
+    "section": "Ownership handoff",
+    "source": "components/RetainedPrivateDocuments.tsx"
+  },
+  {
+    "key": "ui.components.RetainedPrivateDocuments.downloadFailure",
+    "scope": "components.RetainedPrivateDocuments",
+    "text": "The file could not be downloaded. Try again later.",
+    "area": "Product",
+    "page": "Dashboard",
+    "section": "Ownership handoff",
+    "source": "components/RetainedPrivateDocuments.tsx"
+  },
+  ...localPreviewUxUiTextEntries,
+  {
+    "key": "ui.app.i.code.ProfileClient.latestServiceDate",
+    "scope": "app.i.code.ProfileClient",
+    "text": "Last recorded service",
+    "area": "Product",
+    "page": "Public Profile",
+    "section": "Labels and help",
+    "source": "app/i/[code]/ProfileClient.tsx"
+  },
+  {
+    "key": "ui.app.i.code.ProfileClient.serviceDatePrivacy",
+    "scope": "app.i.code.ProfileClient",
+    "text": "Details stay private unless shared.",
+    "area": "Product",
+    "page": "Public Profile",
+    "section": "Labels and help",
+    "source": "app/i/[code]/ProfileClient.tsx"
+  },
+  {
+    "key": "ui.app.i.code.ProfileClient.registrationHelp",
+    "scope": "app.i.code.ProfileClient",
+    "text": "Recorded history may predate registration.",
+    "area": "Product",
+    "page": "Public Profile",
+    "section": "Page text",
+    "source": "app/i/[code]/ProfileClient.tsx"
+  },
+  ...serviceReviewPrivacyUiTextEntries,
   {
     "key": "ui.app.handout.code.page.formatLabel",
     "scope": "app.handout.code.page",
@@ -158,6 +589,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
 
   ...catalogPolicyUiTextEntries,
   ...ownerDashboardPolicyUiTextEntries,
+  ...recordedBusinessSupportUiTextEntries,
   {"key":"ui.app.i.code.ProfileClient.saleDetails","scope":"app.i.code.ProfileClient","text":"Sale details","area":"Product","page":"Public Profile","section":"Sale details","source":"app/i/[code]/ProfileClient.tsx"},
   {"key":"ui.app.i.code.ProfileClient.askingPrice","scope":"app.i.code.ProfileClient","text":"Asking price","area":"Product","page":"Public Profile","section":"Sale details","source":"app/i/[code]/ProfileClient.tsx"},
   {"key":"ui.app.i.code.ProfileClient.priceAtStore","scope":"app.i.code.ProfileClient","text":"Price at {{store}}","area":"Product","page":"Public Profile","section":"Sale details","source":"app/i/[code]/ProfileClient.tsx"},
@@ -213,7 +645,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {"key":"ui.app.contact.page.contactWebsite","scope":"app.contact.page","text":"Leave this field empty","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
   {"key":"ui.app.installers.page.applicationEmailGuidance","scope":"app.installers.page","text":"Complete these six details, review your email, and send it to support@qrguitar.com. Opening a draft does not submit an application. Applications are reviewed manually; applying does not approve or publish your business. Do not include passwords, payment-card numbers, reset links, or unrelated personal documents.","area":"Support & Legal","page":"Installers","section":"Application email","source":"app/installers/page.tsx"},
   {"key":"ui.app.installers.page.applicationEmailSubject","scope":"app.installers.page","text":"QRguitar Provider Network Application","area":"Support & Legal","page":"Installers","section":"Application email","source":"app/installers/page.tsx"},
-  {"key":"ui.components.AccountAccessHelp.billing","scope":"components.AccountAccessHelp","text":"Start with 5 free Profiles. Sign in to see your balance and buy additional permanent Profile credits. Ownership transfers are free.","area":"Global","page":"Account Access","section":"Static account access and credit pricing","source":"components/AccountAccessHelp.tsx"},
+  {"key":"ui.components.AccountAccessHelp.billing","scope":"components.AccountAccessHelp","text":"Profiles are always free. Sign in to create and manage your instruments. Verification and authentication are optional paid services.","area":"Global","page":"Account Access","section":"Static account access and credit pricing","source":"components/AccountAccessHelp.tsx"},
   {"key":"ui.components.AccountAccessHelp.claim","scope":"components.AccountAccessHelp","text":"Use your account to submit evidence, follow a request, or review one sent to you. Submitting a request does not change the Profile’s owner.","area":"Global","page":"Account Access","section":"Static account access and credit pricing","source":"components/AccountAccessHelp.tsx"},
   {"key":"ui.components.AccountAccessHelp.javascript","scope":"components.AccountAccessHelp","text":"Enable JavaScript to sign in and use account tools.","area":"Global","page":"Account Access","section":"Static account access and credit pricing","source":"components/AccountAccessHelp.tsx"},
   {"key":"ui.components.AccountAccessHelp.access","scope":"components.AccountAccessHelp","text":"Sign in to continue","area":"Global","page":"Account Access","section":"Static account access and credit pricing","source":"components/AccountAccessHelp.tsx"},
@@ -8388,7 +8820,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.billing.DirectBillingPage.49f78ed770a3",
     "scope": "app.billing.DirectBillingPage",
-    "text": "Your first 5 Profiles are free.",
+    "text": "Profiles are always free.",
     "page": "Profile credits",
     "area": "Product",
     "section": "Page text",
@@ -9630,7 +10062,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.billing.PayPalBillingPage.8d419aec5796",
     "scope": "app.billing.PayPalBillingPage",
-    "text": "5 free Profiles. More when you need them.",
+    "text": "Profiles are always free. This page is for an earlier payment.",
     "page": "Profile credits",
     "area": "Product",
     "section": "Page text",
@@ -9639,7 +10071,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.billing.PayPalBillingPage.c3e79710e32a",
     "scope": "app.billing.PayPalBillingPage",
-    "text": "No subscription · Credits never expire · Free transfers",
+    "text": "Basic Profiles and ownership transfers are free.",
     "page": "Profile credits",
     "area": "Product",
     "section": "Page text",
@@ -9657,7 +10089,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.billing.PayPalBillingPage.49f78ed770a3",
     "scope": "app.billing.PayPalBillingPage",
-    "text": "Your first 5 Profiles are free.",
+    "text": "Profiles are always free.",
     "page": "Profile credits",
     "area": "Product",
     "section": "Page text",
@@ -9666,7 +10098,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.billing.PayPalBillingPage.6f48f1936e50",
     "scope": "app.billing.PayPalBillingPage",
-    "text": "Sign in to see your balance and add more when you need them.",
+    "text": "Sign in to review an earlier payment.",
     "page": "Profile credits",
     "area": "Product",
     "section": "Page text",
@@ -9801,7 +10233,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.billing.PayPalBillingPage.40f0dbe67eec",
     "scope": "app.billing.PayPalBillingPage",
-    "text": "Existing Profiles and your remaining free allowance are still available.",
+    "text": "Creating and maintaining basic Profiles stays free while an earlier payment is reviewed.",
     "page": "Profile credits",
     "area": "Product",
     "section": "Page text",
@@ -10008,7 +10440,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.billing.PayPalBillingPage.5359c45c4e88",
     "scope": "app.billing.PayPalBillingPage",
-    "text": "Add another Profile pack",
+    "text": "Explore optional services",
     "page": "Profile credits",
     "area": "Product",
     "section": "Page text",
@@ -10053,7 +10485,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.billing.PayPalBillingPage.7fc165e69dac",
     "scope": "app.billing.PayPalBillingPage",
-    "text": "Your free Profiles and existing credits are ready to use.",
+    "text": "Profiles are free. Contact QRguitar about any earlier credits.",
     "page": "Profile credits",
     "area": "Product",
     "section": "Page text",
@@ -10242,7 +10674,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.billing.PayPalBillingPage.fcf8710aef5c",
     "scope": "app.billing.PayPalBillingPage",
-    "text": "Each credit creates one additional Profile after your 5 free Profiles. Unused paid credits never expire.",
+    "text": "Earlier purchased credits and payment history are retained. Basic Profiles no longer need credits.",
     "page": "Profile credits",
     "area": "Product",
     "section": "Page text",
@@ -13231,7 +13663,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.dashboard.page.b90f83fb529f",
     "scope": "app.dashboard.page",
-    "text": "Recipient not email-bound",
+    "text": "No recipient email specified",
     "page": "Dashboard",
     "area": "Product",
     "section": "Page text",
@@ -15139,7 +15571,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.edit.code.page.d7b92d4468d9",
     "scope": "app.edit.code.page",
-    "text": "After you add a Profile, QRguitar may verify its details at no charge when the information is sufficient. Verification does not confirm authenticity.",
+    "text": "Profile verification is an optional paid review of the recorded information and evidence. A free Profile does not receive verified status automatically. Verification does not confirm authenticity.",
     "page": "Edit Profile",
     "area": "Product",
     "section": "Page text",
@@ -15436,7 +15868,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.edit.code.page.4e2bce183e1c",
     "scope": "app.edit.code.page",
-    "text": "Checking your Supabase session now.",
+    "text": "Checking your account now.",
     "page": "Edit Profile",
     "area": "Product",
     "section": "Page text",
@@ -16606,7 +17038,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.i.code.ProfileClient.cca6a9866dcc",
     "scope": "app.i.code.ProfileClient",
-    "text": "Owner preview.",
+    "text": "Your Profile.",
     "page": "Public Profile",
     "area": "Product",
     "section": "Page text",
@@ -17029,7 +17461,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.i.code.ProfileClient.9bb4a8d57a82",
     "scope": "app.i.code.ProfileClient",
-    "text": "Profile created",
+    "text": "QRguitar registration",
     "page": "Public Profile",
     "area": "Product",
     "section": "Page text",
@@ -17047,7 +17479,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.i.code.ProfileClient.0da8a8f6f90b",
     "scope": "app.i.code.ProfileClient",
-    "text": "Owner-approved work connected to this instrument.",
+    "text": "Owner-reported work and owner-approved provider records.",
     "page": "Public Profile",
     "area": "Product",
     "section": "Labels and help",
@@ -19001,24 +19433,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.app.service.review.id.page.82be8fb0e713",
     "scope": "app.service.review.id.page",
     "text": "Choose what happens next.",
-    "page": "Service Review",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/service-review/[id]/page.tsx"
-  },
-  {
-    "key": "ui.app.service.review.id.page.9ed1aca5fa71",
-    "scope": "app.service.review.id.page",
-    "text": "Approving attaches one canonical service entry to this QRguitar Profile. It confirms that you authorize the entry to appear; it is not an independent guarantee by QRguitar.",
-    "page": "Service Review",
-    "area": "Product",
-    "section": "Page text",
-    "source": "app/service-review/[id]/page.tsx"
-  },
-  {
-    "key": "ui.app.service.review.id.page.521b694737f0",
-    "scope": "app.service.review.id.page",
-    "text": "Visibility after approval",
     "page": "Service Review",
     "area": "Product",
     "section": "Page text",
@@ -22447,7 +22861,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.components.BulkImportWorkspace.897a89da498c",
     "scope": "components.BulkImportWorkspace",
-    "text": "Bulk Import creates private QRguitar Profiles inside your owner workspace.",
+    "text": "Saved instruments and photos appear in Catalog.",
     "page": "Bulk Import Workspace",
     "area": "Global",
     "section": "Page text",
@@ -27745,10 +28159,31 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "section": "Saved review outcome",
     "source": "app/service-review/[id]/page.tsx"
   }
-];
+].filter(entry => !localPreviewRetiredUiKeys.has(entry.key) && !freeProfileRetiredUiKeys.has(entry.key));
 
 // Compatibility only: retained for saved CMS snapshots; these removed controls are not displayed.
 export const retiredUiTextEntries = [
+  ...freeProfileRetiredUiTextEntries,
+  ...localPreviewRetiredUiTextEntries,
+  {
+    "key": "ui.app.service.review.id.page.9ed1aca5fa71",
+    "scope": "app.service.review.id.page",
+    "text": "Approving attaches one canonical service entry to this QRguitar Profile. It confirms that you authorize the entry to appear; it is not an independent guarantee by QRguitar.",
+    "page": "Service Review",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/service-review/[id]/page.tsx"
+  },
+  {
+    "key": "ui.app.service.review.id.page.521b694737f0",
+    "scope": "app.service.review.id.page",
+    "text": "Visibility after approval",
+    "page": "Service Review",
+    "area": "Product",
+    "section": "Page text",
+    "source": "app/service-review/[id]/page.tsx"
+  },
+
   { key: "ui.components.Footer.checkingSignIn", scope: "components.Footer", text: "Checking sign-in...", area: "Product", page: "Shared Footer", section: "Session status", source: "components/Footer.tsx" },
   {
     "key": "ui.app.admin.page.5cbd26b5d984",

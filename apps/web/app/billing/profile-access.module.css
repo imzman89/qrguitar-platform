@@ -1,0 +1,20 @@
+.page { color:var(--text); background:var(--canvas); padding:64px 0 80px; }
+.shell { width:min(1100px,calc(100% - 80px)); margin-inline:auto; }
+.hero { max-width:760px; margin-bottom:56px; }
+.eyebrow { color:var(--muted); font-size:11px; letter-spacing:.12em; line-height:1.5; }
+.hero h1 { font-family:var(--font-display,Georgia,serif); font-size:clamp(38px,4.7vw,64px); font-weight:400; letter-spacing:-.035em; line-height:1.06; margin:14px 0 20px; }
+.hero>p:last-child { color:var(--muted-strong); max-width:58ch; font-size:17px; line-height:1.8; }
+.free { padding-bottom:48px; }
+.free h2,.reviews h2 { font-family:var(--font-display,Georgia,serif); font-size:32px; font-weight:400; line-height:1.15; margin:0 0 14px; }
+.free>p { max-width:64ch; }
+.free>p,.reviews p { color:var(--muted-strong); font-size:15px; line-height:1.8; margin:0; }
+.actions { display:flex; align-items:center; gap:24px; margin-top:24px; flex-wrap:wrap; }
+.actions a { display:inline-flex; align-items:center; justify-content:space-between; gap:18px; min-height:46px; color:var(--text); font-size:14px; text-decoration:none; }
+.primary { padding:0 18px; border:1px solid var(--line); border-radius:2px; background:color-mix(in srgb,var(--text) 8%,var(--canvas)); }
+.primary:hover { background:color-mix(in srgb,var(--text) 14%,var(--canvas)); border-color:var(--muted); }
+.optional { border-top:1px solid var(--line); padding:36px 0; }
+.reviews { display:grid; grid-template-columns:1fr 1fr; gap:48px; margin-top:24px; }
+.actions>p { color:var(--muted); font-size:13px; line-height:1.7; max-width:48ch; margin:0; }
+.earlier { color:var(--muted); display:inline-flex; align-items:center; min-height:44px; font-size:13px; line-height:1.6; }
+.page a:focus-visible { outline:2px solid var(--action); outline-offset:4px; }
+@media(max-width:700px) { .page { padding:32px 0 48px; }.shell { width:calc(100% - 40px); }.hero { margin-bottom:36px; }.hero h1 { font-size:40px; }.hero>p:last-child { font-size:16px; }.reviews { grid-template-columns:1fr; gap:30px; }.actions { gap:16px; }.free { padding-bottom:32px; } }

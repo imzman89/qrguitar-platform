@@ -1,3 +1,5 @@
+import { readConfirmedPublicOwnerNames } from "./owner-name-consent-server";
+import { readPublicReviewSnapshot, readPublicReviewState } from "./public-review-snapshot";
 import { defaultQrStyle, type DemoInstrument } from "./local-demo";
 import { mergeRecordTrustSettings, recordTrustContentKey, type RecordTrustSettings } from "./record-trust";
 import { unstable_noStore as noStore } from "next/cache";
@@ -8,12 +10,14 @@ import { cleanPublicCollection, publicCollectionHandleKey, publicCollectionOwner
 import { publicFileUrl } from "./public-file-url";
 import {
   availabilityFromSpecs,
+  getLatestRecordedServiceDate,
   getServiceHistoryEntries,
+  isRecordedOwnershipEvent,
   isLegacyServiceField,
   isManagedInstrumentSpec,
   originalityFromSpecs,
   profileLinksFromSpecs,
-  sanitizePublicInstrument
+  sanitizePublicInstrumentWithConfirmedOwnerNames
 } from "./instrument-profile-contract";
 
 type GuitarRow = {
@@ -229,6 +233,7 @@ function mapRecord({
   specs,
   documents,
   serviceEvents,
+  latestService,
   externalMedia,
   ownerName,
   publicCollection,
@@ -239,6 +244,7 @@ function mapRecord({
   specs: SpecRow[];
   documents: NonNullable<DemoInstrument["documentFiles"]>;
   serviceEvents?: NonNullable<DemoInstrument["serviceEvents"]>;
+  latestService?: { date: string; datePrecision: "day" | "month" | "year" };
   externalMedia?: NonNullable<DemoInstrument["externalMedia"]>;
   ownerName?: string;
   publicCollection?: DemoInstrument["publicCollection"];
@@ -294,7 +300,10 @@ function mapRecord({
     customLinks: profileLinksFromSpecs(specs),
     documentFiles: documents,
     timelineEvents: serviceEvents || [],
+    ownershipTransferCount: (serviceEvents || []).filter(isRecordedOwnershipEvent).length,
     serviceEvents: [],
+    latestServiceDate: latestService?.date,
+    latestServiceDatePrecision: latestService?.datePrecision,
     externalMedia: externalMedia || [],
     qrStyle: defaultQrStyle,
     createdAt: guitar.created_at || "",
@@ -313,7 +322,7 @@ function mapPublicServiceEvent(row: TimelineRow) {
   return {
     id: row.id,
     serviceDate: row.event_date || "",
-    datePrecision: row.date_precision || (row.event_date ? "day" : "unknown"),
+    datePrecision: row.date_precision || "unknown",
     category: row.category || row.event_type || "Other",
     eventType: row.event_type || "",
     title: row.title || "Service entry",
@@ -359,7 +368,7 @@ async function loadTrustSettingsMap(qrCodes: string[]) {
   return trustByCode;
 }
 
-async function loadRelated(guitars: GuitarRow[], serviceRole = true) {
+async function loadRelated(guitars: GuitarRow[], serviceRole = true, allowUnlisted = false) {
   if (!guitars.length) {
     return {
       media: new Map<string, string[]>(),
@@ -368,16 +377,17 @@ async function loadRelated(guitars: GuitarRow[], serviceRole = true) {
       profiles: new Map<string, ProfileRow>(),
       collections: new Map<string, NonNullable<DemoInstrument["publicCollection"]>>(),
       serviceEvents: new Map<string, ReturnType<typeof mapPublicServiceEvent>[]>(),
+      latestServiceDates: new Map<string, { date: string; datePrecision: "day" | "month" | "year" }>(),
       externalMedia: new Map<string, ExternalMediaRow[]>()
     };
   }
 
   const ids = guitars.map((guitar) => guitar.id);
   const ownerIds = [...new Set(guitars.map((guitar) => guitar.owner_id).filter(Boolean) as string[])];
-  const [mediaRows, specRows, documentRows, profileRows, serviceEventRows, externalMediaRows, collectionRows] = await Promise.all([
+  const [mediaRows, specRows, documentRows, profileRows, serviceEventRows, externalMediaRows, collectionRows, serviceDateRows] = await Promise.all([
     supabaseRowsByValues<MediaRow>("/rest/v1/guitar_media?select=guitar_id,storage_path,sort_order&order=sort_order.asc,id.asc", "guitar_id", ids, { serviceRole }),
     supabaseRowsByValues<SpecRow>("/rest/v1/guitar_specs?select=guitar_id,label,value&order=sort_order.asc,id.asc", "guitar_id", ids, { serviceRole }),
-    supabaseRowsByValues<DocumentRow>("/rest/v1/guitar_documents?select=guitar_id,name,storage_path,is_public,document_type,public_description,issuer_source,document_date,description,file_size_bytes,related_timeline_event_id,related_service_event_id,created_at&is_public=eq.true&order=created_at.asc,id.asc", "guitar_id", ids, { serviceRole }),
+    supabaseRowsByValues<DocumentRow>("/rest/v1/guitar_documents?select=guitar_id,name,storage_path,is_public,document_type,public_description,issuer_source,document_date,description,file_size_bytes,related_timeline_event_id,related_service_event_id,created_at&is_public=eq.true&retained_private=eq.false&order=created_at.asc,id.asc", "guitar_id", ids, { serviceRole }),
     supabaseRowsByValues<ProfileRow>("/rest/v1/profiles?select=id,display_name,account_status,hide_public_content&order=id.asc", "id", ownerIds, { serviceRole }),
     supabaseRowsByValues<TimelineRow>("/rest/v1/guitar_timeline_events?select=id,guitar_id,event_date,event_type,title,description,shop_name,location,is_public,created_at,updated_at,date_precision,category,is_system,related_document_id,related_media_id,source_kind,provider_user_id,provider_display_name,provider_verified_at_snapshot,evidence_reviewed_at,service_submission_id,work_order_reference,parts_installed,setup_measurements,who_performed&is_public=eq.true&order=event_date.desc.nullslast,created_at.desc,id.asc", "guitar_id", ids, { serviceRole })
       .catch(async (error: Error) => {
@@ -389,7 +399,16 @@ async function loadRelated(guitars: GuitarRow[], serviceRole = true) {
         if (/relation .*guitar_external_media.* does not exist/i.test(error.message)) return [];
         throw error;
       }),
-    supabaseRowsByValues<PublicCollectionSiteRow>("/rest/v1/site_content?select=content_key,content_value&order=content_key.asc", "content_key", ownerIds.map(publicCollectionOwnerKey), { serviceRole: true })
+    supabaseRowsByValues<PublicCollectionSiteRow>("/rest/v1/site_content?select=content_key,content_value&order=content_key.asc", "content_key", ownerIds.map(publicCollectionOwnerKey), { serviceRole: true }),
+    // Metadata-only read: never select private report text, people, prices or attachments.
+    supabaseRowsByValues<Pick<TimelineRow, "guitar_id" | "event_date" | "date_precision" | "event_type" | "category" | "source_kind" | "is_system">>(
+      "/rest/v1/guitar_timeline_events?select=guitar_id,event_date,date_precision,event_type,category,source_kind,is_system&is_system=eq.false&order=event_date.desc.nullslast,id.asc",
+      "guitar_id", ids, { serviceRole: true }
+    ).catch((error: Error) => {
+      // Legacy schemas cannot prove precision; omit this optional summary only.
+      if (/column .* does not exist/i.test(error.message)) return [];
+      throw error;
+    })
   ]);
 
   const media = new Map<string, string[]>();
@@ -437,9 +456,11 @@ async function loadRelated(guitars: GuitarRow[], serviceRole = true) {
     }
   }
 
-  const serviceEvents = new Map<string, ReturnType<typeof mapPublicServiceEvent>[]>();
+  const confirmedOwnerNames = await readConfirmedPublicOwnerNames(serviceEventRows.filter(row => row.is_system === true && row.event_type === "ownership").map(row => row.id),allowUnlisted);
+  const serviceEvents = new Map<string, (ReturnType<typeof mapPublicServiceEvent> & {previousOwnerPublicName?: string})[]>();
   for (const row of serviceEventRows) {
-    serviceEvents.set(row.guitar_id, [...(serviceEvents.get(row.guitar_id) || []), mapPublicServiceEvent(row)]);
+    const publicName=confirmedOwnerNames.get(row.id);
+    serviceEvents.set(row.guitar_id, [...(serviceEvents.get(row.guitar_id) || []), {...mapPublicServiceEvent(row),...(publicName ? {previousOwnerPublicName:publicName} : {})}]);
   }
 
   const externalMedia = new Map<string, ExternalMediaRow[]>();
@@ -447,13 +468,27 @@ async function loadRelated(guitars: GuitarRow[], serviceRole = true) {
     externalMedia.set(row.guitar_id, [...(externalMedia.get(row.guitar_id) || []), row]);
   }
 
-  return { media, specs, documents, profiles, collections, serviceEvents, externalMedia };
+  const latestServiceDates = new Map<string, { date: string; datePrecision: "day" | "month" | "year" }>();
+  for (const row of serviceDateRows) {
+    const latest = getLatestRecordedServiceDate([{
+      serviceDate: row.event_date || "", datePrecision: row.date_precision || "unknown",
+      eventType: row.event_type || "", category: row.category || "Other",
+      sourceKind: row.source_kind || "owner_reported", isSystem: row.is_system === true
+    }], latestServiceDates.get(row.guitar_id));
+    if (latest) latestServiceDates.set(row.guitar_id, latest);
+  }
+
+  return { media, specs, documents, profiles, collections, serviceEvents, externalMedia, latestServiceDates };
 }
 
 export async function getPublicInstruments(ownerId?: string) {
   noStore();
+  const review = ownerId === undefined ? await readPublicReviewState() : null;
+  const snapshot = review?.instruments.filter(record => !review.workflowCodes.includes(record.qrCode)) || [];
+  if (review && !review.workflowCodes.length) return snapshot;
   const query = new URL("/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,no_serial_used,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at,updated_at&visibility=eq.public&admin_archived_at=is.null&owner_removed_at=is.null&order=created_at.desc,id.asc", "https://supabase.invalid");
   if (ownerId) query.searchParams.set("owner_id", "eq." + ownerId);
+  if (review) query.searchParams.set("qr_code", "in.(" + review.workflowCodes.join(",") + ")");
   const guitars = await supabasePagedRows<GuitarRow>(query.pathname + query.search, { serviceRole: true });
   const [related, trustByCode] = await Promise.all([
     loadRelated(guitars),
@@ -465,17 +500,18 @@ export async function getPublicInstruments(ownerId?: string) {
     return isEligiblePublicProfile(guitar, { ownerProfile: profile });
   });
 
-  return Promise.all(
+  const liveRecords = await Promise.all(
     visibleGuitars.map(async (guitar) => {
       const heroStoragePath = guitar.hero_image_path || "";
       const media = resolveMediaSources((related.media.get(guitar.id) || []).filter((storagePath) => storagePath !== heroStoragePath), guitar.qr_code);
       const heroImagePath = heroStoragePath ? resolveMediaSources([heroStoragePath], guitar.qr_code)[0] : "";
       const documents = resolveDocumentSources(related.documents.get(guitar.id) || [], guitar.qr_code);
-      return sanitizePublicInstrument(mapRecord({
+      return sanitizePublicInstrumentWithConfirmedOwnerNames(mapRecord({
         guitar: { ...guitar, hero_image_path: heroImagePath || guitar.hero_image_path },
         media,
         documents,
         serviceEvents: related.serviceEvents.get(guitar.id) || [],
+        latestService: related.latestServiceDates.get(guitar.id),
         externalMedia: (related.externalMedia.get(guitar.id) || []).map((item) => ({
           id: item.id,
           provider: item.provider,
@@ -495,6 +531,7 @@ export async function getPublicInstruments(ownerId?: string) {
       }));
     })
   );
+  return [...snapshot, ...liveRecords];
 }
 
 export async function getPublicInstrumentByCode(code: string) {
@@ -503,6 +540,9 @@ export async function getPublicInstrumentByCode(code: string) {
   if (!normalizedCode || isRetiredPublicProfileCode(normalizedCode)) {
     return null;
   }
+  const snapshot = await readPublicReviewSnapshot();
+  const publicReviewRecord = snapshot?.find(record => record.qrCode === normalizedCode);
+  if (publicReviewRecord) return publicReviewRecord;
   let rows = await supabaseHttpsJson<GuitarRow[]>(`/rest/v1/guitars?select=id,owner_id,qr_code,permanent_path,name,brand,model,year,serial_number,no_serial_used,builder,location,status,visibility,summary,hero_image_path,safety_status,safety_status_updated_at,public_safety_note,admin_archived_at,owner_removed_at,created_at,updated_at&qr_code=eq.${encodeURIComponent(normalizedCode)}&limit=1`, { serviceRole: true });
   if (!rows.length) {
     const redirects = await supabaseHttpsJson<Array<{ guitar_id: string }>>(`/rest/v1/qr_redirects?select=guitar_id&old_path=eq.${encodeURIComponent(`/i/${normalizedCode}`)}&active=eq.true&limit=1`, { serviceRole: true });
@@ -518,7 +558,7 @@ export async function getPublicInstrumentByCode(code: string) {
   }
 
   const [related, trustByCode] = await Promise.all([
-    loadRelated([data], true),
+    loadRelated([data], true, true),
     loadTrustSettingsMap([data.qr_code])
   ]);
   const ownerProfile = related.profiles.get(data.owner_id || "");
@@ -530,11 +570,12 @@ export async function getPublicInstrumentByCode(code: string) {
   const heroImagePath = heroStoragePath ? resolveMediaSources([heroStoragePath], data.qr_code)[0] : "";
   const documents = resolveDocumentSources(related.documents.get(data.id) || [], data.qr_code);
 
-  return sanitizePublicInstrument(mapRecord({
+  return sanitizePublicInstrumentWithConfirmedOwnerNames(mapRecord({
     guitar: { ...data, hero_image_path: heroImagePath || data.hero_image_path },
     media,
     documents,
     serviceEvents: related.serviceEvents.get(data.id) || [],
+    latestService: related.latestServiceDates.get(data.id),
     externalMedia: (related.externalMedia.get(data.id) || []).map((item) => ({
       id: item.id,
       provider: item.provider,

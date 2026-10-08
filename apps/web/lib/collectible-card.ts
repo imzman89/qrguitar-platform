@@ -17,6 +17,7 @@ export type CollectibleCardData = {
   publicSerial: string;
   photoCount: number;
   publicDocumentCount: number;
+  publicHistoryCount: number;
   collection: DemoInstrument["publicCollection"] | null;
 };
 
@@ -40,6 +41,7 @@ export function resolveCollectibleCard(record: DemoInstrument): CollectibleCardD
     publicSerial: presentation.serialNumber,
     photoCount: presentation.counts.photos,
     publicDocumentCount: presentation.counts.documents,
+    publicHistoryCount: presentation.counts.timeline + presentation.counts.service,
     collection: record.publicCollection || null
   };
 }

@@ -121,7 +121,7 @@ function mapTransfer(row: TransferRow, guitar?: GuitarRow | null, includePrivate
     toName: includePrivate ? row.to_name || "" : "",
     toEmail: includePrivate ? row.to_email : "",
     status: transferStatus(row.status),
-    claimPath: transferClaimPath(row.id),
+    claimPath: row.purchaser_code_hash ? transferClaimPath(row.id) : `/receive/${row.id}`,
     createdAt: row.created_at,
     acceptedAt: row.accepted_at || undefined,
     handoffPrepared: Boolean(row.purchaser_code_hash),
@@ -146,7 +146,7 @@ async function sendTransferClaimEmail(request: Request, transfer: TransferRow, g
   });
   const claimUrl = transfer.purchaser_code_hash
     ? `${(process.env.NEXT_PUBLIC_SITE_URL || env.siteUrl || new URL(request.url).origin).replace(/\/$/, "")}/ownership-claim?handoff=buyer-code`
-    : transferClaimUrl(request, transfer.id);
+    : transferClaimUrl(request, transfer.id).replace(`/transfer/${transfer.id}`, `/receive/${transfer.id}`);
   const recordName = guitar.name || guitar.model || guitar.qr_code;
   const { error } = await authClient.auth.signInWithOtp({
     email: transfer.to_email,
@@ -226,7 +226,7 @@ export async function GET(request: Request) {
         return json({ ok: true, transfer: { id: transfer.id }, requiresSignIn: true,
           message: "Sign in with the recipient email to view this handoff." });
       }
-      return json({ ok: true, transfer: mapTransfer(transfer, guitar, true), requiresSignIn: false });
+      return json({ ok: true, transfer: mapTransfer(transfer, guitar, true), requiresSignIn: false, ownsProfile: guitar?.owner_id === auth.user?.id });
     }
     if (scope !== "mine") return json({ ok: false, message: "Unsupported transfer query." }, { status: 400 });
     if (!auth.user) return json({ ok: false, transfers: [], message: auth.error || "Sign in required." }, { status: 401 });
@@ -281,7 +281,7 @@ export async function POST(request: Request) {
   if (!auth.user) return json({ ok: false, message: auth.error || "Sign in required." }, { status: 401 });
   const writeAccess = await assertAccountCanWrite(supabase, auth.user);
   if (!writeAccess.ok) return json({ ok: false, message: writeAccess.message }, { status: writeAccess.status });
-  const body = await request.json().catch(() => null) as { qrCode?: string; toEmail?: string; toName?: string; mode?: string; expiresInDays?: number; orderReference?: string } | null;
+  const body = await request.json().catch(() => null) as { qrCode?: string; toEmail?: string; toName?: string; mode?: string; expiresInDays?: number; orderReference?: string; expectedUpdatedAt?: string; expectedDocuments?: Array<{ id: string; updatedAt: string }>; selectedPrivateDocumentIds?: string[] } | null;
   const qrCode = String(body?.qrCode || "").trim().toUpperCase();
   const toEmail = normalizeEmail(body?.toEmail || "");
   const toName = String(body?.toName || "").trim();
@@ -291,15 +291,28 @@ export async function POST(request: Request) {
   if (!qrCode || (mode === "email" && !toEmail) || (toEmail && !/^[^\s@]+@[^\s@]+$/.test(toEmail))) {
     return json({ ok: false, message: mode === "email" ? "QRguitar ID and recipient email are required." : "Enter a valid optional recipient email." }, { status: 400 });
   }
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (typeof body?.expectedUpdatedAt !== "string" || !Number.isFinite(Date.parse(body.expectedUpdatedAt))
+    || !Array.isArray(body.expectedDocuments) || body.expectedDocuments.length > 10
+    || !body.expectedDocuments.every(d => d && typeof d.id === "string" && uuid.test(d.id)
+      && typeof d.updatedAt === "string" && Number.isFinite(Date.parse(d.updatedAt)))
+    || !Array.isArray(body.selectedPrivateDocumentIds) || body.selectedPrivateDocumentIds.length > 10
+    || !body.selectedPrivateDocumentIds.every(id => typeof id === "string" && uuid.test(id))
+    || new Set(body.selectedPrivateDocumentIds).size !== body.selectedPrivateDocumentIds.length) {
+    return json({ ok: false, message: "Reload the Profile and review its private-file selection." }, { status: 400 });
+  }
   const buyerCode = mode === "buyer_code" ? createBuyerCode() : "";
   let result;
   try {
-    result = await supabase.rpc("prepare_ownership_transfer", {
+    result = await supabase.rpc("prepare_ownership_transfer_with_documents", {
       p_actor_id: auth.user.id, p_qr_code: qrCode, p_to_email: toEmail, p_to_name: toName,
       p_buyer_code_hash: buyerCode ? hashBuyerCode(buyerCode) : null,
       p_order_reference_hash: buyerCode && orderReference ? hashOrderReference(orderReference) : null,
       p_expires_in_days: expiresInDays, p_env_admin: environmentAdmin(auth.user),
-      p_display_name: auth.user.user_metadata?.display_name || auth.user.email || ""
+      p_display_name: auth.user.user_metadata?.display_name || auth.user.email || "",
+      p_expected_updated_at: body.expectedUpdatedAt,
+      p_expected_documents: body.expectedDocuments,
+      p_selected_private_ids: body.selectedPrivateDocumentIds
     });
   } catch { return transferFailure(); }
   if (result.error) return transferFailure(result.error);
@@ -336,7 +349,7 @@ export async function PATCH(request: Request) {
   let result;
   try {
     result = action === "accept" || action === "redeem_code"
-      ? await supabase.rpc("complete_ownership_transfer", {
+      ? await supabase.rpc("complete_ownership_transfer_with_documents", {
         p_transfer_id: action === "redeem_code" ? null : id, p_new_owner_id: auth.user.id,
         p_buyer_code_hash: code ? hashBuyerCode(code) : null,
         p_order_reference_hash: code && normalizeOrderReference(body?.orderReference || "") ? hashOrderReference(body?.orderReference || "") : null,
@@ -363,6 +376,6 @@ export async function PATCH(request: Request) {
   }
   if (committed.transfer.status !== "accepted" || committed.transfer.accepted_by !== auth.user.id) return transferFailure();
   return json({ ok: true, transfer: mapTransfer(committed.transfer, committed.guitar, true),
-    permanentPath: committed.guitar.permanent_path, replayed: committed.replayed,
+    permanentPath: committed.guitar.permanent_path, replayed: committed.replayed, ownsProfile: committed.guitar.owner_id === auth.user.id,
     message: "Ownership accepted. The QRguitar Profile, ID, URL, and protected history stayed with the instrument." });
 }

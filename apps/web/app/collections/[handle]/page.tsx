@@ -54,7 +54,8 @@ export default async function CollectionPage({ params }: { params: Promise<{ han
   const publishedSettings = await loadPublishedSiteSettings();
   const role = collectionRoleLabel(settings.accountType);
   const jsonLd = buildPublicCollectionJsonLd(settings, records);
-  return <>
+  const businessIdentity = settings.accountType === "shop" || settings.accountType === "builder";
+  const collectionPage = <>
     <script id="qrguitar-collection-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
     <Nav />
     <main className={`${styles.memberPage} page-shell collection-page`}>
@@ -82,8 +83,9 @@ export default async function CollectionPage({ params }: { params: Promise<{ han
           </div>
         </div>
       </header>
-      <CollectionsClient key={settings.handle} records={records} content={publishedSettings.content} />
+      <CollectionsClient key={settings.handle} records={records} content={publishedSettings.content} collectionHref={"/collections/" + encodeURIComponent(settings.handle)} />
     </main>
     <Footer />
   </>;
+  return businessIdentity ? <div className={styles.businessCollection}>{collectionPage}</div> : collectionPage;
 }

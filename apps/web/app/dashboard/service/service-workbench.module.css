@@ -82,3 +82,20 @@
 }
 
 @media (max-width: 540px) { .page input,.page select { font-size: 16px; } .itemDetails dl { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+
+/* Screen-only registered-service workbench chrome; requests, status and evidence remain unchanged. */
+@media screen {
+ .heading h1 { font-family:var(--font-display,Georgia,serif); font-weight:400; }
+ .start h2, .queue h2, .notice h2 { font-family:var(--font-display,Georgia,serif); font-size:clamp(23px,2.5vw,30px); font-weight:400; line-height:1.2; }
+ .start { padding:24px 0; border-block:1px solid var(--line); border-radius:0; background:transparent; }
+ .stats > div { padding:18px 0; border-top:1px solid var(--line); border-radius:0; background:transparent; }
+ .item { padding:24px 0; border-top:1px solid var(--line); border-radius:0; background:transparent; }
+ .primary, .secondary { border-radius:2px; font-weight:500; }
+ .primary { border-color:var(--border-strong); background:var(--surface-subtle); color:var(--text); }
+ .secondary { border-color:var(--line); background:transparent; }
+ .primary:hover, .secondary:hover { border-color:var(--border-strong); background:var(--surface-raised); }
+}
+
+@media screen {
+ .notice, .empty { padding:24px 0; border-block:1px solid var(--line); border-radius:0; background:transparent; }
+}

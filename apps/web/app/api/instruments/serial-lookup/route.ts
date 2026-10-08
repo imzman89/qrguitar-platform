@@ -1,3 +1,4 @@
+import { readPublicReviewSnapshot } from "../../../../lib/public-review-snapshot";
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "../../../../lib/supabase-server";
 import { normalizeSerialBuildId } from "../../../../lib/instrument-profile-contract";
@@ -24,8 +25,13 @@ function response(body: Record<string, unknown>, status = 200) {
   return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
 }
 
-function noPublicMatch() {
-  return response({ ok: true, match: "none", message: "No public QRguitar Profile matches that exact serial." });
+function noPublicMatch(publicReviewSnapshot = false) {
+  return response({
+    ok: true,
+    match: "none",
+    ...(publicReviewSnapshot ? { publicReviewSnapshot: true } : {}),
+    message: "No public QRguitar Profile matches that exact serial."
+  });
 }
 
 function requestKey(request: Request) {
@@ -64,6 +70,29 @@ export async function POST(request: Request) {
     return response({ ok: false, message: "Enter at least four letters or numbers from the exact Serial Number." }, 400);
   }
 
+  let reviewSnapshotActive = false;
+  try {
+    const snapshot = await readPublicReviewSnapshot();
+    if (snapshot) {
+      reviewSnapshotActive = true;
+      const matches = snapshot.filter(record =>
+        record.visibility === "public" && record.showSerialPublic === true &&
+        record.serialNotUsed !== true && typeof record.serial === "string" &&
+        normalizeSerialBuildId(record.serial) === normalized
+      );
+      if (matches.length === 1) return response({
+        ok: true, match: "public", instrument: matches[0],
+        exactSerialMatch: true, publicReviewSnapshot: true
+      });
+      if (matches.length > 1) return noPublicMatch(true);
+    }
+  } catch {
+    return response({
+      ok: false,
+      message: "Serial lookup is temporarily unavailable."
+    }, 503);
+  }
+
   const supabase = createServerSupabaseClient();
   if (!supabase) {
     return response({ ok: false, message: "Serial lookup is temporarily unavailable." }, 503);
@@ -95,7 +124,7 @@ export async function POST(request: Request) {
   }
 
   if (!guitarId) {
-    return noPublicMatch();
+    return noPublicMatch(reviewSnapshotActive);
   }
 
   const guitarResult = await supabase
@@ -105,7 +134,7 @@ export async function POST(request: Request) {
     .maybeSingle<GuitarMatchRow>();
   const guitar = guitarResult.data;
   if (guitarResult.error || !guitar || guitar.admin_archived_at || guitar.owner_removed_at) {
-    return noPublicMatch();
+    return noPublicMatch(reviewSnapshotActive);
   }
 
   if (guitar.visibility === "public") {
@@ -115,5 +144,5 @@ export async function POST(request: Request) {
     }
   }
 
-  return noPublicMatch();
+  return noPublicMatch(reviewSnapshotActive);
 }

@@ -1,5 +1,5 @@
 {
-  "releaseVersion": "2026-10-04.1",
+  "releaseVersion": "2026-10-08.1",
   "checks": [
     "catalog_readable",
     "required_functions",
@@ -22,8 +22,6 @@
     "public.register_staged_instrument_upload(uuid,text,text,text)",
     "public.cleanup_staged_instrument_uploads(uuid,text,text[],text[])",
     "public.save_account_settings(uuid,text,jsonb,bigint)",
-    "public.prepare_ownership_transfer(uuid,text,text,text,text,text,integer,boolean,text)",
-    "public.complete_ownership_transfer(uuid,uuid,text,text,boolean,text)",
     "public.manage_ownership_transfer(uuid,uuid,text,text,boolean,text)",
     "public.approve_ownership_claim(uuid,uuid,text,boolean)",
     "public.approve_service_submission(uuid,uuid,text)",
@@ -120,7 +118,21 @@
     "public.billing_paypal_reserve_promoted_order(uuid,text,uuid,text,text,text,uuid,integer,integer,boolean)",
     "public.create_catalog_instrument_profile(uuid,text,text,jsonb,boolean,text,text)",
     "public.save_catalog_instrument_profile(uuid,uuid,timestamp with time zone,jsonb)",
-    "public.prepare_member_message_upload(uuid,uuid,uuid,uuid,jsonb)"
+    "public.prepare_member_message_upload(uuid,uuid,uuid,uuid,jsonb)",
+    "public.ensure_member_conversation(uuid,uuid,uuid)",
+    "public.send_member_message(uuid,uuid,uuid,text)",
+    "public.ensure_recorded_business_conversation(uuid,uuid,uuid,text)",
+    "public.confirm_service_submission(uuid,uuid,text,text,timestamp with time zone)",
+    "public.complete_ownership_transfer_with_documents(uuid,uuid,text,text,boolean,text)",
+    "public.prepare_ownership_transfer_with_documents(uuid,text,text,text,text,text,integer,boolean,text,timestamp with time zone,jsonb,uuid[])",
+    "public.read_retained_private_documents(uuid,integer,uuid)",
+    "public.mutate_service_correction(uuid,jsonb)",
+    "public.read_public_service_corrections(text)",
+    "public.read_service_corrections(uuid,uuid)",
+    "public.read_owner_service_correction_attention(uuid)",
+    "public.list_owner_name_consents(uuid,uuid,integer)",
+    "public.save_owner_name_consent(uuid,uuid,boolean,text,text)",
+    "public.read_public_owner_names(uuid[],boolean)"
   ],
   "blockedFunctions": [
     "public.create_instrument_profile_unregistered(uuid,text,text,jsonb,boolean,text)",
@@ -234,7 +246,20 @@
     "public._account_deletion_sync_storage_relocations(uuid,uuid,text)",
     "public._account_deletion_text_has_identity(text,uuid,text)",
     "public._account_deletion_unscoped_personal_content(uuid,text)",
-    "public._account_deletion_write_fence()"
+    "public._account_deletion_write_fence()",
+    "public._member_assert_conversation(uuid,uuid,boolean)",
+    "public._member_require_business_message_consent(uuid)",
+    "public.prepare_ownership_transfer(uuid,text,text,text,text,text,integer,boolean,text)",
+    "public.complete_ownership_transfer(uuid,uuid,text,text,boolean,text)",
+    "public._block_retained_document_path_reuse()",
+    "public._ownership_active_document_snapshot(uuid)",
+    "public._ownership_document_receipt_immutable()",
+    "public._retain_private_documents_on_owner_change()",
+    "public._redact_service_corrections(uuid,uuid,text[])",
+    "public.protect_service_record_correction()",
+    "public._owner_name_subject(uuid)",
+    "public._owner_name_item(uuid,uuid)",
+    "public._owner_claim_provenance_guard()"
   ],
   "fingerprints": [
     {
@@ -405,7 +430,7 @@
     },
     {
       "signature": "public._account_deletion_fulfillment_guard()",
-      "source_hash": "ef9911f4dbc606c483d6796540a6c3311c908889ab1c2cdd9405a809f5202495",
+      "source_hash": "59443e08685a4439aa6533d5dd5c36e2eeb57a2401aeea283455445fe11d8bcc",
       "arguments": "",
       "result": "trigger",
       "definer": true,
@@ -515,7 +540,7 @@
     },
     {
       "signature": "public._account_deletion_migrate_service_subject(uuid,uuid,uuid)",
-      "source_hash": "d09de73b2e0b0c6d3f6f48574fe1ce31f6bd7039b5eefdb0f6d3059744db9ad6",
+      "source_hash": "fc4621970ea8949b5f09f3845fa0d28a9805aee799ea6c3182af0e6dd964dab4",
       "arguments": "p_request_id uuid, p_actor_id uuid, p_admin_id uuid",
       "result": "void",
       "definer": true,
@@ -537,7 +562,7 @@
     },
     {
       "signature": "public._account_deletion_profile_graph_fence()",
-      "source_hash": "541f152bdd3cef9f321df712370e4034db5b5cf1401ff77640671fd19a310974",
+      "source_hash": "ed75c33085f739040542c3d586686039a55fb907ac05f9f80582a8af80d9fb5e",
       "arguments": "",
       "result": "trigger",
       "definer": true,
@@ -548,7 +573,7 @@
     },
     {
       "signature": "public._account_deletion_profile_has_exact_identity(uuid,uuid,text)",
-      "source_hash": "5148a8513daaffd1d9c5a66f1d1eb54e9ffb654a985f6bc6ba9463645cfa9999",
+      "source_hash": "f5ba730721a13f9b0e0bbc5699aaa5defea53621f61ea29c0dfdfe420ca1d08f",
       "arguments": "p_guitar_id uuid, p_actor_id uuid, p_email text",
       "result": "boolean",
       "definer": true,
@@ -559,7 +584,7 @@
     },
     {
       "signature": "public._account_deletion_profile_review_graph(uuid,uuid)",
-      "source_hash": "b9e5a065709cc36bb41c229fd02071a5ea351f45459ffb06b993b9991a74bd91",
+      "source_hash": "c54136cc86306f100791deaea1eb65cca80a9beff2db3677eda2e1b799daa9ae",
       "arguments": "p_request_id uuid, p_guitar_id uuid",
       "result": "jsonb",
       "definer": true,
@@ -770,7 +795,7 @@
     },
     {
       "signature": "public._account_deletion_retained_pii(uuid,uuid,text)",
-      "source_hash": "8c82de4192a80996ecbe969e0e6c1ddd4366a8155472006d930fb98c5474e3eb",
+      "source_hash": "bbb8c921e98566811b7dfedcba9b8e55c55685a9fbac9a66c40cb8577e87a5dd",
       "arguments": "p_request_id uuid, p_actor_id uuid, p_email text",
       "result": "boolean",
       "definer": true,
@@ -847,7 +872,7 @@
     },
     {
       "signature": "public._account_deletion_service_graph(uuid,uuid)",
-      "source_hash": "f0c13f857a00ab5d8fc123cb8c56baee78f06b73a64acdf28c6d116032b4b37b",
+      "source_hash": "4ce118e5d05a0fbbe823873c198cec6ca2f2aca4c7a67fbe3e37937fcea5835e",
       "arguments": "p_actor_id uuid, p_subject_id uuid",
       "result": "jsonb",
       "definer": true,
@@ -936,7 +961,7 @@
     },
     {
       "signature": "public._account_deletion_sync_profile_review_scope(uuid,uuid,text)",
-      "source_hash": "cb02c540d5717d2f92830a1b516f0ec5115a76d59bd5314393222dd7e5f28f18",
+      "source_hash": "ebac4243836cd348d60efa9685f43767879dba02258d6bd73e1fac68f5de7884",
       "arguments": "p_request_id uuid, p_actor_id uuid, p_email text",
       "result": "void",
       "definer": true,
@@ -969,7 +994,7 @@
     },
     {
       "signature": "public._account_deletion_unscoped_personal_content(uuid,text)",
-      "source_hash": "9ee9ba6657a6bfbb697df4e7699144a33d53a7d846934be0782a2b8a212eddcc",
+      "source_hash": "8255c0f2714c7ce305f838b7cdff8fa8249a515800a6868d8819c813d5787bd2",
       "arguments": "p_actor_id uuid, p_email text",
       "result": "boolean",
       "definer": true,
@@ -1387,7 +1412,7 @@
     },
     {
       "signature": "public.approve_ownership_claim(uuid,uuid,text,boolean)",
-      "source_hash": "c571700d25f3df6ec004d88632cd6d7a75f23d23f4abfbba2679becd018d6830",
+      "source_hash": "b13f9552aaee0225128936f4fd63578e81983be259ec8c0b00d42c446c3aeecf",
       "arguments": "p_claim_id uuid, p_decided_by uuid, p_decision_note text, p_env_admin boolean",
       "result": "jsonb",
       "definer": true,
@@ -1398,13 +1423,13 @@
     },
     {
       "signature": "public.approve_service_submission(uuid,uuid,text)",
-      "source_hash": "4f1d48b14d4643b1a7299ec317426107b28ccd1376430c5740d66b680e157c79",
+      "source_hash": "a3cf64228c53d1f305597ea6e2e07ae3499bfc1425f934a025525d543bc96167",
       "arguments": "p_submission_id uuid, p_owner_user_id uuid, p_token_hash text DEFAULT NULL::text",
       "result": "TABLE(service_event_id uuid, timeline_event_id uuid, already_approved boolean)",
       "definer": true,
       "volatility": "v",
       "settings": [
-        "search_path=public"
+        "search_path=pg_catalog, public"
       ]
     },
     {
@@ -2212,7 +2237,7 @@
     },
     {
       "signature": "public.create_instrument_profile_credited(uuid,text,text,jsonb,boolean,text,text)",
-      "source_hash": "6db8d676342d537aa2232554892d7920f05338df6a8220106eba2e684afde790",
+      "source_hash": "f4c1e12ea5e3e8cbc3fa9354312db0662e1143c12a33122a37e0f696762450fb",
       "arguments": "p_owner_id uuid, p_idempotency_key text, p_upload_id text, p_payload jsonb, p_launch_testing_access boolean, p_owner_display_name text, p_billing_environment text",
       "result": "jsonb",
       "definer": true,
@@ -2267,7 +2292,7 @@
     },
     {
       "signature": "public.inspect_account_deletion_review_page(uuid,boolean,uuid,uuid,text,uuid,text,text,integer)",
-      "source_hash": "e827f22a0df60be38a251977bba7729a430ae81cb182fc9004a8016c64cd4365",
+      "source_hash": "89bbd9dcbab9262f8c2d9638f5639a179784202ba1c072d007a3a63270938918",
       "arguments": "p_admin_id uuid, p_environment_admin boolean, p_request_id uuid, p_operation_id uuid, p_kind text, p_guitar_id uuid, p_domain text, p_expected_fingerprint text, p_page_index integer",
       "result": "jsonb",
       "definer": true,
@@ -2342,7 +2367,7 @@
     },
     {
       "signature": "public.prepare_account_deletion_fulfillment(uuid,boolean,uuid,uuid,text[])",
-      "source_hash": "deed6f77be86bc3edfdeb7f659d9ee22a22023f824e51efba428d349dcceeafd",
+      "source_hash": "393ad8fe72c06e0aa3a79788f5423a7ded68e2b22227f15c9d961728eae4252e",
       "arguments": "p_admin_id uuid, p_environment_admin boolean, p_request_id uuid, p_operation_id uuid, p_protected_admin_emails text[] DEFAULT '{}'::text[]",
       "result": "jsonb",
       "definer": true,
@@ -2518,7 +2543,7 @@
     },
     {
       "signature": "public.redact_account_deletion_profile_review(uuid,boolean,uuid,uuid,uuid,text,text[])",
-      "source_hash": "62f5fd939a13c0d6a2e13e0f9a4614e19c11763c4b52b29f0b0a37395cd89bb3",
+      "source_hash": "1801091ad234393584d646c32511b8ff88e4ef4204b73b62f8f84257f471debb",
       "arguments": "p_admin_id uuid, p_environment_admin boolean, p_request_id uuid, p_operation_id uuid, p_guitar_id uuid, p_expected_fingerprint text, p_terms text[]",
       "result": "jsonb",
       "definer": true,
@@ -2573,7 +2598,7 @@
     },
     {
       "signature": "public.save_account_settings(uuid,text,jsonb,bigint)",
-      "source_hash": "1beee0b381bf308147d8e0afee278040196d18cf42fd8aea15e1607800b86c42",
+      "source_hash": "ec79eaa202fed80a50de39c0431298b9ac32080e844cac7b1e535acee5f25e69",
       "arguments": "p_user_id uuid, p_display_name text, p_collection jsonb, p_expected_version bigint",
       "result": "jsonb",
       "definer": true,
@@ -2584,7 +2609,7 @@
     },
     {
       "signature": "public.save_instrument_profile(uuid,uuid,timestamp with time zone,jsonb)",
-      "source_hash": "24bb651ac92f5a535463871eeee53c98b819952b239e4fc533de7a6f718f1186",
+      "source_hash": "1c891ec2b7556f7cc0de457df89783d1e62c4c284bf0918d882242aabf6a7dfd",
       "arguments": "p_guitar_id uuid, p_owner_id uuid, p_expected_updated_at timestamp with time zone, p_payload jsonb",
       "result": "jsonb",
       "definer": true,
@@ -2673,6 +2698,282 @@
       "source_hash": "298ef6a5e0b0e967bde93fc1958533982d8293715dbbcb5fe8a2f7b77c4eb839",
       "arguments": "p_conversation_id uuid, p_actor_id uuid, p_operation_id uuid, p_upload_id uuid, p_file jsonb",
       "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._member_assert_conversation(uuid,uuid,boolean)",
+      "source_hash": "cad2a77a2414fbc0a86712f12ee66a0b11d7284698f4af371da8c4ec91344941",
+      "arguments": "p_conversation_id uuid, p_actor_id uuid, p_require_send boolean DEFAULT false",
+      "result": "member_conversations",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.ensure_member_conversation(uuid,uuid,uuid)",
+      "source_hash": "068050d7ec46f1e3059891c13de5714a27ea6536e107ead8a3377258970878dd",
+      "arguments": "p_actor_id uuid, p_target_id uuid, p_context_guitar_id uuid DEFAULT NULL::uuid",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.send_member_message(uuid,uuid,uuid,text)",
+      "source_hash": "19e993bea511c610bebd9b298072f51461837037a31ed161fdd2688373d1319d",
+      "arguments": "p_conversation_id uuid, p_actor_id uuid, p_operation_id uuid, p_body text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._member_require_business_message_consent(uuid)",
+      "source_hash": "111b617701e60f23ec2a9434234c9c1ddc924524a0bd71193c050c833edcc1f2",
+      "arguments": "p_target_id uuid",
+      "result": "void",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.ensure_recorded_business_conversation(uuid,uuid,uuid,text)",
+      "source_hash": "05569cd3f3c2d15d8adc14264f269158208b20b6a07f41e7b32d7174d762f3a5",
+      "arguments": "p_actor_id uuid, p_target_id uuid, p_transfer_id uuid, p_handle text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.confirm_service_submission(uuid,uuid,text,text,timestamp with time zone)",
+      "source_hash": "26ea2e31f53e2576c9b295971b60e1fd089d61ab8b1b6e261d187a0c54759f2b",
+      "arguments": "p_submission_id uuid, p_owner_user_id uuid, p_token_hash text, p_visibility text, p_expected_updated_at timestamp with time zone",
+      "result": "TABLE(service_event_id uuid, timeline_event_id uuid, already_approved boolean)",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._block_retained_document_path_reuse()",
+      "source_hash": "8d78ff982701e459f80f5b266a851f4d105d226cf9c7d31ce1db217322a1f39f",
+      "arguments": "",
+      "result": "trigger",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._ownership_active_document_snapshot(uuid)",
+      "source_hash": "b4b9c27fc6204e5c003c2582e568f65aed103d71756825d42820581bb2fe74b5",
+      "arguments": "p_guitar_id uuid",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "signature": "public._ownership_document_receipt_immutable()",
+      "source_hash": "655b3fea013da37b0fd5fb49559a9d81705348be8c35267c5a00f9fd8f502e71",
+      "arguments": "",
+      "result": "trigger",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._retain_private_documents_on_owner_change()",
+      "source_hash": "23b024fe9bf80c30b7b521affd646d473b3bfd1c420746f67320a97d3708bfb9",
+      "arguments": "",
+      "result": "trigger",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.complete_ownership_transfer_with_documents(uuid,uuid,text,text,boolean,text)",
+      "source_hash": "a92d8ff0307f853ac0616628e4c65a8382921fd75a91822d9cae7fa9ff4e3d60",
+      "arguments": "p_transfer_id uuid, p_new_owner_id uuid, p_buyer_code_hash text, p_order_reference_hash text, p_env_admin boolean, p_display_name text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.prepare_ownership_transfer_with_documents(uuid,text,text,text,text,text,integer,boolean,text,timestamp with time zone,jsonb,uuid[])",
+      "source_hash": "07438706d09e46f4f9760d76cd224eeb851454278d8dfe4b98268ed4840969f4",
+      "arguments": "p_actor_id uuid, p_qr_code text, p_to_email text, p_to_name text, p_buyer_code_hash text, p_order_reference_hash text, p_expires_in_days integer, p_env_admin boolean, p_display_name text, p_expected_updated_at timestamp with time zone, p_expected_documents jsonb, p_selected_private_ids uuid[]",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.read_retained_private_documents(uuid,integer,uuid)",
+      "source_hash": "c07589109aa1460dbd608eda6964a370c8bea3372487001dbbee85d8ec5287c3",
+      "arguments": "p_actor_id uuid, p_offset integer, p_document_id uuid DEFAULT NULL::uuid",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._redact_service_corrections(uuid,uuid,text[])",
+      "source_hash": "4f1d442794f112452c7e36140557653aa6c9d9ee8f07c2ba5b7a1d68ad8d5a65",
+      "arguments": "p_request_id uuid, p_guitar_id uuid, p_terms text[] DEFAULT NULL::text[]",
+      "result": "void",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.mutate_service_correction(uuid,jsonb)",
+      "source_hash": "bc87657f9f70e0df115fee4fd05a64576d0fa97f5b3ffa70aa5d77b20b7eb718",
+      "arguments": "p_actor_id uuid, p_request jsonb",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.protect_service_record_correction()",
+      "source_hash": "7e72368f91eb1a46d60b493819ca6817591193975fc7ade27c78d9926a3c9c1d",
+      "arguments": "",
+      "result": "trigger",
+      "definer": false,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.read_public_service_corrections(text)",
+      "source_hash": "4b599d35c8fec93813d4f50d49d0dac1a7398865f415a369e29de5814cfc8725",
+      "arguments": "p_qr_code text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.read_service_corrections(uuid,uuid)",
+      "source_hash": "e7d97062474f8e7d2430691c2633d9b2f6255c9d617f606197887c793f809e15",
+      "arguments": "p_actor_id uuid, p_submission_id uuid",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.read_owner_service_correction_attention(uuid)",
+      "source_hash": "1c594cb16647a249958624f0d5425580c86948790af68f1a567a50ee116943b7",
+      "arguments": "p_actor_id uuid",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.list_owner_name_consents(uuid,uuid,integer)",
+      "source_hash": "59a0ad088cb0b550d2e777a3f2d91bac56745bb4ac1f171f235afc843b7becef",
+      "arguments": "p_actor_id uuid, p_cursor uuid DEFAULT NULL::uuid, p_limit integer DEFAULT 100",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.save_owner_name_consent(uuid,uuid,boolean,text,text)",
+      "source_hash": "0363b643197879055e2c9e414df9b3c6ee1659b8d9d24d3cd278cdc8900936be",
+      "arguments": "p_actor_id uuid, p_event_id uuid, p_enabled boolean, p_public_name text, p_expected_version text",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "v",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public.read_public_owner_names(uuid[],boolean)",
+      "source_hash": "18127e41f49188160d11ae7d71536be7f6fcc782f84ab55228931b1341f6242a",
+      "arguments": "p_event_ids uuid[], p_allow_unlisted boolean DEFAULT false",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._owner_name_subject(uuid)",
+      "source_hash": "045d1675f8b2021c65e0f4f5af05de17cb16caab5ebbffad07f04b4f9e72b40c",
+      "arguments": "p_event_id uuid",
+      "result": "uuid",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._owner_name_item(uuid,uuid)",
+      "source_hash": "90189b10747a7c34868ab243abc8dadd7b7c1bdcc8ec153118b7403594334973",
+      "arguments": "p_event_id uuid, p_actor_id uuid",
+      "result": "jsonb",
+      "definer": true,
+      "volatility": "s",
+      "settings": [
+        "search_path=pg_catalog, public"
+      ]
+    },
+    {
+      "signature": "public._owner_claim_provenance_guard()",
+      "source_hash": "271a4f80829d0f725787e2a4d5278d9650b7810877c560b600e8bc9c3959e99a",
+      "arguments": "",
+      "result": "trigger",
       "definer": true,
       "volatility": "v",
       "settings": [
@@ -5282,6 +5583,288 @@
       "name": "created_at",
       "type": "timestamp with time zone",
       "not_null": true
+    },
+    {
+      "table": "guitar_documents",
+      "name": "retained_private",
+      "type": "boolean",
+      "not_null": true
+    },
+    {
+      "table": "guitar_documents",
+      "name": "retained_by_user_id",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "ownership_transfer_document_selections",
+      "name": "transfer_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "ownership_transfer_document_selections",
+      "name": "guitar_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "ownership_transfer_document_selections",
+      "name": "schema_version",
+      "type": "integer",
+      "not_null": true
+    },
+    {
+      "table": "ownership_transfer_document_selections",
+      "name": "profile_updated_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "ownership_transfer_document_selections",
+      "name": "document_snapshot",
+      "type": "jsonb",
+      "not_null": true
+    },
+    {
+      "table": "ownership_transfer_document_selections",
+      "name": "selected_private_ids",
+      "type": "uuid[]",
+      "not_null": true
+    },
+    {
+      "table": "ownership_transfer_document_selections",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "service_correction_cleanup_authorizations",
+      "name": "transaction_id",
+      "type": "bigint",
+      "not_null": true
+    },
+    {
+      "table": "service_correction_cleanup_authorizations",
+      "name": "target_table",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "service_correction_cleanup_authorizations",
+      "name": "row_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "service_correction_cleanup_authorizations",
+      "name": "request_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "service_correction_cleanup_authorizations",
+      "name": "guitar_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "service_correction_cleanup_authorizations",
+      "name": "before_hash",
+      "type": "bytea",
+      "not_null": true
+    },
+    {
+      "table": "service_correction_cleanup_authorizations",
+      "name": "after_hash",
+      "type": "bytea",
+      "not_null": true
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "correction_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "owner_user_id",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "owner_subject_id",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "revision",
+      "type": "bigint",
+      "not_null": true
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "request_body",
+      "type": "jsonb",
+      "not_null": true
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "outcome",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "is_public",
+      "type": "boolean",
+      "not_null": true
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "decided_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "submission_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "guitar_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "provider_user_id",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "provider_subject_id",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "owner_user_id",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "owner_subject_id",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "revision",
+      "type": "bigint",
+      "not_null": true
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "request_body",
+      "type": "jsonb",
+      "not_null": true
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "original_event_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "original_event_hash",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "details",
+      "type": "text",
+      "not_null": true
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "submitted_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "owner_name_consents",
+      "name": "event_id",
+      "type": "uuid",
+      "not_null": true
+    },
+    {
+      "table": "owner_name_consents",
+      "name": "subject_user_id",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "owner_name_consents",
+      "name": "enabled",
+      "type": "boolean",
+      "not_null": true
+    },
+    {
+      "table": "owner_name_consents",
+      "name": "public_name",
+      "type": "text",
+      "not_null": false
+    },
+    {
+      "table": "owner_name_consents",
+      "name": "version",
+      "type": "bigint",
+      "not_null": true
+    },
+    {
+      "table": "owner_name_consents",
+      "name": "consented_at",
+      "type": "timestamp with time zone",
+      "not_null": false
+    },
+    {
+      "table": "owner_name_consents",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "not_null": true
+    },
+    {
+      "table": "ownership_claims",
+      "name": "approved_previous_owner_id",
+      "type": "uuid",
+      "not_null": false
+    },
+    {
+      "table": "ownership_claims",
+      "name": "approved_previous_owner_captured",
+      "type": "boolean",
+      "not_null": true
     }
   ],
   "provenanceTriggers": [
@@ -5748,7 +6331,7 @@
     [
       "guitar_documents",
       "account_deletion_fence_guitar_documents",
-      "CREATE TRIGGER account_deletion_fence_guitar_documents BEFORE INSERT OR UPDATE ON public.guitar_documents FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('uploaded_by_user_id')"
+      "CREATE TRIGGER account_deletion_fence_guitar_documents BEFORE INSERT OR UPDATE ON public.guitar_documents FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('uploaded_by_user_id', 'retained_by_user_id')"
     ],
     [
       "guitar_documents",
@@ -6034,6 +6617,81 @@
       "storage.objects",
       "account_deletion_storage_write_fence",
       "CREATE TRIGGER account_deletion_storage_write_fence BEFORE INSERT OR DELETE OR UPDATE ON storage.objects FOR EACH ROW EXECUTE FUNCTION _account_deletion_storage_write_fence()"
+    ],
+    [
+      "guitar_documents",
+      "block_retained_document_path_reuse",
+      "CREATE TRIGGER block_retained_document_path_reuse BEFORE INSERT OR UPDATE ON public.guitar_documents FOR EACH ROW EXECUTE FUNCTION _block_retained_document_path_reuse()"
+    ],
+    [
+      "guitars",
+      "protect_retained_documents_from_profile_delete",
+      "CREATE TRIGGER protect_retained_documents_from_profile_delete BEFORE DELETE ON public.guitars FOR EACH ROW EXECUTE FUNCTION _retain_private_documents_on_owner_change()"
+    ],
+    [
+      "guitars",
+      "retain_private_documents_on_owner_change",
+      "CREATE TRIGGER retain_private_documents_on_owner_change AFTER UPDATE OF owner_id ON public.guitars FOR EACH ROW EXECUTE FUNCTION _retain_private_documents_on_owner_change()"
+    ],
+    [
+      "ownership_transfer_document_selections",
+      "account_deletion_profile_graph_document_selections",
+      "CREATE TRIGGER account_deletion_profile_graph_document_selections BEFORE INSERT OR DELETE OR UPDATE ON public.ownership_transfer_document_selections FOR EACH ROW EXECUTE FUNCTION _account_deletion_profile_graph_fence()"
+    ],
+    [
+      "ownership_transfer_document_selections",
+      "ownership_document_receipt_immutable",
+      "CREATE TRIGGER ownership_document_receipt_immutable BEFORE DELETE OR UPDATE ON public.ownership_transfer_document_selections FOR EACH ROW EXECUTE FUNCTION _ownership_document_receipt_immutable()"
+    ],
+    [
+      "service_record_correction_decisions",
+      "account_deletion_service_correction_decision_graph",
+      "CREATE TRIGGER account_deletion_service_correction_decision_graph BEFORE INSERT OR DELETE OR UPDATE ON public.service_record_correction_decisions FOR EACH ROW EXECUTE FUNCTION _account_deletion_profile_graph_fence()"
+    ],
+    [
+      "service_record_correction_decisions",
+      "account_deletion_service_correction_decision_write",
+      "CREATE TRIGGER account_deletion_service_correction_decision_write BEFORE INSERT OR DELETE OR UPDATE ON public.service_record_correction_decisions FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('owner_user_id')"
+    ],
+    [
+      "service_record_correction_decisions",
+      "service_record_correction_decision_immutable",
+      "CREATE TRIGGER service_record_correction_decision_immutable BEFORE DELETE OR UPDATE ON public.service_record_correction_decisions FOR EACH ROW EXECUTE FUNCTION protect_service_record_correction()"
+    ],
+    [
+      "service_record_corrections",
+      "account_deletion_service_correction_graph",
+      "CREATE TRIGGER account_deletion_service_correction_graph BEFORE INSERT OR DELETE OR UPDATE ON public.service_record_corrections FOR EACH ROW EXECUTE FUNCTION _account_deletion_profile_graph_fence()"
+    ],
+    [
+      "service_record_corrections",
+      "account_deletion_service_correction_write",
+      "CREATE TRIGGER account_deletion_service_correction_write BEFORE INSERT OR DELETE OR UPDATE ON public.service_record_corrections FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('provider_user_id', 'owner_user_id')"
+    ],
+    [
+      "service_record_corrections",
+      "service_record_correction_immutable",
+      "CREATE TRIGGER service_record_correction_immutable BEFORE DELETE OR UPDATE ON public.service_record_corrections FOR EACH ROW EXECUTE FUNCTION protect_service_record_correction()"
+    ],
+    [
+      "owner_name_consents",
+      "account_deletion_fence_owner_name_consents",
+      "CREATE TRIGGER account_deletion_fence_owner_name_consents BEFORE INSERT OR DELETE OR UPDATE ON public.owner_name_consents FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('subject_user_id')"
+    ],
+    [
+      "owner_name_consents",
+      "account_deletion_graph_owner_name_consents",
+      "CREATE TRIGGER account_deletion_graph_owner_name_consents BEFORE INSERT OR DELETE OR UPDATE ON public.owner_name_consents FOR EACH ROW EXECUTE FUNCTION _account_deletion_profile_graph_fence()"
+    ],
+    [
+      "ownership_claims",
+      "account_deletion_fence_claim_previous_owner",
+      "CREATE TRIGGER account_deletion_fence_claim_previous_owner BEFORE INSERT OR DELETE OR UPDATE ON public.ownership_claims FOR EACH ROW EXECUTE FUNCTION _account_deletion_write_fence('approved_previous_owner_id')"
+    ],
+    [
+      "ownership_claims",
+      "owner_claim_provenance_guard",
+      "CREATE TRIGGER owner_claim_provenance_guard BEFORE INSERT OR UPDATE ON public.ownership_claims FOR EACH ROW EXECUTE FUNCTION _owner_claim_provenance_guard()"
     ]
   ],
   "rpcOnlyTables": [
@@ -6056,7 +6714,8 @@
     "billing_paypal_webhook_deliveries",
     "billing_paypal_webhook_heartbeats",
     "billing_paypal_webhook_outcomes",
-    "billing_paypal_webhook_payloads"
+    "billing_paypal_webhook_payloads",
+    "owner_name_consents"
   ],
   "billingDefaults": [
     {
@@ -10325,8 +10984,8 @@
     }
   ],
   "fiveFreeProfilesSourceSha256": "54645cd8d9994a574f390bcc358aa1ba51cdd1017b12f87bea565dd2247b498f",
-  "previousReleaseVersion": "2026-09-23.1",
-  "previousReadinessSourceSha256": "9ff42ad4ee1f74b71062dd08775f5446f8954a7e11b1ce7491cb941022801c82",
+  "previousReleaseVersion": "2026-10-07.1",
+  "previousReadinessSourceSha256": "7146fc09b0c564a651b85a339eb4ae7e6fbbea399e0775c1b4a3e451c9e3aea0",
   "catalogPolicySourceSha256": "b6880a39e316cd2b487e708a80677af4bfc3b5d11bfe2babab32857d4bea6a14",
   "catalogFunctionSignatures": [
     "public.create_catalog_instrument_profile(uuid,text,text,jsonb,boolean,text,text)",
@@ -10345,13 +11004,734 @@
     "prepare_member_message_upload",
     "create_catalog_instrument_profile",
     "save_catalog_instrument_profile",
-    "_ensure_saved_instrument_collection"
+    "_ensure_saved_instrument_collection",
+    "_member_assert_conversation",
+    "ensure_member_conversation",
+    "send_member_message",
+    "_member_require_business_message_consent",
+    "ensure_recorded_business_conversation",
+    "confirm_service_submission",
+    "_block_retained_document_path_reuse",
+    "_ownership_active_document_snapshot",
+    "_ownership_document_receipt_immutable",
+    "_retain_private_documents_on_owner_change",
+    "complete_ownership_transfer_with_documents",
+    "prepare_ownership_transfer_with_documents",
+    "read_retained_private_documents",
+    "_redact_service_corrections",
+    "mutate_service_correction",
+    "protect_service_record_correction",
+    "read_public_service_corrections",
+    "read_service_corrections",
+    "save_instrument_profile",
+    "read_owner_service_correction_attention",
+    "list_owner_name_consents",
+    "save_owner_name_consent",
+    "read_public_owner_names",
+    "_owner_name_subject",
+    "_owner_name_item",
+    "_owner_claim_provenance_guard"
   ],
   "currentFunctionSignatures": [
     "public.complete_ownership_transfer(uuid,uuid)",
     "public.complete_ownership_transfer(uuid,uuid,text,text,boolean,text)",
     "public.create_catalog_instrument_profile(uuid,text,text,jsonb,boolean,text,text)",
     "public.save_catalog_instrument_profile(uuid,uuid,timestamp with time zone,jsonb)",
-    "public.prepare_member_message_upload(uuid,uuid,uuid,uuid,jsonb)"
-  ]
+    "public.prepare_member_message_upload(uuid,uuid,uuid,uuid,jsonb)",
+    "public._member_assert_conversation(uuid,uuid,boolean)",
+    "public.ensure_member_conversation(uuid,uuid,uuid)",
+    "public.send_member_message(uuid,uuid,uuid,text)",
+    "public._member_require_business_message_consent(uuid)",
+    "public.ensure_recorded_business_conversation(uuid,uuid,uuid,text)",
+    "public.confirm_service_submission(uuid,uuid,text,text,timestamp with time zone)",
+    "public._block_retained_document_path_reuse()",
+    "public._ownership_active_document_snapshot(uuid)",
+    "public._ownership_document_receipt_immutable()",
+    "public._retain_private_documents_on_owner_change()",
+    "public.complete_ownership_transfer_with_documents(uuid,uuid,text,text,boolean,text)",
+    "public.prepare_ownership_transfer_with_documents(uuid,text,text,text,text,text,integer,boolean,text,timestamp with time zone,jsonb,uuid[])",
+    "public.read_retained_private_documents(uuid,integer,uuid)",
+    "public._redact_service_corrections(uuid,uuid,text[])",
+    "public.mutate_service_correction(uuid,jsonb)",
+    "public.protect_service_record_correction()",
+    "public.read_public_service_corrections(text)",
+    "public.read_service_corrections(uuid,uuid)",
+    "public.save_instrument_profile(uuid,uuid,timestamp with time zone,jsonb)",
+    "public.read_owner_service_correction_attention(uuid)",
+    "public.list_owner_name_consents(uuid,uuid,integer)",
+    "public.save_owner_name_consent(uuid,uuid,boolean,text,text)",
+    "public.read_public_owner_names(uuid[],boolean)",
+    "public._owner_name_subject(uuid)",
+    "public._owner_name_item(uuid,uuid)",
+    "public._owner_claim_provenance_guard()"
+  ],
+  "recordedBusinessSupportSourceSha256": "1fbc716f375c3065c94a071bc068a5de29b01462120c0e54d46a0f625ecbd920",
+  "privateServiceConfirmationSourceSha256": "cf53e41170dfb8e506d021ec522299db92bd1efbe443806092346ad4308f0e8b",
+  "privateDocumentTables": [
+    "ownership_transfer_document_selections"
+  ],
+  "privateDocumentDefaults": [
+    {
+      "table": "guitar_documents",
+      "name": "retained_private",
+      "expression": "false"
+    },
+    {
+      "table": "guitar_documents",
+      "name": "retained_by_user_id",
+      "expression": null
+    },
+    {
+      "table": "ownership_transfer_document_selections",
+      "name": "transfer_id",
+      "expression": null
+    },
+    {
+      "table": "ownership_transfer_document_selections",
+      "name": "guitar_id",
+      "expression": null
+    },
+    {
+      "table": "ownership_transfer_document_selections",
+      "name": "schema_version",
+      "expression": "1"
+    },
+    {
+      "table": "ownership_transfer_document_selections",
+      "name": "profile_updated_at",
+      "expression": null
+    },
+    {
+      "table": "ownership_transfer_document_selections",
+      "name": "document_snapshot",
+      "expression": null
+    },
+    {
+      "table": "ownership_transfer_document_selections",
+      "name": "selected_private_ids",
+      "expression": null
+    },
+    {
+      "table": "ownership_transfer_document_selections",
+      "name": "created_at",
+      "expression": "clock_timestamp()"
+    }
+  ],
+  "privateDocumentConstraints": [
+    {
+      "table": "guitar_documents",
+      "name": "guitar_documents_retained_actor_check",
+      "type": "c",
+      "definition": "CHECK ((retained_private OR (retained_by_user_id IS NULL)))"
+    },
+    {
+      "table": "guitar_documents",
+      "name": "guitar_documents_retained_by_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (retained_by_user_id) REFERENCES auth.users(id) ON DELETE SET NULL"
+    },
+    {
+      "table": "guitar_documents",
+      "name": "guitar_documents_retained_private_check",
+      "type": "c",
+      "definition": "CHECK (((NOT retained_private) OR (NOT is_public)))"
+    },
+    {
+      "table": "ownership_transfer_document_selections",
+      "name": "ownership_transfer_document_selections_document_snapshot_check",
+      "type": "c",
+      "definition": "CHECK ((jsonb_typeof(document_snapshot) = 'array'::text))"
+    },
+    {
+      "table": "ownership_transfer_document_selections",
+      "name": "ownership_transfer_document_selections_guitar_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (guitar_id) REFERENCES guitars(id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "ownership_transfer_document_selections",
+      "name": "ownership_transfer_document_selections_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (transfer_id)"
+    },
+    {
+      "table": "ownership_transfer_document_selections",
+      "name": "ownership_transfer_document_selections_schema_version_check",
+      "type": "c",
+      "definition": "CHECK ((schema_version = 1))"
+    },
+    {
+      "table": "ownership_transfer_document_selections",
+      "name": "ownership_transfer_document_selections_transfer_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (transfer_id) REFERENCES ownership_transfers(id) ON DELETE RESTRICT"
+    }
+  ],
+  "privateDocumentIndexes": [
+    {
+      "table": "guitar_documents",
+      "name": "guitar_documents_retained_actor_idx",
+      "unique": false,
+      "definition": "CREATE INDEX guitar_documents_retained_actor_idx ON public.guitar_documents USING btree (retained_by_user_id, id) WHERE retained_private"
+    },
+    {
+      "table": "ownership_transfer_document_selections",
+      "name": "ownership_transfer_document_selections_pkey",
+      "unique": true,
+      "definition": "CREATE UNIQUE INDEX ownership_transfer_document_selections_pkey ON public.ownership_transfer_document_selections USING btree (transfer_id)"
+    }
+  ],
+  "privateDocumentHandoffSourceSha256": "a98f60082e072bb3c80797c59eb7e3c8304e3792ff6193f3c3ecad0e54a36083",
+  "serviceCorrectionsSourceSha256": "7ba6e3466c8a7aafd404c1013e0bc2a8f1f318e22bbaaa4ebe718286fd96f913",
+  "serviceCorrectionTables": [
+    "service_record_corrections",
+    "service_record_correction_decisions",
+    "service_correction_cleanup_authorizations"
+  ],
+  "serviceCorrectionDefaults": [
+    {
+      "table": "service_correction_cleanup_authorizations",
+      "name": "transaction_id",
+      "expression": null
+    },
+    {
+      "table": "service_correction_cleanup_authorizations",
+      "name": "target_table",
+      "expression": null
+    },
+    {
+      "table": "service_correction_cleanup_authorizations",
+      "name": "row_id",
+      "expression": null
+    },
+    {
+      "table": "service_correction_cleanup_authorizations",
+      "name": "request_id",
+      "expression": null
+    },
+    {
+      "table": "service_correction_cleanup_authorizations",
+      "name": "guitar_id",
+      "expression": null
+    },
+    {
+      "table": "service_correction_cleanup_authorizations",
+      "name": "before_hash",
+      "expression": null
+    },
+    {
+      "table": "service_correction_cleanup_authorizations",
+      "name": "after_hash",
+      "expression": null
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "id",
+      "expression": null
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "correction_id",
+      "expression": null
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "owner_user_id",
+      "expression": null
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "owner_subject_id",
+      "expression": null
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "revision",
+      "expression": null
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "request_body",
+      "expression": null
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "outcome",
+      "expression": null
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "is_public",
+      "expression": "false"
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "decided_at",
+      "expression": "clock_timestamp()"
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "id",
+      "expression": null
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "submission_id",
+      "expression": null
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "guitar_id",
+      "expression": null
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "provider_user_id",
+      "expression": null
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "provider_subject_id",
+      "expression": null
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "owner_user_id",
+      "expression": null
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "owner_subject_id",
+      "expression": null
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "revision",
+      "expression": null
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "request_body",
+      "expression": null
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "original_event_id",
+      "expression": null
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "original_event_hash",
+      "expression": null
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "details",
+      "expression": null
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "submitted_at",
+      "expression": "clock_timestamp()"
+    }
+  ],
+  "serviceCorrectionConstraints": [
+    {
+      "table": "service_correction_cleanup_authorizations",
+      "name": "service_correction_cleanup_authorizations_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (transaction_id, target_table, row_id)"
+    },
+    {
+      "table": "service_correction_cleanup_authorizations",
+      "name": "service_correction_cleanup_authorizations_request_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (request_id) REFERENCES account_deletion_fulfillments(request_id)"
+    },
+    {
+      "table": "service_correction_cleanup_authorizations",
+      "name": "service_correction_cleanup_authorizations_target_table_check",
+      "type": "c",
+      "definition": "CHECK ((target_table = ANY (ARRAY['service_record_corrections'::text, 'service_record_correction_decisions'::text])))"
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "service_record_correction_decisions_check",
+      "type": "c",
+      "definition": "CHECK (((outcome = 'accepted'::text) OR (NOT is_public)))"
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "service_record_correction_decisions_check1",
+      "type": "c",
+      "definition": "CHECK ((((owner_user_id IS NOT NULL) AND (owner_subject_id IS NULL)) OR ((owner_user_id IS NULL) AND (owner_subject_id IS NOT NULL))))"
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "service_record_correction_decisions_correction_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (correction_id) REFERENCES service_record_corrections(id)"
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "service_record_correction_decisions_correction_id_key",
+      "type": "u",
+      "definition": "UNIQUE (correction_id)"
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "service_record_correction_decisions_outcome_check",
+      "type": "c",
+      "definition": "CHECK ((outcome = ANY (ARRAY['accepted'::text, 'rejected'::text])))"
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "service_record_correction_decisions_owner_subject_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (owner_subject_id) REFERENCES account_deletion_service_subjects(subject_id)"
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "service_record_correction_decisions_owner_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (owner_user_id) REFERENCES auth.users(id)"
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "service_record_correction_decisions_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "service_record_correction_decisions_revision_check",
+      "type": "c",
+      "definition": "CHECK ((revision > 0))"
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "service_record_corrections_check",
+      "type": "c",
+      "definition": "CHECK ((((provider_user_id IS NOT NULL) AND (provider_subject_id IS NULL)) OR ((provider_user_id IS NULL) AND (provider_subject_id IS NOT NULL))))"
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "service_record_corrections_check1",
+      "type": "c",
+      "definition": "CHECK ((((owner_user_id IS NOT NULL) AND (owner_subject_id IS NULL)) OR ((owner_user_id IS NULL) AND (owner_subject_id IS NOT NULL))))"
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "service_record_corrections_details_check",
+      "type": "c",
+      "definition": "CHECK (((length(btrim(details)) >= 1) AND (length(btrim(details)) <= 6000)))"
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "service_record_corrections_original_event_hash_check",
+      "type": "c",
+      "definition": "CHECK ((original_event_hash ~ '^[a-f0-9]{64}$'::text))"
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "service_record_corrections_owner_subject_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (owner_subject_id) REFERENCES account_deletion_service_subjects(subject_id)"
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "service_record_corrections_owner_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (owner_user_id) REFERENCES auth.users(id)"
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "service_record_corrections_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "service_record_corrections_provider_subject_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (provider_subject_id) REFERENCES account_deletion_service_subjects(subject_id)"
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "service_record_corrections_provider_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (provider_user_id) REFERENCES auth.users(id)"
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "service_record_corrections_revision_check",
+      "type": "c",
+      "definition": "CHECK ((revision > 0))"
+    }
+  ],
+  "serviceCorrectionIndexes": [
+    {
+      "table": "service_correction_cleanup_authorizations",
+      "name": "service_correction_cleanup_authorizations_pkey",
+      "unique": true,
+      "definition": "CREATE UNIQUE INDEX service_correction_cleanup_authorizations_pkey ON public.service_correction_cleanup_authorizations USING btree (transaction_id, target_table, row_id)"
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "service_record_correction_decisions_correction_id_key",
+      "unique": true,
+      "definition": "CREATE UNIQUE INDEX service_record_correction_decisions_correction_id_key ON public.service_record_correction_decisions USING btree (correction_id)"
+    },
+    {
+      "table": "service_record_correction_decisions",
+      "name": "service_record_correction_decisions_pkey",
+      "unique": true,
+      "definition": "CREATE UNIQUE INDEX service_record_correction_decisions_pkey ON public.service_record_correction_decisions USING btree (id)"
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "service_record_corrections_pkey",
+      "unique": true,
+      "definition": "CREATE UNIQUE INDEX service_record_corrections_pkey ON public.service_record_corrections USING btree (id)"
+    },
+    {
+      "table": "service_record_corrections",
+      "name": "service_record_corrections_submission",
+      "unique": false,
+      "definition": "CREATE INDEX service_record_corrections_submission ON public.service_record_corrections USING btree (submission_id, revision DESC)"
+    }
+  ],
+  "serviceCorrectionIdentityInventory": [
+    {
+      "domain": "service",
+      "table_name": "service_record_correction_decisions",
+      "actor_column": "owner_user_id",
+      "subject_column": "owner_subject_id"
+    },
+    {
+      "domain": "service",
+      "table_name": "service_record_corrections",
+      "actor_column": "owner_user_id",
+      "subject_column": "owner_subject_id"
+    },
+    {
+      "domain": "service",
+      "table_name": "service_record_corrections",
+      "actor_column": "provider_user_id",
+      "subject_column": "provider_subject_id"
+    }
+  ],
+  "profileMetadataPreservationSourceSha256": "d502f43c5d32347baf8b2d8390fb6d0f8861d6bda8b006b3bdc85e8b25fd22e3",
+  "ownerServiceCorrectionAttentionSourceSha256": "c1178b03c4731c00577c816f6c9c55986f0f9235c6ab1a2f9977aa4b89848b68",
+  "freeInstrumentProfilesSourceSha256": "52fd5633562f7ed39179e385e0448c1b758da41e8a100faf11c7b465bb30f262",
+  "ownerNameConsentConstraints": [
+    {
+      "table": "owner_name_consents",
+      "name": "owner_name_consent_name",
+      "type": "c",
+      "definition": "CHECK (((enabled AND (subject_user_id IS NOT NULL) AND (public_name IS NOT NULL) AND ((char_length(public_name) >= 2) AND (char_length(public_name) <= 80)) AND (public_name = btrim(public_name)) AND (public_name !~ '[[:cntrl:]]'::text) AND (consented_at IS NOT NULL)) OR ((NOT enabled) AND (public_name IS NULL) AND (consented_at IS NULL))))"
+    },
+    {
+      "table": "owner_name_consents",
+      "name": "owner_name_consents_event_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (event_id) REFERENCES guitar_timeline_events(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "owner_name_consents",
+      "name": "owner_name_consents_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (event_id)"
+    },
+    {
+      "table": "owner_name_consents",
+      "name": "owner_name_consents_subject_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (subject_user_id) REFERENCES profiles(id) ON DELETE SET NULL"
+    },
+    {
+      "table": "owner_name_consents",
+      "name": "owner_name_consents_version_check",
+      "type": "c",
+      "definition": "CHECK ((version >= 0))"
+    },
+    {
+      "table": "ownership_claims",
+      "name": "ownership_claims_approved_previous_owner_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (approved_previous_owner_id) REFERENCES profiles(id) ON DELETE SET NULL"
+    }
+  ],
+  "ownerNameConsentIndexes": [
+    {
+      "table": "owner_name_consents",
+      "name": "owner_name_consents_pkey",
+      "unique": true,
+      "definition": "CREATE UNIQUE INDEX owner_name_consents_pkey ON public.owner_name_consents USING btree (event_id)"
+    },
+    {
+      "table": "owner_name_consents",
+      "name": "owner_name_consents_subject",
+      "unique": false,
+      "definition": "CREATE INDEX owner_name_consents_subject ON public.owner_name_consents USING btree (subject_user_id) WHERE (subject_user_id IS NOT NULL)"
+    }
+  ],
+  "ownerNameConsentDefaults": [
+    {
+      "table": "owner_name_consents",
+      "name": "event_id",
+      "expression": null
+    },
+    {
+      "table": "owner_name_consents",
+      "name": "subject_user_id",
+      "expression": null
+    },
+    {
+      "table": "owner_name_consents",
+      "name": "enabled",
+      "expression": "false"
+    },
+    {
+      "table": "owner_name_consents",
+      "name": "public_name",
+      "expression": null
+    },
+    {
+      "table": "owner_name_consents",
+      "name": "version",
+      "expression": "0"
+    },
+    {
+      "table": "owner_name_consents",
+      "name": "consented_at",
+      "expression": null
+    },
+    {
+      "table": "owner_name_consents",
+      "name": "updated_at",
+      "expression": "now()"
+    },
+    {
+      "table": "ownership_claims",
+      "name": "approved_previous_owner_id",
+      "expression": null
+    },
+    {
+      "table": "ownership_claims",
+      "name": "approved_previous_owner_captured",
+      "expression": "false"
+    }
+  ],
+  "ownerNameConsentSourceSha256": "8c4e1412d10f5c8ee05b17ebc23c1fa246f5f038d77a5952a09796db14de0304",
+  "ownerNameConsentFunctionSignatures": [
+    "public.list_owner_name_consents(uuid,uuid,integer)",
+    "public.save_owner_name_consent(uuid,uuid,boolean,text,text)",
+    "public.read_public_owner_names(uuid[],boolean)",
+    "public._owner_name_subject(uuid)",
+    "public._owner_name_item(uuid,uuid)",
+    "public._owner_claim_provenance_guard()"
+  ],
+  "accountDeletionReviewReplaySourceSha256": "d434cde921ecd17c9228507b7ba87412a22bdc417f0da275db5dfd7cd96bd384",
+  "deletionReviewPageSchema": {
+    "table": {
+      "acl": "{postgres=arwdDxtm/postgres}",
+      "rls": true,
+      "owner": "postgres",
+      "forceRls": true
+    },
+    "indexes": [
+      {
+        "name": "account_deletion_review_page_receipts_pkey",
+        "ready": true,
+        "valid": true,
+        "unique": true,
+        "primary": true,
+        "clustered": false,
+        "predicate": null,
+        "replident": false,
+        "definition": "CREATE UNIQUE INDEX account_deletion_review_page_receipts_pkey ON public.account_deletion_review_page_receipts USING btree (operation_id)"
+      },
+      {
+        "name": "account_deletion_review_page_scope_lookup",
+        "ready": true,
+        "valid": true,
+        "unique": false,
+        "primary": false,
+        "clustered": false,
+        "predicate": null,
+        "replident": false,
+        "definition": "CREATE INDEX account_deletion_review_page_scope_lookup ON public.account_deletion_review_page_receipts USING btree (request_id, kind, scope_key, content_fingerprint, page_index, reviewed_by)"
+      }
+    ],
+    "policies": [
+      {
+        "name": "account_deletion_review_page_receipts_no_direct_access",
+        "qual": "false",
+        "check": "false",
+        "roles": [
+          "0"
+        ],
+        "command": "*"
+      }
+    ],
+    "triggers": [
+      {
+        "name": "account_deletion_review_page_receipts_immutable",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER account_deletion_review_page_receipts_immutable BEFORE DELETE OR UPDATE ON public.account_deletion_review_page_receipts FOR EACH ROW EXECUTE FUNCTION _account_deletion_fulfillment_guard()"
+      }
+    ],
+    "constraints": [
+      {
+        "name": "account_deletion_review_page_receipts_check",
+        "type": "c",
+        "index": "-",
+        "validated": true,
+        "definition": "CHECK (((page_count >= 1) AND (page_index < page_count)))"
+      },
+      {
+        "name": "account_deletion_review_page_receipts_content_fingerprint_check",
+        "type": "c",
+        "index": "-",
+        "validated": true,
+        "definition": "CHECK ((octet_length(content_fingerprint) = 32))"
+      },
+      {
+        "name": "account_deletion_review_page_receipts_kind_check",
+        "type": "c",
+        "index": "-",
+        "validated": true,
+        "definition": "CHECK ((kind = ANY (ARRAY['profile'::text, 'retention'::text])))"
+      },
+      {
+        "name": "account_deletion_review_page_receipts_page_digest_check",
+        "type": "c",
+        "index": "-",
+        "validated": true,
+        "definition": "CHECK ((octet_length(page_digest) = 32))"
+      },
+      {
+        "name": "account_deletion_review_page_receipts_page_index_check",
+        "type": "c",
+        "index": "-",
+        "validated": true,
+        "definition": "CHECK ((page_index >= 0))"
+      },
+      {
+        "name": "account_deletion_review_page_receipts_pkey",
+        "type": "p",
+        "index": "account_deletion_review_page_receipts_pkey",
+        "validated": true,
+        "definition": "PRIMARY KEY (operation_id)"
+      },
+      {
+        "name": "account_deletion_review_page_receipts_request_id_fkey",
+        "type": "f",
+        "index": "account_deletion_fulfillments_pkey",
+        "validated": true,
+        "definition": "FOREIGN KEY (request_id) REFERENCES account_deletion_fulfillments(request_id) ON DELETE CASCADE"
+      }
+    ]
+  }
 }

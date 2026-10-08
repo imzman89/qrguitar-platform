@@ -76,4 +76,68 @@ await test("unauthenticated requests do not read any service data", async () => 
   assert.equal((await f.route.GET(request())).status, 401);
   assert.equal(f.db.calls.length, 0);
 });
+
+function privateAccessFixture(hooks = {}) {
+  const guitar = { id: "grant-guitar", owner_id: owner.id, visibility: "private" };
+  const grant = {
+    id: "grant-one", guitar_id: guitar.id, provider_user_id: provider.id,
+    granted_by_user_id: owner.id, expires_at: null, revoked_at: null
+  };
+  const tables = { service_provider_profile_access: [grant] };
+  const db = createMemoryDatabase(tables, hooks);
+  const workflow = loadRoutes(repo, db, { user: provider })("apps/web/lib/service-workflow.ts");
+  return { guitar, grant, db, workflow };
+}
+await test("private provider consent does not carry from the old owner to a new owner", async () => {
+  const f = privateAccessFixture();
+  assert.equal(await f.workflow.canProviderAccessGuitar(f.db, f.guitar, provider), true);
+  f.guitar.owner_id = "owner-two";
+  assert.equal(await f.workflow.canProviderAccessGuitar(f.db, f.guitar, provider), false);
+  assert.equal(f.db.calls.every((call) => call.operation === "select"), true);
+});
+await test("the new owner's explicit private provider grant permits a new request", async () => {
+  const f = privateAccessFixture();
+  f.guitar.owner_id = "owner-two"; f.grant.granted_by_user_id = "owner-two";
+  assert.equal(await f.workflow.canProviderAccessGuitar(f.db, f.guitar, provider), true);
+  assert.equal(f.db.calls.every((call) => call.operation === "select"), true);
+});
+await test("private provider consent remains scoped to the exact Profile and provider", async () => {
+  const f = privateAccessFixture();
+  f.grant.guitar_id = "other-guitar";
+  assert.equal(await f.workflow.canProviderAccessGuitar(f.db, f.guitar, provider), false);
+  f.grant.guitar_id = f.guitar.id; f.grant.provider_user_id = "other-provider";
+  assert.equal(await f.workflow.canProviderAccessGuitar(f.db, f.guitar, provider), false);
+});
+await test("current-owner private grants still require nonrevoked and unexpired access", async () => {
+  const f = privateAccessFixture();
+  f.grant.revoked_at = "2026-09-01T00:00:00Z";
+  assert.equal(await f.workflow.canProviderAccessGuitar(f.db, f.guitar, provider), false);
+  f.grant.revoked_at = null; f.grant.expires_at = new Date(Date.now() - 60_000).toISOString();
+  assert.equal(await f.workflow.canProviderAccessGuitar(f.db, f.guitar, provider), false);
+  f.grant.expires_at = new Date(Date.now() + 60_000).toISOString();
+  assert.equal(await f.workflow.canProviderAccessGuitar(f.db, f.guitar, provider), true);
+  f.grant.expires_at = null;
+  assert.equal(await f.workflow.canProviderAccessGuitar(f.db, f.guitar, provider), true);
+});
+await test("ownerless Profiles and owner self-submissions remain ineligible without grant reads", async () => {
+  const f = privateAccessFixture();
+  f.guitar.owner_id = null;
+  assert.equal(await f.workflow.canProviderAccessGuitar(f.db, f.guitar, provider), false);
+  f.guitar.owner_id = provider.id;
+  assert.equal(await f.workflow.canProviderAccessGuitar(f.db, f.guitar, provider), false);
+  assert.equal(f.db.calls.length, 0);
+});
+await test("public and unlisted provider submissions retain their existing no-grant contract", async () => {
+  const f = privateAccessFixture();
+  f.guitar.owner_id = "owner-two";
+  for (const visibility of ["public", "unlisted"]) {
+    f.guitar.visibility = visibility;
+    assert.equal(await f.workflow.canProviderAccessGuitar(f.db, f.guitar, provider), true);
+  }
+  assert.equal(f.db.calls.length, 0);
+});
+await test("a private access read failure never becomes permission", async () => {
+  const f = privateAccessFixture({ before() { return { data: null, error: { message: "Synthetic grant read outage" } }; } });
+  await assert.rejects(() => f.workflow.canProviderAccessGuitar(f.db, f.guitar, provider), /grant read outage/);
+});
 console.log(`${passes} service submission read cases passed.`);

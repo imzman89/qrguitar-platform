@@ -3,15 +3,14 @@ import { useUiText } from "./UiTextProvider";
 
 
 import Link from "./CheckoutAwareLink";
-import { ArrowRight, Check, Fingerprint, ShieldCheck, RefreshCw } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { HomeRoleSelector } from "./HomeRoleSelector";
 import { CollectibleRecordCard } from "./CollectibleRecordCard";
 import { Footer } from "./Footer";
 import { EditorialIcon } from "./EditorialIcon";
-import { LatestPublicRecord } from "./LatestPublicRecord";
 import { Nav } from "./Nav";
-import { PublicCreditPricing } from "./PublicCreditPricing";
 import { siteCopy } from "../content/site-copy";
 import type { DemoInstrument } from "../lib/local-demo";
 import { getProfilePhotoUrls } from "../lib/instrument-profile-contract";
@@ -19,7 +18,10 @@ import { publicMediaVariantSrcSet, publicMediaVariantUrl } from "../lib/public-m
 import { buildEditableHomeCopy, fetchPublishedSiteSettings, mergeSiteSettings, type EditableSiteSettings } from "../lib/site-settings";
 
 import { selectHomeFeaturedProfile } from "../lib/home-featured-profile";
+import { isEligiblePublicProfile } from "../lib/public-profile-eligibility";
+import { requestPublicProfiles } from "../lib/public-profile-request";
 import { getContentValue } from "../lib/content-registry";
+import { homeActionTextColors } from "../lib/home-action-contrast";
 import styles from "./HomePageClient.module.css";
 
 export function HomePageClient({
@@ -31,7 +33,18 @@ export function HomePageClient({
 }) {
   const ui = useUiText("components.HomePageClient");
   const [settings, setSettings] = useState<EditableSiteSettings | null>(() => mergeSiteSettings(initialSettings));
-  const [activeAudienceId, setActiveAudienceId] = useState<string | null>(null);
+  const [homeRecords, setHomeRecords] = useState(initialRecords);
+  const [galleryFailed, setGalleryFailed] = useState(false);
+  const [galleryPending, setGalleryPending] = useState(true);
+  const [galleryAttempt, setGalleryAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setGalleryPending(true);
+    void requestPublicProfiles().then(records => {
+      if (active) { setHomeRecords(records); setGalleryFailed(false); }
+    }).catch(() => { if (active) setGalleryFailed(true); }).finally(() => { if (active) setGalleryPending(false); });
+    return () => { active = false; };
+  }, [galleryAttempt]);
   const [failedRecordPhotos, setFailedRecordPhotos] = useState<string[]>([]);
 
   useEffect(() => {
@@ -86,18 +99,27 @@ export function HomePageClient({
     };
   }, [settings]);
 
-  const initialLatestRecord = selectHomeFeaturedProfile(initialRecords);
-  const heroImages = new Set(initialLatestRecord ? getProfilePhotoUrls(initialLatestRecord) : []);
-  const archiveImages = new Set(heroImages);
-  const archiveRecords = initialRecords.filter((record) => {
-    if (record.qrCode === initialLatestRecord?.qrCode) return false;
-    const leadImage = getProfilePhotoUrls(record)[0];
-    if (!leadImage || archiveImages.has(leadImage)) return false;
-    archiveImages.add(leadImage);
-    return true;
+  const eligibleRecords = homeRecords.filter(record => record.visibility === "public" && !record.collectionRemovedAt && isEligiblePublicProfile(record) && record.safetyStatus !== "lost" && record.safetyStatus !== "stolen" && getProfilePhotoUrls(record).length > 0);
+  const initialLatestRecord = selectHomeFeaturedProfile(eligibleRecords);
+  const seenCodes = new Set<string>();
+  const seenPhotos = new Set<string>();
+  const orderedRecords = [...eligibleRecords.filter(record => /guitar/i.test(record.instrumentType || "")), ...eligibleRecords.filter(record => !/guitar/i.test(record.instrumentType || ""))];
+  const galleryRecords = [initialLatestRecord, ...orderedRecords].filter((record): record is DemoInstrument => {
+    if (!record) return false;
+    const code = record.qrCode.trim().toUpperCase();
+    const photos = getProfilePhotoUrls(record);
+    if (seenCodes.has(code) || seenPhotos.has(photos[0])) return false;
+    seenCodes.add(code); photos.forEach(photo => seenPhotos.add(photo)); return true;
   }).slice(0, 3);
-  const supportingRecord = initialRecords.find((record) => record.qrCode !== initialLatestRecord?.qrCode && getProfilePhotoUrls(record).length > 1)
-    || initialRecords.find((record) => record.qrCode !== initialLatestRecord?.qrCode && getProfilePhotoUrls(record).length > 0);
+  const galleryCodes = new Set(galleryRecords.map(record => record.qrCode));
+  const archiveImages = new Set(galleryRecords.flatMap(record => getProfilePhotoUrls(record)));
+  const archiveRecords = eligibleRecords.filter(record => {
+    if (galleryCodes.has(record.qrCode)) return false;
+    const leadImage = getProfilePhotoUrls(record)[0];
+    if (archiveImages.has(leadImage)) return false;
+    archiveImages.add(leadImage); return true;
+  }).slice(0, 3);
+  const supportingRecord = eligibleRecords.find(record => record.qrCode !== initialLatestRecord?.qrCode && getProfilePhotoUrls(record).length > 1) || eligibleRecords.find(record => record.qrCode !== initialLatestRecord?.qrCode);
   const supportingPhotos = supportingRecord ? getProfilePhotoUrls(supportingRecord) : [];
   const recordPhotoCandidates = supportingPhotos.length > 1
     ? [supportingPhotos[1], supportingPhotos[0], ...supportingPhotos.slice(2)]
@@ -106,30 +128,43 @@ export function HomePageClient({
   const homeSections = settings?.composition.home.sections || [];
   const sectionBlocks = (sectionId: string) => homeSections.find((section) => section.id === sectionId)?.blocks.filter((block) => block.visible) || [];
   const audienceBlocks = sectionBlocks("roles");
-  const activeAudience = Math.max(0, audienceBlocks.findIndex(block => block.id === activeAudienceId));
-  const selectedAudience = audienceBlocks[activeAudience];
-  const setActiveAudience = (index: number) => setActiveAudienceId(audienceBlocks[index]?.id || null);
+
 
   const renderedSections: Record<string, ReactNode> = {
     hero: (
-      <section className="hero">
-        <div className="shell hero-grid">
-          <div className="hero-copy">
-            {copy.hero.eyebrow ? <div className="eyebrow">{copy.hero.eyebrow}</div> : null}
-            <h1>{copy.hero.headline}</h1>
-            <p>{copy.hero.body}</p>
-            <div className="hero-actions">
-              <Link className="button" href="/create">{copy.hero.primaryCta}<ArrowRight size={17} aria-hidden="true" /></Link>
-              <Link className="button secondary" href={initialLatestRecord ? `/i/${encodeURIComponent(initialLatestRecord.qrCode)}` : "/catalog"}>{initialLatestRecord ? getContentValue(settings?.content || {}, "home.hero.viewProfile") : copy.hero.secondaryCta}</Link>
+      <section className={styles.galleryOpening}>
+        <div className="shell">
+          <div className={styles.galleryIntro}>
+            <div className={styles.galleryHeadline}>
+              {copy.hero.eyebrow ? <p className={styles.audienceNote}>{copy.hero.eyebrow}</p> : null}
+              <h1>{copy.hero.headline}</h1>
             </div>
-            <a className={styles.betaNote} href="#pricing">{getContentValue(settings?.content || {}, "home.hero.accessNote")}</a>
+            <div className={styles.galleryDescription}>
+              <p>{copy.hero.body}</p>
+              <div className="hero-actions">
+                <Link className="button" href="/create">{copy.hero.primaryCta}<ArrowRight size={17} aria-hidden="true" /></Link>
+                <Link className="text-link" href="/catalog">{copy.hero.secondaryCta}</Link>
+              </div>
+              <span className={styles.betaNote}>{getContentValue(settings?.content || {}, "home.hero.accessNote")}</span>
+            </div>
           </div>
-          <div className={styles.heroShowcase}><LatestPublicRecord initialRecord={initialLatestRecord} content={settings?.content} presentation="showcase" /></div>
-        </div>
-        <div className={"shell " + styles.valueStrip} aria-label={ui("ui.components.HomePageClient.bec4c56fb4cb", "What stays with your instrument")}>
-          <div><Fingerprint size={24} strokeWidth={1.4} aria-hidden="true" /><span><strong>{ui("ui.components.HomePageClient.ecbcf256c14d", "Permanent Profile")}</strong><small>{ui("ui.components.HomePageClient.bc615fcc90ab", "One permanent link.")}</small></span></div>
-          <div><ShieldCheck size={24} strokeWidth={1.4} aria-hidden="true" /><span><strong>{ui("ui.components.HomePageClient.eb341bf13357", "Documents")}</strong><small>{ui("ui.components.HomePageClient.a4c1dff0c2e1", "Choose which documents to share.")}</small></span></div>
-          <div><RefreshCw size={24} strokeWidth={1.4} aria-hidden="true" /><span><strong>{ui("ui.components.HomePageClient.f5ab906e49d7", "Service history")}</strong><small>{ui("ui.components.HomePageClient.104c2472352a", "Keep service records with the Profile.")}</small></span></div>
+          <div className={styles.profileGallery} role="region" tabIndex={0}
+            onFocusCapture={(event) => {
+              const rail = event.currentTarget;
+              if (rail.scrollWidth <= rail.clientWidth) return;
+              const card = (event.target as HTMLElement).closest<HTMLElement>('[data-home-featured="true"]');
+              if (!card || !rail.contains(card)) return;
+              const viewport = rail.getBoundingClientRect();
+              const bounds = card.getBoundingClientRect();
+              const gutter = parseFloat(getComputedStyle(rail).scrollPaddingInlineStart) || 0;
+              if (bounds.left < viewport.left + gutter - 1 || bounds.right > viewport.right - gutter + 1) {
+                rail.scrollTo({ left: rail.scrollLeft + bounds.left - viewport.left - gutter, behavior: "instant" });
+              }
+            }}
+            aria-label={ui("ui.components.HomePageClient.230cdd8c2e80", "Explore additional QRguitar Profiles")}>
+            {galleryRecords.map((record, index) => <CollectibleRecordCard key={record.qrCode} record={record} variant="latest" homeFeatured prioritizeLeadImage={index === 0} content={settings?.content} />)}
+          </div>
+          {galleryPending && !galleryRecords.length ? <p role="status" aria-busy="true">{ui("ui.components.LatestPublicRecord.feef6ffa93b4", "Loading latest QRguitar Profile")}</p> : galleryFailed ? <div role="status"><span>{ui("ui.components.LatestPublicRecord.unavailable", "The Profile example is temporarily unavailable.")}</span>{" "}<button className="text-link" type="button" onClick={() => { setGalleryPending(true); setGalleryAttempt(attempt => attempt + 1); }}>{ui("ui.components.LatestPublicRecord.retry", "Retry")}</button></div> : !homeRecords.length ? <p>{ui("ui.components.LatestPublicRecord.bf94b5d71589", "No public Profiles yet.")}</p> : null}
         </div>
       </section>
     ),
@@ -197,18 +232,10 @@ export function HomePageClient({
       </section>
     ),
     roles: (
-      <section className="section home-roles-section">
+      <section className="section home-roles-section" id="audiences">
         <div className="shell">
           <div className="section-header">{copy.audiences.eyebrow ? <div className="eyebrow">{copy.audiences.eyebrow}</div> : null}<h2>{copy.audiences.headline}</h2>{copy.audiences.body ? <p>{copy.audiences.body}</p> : null}</div>
-          <div className="audience-switcher">
-            <div className="audience-tabs" role="tablist" aria-label={ui("ui.components.HomePageClient.5545daa79d3d", "Choose how you use QRguitar")} onKeyDown={(event) => {
-              const next = event.key === "ArrowRight" ? (activeAudience + 1) % audienceBlocks.length : event.key === "ArrowLeft" ? (activeAudience - 1 + audienceBlocks.length) % audienceBlocks.length : event.key === "Home" ? 0 : event.key === "End" ? audienceBlocks.length - 1 : null;
-              if (next !== null) { event.preventDefault(); setActiveAudience(next); (event.currentTarget.querySelectorAll<HTMLButtonElement>("[role=tab]")[next])?.focus(); }
-            }}>
-              {audienceBlocks.map((item, index) => <button className={index === activeAudience ? "is-active" : ""} key={item.id} type="button" role="tab" id={`home-audience-${index}`} aria-controls="home-audience-panel" tabIndex={index === activeAudience ? 0 : -1} aria-selected={index === activeAudience} onClick={() => setActiveAudience(index)}>{item.title}</button>)}
-            </div>
-            {selectedAudience ? <article className="audience-panel" role="tabpanel" id="home-audience-panel" aria-labelledby={`home-audience-${activeAudience}`}><div className="icon"><EditorialIcon name={selectedAudience.icon} size={30} /></div><div><h3>{selectedAudience.title}</h3><p>{selectedAudience.body}</p>{["home-role-shop", "home-role-builder", "home-role-provider"].includes(selectedAudience.id) ? <Link className={styles.creditLink} href="/installers">{ui("ui.components.HomePageClient.installerProgram", "Explore the Installer program")}<ArrowRight size={16} aria-hidden="true" /></Link> : null}</div><Link className="button secondary" href={selectedAudience.ctaUrl || "/how-it-works"}>{selectedAudience.ctaLabel || ui("ui.components.HomePageClient.cd7d731ce76a", "See the workflow")}</Link></article> : null}
-          </div>
+          <HomeRoleSelector blocks={audienceBlocks} content={settings?.content || {}} label={ui("ui.components.HomePageClient.5545daa79d3d", "Choose how you use QRguitar")} fallbackAction={ui("ui.components.HomePageClient.cd7d731ce76a", "See the workflow")} installerLabel={ui("ui.components.HomePageClient.installerProgram", "Explore the Installer program")} />
         </div>
       </section>
     ),
@@ -241,7 +268,6 @@ export function HomePageClient({
             {sectionBlocks("pricing").map((plan) => <PricingCard key={plan.id} primary={plan.id === "home-price-beta"} name={plan.title} price={plan.label || ""} copy={plan.body} features={plan.items || []} cta={plan.ctaLabel} href={plan.ctaUrl} secondaryHref={plan.id === "home-price-commercial" && plan.ctaUrl !== "/installers" ? "/installers" : undefined} secondaryCta={plan.id === "home-price-commercial" && plan.ctaUrl !== "/installers" ? ui("ui.components.HomePageClient.installerProgram", "Explore the Installer program") : undefined} />)}
           </div>
           <div className={styles.creditNote}><div><h3>{getContentValue(settings?.content || {}, "home.pricing.creditsTitle")}</h3><p>{getContentValue(settings?.content || {}, "home.pricing.creditsBody")}</p></div><Link className={styles.creditLink} href="/billing">{getContentValue(settings?.content || {}, "home.pricing.creditsCta")}<ArrowRight size={16} aria-hidden="true" /></Link></div>
-          <PublicCreditPricing compact />
         </div>
       </section>
     ),
@@ -249,7 +275,7 @@ export function HomePageClient({
       <section className="section home-final-cta">
         <div className="shell">
           <div className="section-header">{settings?.content["home.finalCta.eyebrow"] ? <div className="eyebrow">{settings.content["home.finalCta.eyebrow"]}</div> : null}<h2>{settings?.content["home.finalCta.headline"] || ui("ui.components.HomePageClient.b575d2660321", "Create a Profile")}</h2>{settings?.content["home.finalCta.body"] ? <p>{settings.content["home.finalCta.body"]}</p> : null}</div>
-          <div className="section-cta"><Link className="button" href="/create">{settings?.content["home.finalCta.primaryCta"] || ui("ui.components.HomePageClient.8088497eb587", "Create a Profile")}</Link><Link className="button secondary" href="/catalog">{settings?.content["home.finalCta.secondaryCta"] || ui("ui.components.HomePageClient.004ca2d8b070", "Catalog")}</Link></div>
+          <div className="section-cta"><Link className="button" href="/create">{settings?.content["home.finalCta.primaryCta"] || ui("ui.components.HomePageClient.8088497eb587", "Create a Profile")}<ArrowRight size={17} aria-hidden="true" /></Link><Link className="text-link" href="/catalog">{settings?.content["home.finalCta.secondaryCta"] || ui("ui.components.HomePageClient.004ca2d8b070", "Catalog")}</Link></div>
         </div>
       </section>
     )
@@ -258,7 +284,7 @@ export function HomePageClient({
   return (
     <>
       <Nav />
-      <main className={`home-page ${styles.home}`}>
+      <main className={`home-page ${styles.home}`} style={homeActionTextColors((settings || initialSettings).colors.gold)}>
         {homeSections.filter((section) => section.visible).map((section) => <Fragment key={section.id}>{renderedSections[section.id] || null}</Fragment>)}
       </main>
       <Footer />

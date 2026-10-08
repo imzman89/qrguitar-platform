@@ -69,12 +69,22 @@ export function fixture(kind = "service", options = {}) {
     if (name.endsWith("/Nav") || name.endsWith("/Footer")) return { Nav: () => null, Footer: () => null };
     if (name.endsWith("/content-registry")) return { getContentValue: (_, key) => ({ "serviceReview.actions.approve": "Approve", "serviceReview.actions.revise": "Request changes", "serviceReview.actions.decline": "Decline" })[key] || key };
     if (name.endsWith("/use-site-content")) return { useSiteContent: () => ({}) };
-    if (name.endsWith("/supabase-browser")) return { createBrowserSupabaseClient: () => ({ auth, channel: () => { const channel = { on: () => channel, subscribe: () => channel }; return channel; }, removeChannel: async () => {}, storage: { from: () => ({ uploadToSignedUrl: (...args) => options.upload?.(...args) ?? Promise.resolve({ error: null }) }) } }), getSupabaseAccessToken: () => options.getToken?.() ?? Promise.resolve("synthetic-token") };
+    if (name.endsWith("/supabase-browser")) return { createBrowserSupabaseClient: () => ({ auth, channel: () => { const channel = { on: () => channel, subscribe: fn => { options.onChannelSubscribe?.(fn); return channel; } }; return channel; }, removeChannel: async () => {}, storage: { from: () => ({ uploadToSignedUrl: (...args) => options.upload?.(...args) ?? Promise.resolve({ error: null }) }) } }), getSupabaseAccessToken: () => options.getToken?.() ?? Promise.resolve("synthetic-token") };
     if (name.endsWith("/use-auth-navigation")) return { useAuthNavigation: () => ({ logout: options.logout || (async () => false), signingOut: false, logoutError: options.logoutError || "" }) };
     if (name.endsWith("/local-demo")) return { transferStatusLabel: value => value.status };
     if (name.endsWith("/optional-tracking-consent")) return { optionalTrackingProductEvents: {}, dispatchOptionalTrackingProductEvent: async () => true };
     if (name.endsWith("/member-messaging")) return library("member-messaging");
     if (name.endsWith("/message-session")) return library("message-session");
+    if (name.endsWith("/service-corrections-client")) return library("service-corrections-client");
+    if (name.endsWith("/ServiceCorrections")) {
+      const componentKey = "component/ServiceCorrections";
+      if (libraries.has(componentKey)) return libraries.get(componentKey);
+      const actual = { exports: {} };
+      const componentSource = fs.readFileSync(path.join(root, "components/ServiceCorrections.tsx"), "utf8");
+      const componentCode = ts.transpileModule(componentSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
+      new Function("require", "module", "exports", componentCode)(modules, actual, actual.exports);
+      libraries.set(componentKey, actual.exports); return actual.exports;
+    }
     throw new Error(`Unexpected test import: ${name}`);
   };
   const source = fs.readFileSync(path.join(root, names[kind]), "utf8");
@@ -132,12 +142,14 @@ test("status reconciliation is GET only, preserves drafts, and unlocks explicit 
   let failed = false;
   const h = await ready("service", { fetch: serviceFetch(r => { if (r.method === "PATCH") { failed = true; throw Error("lost"); } return Response.json({ ok: true, submission: review }); }) });
   h.elements().find(n => n.type === "textarea").props.onChange({ target: { value: "Please explain the setup." } });
-  h.elements().find(n => n.type === "select").props.onChange({ target: { value: "public" } });
+  const sharing = h.elements().find(n => n.type === "input" && n.props.type === "checkbox");
+  assert.equal(sharing.props.checked, false, "Service report sharing starts private");
+  sharing.props.onChange({ target: { checked: true } });
   h.button("Request changes").props.onClick(); await h.settle(); assert.equal(failed, true);
   h.button("Check review status").props.onClick(); await h.settle();
   assert.equal(h.decisions().length, 1); assert.equal(h.button("Approve").props.disabled, false);
   assert.equal(h.elements().find(n => n.type === "textarea").props.value, "Please explain the setup.");
-  assert.equal(h.elements().find(n => n.type === "select").props.value, "public");
+  assert.equal(h.elements().find(n => n.type === "input" && n.props.type === "checkbox").props.checked, true);
   assert.match(h.text(), /still awaiting your decision/); h.unmount();
 });
 
@@ -225,4 +237,37 @@ test("Messages exposes the existing Profile context near the header before the c
   const css = fs.readFileSync(path.join(root, "components/MessagesClient.module.css"), "utf8");
   assert.match(css, /\.threadContext\s*\{[^}]*grid-column:\s*1 \/ -1/); assert.match(css, /\.threadContext\s*\{[^}]*min-height:\s*44px/); assert.match(css, /\.threadContext\s*\{[^}]*overflow-wrap:\s*anywhere/);
   h.unmount();
+});
+
+
+function refreshingThread() { return { id: "conversation-a", member: { publicName: "Synthetic member", accountType: "player", avatarUrl: "", location: "" }, contextProfile: null, messages: [], hasOlderMessages: false, nextMessageCursor: null }; }
+function refreshResponse(request) { return Response.json(request.url.endsWith("/controls") ? { ok: true } : { ok: true, conversation: refreshingThread() }); }
+function refreshTimer(h) { const timer = [...h.timers.values()].find(t => t.ms === 12000); assert.ok(timer, "actual 12-second fallback scheduled"); timer.fn(); }
+for (const status of ["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"]) test("Messages successful HTTP fallback is disclosed after " + status, async () => {
+  let channel;
+  const h = await ready("messages", { onChannelSubscribe: fn => { channel = fn; }, fetch: refreshResponse });
+  channel(status); await h.settle(); assert.match(h.text(), /Automatic refresh/); assert.doesNotMatch(h.text(), /Reconnecting/);
+  const before = h.requests.filter(r => r.method === "GET").length; refreshTimer(h); await h.settle();
+  assert.equal(h.requests.filter(r => r.method === "GET").length, before + 1); assert.match(h.text(), /Automatic refresh/);
+  channel("SUBSCRIBED"); await h.settle(); assert.doesNotMatch(h.text(), /Automatic refresh/); assert.match(h.text(), /Live/);
+  h.unmount(); assert.equal(h.timers.size, 0);
+});
+test("Messages failed fallback withdraws healthy label and recovery restores it", async () => {
+  let channel, fail = false;
+  const h = await ready("messages", { onChannelSubscribe: fn => { channel = fn; }, fetch: request => fail && request.method === "GET" ? Response.json({ ok: false, message: "Refresh failed" }, { status: 503 }) : refreshResponse(request) });
+  channel("CHANNEL_ERROR"); await h.settle(); assert.match(h.text(), /Automatic refresh/);
+  fail = true; refreshTimer(h); await h.settle(); assert.doesNotMatch(h.text(), /Automatic refresh/); assert.match(h.text(), /Reconnecting/); assert.match(h.text(), /Refresh failed/);
+  fail = false; refreshTimer(h); await h.settle(); assert.match(h.text(), /Automatic refresh/); assert.doesNotMatch(h.text(), /Refresh failed/); h.unmount();
+});
+test("Messages stale refresh cannot clear newer success or resurrect status after signout", async () => {
+  let channel, next;
+  const h = await ready("messages", { onChannelSubscribe: fn => { channel = fn; }, fetch: request => request.method === "GET" && next ? next.promise : refreshResponse(request) });
+  channel("CHANNEL_ERROR"); const old = deferred(); next = old; refreshTimer(h); await tick(); next = undefined; refreshTimer(h); await h.settle();
+  old.resolve(Response.json({ ok: false, message: "old failure" }, { status: 503 })); await h.settle(); assert.match(h.text(), /Automatic refresh/); assert.doesNotMatch(h.text(), /old failure/);
+  next = deferred(); const late = next; refreshTimer(h); await tick(); h.auth(null); await h.settle(); late.resolve(Response.json({ ok: true, conversation: refreshingThread() })); await h.settle(); channel("SUBSCRIBED");
+  assert.match(h.text(), /Sign in to Messages/); assert.doesNotMatch(h.text(), /Automatic refresh|Synthetic member/); h.unmount(); assert.equal(h.afterUnmount(), 0);
+});
+test("Messages initial failed read never claims successful automatic refresh", async () => {
+  const h = await ready("messages", { fetch: () => Response.json({ ok: false, error: "Unavailable" }, { status: 503 }) });
+  assert.match(h.text(), /Messages are unavailable/); assert.doesNotMatch(h.text(), /Automatic refresh/); h.unmount();
 });

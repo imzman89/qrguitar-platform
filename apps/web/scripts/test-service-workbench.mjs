@@ -628,8 +628,20 @@ function renderEditor(status, removalId = "", phase = "ready", patch = {}, disca
   const submission = submissionFor({ status });
   const values = [{ ...initialWorkbenchState(), phase, actorId: "11111111-1111-4111-8111-111111111111", submission, provider: providerFor("11111111-1111-4111-8111-111111111111"), form: { ...emptyServiceForm(), ...submission }, evidence: [evidenceFor("invoice-one")], evidenceRecovery: { phase: "confirmed", revision: "0", attempt: null, pendingCount: 0, canPrepare: true, error: "" }, ...patch }, "invoice", removalId, discardId];
   let index = 0, refIndex = 0;
+  const correctionModule = { exports: {} };
+  const correctionPath = "components/ServiceCorrections.tsx";
+  const correctionSource = fs.readFileSync(fs.existsSync(path.join(overlayRoot, correctionPath)) ? path.join(overlayRoot, correctionPath) : path.join(root, correctionPath), "utf8");
+  const correctionCode = ts.transpileModule(correctionSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
+  new Function("require", "module", "exports", correctionCode)(name => {
+    if (name === "./UiTextProvider") return { useUiText };
+    if (name === "next/link") return ({ children, ...props }) => React.createElement("a", props, children);
+    if (name === "../lib/supabase-browser") return { createBrowserSupabaseClient() { throw new Error("Server render must not start correction authentication"); } };
+    if (name === "../lib/service-corrections-client") return loadTs("lib/service-corrections-client.ts");
+    return require(name);
+  }, correctionModule, correctionModule.exports);
   const empty = () => null;
   const env = { useUiText, React, useState: () => [values[index++], () => {}], useRef: () => ({ current: refIndex++ === 0 ? options.controller || null : null }), useEffect() {}, useSiteContent: () => ({}), initialWorkbenchState, categories: ["Setup"], getContentValue: (_, key) => key, serviceResumePath,
+    ServiceCorrections: correctionModule.exports.ServiceCorrections,
     Nav: empty, Footer: empty, ArrowLeft: empty, CheckCircle2: empty, FileLock2: empty, Upload: empty,
     Link: ({ children, ...props }) => React.createElement("a", props, children), styles: new Proxy({}, { get: (_, name) => name }), workflow: new Proxy({}, { get: (_, name) => name }) };
   const code = ts.transpileModule(editorComponent, { compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React } }).outputText;

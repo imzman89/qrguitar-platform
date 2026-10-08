@@ -21,6 +21,12 @@ const nextConfig = {
   distDir: process.env.QRGUITAR_LOCAL_REVIEW === "1" ? ".next-review" : process.env.QRGUITAR_LOCAL_REVIEW === "build" ? ".next-review-build" : ".next",
   transpilePackages: ["@qrguitar/shared"],
   poweredByHeader: false,
+  webpack(config, { dev }) {
+    if (!dev && process.env.QRGUITAR_LOCAL_REVIEW === "build" && process.env.QRGUITAR_REVIEW_DISABLE_CACHE === "1") {
+      config.cache = false;
+    }
+    return config;
+  },
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   env: {
     QRGUITAR_BUILD_ENV: buildIdentity.environment,

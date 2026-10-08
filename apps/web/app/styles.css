@@ -5,6 +5,7 @@
 @import "./theme.css";
 @import "./account-interface.css";
 @import "./supporting-interface.css";
+@import "./visual-identity.css";
 
 .cms-text-search-results { padding: 8px; max-height: 420px; overflow-y: auto; }
 .cms-text-search-results p { margin: 4px 8px 12px; color: var(--muted, #adb4bb); font-size: 13px; }

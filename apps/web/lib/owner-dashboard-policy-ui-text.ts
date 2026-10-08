@@ -1,5 +1,7 @@
 // Scoped policy copy: automatic instrument listing does not grant access to owner tools or unshared documents.
 export const ownerDashboardPolicyUiTextEntries = [
+  {"key":"ui.app.dashboard.page.ownerDashboardPolicy.nextHandoff","scope":"app.dashboard.page","text":"Start a new handoff below.","area":"Product","page":"Dashboard","section":"Catalog policy and authorized owner tools","source":"app/dashboard/page.tsx"},
+  {"key":"ui.app.dashboard.page.ownerDashboardPolicy.previousHandoff","scope":"app.dashboard.page","text":"Previous handoff (completed)","area":"Product","page":"Dashboard","section":"Catalog policy and authorized owner tools","source":"app/dashboard/page.tsx"},
   {"key":"ui.app.dashboard.page.ownerDashboardPolicy.showAllProfiles","scope":"app.dashboard.page","text":"Show all Profiles","area":"Product","page":"Dashboard","section":"Catalog policy and authorized owner tools","source":"app/dashboard/page.tsx"},
   {"key":"ui.app.dashboard.page.ownerDashboardPolicy.profiles","scope":"app.dashboard.page","text":"Profiles","area":"Product","page":"Dashboard","section":"Catalog policy and authorized owner tools","source":"app/dashboard/page.tsx"},
   {"key":"ui.app.dashboard.page.ownerDashboardPolicy.myCollection","scope":"app.dashboard.page","text":"My collection","area":"Product","page":"Dashboard","section":"Catalog policy and authorized owner tools","source":"app/dashboard/page.tsx"},

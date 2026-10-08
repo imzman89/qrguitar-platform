@@ -3,6 +3,7 @@ import { useUiText } from "../../components/UiTextProvider";
 
 
 import { OwnerWorkspace } from "../../components/OwnerWorkspace";
+import { RetainedPrivateDocuments } from "../../components/RetainedPrivateDocuments";
 import authStyles from "../../components/AuthForm.module.css";
 
 import { ownerProfileHref } from "../../lib/owner-profile";
@@ -47,6 +48,9 @@ type ServiceRequestSummary = {
   updatedAt: string;
   provider?: { publicDisplayName?: string; businessName?: string; verificationStatus?: "verified" | "unverified" } | null;
 };
+
+type OwnerServiceCorrectionAttentionRow = { submissionId: string; qrCode: string; pendingCount: number };
+type OwnerServiceCorrectionAttentionState = { revision: number; phase: "loading" | "ready" | "error"; rows: OwnerServiceCorrectionAttentionRow[] };
 
 function mergeDashboardRecords(records: DemoInstrument[]) {
   return records;
@@ -113,6 +117,7 @@ export default function DashboardPage() {
   const sessionEmail = useRef("");
   const accountRevision = useRef(0);
   const renderedAccountRevision = accountRevision.current;
+  const currentAccountSession = useMemo(() => () => accountRevision.current === renderedAccountRevision, [renderedAccountRevision]);
   const visibilityRequests = useRef(new Map<string, { revision: number }>());
   const removalRequests = useRef(new Map<string, { revision: number }>());
   const [visibilityPendingCodes, setVisibilityPendingCodes] = useState<string[]>([]);
@@ -124,12 +129,18 @@ export default function DashboardPage() {
   const [quickEditRecord, setQuickEditRecord] = useState<DemoInstrument | null>(null);
   const [collectionHandle, setCollectionHandle] = useState("");
   const [collectionAccountType, setCollectionAccountType] = useState("");
+  const [workspaceStatus, setWorkspaceStatus] = useState<"pending" | "ready" | "error">("pending");
+  const [workspaceAttempt, setWorkspaceAttempt] = useState(0);
+  const [correctionAttention, setCorrectionAttention] = useState<OwnerServiceCorrectionAttentionState>({ revision: -1, phase: "loading", rows: [] });
+  const [correctionAttentionAttempt, setCorrectionAttentionAttempt] = useState(0);
   const workspace = getWorkspace(collectionAccountType, content);
+  const personalCollection = collectionAccountType === "player" || collectionAccountType === "collector";
   const [actionRecord, setActionRecord] = useState<DemoInstrument | null>(null);
   const [actionContext, setActionContext] = useState<"all" | "transfer">("all");
   const [actionTrigger, setActionTrigger] = useState<HTMLElement | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const transferLinkOpened = useRef("");
+  const [collectionView, setCollectionView] = useState<"gallery" | "list">("gallery");
 
   useEffect(() => {
     if (!user || !recordsLoaded || loadingRecords || recordsError || accountRevision.current !== renderedAccountRevision || sessionEmail.current !== user.email) return;
@@ -183,8 +194,8 @@ export default function DashboardPage() {
         visibilityRequests.current.clear(); removalRequests.current.clear(); setVisibilityPendingCodes([]);
         setInstruments([]); setTransfers([]); setServiceRequests([]);
         setQuickEditRecord(null); setActionRecord(null); setSearchQuery("");
-        setCollectionHandle(""); setCollectionAccountType("");
-        setRecordsLoaded(false); setRecordsError("");
+        setCollectionHandle(""); setCollectionAccountType(""); setWorkspaceStatus("pending");
+        setRecordsLoaded(false); setRecordsError(""); setLoadingRecords(Boolean(email));
       }
       setUser(session?.user ? mapSupabaseUser(session.user) : null);
       setAuthChecked(true);
@@ -241,17 +252,65 @@ export default function DashboardPage() {
     if (!user?.email) return;
     let cancelled = false;
     const revision = accountRevision.current;
+    const controller = new AbortController();
+    const isCurrent = () => !cancelled && revision === accountRevision.current && !controller.signal.aborted;
+    setWorkspaceStatus("pending");
+    const timeout = window.setTimeout(() => {
+      if (!isCurrent()) return;
+      controller.abort();
+      setWorkspaceStatus("error");
+    }, 8000);
     void getSupabaseAccessToken().then(async token => {
-      const response = await fetch("/api/account", { headers: { authorization: "Bearer " + token }, cache: "no-store" });
-      const payload = await response.json().catch(() => null) as { ok?: boolean; account?: { publicCollection?: { enabled?: boolean; handle?: string; accountType?: string } } } | null;
-      if (cancelled || revision !== accountRevision.current) return;
-      if (!response.ok || !payload?.ok) { setCollectionHandle(""); setCollectionAccountType(""); return; }
-      const collection = payload.account?.publicCollection;
-      setCollectionHandle(collection?.enabled ? String(collection.handle || "") : "");
-      setCollectionAccountType(String(collection?.accountType || ""));
-    }).catch(() => { if (!cancelled && revision === accountRevision.current) { setCollectionHandle(""); setCollectionAccountType(""); } });
-    return () => { cancelled = true; };
-  }, [user?.email, loadAttempt]);
+      if (!isCurrent()) return;
+      if (!token) throw new Error("Missing account token");
+      const response = await fetch("/api/account", { headers: { authorization: "Bearer " + token }, cache: "no-store", signal: controller.signal });
+      const payload = await response.json();
+      if (!isCurrent()) return;
+      const collection = payload?.account?.publicCollection;
+      if (!response.ok || payload?.ok !== true || !collection ||
+          !["player", "collector", "shop", "builder", "brand", "luthier", "other"].includes(collection.accountType)) {
+        throw new Error("Unconfirmed workspace settings");
+      }
+      setCollectionHandle(collection.enabled ? String(collection.handle || "") : "");
+      setCollectionAccountType(collection.accountType);
+      setWorkspaceStatus("ready");
+    }).catch(() => {
+      if (isCurrent()) setWorkspaceStatus("error");
+    }).finally(() => window.clearTimeout(timeout));
+    return () => { cancelled = true; controller.abort(); window.clearTimeout(timeout); };
+  }, [user?.email, loadAttempt, workspaceAttempt]);
+
+  useEffect(() => {
+    if (!user?.email) return;
+    let cancelled = false;
+    const revision = accountRevision.current;
+    const controller = new AbortController();
+    const isCurrent = () => !cancelled && revision === accountRevision.current && !controller.signal.aborted;
+    setCorrectionAttention({ revision, phase: "loading", rows: [] });
+    const timeout = window.setTimeout(() => {
+      if (!isCurrent()) return;
+      controller.abort();
+      setCorrectionAttention({ revision, phase: "error", rows: [] });
+    }, 10000);
+    void getSupabaseAccessToken().then(async token => {
+      if (!isCurrent()) return;
+      const rows = await loadOwnerServiceCorrectionAttention(token, controller.signal);
+      if (isCurrent()) setCorrectionAttention({ revision, phase: "ready", rows });
+    }).catch(() => {
+      if (isCurrent()) setCorrectionAttention({ revision, phase: "error", rows: [] });
+    }).finally(() => window.clearTimeout(timeout));
+    return () => { cancelled = true; controller.abort(); window.clearTimeout(timeout); };
+  }, [user?.email, loadAttempt, correctionAttentionAttempt]);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("qrguitar.collection.view");
+      if (saved === "gallery" || saved === "list") setCollectionView(saved);
+    } catch { /* Storage may be unavailable; keep the in-memory view. */ }
+  }, []);
+
+  const currentCorrectionAttention = correctionAttention.revision === renderedAccountRevision
+    ? correctionAttention : { revision: renderedAccountRevision, phase: "loading" as const, rows: [] };
 
   const instrumentCodes = useMemo(() => new Set(instruments.map((instrument) => instrument.qrCode.toUpperCase())), [instruments]);
   const pendingTransfers = transfers.filter(
@@ -276,6 +335,13 @@ export default function DashboardPage() {
   );
 
   function refreshInstruments() { setLoadAttempt(value => value + 1); }
+
+  function selectCollectionView(view: "gallery" | "list") {
+    if (!personalCollection) return;
+    setCollectionView(view);
+    try { window.localStorage.setItem("qrguitar.collection.view", view); }
+    catch { /* The selected view still works when storage is unavailable. */ }
+  }
 
   function focusServiceRequests() {
     setDashboardMessage("");
@@ -412,20 +478,24 @@ export default function DashboardPage() {
   return (
     <>
       <Nav />
-      <OwnerWorkspace current="collection">
+      <OwnerWorkspace current="collection" accountType={collectionAccountType}>
         <div className={styles.dashboard}>
           <div className={styles.header}>
             <div>
-              <div className="eyebrow">{workspace.label}</div>
+              <div className="eyebrow">{collectionAccountType ? workspace.label : ui("ui.app.dashboard.page.workspaceTitle", "Your workspace")}</div>
               <h1>{getContentValue(content, "dashboard.hero.headline")}</h1>
               <p>{collectionAccountType ? workspace.description : getContentValue(content, "dashboard.hero.body")}</p>
             </div>
             <div className={styles.headerActions}>
-              {collectionAccountType === "luthier" ? <Link className="button" href="/dashboard/service"><Wrench size={16} />{" "}{ui("ui.app.dashboard.page.61669a91a83b", "Open service workbench")}</Link> : <Link className="button" href="/create">{getContentValue(content, "dashboard.actions.create")}</Link>}
-              {collectionAccountType === "shop" || collectionAccountType === "builder" ? <Link className="button secondary" href="/dashboard/import"><FileSpreadsheet size={16} /> {getContentValue(content, "dashboard.actions.bulk")}</Link> : <Link className="button secondary" href={collectionAccountType === "luthier" ? "/create" : "/account?section=collection"}>{collectionAccountType === "luthier" ? ui("ui.app.dashboard.page.3880eee7e45c", "Add your own instrument") : ui("ui.app.dashboard.page.ownerDashboardPolicy.collectionSettings", "Collection settings")}</Link>}
+              {collectionAccountType === "luthier" ? <Link className="button" href="/dashboard/service/slips"><Wrench size={16} />{" "}{ui("ui.app.dashboard.page.serviceSlips", "Service slips")}</Link> : <Link className="button" href="/create">{getContentValue(content, "dashboard.actions.create")}</Link>}
+              {["shop", "builder", "brand"].includes(collectionAccountType) ? <Link className="button secondary" href="/dashboard/import"><FileSpreadsheet size={16} /> {getContentValue(content, "dashboard.actions.bulk")}</Link> : <Link className="button secondary" href={collectionAccountType === "luthier" ? "/create" : "/account?section=collection"}>{collectionAccountType === "luthier" ? ui("ui.app.dashboard.page.3880eee7e45c", "Add your own instrument") : ui("ui.app.dashboard.page.ownerDashboardPolicy.collectionSettings", "Collection settings")}</Link>}
+              {["shop", "builder", "brand"].includes(collectionAccountType) ? <Link className="button secondary" href="/print/qr"><Printer size={16} /> QR labels</Link> : null}
+              {collectionAccountType === "luthier" ? <Link className="text-link" href="/dashboard/service">{ui("ui.app.dashboard.page.registeredServiceWork", "Registered service work")}</Link> : null}
             </div>
           </div>
 
+          {workspaceStatus === "pending" ? <div className="profile-refresh-notice" role="status" aria-busy="true">{ui("ui.app.dashboard.page.workspacePending", "Loading your workspace...")}</div> : null}
+          {workspaceStatus === "error" ? <div className="profile-refresh-notice" role="alert"><p>{ui("ui.app.dashboard.page.workspaceUnavailable", "Your workspace settings could not be loaded.")}</p><button type="button" className="button secondary" onClick={() => setWorkspaceAttempt(value => value + 1)}>{ui("ui.app.dashboard.page.d8b8392e2c54", "Try again")}</button></div> : null}
           {dashboardMessage ? <div className="admin-message" role="status">{dashboardMessage}</div> : null}
           {recordsError ? <div className="profile-refresh-notice" role="alert"><p>{recordsError} {recordsLoaded ? ui("ui.app.dashboard.page.6fe48008e091", "Previously loaded Profiles are shown below.") : ui("ui.app.dashboard.page.65dc6018f43f", "Your collection is not yet loaded.")}</p><button type="button" className="button secondary" onClick={refreshInstruments}>{ui("ui.app.dashboard.page.d8b8392e2c54", "Try again")}</button></div> : null}
 
@@ -440,9 +510,10 @@ export default function DashboardPage() {
                   <Wrench size={17} aria-hidden="true" />
                   <span><b>{ui("ui.app.dashboard.page.f97efc02c5d2", "Service requests")}</b><small>{ownerReviewRequests} {ui("ui.app.dashboard.page.0f503c13fb6a", "awaiting review")}</small></span>
                 </button>
+                <DashboardServiceCorrectionAttention state={currentCorrectionAttention} retry={() => setCorrectionAttentionAttempt(value => value + 1)} />
               </div>
             </section>
-          ) : null}
+          ) : <DashboardServiceCorrectionAttention state={currentCorrectionAttention} retry={() => setCorrectionAttentionAttempt(value => value + 1)} standalone />}
 
           <div className={styles.collectionControls}>
           <div className={styles.filters} aria-label={ui("ui.app.dashboard.page.c4e6f5e2cc0b", "Collection overview")}>
@@ -451,6 +522,16 @@ export default function DashboardPage() {
               <span>{ui("ui.app.dashboard.page.ownerDashboardPolicy.profiles", "Profiles")}</span>
             </button>
           </div>
+          {personalCollection ? (
+            <div className={styles.collectionViewToggle} role="group" aria-label={ui("ui.app.dashboard.page.collectionView", "Collection view")}>
+              <button type="button" aria-pressed={collectionView === "gallery"} aria-controls="saved-profiles" onClick={() => selectCollectionView("gallery")}>
+                {ui("ui.app.dashboard.page.galleryView", "Gallery")}
+              </button>
+              <button type="button" aria-pressed={collectionView === "list"} aria-controls="saved-profiles" onClick={() => selectCollectionView("list")}>
+                {ui("ui.app.dashboard.page.listView", "List")}
+              </button>
+            </div>
+          ) : null}
           <label className={styles.search}>
             <Search size={17} aria-hidden="true" />
             <input type="search" aria-label={ui("ui.app.dashboard.page.61d5a3e9beca", "Search your collection")} placeholder={ui("ui.app.dashboard.page.61d5a3e9beca", "Search your collection")} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
@@ -463,9 +544,9 @@ export default function DashboardPage() {
               </div>
 
             </div>
-            <div className={styles.instrumentList}>
-              {loadingRecords ? (
-                <div className="card auth-card">
+            <div className={`${styles.instrumentList}${personalCollection ? ` ${collectionView === "list" ? styles.personalRecords : styles.personalGallery}` : ""}`} data-collection-view={personalCollection ? collectionView : undefined}>
+              {loadingRecords || (!recordsLoaded && !recordsError) ? (
+                <div className="card auth-card" role="status" aria-busy="true">
                   <h3>{ui("ui.app.dashboard.page.139a32beaa54", "Loading your Profiles...")}</h3>
                   <p>{ui("ui.app.dashboard.page.b4694d08f7e0", "Pulling your saved Profiles now.")}</p>
                 </div>
@@ -485,7 +566,7 @@ export default function DashboardPage() {
 
                   return (
                     <article className={styles.instrumentRow} data-profile-code={instrument.qrCode} key={instrument.qrCode} aria-label={ui("ui.app.dashboard.page.c9a11cf01443", "Collection profile {{value1}}: {{value2}}", { value1: profileNumber, value2: title })}>
-                      <Link className={styles.instrumentBodyLink} href={ownerProfileHref(instrument)} aria-label={ui("ui.app.dashboard.page.ca7577d56ebc", "{{value1}}: {{value2}}", { value1: getContentValue(content, "dashboard.card.open"), value2: title })}>
+                      <Link className={styles.instrumentBodyLink} href={ownerProfileHref(instrument, "/dashboard")} aria-label={ui("ui.app.dashboard.page.ca7577d56ebc", "{{value1}}: {{value2}}", { value1: getContentValue(content, "dashboard.card.open"), value2: title })}>
                         <DashboardInstrumentThumb sources={imageSources} title={title} />
                         <div className={styles.instrumentDetails}>
                           <div className={styles.instrumentInfo}>
@@ -510,7 +591,7 @@ export default function DashboardPage() {
                       <aside className={styles.qrActionColumn} aria-label={ui("ui.app.dashboard.page.34e14d665e15", "Actions for {{value1}}", { value1: title })}>
                         <div className={styles.primaryActions}>
                           <Link className={`button ${styles.editAction}`} href={`/edit/${instrument.qrCode}`}>{getContentValue(content, "dashboard.card.edit")}</Link>
-                          <Link className={`button secondary ${styles.printAction}`} href={`/handout/${instrument.qrCode}`}><Printer size={15} aria-hidden="true" /> {ui("ui.app.dashboard.page.d6d8303655f5", "Print Suite")}</Link>
+                          <Link className={`button secondary ${styles.printAction}`} href={`/handout/${instrument.qrCode}?returnTo=%2Fdashboard`}><Printer size={15} aria-hidden="true" /> {ui("ui.app.dashboard.page.d6d8303655f5", "Print Suite")}</Link>
                         </div>
                         <button
                           className={styles.moreButton}
@@ -523,7 +604,7 @@ export default function DashboardPage() {
                             setActionContext("all");
                             setActionRecord(instrument);
                           }}
-                        ><Ellipsis size={20} aria-hidden="true" /></button>
+                        ><Ellipsis size={20} aria-hidden="true" />{personalCollection ? <span>{getContentValue(content, "dashboard.card.more")}</span> : null}</button>
                       </aside>
                     </article>
                   );
@@ -584,6 +665,8 @@ export default function DashboardPage() {
             </section>
           ) : null}
 
+          {user?.email ? <RetainedPrivateDocuments key={renderedAccountRevision} actorEmail={user.email}
+            isSessionCurrent={currentAccountSession} /> : null}
           <details className={styles.transfers} id="ownership-transfers">
             <summary>{ui("ui.app.dashboard.page.48920b5ab551", "Ownership transfers")}{" "}<span>{recordsLoaded ? pendingTransfers : "—"}{" "}{ui("ui.app.dashboard.page.62a2fed3d6e0", "pending")}</span></summary>
             <p>{ui("ui.app.dashboard.page.29f32c3200b7", "To send an instrument to a new owner, open its More menu below and choose Transfer Ownership. The instrument keeps its QRguitar ID, QR link, and history.")}</p>
@@ -595,7 +678,7 @@ export default function DashboardPage() {
               </div> : null;
             })}
           </details>
-          <WorkspaceActions accountType={collectionAccountType} />
+          {collectionAccountType ? <WorkspaceActions accountType={collectionAccountType} /> : null}
           </div>
           </details>
 
@@ -614,7 +697,7 @@ export default function DashboardPage() {
             <section>
               <b>{ui("ui.app.dashboard.page.9af3e044122c", "QR, print & sharing")}</b>
               <QrDownload code={actionRecord.qrCode} label={dashboardRecordTitle(actionRecord)} qrStyle={actionRecord.qrStyle} showPrintHandout={false} onStyleChange={(qrStyle) => { setInstruments((current) => current.map((item) => item.qrCode === actionRecord.qrCode ? { ...item, qrStyle } : item)); setActionRecord((current) => current ? { ...current, qrStyle } : current); }} />
-              <Link href={`/handout/${actionRecord.qrCode}`}><Printer size={15} />{" "}{ui("ui.app.dashboard.page.5ee3796350c7", "Open Print Suite")}</Link>
+              <Link href={`/handout/${actionRecord.qrCode}?returnTo=%2Fdashboard`}><Printer size={15} />{" "}{ui("ui.app.dashboard.page.5ee3796350c7", "Open Print Suite")}</Link>
               <RecordShareButton className={styles.dashboardShare} code={actionRecord.qrCode} title={dashboardRecordTitle(actionRecord)} showLabel />
             </section>
             <section>
@@ -631,7 +714,7 @@ export default function DashboardPage() {
               <Link href={`/edit/${actionRecord.qrCode}#privacy-safety`}><ShieldCheck size={15} />{" "}{ui("ui.app.dashboard.page.ownerDashboardPolicy.serialSafetyHeading", "Serial Number & safety")}</Link>
             </section>
             </> : null}
-            <TransferPanel initiallyOpen={actionContext === "transfer"} className={styles.transferPanel} bodyClassName={styles.transferPanelBody} instrument={actionRecord} user={user} isSessionCurrent={() => accountRevision.current === renderedAccountRevision} allowBuyerCode={collectionAccountType === "shop" || collectionAccountType === "builder"} latestTransfer={latestTransferForInstrument(transfers, actionRecord.qrCode)} onTransferCreated={(transfer) => { if (sessionEmail.current === user?.email) setTransfers((current) => [transfer, ...current.filter((item) => item.id !== transfer.id)]); }} onTransferChanged={refreshInstruments} />
+            <TransferPanel initiallyOpen={actionContext === "transfer"} className={styles.transferPanel} bodyClassName={styles.transferPanelBody} instrument={actionRecord} user={user} sessionRevision={renderedAccountRevision} isSessionCurrent={() => accountRevision.current === renderedAccountRevision} allowBuyerCode={collectionAccountType === "shop" || collectionAccountType === "builder"} latestTransfer={latestTransferForInstrument(transfers, actionRecord.qrCode)} onTransferCreated={(transfer) => { if (sessionEmail.current === user?.email) setTransfers((current) => [transfer, ...current.filter((item) => item.id !== transfer.id)]); }} onTransferChanged={refreshInstruments} />
             {actionContext === "all" ? <section className={styles.drawerDanger}><b>{ui("ui.app.dashboard.page.fd8b8dae4421", "Danger zone")}</b><button className={styles.dangerAction} type="button" onClick={() => void removeFromCollection(actionRecord)}>{getContentValue(content, "dashboard.card.remove")}</button></section> : null}
           </div>
         </ActionDrawer>
@@ -648,6 +731,7 @@ function TransferPanel({
   instrument,
   user,
   isSessionCurrent,
+  sessionRevision,
   allowBuyerCode,
   latestTransfer,
   onTransferCreated,
@@ -659,6 +743,7 @@ function TransferPanel({
   instrument: DemoInstrument;
   user: DemoUser | null;
   isSessionCurrent: () => boolean;
+  sessionRevision: number;
   allowBuyerCode: boolean;
   latestTransfer?: DemoTransfer;
   onTransferCreated: (transfer: DemoTransfer) => void;
@@ -676,18 +761,26 @@ function TransferPanel({
   const [saving, setSaving] = useState(false);
   const feedbackLifetime = useRef({ active: false, revision: 0 });
   const transferMutation = useRef<symbol | null>(null);
+  const [privateSelection, setPrivateSelection] = useState<{ key: string; ids: string[] }>({ key: "", ids: [] });
+  const handoffDocuments = instrument.documentFiles || [];
+  const documentSelectionKey = JSON.stringify([instrument.qrCode, user?.email, sessionRevision, instrument.updatedAt,
+    handoffDocuments.map(file => [file.id, file.updatedAt, file.visibility])]);
+  const selectedPrivateDocumentIds = privateSelection.key === documentSelectionKey ? privateSelection.ids : [];
+  const canReviewDocuments = Boolean(instrument.updatedAt && Number.isFinite(Date.parse(instrument.updatedAt))
+    && handoffDocuments.every(file => file.id && file.updatedAt && Number.isFinite(Date.parse(file.updatedAt))));
 
   const claimUrl =
     typeof window !== "undefined" && latestTransfer ? `${window.location.origin}${latestTransfer.claimPath}` : "";
   const visibleClaimUrl = claimUrl || lastCreatedClaimUrl;
   const hasPendingTransfer = latestTransfer?.status === "sent";
+  const acceptedHistory = latestTransfer?.status === "accepted";
   const transferStatus = latestTransfer ? transferStatusLabel(latestTransfer) : null;
 
   useEffect(() => {
     const lifetime = feedbackLifetime.current;
     lifetime.active = true; lifetime.revision++;
     return () => { lifetime.active = false; lifetime.revision++; };
-  }, [instrument.qrCode, user?.email, latestTransfer?.id, latestTransfer?.status, visibleClaimUrl, buyerCode, handoffMode]);
+  }, [instrument.qrCode, user?.email, latestTransfer?.id, latestTransfer?.status, visibleClaimUrl, buyerCode, handoffMode, documentSelectionKey]);
 
   function beginFeedback() {
     const lifetime = feedbackLifetime.current;
@@ -723,13 +816,17 @@ function TransferPanel({
   }
 
   async function createTransfer() {
-    if (transferMutation.current) return;
+    if (transferMutation.current || !isSessionCurrent() || !canReviewDocuments) return;
     const mutation = Symbol(); transferMutation.current = mutation;
     const feedback = beginFeedback();
     feedback("");
     setSaving(true);
+    const revision = feedbackLifetime.current.revision;
+    const current = () => transferMutation.current === mutation && feedbackLifetime.current.active
+      && feedbackLifetime.current.revision === revision && isSessionCurrent();
     try {
       const token = await getSupabaseAccessToken();
+      if (!current()) return;
       const response = await fetch("/api/transfers", {
         method: "POST",
         headers: {
@@ -742,7 +839,10 @@ function TransferPanel({
           toName,
           mode: handoffMode,
           expiresInDays: Number(expiresInDays),
-          orderReference
+          orderReference,
+          expectedUpdatedAt: instrument.updatedAt,
+          expectedDocuments: handoffDocuments.map(file => ({ id: file.id!, updatedAt: file.updatedAt! })),
+          selectedPrivateDocumentIds
         })
       });
       const result = (await response.json().catch(() => null)) as
@@ -754,6 +854,7 @@ function TransferPanel({
         return;
       }
 
+      if (!current()) return;
       const nextClaimUrl = handoffMode === "email"
         ? typeof window !== "undefined" ? `${window.location.origin}${result.transfer.claimPath}` : result.transfer.claimPath
         : "";
@@ -762,6 +863,7 @@ function TransferPanel({
       onTransferCreated(result.transfer);
       feedback(result.message || "Transfer prepared. Check its invitation status before sharing.");
     } catch {
+      if (!current()) return;
       feedback("We could not confirm that action. Reload your collection to check its status before trying again.");
       onTransferChanged();
     } finally {
@@ -843,14 +945,14 @@ function TransferPanel({
     <details className={className} open={initiallyOpen || undefined} data-pending={hasPendingTransfer ? "true" : "false"}>
       <summary>
         <span>{ui("ui.app.dashboard.page.f49cda3a003c", "Transfer Ownership")}<small>{ui("ui.app.dashboard.page.169f2da401df", "Start a secure handoff to the next owner.")}</small></span>
-        {transferStatus ? <strong>{transferStatus}</strong> : null}
+        {transferStatus && !acceptedHistory ? <strong>{transferStatus}</strong> : null}
       </summary>
       <div className={bodyClassName}>
         <p className="field-note" role="status">
           {!latestTransfer
             ? ui("ui.app.dashboard.page.noHandoff", "No handoff started. Choose a method below when you are ready.")
             : latestTransfer.status === "accepted"
-              ? ui("ui.app.dashboard.page.handoffCompleted", "Handoff completed. The next owner accepted the Profile.")
+              ? ui("ui.app.dashboard.page.ownerDashboardPolicy.nextHandoff", "Start a new handoff below.")
               : latestTransfer.status === "cancelled"
                 ? ui("ui.app.dashboard.page.handoffCancelled", "Handoff cancelled. Start a new transfer if needed.")
                 : latestTransfer.handoffPrepared
@@ -862,17 +964,17 @@ function TransferPanel({
           <strong>{handoffMode === "buyer_code" ? ui("ui.app.dashboard.page.ownerDashboardPolicy.buyerPrepare", "Prepare a buyer code for an in-person handoff.") : ui("ui.app.dashboard.page.a55829ebe2f6", "Email a claim link to the next owner.")}</strong>
           <p>{handoffMode === "buyer_code" ? ui("ui.app.dashboard.page.605c3c2813aa", "Use this at checkout or pickup. The code expires, works once, and can be bound to the buyer's email.") : ui("ui.app.dashboard.page.4060ac58871b", "The recipient signs in with the email below, opens the claim link, and accepts the same permanent QRguitar Profile.")}</p>
         </div>
-        <div className="transfer-form">
+        <form className="transfer-form" onSubmit={event => { event.preventDefault(); if (!hasPendingTransfer && !saving) void createTransfer(); }}>
           {allowBuyerCode && !hasPendingTransfer ? (
             <div className="transfer-mode" role="group" aria-label={ui("ui.app.dashboard.page.84650f6c3f73", "Handoff method")}>
-              <button type="button" aria-pressed={handoffMode === "email"} onClick={() => { setHandoffMode("email"); setBuyerCode(""); }}>{ui("ui.app.dashboard.page.91c5b0010aa1", "Email invitation")}</button>
-              <button type="button" aria-pressed={handoffMode === "buyer_code"} onClick={() => { setHandoffMode("buyer_code"); setBuyerCode(""); }}>{ui("ui.app.dashboard.page.ownerDashboardPolicy.buyerCode", "Buyer code")}</button>
+              <button type="button" disabled={saving} aria-pressed={handoffMode === "email"} onClick={() => { if (saving || transferMutation.current) return; setHandoffMode("email"); setBuyerCode(""); }}>{ui("ui.app.dashboard.page.91c5b0010aa1", "Email invitation")}</button>
+              <button type="button" disabled={saving} aria-pressed={handoffMode === "buyer_code"} onClick={() => { if (saving || transferMutation.current) return; setHandoffMode("buyer_code"); setBuyerCode(""); }}>{ui("ui.app.dashboard.page.ownerDashboardPolicy.buyerCode", "Buyer code")}</button>
             </div>
           ) : null}
           <label>{ui("ui.app.dashboard.page.db2f662af00b", "New owner name")}<input
               value={toName}
               onChange={(event) => setToName(event.target.value)}
-              disabled={hasPendingTransfer}
+              disabled={hasPendingTransfer || saving}
               placeholder={ui("ui.app.dashboard.page.db2f662af00b", "New owner name")}
             />
           </label>
@@ -880,27 +982,40 @@ function TransferPanel({
             {handoffMode === "buyer_code" ? ui("ui.app.dashboard.page.f15b921cee8c", "Buyer email (optional, recommended)") : ui("ui.app.dashboard.page.1a188a2a4288", "New owner email")}
             <input
               type="email"
+              required={handoffMode === "email"}
               value={toEmail}
               onChange={(event) => setToEmail(event.target.value)}
-              disabled={hasPendingTransfer}
+              disabled={hasPendingTransfer || saving}
               placeholder={ui("ui.app.dashboard.page.4680d9cb3265", "new-owner@example.com")}
             />
           </label>
           {handoffMode === "buyer_code" && !hasPendingTransfer ? (
             <>
-              <label>{ui("ui.app.dashboard.page.7a388472fdd9", "Order or receipt reference (optional)")}<input value={orderReference} onChange={(event) => setOrderReference(event.target.value)} placeholder={ui("ui.app.dashboard.page.db963ae6d517", "Order 1048 or receipt 6812")} />
+              <label>{ui("ui.app.dashboard.page.7a388472fdd9", "Order or receipt reference (optional)")}<input disabled={saving} value={orderReference} onChange={(event) => setOrderReference(event.target.value)} placeholder={ui("ui.app.dashboard.page.db963ae6d517", "Order 1048 or receipt 6812")} />
                 <small>{ui("ui.app.dashboard.page.0907f3c17b11", "If entered, the buyer must match it. QRguitar stores only a one-way check.")}</small>
               </label>
-              <label>{ui("ui.app.dashboard.page.40a35cf6c6bf", "Code expires")}<select value={expiresInDays} onChange={(event) => setExpiresInDays(event.target.value)}>
+              <label>{ui("ui.app.dashboard.page.40a35cf6c6bf", "Code expires")}<select disabled={saving} value={expiresInDays} onChange={(event) => setExpiresInDays(event.target.value)}>
                   <option value="1">{ui("ui.app.dashboard.page.f64edb0fb007", "After 24 hours")}</option><option value="3">{ui("ui.app.dashboard.page.21b6268b43ba", "After 3 days")}</option><option value="7">{ui("ui.app.dashboard.page.a166017f5868", "After 7 days")}</option><option value="14">{ui("ui.app.dashboard.page.646cf904ed78", "After 14 days")}</option><option value="30">{ui("ui.app.dashboard.page.16e515568d66", "After 30 days")}</option>
                 </select>
               </label>
             </>
           ) : null}
+          {!hasPendingTransfer && (handoffDocuments.some(file => file.visibility !== "public") || !canReviewDocuments) ? <fieldset disabled={saving || !canReviewDocuments}>
+            <legend>{ui("ui.app.dashboard.page.privateFileSelection", "Private files for the next owner")}</legend>
+            <p>{ui("ui.app.dashboard.page.privateFileSelectionHelp", "Selected private files and their saved details move to the next owner. Unchecked private files stay with your account. Public files keep their current visibility.")}</p>
+            {handoffDocuments.filter(file => file.visibility !== "public").map(file => <label key={file.id || file.name}>
+              <input type="checkbox" checked={Boolean(file.id && selectedPrivateDocumentIds.includes(file.id))}
+                onChange={event => { const id = file.id; if (!id) return;
+                  setPrivateSelection({ key: documentSelectionKey, ids: event.target.checked
+                    ? [...selectedPrivateDocumentIds.filter(value => value !== id), id]
+                    : selectedPrivateDocumentIds.filter(value => value !== id) }); }} />{file.name}
+            </label>)}
+            {!canReviewDocuments ? <p role="status">{ui("ui.app.dashboard.page.privateFileSelectionReload", "Reload your collection before preparing this handoff.")}</p> : null}
+          </fieldset> : null}
           {hasPendingTransfer ? (
             <div className="transfer-actions">
               {!latestTransfer?.handoffPrepared ? <button className="button secondary" type="button" disabled={saving} onClick={() => void copyClaimLink()}><Copy size={16} />{ui("ui.app.dashboard.page.222e0344a18c", "Copy Claim Link")}</button> : null}
-              {latestTransfer?.handoffPrepared && latestTransfer.toEmail ? <button className="button secondary" type="button" onClick={() => void resendBuyerInvitation()} disabled={saving}><Mail size={16} />{ui("ui.app.dashboard.page.1e11da231ca3", "Resend Sign-in Email")}</button> : null}
+              {latestTransfer?.toEmail ? <button className="button secondary" type="button" onClick={() => void resendBuyerInvitation()} disabled={saving}><Mail size={16} />{ui("ui.app.dashboard.page.resendInvitation", "Resend invitation")}</button> : null}
               {latestTransfer ? (
                 <button
                   className="button secondary"
@@ -911,7 +1026,7 @@ function TransferPanel({
               ) : null}
             </div>
           ) : (
-            <button className="button" type="button" onClick={() => void createTransfer()} disabled={saving}>
+            <button className="button" type="submit" disabled={saving || !canReviewDocuments}>
               {handoffMode === "email" ? <Mail size={16} /> : <Copy size={16} />}
               {saving ? ui("ui.app.dashboard.page.74a6b5348c06", "Preparing...") : handoffMode === "email" ? ui("ui.app.dashboard.page.a94ebe414853", "Send Transfer Email") : ui("ui.app.dashboard.page.fc3fb992308f", "Prepare for Buyer")}
             </button>
@@ -922,8 +1037,17 @@ function TransferPanel({
               <button className="button secondary" type="button" disabled={saving} onClick={() => void copyBuyerCode()}><Copy size={16} />{" "}{ui("ui.app.dashboard.page.7e554bec7cf4", "Copy Buyer Code")}</button>
             </div>
           ) : null}
-        </div>
-        {latestTransfer ? (
+        </form>
+        {acceptedHistory && latestTransfer ? (
+          <details className="previous-handoff">
+            <summary><span>{ui("ui.app.dashboard.page.ownerDashboardPolicy.previousHandoff", "Previous handoff (completed)")}</span><span className="handoff-history-marker" aria-hidden="true" /></summary>
+            <div className="claim-link-box">
+              <p className="field-note">{ui("ui.app.dashboard.page.handoffCompleted", "Handoff completed. The next owner accepted the Profile.")}</p>
+              <strong>{[latestTransfer.toName, latestTransfer.toEmail].filter(Boolean).join(" - ") || ui("ui.app.dashboard.page.b90f83fb529f", "No recipient email specified")}</strong>
+              {latestTransfer.acceptedAt && Number.isFinite(Date.parse(latestTransfer.acceptedAt)) ? <time dateTime={latestTransfer.acceptedAt}>{new Date(latestTransfer.acceptedAt).toLocaleString()}</time> : null}
+            </div>
+          </details>
+        ) : latestTransfer ? (
           <div className="claim-link-box">
             <span>
               {latestTransfer.status === "accepted"
@@ -932,7 +1056,7 @@ function TransferPanel({
                   ? ui("ui.app.dashboard.page.b6321ee9a4a7", "Transfer cancelled")
                   : latestTransfer.handoffPrepared ? ui("ui.app.dashboard.page.ownerDashboardPolicy.buyerPrepared", "Buyer handoff prepared") : ui("ui.app.dashboard.page.5d2356016d09", "Claim link created")}
             </span>
-            <strong>{[latestTransfer.toName, latestTransfer.toEmail].filter(Boolean).join(" - ") || ui("ui.app.dashboard.page.b90f83fb529f", "Recipient not email-bound")}</strong>
+            <strong>{[latestTransfer.toName, latestTransfer.toEmail].filter(Boolean).join(" - ") || ui("ui.app.dashboard.page.b90f83fb529f", "No recipient email specified")}</strong>
             {latestTransfer.handoffPrepared ? <small>{latestTransfer.expiresAt ? ui("ui.app.dashboard.page.c6d4108974a1", "Expires {{value1}}. ", { value1: new Date(latestTransfer.expiresAt).toLocaleString() }) : ""}{ui("ui.app.dashboard.page.ownerDashboardPolicy.buyerStorage", "The buyer code is never stored in readable form. Revoke and prepare a new handoff if it was not copied.")}</small> : <code>{visibleClaimUrl}</code>}
             {latestTransfer.status === "sent" && !latestTransfer.handoffPrepared ? (
               <button className="button secondary" type="button" disabled={saving} onClick={() => void copyClaimLink()}>
@@ -948,7 +1072,7 @@ function TransferPanel({
               <Copy size={16} />{ui("ui.app.dashboard.page.222e0344a18c", "Copy Claim Link")}</button>
           </div>
         ) : null}
-        {message ? <p className="form-message">{message}</p> : null}
+        <p className={message ? "form-message" : "sr-only"} role="status" aria-live="polite" aria-atomic="true">{message}</p>
       </div>
     </details>
   );
@@ -999,6 +1123,39 @@ async function loadOwnerServiceRequests(token: string, signal?: AbortSignal): Pr
   const payload = await response.json().catch(() => null) as { ok?: boolean; submissions?: ServiceRequestSummary[] } | null;
   if (!response.ok || !payload?.ok || !Array.isArray(payload.submissions)) throw new Error("We could not load service requests. Please try again.");
   return payload.submissions;
+}
+
+async function loadOwnerServiceCorrectionAttention(token: string, signal?: AbortSignal): Promise<OwnerServiceCorrectionAttentionRow[]> {
+  if (!token) throw new Error("Sign in again to check service corrections.");
+  const response = await fetch("/api/service-corrections/attention", { headers: { authorization: "Bearer " + token }, cache: "no-store", signal });
+  const payload = await response.json().catch(() => null);
+  const uuid = (value: unknown) => typeof value === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(value);
+  if (!response.ok || payload?.ok !== true || !Array.isArray(payload.items) || payload.items.some((row: OwnerServiceCorrectionAttentionRow) =>
+    !uuid(row?.submissionId) || typeof row.qrCode !== "string" || row.qrCode.length > 80 || !/^QRG-[A-Z0-9_-]+$/.test(row.qrCode) ||
+    !Number.isSafeInteger(row.pendingCount) || row.pendingCount < 1)) throw new Error("Service corrections could not be checked. Please try again.");
+  return payload.items.map((row: OwnerServiceCorrectionAttentionRow) => ({ submissionId: row.submissionId, qrCode: row.qrCode, pendingCount: row.pendingCount }));
+}
+
+function DashboardServiceCorrectionAttention({ state, retry, standalone = false }: {
+  state: OwnerServiceCorrectionAttentionState; retry: () => void; standalone?: boolean;
+}) {
+  const ui = useUiText("app.dashboard.page");
+  const correctionUi = useUiText("components.ServiceCorrections");
+  if (state.phase === "ready" && !state.rows.length) return null;
+  const actions = <div className={styles.taskActions}>
+    {state.phase === "loading" ? <span role="status">{correctionUi("ui.components.ServiceCorrections.loading", "Loading correction history…")}</span>
+      : state.phase === "error" ? <div role="alert"><span>{correctionUi("ui.components.ServiceCorrections.unavailable", "Approved service record unavailable.")}</span>{" "}
+        <button type="button" onClick={retry}>{ui("ui.app.dashboard.page.d8b8392e2c54", "Try again")}</button></div>
+      : state.rows.map(row => <Link className="text-link" key={row.submissionId} href={`/service-corrections/${row.submissionId}`}>
+          <Wrench size={17} aria-hidden="true" />{" "}<span>{correctionUi("ui.components.ServiceCorrections.ownerEntry", "Review service corrections")} · {row.qrCode}{" "}
+          <small>({row.pendingCount} {ui("ui.app.dashboard.page.0f503c13fb6a", "awaiting review")})</small></span>
+        </Link>)}
+  </div>;
+  return standalone ? <section className={styles.taskPanel} aria-labelledby="dashboard-corrections-title">
+    <div className={styles.taskHeading}><span className={styles.taskIndicator} aria-hidden="true" />
+      <h2 id="dashboard-corrections-title">{ui("ui.app.dashboard.page.11de928b330a", "Needs your attention")}</h2>
+    </div>{actions}
+  </section> : actions;
 }
 
 function serviceRequestStatusLabel(status: ServiceRequestSummary["status"]) {

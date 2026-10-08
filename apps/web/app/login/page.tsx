@@ -13,6 +13,7 @@ import { getContentValue } from "../../lib/content-registry";
 import { useSiteContent } from "../../lib/use-site-content";
 
 import { safeAuthRedirect } from "../../lib/auth-redirect";
+import { WORKSPACE_OPTIONS, getWorkspace, workspaceOptionLabel, type WorkspaceType } from "../../lib/workspace-tools";
 import { replaceWithCheckoutPolicy } from "../../lib/checkout-navigation";
 import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "../../lib/optional-tracking-consent";
 
@@ -48,13 +49,21 @@ export default function LoginPage() {
   const [status, setStatus] = useState("");
   const [isWorking, setIsWorking] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
+  const [registrationRole, setRegistrationRole] = useState<WorkspaceType | "">("");
+  const [registrationDetailsReady, setRegistrationDetailsReady] = useState(false);
+  const registrationFocus = useRef<"name" | "role" | null>(null);
+  const buyerRegistration = /^\/transfer\/[^/?#]+\/?(?:[?#]|$)/.test(safeNext);
+  const businessRegistration = !buyerRegistration && ["shop", "builder", "luthier"].includes(registrationRole);
+  const registrationRoleStep = mode === "register" && !buyerRegistration && !registrationDetailsReady;
+  const selectedRegistration = WORKSPACE_OPTIONS.find(option => option.value === registrationRole);
 
   const applyIdentity = useCallback((actor: string) => {
     const life = lifetime.current;
     if (!life.active) return;
     if (actor !== life.actor) {
       life.revision++;
-      setName(""); setEmail(""); setPassword(""); setStatus("");
+      setName(""); setEmail(""); setPassword(""); setStatus(""); setRegistrationRole("");
+      setRegistrationDetailsReady(false); registrationFocus.current = null;
     }
     life.known = true; life.actor = actor;
     setIsSignedIn(Boolean(actor));
@@ -157,12 +166,33 @@ export default function LoginPage() {
     (nextMode === "login" ? loginTabRef : registerTabRef).current?.focus();
   }
 
+  function continueRegistration() {
+    if (!lifetime.current.active || pending.current || !registrationRoleStep || !selectedRegistration) return;
+    registrationFocus.current = "name";
+    setStatus(""); setRegistrationDetailsReady(true);
+  }
+
+  function changeRegistration() {
+    if (!lifetime.current.active || pending.current || mode !== "register" || buyerRegistration) return;
+    registrationFocus.current = "role";
+    setStatus(""); setRegistrationDetailsReady(false);
+  }
+
   async function submitAccountAction() {
     const supabase = client.current, life = lifetime.current;
     if (!life.active || pending.current) return;
     if (!supabase) { setStatus("Sign-in is temporarily unavailable. Please reload and try again."); return; }
+    if (mode === "register" && !buyerRegistration && !WORKSPACE_OPTIONS.some(option => option.value === registrationRole)) {
+      setStatus(ui("ui.app.login.page.registrationRole", "Choose your workspace"));
+      return;
+    }
+    if (registrationRoleStep) { continueRegistration(); return; }
     if (mode === "register" && (!name.trim() || !email.trim() || !password.trim())) {
       setStatus("Name, email, and password are required.");
+      return;
+    }
+    if (mode === "register" && !buyerRegistration && (Array.from(name.trim()).length < 2 || Array.from(name.trim()).length > 80)) {
+      setStatus("Use a name between 2 and 80 characters.");
       return;
     }
     if (mode === "register" && password.length < 8) {
@@ -195,7 +225,7 @@ export default function LoginPage() {
         return;
       }
       const { data, error } = await mutation(operation, () => mode === "register"
-        ? supabase.auth.signUp({ email: email.trim(), password, options: { data: { display_name: name.trim() }, emailRedirectTo: `${window.location.origin}${safeNext}` } })
+        ? supabase.auth.signUp({ email: email.trim(), password, options: { data: { display_name: name.trim(), ...(!buyerRegistration ? { qrguitar_workspace_type: registrationRole } : {}) }, emailRedirectTo: `${window.location.origin}${safeNext}` } })
         : supabase.auth.signInWithPassword({ email: email.trim(), password }));
       if (error) { if (sameActor(operation)) setStatus(cleanAuthError(error.message)); return; }
       if (mode === "register" && data.user?.id && Array.isArray(data.user.identities) && data.user.identities.length > 0) {
@@ -253,6 +283,10 @@ export default function LoginPage() {
     }
   }
 
+  const registrationContinueAction = (
+    <button className={`button ${styles.registrationContinue}`} type="button" disabled={isWorking || !selectedRegistration} aria-controls="registration-details" onClick={continueRegistration}>{ui("ui.app.login.page.registrationContinue", "Continue")}</button>
+  );
+
   return (
     <>
       <Nav />
@@ -293,22 +327,59 @@ export default function LoginPage() {
 
                 <div id="auth-access-panel" role={mode === "reset" ? undefined : "tabpanel"} aria-labelledby={mode === "reset" ? undefined : `auth-${mode}-tab`}>
                 <form method="post" onSubmit={(event) => { event.preventDefault(); void submitAccountAction(); }} aria-busy={isWorking}>
+                {mode === "register" && !buyerRegistration ? (
+                  <fieldset id="registration-role-choices" className={styles.registrationRoles} hidden={!registrationRoleStep} disabled={isWorking || !registrationRoleStep} aria-describedby="registration-role-help">
+                    <legend>{ui("ui.app.login.page.registrationRole", "Choose your workspace")}</legend>
+                    <p id="registration-role-help">{ui("ui.app.login.page.registrationRoleHelp", "Choose how you use QRguitar. You can change this later in Account settings.")}</p>
+                    <div className={styles.registrationRoleChoices}>
+                      {WORKSPACE_OPTIONS.map(option => (
+                        <div key={option.value}>
+                        <label className={styles.registrationRoleChoice} key={option.value}>
+                          <input ref={(node) => {
+                            if (node && registrationFocus.current === "role" && registrationRole === option.value) {
+                              registrationFocus.current = null; node.focus();
+                            }
+                          }} type="radio" name="workspace-role" value={option.value} required checked={registrationRole === option.value} onChange={() => setRegistrationRole(option.value)} />
+                          <span><strong>{workspaceOptionLabel(option.label, content)}</strong><small>{getWorkspace(option.value, content).description}</small></span>
+                        </label>
+                        {registrationRoleStep && registrationRole === option.value ? registrationContinueAction : null}
+                        </div>
+                      ))}
+                    </div>
+                  </fieldset>
+                ) : null}
+                {registrationRoleStep && !selectedRegistration ? registrationContinueAction : null}
+                {mode === "register" && !buyerRegistration && registrationDetailsReady && selectedRegistration ? (
+                  <div className={styles.registrationSummary}>
+                    <div className={styles.stateHeading}>
+                      <strong>{workspaceOptionLabel(selectedRegistration.label, content)}</strong>
+                      <span>{getWorkspace(selectedRegistration.value, content).description}</span>
+                    </div>
+                    <button className="link-button" type="button" disabled={isWorking} aria-controls="registration-role-choices" onClick={changeRegistration}>{ui("ui.app.login.page.registrationChange", "Change workspace")}</button>
+                  </div>
+                ) : null}
+                <div id="registration-details" className={styles.registrationDetails} hidden={registrationRoleStep}>
                 {mode === "register" ? (
                   <div className="field">
-                    <label htmlFor="name">{ui("ui.app.login.page.2b7f6a84de91", "Display name")}</label>
-                    <input id="name" name="name" autoComplete="nickname" required value={name} onChange={(event) => setName(event.target.value)} placeholder={ui("ui.app.login.page.d4b8227dbd30", "Owner, builder, or shop name")} />
+                    <label htmlFor="name">{businessRegistration ? ui("ui.app.login.page.businessName", "Business name") : ui("ui.app.login.page.2b7f6a84de91", "Display name")}</label>
+                    <input ref={(node) => {
+                      if (node && !registrationRoleStep && registrationFocus.current === "name") {
+                        registrationFocus.current = null; node.focus();
+                      }
+                    }} id="name" name="name" disabled={registrationRoleStep} autoComplete={businessRegistration ? "organization" : "nickname"} minLength={buyerRegistration ? undefined : 2} maxLength={buyerRegistration ? undefined : 80} required value={name} onChange={(event) => setName(event.target.value)} placeholder={businessRegistration ? ui("ui.app.login.page.businessName", "Business name") : ui("ui.app.login.page.d4b8227dbd30", "Owner, builder, or shop name")} />
+                    {businessRegistration ? <p className="fine-print">{ui("ui.app.login.page.businessDetailsLater", "Add your logo and support preferences later in Account settings.")}</p> : null}
                   </div>
                 ) : null}
 
                 <div className="field">
                   <label htmlFor="email">{ui("ui.app.login.page.969ccbd3cf63", "Email")}</label>
-                  <input ref={emailRef} id="email" name="email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder={ui("ui.app.login.page.53e6cdc30765", "you@example.com")} />
+                  <input ref={emailRef} id="email" name="email" type="email" disabled={registrationRoleStep} required value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder={ui("ui.app.login.page.53e6cdc30765", "you@example.com")} />
                 </div>
 
                 {mode !== "reset" ? (
                   <div className="field">
                     <label htmlFor="password">{ui("ui.app.login.page.e7cf3ef4f17c", "Password")}</label>
-                    <input id="password" name="password" type="password" required minLength={mode === "register" ? 8 : undefined} aria-describedby={mode === "register" ? "password-hint" : undefined} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "register" ? "new-password" : "current-password"} placeholder={mode === "register" ? ui("ui.app.login.page.4defceba0862", "Create a password") : ui("ui.app.login.page.c06bf9670174", "Enter your password")} />
+                    <input id="password" name="password" type="password" disabled={registrationRoleStep} required minLength={mode === "register" ? 8 : undefined} aria-describedby={mode === "register" ? "password-hint" : undefined} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "register" ? "new-password" : "current-password"} placeholder={mode === "register" ? ui("ui.app.login.page.4defceba0862", "Create a password") : ui("ui.app.login.page.c06bf9670174", "Enter your password")} />
                     {mode === "register" ? <p className="fine-print" id="password-hint">{ui("ui.app.login.page.9b15ce9e25e9", "Use at least 8 characters.")}</p> : null}
                   </div>
                 ) : null}
@@ -329,6 +400,7 @@ export default function LoginPage() {
                       {isWorking ? ui("ui.app.login.page.286a3af7348e", "Sending...") : ui("ui.app.login.page.708c5d67ba8e", "Send reset link")}
                     </button>
                   ) : null}
+                </div>
                 </div>
 
                 </form>

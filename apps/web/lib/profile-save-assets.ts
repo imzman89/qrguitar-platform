@@ -164,7 +164,7 @@ export async function prepareProfileAssets(options: {
     heroImagePath: photoPlans[0].path,
     media: uniquePhotoPlans.map((photo, index) => {
       const existing = existingMedia.find((row) => row.storage_path === photo.path);
-      return { id: existing?.id || null, storage_path: photo.path, alt: existing?.alt || `Instrument media ${index + 1}`, sort_order: index };
+      return { id: existing?.id || null, storage_path: photo.path, alt: existing ? (existing.alt ?? "") : `Instrument media ${index + 1}`, sort_order: index };
     }),
     documents: documentPlans,
     expectedMedia: existingMedia.map(({ id, storage_path, sort_order }) => ({ id, storage_path, sort_order })),

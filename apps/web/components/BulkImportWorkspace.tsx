@@ -31,8 +31,8 @@ export function BulkImportWorkspace() {
   }
 
   if (!actorId) {
-    return <section className="auth-state-card"><span className="eyebrow">{ui("ui.components.BulkImportWorkspace.832fd327544b", "Owner tools")}</span><h1>{ui("ui.components.BulkImportWorkspace.96812e83690f", "Sign in to import inventory.")}</h1><p>{ui("ui.components.BulkImportWorkspace.897a89da498c", "Bulk Import creates private QRguitar Profiles inside your owner workspace.")}</p><Link className="button" href="/login?next=/dashboard/import">{ui("ui.components.BulkImportWorkspace.bfd402b2f6f3", "Sign in")}</Link></section>;
+    return <section className="auth-state-card"><span className="eyebrow">{ui("ui.components.BulkImportWorkspace.832fd327544b", "Owner tools")}</span><h1>{ui("ui.components.BulkImportWorkspace.96812e83690f", "Sign in to import inventory.")}</h1><p>{ui("ui.components.BulkImportWorkspace.897a89da498c", "Saved instruments and photos appear in Catalog.")}</p><Link className="button" href="/login?next=/dashboard/import">{ui("ui.components.BulkImportWorkspace.bfd402b2f6f3", "Sign in")}</Link></section>;
   }
 
-  return <BulkProfileImport key={`${actorId}:${identity.generation}`} />;
+  return <><p><Link className="text-link" href="/dashboard">{ui("ui.components.BulkImportWorkspace.backToCollection", "Back to my collection")}</Link></p><BulkProfileImport key={`${actorId}:${identity.generation}`} /></>;
 }

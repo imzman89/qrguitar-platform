@@ -45,11 +45,13 @@ export function buildProfileIdentityFields(values: ProfileIdentityValues): Profi
 export function ProfileIdentity({
   values,
   mediaSummary = "",
+  heading = "At a glance",
   excludeLabels = [],
   children
 }: {
   values: ProfileIdentityValues;
   mediaSummary?: string;
+  heading?: string;
   excludeLabels?: ProfileIdentityField["label"][];
   children?: ReactNode;
 }) {
@@ -58,7 +60,7 @@ export function ProfileIdentity({
   return (
     <section className={styles["identity-card"]}>
       <header className={styles["identity-card-header"]}>
-        <span>At a glance</span>
+        <span>{heading}</span>
         {mediaSummary ? <span className={styles["identity-media-summary"]}>{mediaSummary}</span> : null}
       </header>
       <dl className={styles["identity-grid"]}>

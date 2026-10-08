@@ -28,7 +28,7 @@ const functions=names.map(name=>{
   const node=ast.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text===name);
   assert.ok(node,`Missing production function ${name}`);
   return node.getText(ast);
-}).join('\n')+'\nexport { loadRecordsForUser };';
+}).join('\n')+'\nexport { loadRecordsForUser, mapInstrumentRow };';
 const owner={id:'owner-1',email:'owner@example.test',user_metadata:{display_name:'Account name'}};
 function database(tables={}, {cap=7,failTable='',rejectTable=''}={}) {
   const calls=[];
@@ -81,7 +81,7 @@ test('batched IN reads are unique, bounded, complete, and skip empty input',asyn
 test('owner reads return all related rows across 103 guitars, preserving order, statuses, documents and private history',async()=>{
   const guitars=Array.from({length:103},(_,i)=>guitar(`g${String(i).padStart(3,'0')}`,{hero_image_path:`hero-${i}`,visibility:i%2?'unlisted':'private',safety_status:'stolen',safety_note:'Owner note'}));
   const media=guitars.flatMap(g=>Array.from({length:15},(_,i)=>({id:`${g.id}-m${String(i).padStart(2,'0')}`,guitar_id:g.id,storage_path:`${g.id}/photo-${i}`,sort_order:14-i}))).reverse();
-  const docs=Array.from({length:1003},(_,i)=>({id:`d${String(i).padStart(4,'0')}`,guitar_id:guitars[0].id,name:`Document ${i}`,storage_path:`doc-${i}`,is_public:i%2===0,mime_type:'application/pdf',issuer_source:'Luthier',document_date:'2026-08-01',description:'Receipt',public_description:'Public',private_notes:'Keep private',file_size_bytes:0,related_timeline_event_id:'t0',related_service_event_id:'t0',created_at:'2026-01-01',updated_at:'2026-09-01'}));
+  const docs=Array.from({length:1003},(_,i)=>({id:`d${String(i).padStart(4,'0')}`,guitar_id:guitars[0].id,name:`Document ${i}`,storage_path:`doc-${i}`,retained_private:false,is_public:i%2===0,mime_type:'application/pdf',issuer_source:'Luthier',document_date:'2026-08-01',description:'Receipt',public_description:'Public',private_notes:'Keep private',file_size_bytes:0,related_timeline_event_id:'t0',related_service_event_id:'t0',created_at:'2026-01-01',updated_at:'2026-09-01'}));
   const timelines=Array.from({length:1003},(_,i)=>({id:`t${String(i).padStart(4,'0')}`,guitar_id:guitars[0].id,title:`History ${i}`,event_type:'service',category:'Maintenance',event_date:'2026-08-01',private_notes:'Private',description:'Public',is_public:false,created_at:'2026-08-01',related_document_id:docs[0].id}));
   const transfers=Array.from({length:1003},(_,i)=>({id:`x${i}`,guitar_id:guitars[0].id,status:'accepted'}));
   const specs=guitars.flatMap(g=>[{id:`${g.id}-spec1`,guitar_id:g.id,label:'Availability',value:'For Sale',sort_order:2},{id:`${g.id}-spec2`,guitar_id:g.id,label:'Originality',value:'Modified',sort_order:1},{id:`${g.id}-spec3`,guitar_id:g.id,label:'Condition',value:'New',sort_order:0}]);
@@ -132,12 +132,46 @@ for(const kind of ['throw','empty','malformed']) test(`owner signing ${kind} fai
   const db=database({guitars:[guitar('g0',{hero_image_path:'private-photo'})]});const res=await get(fixture(db,{sign:async()=>{if(kind==='throw')throw new Error('storage down');return kind==='empty'?'':'raw-storage-path';}}));assert.equal(res.status,503);assert.equal(res.body.instrument,undefined);
 });
 test('document signing failure also fails the owner response without discarding document rows',async()=>{
-  const db=database({guitars:[guitar()],guitar_documents:[{id:'d0',guitar_id:'g0',name:'Hidden document',storage_path:'private-doc'}]});assert.equal((await get(fixture(db,{sign:async()=>{throw new Error('storage down');}}))).status,503);
+  const db=database({guitars:[guitar()],guitar_documents:[{id:'d0',guitar_id:'g0',name:'Hidden document',storage_path:'private-doc',retained_private:false}]});assert.equal((await get(fixture(db,{sign:async()=>{throw new Error('storage down');}}))).status,503);
 });
 
 test('invalid stored document/media references fail explicitly instead of disappearing',async()=>{
   for(const table of ['guitar_documents','guitar_media']) {
-    const db=database({guitars:[guitar()], [table]:[{id:'bad-reference',guitar_id:'g0',name:'Broken asset',storage_path:''}]});
+    const db=database({guitars:[guitar()], [table]:[{id:'bad-reference',guitar_id:'g0',name:'Broken asset',storage_path:'',retained_private:false}]});
     assert.equal((await get(fixture(db))).status,503);
+  }
+});
+
+for (const version of ['2026-10-05T14:57:13.123456+00:00', '2026-10-05T10:57:13.000001-04:00', '2026-10-05T14:57:13Z']) {
+  test('owner fresh edit preserves exact database version '+version, async()=>{
+    const db=database({guitars:[guitar('g-version',{updated_at:version})]});
+    const api=fixture(db);
+    const detail=await get(api,'scope=mine&code=g-version');
+    assert.equal(detail.status,200);
+    assert.equal(detail.body.instrument.updatedAt,version);
+    const list=await get(api);
+    assert.equal(list.status,200);
+    assert.equal(list.body.instruments[0].updatedAt,version);
+    assert.ok(db.calls.filter(call=>call.table==='guitars').every(call=>call.columns==='*'||call.columns.split(',').includes('updated_at')));
+  });
+}
+test('owner version correction leaves anonymous mapper private fields omitted',()=>{
+  const api=fixture(database());
+  const visible=api.mapInstrumentRow({guitar:guitar('g-public',{visibility:'public',updated_at:'2026-10-05T14:57:13.123456+00:00'}),media:[],specs:[]});
+  assert.equal(Object.hasOwn(visible,'updatedAt'),false);
+  assert.equal(Object.hasOwn(visible,'recordId'),false);
+  assert.equal(Object.hasOwn(visible,'safetyNote'),false);
+  assert.equal(Object.hasOwn(visible,'internalVerificationNote'),false);
+});
+
+test('owner reads exclude seller-kept private files before signing for every custodian state',async()=>{
+  for(const custodian of ['seller-before-transfer',owner.id,null]) {
+    const docs=[{id:'attached',guitar_id:'g0',name:'Shared with buyer',storage_path:'attached.pdf',is_public:false,retained_private:false},
+      {id:'kept',guitar_id:'g0',name:'PRIVATE_SELLER_RECEIPT',storage_path:'kept.pdf',is_public:false,retained_private:true,retained_by_user_id:custodian}];
+    const db=database({guitars:[guitar()],guitar_documents:docs}),signed=[];
+    const result=await get(fixture(db,{sign:async(bucket,source)=>{signed.push(source);assert.notEqual(source,'kept.pdf');return 'https://storage.test/'+source;}}));
+    assert.equal(result.status,200);assert.deepEqual(result.body.instruments[0].documentFiles.map(d=>d.id),['attached']);
+    assert.deepEqual(signed,['attached.pdf']);assert.doesNotMatch(JSON.stringify(result.body),/PRIVATE_SELLER_RECEIPT|kept.pdf/);
+    assert.ok(db.calls.filter(q=>q.table==='guitar_documents').every(q=>q.filters.some(([op,key,val])=>op==='eq'&&key==='retained_private'&&val===false)));
   }
 });

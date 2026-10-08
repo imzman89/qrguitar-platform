@@ -1,3 +1,4 @@
+import { cleanOwnerPublicName } from "./owner-name-consent";
 import type {
   CustomDocumentFile,
   CustomProfileLink,
@@ -94,16 +95,74 @@ const SERVICE_HISTORY_CATEGORIES = new Set([
   "service",
   "setup",
   "repair",
+  "electronics",
+  "fretwork",
+  "structural repair",
+  "finish work",
+  "amplifier service",
   "modification",
   "restoration",
-  "inspection",
-  "appraisal"
+  "inspection"
 ]);
 
-export function isServiceHistoryEvent(event: Pick<ServiceHistoryEntry, "category" | "eventType" | "isSystem">) {
+export function isServiceHistoryEvent(event: Pick<ServiceHistoryEntry, "category" | "eventType" | "isSystem" | "sourceKind">) {
   if (event.isSystem) return false;
-  const category = String(event.category || event.eventType || "").trim().toLowerCase();
-  return SERVICE_HISTORY_CATEGORIES.has(category);
+  const kind = String(event.eventType || "").trim().toLowerCase();
+  const category = String(event.category || kind).trim().toLowerCase();
+  const excluded = ["ownership", "purchase", "sale", "verification", "safety", "media", "documentation", "profile_created", "creation", "registration", "appraisal"];
+  if (excluded.includes(kind) || excluded.includes(category)) return false;
+  if (SERVICE_HISTORY_CATEGORIES.has(category) || SERVICE_HISTORY_CATEGORIES.has(kind)) return true;
+  return event.sourceKind === "provider_submitted_owner_approved" && kind === "other" && category === "other";
+}
+
+export type RecordedServiceDate = { date: string; datePrecision: "day" | "month" | "year" };
+
+export function normalizeRecordedServiceDate(value: unknown, precision: unknown): RecordedServiceDate | undefined {
+  if (typeof value !== "string" || !["day", "month", "year"].includes(String(precision))) return undefined;
+  const pattern = precision === "year" ? /^\d{4}$/ : precision === "month" ? /^\d{4}-\d{2}$/ : /^\d{4}-\d{2}-\d{2}$/;
+  if (!pattern.test(value) && !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const anchor = value.length === 4 ? value + "-01-01" : value.length === 7 ? value + "-01" : value;
+  const parsed = new Date(anchor + "T00:00:00.000Z");
+  if (Number(anchor.slice(0, 4)) < 1 || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== anchor) return undefined;
+  const length = precision === "year" ? 4 : precision === "month" ? 7 : 10;
+  const date = value.slice(0, length);
+  if (date > new Date().toISOString().slice(0, length)) return undefined;
+  return { date, datePrecision: precision as RecordedServiceDate["datePrecision"] };
+}
+
+export function getLatestRecordedServiceDate(
+  events: readonly Pick<ServiceHistoryEntry, "serviceDate" | "datePrecision" | "category" | "eventType" | "isSystem" | "sourceKind">[],
+  projected?: { date?: unknown; datePrecision?: unknown }
+): RecordedServiceDate | undefined {
+  const dates = [
+    normalizeRecordedServiceDate(projected?.date, projected?.datePrecision),
+    ...events.filter(isServiceHistoryEvent).map((event) => normalizeRecordedServiceDate(event.serviceDate, event.datePrecision))
+  ].filter((date): date is RecordedServiceDate => Boolean(date));
+  // Ordering keys only: overlapping periods retain their coarser precision,
+  // never an inferred January 1 or first-of-month service day.
+  const endKey = (date: RecordedServiceDate) => date.date + (date.datePrecision === "year" ? "-99-99" : date.datePrecision === "month" ? "-99" : "");
+  return dates.reduce<RecordedServiceDate | undefined>((latest, date) => !latest || endKey(date) > endKey(latest) ? date : latest, undefined);
+}
+
+export function formatRecordedServiceDate(value: RecordedServiceDate): string {
+  if (value.datePrecision === "year") return value.date;
+  const anchor = value.datePrecision === "month" ? value.date + "-01" : value.date;
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC", month: value.datePrecision === "month" ? "long" : "short", year: "numeric",
+    ...(value.datePrecision === "day" ? { day: "numeric" } : {})
+  }).format(new Date(anchor + "T00:00:00.000Z"));
+}
+
+export function isProfileCreationEvent(event: Pick<ServiceHistoryEntry, "eventType" | "title">) {
+  return String(event.eventType || "").trim().toLowerCase() === "profile_created" || /^(qrguitar )?profile created$/i.test(event.title.trim());
+}
+
+export function isRecordedOwnershipEvent(event: Pick<ServiceHistoryEntry, "eventType" | "isSystem">) {
+  return event.isSystem === true && String(event.eventType || "").trim().toLowerCase() === "ownership";
+}
+
+export function isMeaningfulTimelineEvent(event: ServiceHistoryEntry) {
+  return !isProfileCreationEvent(event) && (!event.isSystem || isRecordedOwnershipEvent(event)) && !isServiceHistoryEvent(event);
 }
 
 export function getTimelineEvents(instrument: Pick<DemoInstrument, "timelineEvents" | "serviceEvents">) {
@@ -231,13 +290,10 @@ export function resolveInstrumentPresentation(
   const timelineEvents = getTimelineEvents(instrument).filter((event) =>
     isOwner || event.isPublic === true
   );
-  const meaningfulTimelineEvents = timelineEvents.filter((event) =>
-    !event.isSystem && !/^(qrguitar )?profile created$/i.test(event.title.trim()) &&
-    !isServiceHistoryEvent(event)
-  );
-  const profileOrigin = timelineEvents.find((event) =>
-    event.isSystem || /^(qrguitar )?profile created$/i.test(event.title.trim())
-  ) || null;
+  const meaningfulTimelineEvents = timelineEvents.filter(isMeaningfulTimelineEvent);
+  const recordedOwnershipCount = meaningfulTimelineEvents.filter(isRecordedOwnershipEvent).length;
+  const legacyOwnershipCount = Math.max(0, Number(instrument.ownershipTransferCount || 0) - recordedOwnershipCount);
+  const profileOrigin = timelineEvents.find(isProfileCreationEvent) || null;
   const serviceEntries = getServiceHistoryEntries(instrument).filter((event) =>
     isOwner || event.isPublic === true
   );
@@ -274,7 +330,7 @@ export function resolveInstrumentPresentation(
       photos: photos.length,
       documents: documents.length,
       supplementalMedia: supplementalMedia.length,
-      timeline: meaningfulTimelineEvents.length,
+      timeline: meaningfulTimelineEvents.length + legacyOwnershipCount,
       service: serviceEntries.length,
       privateDocuments
     },
@@ -305,6 +361,15 @@ export function getProfileCompleteness(instrument: DemoInstrument) {
 }
 
 export function sanitizePublicInstrument(instrument: DemoInstrument): DemoInstrument {
+  return sanitizePublicInstrumentInternal(instrument,false);
+}
+export function sanitizePublicInstrumentWithConfirmedOwnerNames(instrument: DemoInstrument): DemoInstrument {
+  return sanitizePublicInstrumentInternal(instrument,true);
+}
+function sanitizePublicInstrumentInternal(instrument: DemoInstrument, includeConfirmedOwnerNames: boolean): DemoInstrument {
+  const latestService = getLatestRecordedServiceDate([...(instrument.timelineEvents || []), ...(instrument.serviceEvents || [])], {
+    date: instrument.latestServiceDate, datePrecision: instrument.latestServiceDatePrecision
+  });
   const {
     ownerUserEmail: _ownerUserEmail,
     internalVerificationNote: _internalVerificationNote,
@@ -319,6 +384,13 @@ export function sanitizePublicInstrument(instrument: DemoInstrument): DemoInstru
     delete (publicInstrument as Partial<DemoInstrument>).serial;
   }
 
+  delete publicInstrument.latestServiceDate;
+  delete publicInstrument.latestServiceDatePrecision;
+  if (latestService) {
+    publicInstrument.latestServiceDate = latestService.date;
+    publicInstrument.latestServiceDatePrecision = latestService.datePrecision;
+  }
+
   publicInstrument.owner = publicInstrument.publicCollection?.publicName || "Collection";
   publicInstrument.customFields = (publicInstrument.customFields || [])
     .filter((field) => !isOwnerOnlyInstrumentSpec(field.label));
@@ -329,7 +401,11 @@ export function sanitizePublicInstrument(instrument: DemoInstrument): DemoInstru
 
   publicInstrument.timelineEvents = getTimelineEvents(publicInstrument)
     .filter((event) => event.isPublic === true)
-    .map(({ privateNotes: _privateNotes, canEdit: _canEdit, lockedReason: _lockedReason, ...event }) => event);
+    .map(({ privateNotes: _privateNotes, canEdit: _canEdit, lockedReason: _lockedReason, previousOwnerPublicName, ...event }) => ({
+      ...event,
+      ...(includeConfirmedOwnerNames && event.isSystem === true && event.eventType === "ownership" && cleanOwnerPublicName(previousOwnerPublicName)
+        ? {previousOwnerPublicName: cleanOwnerPublicName(previousOwnerPublicName)} : {})
+    }));
 
   publicInstrument.serviceEvents = publicInstrument.timelineEvents.filter(isServiceHistoryEvent);
 

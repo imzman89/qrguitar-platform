@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { Footer } from "../../../components/Footer";
+import { ServiceCorrections } from "../../../components/ServiceCorrections";
 import { Nav } from "../../../components/Nav";
 import { getContentValue } from "../../../lib/content-registry";
 import { createBrowserSupabaseClient } from "../../../lib/supabase-browser";
@@ -137,6 +138,7 @@ function ServiceWorkEditor({ qrCode, requestedId }: { qrCode: string; requestedI
         </div>}
       </section>
       {!closed && <div className="service-form-actions"><button className="button secondary" disabled={disabled} onClick={() => void saveSubmission("save_draft")}>{busy === "save_draft" ? ui("ui.app.service.work.code.page.dc85af8f2b1d", "Saving...") : getContentValue(content, "serviceProviders.actions.draft")}</button><button className="button" disabled={disabled} onClick={() => void saveSubmission(submission?.status === "changes_requested" ? "revise" : "submit")}>{busy === "submit" || busy === "revise" ? ui("ui.app.service.work.code.page.64115d5b9c79", "Submitting...") : submission?.status === "changes_requested" ? ui("ui.app.service.work.code.page.0435d1b361c0", "Send revised work") : getContentValue(content, "serviceProviders.actions.submit")}</button></div>}
+      {submission?.status === "approved" && <ServiceCorrections key={submission.id} submissionId={submission.id} />}
     </>}
   </div></section></main><Footer /></>;
 }

@@ -3,7 +3,7 @@ import { useUiText } from "../../components/UiTextProvider";
 
 
 import Link from "../../components/CheckoutAwareLink";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   Eye,
@@ -26,15 +26,38 @@ import { CollectibleRecordCard } from "../../components/CollectibleRecordCard";
 import type { DemoInstrument } from "../../lib/local-demo";
 import styles from "./guide.module.css";
 
-export function HowItWorksClient({ settings, example = null }: { settings: EditableSiteSettings; example?: DemoInstrument | null }) {
+function revealRoleTab(strip: HTMLElement | null, tab: HTMLElement | null) {
+  if (!strip || !tab || strip.scrollWidth <= strip.clientWidth) return;
+  const stripBounds = strip.getBoundingClientRect();
+  const tabBounds = tab.getBoundingClientRect();
+  const left = stripBounds.left + strip.clientLeft;
+  const right = left + strip.clientWidth;
+  if (tabBounds.left < left || tabBounds.width > strip.clientWidth) strip.scrollLeft += tabBounds.left - left;
+  else if (tabBounds.right > right) strip.scrollLeft += tabBounds.right - right;
+}
+
+export function HowItWorksClient({ settings, example = null, initialAudienceId = "" }: { settings: EditableSiteSettings; example?: DemoInstrument | null; initialAudienceId?: string }) {
   const ui = useUiText("app.how.it.works.HowItWorksClient");
-  const [activeAudience, setActiveAudience] = useState(0);
   const content = settings.content;
   const sections = resolveVisibleEditorialSections(settings, "howItWorks");
   const visibleSectionIds = useMemo(() => new Set(sections.map((section) => section.id)), [sections]);
   const blocks = (sectionId: string) => sections.find((section) => section.id === sectionId)?.blocks.filter((block) => block.visible) || [];
   const roleBlocks = blocks("roles");
+  const [activeAudience, setActiveAudience] = useState(() => Math.max(0, roleBlocks.findIndex(block => block.id === initialAudienceId)));
   const selectedAudience = roleBlocks[activeAudience] || roleBlocks[0];
+  const selectedAudienceHref = selectedAudience?.id === "how-role-provider" && selectedAudience.ctaUrl === "/account#service-provider"
+    ? "/account?section=profile"
+    : selectedAudience?.ctaUrl || "/create";
+  const roleTabsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const revealSelectedRole = () => {
+      const strip = roleTabsRef.current;
+      revealRoleTab(strip, strip?.querySelector<HTMLElement>('[aria-selected="true"]') || null);
+    };
+    revealSelectedRole();
+    window.addEventListener("resize", revealSelectedRole);
+    return () => window.removeEventListener("resize", revealSelectedRole);
+  }, [selectedAudience?.id]);
   const sectionStyle = (sectionId: string) => ({ order: Math.max(0, sections.findIndex((section) => section.id === sectionId)) });
 
   const visibility = [
@@ -150,19 +173,21 @@ export function HowItWorksClient({ settings, example = null }: { settings: Edita
             <div className="shell">
               <div className="section-heading centered-heading"><div className="eyebrow">{ui("ui.app.how.it.works.HowItWorksClient.10f89fbc4f6e", "FOR THE INSTRUMENT COMMUNITY")}</div><h2>{getContentValue(content, "howItWorks.roles.heading")}</h2></div>
               <div className="product-guide-role-switcher">
-                <div className="product-guide-role-tabs" role="tablist" aria-label={ui("ui.app.how.it.works.HowItWorksClient.6cda88bdf5a8", "Choose your role")}>
+                <div className="product-guide-role-tabs" ref={roleTabsRef} role="tablist" aria-label={ui("ui.app.how.it.works.HowItWorksClient.6cda88bdf5a8", "Choose your role")}>
                   {roleBlocks.map((item, index) => <button className={index === activeAudience ? "is-active" : ""} type="button" role="tab" id={`guide-audience-${index}`} aria-controls="guide-audience-panel" tabIndex={index === activeAudience ? 0 : -1} aria-selected={index === activeAudience} key={item.id} onClick={() => setActiveAudience(index)} onKeyDown={(event) => {
                     const target = event.key === "ArrowRight" ? (index + 1) % roleBlocks.length : event.key === "ArrowLeft" ? (index - 1 + roleBlocks.length) % roleBlocks.length : event.key === "Home" ? 0 : event.key === "End" ? roleBlocks.length - 1 : null;
                     if (target === null) return;
                     event.preventDefault(); setActiveAudience(target);
-                    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[target]?.focus();
+                    const targetTab = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[target];
+                    targetTab?.focus({ preventScroll: true });
+                    revealRoleTab(roleTabsRef.current, targetTab || null);
                   }}>{item.title}</button>)}
                 </div>
                 {selectedAudience ? (
                   <article className="product-guide-role-panel" role="tabpanel" id="guide-audience-panel" aria-labelledby={`guide-audience-${activeAudience}`}>
                     <span>{String(activeAudience + 1).padStart(2, "0")}</span>
                     <div><h3>{selectedAudience.title}</h3><p>{selectedAudience.body}</p></div>
-                    <Link className="button secondary" href={selectedAudience.ctaUrl || "/create"}>{selectedAudience.ctaLabel || ui("ui.app.how.it.works.HowItWorksClient.8088497eb587", "Create a Profile")}</Link>
+                    <Link className="button secondary" href={selectedAudienceHref}>{selectedAudience.ctaLabel || ui("ui.app.how.it.works.HowItWorksClient.8088497eb587", "Create a Profile")}</Link>
                   </article>
                 ) : null}
               </div>

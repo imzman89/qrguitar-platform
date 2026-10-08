@@ -234,14 +234,15 @@ test("Catalog grants high priority to exactly the first visible Profile card", (
   assert.equal((catalog.match(/prioritizeLeadImage=/g) || []).length, 1);
 });
 
-test("Homepage keeps only its above-the-fold showcase eager and defers supporting media", () => {
+test("Homepage prioritizes only the first gallery Profile and defers supporting media", () => {
   assert.match(showcase, /loading="eager" fetchPriority="high" decoding="async" width=\{1200\} height=\{900\}/);
   const heroPhotos = [...renderHomepageShowcase().matchAll(/<img\b[^>]*>/g)].map((match) => match[0]);
   assert.equal(heroPhotos.length, 1);
   assert.match(heroPhotos[0], /loading="eager"/);
   assert.equal((showcase.match(/fetchPriority="high"/g) || []).length, 1);
   assert.match(homepage, /loading="lazy" fetchPriority="low" decoding="async" width=\{1200\} height=\{900\}/);
-  assert.doesNotMatch(homepage, /prioritizeLeadImage/);
+  assert.match(homepage, /galleryRecords\.map\(\(record, index\) =>[\s\S]*?prioritizeLeadImage=\{index === 0\}/);
+  assert.equal((homepage.match(/prioritizeLeadImage=/g) || []).length, 1);
 });
 
 test("shared Profile cards show the category selected for that Profile", () => {
@@ -267,10 +268,10 @@ test("homepage Profile copy uses the saved category instead of a hard-coded inst
   assert.doesNotMatch(showcase, /A real QRguitar Profile|THE INSTRUMENT/);
 });
 
-test("homepage hero and archive reflow into a single column on phones", () => {
-  assert.match(homeStyles, /@media\s*\(max-width:760px\)[\s\S]*?\.home :global\(\.hero-grid\)\s*\{[^}]*grid-template-columns:1fr/);
-  assert.match(homeStyles, /@media\s*\(max-width:520px\)[\s\S]*?\.home :global\(\.home-archive-rail\)\s*\{[^}]*grid-template-columns:1fr/);
-  assert.doesNotMatch(homeStyles, /scroll-snap-type:\s*x mandatory/);
+test("homepage opening and archive reflow while the featured phone gallery can scroll", () => {
+  assert.match(homeStyles, /@media\s*\(max-width:760px\)[\s\S]*?\.galleryIntro\s*\{[^}]*grid-template-columns:1fr/);
+  assert.match(homeStyles, /@media\s*\(max-width:520px\)[\s\S]*?\.profileGallery,\.home :global\(\.home-archive-rail\)\s*\{[^}]*grid-template-columns:1fr/);
+  assert.match(homeStyles, /@media\s*\(max-width:520px\)\s*\{[\s\S]*?\.profileGallery\s*\{[^}]*scroll-snap-type:\s*x mandatory/);
 });
 
 test("homepage photo count and accessible image total agree after a failed source", () => {
@@ -375,7 +376,7 @@ function findElement(node, predicate) {
   return findElement(node.props?.children, predicate);
 }
 
-function cardInteractionHarness(images = ["/lead.jpg", "/detail.jpg", "/back.jpg"], variant = "catalog") {
+function cardInteractionHarness(images = ["/lead.jpg", "/detail.jpg", "/back.jpg"], variant = "catalog", homeFeatured = false) {
   const states = [], refs = [], navigation = [], scrolls = [];
   let stateCursor = 0, refCursor = 0;
   const PhotoViewer = () => null;
@@ -404,7 +405,7 @@ function cardInteractionHarness(images = ["/lead.jpg", "/detail.jpg", "/back.jpg
   };
   function render() {
     stateCursor = 0; refCursor = 0;
-    const tree = Card({ record: { qrCode: "TEST" }, variant });
+    const tree = Card({ record: { qrCode: "TEST" }, variant, homeFeatured });
     const photo = findElement(tree, (node) => node.props?.className === "collectible-card-media-rail");
     photo.props.ref.current = rail;
     return { tree, photo, viewer: findElement(tree, (node) => node.type === PhotoViewer) };
@@ -412,92 +413,77 @@ function cardInteractionHarness(images = ["/lead.jpg", "/detail.jpg", "/back.jpg
   return { render, rail, navigation, scrolls };
 }
 
-test("card photo click opens the full gallery at its selected image without changing the Profile route", () => {
+test("card photograph is a native Profile link while its gallery position remains intact", () => {
   const harness = cardInteractionHarness();
   let view = harness.render();
   harness.rail.scrollLeft = 300;
   view.photo.props.onScroll({ currentTarget: harness.rail });
   view = harness.render();
-  view.photo.props.onClick();
-  view = harness.render();
-  assert.ok(view.viewer);
-  assert.equal(view.viewer.props.initialIndex, 1);
-  assert.deepEqual(view.viewer.props.images, ["/lead.jpg", "/detail.jpg", "/back.jpg"]);
-  assert.deepEqual(harness.navigation, []);
-  view.viewer.props.onClose();
-  assert.equal(harness.render().viewer, null);
-});
-
-test("archive preview announces the complete photo count and opens every public photo", () => {
-  const images = ["/lead.jpg", "/detail.jpg", "/back.jpg", "/serial.jpg"];
-  const harness = cardInteractionHarness(images, "archive");
-  let view = harness.render();
-  const inlineImages = [];
-  function collectImages(node) {
-    if (Array.isArray(node)) return node.forEach(collectImages);
-    if (!node || typeof node !== "object") return;
-    if (node.type === "img") inlineImages.push(node);
-    collectImages(node.props?.children);
-  }
-  collectImages(view.tree);
-  assert.equal(inlineImages.length, 1, "the archive keeps its single-image loading budget");
-  assert.equal(view.photo.props["aria-label"], "Test Profile photo preview. 4 photos available. Press Enter to view photos.");
-  assert.equal(inlineImages[0].props.alt, "Test Profile preview photo 1 of 4");
-  view.photo.props.onClick();
-  view = harness.render();
-  assert.ok(view.viewer);
-  assert.deepEqual(view.viewer.props.images, images, "the viewer receives the complete public gallery, not the preview slice");
-  assert.equal(view.viewer.props.initialIndex, 0);
+  let prevented = false;
+  view.photo.props.onClick({ preventDefault() { prevented = true; } });
+  assert.equal(view.photo.props.href, "/i/TEST");
+  assert.equal(view.photo.props["aria-label"], "Open Test Profile Profile. Photo 2 of 3");
+  assert.equal(prevented, false, "ordinary and modified native anchor navigation are retained");
+  assert.equal(view.viewer, null);
   assert.deepEqual(harness.navigation, []);
 });
 
-test("Enter and Space activate the same card photo viewer, while arrow keys only browse the rail", () => {
-  for (const key of ["Enter", " "]) {
-    const harness = cardInteractionHarness();
-    let prevented = 0;
-    harness.render().photo.props.onKeyDown({ key, preventDefault: () => { prevented++; } });
-    assert.ok(harness.render().viewer, key + " opens viewer");
+test("archive preview links to its Profile and retains its single-image loading budget", () => {
+  const harness = cardInteractionHarness(["/lead.jpg", "/detail.jpg", "/back.jpg", "/serial.jpg"], "archive");
+  const view = harness.render(), images = [];
+  function collect(node) { if (Array.isArray(node)) return node.forEach(collect); if (!node || typeof node !== "object") return; if (node.type === "img") images.push(node); collect(node.props?.children); }
+  collect(view.tree);
+  assert.equal(images.length, 1);
+  assert.equal(images[0].props.alt, "Test Profile preview photo 1 of 4");
+  assert.equal(view.photo.props.href, "/i/TEST");
+  assert.equal(view.photo.props["aria-label"], "Open Test Profile Profile. Photo 1 of 4");
+});
+
+test("native Enter, custom Space and modifier shortcuts retain normal Profile link behavior", () => {
+  for (const key of [" "]) {
+    const harness = cardInteractionHarness(); let prevented = 0;
+    harness.render().photo.props.onKeyDown({ key, preventDefault() { prevented++; } });
+    assert.deepEqual(harness.navigation, ["/i/TEST"]);
     assert.equal(prevented, 1);
-    assert.deepEqual(harness.navigation, []);
   }
-  const harness = cardInteractionHarness();
-  let prevented = 0;
-  harness.render().photo.props.onKeyDown({ key: "ArrowRight", preventDefault: () => { prevented++; } });
-  assert.equal(harness.render().viewer, null);
+  for (const event of [{ key: "Enter" }, { key: "Enter", ctrlKey: true }, { key: "Enter", metaKey: true }, { key: "Enter", shiftKey: true }, { key: " ", altKey: true }, { key: "ArrowLeft", metaKey: true }, { key: "ArrowRight", ctrlKey: true }]) {
+    const native = cardInteractionHarness(); let prevented = 0;
+    native.render().photo.props.onKeyDown({ ...event, preventDefault() { prevented++; } });
+    assert.equal(prevented, 0); assert.deepEqual(native.navigation, []);
+    assert.equal(native.render().photo.props.href, "/i/TEST");
+  }
+  const harness = cardInteractionHarness(); let prevented = 0;
+  harness.render().photo.props.onKeyDown({ key: "ArrowRight", preventDefault() { prevented++; } });
   assert.equal(harness.rail.scrollLeft, 300);
-  harness.render().photo.props.onKeyDown({ key: "ArrowLeft", preventDefault: () => { prevented++; } });
+  harness.render().photo.props.onKeyDown({ key: "ArrowLeft", preventDefault() { prevented++; } });
   assert.equal(harness.rail.scrollLeft, 0);
-  assert.equal(prevented, 2);
-  harness.render().photo.props.onKeyDown({ key: "Tab", preventDefault: () => { prevented++; } });
-  assert.equal(prevented, 2, "normal keyboard focus navigation remains native");
+  assert.deepEqual(harness.navigation, []);
+  harness.render().photo.props.onKeyDown({ key: "Tab", preventDefault() { prevented++; } });
+  assert.equal(prevented, 2, "normal focus navigation remains native");
 });
 
-test("dragging a card photo does not open its viewer and the next intentional click still works", () => {
-  const harness = cardInteractionHarness();
-  const photo = harness.render().photo;
+test("dragging a card suppresses navigation, and the next deliberate click retains its Profile link", () => {
+  const harness = cardInteractionHarness(), photo = harness.render().photo;
   photo.props.onPointerDown({ pointerType: "mouse", pointerId: 1, clientX: 250 });
   photo.props.onPointerMove({ pointerType: "mouse", pointerId: 1, clientX: 30 });
   photo.props.onPointerUp({ pointerType: "mouse", pointerId: 1 });
-  photo.props.onClick();
-  assert.equal(harness.render().viewer, null);
-  assert.deepEqual(harness.navigation, []);
-  harness.render().photo.props.onClick();
-  assert.ok(harness.render().viewer);
+  let prevented = 0;
+  photo.props.onClick({ preventDefault() { prevented++; } });
+  assert.equal(prevented, 1);
+  harness.render().photo.props.onClick({ preventDefault() { prevented++; } });
+  assert.equal(prevented, 1);
+  assert.equal(harness.render().photo.props.href, "/i/TEST");
 });
 
-test("a card without photos cannot open an empty viewer by click or keyboard", () => {
-  const harness = cardInteractionHarness([]);
-  let photo = harness.render().photo;
-  assert.equal(photo.props.tabIndex, -1);
-  assert.doesNotMatch(photo.props["aria-label"], /Press Enter/);
-  photo.props.onClick();
-  assert.equal(harness.render().viewer, null);
-  for (const key of ["Enter", " "]) {
-    photo = harness.render().photo;
-    photo.props.onKeyDown({ key, preventDefault() {} });
-    assert.equal(harness.render().viewer, null);
-  }
+test("a card without photographs still links to its instrument Profile without an empty viewer", () => {
+  const harness = cardInteractionHarness([]), photo = harness.render().photo;
+  assert.equal(photo.props.href, "/i/TEST");
+  assert.equal(photo.props["aria-label"], "Open Test Profile Profile");
+  let prevented = false;
+  photo.props.onKeyDown({ key: "Enter", preventDefault() { prevented = true; } });
+  assert.equal(prevented, false);
   assert.deepEqual(harness.navigation, []);
+  assert.equal(harness.render().viewer, null);
 });
 
 function compileStatusBadges() {
@@ -545,6 +531,7 @@ test("card content opens its Profile without hijacking nested collection links o
   assert.ok(content);
   content.props.onClick({ target: { closest: () => ({ tagName: "A" }) } });
   content.props.onClick({ target: { closest: () => ({ tagName: "BUTTON" }) } });
+  content.props.onClick({ target: { closest: (selector) => selector.split(", ").includes("details") ? { tagName: "DETAILS" } : null } });
   assert.deepEqual(harness.navigation, []);
   content.props.onClick({ target: { closest: () => null } });
   assert.deepEqual(harness.navigation, ["/i/TEST"]);
@@ -631,4 +618,37 @@ test("photo upload failure stays attached to its source through reordering and l
   findElement(failedTile, (node) => node.type === "button" && node.props["aria-label"] === "Remove photo 2").props.onClick();
   assert.deepEqual(removed, ["/lead.jpg"]);
   assert.deepEqual(images, ["/detail.jpg", "/back.jpg"]);
+});
+
+test('Home featured caption keeps canonical photograph and title links without duplicate disclosure rows',()=>{const Card=compileCard(),html=renderToStaticMarkup(React.createElement(Card,{record:{qrCode:'TEST'},variant:'latest',homeFeatured:true}));assert.match(html,/data-home-featured="true"/);assert.match(html,/<a href="\/i\/TEST"[^>]*class="collectible-card-media-rail"/);assert.match(html,/<a class="collectible-card-profile-link" href="\/i\/TEST"/);assert.match(html,/<h3><span>Test Profile<\/span>/);assert.ok(!html.includes('<summary>Record details</summary>'));assert.ok(!html.includes('collectible-card-cta'));assert.match(html,/collectible-card-code/);});
+test('featured caption requires Home latest opt-in and preserves other card controls',()=>{const Card=compileCard();for(const props of [{variant:'latest'},{variant:'catalog',homeFeatured:true},{variant:'archive',homeFeatured:true}]){const html=renderToStaticMarkup(React.createElement(Card,{record:{qrCode:'TEST'},...props}));assert.ok(!html.includes('data-home-featured='));assert.match(html,/<summary>Record details<\/summary>/);assert.match(html,/collectible-card-cta/);}});
+test('only Catalog details request the visible managed Share Profile label',()=>{const Card=compileCard({'./RecordShareButton':{RecordShareButton:({showLabel})=>React.createElement('button',{'aria-label':'Share Profile'},showLabel?'Visible share label':null)}});const render=variant=>renderToStaticMarkup(React.createElement(Card,{record:{qrCode:'TEST'},variant}));assert.ok(render('catalog').includes('Visible share label'));assert.ok(!render('latest').includes('Visible share label'));});
+
+test("Home preview lets the outer instrument gallery receive native scrolling without losing its Profile link", () => {
+  const harness = cardInteractionHarness(undefined, "latest", true);
+  const photo = harness.render().photo; let prevented = 0;
+  const preventDefault = () => { prevented++; };
+  photo.props.onWheel({ deltaX: 240, deltaY: 0, preventDefault });
+  photo.props.onKeyDown({ key: "ArrowRight", preventDefault });
+  photo.props.onPointerDown({ pointerType: "mouse", pointerId: 1, clientX: 250 });
+  photo.props.onPointerMove({ pointerType: "mouse", pointerId: 1, clientX: 30 });
+  photo.props.onPointerUp({ pointerType: "mouse", pointerId: 1 });
+  photo.props.onClick({ preventDefault });
+  assert.equal(prevented, 0);
+  assert.equal(harness.rail.scrollLeft, 0);
+  assert.deepEqual(harness.scrolls, []);
+  assert.deepEqual(harness.navigation, []);
+  assert.equal(photo.props.href, "/i/TEST");
+  photo.props.onKeyDown({ key: " ", preventDefault });
+  assert.deepEqual(harness.navigation, ["/i/TEST"]);
+  assert.equal(prevented, 1);
+});
+
+test("Home opt-in does not disable a Catalog card's photograph navigation", () => {
+  const harness = cardInteractionHarness(undefined, "catalog", true);
+  let prevented = 0;
+  harness.render().photo.props.onKeyDown({ key: "ArrowRight", preventDefault() { prevented++; } });
+  assert.equal(prevented, 1);
+  assert.equal(harness.rail.scrollLeft, 300);
+  assert.deepEqual(harness.navigation, []);
 });

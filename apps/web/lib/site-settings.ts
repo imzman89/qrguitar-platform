@@ -137,8 +137,8 @@ export const defaultEditorialComposition: EditorialComposition = {
   home: {
     sections: [
       { id: "hero", name: "Hero and newest Profile", visible: true, locked: true, blocks: [] },
-      { id: "archive", name: "Public Profile archive", visible: true, blocks: [] },
-      { id: "lifecycle", name: "Profile lifecycle", visible: true, blocks: [
+      { id: "archive", name: "Public Profile archive", visible: false, blocks: [] },
+      { id: "lifecycle", name: "Profile lifecycle", visible: false, blocks: [
         { id: "home-step-identity", name: "Identify", title: "Identify", body: "Serial Number, photos, specifications, and the permanent QRguitar ID.", icon: "qr", visible: true, protected: true },
         { id: "home-step-history", name: "Document", title: "Document", body: "Service, documents, media, safety, and ownership history.", icon: "document", visible: true },
         { id: "home-step-share", name: "Carry Forward", title: "Carry Forward", body: "Transfer the same Profile when the instrument changes hands.", icon: "transfer", visible: true }
@@ -162,8 +162,8 @@ export const defaultEditorialComposition: EditorialComposition = {
         { id: "home-continuity-provenance", name: "Continuity", title: "The same Profile continues", body: "Approved history stays connected while the QRguitar ID and permanent link remain unchanged.", icon: "history", visible: true }
       ] },
       { id: "pricing", name: "Profile access", visible: true, blocks: [
-        { id: "home-price-beta", name: "Owners and collectors", title: "For owners and collectors", label: "Free", body: "Create up to 5 Profiles with photos, specs, history, and downloadable QR codes.", ctaLabel: "Create a Free Profile", ctaUrl: "/create", items: ["5 free Profiles", "Choose which documents to share", "Downloadable QR codes", "Service and ownership history"], icon: "qr", visible: true, protected: true },
-        { id: "home-price-commercial", name: "Shops, builders, and brands", title: "For shops, builders & brands", label: "From $99", body: "Need help with bulk setup, QR hardware, verification, or a commercial rollout? We'll help you get started.", ctaLabel: "Talk to QRguitar", ctaUrl: "mailto:support@qrguitar.com", items: ["Bulk Profile setup", "Business onboarding", "QR hardware and print support", "Verification support"], icon: "store", visible: true }
+        { id: "home-price-beta", name: "Owners and collectors", title: "For owners and collectors", label: "Free", body: "Create and maintain Profiles for free with photos, specs, history, and downloadable QR codes.", ctaLabel: "Create a Free Profile", ctaUrl: "/create", items: ["Profiles are always free", "Choose which documents to share", "Downloadable QR codes", "Service and ownership history"], icon: "qr", visible: true, protected: true },
+        { id: "home-price-commercial", name: "Shops, builders, and brands", title: "Optional assisted setup", label: "From $99", body: "Business Profiles are always free. Optional assisted setup covers bulk onboarding, QR hardware and print support. Verification and authentication are separate paid reviews.", ctaLabel: "Talk to QRguitar", ctaUrl: "mailto:support@qrguitar.com", items: ["Bulk Profile setup", "Business onboarding", "QR hardware and print support", "Verification support"], icon: "store", visible: true }
       ] },
       { id: "finalCta", name: "Closing action", visible: true, blocks: [] }
     ]
@@ -191,7 +191,7 @@ export const defaultEditorialComposition: EditorialComposition = {
         { id: "how-role-player", name: "Players and Collectors", title: "Players and Collectors", body: "Keep instruments organized and preserve the history that matters.", ctaLabel: "Create a Profile", ctaUrl: "/create", icon: "photo", visible: true, protected: true },
         { id: "how-role-shop", name: "Shops", title: "Shops", body: "Create or import inventory, print QR materials, and transfer Profiles after a sale.", ctaLabel: "Open inventory tools", ctaUrl: "/dashboard/import", icon: "store", visible: true },
         { id: "how-role-builder", name: "Builders and Brands", title: "Builders and Brands", body: "Create consistent Profiles for new builds and hand them to the first owner.", ctaLabel: "Open inventory tools", ctaUrl: "/dashboard/import", icon: "store", visible: true },
-        { id: "how-role-provider", name: "Luthiers and Technicians", title: "Luthiers and Technicians", body: "Submit completed service for the owner to review and add to the Profile.", ctaLabel: "Set up provider tools", ctaUrl: "/account#service-provider", icon: "wrench", visible: true },
+        { id: "how-role-provider", name: "Luthiers and Technicians", title: "Luthiers and Technicians", body: "Submit completed service for the owner to review and add to the Profile.", ctaLabel: "Set up provider tools", ctaUrl: "/account?section=profile", icon: "wrench", visible: true },
         { id: "how-role-buyer", name: "Buyers", title: "Buyers", body: "Review the public Profile, then receive the same Profile through a secure transfer or claim.", ctaLabel: "Open Claim Center", ctaUrl: "/ownership-claim", icon: "eye", visible: true }
       ] },
       { id: "faq", name: "Common questions", visible: true, blocks: [
@@ -325,7 +325,7 @@ export const defaultSiteSettings: EditableSiteSettings = {
     transferGuidanceTitle: "Ownership transfer",
     transferGuidanceBody: "Use transfer tools for normal handoffs and support for edge cases.",
     verificationGuidanceTitle: "Verification and authenticity",
-    verificationGuidanceBody: "QRguitar may verify a Profile at no charge after review. Authenticity confirmation is a separate paid staff review."
+    verificationGuidanceBody: "Verification and authentication are optional paid reviews. Creating a Profile does not grant either status."
   },
   composition: structuredClone(defaultEditorialComposition),
   content: { ...defaultContentValues }
@@ -589,22 +589,24 @@ function normalizeProfileCopy(value: string) {
     "Explore the archive": "See what's already documented.",
     "Free Profiles during public beta.": "Start free. Get help when you need it.",
     "Create QRguitar Profiles free. Commercial setup starts at $99+.": "Start free. Get help when you need it.",
-    "Create and maintain QRguitar Profiles without a hard paywall while the registry grows. Paid help is available separately.": "Start with five free Profiles, or ask QRguitar for hands-on commercial setup.",
-    "During public beta, users can create instrument profiles without a hard paywall. Verification, QR hardware, install help, builder/shop onboarding, and commercial setup are available as paid services.": "Start with five free Profiles, or ask QRguitar for hands-on commercial setup.",
+    "Create and maintain QRguitar Profiles without a hard paywall while the registry grows. Paid help is available separately.": "Create and maintain Profiles for free. Verification and authentication are optional paid services.",
+    "During public beta, users can create instrument profiles without a hard paywall. Verification, QR hardware, install help, builder/shop onboarding, and commercial setup are available as paid services.": "Create and maintain Profiles for free. Verification and authentication are optional paid services.",
     "Free Public Beta": "For owners and collectors",
     "$0": "Free",
     "$0 during public beta": "Free",
     "PUBLIC BETA": "PROFILE ACCESS",
     "Public beta": "Profile access",
-    "Create Profiles during public beta, or ask QRguitar for hands-on commercial setup.": "Start with five free Profiles, or ask QRguitar for hands-on commercial setup.",
-    "Create up to 25 profiles during public beta. Add photos, specs, documents, notes, visibility settings, and QR downloads without a hard paywall.": "Create up to five Profiles with photos, specifications, privacy controls, history, and downloadable QR codes.",
-    "Up to 25 profiles during beta": "5 free Profiles",
+    "Create Profiles during public beta, or ask QRguitar for hands-on commercial setup.": "Create and maintain Profiles for free. Verification and authentication are optional paid services.",
+    "Create up to 25 profiles during public beta. Add photos, specs, documents, notes, visibility settings, and QR downloads without a hard paywall.": "Create and maintain Profiles for free with photos, specifications, privacy controls, history, and downloadable QR codes.",
+    "Up to 25 profiles during beta": "Profiles are always free",
     "Photos, videos, sale notes, provenance, private notes, and beta owner-change support": "Photos, videos, sale notes, provenance, private notes, and ownership handoff support",
-    "Create QRguitar Profiles for free during beta. Paid help is handled manually by request.": "Start with five free Profiles. Assisted setup is available by request.",
+    "Create QRguitar Profiles for free during beta. Paid help is handled manually by request.": "Profiles are always free. Assisted setup is available by request.",
     "Use transfer tools for normal handoffs and support for edge cases during beta.": "Use transfer tools for normal handoffs and support for edge cases.",
-    "Manual verification and authenticity review are handled carefully during beta.": "QRguitar may verify a Profile at no charge after review. Authenticity confirmation is a separate paid staff review.",
+    "Manual verification and authenticity review are handled carefully during beta.": "Verification and authentication are optional paid reviews. Creating a Profile does not grant either status.",
     "Public beta pricing": "Profile access",
-    "Commercial / Brand Setup": "For shops, builders & brands",
+    "Commercial / Brand Setup": "Optional assisted setup",
+    "For shops, builders & brands": "Optional assisted setup",
+    "Need help with bulk setup, QR hardware, verification, or a commercial rollout? We'll help you get started.": "Business Profiles are always free. Optional assisted setup covers bulk onboarding, QR hardware and print support. Verification and authentication are separate paid reviews.",
     "From $99+": "From $99",
     "Give the next instrument a permanent place to live.": "Start with one instrument.",
     "Create a Profile in minutes and keep improving it for years.": "Create the Profile now. Add the rest over time.",
@@ -659,12 +661,12 @@ function normalizeProfileCopy(value: string) {
     ],
     [/^Simple enough for one guitar\. Essential for an entire brand\.$/, siteCopy.workflow.headline],
     [/^What each record holds$/i, siteCopy.customization.eyebrow],
-    [/\bCreate up to (?:5|25) records during public beta\b/gi, "Create up to 5 Profiles"],
-    [/\bUp to (?:5|25) records during beta\b/gi, "Up to 5 Profiles"],
+    [/\bCreate up to (?:5|25) records during public beta\b/gi, "Create Profiles for free"],
+    [/\bUp to (?:5|25) records during beta\b/gi, "Profiles are always free"],
     // Saved Content Studio copy can outlive the old public-beta allowance.
     // Match allowance language only: the approved 25-credit pack stays unchanged.
-    [/(?<=\bup to )25(?= (?:owned )?profiles\b)/gi, "5"],
-    [/\b25 free (?=(?:owned )?profiles\b)/gi, "5 free "],
+    [/\bup to (?:5|25) (?:owned )?profiles\b/gi, "Profiles for free"],
+    [/\b(?:5|25) free (?=(?:owned )?profiles\b)/gi, "free "],
     [/\bBulk record setup\b/gi, "Bulk profile setup"],
     [/\ba record the customer can keep\b/gi, "a QRguitar Profile the customer can keep"],
     [/\bCreate a Record\b/g, "Create Profile"],
@@ -1010,7 +1012,7 @@ export function buildEditableHomeCopy(settings: EditableSiteSettings) {
       cta: getContentValue(settings.content, "home.anatomy.cta") || settings.sections.detailsCta
     },
     audiences: {
-      eyebrow: getContentValue(settings.content, "home.roles.eyebrow") || settings.sections.audienceEyebrow,
+      eyebrow: getContentValue(settings.content, "home.roles.eyebrow"),
       headline: getContentValue(settings.content, "home.roles.headline") || settings.sections.audienceHeadline,
       body: getContentValue(settings.content, "home.roles.body"),
       cards: settings.sections.audienceCards.map((card, index) => ({

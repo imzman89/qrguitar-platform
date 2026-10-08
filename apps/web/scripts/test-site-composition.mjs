@@ -60,7 +60,7 @@ test("brand logo URLs permit only HTTPS or one-slash site-relative paths", () =>
     remote: "https://assets.example.test/logo.svg"
   });
 });
-test("saved beta allowance copy upgrades to 5 without changing the 25-credit pack", () => {
+test("saved beta allowance copy resolves to unlimited free Profiles while retaining historical credit wording", () => {
   const saved = settings.mergeSiteSettings({
     composition: { home: { sections: [{
       id: "pricing", name: "Pricing", visible: true, blocks: [{
@@ -73,12 +73,13 @@ test("saved beta allowance copy upgrades to 5 without changing the 25-credit pac
   });
   const block = saved.composition.home.sections.find(section => section.id === "pricing").blocks[0];
   assert.equal(block.title, "Our owner plan");
-  assert.equal(block.body, "Create up to 5 Profiles with photos. Additional 25 Profiles cost $99.");
-  assert.deepEqual(block.items, ["Up to 5 Profiles", "5 free owned Profiles", "25 Profile credits for $99"]);
-  assert.match(saved.content["pricing.beta.body"], /up to 5 Profiles/);
+  assert.equal(block.body, "Create Profiles for free with photos. Additional 25 Profiles cost $99.");
+  assert.deepEqual(block.items, ["Profiles for free", "free owned Profiles", "25 Profile credits for $99"]);
+  assert.match(saved.content["pricing.beta.body"], /Create Profiles for free/);
+  assert.doesNotMatch(block.body, /up to (?:5|25) Profiles/);
   assert.doesNotMatch(JSON.stringify(settings.defaultSiteSettings), /up to 25 Profiles/i);
 });
-test("published beta-era pricing copy resolves to current five-Profile offer", () => {
+test("published beta-era pricing copy resolves to permanently free Profiles", () => {
   const published = settings.mergeSiteSettings({
     sections: {
       pricingBody: "Create Profiles during public beta, or ask QRguitar for hands-on commercial setup.",
@@ -98,9 +99,9 @@ test("published beta-era pricing copy resolves to current five-Profile offer", (
   });
   const block = published.composition.home.sections.find(section => section.id === "pricing").blocks[0];
   assert.equal(block.label, "Free");
-  assert.equal(block.body, "Create up to 5 Profiles with photos, specifications, privacy controls, history, and downloadable QR codes.");
-  assert.deepEqual(block.items, ["5 free Profiles"]);
-  assert.equal(published.content["pricing.beta.body"], "Create up to 5 Profiles with photos, specifications, privacy controls, history, and downloadable QR codes.");
+  assert.equal(block.body, "Create Profiles for free with photos, specifications, privacy controls, history, and downloadable QR codes.");
+  assert.deepEqual(block.items, ["free Profiles"]);
+  assert.equal(published.content["pricing.beta.body"], "Create and maintain Profiles without a count limit, with photos, specifications, privacy controls, history and downloadable QR codes.");
   assert.equal(published.sections.pricingEyebrow, "Profile access");
   assert.equal(published.sections.pricingCards[0].price, "Free");
   assert.doesNotMatch(published.sections.pricingCards[0].copy, /beta|25 profiles/i);

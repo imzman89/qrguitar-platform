@@ -122,3 +122,28 @@
   .photoSection :global(.photo-organizer-menu button) { padding: 8px; }
   .photoSection :global(.photo-organizer-menu summary:focus-visible), .photoSection :global(.photo-organizer-menu button:focus-visible) { outline: 2px solid var(--action); outline-offset: -3px; }
 }
+
+/* Screen-only owner editor chrome; saved content and controls are unchanged. */
+@media screen {
+ .layout > div > h1 { font-family:var(--font-display,Georgia,serif); font-weight:400; }
+ .tools, .secondarySections { border-radius:0; background:transparent; }
+ .photoPicker { padding:20px 0; border-radius:0; background:transparent; border-block:1px solid var(--line); }
+ .photoChoose { border:1px solid var(--border-strong); border-radius:2px; background:transparent; color:var(--text); }
+ .layout :global(.editor-save-bar) :global(.button) { border:1px solid var(--border-strong); border-radius:2px; background:var(--surface-subtle); color:var(--text); }
+ .layout :global(.editor-save-bar) :global(.button.secondary) { background:transparent; }
+ .layout :global(.editor-save-bar) :global(.button):hover:not(:disabled) { background:var(--surface-raised); }
+ .layout :global(.editor-save-bar) :global(.button.secondary):hover:not(:disabled) { background:transparent; border-color:var(--text); }
+}
+
+/* Screen-only native document picker; input geometry and behavior remain unchanged. */
+@media screen {
+  .layout :global(#profileDocuments)::file-selector-button {
+    background: var(--surface-subtle);
+    color: var(--text);
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+  }
+  .layout :global(#profileDocuments:not(:disabled))::file-selector-button:hover {
+    background: var(--surface-raised);
+  }
+}

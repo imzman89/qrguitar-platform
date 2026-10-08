@@ -9,6 +9,8 @@ export type PublicCollectionSettings = {
   avatarUrl: string;
   allowIndexing: boolean;
   allowMessages: boolean;
+  allowWarrantyHelp: boolean;
+  warrantyHelpUrl: string;
   ownerId?: string;
 };
 
@@ -22,7 +24,9 @@ export const defaultPublicCollectionSettings: PublicCollectionSettings = {
   websiteUrl: "",
   avatarUrl: "",
   allowIndexing: true,
-  allowMessages: false
+  allowMessages: false,
+  allowWarrantyHelp: false,
+  warrantyHelpUrl: ""
 };
 
 export function publicCollectionOwnerKey(ownerId: string) {
@@ -69,6 +73,8 @@ export function cleanPublicCollection(value: Partial<PublicCollectionSettings> |
     avatarUrl: /^https:\/\//i.test(String(value?.avatarUrl || "")) ? String(value?.avatarUrl || "").trim().slice(0, 1000) : "",
     allowIndexing: value?.allowIndexing !== false,
     allowMessages: value?.allowMessages === true,
+    allowWarrantyHelp: value?.allowWarrantyHelp === true,
+    warrantyHelpUrl: cleanCollectionWebsite(value?.warrantyHelpUrl),
     ownerId: value?.ownerId ? String(value.ownerId) : undefined
   };
 }

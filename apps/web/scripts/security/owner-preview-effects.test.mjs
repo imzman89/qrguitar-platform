@@ -40,18 +40,21 @@ const session = (tag) => ({ access_token: tag, user: { id: tag, email: tag + "@e
 function fixture({ preview = false, initialRecord = null, configError = false } = {}) {
   const initial = deferred(), listeners = new Set(), requests = [], timers = new Map();
   let timerId = 0;
-  const state = { instrument: null, status: "loading", stored: initialRecord, ownerRecord: null, transfers: [], currentUserEmail: "", activeMedia: null, profileLoadError: false, resolved: true, changes: 0 };
+  const state = { instrument: null, status: "loading", stored: initialRecord, ownerRecord: null, transfers: [], currentUserEmail: "", currentWorkspaceType: "", activeMedia: null, profileLoadError: false, resolved: true, changes: 0 };
   const update = (name) => (value) => { state[name] = value; state.changes++; };
   const fetch = (url, options = {}) => { const pending = deferred(); const request = { url: String(url), options, ...pending }; requests.push(request); return pending.promise; };
   const owner = helper(fetch);
   const supabase = { auth: { getSession: () => initial.promise, onAuthStateChange(callback) { listeners.add(callback); return { data: { subscription: { unsubscribe: () => listeners.delete(callback) } } }; } } };
-  const globals = { Promise, AbortController, Error, console, encodeURIComponent, decodeURIComponent,
+  const globals = { Promise, AbortController, AbortSignal, Error, console, encodeURIComponent, decodeURIComponent,
     setTimeout: (fn) => { const id = ++timerId; timers.set(id, fn); return id; }, clearTimeout: (id) => timers.delete(id),
     fetch, ...owner, code: "QRG-TEST", ownerPreview: preview, initialInstrument: initialRecord, PROFILE_FETCH_TIMEOUT_MS: 28000,
+    get publicReviewSnapshot() {
+      return Boolean(initialRecord?.publicReviewSnapshot || state.stored?.publicReviewSnapshot);
+    },
     createBrowserSupabaseClient: () => { if (configError) throw new Error("Configuration missing"); return supabase; },
     getSupabaseAccessToken: async () => (await initial.promise).data.session?.access_token || "",
     setInstrument: update("instrument"), setStatus: update("status"), setStored: update("stored"), setOwnerRecord: update("ownerRecord"),
-    setTransfers: update("transfers"), setCurrentUserEmail: update("currentUserEmail"), setActiveMedia: update("activeMedia"),
+    setTransfers: update("transfers"), setCurrentUserEmail: update("currentUserEmail"), setCurrentWorkspaceType: update("currentWorkspaceType"), setActiveMedia: update("activeMedia"),
     setProfileLoadError: update("profileLoadError"), setResolved: update("resolved")
   };
   const mount = (relative, index = 0) => vm.runInNewContext(compile("(" + expression(relative, "effect", index) + ")()"), globals);
@@ -206,3 +209,104 @@ console.log(passes + " owner preview behavior/effect tests passed.");
 
 
 
+
+await test("snapshot marker skips owner auth, requests and transfer subscription", async () => {
+  const f = fixture({
+    initialRecord: {
+      ...record("public", "public"),
+      publicReviewSnapshot: true,
+      ownerUserEmail: undefined
+    }
+  });
+  let authCalls = 0;
+  f.globals.createBrowserSupabaseClient = () => {
+    authCalls++;
+    throw Error("Unexpected Auth access");
+  };
+
+  const cleanup = f.mount(profilePath, 1);
+  f.emit(session("A"));
+  await flush();
+
+  assert.equal(cleanup, undefined);
+  assert.equal(authCalls, 0);
+  assert.equal(f.requests.length, 0);
+  assert.equal(f.listeners.size, 0);
+  assert.equal(f.state.ownerRecord, null);
+  assert.equal(f.state.currentUserEmail, "");
+  assert.equal(f.displayed().publicReviewSnapshot, true);
+});
+
+await test("snapshot fixture marker binding matches actual component initializer", async () => {
+  const sf = ts.createSourceFile(
+    profilePath, source(profilePath),
+    ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX
+  );
+  const component = sf.statements.find(n =>
+    ts.isFunctionDeclaration(n) && n.name?.text === "ProfileClient"
+  );
+  const variable = component.body.statements
+    .filter(ts.isVariableStatement)
+    .flatMap(n => Array.from(n.declarationList.declarations))
+    .find(n => n.name.getText(sf) === "publicReviewSnapshot");
+
+  assert.ok(variable, "Actual marker initializer must exist");
+
+  for (const [initial, stored] of [
+    [null, null],
+    [{}, {}],
+    [{ publicReviewSnapshot: true }, null],
+    [null, { publicReviewSnapshot: true }]
+  ]) {
+    const f = fixture({ initialRecord: initial });
+    f.state.stored = stored;
+    const actual = vm.runInNewContext(
+      compile(variable.initializer.getText(sf)),
+      { initialInstrument: initial, stored }
+    );
+    assert.equal(f.globals.publicReviewSnapshot, actual);
+  }
+});
+
+console.log("TOTAL_WITH_FIXTURE_BINDING " + passes);
+
+function workspaceRequest(f, token) {
+  const request = f.requests.filter(item => item.url === "/api/account" && item.options.headers.authorization === "Bearer " + token).at(-1);
+  assert.ok(request, "Expected authenticated workspace lookup");
+  return request;
+}
+function serviceShortcut(f, instrument = record("PUBLIC", "public"), canEdit = false) {
+  return Boolean(vm.runInNewContext(compile("(" + expression(profilePath, "canSubmitService") + ")"), {
+    publicReviewSnapshot: Boolean(instrument?.publicReviewSnapshot), currentUserEmail: f.state.currentUserEmail,
+    currentWorkspaceType: f.state.currentWorkspaceType, instrument, canEdit
+  }));
+}
+for (const type of ["player", "collector", "other", "builder", "shop", "luthier", "unknown"]) await test("Profile service shortcut follows saved workspace: " + type, async () => {
+  const f = fixture(), cleanup = f.mount(profilePath, 1); f.emit(session("A"));
+  assert.equal(serviceShortcut(f), false);
+  workspaceRequest(f, "A").resolve(Response.json({ ok: true, account: { publicCollection: { accountType: type } } }));
+  await flush();
+  assert.equal(serviceShortcut(f), type === "shop" || type === "luthier");
+  assert.equal(serviceShortcut(f, record("PRIVATE"), false), false);
+  assert.equal(serviceShortcut(f, record("PUBLIC", "public"), true), false);
+  assert.equal(serviceShortcut(f, { ...record("PUBLIC", "public"), publicReviewSnapshot: true }), false);
+  cleanup();
+});
+await test("late professional workspace cannot restore a shortcut after account switch or logout", async () => {
+  const f = fixture(), cleanup = f.mount(profilePath, 1); f.emit(session("A"));
+  const old = workspaceRequest(f, "A"); f.emit(session("B"));
+  workspaceRequest(f, "B").resolve(Response.json({ ok: true, account: { publicCollection: { accountType: "player" } } }));
+  old.resolve(Response.json({ ok: true, account: { publicCollection: { accountType: "shop" } } }));
+  await flush(); assert.equal(serviceShortcut(f), false);
+  f.emit(session("C")); const pending = workspaceRequest(f, "C"); f.emit(null);
+  pending.resolve(Response.json({ ok: true, account: { publicCollection: { accountType: "luthier" } } }));
+  await flush(); assert.equal(f.state.currentWorkspaceType, ""); assert.equal(serviceShortcut(f), false);
+  cleanup();
+});
+await test("workspace failure does not block owner Profile or restore professional tools", async () => {
+  const f = fixture(), cleanup = f.mount(profilePath, 1); f.emit(session("A"));
+  workspaceRequest(f, "A").reject(new Error("Account unavailable"));
+  await settleOwner(f, "A"); assert.equal(f.state.ownerRecord.serial, "PRIVATE-A"); assert.equal(serviceShortcut(f), false);
+  cleanup();
+});
+console.log("TOTAL_WITH_PROFILE_WORKSPACE " + passes);

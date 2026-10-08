@@ -1,5 +1,5 @@
 .screenChrome { display: contents; }
-.root:global(.handout-page) { padding: 32px 0 64px; background: var(--canvas); color: var(--text); }
+.root:global(.handout-page) { padding: 48px 0 80px; background: var(--canvas); color: var(--text); }
 .root :global(.handout-shell) { width: min(1280px, calc(100% - 48px)); max-width: none; }
 .root :global(.print-kit-toolbar) { margin-bottom: 24px; }
 .root :global(.print-kit-toolbar) h1 { font-size: 30px; line-height: 1.15; }
@@ -15,7 +15,7 @@
 .controlRailOpen { display: grid; position: fixed; inset: 0 0 0 auto; width: 380px; z-index: 101; padding: 20px 24px; background: var(--surface); border-left: 1px solid var(--line); overflow-y: auto; align-content: start; }
 .controlSection { display: grid; gap: 10px; border: 0; padding: 0; margin: 0; min-width: 0; }
 .controlLabel { display: block; color: var(--text); font-size: 14px; font-weight: 650; padding: 0; margin-bottom: 4px; }
-.formatToolbar { display: flex; align-items: end; gap: 12px; margin-bottom: 20px; }
+.formatToolbar { display: flex; align-items: flex-end; gap: 12px; margin-bottom: 20px; }
 .formatSelect { display: grid; gap: 6px; width: 288px; min-width: 0; font-size: 13px; font-weight: 600; }
 .formatSelect select { width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--surface); color: var(--text); font: inherit; }
 .profileLink { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; color: var(--muted-strong); font-size: 14px; }
@@ -37,7 +37,7 @@
 .toggleGrid label { display: flex; align-items: flex-start; min-height: 44px; padding-block: 10px; gap: 9px; color: var(--text); font-size: 13px; cursor: pointer; }
 .controlActions { border-top: 1px solid var(--line); padding-top: 15px; display: flex; gap: 10px; }
 .resetButton, .doneButton { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; background: var(--surface); color: var(--text); padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; cursor: pointer; }
-.previewStage { min-width: 0; background: var(--surface); border: 0; border-radius: 8px; overflow: hidden; }
+.previewStage { min-width: 0; background: var(--surface); border: 1px solid var(--border-soft); border-radius: 16px; overflow: hidden; }
 .previewStageEmpty { grid-column: 1 / -1; }
 .previewToolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 15px 18px; border-bottom: 1px solid var(--line); }
 .previewToolbar > div:first-child { min-width: 0; display: grid; gap: 4px; }
@@ -140,4 +140,38 @@
       padding: 0 !important;
     }
   }
+}
+
+@media screen and (min-width: 1100px) {
+ .workspace:has(.controlRail) { grid-template-columns: 280px minmax(0,1fr); gap: 28px; }
+ .controlRail:not(.controlRailOpen) { display: grid; padding: 22px; border: 1px solid var(--border-soft); border-radius: 16px; background: var(--surface); }
+ .controlRail:not(.controlRailOpen) .mobileControlsHeader { position: static; padding: 0 0 10px; }
+ .controlRail:not(.controlRailOpen) .mobileControlsHeader button, .controlRail:not(.controlRailOpen) .doneButton, .mobileControlsButton { display: none; }
+ .controlRail:not(.controlRailOpen) .controlActions { position: static; padding-bottom: 0; }
+ .canvasViewport { padding: 32px; }
+}
+
+/* Screen chrome follows the same restrained design; paper and print rules are untouched. */
+@media screen {
+ .root :global(.print-kit-toolbar) h1 { font-family:var(--font-display,Georgia,serif); font-size:clamp(30px,3.5vw,44px); font-weight:400; line-height:1.1; letter-spacing:-.035em; }
+ .root :global(.print-kit-toolbar-actions) :global(.button) { min-height:44px; border:1px solid var(--border-strong); border-radius:2px; background:var(--surface-subtle); color:var(--text); }
+ .root :global(.print-kit-toolbar-actions) :global(.button):hover:not(:disabled) { background:var(--surface-raised); }
+ .backButton, .formatSelect select, .controlRail :is(select,textarea,input[type="text"]), .resetButton, .doneButton, .previewZoom summary, .zoomControls button, .retryButton, .mobileControlsButton, .mobileControlsHeader button { border-radius:2px; }
+ .backButton { border:0; background:transparent; }
+ .formatSelect select, .controlRail :is(select,textarea,input[type="text"]) { border-color:var(--border-strong); background:var(--field-surface,var(--canvas)); }
+ .previewStage { background:transparent; border:0; border-radius:0; }
+ .previewToolbar { padding:14px 0; border-top:1px solid var(--line); }
+ .previewZoom summary:focus-visible { outline-offset:-3px; }
+ .validation, .printAdvice, .scopeNotice { padding-left:0; padding-right:0; }
+ .mobileControlsHeader { font-family:var(--font-display,Georgia,serif); font-size:24px; font-weight:400; }
+}
+@media screen and (min-width:1100px) {
+ .controlRail:not(.controlRailOpen) { padding:20px 24px 0 0; border:0; border-right:1px solid var(--line); border-radius:0; background:transparent; }
+ .controlRail:not(.controlRailOpen) .controlActions { background:transparent; }
+ .controlRail:not(.controlRailOpen) .mobileControlsHeader { background:transparent; }
+}
+
+@media screen and (max-width:560px) {
+ .root :global(.print-kit-toolbar-actions) { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; align-items:center; }
+ .root :global(.print-kit-toolbar-actions) > button { grid-column:1 / -1; width:100%; min-height:46px; }
 }

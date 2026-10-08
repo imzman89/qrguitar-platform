@@ -5,7 +5,7 @@ import { qrRenderOptions } from "./qr-output";
 export const qrPrintColors = { foreground: "#000000", background: "#ffffff" };
 
 export function qrPrintMetrics(code: string, sideMm: number) {
-  if (![25, 32, 38].includes(sideMm)) throw new Error("Choose a supported QR size.");
+  if (![25, 32, 38, 38.1].includes(sideMm)) throw new Error("Choose a supported QR size.");
   const profileUrl = publicProfileUrl(code);
   const modules = QRCode.create(profileUrl, { errorCorrectionLevel: "H" }).modules.size;
   const totalModules = modules + 8;

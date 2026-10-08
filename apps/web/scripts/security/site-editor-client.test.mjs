@@ -108,5 +108,83 @@ await test('actual UI preserves edits typed while autosave is in flight',async()
 await test('manual publish waits for autosave and uses its resulting versions',async()=>{const gate=deferred(),bodies=[];const h=ui(async body=>{bodies.push(JSON.parse(body));if(bodies.length===1)await gate.promise;return uiOk(body);});const save=h.executeEditor('save_draft');const publish=h.executeEditor('publish',{},true);assert.equal(bodies.length,1);gate.resolve();await Promise.all([save,publish]);assert.equal(bodies.length,2);assert.equal(bodies[1].expectedDraftVersion,'d2');});
 await test('actual UI uncertainty blocks a different manual mutation until exact retry',async()=>{let fail=true;const bodies=[];const h=ui(async body=>{bodies.push(body);if(fail)throw Error('lost');return uiOk(body);});await h.executeEditor('save_draft');assert.equal(h.d.issueRef.current,'uncertain');await h.executeEditor('publish',{},true);assert.equal(bodies.length,1);assert.match(h.d.messages.at(-1),/Resolve the current save issue with the recovery controls/);fail=false;await h.executeEditor('',{},true,true);assert.equal(bodies[0],bodies[1]);assert.equal(h.d.issueRef.current,'');});
 await test('superseded successful replay remains saved but blocks automatic overwrite',async()=>{const h=ui(async body=>({...uiOk(body),payload:{...uiOk(body).payload,superseded:true}}));await h.executeEditor('save_draft');assert.equal(h.d.issueRef.current,'conflict');assert.match(h.d.messages.at(-1),/was saved/);await h.executeEditor('publish',{},true);assert.equal(h.d.issueRef.current,'conflict');});
+
+// Use the component's autosave effect with the existing UI/controller fixture.
+const normalizedPage=page.replace(/\r\n/g,'\n');
+const autosaveHead='  useEffect(() => {\n    if (!loaded.current || !authorized) return;';
+const autosaveTail='  }, [authorized, draftMeta, executeEditor, hasChanges, selected.area, selected.page, settings, writeBusy, editorIssue]);';
+assert.equal(normalizedPage.split(autosaveHead).length,2,'Actual autosave effect start missing or ambiguous');
+assert.equal(normalizedPage.split(autosaveTail).length,2,'Actual autosave effect end missing or ambiguous');
+const autosaveStart=normalizedPage.indexOf(autosaveHead),autosaveEnd=normalizedPage.indexOf(autosaveTail);
+assert.ok(autosaveEnd>autosaveStart,'Actual autosave effect boundaries are out of order');
+const changeComparison=normalizedPage.match(/^  const hasChanges = .+;$/gm);
+assert.equal(changeComparison?.length,1,'Actual published-state comparison missing or ambiguous');
+const autosaveModule=compile(`export function run(d:any){const {loaded,authorized,window,actorRef,settings,published,writeBusy,editorIssue,manualPending,lastServerDraft,setStatus,writeTask,issueRef,settingsRef,executeEditor,selected,draftMeta,useEffect}=d;const crashRecoveryKey='test';${changeComparison[0]}${normalizedPage.slice(autosaveStart,autosaveEnd+autosaveTail.length)}}`);
+function autosaveUi(initialDraft=null){
+ const requests=[],timers=new Map();let timerId=0,cleanup,serverDraft=initialDraft,serverVersion=0;
+ const snapshot=()=>({published:base,draft:serverDraft,publishedVersion:'p1',draftVersion:serverDraft?'d'+serverVersion:'',draftMeta:serverDraft?{}:null,revisions:[]});
+ const h=ui(async body=>{
+  const request=JSON.parse(body);requests.push(request);
+  assert.equal(request.action,'save_draft');
+  if(h.gate)await h.gate.promise;
+  serverDraft=request.settings;serverVersion++;
+  return ok(body,snapshot());
+ });
+ const d=h.d;
+ Object.assign(d,{
+  loaded:{current:true},authorized:true,published:base,writeBusy:false,draftMeta:null,selected:{area:'Product',page:'Test'},
+  setPublished:value=>{d.published=value;},setDraftMeta:value=>{d.draftMeta=value;},setWriteBusy:value=>{d.writeBusy=value;},
+  useEffect:callback=>{cleanup=callback();},
+  window:{localStorage:storage(),setTimeout:callback=>{const id=++timerId;timers.set(id,callback);return id;},clearTimeout:id=>timers.delete(id)}
+ });
+ // Rebind so the real persistence functions capture the tracked state setters.
+ Object.assign(h,harnessModule.harness(d));d.executeEditor=h.executeEditor;
+ Object.assign(h,{
+  requests,snapshot,edit:value=>d.setSettings(value),reload:()=>h.applyPayload(snapshot()),
+  render(){cleanup?.();d.settings=d.settingsRef.current;d.editorIssue=d.issueRef.current;autosaveModule.run(d);},
+  fire(){const pending=[...timers.values()];timers.clear();for(const callback of pending)callback();},
+  async idle(){if(d.writeTask.current)await d.writeTask.current;},
+  async cycle(){h.render();h.fire();await h.idle();}
+ });
+ h.reload();return h;
+}
+const autosaveDraft={...base,content:{...base.content,title:'Draft B'}};
+await test('actual autosave persists the last saved draft difference reverted to published',async()=>{
+ const h=autosaveUi(autosaveDraft);h.edit(base);await h.cycle();
+ assert.equal(h.requests.length,1);assert.equal(h.requests[0].expectedDraftVersion,'d0');
+ assert.equal(h.requests[0].expectedActorId,'a');assert.equal(h.requests[0].settings.content.title,base.content.title);
+ assert.ok(h.d.statuses.includes('dirty'));assert.equal(h.d.statuses.at(-1),'saved');
+ h.reload();assert.equal(h.d.settingsRef.current.content.title,base.content.title);
+ assert.equal(h.snapshot().published,base);assert.ok(h.snapshot().draft);
+});
+await test('actual autosave leaves initial unedited published and draft snapshots alone',async()=>{
+ for(const draft of [null,autosaveDraft,base]){
+  const h=autosaveUi(draft);await h.cycle();
+  assert.equal(h.requests.length,0);assert.equal(h.snapshot().draft,draft);
+ }
+});
+await test('actual autosave cancels an edit reverted before debounce without creating a draft',async()=>{
+ const h=autosaveUi();h.edit(autosaveDraft);h.render();h.edit(base);await h.cycle();
+ assert.equal(h.requests.length,0);assert.equal(h.snapshot().draft,null);
+ h.reload();assert.equal(h.d.settingsRef.current.content.title,base.content.title);
+});
+await test('actual autosave preserves an in-flight reversion and then saves it with the confirmed version',async()=>{
+ const h=autosaveUi();h.gate=deferred();h.edit(autosaveDraft);h.render();h.fire();
+ assert.equal(h.requests.length,1);
+ h.edit(base);h.render();h.fire();assert.equal(h.requests.length,1);
+ h.gate.resolve();await h.idle();
+ assert.equal(h.d.settingsRef.current.content.title,base.content.title);assert.equal(h.d.statuses.at(-1),'dirty');
+ assert.equal(h.snapshot().draft.content.title,autosaveDraft.content.title);
+ h.gate=null;await h.cycle();
+ assert.equal(h.requests.length,2);assert.equal(h.requests[1].expectedDraftVersion,'d1');
+ assert.equal(h.requests[1].settings.content.title,base.content.title);
+ h.reload();assert.equal(h.d.settingsRef.current.content.title,base.content.title);
+});
+await test('actual autosave does not loop after a confirmed draft including a published-value reversion',async()=>{
+ const h=autosaveUi();h.edit(autosaveDraft);await h.cycle();assert.equal(h.requests.length,1);
+ await h.cycle();await h.cycle();assert.equal(h.requests.length,1);
+ h.edit(base);await h.cycle();assert.equal(h.requests.length,2);
+ await h.cycle();await h.cycle();assert.equal(h.requests.length,2);
+});
 console.log(`\n${passes} client/API control-flow tests passed.`);
 

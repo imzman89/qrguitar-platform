@@ -1,7 +1,7 @@
 import type { DemoInstrument } from "./local-demo";
 
 export type PrintMode = "label" | "hangtag" | "handout" | "service" | "qr";
-export type PrintSize = "letter" | "a4" | "4x6" | "compact" | "qr25" | "qr32" | "qr38";
+export type PrintSize = "letter" | "a4" | "4x6" | "compact" | "qr25" | "qr32" | "qr38" | "qr381";
 export type PrintOrientation = "portrait" | "landscape";
 
 export type FormatConfig = { sizes: PrintSize[]; defaultSize: PrintSize; orientations: PrintOrientation[]; photo: boolean; availability: boolean; attribution: boolean; specifications: boolean; timeline: boolean };
@@ -11,16 +11,16 @@ export const printFormats: Record<PrintMode, FormatConfig> = {
   hangtag: { sizes: ["4x6"], defaultSize: "4x6", orientations: ["portrait", "landscape"], photo: true, availability: true, attribution: true, specifications: true, timeline: false },
   handout: { sizes: ["letter", "a4"], defaultSize: "letter", orientations: ["portrait"], photo: true, availability: true, attribution: true, specifications: true, timeline: true },
   service: { sizes: ["letter", "a4"], defaultSize: "letter", orientations: ["portrait"], photo: true, availability: false, attribution: false, specifications: false, timeline: false },
-  qr: { sizes: ["qr25", "qr32", "qr38"], defaultSize: "qr32", orientations: ["portrait"], photo: false, availability: false, attribution: false, specifications: false, timeline: false }
+  qr: { sizes: ["qr25", "qr32", "qr38", "qr381"], defaultSize: "qr381", orientations: ["portrait"], photo: false, availability: false, attribution: false, specifications: false, timeline: false }
 };
 
 export function qrSideMillimeters(size: PrintSize) {
-  return size === "qr25" ? 25 : size === "qr38" ? 38 : 32;
+  return size === "qr25" ? 25 : size === "qr38" ? 38 : size === "qr381" ? 38.1 : 32;
 }
 
 export function printGeometry(size: PrintSize, orientation: PrintOrientation) {
   const qrSide = qrSideMillimeters(size) / 25.4;
-  const dimensions = { letter: [8.5, 11], a4: [210 / 25.4, 297 / 25.4], "4x6": [4, 6], compact: [3.5, 2.25], qr25: [qrSide, qrSide], qr32: [qrSide, qrSide], qr38: [qrSide, qrSide] }[size];
+  const dimensions = { letter: [8.5, 11], a4: [210 / 25.4, 297 / 25.4], "4x6": [4, 6], compact: [3.5, 2.25], qr25: [qrSide, qrSide], qr32: [qrSide, qrSide], qr38: [qrSide, qrSide], qr381: [qrSide, qrSide] }[size];
   const [width, height] = orientation === "landscape" ? [...dimensions].reverse() : dimensions;
   // QR-only stock already includes the four-module white quiet zone in the asset.
   const margin = size.startsWith("qr") ? 0 : size === "compact" ? 0.1 : size === "4x6" ? 0.2 : 0.3;
@@ -92,7 +92,7 @@ export function printPlacement(instrumentType?: string) {
 export function hangTagSpecifications(specifications: [string, string][]) {
   // Sale facts are already atomic and prioritized before the specification cap.
   return [...specifications.filter(([label]) => salePrintLabels.has(normalizeLabel(label))),
-    ...specifications.filter(([label]) => normalizeLabel(label) !== "type" && !salePrintLabels.has(normalizeLabel(label)))].slice(0, 3);
+    ...specifications.filter(([label, value]) => normalizeLabel(label) !== "type" && !salePrintLabels.has(normalizeLabel(label)) && value.length <= 72)].slice(0, 3);
 }
 
 export function normalizePrintOptions(mode: PrintMode, size: string | null, orientation: string | null) {

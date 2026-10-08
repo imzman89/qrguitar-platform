@@ -10,7 +10,7 @@ import { CollectibleRecordCard } from "../../../components/CollectibleRecordCard
 import { getContentValue } from "../../../lib/content-registry";
 import { getInstrumentCondition, type DemoInstrument } from "../../../lib/local-demo";
 
-export function CollectionsClient({ records, content }: { records: DemoInstrument[]; content: Record<string, string> }) {
+export function CollectionsClient({ records, content, collectionHref = "" }: { records: DemoInstrument[]; content: Record<string, string>; collectionHref?: string }) {
   const ui = useUiText("app.collections.handle.CollectionsClient");
   const [query, setQuery] = useState("");
   const [brand, setBrand] = useState("All brands");
@@ -54,7 +54,7 @@ export function CollectionsClient({ records, content }: { records: DemoInstrumen
     </p>
     {hasFilters && visible.length > 0 && <div className="form-actions"><button className="button secondary" type="button" onClick={clearFilters}>{ui("ui.app.collections.handle.CollectionsClient.7179ea0035fc", "Clear filters")}</button></div>}
     <div className={`${styles.profileGrid} catalog-record-grid collection-record-grid`}>
-      {visible.map((record) => <CollectibleRecordCard key={record.qrCode} record={record} content={content} />)}
+      {visible.map((record) => <CollectibleRecordCard key={record.qrCode} record={record} content={content} returnTo={collectionHref || undefined} />)}
     </div>
     {!visible.length ? (
       <div className="empty-state">

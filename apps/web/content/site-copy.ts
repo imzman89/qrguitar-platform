@@ -27,9 +27,9 @@ import {
 export const siteCopy = {
   hero: {
     eyebrow: "FOR OWNERS, SHOPS, BUILDERS & COLLECTORS",
-    headline: "One Profile for the life of an instrument.",
+    headline: "Keep the story with the instrument.",
     body:
-      "Keep the photos, specs, service, documents, ownership, and permanent QR with the instrument.",
+      "Photos, specs and documented history in one permanent Profile. Keep it current through ownership, service and sale.",
     primaryCta: "Create a Profile",
     secondaryCta: "Explore the Catalog",
     trust: ["Permanent QRguitar ID", "Owner-controlled privacy"]
@@ -189,18 +189,18 @@ export const siteCopy = {
       {
         name: "For owners and collectors",
         price: "Free",
-        copy: "Create up to 5 Profiles with photos, specifications, privacy controls, history, and downloadable QR codes.",
+        copy: "Create and maintain Profiles for free with photos, specifications, privacy controls, history, and downloadable QR codes.",
         features: [
-          "5 free Profiles",
+          "Profiles are always free",
           "Public, Unlisted, or Private",
           "Downloadable QR codes",
           "Service and ownership history"
         ]
       },
       {
-        name: "For shops, builders & brands",
+        name: "Optional assisted setup",
         price: "From $99",
-        copy: "Need help with bulk setup, QR hardware, verification, or a commercial rollout? We'll help you get started.",
+        copy: "Business Profiles are always free. Optional assisted setup covers bulk onboarding, QR hardware and print support. Verification and authentication are separate paid reviews.",
         features: [
           "Bulk Profile setup",
           "Business onboarding",
@@ -211,7 +211,7 @@ export const siteCopy = {
     ],
     enterpriseTitle: "Commercial setup by request",
     enterpriseBody:
-      "Start with five free Profiles. Assisted setup is available by request."
+      "Profiles are always free. Assisted setup is available by request."
   },
   preview: {
     specsIcon: Layers3,

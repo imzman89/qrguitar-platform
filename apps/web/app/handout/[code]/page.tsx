@@ -44,7 +44,8 @@ const printSizeLabels: Record<PrintSize, string> = {
   compact: "3.5 × 2.25 in",
   qr25: "25 × 25 mm (0.98 in)",
   qr32: "32 × 32 mm (1.26 in)",
-  qr38: "38 × 38 mm (1.50 in)"
+  qr38: "38 × 38 mm (1.496 in)",
+  qr381: "1.5 × 1.5 in · 38.1 mm"
 };
 
 function formatServiceDate(entry: ServiceHistoryEntry) {
@@ -136,6 +137,15 @@ export default function HandoutPage() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const loadRevision = useRef(0);
   const renderedRevision = useRef(-1);
+  const profileReturnHref = useMemo(() => {
+    if (!instrument) return "/dashboard";
+    const returnTo = searchParams.get("returnTo");
+    const href = ownerProfileHref(instrument, returnTo === "/dashboard" ? "/dashboard" : undefined);
+    if (!returnTo || returnTo.length > 2048) return href;
+    const url = new URL(href, "https://qrguitar.invalid");
+    url.searchParams.set("returnTo", returnTo);
+    return url.pathname + url.search + url.hash;
+  }, [instrument, searchParams]);
   const canonicalCode = instrument?.qrCode || code;
   const profileUrl = publicProfileUrl(canonicalCode);
   const qrSideMm = qrSideMillimeters(printSize);
@@ -464,14 +474,15 @@ export default function HandoutPage() {
         <div className="shell handout-shell" data-print-ready={readyToPrint} data-print-mode={mode} data-print-size={printSize} data-print-orientation={orientation} data-print-theme={theme}>
           <div className="print-kit-toolbar no-print">
             <div className={styles.workspaceHeading}>
-              <Link className={styles.backButton} href="/dashboard" aria-label={ui("ui.app.handout.code.page.67b696468610", "Dashboard")} title={ui("ui.app.handout.code.page.67b696468610", "Dashboard")}>
+              <Link className={styles.backButton} href={profileReturnHref} aria-label={instrument ? "Back to Profile" : "Back to Dashboard"} title={instrument ? "Back to Profile" : "Back to Dashboard"}>
                 <ArrowLeft size={20} /></Link>
               <h1>{getContentValue(content, "printWorkspace.title")}</h1>
             </div>
             <div className="print-kit-toolbar-actions">
               {mode === "qr" && readyToPrint ? <a className="button secondary" href={qrDataUrl} download={`qrguitar-${canonicalCode}-${qrSideMm}mm.svg`}>{ui("ui.app.handout.code.page.downloadSvg", "Download SVG")}</a> : null}
               {mode === "qr" ? pngDataUrl && readyToPrint ? <a className="button secondary" href={pngDataUrl} download={`qrguitar-${canonicalCode}-${qrSideMm}mm.png`}>{ui("ui.app.handout.code.page.downloadPng", "Download PNG")}</a> : <button className="button secondary" type="button" disabled>{pngError ? "PNG unavailable" : "Preparing PNG"}</button> : null}
-              <Link className={styles.profileLink} href={instrument ? ownerProfileHref(instrument) : "/dashboard"} target="_blank">
+              {ownerAuthorized ? <Link className={styles.profileLink} href={`/print/qr?code=${encodeURIComponent(canonicalCode)}`}>QR label batch</Link> : null}
+              <Link className={styles.profileLink} href={profileReturnHref} target="_blank">
                 <ExternalLink size={16} />{ui("ui.app.handout.code.page.f9d77f6cb2f2", "Open Profile")}</Link>
               <button className="button" type="button" onClick={printSelectedPage} disabled={!readyToPrint || printing}>
                 <Printer size={16} />

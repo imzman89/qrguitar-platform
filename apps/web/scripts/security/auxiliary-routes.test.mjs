@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -22,7 +23,7 @@ function fixture({actor=owner,hooks={},modules={},realAdmin=false}={}) {
   db.auth.admin.getUserById=async()=>({data:{user:{email:"recipient@example.test"}},error:null});
   db.rpc=async(name,values)=>{rpcCalls.push({name,values});if(name==="commit_service_evidence")return {data:values.p_action==="upload"?{id:"new-evidence",...values.p_evidence}:tables.service_submission_evidence[0],error:null};return {data:tables.guitar_external_media[0],error:null};};
   const user=actor?{id:actor,email:actor+"@example.test",user_metadata:{}}:null;
-  const route=loadRoutes(repo,db,{user,overlay,realAdmin,modules:{"apps/web/lib/security.ts":{checkServerRateLimit:()=>true},"apps/web/lib/transactional-email.ts":{sendCollectionInquiryEmail:async(value)=>{emails.push(value);return {ok:true,message:"Sent"};}},...modules}});
+  const route=loadRoutes(repo,db,{user,overlay,realAdmin,modules:{"apps/web/lib/security.ts":{checkServerRateLimit:()=>true},"apps/web/lib/transactional-email.ts":{sendCollectionInquiryEmail:async(value)=>{emails.push(value);return {ok:true,message:"Sent"};}},"apps/web/lib/public-review-snapshot.ts": {  readPublicReviewSnapshot: async () => null},...modules}});
   return {tables,db,storageCalls,rpcCalls,emails,route};
 }
 function uploadRequest() {return request("service-evidence","POST",{protocolVersion:2,action:"complete",expectedActorId:provider,submissionId:submission,uploadId:"77777777-7777-4777-8777-777777777777",expectedRevision:"0"});}
@@ -146,5 +147,174 @@ await test("catalog offers the same ownership-claim path for every no-public-mat
   assert.match(source,/setShowOwnershipClaim\(payload\.match === "none"\)/);
   assert.match(source,/showOwnershipClaim \? <Link className="button secondary" href="\/ownership-claim">\{ui\("ui\.app\.catalog\.CatalogClient\.[^"]+", "Start ownership claim"\)\}<\/Link>/);
   assert.doesNotMatch(source,/protectedSerialMatch|match\?: "public" \| "protected"/);
+});
+const reviewSerialRoute = "apps/web/app/api/instruments/serial-lookup/route.ts";
+const reviewSerialRecord = {
+  qrCode: "QRG-EVH1400467", visibility: "public",
+  showSerialPublic: true, serial: "EVH1400467",
+  publicReviewSnapshot: true
+};
+const reviewFixture = readPublicReviewSnapshot => fixture({ modules: {
+  "apps/web/lib/public-review-snapshot.ts": { readPublicReviewSnapshot }
+}});
+
+await test("snapshot exact serial matches disclosed public serial without local DB lookup", async () => {
+  const f = reviewFixture(async () => [reviewSerialRecord]);
+  const result = await f.route(reviewSerialRoute).POST(
+    request("instruments/serial-lookup", "POST", { serial: "evh-1400467" })
+  );
+  assert.equal(result.status, 200);
+  assert.deepEqual(await result.json(), {
+    ok: true, match: "public", instrument: reviewSerialRecord,
+    exactSerialMatch: true, publicReviewSnapshot: true
+  });
+  assert.equal(f.db.calls.length, 0);
+});
+
+await test("snapshot hidden private unused and absent serials are indistinguishable", async () => {
+  let expected;
+  for (const records of [
+    [{ ...reviewSerialRecord, showSerialPublic: false }],
+    [{ ...reviewSerialRecord, visibility: "private" }],
+    [{ ...reviewSerialRecord, serialNotUsed: true }],
+    [{ ...reviewSerialRecord, serial: undefined }],
+    []
+  ]) {
+    const f = reviewFixture(async () => records);
+    const result = await f.route(reviewSerialRoute).POST(
+      request("instruments/serial-lookup", "POST", { serial: "EVH1400467" })
+    );
+    assert.equal(result.status, 200);
+    const payload = await result.json();
+    expected ||= payload;
+    assert.deepEqual(payload, expected);
+    assert.equal(payload.match, "none");
+    assert.equal(payload.publicReviewSnapshot, true);
+    assert.equal(Object.hasOwn(payload, "instrument"), false);
+    assert.ok(f.db.calls.length > 0, "No snapshot match retains the local lookup");
+  }
+});
+
+await test("snapshot exact lookup does not match a partial serial", async () => {
+  const f = reviewFixture(async () => [reviewSerialRecord]);
+  const result = await f.route(reviewSerialRoute).POST(
+    request("instruments/serial-lookup", "POST", { serial: "1400467" })
+  );
+  assert.equal((await result.json()).match, "none");
+  assert.ok(f.db.calls.length > 0);
+});
+
+await test("snapshot lookup errors fail without falling through to local data", async () => {
+  const f = reviewFixture(async () => { throw Error("snapshot unavailable"); });
+  const result = await f.route(reviewSerialRoute).POST(
+    request("instruments/serial-lookup", "POST", { serial: "EVH1400467" })
+  );
+  assert.equal(result.status, 503);
+  assert.equal((await result.json()).ok, false);
+  assert.equal(f.db.calls.length, 0);
+});
+
+await test("snapshot lookup retains input validation and rate limit", async () => {
+  let reads = 0;
+  const f = reviewFixture(async () => { reads++; return []; });
+  const api = f.route(reviewSerialRoute);
+  assert.equal((await api.POST(
+    request("instruments/serial-lookup", "POST", { serial: "x" })
+  )).status, 400);
+  assert.equal(reads, 0);
+  for (let i = 0; i < 11; i++) {
+    assert.equal((await api.POST(
+      request("instruments/serial-lookup", "POST", { serial: "EVH1400467" })
+    )).status, 200);
+  }
+  assert.equal((await api.POST(
+    request("instruments/serial-lookup", "POST", { serial: "EVH1400467" })
+  )).status, 429);
+  assert.equal(reads, 11);
+});
+
+await test("actual Catalog handler suppresses snapshot claims while preserving normal claims", async () => {
+  const ts = createRequire(path.join(repo, "package.json"))("typescript");
+  const source = fs.readFileSync(
+    path.join(repo, "apps/web/app/catalog/CatalogClient.tsx"), "utf8"
+  );
+  const ast = ts.createSourceFile(
+    "CatalogClient.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX
+  );
+  let handler;
+  function visit(node) {
+    if (ts.isFunctionDeclaration(node) && node.name?.text === "searchExactSerial")
+      handler = node.getText(ast);
+    ts.forEachChild(node, visit);
+  }
+  visit(ast);
+  assert.ok(handler, "Actual Catalog handler must exist");
+  const js = ts.transpileModule(handler, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022 }
+  }).outputText;
+
+  for (const snapshot of [true, false]) {
+    const claims = [];
+    const bindings = {
+      query: "EVH1400467",
+      serialLookupRevision: { current: 0 },
+      setSerialLookupBusy() {},
+      setSerialLookupMessage() {},
+      setExactMatchCode() {},
+      setShowOwnershipClaim: value => claims.push(value),
+      fetch: async () => ({
+        ok: true,
+        json: async () => ({
+          ok: true, match: "none",
+          ...(snapshot ? { publicReviewSnapshot: true } : {})
+        })
+      })
+    };
+    const run = new Function(
+      ...Object.keys(bindings), js + "; return searchExactSerial;"
+    )(...Object.values(bindings));
+    await run();
+    assert.equal(claims[0], false);
+    assert.equal(claims.at(-1), !snapshot);
+  }
+});
+
+await test("duplicate normalized snapshot serials return no match without arbitrary selection", async () => {
+  const f = reviewFixture(async () => [
+    reviewSerialRecord,
+    { ...reviewSerialRecord, qrCode: "QRG-OTHER", serial: "evh-1400467" }
+  ]);
+  const result = await f.route(reviewSerialRoute).POST(
+    request("instruments/serial-lookup", "POST", { serial: "EVH1400467" })
+  );
+  const payload = await result.json();
+  assert.equal(result.status, 200);
+  assert.equal(payload.match, "none");
+  assert.equal(payload.publicReviewSnapshot, true);
+  assert.equal(Object.hasOwn(payload, "instrument"), false);
+  assert.equal(f.db.calls.length, 0);
+});
+
+await test("snapshot miss retains existing local public exact lookup", async () => {
+  const instrument = { qrCode: "QRG-AUDIT", name: "Local public fixture" };
+  const f = fixture({ modules: {
+    "apps/web/lib/public-review-snapshot.ts": {
+      readPublicReviewSnapshot: async () => [reviewSerialRecord]
+    },
+    "apps/web/lib/public-instruments.ts": {
+      getPublicInstrumentByCode: async () => instrument
+    }
+  }});
+  f.tables.guitar_serial_aliases = [
+    { serial_normalized: "LOCAL123", guitar_id: guitar }
+  ];
+  const result = await f.route(reviewSerialRoute).POST(
+    request("instruments/serial-lookup", "POST", { serial: "LOCAL123" })
+  );
+  assert.equal(result.status, 200);
+  assert.deepEqual(await result.json(), {
+    ok: true, match: "public", instrument, exactSerialMatch: true
+  });
+  assert.ok(f.db.calls.length > 0);
 });
 console.log(passes+" mocked auxiliary API tests passed.");

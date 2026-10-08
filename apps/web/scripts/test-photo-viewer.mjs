@@ -18,16 +18,27 @@ const variants = compile(read("lib/public-media-variant.ts"));
 const source = read("components/PhotoViewer.tsx");
 
 function fixture(options = {}) {
-  let cursor = 0, dirty = false, tree, pending = [], closes = 0, showCount = 0;
+  let cursor = 0, dirty = false, tree, domRoot, pending = [], closes = 0, showCount = 0;
   const slots = [], errors = [], selected = [], preloads = [], nodes = new Map();
   class Element {
     isConnected = true;
+    node = null;
+    children = [];
     focus() { document.activeElement = this; }
     showModal() { showCount += 1; }
     close() {}
     scrollIntoView() {}
-    querySelector() { return null; }
-    querySelectorAll() { return controls(); }
+    contains(node) { return this === node || this.children.some((child) => child.contains(node)); }
+    descendants() { return this.children.flatMap((child) => [child, ...child.descendants()]); }
+    querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
+    querySelectorAll(selector) {
+      let matches;
+      if (selector === "button") matches = (element) => element.node.type === "button";
+      else if (selector === "button:not([disabled])") matches = (element) => element.node.type === "button" && !element.node.props.disabled;
+      else if (selector === '[aria-current="true"]') matches = (element) => element.node.props["aria-current"] === "true";
+      else throw new Error("Unsupported fixture selector: " + selector);
+      return this.descendants().filter(matches);
+    }
     naturalWidth = 1600;
     naturalHeight = 1200;
   }
@@ -64,31 +75,50 @@ function fixture(options = {}) {
     if (!React.isValidElement(node)) return [];
     return [node, ...React.Children.toArray(node.props.children).flatMap((child) => all(child))];
   }
-  function controls() {
-    return all().filter((node) => node.type === "button").map((node) => {
-      if (!nodes.has(node.props["aria-label"])) nodes.set(node.props["aria-label"], new Element());
-      return nodes.get(node.props["aria-label"]);
-    });
+  function bindDom(node, key = "root") {
+    if (!React.isValidElement(node) || typeof node.type !== "string") return null;
+    if (!nodes.has(key)) nodes.set(key, new Element());
+    const element = nodes.get(key);
+    element.node = node;
+    element.isConnected = true;
+    element.children = React.Children.toArray(node.props.children)
+      .map((child, index) => bindDom(child, key + "/" + (child.key ?? index))).filter(Boolean);
+    if (node.props.ref) node.props.ref.current = element;
+    return element;
   }
+  function controls() { return domRoot.querySelectorAll("button:not([disabled])"); }
   function render() {
     let count = 0;
     do {
       if (++count > 15) throw new Error("render loop");
       cursor = 0; dirty = false; pending = [];
       tree = Viewer(props);
-      for (const node of all()) {
-        const ref = node.props.ref;
-        if (!ref) continue;
-        if (!nodes.has(ref)) nodes.set(ref, new Element());
-        ref.current = nodes.get(ref);
+      for (const element of nodes.values()) {
+        element.isConnected = false;
+        if (element.node?.props.ref) element.node.props.ref.current = null;
       }
+      domRoot = bindDom(tree);
       pending.forEach((run) => run());
     } while (dirty);
     return tree;
   }
   function button(label) { const node = all().find((item) => item.type === "button" && item.props["aria-label"] === label); assert.ok(node, label); return node; }
   function click(label) { button(label).props.onClick(); render(); }
-  function key(value, shiftKey = false) { let prevented = false; tree.props.onKeyDown({ key: value, shiftKey, preventDefault() { prevented = true; } }); render(); return prevented; }
+  function focus(label) {
+    const element = controls().find((control) => control.node.props["aria-label"] === label);
+    assert.ok(element, label);
+    element.focus();
+    return element;
+  }
+  function key(value, shiftKey = false) {
+    const target = document.activeElement;
+    let prevented = false;
+    tree.props.onKeyDown({ key: value, shiftKey, target, currentTarget: domRoot, preventDefault() { prevented = true; } });
+    // Enter activates its focused native button only when bubbling did not cancel it.
+    if (value === "Enter" && !prevented && target?.node?.type === "button" && !target.node.props.disabled) target.node.props.onClick?.();
+    render();
+    return prevented;
+  }
   function image() { return all().find((node) => node.type === "img" && node.props.className === "photo"); }
   function cleanup() {
     slots.forEach((slot) => slot?.cleanup?.());
@@ -100,7 +130,7 @@ function fixture(options = {}) {
     return { restoredFocus, restoredStyle };
   }
   render();
-  return { render, button, click, key, image, cleanup, controls, props, trigger, errors, selected, preloads, get closes() { return closes; }, get tree() { return tree; }, get showCount() { return showCount; }, get loading() { return all().some((node) => node.props.role === "status"); } };
+  return { render, button, click, focus, key, image, cleanup, controls, props, trigger, errors, selected, preloads, get closes() { return closes; }, get tree() { return tree; }, get showCount() { return showCount; }, get loading() { return all().some((node) => node.props.role === "status"); } };
 }
 
 test("viewer opens chosen photo and keyboard wraps without reopening the modal or losing focus", () => {
@@ -258,3 +288,64 @@ test("loading feedback follows the selected photo and survives a late load or fa
     assert.deepEqual(f.errors, ["/second.jpg"]);
   } finally { f.cleanup(); }
 });
+
+
+test("filmstrip arrows move focus with selection and Enter cannot restore the previous photo", () => {
+  const f = fixture();
+  try {
+    f.focus("Show photo 1");
+    for (const [key, source, label, index] of [
+      ["ArrowRight", "/second.jpg", "Show photo 2", 1],
+      ["ArrowLeft", "/first.jpg", "Show photo 1", 0],
+      ["ArrowLeft", "/third.jpg", "Show photo 3", 2],
+      ["ArrowRight", "/first.jpg", "Show photo 1", 0]
+    ]) {
+      assert.equal(f.key(key), true);
+      assert.equal(f.image().props.src, source);
+      assert.equal(document.activeElement.node.props["aria-label"], label);
+      assert.equal(f.button(label).props["aria-current"], "true");
+      const focused = document.activeElement, selections = f.selected.length;
+      assert.equal(f.key("Enter"), false);
+      assert.equal(document.activeElement, focused);
+      assert.equal(f.image().props.src, source);
+      assert.equal(f.selected.length, selections + 1);
+      assert.equal(f.selected.at(-1), index);
+    }
+    assert.deepEqual(f.selected, [1, 1, 0, 0, 2, 2, 0, 0]);
+    assert.equal(f.showCount, 1);
+    assert.equal(f.closes, 0);
+  } finally { f.cleanup(); }
+});
+
+for (const label of ["Close photos", "Zoom in"]) {
+  test("arrows preserve " + label + " focus and its native Enter action", () => {
+    const f = fixture();
+    try {
+      const focused = f.focus(label);
+      if (label === "Zoom in") {
+        assert.equal(f.key("Enter"), false);
+        assert.match(f.image().props.style.transform, /scale\(2\)/);
+        assert.equal(document.activeElement, focused);
+        assert.equal(focused.node.props["aria-label"], "Zoom out");
+      }
+      for (const [key, source] of [
+        ["ArrowRight", "/second.jpg"], ["ArrowLeft", "/first.jpg"],
+        ["ArrowLeft", "/third.jpg"], ["ArrowRight", "/first.jpg"]
+      ]) {
+        assert.equal(f.key(key), true);
+        assert.equal(f.image().props.src, source);
+        assert.equal(document.activeElement, focused);
+        assert.match(f.image().props.style.transform, /scale\(1\)/);
+      }
+      assert.deepEqual(f.selected, [1, 0, 2, 0]);
+      assert.equal(f.key("Enter"), false);
+      if (label === "Close photos") assert.equal(f.closes, 1);
+      else {
+        assert.match(f.image().props.style.transform, /scale\(2\)/);
+        assert.equal(f.closes, 0);
+      }
+      assert.equal(document.activeElement, focused);
+      assert.equal(f.showCount, 1);
+    } finally { f.cleanup(); }
+  });
+}

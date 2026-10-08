@@ -1,5 +1,6 @@
 "use client";
 import { useUiText } from "../../../components/UiTextProvider";
+import { existingProfileSpecId, isSafetyContentUnchanged } from "../../../lib/profile-metadata-preservation";
 
 
 import { ownerProfileHref } from "../../../lib/owner-profile";
@@ -158,6 +159,55 @@ function revealEditorTarget(id: string) {
     focusTarget.focus({ preventScroll: true });
   }
   return true;
+}
+
+function retainEditorSectionArrivalOnWidthChange(section: string) {
+  if (!isKnownEditorSection(section)) return;
+  const target = document.getElementById(section);
+  if (!(target instanceof HTMLDetailsElement) || !target.open) return;
+  const summary = target.querySelector<HTMLElement>(":scope > summary");
+  if (!summary || document.activeElement !== summary) return;
+  let width = window.innerWidth;
+  const margin = parseFloat(window.getComputedStyle(target).scrollMarginTop) || 0;
+  const padding = parseFloat(window.getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
+  const maximumY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+  let arrivalY = Math.min(maximumY, Math.max(0, target.getBoundingClientRect().top + window.scrollY - margin - padding));
+  const atArrival = () => Math.abs(window.scrollY - arrivalY) <= 2;
+  let arrived = atArrival();
+  let following = true;
+  const stopFollowing = () => { following = false; };
+  const onScroll = () => {
+    if (!following || window.innerWidth !== width) return;
+    if (!arrived) { arrived = atArrival(); return; }
+    if (!atArrival()) stopFollowing();
+  };
+  const onResize = () => {
+    if (!following || window.innerWidth === width) return;
+    width = window.innerWidth;
+    if (!arrived || !target.isConnected || !target.open || document.activeElement !== summary || !atArrival()) {
+      stopFollowing();
+      return;
+    }
+    const bounds = summary.getBoundingClientRect();
+    if (bounds.top >= 0 && bounds.bottom <= window.innerHeight) return;
+    target.scrollIntoView({ behavior: "instant", block: "start" });
+    arrivalY = window.scrollY;
+  };
+  const onFocus = (event: FocusEvent) => {
+    if (event.target !== summary) stopFollowing();
+  };
+  const intentEvents = ["wheel", "touchstart", "pointerdown", "keydown", "input"];
+  window.addEventListener("scroll", onScroll);
+  window.addEventListener("resize", onResize);
+  window.addEventListener("focusin", onFocus, true);
+  for (const event of intentEvents) window.addEventListener(event, stopFollowing, true);
+  return () => {
+    stopFollowing();
+    window.removeEventListener("scroll", onScroll);
+    window.removeEventListener("resize", onResize);
+    window.removeEventListener("focusin", onFocus, true);
+    for (const event of intentEvents) window.removeEventListener(event, stopFollowing, true);
+  };
 }
 
 function replaceEditorSectionHash(section: string) {
@@ -343,6 +393,11 @@ export default function EditInstrumentPage() {
   }, [ready]);
 
   useEffect(() => {
+    if (!ready) return;
+    return retainEditorSectionArrivalOnWidthChange(requestedEditorSection());
+  }, [ready, code]);
+
+  useEffect(() => {
     let cancelled = false;
 
     void fetchPublishedSiteSettings().then((published) => {
@@ -463,7 +518,7 @@ export default function EditInstrumentPage() {
   }, [code, router, loadAttempt]);
 
   const profileHref = useMemo(() => {
-    return original ? ownerProfileHref(original) : "/dashboard/profile/" + encodeURIComponent(code);
+    return original ? ownerProfileHref(original, "/dashboard") : "/dashboard/profile/" + encodeURIComponent(code);
   }, [code, original]);
 
   function updateField(field: keyof typeof form, value: string) {
@@ -1044,7 +1099,6 @@ export default function EditInstrumentPage() {
           condition: form.instrumentCondition as "new" | "used",
           saleStatus: form.saleStatus as "for_sale" | "not_for_sale",
           originalityStatus: form.originalityStatus as "all_original" | "modified" | "unknown",
-          ownerName: form.owner || "",
           location: form.location,
           visibility: form.visibility,
           summary: form.summary || "",
@@ -1070,7 +1124,7 @@ export default function EditInstrumentPage() {
             form.serviceNotes.trim() ? { label: "Service notes", value: form.serviceNotes.trim() } : null,
             ...customFields
               .filter((field) => field.label.trim() && field.value.trim())
-              .map((field) => ({ label: field.label.trim(), value: field.value.trim() }))
+              .map((field) => ({ ...(existingProfileSpecId(field.id) ? { id: field.id } : {}), label: field.label.trim(), value: field.value.trim() }))
           ].filter(Boolean),
           customLinks: customLinks
             .filter((link) => link.label.trim() && link.url.trim())
@@ -1144,7 +1198,7 @@ export default function EditInstrumentPage() {
       router.refresh();
 
       if (preview) {
-        router.push(ownerProfileHref(savedInstrument));
+        router.push(ownerProfileHref(savedInstrument, "/dashboard"));
         return;
       }
 
@@ -1233,6 +1287,10 @@ export default function EditInstrumentPage() {
     if (!original) {
       return { ok: false, message: "Profile was not loaded." };
     }
+    if (!isCurrent(operation)) return { ok: false, message: "The account changed." };
+    if (isSafetyContentUnchanged(original, { safetyStatus, publicSafetyNote, safetyNote })) {
+      return { ok: true, message: "Safety status unchanged." };
+    }
 
     setSavingSafety(true);
     try {
@@ -1283,7 +1341,7 @@ export default function EditInstrumentPage() {
             <p>{getContentValue(content, "edit.hero.body")}</p>
             <div className={styles.saveBar}>
               {message ? <p className="form-message" role="status" aria-live="polite">{message}</p> : null}
-              {Object.entries(recovery).map(([kind, pending]) => <section className="card" key={kind} aria-label={ui("ui.app.edit.code.page.recoveryTitle", "Saved-result recovery")}>
+              {Object.entries(recovery).filter(([kind]) => !(kind === "details" ? savingRecord : kind === "media" ? savingMedia : kind === "history" ? savingService : false)).map(([kind, pending]) => <section className="card" key={kind} aria-label={ui("ui.app.edit.code.page.recoveryTitle", "Saved-result recovery")}>
                 <strong>{kind === "details" ? ui("ui.app.edit.code.page.savedDetails", "Profile details, trust and safety") : kind === "media" ? ui("ui.app.edit.code.page.savedMedia", "Media") : ui("ui.app.edit.code.page.savedHistory", "History")}</strong>
                 <p>{recoveryMessage()}</p>
                 <button className="button secondary" type="button" disabled={savingRecord || savingMedia || savingService} onClick={() => void checkSavedResult(kind)}>{ui("ui.app.edit.code.page.checkSaved", "Check saved result")}</button>
@@ -1452,8 +1510,7 @@ export default function EditInstrumentPage() {
                   <Field label={ui("ui.app.edit.code.page.cf846c3fbd33", "Builder (optional)")} id="builder" value={form.builder} onChange={(value) => updateField("builder", value)} />
                   <Field label={ui("ui.app.edit.code.page.a6c7a84baa67", "Finish")} id="finish" value={form.finish} onChange={(value) => updateField("finish", value)} />
                   <Field label={ui("ui.app.edit.code.page.81d27ef6d503", "Weight")} id="weight" value={form.weight} onChange={(value) => updateField("weight", value)} />
-                  <Field label={ui("ui.app.edit.code.page.collectionName", "Collection name")} id="owner" value={form.owner} onChange={(value) => updateField("owner", value)} disabled={Boolean(original?.publicCollection?.publicName)} />
-                  <p className="field-note">{ui("ui.app.edit.code.page.collectionNameHelp", "Use a name you choose, not necessarily your real name. An existing collection name is managed in Account.")} <Link href="/account?section=collection">{ui("ui.app.edit.code.page.collectionSettings", "Collection settings")}</Link></p>
+                  <p className="field-note"><Link href="/account?section=collection" target="_blank" rel="noopener noreferrer">{ui("ui.app.edit.code.page.collectionSettingsNewTab", "Collection settings (opens in a new tab)")}</Link></p>
                   <Field label={ui("ui.app.edit.code.page.74d91b61ae60", "Owner status")} id="ownerStatus" value={form.ownerStatus} onChange={(value) => updateField("ownerStatus", value)} />
                   <Field label={ui("ui.app.edit.code.page.15b61974b270", "Location")} id="location" value={form.location} onChange={(value) => updateField("location", value)} />
                 </div>
@@ -1883,7 +1940,7 @@ export default function EditInstrumentPage() {
                   <p>
                     {verificationStatus === "verified"
                       ? ui("ui.app.edit.code.page.df6ad347b1a1", "This Profile is verified by QRguitar.")
-                      : ui("ui.app.edit.code.page.d7b92d4468d9", "After you add a Profile, QRguitar may verify its details at no charge when the information is sufficient. Verification does not confirm authenticity.")}
+                      : ui("ui.app.edit.code.page.d7b92d4468d9", "Profile verification is an optional paid review of the recorded information and evidence. A free Profile does not receive verified status automatically. Verification does not confirm authenticity.")}
                   </p>
                   <p>
                     {authenticityStatus === "confirmed"
@@ -2044,7 +2101,7 @@ export default function EditInstrumentPage() {
             <h2>{!ready ? ui("ui.app.edit.code.page.4e0d5600059d", "Checking account...") : unavailable ? ui("ui.app.edit.code.page.loadUnavailable", "Profile temporarily unavailable") : forbidden ? ui("ui.app.edit.code.page.3d8a710de98a", "Owner access required.") : ui("ui.app.edit.code.page.b2a4948798a5", "Sign in to edit this Profile.")}</h2>
             <p>
               {!ready
-                ? ui("ui.app.edit.code.page.4e2bce183e1c", "Checking your Supabase session now.")
+                ? ui("ui.app.edit.code.page.4e2bce183e1c", "Checking your account now.")
                 : forbidden
                   ? message || ui("ui.app.edit.code.page.c2321cba55d7", "Only the profile owner can edit this profile.")
                   : message || ui("ui.app.edit.code.page.4bfdf5db3c0d", "Sign in with the account that owns this QRguitar Profile.")}

@@ -209,3 +209,12 @@ test('photo-free print formats remove every named photo track in both orientatio
   assert.equal(properties('.serviceIdentity[data-has-photo="false"]')['grid-template-columns'], 'minmax(0, 1fr)');
   for (const mode of ['hangtag','service']) { const html = render({mode,photo:''}); assert.match(html,/data-has-photo="false"/); assert.doesNotMatch(html,/class="photograph"/); }
 });
+test('hang tags keep concise facts and sale amounts while long notes remain on the full sheet', () => {
+  const long = 'Long service and construction note '.repeat(8);
+  const specifications = [['Finish','White with black stripes'],['Specs notes',long],['Asking price','USD 1,250.00'],['Pickups','Original']];
+  const tag = render({mode:'hangtag',specifications});
+  assert.ok(!tag.includes(long));
+  assert.ok(tag.includes('White with black stripes'));
+  assert.ok(tag.includes('USD 1,250.00'));
+  assert.ok(render({mode:'handout',specifications}).includes(long));
+});

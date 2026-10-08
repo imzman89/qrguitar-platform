@@ -1,5 +1,4 @@
-import { billingHandlers } from "../../../../lib/billing-runtime";
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const maxDuration = 60;
-export const POST = billingHandlers.checkout;
+import { retiredProfileCheckout } from "../../../../lib/retired-profile-checkout";
+export const runtime="nodejs";
+export const dynamic="force-dynamic";
+export const POST=retiredProfileCheckout;

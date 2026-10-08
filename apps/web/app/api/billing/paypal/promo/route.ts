@@ -1,6 +1,4 @@
-import { paypalHandlers } from "../../../../../lib/paypal-runtime";
-
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const maxDuration = 30;
-export const POST = paypalHandlers.quote;
+import { retiredProfileCheckout } from "../../../../../lib/retired-profile-checkout";
+export const runtime="nodejs";
+export const dynamic="force-dynamic";
+export const POST=retiredProfileCheckout;

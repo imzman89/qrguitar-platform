@@ -429,3 +429,19 @@ test("collection publication is an explicit saved choice, preserved by unrelated
   await f.client.reload(); assert.equal(input("collectionEnabled").props.checked, false); assert.equal(savedCollectionHref(f.client.getState().account), "");
   f.client.dispose();
 });
+
+for (const role of ["player","collector","other","shop","builder","luthier"]) test("saved "+role+" workspace controls Account business navigation and rail",async()=>{
+ const f=fixture();f.accounts.a.publicCollection.accountType=role;await f.mount();
+ const render=await accountPageUI(f,"provider");render();const html=renderToStaticMarkup(render());
+ const pro=["shop","builder","luthier"].includes(role),service=["shop","luthier"].includes(role);
+ assert.equal(html.includes('value="provider"'),pro);
+ assert.equal(html.includes('href="/dashboard/service/slips"'),service);
+ assert.equal(html.includes('href="/dashboard/import"'),role==="shop"||role==="builder");
+ assert.match(html,/href="\/dashboard"/);assert.equal(f.saved,0);f.client.dispose();
+});
+test("unsaved professional preference does not change saved personal navigation",async()=>{
+ const f=await fixture().mount(),render=await accountPageUI(f,"profile");
+ f.client.setDraft({publicCollection:{...f.client.getState().draft.publicCollection,accountType:"luthier"}});
+ let html=renderToStaticMarkup(render());assert.doesNotMatch(html,/href="\/dashboard\/service"|value="provider"/);
+ assert.equal(f.saved,0);f.client.dispose();
+});

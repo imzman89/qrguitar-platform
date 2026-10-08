@@ -12,10 +12,12 @@ export const revalidate = 0;
 
 export async function generateMetadata() { return buildManagedPageMetadata("howItWorks", "/how-it-works"); }
 
-export default async function HowItWorksPage() {
+export default async function HowItWorksPage(props: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+  const query = await props?.searchParams;
+  const initialAudienceId = typeof query?.audience === "string" ? query.audience : "";
   noStore();
   const [settings, records] = await Promise.all([loadPublishedSiteSettings(), getPublicInstruments().catch(() => [])]);
   const faq = resolveVisibleEditorialSections(settings, "howItWorks").find(section => section.id === "faq")?.blocks.filter(block => block.visible && block.title.trim() && block.body.trim()) || [];
   const faqJsonLd = { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: faq.map(block => ({ "@type": "Question", name: block.title, acceptedAnswer: { "@type": "Answer", text: block.body } })) };
-  return <><HowItWorksClient settings={settings} example={selectHomeFeaturedProfile(records)} />{faq.length ? <script id="qrguitar-guide-faq-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }} /> : null}</>;
+  return <><HowItWorksClient key={initialAudienceId} settings={settings} example={selectHomeFeaturedProfile(records)} initialAudienceId={initialAudienceId} />{faq.length ? <script id="qrguitar-guide-faq-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }} /> : null}</>;
 }

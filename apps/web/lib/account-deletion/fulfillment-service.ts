@@ -98,19 +98,19 @@ function memberMediaPath(value: unknown): value is string {
 const safeText = (value: unknown, max: number): value is string => typeof value === "string" && value.length > 0 && value.length <= max && !/[\u0000-\u001f\u007f]/.test(value);
 const relationshipCodes = new Set([
   "current_owner", "safety_author", "owner_removal_author", "archive_author", "transfer_from_owner", "transfer_recipient",
-  "claim_participant", "claim_evidence_author", "claim_event_author", "document_author", "external_media_author", "serial_author",
+  "claim_participant", "claim_evidence_author", "claim_event_author", "document_author", "document_custodian", "external_media_author", "serial_author",
   "timeline_author", "service_access", "service_participant", "service_evidence_author", "service_activity_author",
   "service_notification_recipient", "service_upload_author", "service_upload_scope", "service_discard_receipt", "create_receipt",
-  "staged_upload", "site_content"
+  "staged_upload", "site_content", "claim_previous_owner", "owner_name_consent"
 ]);
-const profileSectionCodes = new Set(["guitar", "redirects", "specs", "media", "documents", "externalMedia", "serialAliases", "timeline",
+const profileSectionCodes = new Set(["guitar", "redirects", "specs", "media", "documents", "documentSelections", "externalMedia", "serialAliases", "timeline",
   "transfers", "claims", "claimEvidence", "claimEvents", "serviceAccess", "serviceSubmissions", "serviceEvidence", "serviceTokens",
-  "serviceActivity", "serviceNotifications", "serviceUploads", "serviceUploadScopes", "serviceDiscardReceipts", "createReceipts",
-  "stagedUploads", "siteContent"]);
+  "serviceActivity", "serviceNotifications", "serviceCorrections", "serviceCorrectionDecisions", "serviceUploads", "serviceUploadScopes", "serviceDiscardReceipts", "createReceipts",
+  "stagedUploads", "siteContent", "ownerNameConsents"]);
 const retentionSectionCodes = {
   billing: new Set(["customers", "orders", "receipts", "grants", "consumptions", "holds", "decisions", "promotions", "directOrders", "directClaims",
     "directPayments", "providerReferences", "paypalOrders", "paypalBindings", "webhookDeliveries", "webhookPayloads", "webhookOutcomes", "webhookActions"]),
-  service: new Set(["submissions", "evidence", "uploads", "discards", "activity", "timeline"])
+  service: new Set(["submissions", "evidence", "uploads", "discards", "activity", "timeline", "corrections", "correctionDecisions"])
 };
 const forbiddenReviewKeys = new Set(["authActorId", "owner_id", "subject_id", "operator_id", "operator_subject_id", "provider_user_id",
   "provider_subject_id", "owner_user_id", "owner_subject_id", "uploaded_by_user_id", "uploaded_by_subject_id", "actor_user_id",

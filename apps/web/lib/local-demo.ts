@@ -1,5 +1,5 @@
 import { formatRecordLocation } from "./record-location";
-import { FREE_PROFILE_ALLOWANCE } from "@qrguitar/shared";
+
 
 export type DemoUser = {
   name: string;
@@ -35,6 +35,8 @@ export type RecordAuthenticityStatus = "unconfirmed" | "confirmed";
 export type RecordSafetyStatus = "clear" | "lost" | "stolen" | "recovered";
 
 export type DemoInstrument = {
+  /** Read-only public snapshot, supplied only by the isolated local review loader. */
+  publicReviewSnapshot?: true;
   /** Internal database identity, exposed only by authenticated owner reads. */
   recordId?: string;
   qrCode: string;
@@ -98,6 +100,9 @@ export type DemoInstrument = {
   documentFiles?: CustomDocumentFile[];
   timelineEvents?: ServiceHistoryEntry[];
   serviceEvents?: ServiceHistoryEntry[];
+  /** Public date/precision only; no access to the underlying private service record. */
+  latestServiceDate?: string;
+  latestServiceDatePrecision?: "day" | "month" | "year";
   externalMedia?: ExternalMediaItem[];
   ownershipTransferCount?: number;
   heroImageDataUrl?: string;
@@ -139,6 +144,7 @@ export type CustomDocumentFile = {
 };
 
 export type ServiceHistoryEntry = {
+  previousOwnerPublicName?: string;
   id: string;
   serviceDate?: string;
   datePrecision?: "day" | "month" | "year" | "unknown";
@@ -1169,17 +1175,9 @@ export function getDefaultInstrumentVerificationStatus(user?: Pick<DemoUser, "pl
   return getAccountVerificationStatus(user) === "verified" ? "verified" : "unverified";
 }
 
-export function isFreeInstrumentLimitReached(user: DemoUser | null, instruments: DemoInstrument[]) {
-  if (!user) {
-    return false;
-  }
-
-  if (getAccountPlan(user) === "brand" || getAccountPlan(user) === "commercial") {
-    return false;
-  }
-
-  const ownedRecords = instruments.filter((instrument) => !isDemoInstrumentRecord(instrument)).length;
-  return ownedRecords >= FREE_PROFILE_ALLOWANCE;
+/** Basic instrument Profiles are always free, independent of account plan or collection size. */
+export function isFreeInstrumentLimitReached(_user: DemoUser | null, _instruments: DemoInstrument[]) {
+  return false;
 }
 
 export function getInstrumentCondition(instrument: Pick<DemoInstrument, "instrumentCondition">): InstrumentCondition {

@@ -13,16 +13,17 @@ type WorkspaceAction = { href: string; title: string; description: string };
 type Workspace = { label: string; title: string; description: string; actions: WorkspaceAction[] };
 const collectionAction = { href: "/account?section=collection", title: "Share your collection", description: "Publish your public Profiles together under one link." };
 const sellerAction = { href: "/account?section=collection", title: "Connect your website", description: "Send visitors from your public collection and instrument Profiles to your own website." };
+const privateServiceSlipAction = { href: "/dashboard/service/slips", title: "Service slips", description: "Save and print private job records for any instrument. No QR registration needed." };
 const serviceAction = { href: "/dashboard/service", title: "Service workbench", description: "Resume saved work, respond to requested changes, and check owner review status." };
 const claimAction = { href: "/ownership-claim", title: "Claim an instrument", description: "Claim an instrument you acquired and check your submitted ownership claims." };
 const handoffAction = { href: "/dashboard#saved-profiles", title: "Transfer an instrument", description: "Choose one of your saved Profiles, then open Transfer to prepare its buyer handoff." };
 const workspaces: Record<WorkspaceType, Workspace> = {
-  player: { label: "Player workspace", title: "Your instruments, in order.", description: "Photos, documents, service history, and ownership records.", actions: [collectionAction, claimAction, serviceAction] },
-  collector: { label: "Collector workspace", title: "Keep the story with the instrument.", description: "Collection Profiles, history, and ownership transfers.", actions: [collectionAction, claimAction, serviceAction] },
-  shop: { label: "Store workspace", title: "Make every instrument buyer-ready.", description: "Inventory Profiles, website links, and ownership transfers.", actions: [sellerAction, { href: "/dashboard/import", title: "Import inventory", description: "Prepare multiple instrument Profiles from a spreadsheet." }, serviceAction] },
+  player: { label: "Player workspace", title: "Your instruments, in order.", description: "Photos, documents, service history, and ownership records.", actions: [collectionAction, claimAction, handoffAction] },
+  collector: { label: "Collector workspace", title: "Keep the story with the instrument.", description: "Collection Profiles, history, and ownership transfers.", actions: [collectionAction, claimAction, handoffAction] },
+  shop: { label: "Store workspace", title: "Make every instrument buyer-ready.", description: "Inventory Profiles, website links, and ownership transfers.", actions: [sellerAction, { href: "/dashboard/import", title: "Import inventory", description: "Prepare multiple instrument Profiles from a spreadsheet." }, privateServiceSlipAction] },
   builder: { label: "Builder / brand workspace", title: "Give every build its own record.", description: "Build Profiles, website links, and ownership transfers.", actions: [sellerAction, { href: "/dashboard/import", title: "Import your builds", description: "Start Profiles for a batch of instruments from a spreadsheet." }, handoffAction] },
-  luthier: { label: "Service provider workspace", title: "Keep customer work moving.", description: "Drafts, owner feedback, and service records without changing instrument ownership.", actions: [serviceAction, { href: "/installers", title: "Provider network", description: "Learn about applying to the manually reviewed provider network." }, sellerAction] },
-  other: { label: "Instrument workspace", title: "Your instruments, in order.", description: "Instrument Profiles, collections, and ownership transfers.", actions: [collectionAction, claimAction, serviceAction] }
+  luthier: { label: "Service provider workspace", title: "Keep customer work moving.", description: "Drafts, owner feedback, and service records without changing instrument ownership.", actions: [privateServiceSlipAction, { href: "/installers", title: "Provider network", description: "Learn about applying to the manually reviewed provider network." }, sellerAction] },
+  other: { label: "Instrument workspace", title: "Your instruments, in order.", description: "Instrument Profiles, collections, and ownership transfers.", actions: [collectionAction, claimAction, handoffAction] }
 };
 
 // Workspace preferences change navigation, never account permissions or verification.

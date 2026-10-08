@@ -131,13 +131,13 @@ function CreateOwnerDraft({ user, authChecked, isCurrent }: { user: CreateOwner 
   const router = useRouter();
   const uploadFileIds = useRef(new Map<string,string>());
   const saveInFlight = useRef(false);
-  const collectionNameEdited = useRef(false);
   const fileSelectionPending = useRef(false);
   const [preparingFiles, setPreparingFiles] = useState(false);
   const [photoFeedback, setPhotoFeedback] = useState("");
   const [documentFeedback, setDocumentFeedback] = useState("");
   const [message, setMessage] = useState("");
   const [honeypot, setHoneypot] = useState("");
+  const [workspaceAccountType, setWorkspaceAccountType] = useState("");
   const [form, setForm] = useState({
     name: "",
     brand: "",
@@ -171,7 +171,6 @@ function CreateOwnerDraft({ user, authChecked, isCurrent }: { user: CreateOwner 
     serviceIsPublic: false,
     visibility: "public"
   });
-  const [savedCollectionName, setSavedCollectionName] = useState("");
   useEffect(() => {
     if (!user?.id) return;
     const controller = new AbortController();
@@ -183,12 +182,12 @@ function CreateOwnerDraft({ user, authChecked, isCurrent }: { user: CreateOwner 
         headers: { authorization: `Bearer ${data.session.access_token}` } });
       const payload = await response.json();
       if (controller.signal.aborted || !isCurrent() || !response.ok || payload?.ok !== true) return;
+      setWorkspaceAccountType(typeof payload.account?.publicCollection?.accountType === "string" ? payload.account.publicCollection.accountType : "");
       const name = typeof payload.account?.publicCollection?.publicName === "string"
         ? payload.account.publicCollection.publicName.trim() : "";
-      if (!name || collectionNameEdited.current || saveInFlight.current) return;
-      setSavedCollectionName(name);
+      if (!name || saveInFlight.current) return;
       setForm((current) => ({ ...current, owner: name }));
-    })().catch(() => { /* The owner can explicitly choose a collection name below. */ })
+    })().catch(() => { /* Account owns collection settings; the preview can omit its name. */ })
       .finally(() => window.clearTimeout(timer));
     return () => { controller.abort(); window.clearTimeout(timer); };
   }, [user?.id]);
@@ -256,7 +255,6 @@ function CreateOwnerDraft({ user, authChecked, isCurrent }: { user: CreateOwner 
 
   function updateField(field: keyof typeof form, value: string) {
     if (!isCurrent()) return;
-    if (field === "owner") collectionNameEdited.current = true;
     setForm((current) => {
       if (field === "serial") {
         const firstSerialEntry = !current.serial.trim() && Boolean(value.trim());
@@ -470,7 +468,6 @@ function CreateOwnerDraft({ user, authChecked, isCurrent }: { user: CreateOwner 
       if (!form.brand.trim()) nextFieldErrors.brand = "Choose the instrument brand.";
       if (!form.model.trim()) nextFieldErrors.model = "Enter the model or build name.";
       if (!form.instrumentType.trim()) nextFieldErrors.instrumentType = "Choose the instrument type.";
-      if (!form.owner.trim() || form.owner.trim().length > 80) nextFieldErrors.owner = "Choose a collection name of 1 to 80 characters. It does not have to be your real name.";
       if (!form.serial.trim() && !form.serialNotUsed) nextFieldErrors.serial = "Enter the Serial Number or confirm that this instrument has no serial.";
       if (!galleryImages.length) nextFieldErrors.photos = "Add at least one clear instrument photo.";
       if (galleryImages.length > 20) nextFieldErrors.photos = "Choose no more than 20 photos.";
@@ -519,7 +516,6 @@ function CreateOwnerDraft({ user, authChecked, isCurrent }: { user: CreateOwner 
           condition: form.instrumentCondition as "new" | "used",
           saleStatus: form.saleStatus as "for_sale" | "not_for_sale",
           originalityStatus: form.originalityStatus as "all_original" | "modified" | "unknown",
-          ownerName: form.owner.trim(),
           location: form.location,
           visibility: "public" as const,
           summary: form.summary || "",
@@ -610,7 +606,7 @@ function CreateOwnerDraft({ user, authChecked, isCurrent }: { user: CreateOwner 
       setMessage(ui("ui.app.create.page.8063b8ce1a81", "QRguitar Profile created."));
 
       if (showProfile) {
-        router.push(ownerProfileHref({ qrCode: finalCode, visibility: "public" }));
+        router.push(ownerProfileHref({ qrCode: finalCode, visibility: "public" }, "/dashboard"));
       }
     } catch (error) {
       if (!isCurrent()) return;
@@ -646,7 +642,7 @@ function CreateOwnerDraft({ user, authChecked, isCurrent }: { user: CreateOwner 
   return authChecked && user ? (
     <>
       <Nav />
-      <OwnerWorkspace current="create">
+      <OwnerWorkspace current="create" accountType={workspaceAccountType}>
         {createdCode ? (
           <div className={styles.success}>
             <section className={styles.successContent}>
@@ -655,8 +651,8 @@ function CreateOwnerDraft({ user, authChecked, isCurrent }: { user: CreateOwner 
               <p>{ui("ui.app.create.page.de62112c6b17", "The Profile can keep growing with history, media, documents, service, and ownership while its QRguitar ID and URL stay the same.")}</p>
               <div className="create-success-id"><span>{ui("ui.app.create.page.a6c8f92c19f4", "QRguitar ID")}</span><strong>{createdCode}</strong></div>
               <div className="create-success-actions">
-                <Link className="button" href={ownerProfileHref({ qrCode: createdCode, visibility: "public" })}>{ui("ui.app.create.page.41a634bed373", "View Profile")}</Link>
-                <Link className="button secondary" href={`/handout/${createdCode}`}>{ui("ui.app.create.page.5ee3796350c7", "Open Print Suite")}</Link>
+                <Link className="button" href={ownerProfileHref({ qrCode: createdCode, visibility: "public" }, "/dashboard")}>{ui("ui.app.create.page.41a634bed373", "View Profile")}</Link>
+                <Link className="button secondary" href={`/handout/${createdCode}?returnTo=%2Fdashboard`}>{ui("ui.app.create.page.5ee3796350c7", "Open Print Suite")}</Link>
               </div>
               <details className={styles.moreSuccessActions}>
                 <summary>{ui("ui.app.create.page.moreAfterCreate", "Add more to this Profile")}</summary>
@@ -734,8 +730,7 @@ function CreateOwnerDraft({ user, authChecked, isCurrent }: { user: CreateOwner 
                         <option value="Other">{ui("ui.app.create.page.f97e9da0e3b8", "Other")}</option>
                       </select>
                     </div>
-                    <Field label={ui("ui.app.create.page.collectionName", "Collection name")} id="owner" value={form.owner} onChange={(value) => updateField("owner", value)} disabled={Boolean(savedCollectionName)} required error={fieldErrors.owner || ""} placeholder={ui("ui.app.create.page.collectionNamePlaceholder", "A name you choose")} />
-                    <p className="field-note">{ui("ui.app.create.page.collectionNameHelp", "Use a name you choose, not necessarily your real name. Change an existing collection name in Account.")} <Link href="/account?section=collection">{ui("ui.app.create.page.collectionSettings", "Collection settings")}</Link></p>
+                    <p className="field-note"><Link href="/account?section=collection" target="_blank" rel="noopener noreferrer">{ui("ui.app.create.page.collectionSettingsNewTab", "Collection settings (opens in a new tab)")}</Link></p>
                     <div className={`field${fieldErrors.acquisitionDate ? " has-error" : ""}`}><label htmlFor="acquisitionDate">{ui("ui.app.create.page.0b0489074742", "Acquisition date")}</label><input id="acquisitionDate" type="date" value={form.acquisitionDate} onChange={(event) => updateField("acquisitionDate", event.target.value)} aria-invalid={Boolean(fieldErrors.acquisitionDate)} />{fieldErrors.acquisitionDate ? <span className="field-error">{fieldErrors.acquisitionDate}</span> : null}</div>
                     <Field label={ui("ui.app.create.page.5e553fd3aa01", "Seller / store (optional)")} id="seller" value={form.seller} onChange={(value) => updateField("seller", value)} />
                     <Field label={ui("ui.app.create.page.15b61974b270", "Location")} id="location" value={form.location} onChange={(value) => updateField("location", value)} placeholder={ui("ui.app.create.page.fef8ce3a04b7", "City, region, country")} />

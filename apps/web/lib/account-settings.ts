@@ -33,6 +33,8 @@ function readCollection(value: unknown) {
   const row = object(value);
   if (["enabled", "allowIndexing", "allowMessages"].some((key) => typeof row[key] !== "boolean")
     || ["handle", "publicName", "accountType", "bio", "location", "websiteUrl", "avatarUrl"].some((key) => typeof row[key] !== "string")) throw new Error("Could not confirm the saved collection settings.");
+  if ((row.allowWarrantyHelp !== undefined && typeof row.allowWarrantyHelp !== "boolean")
+    || (row.warrantyHelpUrl !== undefined && typeof row.warrantyHelpUrl !== "string")) throw new Error("Could not confirm the saved assistance settings.");
   return cleanPublicCollection(row);
 }
 function readAccount(value: unknown, email: string): AccountSnapshot {
@@ -154,6 +156,7 @@ export function createAccountSettings(deps: { auth: () => AccountAuth; fetch?: t
         const saved = object(payload.account);
         if (payload.committed !== true || typeof saved.displayName !== "string" || saved.email !== email || !Number.isSafeInteger(saved.settingsVersion) || saved.settingsVersion !== draft.expectedVersion + 1) throw new Error();
         account = { ...state.account!, email, displayName: saved.displayName, publicCollection: readCollection(saved.publicCollection), settingsVersion: saved.settingsVersion as number };
+        if (account.publicCollection.allowWarrantyHelp !== draft.publicCollection.allowWarrantyHelp || account.publicCollection.warrantyHelpUrl !== cleanPublicCollection(draft.publicCollection).warrantyHelpUrl) throw new Error();
       } catch { throw new AccountFailure("Could not confirm the saved settings. Reload your account before trying again.", true); }
       publish({ account, draft: { displayName: account.displayName, publicCollection: { ...account.publicCollection } }, message: typeof payload.message === "string" ? payload.message : "Account updated.", uncertainSave: false });
       try { deps.onSaved?.(); } catch { /* The committed save remains authoritative. */ }

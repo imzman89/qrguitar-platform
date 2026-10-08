@@ -1,0 +1,17 @@
+@font-face {
+  font-family: "QRguitar Modern";
+  src: url("/fonts/manrope/Manrope-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+}
+/* Screen typography only: printed documents retain their qualified geometry. */
+@media screen {
+  body[data-product-theme] {
+    --font-display: "QRguitar Modern", "Aptos", "Segoe UI", sans-serif;
+    --font-ui: "QRguitar Modern", "Aptos", "Segoe UI", sans-serif;
+    font-family: var(--font-ui);
+    font-synthesis: none;
+    -webkit-font-smoothing: antialiased;
+  }
+}

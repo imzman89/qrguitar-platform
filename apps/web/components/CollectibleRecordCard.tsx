@@ -18,19 +18,20 @@ import { resolveCollectibleCard } from "../lib/collectible-card";
 import type { DemoInstrument } from "../lib/local-demo";
 import { publicMediaVariantUrl } from "../lib/public-media-variant";
 import { ProfileStatusBadges } from "./ProfileStatusBadges";
-import { PhotoViewer } from "./PhotoViewer";
 import { RecordShareButton } from "./RecordShareButton";
 import styles from "./CollectibleRecordCard.module.css";
 
 type CollectibleRecordCardProps = {
   record: DemoInstrument;
   variant?: "latest" | "catalog" | "spotlight" | "archive";
+  homeFeatured?: boolean;
   prioritizeLeadImage?: boolean;
   compactMobilePhotos?: boolean;
   deferAdjacentPhotos?: boolean;
   eyebrow?: string;
   createdLabel?: string;
   ctaLabel?: string;
+  returnTo?: string;
   secondaryHref?: string;
   secondaryLabel?: string;
   content?: Record<string, string>;
@@ -51,18 +52,25 @@ function freshCardGallery(key: string): CardGalleryState {
 export function CollectibleRecordCard({
   record,
   variant = "catalog",
+  homeFeatured = false,
   prioritizeLeadImage = false,
   compactMobilePhotos = false,
   deferAdjacentPhotos = false,
   eyebrow = "",
   createdLabel = "",
   ctaLabel = "Open Profile",
+  returnTo,
   secondaryHref = "",
   secondaryLabel = ""
 }: CollectibleRecordCardProps) {
   const router = useRouter();
   const card = useMemo(() => resolveCollectibleCard(record), [record]);
-  const [viewerOpen, setViewerOpen] = useState(false);
+  const localProfileHref = useMemo(() => {
+    if (!returnTo) return card.profileUrl;
+    const url = new URL(card.profileUrl, "https://qrguitar.invalid");
+    url.searchParams.set("returnTo", returnTo);
+    return url.pathname + url.search + url.hash;
+  }, [card.profileUrl, returnTo]);
   const galleryKey = JSON.stringify([record.qrCode, card.images]);
   const [storedGallery, setStoredGallery] = useState(() => freshCardGallery(galleryKey));
   // New records never reuse an old gallery's selection or loading state.
@@ -84,13 +92,14 @@ export function CollectibleRecordCard({
       ...current, failedImages: current.failedImages.includes(index) ? current.failedImages : [...current.failedImages, index], adjacentPhotosReady: true
     });
   }, [updateGallery]);
-  const railRef = useRef<HTMLDivElement | null>(null);
+  const railRef = useRef<HTMLAnchorElement | null>(null);
   const dragState = useRef({ galleryKey, pointerId: -1, startX: 0, scrollLeft: 0, moved: false, userScrollPending: false });
   const previewOnly = variant === "archive" || variant === "latest";
+  const isHomeFeatured = variant === "latest" && homeFeatured;
   const galleryImages = previewOnly ? card.images.slice(0, 1) : card.images;
   const showSecondaryAction = variant !== "latest" && secondaryHref && secondaryLabel;
   const showSecondaryText = variant !== "latest" && !secondaryHref && secondaryLabel;
-  const summary = variant === "latest" || variant === "archive" ? "" : card.summary;
+  const summary = variant === "spotlight" ? card.summary : "";
   const showGalleryControls = galleryImages.length > 1;
   useEffect(() => {
     const rail = railRef.current;
@@ -119,7 +128,8 @@ export function CollectibleRecordCard({
     selectGalleryPhoto(next);
   }
 
-  function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
+  function handlePointerDown(event: PointerEvent<HTMLAnchorElement>) {
+    if (isHomeFeatured) return;
     if (event.pointerType !== "mouse") {
       dragState.current = { galleryKey, pointerId: -1, startX: 0, scrollLeft: 0, moved: false, userScrollPending: true };
       return;
@@ -130,7 +140,7 @@ export function CollectibleRecordCard({
     rail.setPointerCapture(event.pointerId);
   }
 
-  function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
+  function handlePointerMove(event: PointerEvent<HTMLAnchorElement>) {
     if (event.pointerType !== "mouse") return;
     const rail = railRef.current;
     const drag = dragState.current;
@@ -143,7 +153,7 @@ export function CollectibleRecordCard({
     }
   }
 
-  function handlePointerEnd(event: PointerEvent<HTMLDivElement>) {
+  function handlePointerEnd(event: PointerEvent<HTMLAnchorElement>) {
     if (event.pointerType !== "mouse") return;
     const rail = railRef.current;
     if (!rail || dragState.current.galleryKey !== galleryKey || dragState.current.pointerId !== event.pointerId) return;
@@ -154,50 +164,49 @@ export function CollectibleRecordCard({
     selectGalleryPhoto(next);
   }
 
-  function handleRailClick() {
+  function handleRailClick(event: MouseEvent<HTMLAnchorElement>) {
     if (dragState.current.moved) {
       dragState.current.moved = false;
-      return;
+      event.preventDefault();
     }
-    unlockAdjacentPhotos();
-    if (card.images.length) setViewerOpen(true);
   }
 
   function handleContentClick(event: MouseEvent<HTMLDivElement>) {
-    if ((event.target as HTMLElement).closest("a, button")) return;
-    router.push(card.profileUrl);
+    if ((event.target as HTMLElement).closest("a, button, details")) return;
+    router.push(localProfileHref);
   }
 
-  function handleWheel(event: WheelEvent<HTMLDivElement>) {
+  function handleWheel(event: WheelEvent<HTMLAnchorElement>) {
+    if (isHomeFeatured) return;
     if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
     event.preventDefault();
     unlockAdjacentPhotos();
     railRef.current?.scrollBy({ left: event.deltaX, behavior: "auto" });
   }
 
-  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key === "Enter" || event.key === " ") {
+  function handleKeyDown(event: KeyboardEvent<HTMLAnchorElement>) {
+    if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.key === "Enter") return;
+    if (event.key === " ") {
       event.preventDefault();
-      unlockAdjacentPhotos();
-      if (card.images.length) setViewerOpen(true);
+      router.push(localProfileHref);
       return;
     }
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    if (isHomeFeatured) return;
     event.preventDefault();
     moveGallery(event.key === "ArrowRight" ? 1 : -1);
   }
 
   return (
-    <article className={styles["collectible-card"]} data-card-variant={variant} aria-label={`Open ${card.title} QRguitar Profile`}>
+    <article className={styles["collectible-card"]} data-card-variant={variant} data-home-featured={isHomeFeatured ? "true" : undefined} aria-label={`Open ${card.title} QRguitar Profile`}>
       <div className={styles["collectible-card-link"]}>
+        <div className={styles["collectible-card-gallery"]}>
         <div className={styles["collectible-card-media"]}>
-          <div
+          <Link
+            href={localProfileHref}
             ref={railRef}
             className={styles["collectible-card-media-rail"]}
-            role="region"
-            aria-roledescription="carousel"
-            aria-label={galleryImages.length ? (previewOnly ? `${card.title} photo preview. ${card.photoCount} ${card.photoCount === 1 ? "photo" : "photos"} available. Press Enter to view photos.` : `${card.title} photos. Image ${activeImageIndex + 1} of ${galleryImages.length}. Press Enter to view photos.`) : `${card.title}. Photos unavailable.`}
-            tabIndex={galleryImages.length ? 0 : -1}
+            aria-label={`Open ${card.title} Profile${galleryImages.length ? `. Photo ${activeImageIndex + 1} of ${card.photoCount}` : ""}`}
             onClick={handleRailClick}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -251,12 +260,9 @@ export function CollectibleRecordCard({
               </div>
             )}
 
-          </div>
+          </Link>
 
-            <div className={styles["collectible-card-topline"]}>
-              {eyebrow ? <span className={styles["collectible-card-eyebrow"]}><Globe2 size={13} /> {eyebrow}</span> : null}
-              {createdLabel ? <span className={styles["collectible-card-age"]}>{createdLabel}</span> : null}
-            </div>
+
         </div>
 
         <div className={styles["collectible-card-media-toolbar"]}>
@@ -272,20 +278,31 @@ export function CollectibleRecordCard({
               </button>
             </div>
           ) : null}
-          <RecordShareButton className={styles["collectible-card-share"]} code={card.code} title={card.title} />
         </div>
 
+        </div>
         <div className={styles["collectible-card-content"]} onClick={handleContentClick}>
-          <Link className={styles["collectible-card-profile-link"]} href={card.profileUrl}>
+          {eyebrow || createdLabel ? <div className={styles["collectible-card-topline"]}>
+            {eyebrow ? <span className={styles["collectible-card-eyebrow"]}><Globe2 size={13} aria-hidden="true" /> {eyebrow}</span> : null}
+            {createdLabel ? <span className={styles["collectible-card-age"]}>{createdLabel}</span> : null}
+          </div> : null}
+          <Link className={styles["collectible-card-profile-link"]} href={localProfileHref}>
             <span className={styles["collectible-card-type"]}>{card.typeLabel}</span>
-            <h3>{card.title}</h3>
+            <h3>{isHomeFeatured ? <><span>{card.title}</span><ArrowRight size={16} aria-hidden="true" /></> : card.title}</h3>
             <p className={styles["collectible-card-subtitle"]}>{card.factLine}</p>
             {summary ? <p className={styles["collectible-card-summary"]}>{summary}</p> : null}
           </Link>
 
           <ProfileStatusBadges record={record} includeCondition={false} ownerCollection={card.collection || undefined} />
 
-          {card.publicSerial || card.publicDocumentCount ? <div className={styles["collectible-card-facts"]} aria-label="Profile contents">
+          {card.publicHistoryCount ? <p className={styles["collectible-card-provenance"]}>{card.publicHistoryCount} {card.publicHistoryCount === 1 ? "recorded history entry" : "recorded history entries"}</p> : null}
+
+
+          {!isHomeFeatured ? <div className={styles["collectible-card-actions"]}>
+            <Link className={styles["collectible-card-cta"]} href={localProfileHref}>{ctaLabel} <ArrowRight size={14} /></Link>
+            {showSecondaryText ? <span className={styles["collectible-card-secondary"]}>{secondaryLabel}</span> : null}
+          </div> : null}
+          {!isHomeFeatured ? <details className={styles["collectible-card-details"]}><summary>Record details</summary><div className={styles["collectible-card-facts"]} aria-label="Profile contents">
             {card.publicSerial ? (
               <span className={styles["collectible-card-serial"]}>
                 <Hash size={13} aria-hidden="true" />
@@ -296,17 +313,15 @@ export function CollectibleRecordCard({
               </span>
             ) : null}
             {card.publicDocumentCount ? <span><FileText size={13} /> {card.publicDocumentCount} {card.publicDocumentCount === 1 ? "document" : "documents"}</span> : null}
-          </div> : null}
-
-          <div className={styles["collectible-card-actions"]}>
-            <Link className={styles["collectible-card-cta"]} href={card.profileUrl}>{ctaLabel} <ArrowRight size={14} /></Link>
-            <span className={styles["collectible-card-code"]}>{card.code}</span>
-            {showSecondaryText ? <span className={styles["collectible-card-secondary"]}>{secondaryLabel}</span> : null}
           </div>
+            <div className={styles["collectible-card-utilities"]}>
+              <RecordShareButton className={styles["collectible-card-share"]} showLabel={variant === "catalog"} code={card.code} title={card.title} />
+            </div>
+          </details> : null}
+          <span className={styles["collectible-card-code"]}>{card.code}</span>
         </div>
       </div>
 
-      {viewerOpen ? <PhotoViewer images={card.images} initialIndex={activeImageIndex} title={card.title} onClose={() => setViewerOpen(false)} /> : null}
       {showSecondaryAction ? (
         <Link className={styles["collectible-card-secondary-link"]} href={secondaryHref}>
           {secondaryLabel}

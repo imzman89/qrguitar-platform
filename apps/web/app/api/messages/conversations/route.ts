@@ -1,3 +1,4 @@
+import { BusinessContactError, loadRecordedBusinessContact } from "../../../../lib/recorded-business-contact";
 import { cleanCollectionHandle } from "../../../../lib/public-collections";
 import { loadPublicCollectionSettings } from "../../../../lib/public-collection-page";
 import { memberMessageJson, memberMessageOriginAllowed, readMemberMessageJson } from "../../../../lib/member-messaging-http";
@@ -13,11 +14,16 @@ export async function POST(request: Request) {
   const body = await readMemberMessageJson(request);
   const handle = cleanCollectionHandle(body?.handle);
   const profileCode = String(body?.profileCode || "").trim().toUpperCase();
+  const transferId = body?.transferId;
+  if (transferId !== undefined && (typeof transferId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(transferId) || profileCode)) return memberMessageJson({ ok: false, message: "Choose an available recorded business." }, 400);
   if (!handle || (profileCode && !/^QRG-[A-Z0-9-]{4,40}$/.test(profileCode))) {
     return memberMessageJson({ ok: false, message: "Choose an available member Profile." }, 400);
   }
   try {
+    const recorded = transferId ? await loadRecordedBusinessContact(access.supabase, access.user.id, { transferId }) : null;
+    if (transferId && (!recorded || recorded.handle !== handle)) return memberMessageJson({ ok: false, message: "Recorded business unavailable. Refresh your Profile." }, 404);
     const collection = await loadPublicCollectionSettings(handle);
+    if (recorded && (!collection || collection.ownerId !== recorded.senderId)) return memberMessageJson({ ok: false, message: "Recorded business unavailable. Refresh your Profile." }, 404);
     if (!collection) return memberMessageJson({ ok: false, message: "Member Profile not found." }, 404);
     if (!collection.allowMessages) return memberMessageJson({ ok: false, message: "This member is not accepting messages." }, 403);
     let contextGuitarId: string | null = null;
@@ -28,10 +34,10 @@ export async function POST(request: Request) {
       if (profile.error || !profile.data) return memberMessageJson({ ok: false, message: "The selected Profile is unavailable." }, 400);
       contextGuitarId = profile.data.id;
     }
-    const result = await access.supabase.rpc("ensure_member_conversation", {
-      p_actor_id: access.user.id,
-      p_target_id: collection.ownerId,
-      p_context_guitar_id: contextGuitarId
+    const result = await access.supabase.rpc(recorded ? "ensure_recorded_business_conversation" : "ensure_member_conversation", recorded ? {
+      p_actor_id: access.user.id, p_target_id: recorded.senderId, p_transfer_id: transferId, p_handle: handle
+    } : {
+      p_actor_id: access.user.id, p_target_id: collection.ownerId, p_context_guitar_id: contextGuitarId
     });
     if (result.error) {
       const failure = messagingDatabaseError(result.error);
@@ -40,7 +46,8 @@ export async function POST(request: Request) {
     const value = result.data as { conversationId?: string; created?: boolean } | null;
     if (!value?.conversationId) return memberMessageJson({ ok: false, message: "The conversation could not be confirmed." }, 503);
     return memberMessageJson({ ok: true, conversationId: value.conversationId, created: value.created === true });
-  } catch {
+  } catch (error) {
+    if (error instanceof BusinessContactError) return memberMessageJson({ ok: false, message: error.message }, error.status);
     return memberMessageJson({ ok: false, message: "Messages are temporarily unavailable. Try again." }, 503);
   }
 }

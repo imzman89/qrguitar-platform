@@ -115,6 +115,21 @@ function fixture(t, { parent = false, synchronousActor, factoryThrows = false, g
     lateEvent(event, actor) { for (const fn of retainedCallbacks) fn(event, session(actor)); f.settle(); },
     textarea: () => nodes(tree).find(node => node.type === 'textarea')?.props.value,
     copy: () => copy(tree),
+    inputs: () => nodes(tree)
+      .filter(n => n.type === 'input')
+      .map(n => n.props),
+    accountLinks: () => nodes(tree)
+      .filter(n => n.props?.href === '/account?section=collection'),
+    async startCreate() {
+      const button = nodes(tree).find(n =>
+        n.type === 'button' &&
+        String(n.props?.onClick).includes('createProfiles')
+      );
+      assert.ok(button);
+      await button.props.onClick();
+      f.settle();
+    },
+    links: () => nodes(tree).filter(node => node.type === 'a').map(node => ({ text: copy(node), href: node.props.href, target: node.props.target, rel: node.props.rel })),
     child: () => nodes(tree).find(node => node.type === 'BulkProfileImport'),
     edit(value) { nodes(tree).find(node => node.type === 'textarea').props.onChange({ target: { value } }); f.settle(); },
     dispose() { if (disposed) return; disposed = true; slots.forEach(slot => slot?.cleanup?.()); },
@@ -246,4 +261,74 @@ test('parent batched same-actor refreshes keep the same controller mounted', asy
   const f = fixture(t, { parent: true }); f.initial.resolve(snapshot('actor-a')); await f.flush();
   const key = f.child().key;
   f.emitBatch([['TOKEN_REFRESHED', 'actor-a'], ['SIGNED_IN', 'actor-a']]); assert.equal(f.child().key, key);
+});
+
+test('signed-out import copy and registered default disclose Catalog publication', async t => {
+  const f = fixture(t, { parent: true });
+  f.initial.resolve(snapshot('')); await f.flush();
+  assert.match(f.copy(), /Saved instruments and photos appear in Catalog\./);
+  assert.doesNotMatch(f.copy(), /creates private QRguitar Profiles/);
+  const registry = fs.readFileSync(path.join(root, 'lib/ui-text-registry.ts'), 'utf8');
+  const registryAst = ts.createSourceFile('registry.ts', registry, ts.ScriptTarget.Latest, true);
+  const matches = [];
+  function visit(node) {
+    if (ts.isObjectLiteralExpression(node)) {
+      const fields = Object.fromEntries(node.properties.filter(ts.isPropertyAssignment)
+        .filter(p => ts.isStringLiteral(p.name) && ts.isStringLiteral(p.initializer))
+        .map(p => [p.name.text, p.initializer.text]));
+      if (fields.key === 'ui.components.BulkImportWorkspace.897a89da498c') matches.push(fields.text);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(registryAst);
+  assert.deepEqual(matches, ['Saved instruments and photos appear in Catalog.']);
+  assert.equal(f.requests(), 0);
+});
+for (const code of ['QRG-PRIVATE-DUPLICATE', 'QRG-PRIVATE/ONE?next=1']) {
+  test('owned duplicate link uses the protected owner route: ' + code, async t => {
+    const f = fixture(t), saved = draft('actor-a');
+    saved.rows[0].visibility = 'private';
+    saved.rows[0].duplicateCode = code;
+    saved.rows[0].error = 'Serial Number already belongs to this owned Profile.';
+    f.storage.set(bulk.bulkDraftKey('actor-a'), JSON.stringify(saved));
+    f.initial.resolve(snapshot('actor-a')); await f.flush();
+    const links = f.links().filter(link => link.text === 'Open existing Profile');
+    assert.deepEqual(links, [{
+      text: 'Open existing Profile', href: '/dashboard/profile/' + encodeURIComponent(code),
+      target: '_blank', rel: 'noreferrer'
+    }]);
+    assert.equal(f.requests(), 0);
+    f.emit('SIGNED_OUT', ''); await f.flush();
+    assert.equal(f.links().filter(link => link.text === 'Open existing Profile').length, 0);
+  });
+}
+
+test('Bulk Import exposes an Account link instead of an editable collection name', async t => {
+  const f = fixture(t);
+  f.initial.resolve(snapshot('actor-a'));
+  await f.flush();
+
+  assert.equal(
+    f.inputs().some(p => p.placeholder === 'A name you choose'),
+    false
+  );
+  assert.equal(f.accountLinks().length, 1);
+});
+
+test('actual Bulk create reaches duplicate lookup without requiring a collection name', async t => {
+  const f = fixture(t);
+  f.initial.resolve(snapshot('actor-a'));
+  await f.flush();
+
+  const reads = [];
+  globalThis.fetch = async (url, init) => {
+    reads.push({ url, method: init?.method || 'GET' });
+    throw Error('Stop after synthetic duplicate lookup');
+  };
+
+  await f.startCreate();
+
+  assert.deepEqual(reads, [
+    { url: '/api/instruments?scope=mine', method: 'GET' }
+  ]);
 });

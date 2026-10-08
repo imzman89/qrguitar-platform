@@ -23,7 +23,10 @@ for(const stmt of fn.body.statements)if(ts.isVariableStatement(stmt))for(const d
 const authIndex=fn.body.statements.filter(n=>ts.isExpressionStatement(n)&&ts.isCallExpression(n.expression)&&n.expression.expression.getText(ast)==='useEffect')
 .findIndex(n=>n.getText(ast).includes('createBrowserSupabaseClient'));
 assert.equal(authIndex,2);
-const code=ts.transpileModule(fn.getText(ast).replace('export default ','')+'\n'+mapFn.getText(ast),{
+const helperNames=['matchesDashboardSearch','dashboardRecordTitle','dashboardRecordMeta','latestTransferForInstrument','sameText','DashboardServiceCorrectionAttention','DashboardInstrumentThumb','TransferPanel'];
+const helpers=ast.statements.filter(n=>ts.isFunctionDeclaration(n)&&helperNames.includes(n.name?.text)).map(n=>n.getText(ast)).join('\n');
+const preferenceIndex=fn.body.statements.filter(n=>ts.isExpressionStatement(n)&&ts.isCallExpression(n.expression)&&n.expression.expression.getText(ast)==='useEffect').findIndex(n=>n.getText(ast).includes('localStorage.getItem'));
+const code=ts.transpileModule(fn.getText(ast).replace('export default ','')+'\n'+mapFn.getText(ast)+'\n'+helpers,{
  compilerOptions:{jsx:ts.JsxEmit.React,target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None},
  reportDiagnostics:true
 });
@@ -52,6 +55,7 @@ const flush=async()=>{await Promise.resolve();await Promise.resolve();await Prom
 function fixture({constructorError=false,overrides={}}={}){
  let cursor=0,writes=0,reloads=0,listener,unsubscribed=false,cleanup;
  const slots=[],effects=[],timers=new Map();
+ const storage={saved:null,reads:0,writes:[],throwRead:false,throwWrite:false};
  let resolve,reject;const read=new Promise((a,b)=>{resolve=a;reject=b;});
  const context={
   React,useUiText:()=>((key,fallback)=>overrides[key]??fallback),useSiteContent:()=>({}),
@@ -62,8 +66,11 @@ function fixture({constructorError=false,overrides={}}={}){
    getSession:()=>read,onAuthStateChange:cb=>{listener=cb;return{data:{subscription:{unsubscribe:()=>{unsubscribed=true;}}}};}
   }};},
   defaultSiteSettings:{dashboard:{subtitle:'Dashboard subtitle'}},getWorkspace:()=>({label:'Collection',description:'Collection'}),
-  getContentValue:(_content,key)=>key,styles:{},authStyles:{},URLSearchParams,
-  window:{setTimeout:(cb,ms)=>{assert.equal(ms,10000);timers.set(1,cb);return 1;},clearTimeout:id=>timers.delete(id),location:{reload:()=>{reloads++;}}},
+  getContentValue:(_content,key)=>key,styles:new Proxy({}, {get:(_target,key)=>String(key)}),authStyles:{},URLSearchParams,
+  getInstrumentVerificationStatus:()=>"unverified",getInstrumentCondition:()=>"used",
+  getProfilePhotoUrls:r=>r.photos||[],getServiceHistoryEntries:r=>r.serviceHistory||[],
+  ownerProfileHref:r=>`/dashboard/profile/${r.qrCode}?returnTo=%2Fdashboard`,
+  window:{localStorage:{getItem:key=>{assert.equal(key,"qrguitar.collection.view");storage.reads++;if(storage.throwRead)throw Error("Storage unavailable");return storage.saved;},setItem:(key,value)=>{assert.equal(key,"qrguitar.collection.view");if(storage.throwWrite)throw Error("Storage unavailable");storage.saved=value;storage.writes.push({key,value});}},setTimeout:(cb,ms)=>{assert.equal(ms,10000);timers.set(1,cb);return 1;},clearTimeout:id=>timers.delete(id),location:{reload:()=>{reloads++;}}},
  };
  for(const stmt of ast.statements)if(ts.isImportDeclaration(stmt)){
   const c=stmt.importClause;
@@ -74,12 +81,12 @@ function fixture({constructorError=false,overrides={}}={}){
  vm.createContext(context);vm.runInContext(code.outputText,context);
  function render(){cursor=0;effects.length=0;return context.DashboardPage();}
  function walk(node,visit){if(node===null||node===undefined||typeof node==='boolean')return;if(Array.isArray(node)){node.forEach(n=>walk(n,visit));return;}visit(node);if(typeof node==='object')walk(node.props?.children,visit);}
- function view(){const root=render();const texts=[],alerts=[],links=[],headings=[],buttons=[];walk(root,n=>{
+ function view(){const root=render();const texts=[],alerts=[],links=[],headings=[],buttons=[],nodes=[];walk(root,n=>{
   if(typeof n==='string'||typeof n==='number')texts.push(String(n));
-  else{if(n.props?.role==='alert')alerts.push(n);if(n.type==='a')links.push(n.props.href);if(n.type==='h1')headings.push(n);if(n.type==='button')buttons.push(n);}
- });return{text:texts.join(' '),alerts,links,headings,buttons};}
+  else{nodes.push(n);if(n.props?.role==='alert')alerts.push(n);if(n.type==='a')links.push(n.props.href);if(n.type==='h1')headings.push(n);if(n.type==='button')buttons.push(n);}
+ });return{text:texts.join(' '),alerts,links,headings,buttons,nodes};}
  render();cleanup=effects[authIndex]();
- return{view,resolve:session=>resolve({data:{session},error:null}),errorResult:()=>resolve({data:{session:null},error:{message:'controlled SDK failure'}}),
+ return{view,storage,runPreference:()=>{render();assert(preferenceIndex>=0,"Preference effect required");effects[preferenceIndex]();},resolve:session=>resolve({data:{session},error:null}),errorResult:()=>resolve({data:{session:null},error:{message:'controlled SDK failure'}}),
  reject:()=>reject(Error('controlled read failure')),event:(session,event=session?'SIGNED_IN':'SIGNED_OUT')=>listener(event,session),
  timeout:()=>{const cb=timers.get(1);assert(cb,'Expected 10s timer');timers.delete(1);cb();},
  set:(name,value)=>{const i=slotNames.indexOf(name);assert(i>=0,name);slots[i]=value;},
@@ -126,11 +133,22 @@ test('later nonnull event recovers after SDK error and INITIAL_SESSION null',asy
 test('failed session uses a neutral heading and keeps safe sign-in access',async f=>{f.errorResult();await flush();const v=f.view();assert.equal(v.headings[0].props.children,'Dashboard');assert(v.links.includes('/login?next=%2Fdashboard'));assert(!v.links.includes('/login?mode=register&next=%2Fdashboard'));assert.equal(v.buttons.length+v.links.length,3);});
 test('failed session retry invokes an actual page reload',async f=>{f.reject();await flush();const retry=f.view().buttons.find(n=>n.props.children==='Try again');assert(retry,'Visible retry action required');assert.equal(retry.props.type,'button');retry.props.onClick();assert.equal(f.reloads(),1);});
 test('confirmed guest retains its existing three actions without an error retry',async f=>{f.resolve(null);await flush();const v=f.view();assert.equal(v.buttons.length,0);assert.equal(v.links.length,3);assert(v.links.includes('/login?mode=register&next=%2Fdashboard'));assert(v.headings[0].props.children.includes('Sign in to manage'));});
+const personal=f=>{f.set("user",{email:"owner@example.invalid"});f.set("authChecked",true);f.set("collectionAccountType","player");f.set("workspaceStatus","ready");f.set("loadingRecords",false);f.set("recordsLoaded",true);};
+const viewButton=(f,label)=>{const button=f.view().buttons.find(n=>n.props.children===label);assert(button,"View button required: "+label);assert.equal(button.props.type,"button");assert.equal(button.props["aria-controls"],"saved-profiles");return button;};
+const presentation=f=>f.view().nodes.find(n=>n.props?.className?.split(" ").includes("instrumentList"));
+test("collection defaults to gallery without writing a preference",async f=>{personal(f);f.runPreference();assert.equal(f.state("collectionView"),"gallery");assert.equal(viewButton(f,"Gallery").props["aria-pressed"],true);assert.equal(viewButton(f,"List").props["aria-pressed"],false);assert.equal(presentation(f).props.className,"instrumentList personalGallery");assert.equal(f.storage.writes.length,0);assert.equal(f.storage.reads,1);assert(f.view().nodes.some(n=>n.props?.role==="group"&&n.props["aria-label"]==="Collection view"));});
+test("collection restores list without an initial gallery overwrite",async f=>{personal(f);f.storage.saved="list";f.runPreference();assert.equal(f.state("collectionView"),"list");assert.equal(viewButton(f,"List").props["aria-pressed"],true);assert.equal(presentation(f).props.className,"instrumentList personalRecords");assert.equal(f.storage.saved,"list");assert.equal(f.storage.writes.length,0);});
+test("collection rejects unknown saved preferences",async f=>{personal(f);f.storage.saved="unexpected";f.runPreference();assert.equal(f.state("collectionView"),"gallery");assert.equal(f.storage.saved,"unexpected");assert.equal(f.storage.writes.length,0);});
+test("collection read failure keeps usable in-memory gallery",async f=>{personal(f);f.storage.throwRead=true;f.runPreference();assert.equal(f.state("collectionView"),"gallery");viewButton(f,"List").props.onClick();assert.equal(f.state("collectionView"),"list");});
+test("collection write failure still changes the actual view",async f=>{personal(f);f.storage.throwWrite=true;viewButton(f,"List").props.onClick();assert.equal(f.state("collectionView"),"list");assert.equal(presentation(f).props.className,"instrumentList personalRecords");assert.equal(f.storage.writes.length,0);});
+test("collection writes only explicit choices and restores the last choice",async f=>{personal(f);viewButton(f,"List").props.onClick();assert.equal(f.storage.saved,"list");viewButton(f,"Gallery").props.onClick();assert.equal(f.storage.saved,"gallery");assert.deepEqual(f.storage.writes.map(w=>w.value),["list","gallery"]);const reload=fixture();try{personal(reload);reload.storage.saved=f.storage.saved;reload.runPreference();assert.equal(reload.state("collectionView"),"gallery");assert.equal(reload.storage.writes.length,0);}finally{reload.dispose();}});
+test("collection view choice is limited to players and collectors",async f=>{personal(f);for(const role of ["player","collector"]){f.set("collectionAccountType",role);viewButton(f,"List").props.onClick();assert.equal(presentation(f).props.className,"instrumentList personalRecords");}for(const role of ["shop","luthier","builder","brand",""]){f.set("collectionAccountType",role);assert(!f.view().buttons.some(n=>["Gallery","List"].includes(n.props.children)));assert.equal(presentation(f).props.className,"instrumentList");assert.equal(presentation(f).props["data-collection-view"],undefined);}});
+test("collection toggles preserve records search feedback and owner action targets",async f=>{personal(f);const records=[{qrCode:"QRG-COLLECTION-UNIT",name:"Stored guitar",brand:"Stored",model:"Guitar",serial:"UNIT",instrumentType:"Electric Guitar",createdAt:"2020-01-01",photos:["photo.jpg"],serviceHistory:[],documents:[]}];f.set("instruments",records);f.set("searchQuery","Stored");f.set("dashboardMessage","Existing owner feedback");const before=f.view();const targets=before.links.filter(h=>/QRG-COLLECTION-UNIT/.test(h));assert.equal(targets.length,3);assert(targets.includes("/dashboard/profile/QRG-COLLECTION-UNIT?returnTo=%2Fdashboard"));assert(targets.includes("/edit/QRG-COLLECTION-UNIT"));assert(targets.includes("/handout/QRG-COLLECTION-UNIT?returnTo=%2Fdashboard"));const revision=f.state("accountRevision").current,loads=f.state("loadAttempt");for(const label of ["List","Gallery"]){viewButton(f,label).props.onClick();assert.equal(f.state("instruments"),records);assert.equal(f.state("searchQuery"),"Stored");assert.equal(f.state("dashboardMessage"),"Existing owner feedback");assert.equal(f.state("accountRevision").current,revision);assert.equal(f.state("loadAttempt"),loads);assert.deepEqual(f.view().links.filter(h=>/QRG-COLLECTION-UNIT/.test(h)),targets);}assert.equal(f.view().nodes.filter(n=>n.type==="article"&&n.props["data-profile-code"]==="QRG-COLLECTION-UNIT").length,1);});
 const results=[];
 for(const c of cases){const f=fixture({constructorError:c.name.startsWith('constructor')||c.name.startsWith('reload')||c.name.startsWith('CMS override used for construction'),
  overrides:c.name.startsWith('CMS')?{'ui.app.dashboard.page.sessionUnavailable':'Published unavailable guidance','ui.app.dashboard.page.sessionCheckFailed':'Published check guidance'}:{}});
  try{await c.cb(f);results.push({name:c.name,pass:true});}catch(e){results.push({name:c.name,pass:false,error:e.message});}finally{f.dispose();}
 }
-console.log(JSON.stringify({source:sourcePath,method:'Actual AST-extracted DashboardPage + mapSupabaseUser with deterministic hook state and auth-only effect; actual JSX tree traversed; installed SDK _emitInitialSession method executed with controlled _useSession result/callback, no client construction/storage/data effects/network/backend',sdkSource:sdkPath,sdkVersion:JSON.parse(fs.readFileSync(path.join(sdkRoot,'node_modules/@supabase/auth-js/package.json'),'utf8')).version,count:results.length,passed:results.filter(r=>r.pass).length,failed:results.filter(r=>!r.pass).length,results},null,2));
+console.log(JSON.stringify({source:sourcePath,method:'Actual AST-extracted DashboardPage + mapSupabaseUser with deterministic hook state and auth-only effect for prior cases, preference-only effect and actual view button handlers for new cases; actual JSX tree traversed; installed SDK _emitInitialSession method executed with controlled _useSession result/callback, no real client construction/storage/data effects/network/backend; preference cases use controlled mocked storage and record presentation helpers',sdkSource:sdkPath,sdkVersion:JSON.parse(fs.readFileSync(path.join(sdkRoot,'node_modules/@supabase/auth-js/package.json'),'utf8')).version,count:results.length,passed:results.filter(r=>r.pass).length,failed:results.filter(r=>!r.pass).length,results},null,2));
 process.exitCode=results.some(r=>!r.pass)?1:0;
 

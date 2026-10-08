@@ -78,3 +78,17 @@ test('actual Create handler serializes valid sale details with the guarded origi
   assert.ok(body.customFields.some((field) => field.label === 'Currency' && field.value === 'USD'));
   assert.equal(body.idempotencyKey, 'original-request');
 });
+
+for (const name of ['', 'Legacy collection text']) {
+  test('actual Create submits without renaming account: ' + JSON.stringify(name), async () => {
+    const f = submitFixture();
+    f.form.owner = name;
+    await f.submit();
+
+    assert.equal(f.requests.length, 1);
+    const body = JSON.parse(f.requests[0].init.body);
+    assert.equal(Object.hasOwn(body, 'ownerName'), false);
+    assert.equal(body.idempotencyKey, 'original-request');
+    assert.equal(body.uploadId, 'original-upload');
+  });
+}

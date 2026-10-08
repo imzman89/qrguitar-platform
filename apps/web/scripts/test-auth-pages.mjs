@@ -16,15 +16,17 @@ const deferred = () => { let resolve, reject; const promise = new Promise((yes, 
 const session = id => id ? { user: { id }, access_token: 'synthetic-token-' + id } : null;
 const sessionResult = id => ({ data: { session: session(id) }, error: null });
 
-function compile(relative, imports, globals) {
+function compile(relative, imports, globals, fallbackRequire = require) {
   const input = fs.readFileSync(path.join(source, 'apps/web', relative), 'utf8');
   const code = ts.transpileModule(input, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const module = { exports: {} };
-  new Function('require', 'module', 'exports', ...Object.keys(globals), code)(name => Object.hasOwn(imports, name) ? imports[name] : name.endsWith('.module.css') ? { __esModule: true, default: new Proxy({}, { get: (_, key) => String(key) }) } : require(name), module, module.exports, ...Object.values(globals));
+  new Function('require', 'module', 'exports', ...Object.keys(globals), code)(name => Object.hasOwn(imports, name) ? imports[name] : name.endsWith('.module.css') ? { __esModule: true, default: new Proxy({}, { get: (_, key) => String(key) }) } : fallbackRequire(name), module, module.exports, ...Object.values(globals));
   return module.exports;
 }
 const checkoutNavigation = compile('lib/checkout-navigation.ts', { './security-headers': compile('lib/security-headers.ts', {}, {}) }, {});
 const authRedirect = compile('lib/auth-redirect.ts', {}, {});
+const uiText = compile('lib/ui-text.ts', {}, {});
+const workspaceTools = compile('lib/workspace-tools.ts', { './ui-text': uiText }, {});
 function find(tree, predicate) {
   if (!tree || typeof tree !== 'object') return;
   if (predicate(tree)) return tree;
@@ -36,7 +38,7 @@ function text(tree) {
   return React.Children.toArray(tree.props?.children).map(text).join(' ');
 }
 function fixture(page, options = {}) {
-  const f = { actor: options.actor ?? (page === 'reset-password' ? 'a' : ''), clears: 0, writes: 0, navigations: [], documentNavigations: [], history: [], calls: [], tracking: [], reads: 0, disposed: false };
+  const f = { actor: options.actor ?? (page === 'reset-password' ? 'a' : ''), clears: 0, writes: 0, navigations: [], documentNavigations: [], history: [], calls: [], tracking: [], focusRequests: [], reads: 0, disposed: false };
   const states = [], effects = [], listeners = new Set(), timers = new Map();
   let cursor = 0, effectCursor = 0, dirty = true, tree, now = 0, timerId = 0;
   const setTimer = (callback, delay) => { const id = ++timerId; timers.set(id, { at: now + delay, callback }); return id; };
@@ -84,21 +86,38 @@ function fixture(page, options = {}) {
       createBrowserSupabaseClient: () => { if (options.constructError) throw Error('PRIVATE_CONFIG'); return { auth }; },
       clearQrGuitarSessionState: () => f.clears++, readSessionStorage: () => null, removeSessionStorage() {}, sessionExpiredMessageKey: 'expiry',
     },
-    '../../lib/content-registry': { getContentValue: (_content, key) => key }, '../../lib/use-site-content': { useSiteContent: () => ({}) },
+    '../../lib/content-registry': { getContentValue: (_content, key) => key }, '../../lib/use-site-content': { useSiteContent: () => options.content || {} },
     '../../lib/auth-redirect': authRedirect,
+    '../../lib/workspace-tools': workspaceTools,
     '../../lib/checkout-navigation': checkoutNavigation,
     '../../lib/optional-tracking-consent': {
       optionalTrackingProductEvents: { registrationCompleted: 'account_registration_completed' },
       dispatchOptionalTrackingProductEvent: async event => { f.tracking.push(event); return true; },
     },
   };
-  const Component = compile('app/' + page + '/page.tsx', imports, globals).default;
+  const Component = compile('app/' + page + '/page.tsx', imports, globals, withUiTextTestContext(require, options.content || {})).default;
+  // Commit only the registration callback refs. Record requested focus, not native keyboard focus.
+  function commitRegistrationRefs(node, hidden = false, disabled = false) {
+    if (!node || typeof node !== 'object') return;
+    const props = node.props || {}, hiddenHere = hidden || Boolean(props.hidden);
+    const disabledHere = disabled || (node.type === 'fieldset' && Boolean(props.disabled));
+    if (node.type === 'input' && (props.id === 'name' || props.name === 'workspace-role') && typeof props.ref === 'function') {
+      const target = props.id === 'name' ? 'name' : props.value;
+      props.ref({ focus() {
+        assert.equal(hiddenHere, false, target + ' requested focus while hidden');
+        assert.equal(disabledHere || Boolean(props.disabled), false, target + ' requested focus while disabled');
+        f.focusRequests.push(target);
+      } });
+    }
+    for (const child of React.Children.toArray(props.children)) commitRegistrationRefs(child, hiddenHere, disabledHere);
+  }
   f.render = () => {
     assert.equal(f.disposed, false); dirty = true; let remaining = 30;
     while (dirty) {
       assert.ok(remaining--, 'render loop'); dirty = false; cursor = effectCursor = 0; tree = Component();
       for (const effect of effects) if (effect.pending) { effect.pending = false; effect.cleanup?.(); effect.cleanup = effect.run(); }
     }
+    commitRegistrationRefs(tree);
     return tree;
   };
   f.flush = async () => { await tick(); return f.render(); };
@@ -107,6 +126,21 @@ function fixture(page, options = {}) {
   f.node = predicate => find(f.render(), predicate);
   f.button = label => f.node(node => node.type === 'button' && text(node).trim() === label);
   f.input = (id, value) => { const node = f.node(node => node.type === 'input' && node.props.id === id); assert.ok(node, id + ' input'); node.props.onChange({ target: { value } }); f.render(); };
+  f.selectRole = value => {
+    const group = f.node(node => node.props?.id === 'registration-role-choices');
+    assert.ok(group, 'registration role group'); assert.equal(group.props.hidden, false); assert.equal(group.props.disabled, false);
+    const node = f.node(node => node.type === 'input' && node.props.name === 'workspace-role' && node.props.value === value);
+    assert.ok(node, value + ' role choice'); node.props.onChange(); f.render();
+  };
+  f.stageButton = target => f.node(node => node.type === 'button' && node.props['aria-controls'] === target);
+  f.continueRegistration = () => {
+    const button = f.stageButton('registration-details'); assert.ok(button, 'explicit registration Continue');
+    assert.equal(button.props.type, 'button'); assert.equal(button.props.disabled, false); button.props.onClick(); f.render();
+  };
+  f.changeRegistration = () => {
+    const button = f.stageButton('registration-role-choices'); assert.ok(button, 'explicit Change workspace');
+    assert.equal(button.props.type, 'button'); assert.equal(button.props.disabled, false); button.props.onClick(); f.render();
+  };
   f.fill = () => { if (page === 'login') f.input('email', 'owner@example.test'); f.input('password', 'new-password-123'); if (page === 'reset-password') f.input('confirmPassword', 'new-password-123'); };
   f.submit = () => {
     const form = f.node(node => node.type === 'form'); assert.ok(form); form.props.onSubmit({ preventDefault() {} });
@@ -268,7 +302,7 @@ test('login: sign-in followed by failed session verification shows an honest rec
   await f.flush(); f.fill(); f.submit(); await f.flush(); assert.match(f.text(), /Welcome back/); assert.match(f.text(), /request could not be confirmed/); assert.equal(f.navigations.length, 0); assert.equal(f.busy(), false); f.dispose();
 });
 test('login: registration without a session honestly asks for email confirmation', async () => {
-  const f = fixture('login', { search: '?mode=register&next=%2Fcreate' }); await f.flush(); f.input('name', 'Synthetic owner'); f.fill(); f.submit(); await f.flush();
+  const f = fixture('login', { search: '?mode=register&next=%2Fcreate' }); await f.flush(); f.selectRole('player'); f.continueRegistration(); f.input('name', 'Synthetic owner'); f.fill(); f.submit(); await f.flush();
   assert.match(f.text(), /Check your email to confirm/); assert.equal(f.navigations.length, 0); assert.equal(f.calls[0].values[0].options.emailRedirectTo, 'https://www.qrguitar.com/create');
   assert.deepEqual(f.tracking, [{ name: 'account_registration_completed', properties: { confirmation: 'email_pending' } }]); f.dispose();
 });
@@ -288,13 +322,13 @@ test('login: registration with a confirmed session records the session-ready out
     fixtureState.event('a');
     return { data: { session: session('a'), user: { id: 'a', identities: [{ id: 'email-a' }] } }, error: null };
   } });
-  await f.flush(); f.input('name', 'Synthetic owner'); f.fill(); f.submit(); await f.flush();
+  await f.flush(); f.selectRole('player'); f.continueRegistration(); f.input('name', 'Synthetic owner'); f.fill(); f.submit(); await f.flush();
   assert.deepEqual(f.tracking, [{ name: 'account_registration_completed', properties: { confirmation: 'session_ready' } }]);
   assert.deepEqual(f.navigations, ['/create']); f.dispose();
 });
 test('login: existing-email obfuscation never records a new registration', async () => {
   const f = fixture('login', { search: '?mode=register&next=%2Fcreate', signUp: async () => ({ data: { session: null, user: { id: 'opaque-user', identities: [] } }, error: null }) });
-  await f.flush(); f.input('name', 'Synthetic owner'); f.fill(); f.submit(); await f.flush();
+  await f.flush(); f.selectRole('player'); f.continueRegistration(); f.input('name', 'Synthetic owner'); f.fill(); f.submit(); await f.flush();
   assert.match(f.text(), /Check your email to confirm/); assert.deepEqual(f.tracking, []); assert.equal(f.navigations.length, 0); f.dispose();
 });
 test('login: reset email uses the intended return path and does not navigate', async () => {
@@ -409,4 +443,138 @@ test('reset: native form submission reuses the guarded update and preserves the 
   let prevented = false; form.props.onSubmit({ preventDefault() { prevented = true; } }); await f.flush();
   assert.equal(prevented, true); assert.equal(f.count('updateUser'), 1);
   await f.advance(900); assert.deepEqual(f.navigations, ['/account?section=security']); f.dispose();
+});
+
+// Role-first signup: actual page callbacks and SDK arguments, no account or network mutations.
+test('signup: a self-service account requires an explicit workspace choice before SDK mutation', async () => {
+  const f = fixture('login', { search: '?mode=register' }); await f.flush(); f.input('name', 'New owner'); f.fill(); f.submit(); await f.flush(); assert.equal(f.count('signUp'),0); assert.match(f.text(), /Choose your workspace/); f.dispose();
+});
+for (const role of ['player','collector','shop','builder','luthier','other']) test('signup: exact selected workspace metadata is submitted for '+role, async () => {
+  const f = fixture('login', { search: '?mode=register&next=%2Fcreate' }); await f.flush(); f.selectRole(role); f.continueRegistration(); f.input('name','  New owner  '); f.fill(); f.submit(); await f.flush(); assert.equal(f.count('signUp'),1); assert.deepEqual(f.calls[0].values[0].options.data,{display_name:'New owner',qrguitar_workspace_type:role}); assert.equal(f.calls[0].values[0].options.emailRedirectTo,'https://www.qrguitar.com/create'); assert.match(f.text(),/Check your email/); f.dispose();
+});
+test('signup: choosing a business changes the single name field without losing its typed value', async () => {
+  const f=fixture('login',{search:'?mode=register'});await f.flush();f.selectRole('shop');f.continueRegistration();f.input('name','My guitars');assert.match(f.text(),/Business name/);assert.match(f.text(),/Add your logo and support preferences later/);const name=f.node(n=>n.type==='input'&&n.props.id==='name');assert.equal(name.props.value,'My guitars');assert.equal(name.props.autoComplete,'organization');assert.equal(name.props.maxLength,80);f.changeRegistration();f.selectRole('collector');f.continueRegistration();assert.equal(f.node(n=>n.type==='input'&&n.props.id==='name').props.value,'My guitars');assert.doesNotMatch(f.text(),/Add your logo/);f.dispose();
+});
+test('signup: a pending registration locks workspace choices and duplicate submit', async()=>{
+  const gate=deferred(),f=fixture('login',{search:'?mode=register',signUp:()=>gate.promise});await f.flush();f.selectRole('builder');f.continueRegistration();f.input('name','Maker');f.fill();f.submit();await f.flush();assert.equal(f.node(n=>n.type==='fieldset').props.disabled,true);f.submit();await f.flush();assert.equal(f.count('signUp'),1);gate.resolve({data:{session:null,user:{id:'new',identities:[{id:'new-email'}]}},error:null});await f.flush();assert.equal(f.busy(),false);f.dispose();
+});
+test('signup: an account transition clears its preceding role choice',async()=>{
+  const f=fixture('login',{search:'?mode=register'});await f.flush();f.selectRole('collector');f.emit('another');f.emit('');assert.equal(f.node(n=>n.type==='input'&&n.props.value==='collector').props.checked,false);f.dispose();
+});
+for(const invalid of ['A','  ','🎸']) test('signup: too short normalized name cannot submit '+JSON.stringify(invalid),async()=>{
+  const f=fixture('login',{search:'?mode=register'});await f.flush();f.selectRole('collector');f.continueRegistration();f.input('name',invalid);f.fill();f.submit();await f.flush();assert.equal(f.count('signUp'),0);assert.match(f.text(),/required|between 2 and 80/);f.dispose();
+});
+test('signup: an overlong business name cannot submit',async()=>{
+  const f=fixture('login',{search:'?mode=register'});await f.flush();f.selectRole('shop');f.continueRegistration();f.input('name','x'.repeat(81));f.fill();f.submit();await f.flush();assert.equal(f.count('signUp'),0);assert.match(f.text(),/between 2 and 80/);f.dispose();
+});
+test('signup: invited buyer keeps its simple original registration payload and exact destination',async()=>{
+  const destination='/transfer/invite-id?code=1#accept',f=fixture('login',{search:'?mode=register&next='+encodeURIComponent(destination),signUp:async state=>{state.event('a');return {data:{session:session('a'),user:{id:'a',identities:[{id:'email-a'}]}},error:null};}});await f.flush();assert.equal(f.node(n=>n.type==='fieldset'),undefined);f.input('name','B');f.fill();f.submit();await f.flush();assert.equal(f.count('signUp'),1);assert.deepEqual(f.calls[0].values[0].options.data,{display_name:'B'});assert.deepEqual(f.navigations,[destination]);f.dispose();
+});
+test('signup: sign-in and reset modes show no registration roles',async()=>{
+  const f=fixture('login');await f.flush();assert.equal(f.node(n=>n.type==='fieldset'),undefined);f.click('Create account');assert.ok(f.node(n=>n.type==='fieldset'));f.click('Sign in');assert.equal(f.node(n=>n.type==='fieldset'),undefined);f.dispose();
+});
+
+// Explicit progression uses the actual component/controller, real copy resolver and existing SDK fixture.
+function registrationValues(f) {
+  return Object.fromEntries(['name', 'email', 'password'].map(id => [id, f.node(n => n.type === 'input' && n.props.id === id).props.value]));
+}
+function assertRegistrationStage(f, roleStep) {
+  const group = f.node(n => n.props?.id === 'registration-role-choices'), details = f.node(n => n.props?.id === 'registration-details');
+  assert.ok(group); assert.ok(details); assert.equal(group.props.hidden, !roleStep); assert.equal(group.props.disabled, !roleStep || f.busy()); assert.equal(details.props.hidden, roleStep);
+  for (const id of ['name', 'email', 'password']) assert.equal(f.node(n => n.type === 'input' && n.props.id === id).props.disabled, roleStep);
+  assert.equal(Boolean(f.stageButton('registration-details')), roleStep);
+  assert.equal(Boolean(f.stageButton('registration-role-choices')), !roleStep);
+}
+
+test('signup progression: initial roles stay unselected and radio changes never advance or request focus', async () => {
+  const f = fixture('login', { search: '?mode=register' }); await f.flush(); const reads = f.reads;
+  assertRegistrationStage(f, true); assert.equal(f.stageButton('registration-details').props.disabled, true);
+  for (const role of ['player', 'collector', 'shop', 'builder', 'luthier', 'other']) assert.equal(f.node(n => n.type === 'input' && n.props.value === role).props.checked, false);
+  for (const role of ['player', 'collector', 'shop', 'builder', 'luthier', 'other']) {
+    const radio = f.node(n => n.type === 'input' && n.props.value === role); assert.equal(radio.props.onKeyDown, undefined);
+    f.selectRole(role); assertRegistrationStage(f, true); assert.equal(f.node(n => n.type === 'input' && n.props.value === role).props.checked, true);
+    assert.deepEqual(f.focusRequests, []); assert.equal(f.calls.length, 0); assert.equal(f.reads, reads);
+  }
+  f.dispose();
+});
+
+test('signup progression: guarded Continue and stage-one form submission never create an account', async () => {
+  const f = fixture('login', { search: '?mode=register' }); await f.flush(); const reads = f.reads;
+  f.stageButton('registration-details').props.onClick(); f.render(); assertRegistrationStage(f, true);
+  f.submit(); await f.flush(); assertRegistrationStage(f, true); assert.match(f.text(), /Choose your workspace/); assert.equal(f.calls.length, 0);
+  f.selectRole('shop'); f.submit(); await f.flush(); assertRegistrationStage(f, false);
+  assert.equal(f.calls.length, 0); assert.equal(f.reads, reads); assert.deepEqual(registrationValues(f), { name: '', email: '', password: '' }); assert.deepEqual(f.focusRequests, ['name']);
+  f.dispose();
+});
+
+test('signup progression: Continue and Change consume their focus request once and never on radio updates', async () => {
+  const f = fixture('login', { search: '?mode=register' }); await f.flush(); f.selectRole('shop'); f.continueRegistration();
+  assert.deepEqual(f.focusRequests, ['name']); f.render(); await f.flush(); f.input('name', 'Retained name'); assert.deepEqual(f.focusRequests, ['name']);
+  f.changeRegistration(); assert.deepEqual(f.focusRequests, ['name', 'shop']); f.render(); await f.flush(); assert.deepEqual(f.focusRequests, ['name', 'shop']);
+  f.selectRole('builder'); assert.deepEqual(f.focusRequests, ['name', 'shop']); f.continueRegistration(); assert.deepEqual(f.focusRequests, ['name', 'shop', 'name']);
+  f.render(); await f.flush(); assert.deepEqual(f.focusRequests, ['name', 'shop', 'name']); assert.equal(f.calls.length, 0); f.dispose();
+});
+
+test('signup progression: repeated Change preserves all fields and submits only the final exact workspace', async () => {
+  const destination = '/create?from=signup#instrument', f = fixture('login', { search: '?mode=register&next=' + encodeURIComponent(destination) }); await f.flush();
+  f.selectRole('shop'); f.continueRegistration(); f.input('name', 'My guitar business'); f.input('email', 'studio@example.test'); f.input('password', 'retained-password-123');
+  const expected = { name: 'My guitar business', email: 'studio@example.test', password: 'retained-password-123' };
+  for (const role of ['builder', 'collector', 'luthier', 'other', 'player']) {
+    f.changeRegistration(); assertRegistrationStage(f, true); assert.deepEqual(registrationValues(f), expected);
+    f.selectRole(role); assert.deepEqual(registrationValues(f), expected); f.continueRegistration(); assertRegistrationStage(f, false); assert.deepEqual(registrationValues(f), expected); assert.equal(f.calls.length, 0);
+  }
+  f.submit(); await f.flush(); assert.equal(f.count('signUp'), 1);
+  assert.deepEqual(f.calls[0].values[0], { email: expected.email, password: expected.password, options: { data: { display_name: expected.name, qrguitar_workspace_type: 'player' }, emailRedirectTo: 'https://www.qrguitar.com' + destination } });
+  f.dispose();
+});
+
+test('signup progression: pending signup guards Change, stale Continue and duplicate submission without losing fields', async () => {
+  const gate = deferred(), f = fixture('login', { search: '?mode=register', signUp: () => gate.promise }); await f.flush(); f.selectRole('builder');
+  const staleContinue = f.stageButton('registration-details').props.onClick; f.continueRegistration(); f.input('name', 'Pending builder'); f.fill(); const expected = registrationValues(f);
+  f.submit(); await f.flush(); assert.equal(f.count('signUp'), 1); assert.equal(f.stageButton('registration-role-choices').props.disabled, true);
+  staleContinue(); f.stageButton('registration-role-choices').props.onClick(); f.submit(); await f.flush(); await f.advance(20000);
+  assertRegistrationStage(f, false); assert.deepEqual(registrationValues(f), expected); assert.deepEqual(f.focusRequests, ['name']); assert.equal(f.count('signUp'), 1); assert.equal(f.busy(), true);
+  gate.resolve({ data: { session: null, user: { id: 'new', identities: [{ id: 'new-email' }] } }, error: null }); await f.flush();
+  assert.equal(f.busy(), false); assert.deepEqual(registrationValues(f), expected); f.changeRegistration(); assertRegistrationStage(f, true); assert.deepEqual(registrationValues(f), expected); f.dispose();
+});
+
+test('signup progression: an actor transition resets the advanced stage, choices, fields and focus intent', async () => {
+  const f = fixture('login', { search: '?mode=register&next=%2Fcreate' }); await f.flush(); f.selectRole('collector'); f.continueRegistration(); f.input('name', 'Earlier actor'); f.fill();
+  f.emit('another'); f.emit(''); assertRegistrationStage(f, true); assert.deepEqual(registrationValues(f), { name: '', email: '', password: '' });
+  for (const role of ['player', 'collector', 'shop', 'builder', 'luthier', 'other']) assert.equal(f.node(n => n.type === 'input' && n.props.value === role).props.checked, false);
+  assert.equal(f.stageButton('registration-details').props.disabled, true); assert.deepEqual(f.focusRequests, ['name']); assert.equal(f.calls.length, 0); assert.deepEqual(f.navigations, []); f.dispose();
+});
+
+test('signup progression: real CMS overrides survive the role/details/Change transitions without leaking to another fixture', async () => {
+  const content = {
+    'ui.app.login.page.registrationRole': 'Published workspace heading', 'ui.app.login.page.registrationRoleHelp': 'Published workspace help',
+    'ui.app.login.page.registrationContinue': 'Published continue', 'ui.app.login.page.registrationChange': 'Published change',
+    'ui.app.login.page.businessName': 'Published business name', 'ui.app.login.page.businessDetailsLater': 'Published later details',
+    'ui.workspace.679ab74fd398': 'Published store choice', 'ui.workspace.15aa16da501a': 'Published store benefit'
+  };
+  const f = fixture('login', { search: '?mode=register', content }); await f.flush();
+  const group = f.node(n => n.props?.id === 'registration-role-choices'); assert.match(text(group), /Published workspace heading/); assert.match(text(group), /Published workspace help/);
+  assert.equal(text(f.stageButton('registration-details')), 'Published continue'); f.selectRole('shop'); f.continueRegistration();
+  const summary = f.node(n => n.props?.className === 'registrationSummary'); assert.ok(summary); assert.equal(text(find(summary, n => n.type === 'strong')), 'Published store choice'); assert.equal(text(find(summary, n => n.type === 'span')), 'Published store benefit');
+  assert.equal(text(f.node(n => n.type === 'label' && n.props.htmlFor === 'name')), 'Published business name'); assert.match(f.text(), /Published later details/); assert.equal(text(f.stageButton('registration-role-choices')), 'Published change');
+  f.changeRegistration(); assert.equal(text(f.stageButton('registration-details')), 'Published continue'); f.dispose();
+  const plain = fixture('login', { search: '?mode=register' }); await plain.flush(); assert.equal(text(plain.stageButton('registration-details')), 'Continue'); plain.dispose();
+});
+
+for (const [role, key] of [
+  ['player', 'ui.workspace.11c503369f69'], ['collector', 'ui.workspace.b5efa61cb710'], ['shop', 'ui.workspace.15aa16da501a'],
+  ['builder', 'ui.workspace.c110fe1e6af2'], ['luthier', 'ui.workspace.93363fe59878'], ['other', 'ui.workspace.23160d470c3a']
+]) test('signup progression: registered benefit override is retained in the role choice and summary for ' + role, async () => {
+  const benefit = 'Published benefit for ' + role, f = fixture('login', { search: '?mode=register', content: { [key]: benefit } }); await f.flush();
+  const choice = f.node(n => n.type === 'label' && find(n, child => child.type === 'input' && child.props.value === role)); assert.ok(choice); assert.equal(text(find(choice, n => n.type === 'small')), benefit);
+  f.selectRole(role); f.continueRegistration(); const summary = f.node(n => n.props?.className === 'registrationSummary'); assert.ok(summary); assert.equal(text(find(summary, n => n.type === 'span')), benefit); assert.equal(f.calls.length, 0); f.dispose();
+});
+
+test('signup progression: invited buyers keep enabled one-step credentials and the original metadata boundary', async () => {
+  const destination = '/transfer/invite-id?code=1#accept', f = fixture('login', { search: '?mode=register&next=' + encodeURIComponent(destination) }); await f.flush();
+  assert.equal(f.node(n => n.props?.id === 'registration-role-choices'), undefined); assert.equal(f.stageButton('registration-details'), undefined); assert.equal(f.stageButton('registration-role-choices'), undefined);
+  assert.equal(f.node(n => n.props?.id === 'registration-details').props.hidden, false);
+  for (const id of ['name', 'email', 'password']) assert.equal(f.node(n => n.type === 'input' && n.props.id === id).props.disabled, false);
+  const name = f.node(n => n.type === 'input' && n.props.id === 'name'); assert.equal(name.props.minLength, undefined); assert.equal(name.props.maxLength, undefined); assert.equal(name.props.autoComplete, 'nickname');
+  f.input('name', 'B'); f.fill(); f.submit(); await f.flush(); assert.equal(f.count('signUp'), 1); assert.deepEqual(f.calls[0].values[0].options.data, { display_name: 'B' }); assert.equal(f.calls[0].values[0].options.emailRedirectTo, 'https://www.qrguitar.com' + destination); assert.deepEqual(f.focusRequests, []); f.dispose();
 });
