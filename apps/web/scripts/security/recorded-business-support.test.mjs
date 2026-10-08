@@ -9,7 +9,7 @@ import { loadRoutes } from "./mock-routes.mjs";
 const args = process.argv.slice(2);
 const repo = path.resolve(args.includes("--repo") ? args[args.indexOf("--repo") + 1] : path.join(path.dirname(fileURLToPath(import.meta.url)), "../../../.."));
 const requireWeb = createRequire(path.join(repo, "apps/web/package.json"));
-const { PGlite } = requireWeb("@electric-sql/pglite");
+const { PGlite } = requireWeb("@electric-sql/pglite-pg17");
 const ts = requireWeb("typescript");
 const db = new PGlite();
 const buyer = "11111111-1111-4111-8111-111111111111";

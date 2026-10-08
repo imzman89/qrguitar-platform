@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import {createRequire} from "node:module";
 import {fileURLToPath} from "node:url";
 export async function qualifyServiceCorrections({repo,sql,read,only}){
- const require=createRequire(path.join(repo,"apps/web/package.json")),ts=require("typescript"),{PGlite}=require("@electric-sql/pglite");
+ const require=createRequire(path.join(repo,"apps/web/package.json")),ts=require("typescript"),{PGlite}=require("@electric-sql/pglite-pg17");
  const db=new PGlite(),results=[];let seq=100;const id=()=>"aaaaaaaa-aaaa-4aaa-8aaa-"+String(++seq).padStart(12,"0");
  const owner=id(),other=id();let provider=id();
  const cache=new Map();

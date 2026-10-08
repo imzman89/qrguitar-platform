@@ -19,7 +19,7 @@ const historicalChecks=[...manifest.checks],historicalFingerprints=structuredClo
 const sourcePath=path.resolve(option('--upload-sql')||path.join(output,'supabase/migrations/20260917210000_service_evidence_uploads.sql'));
 const upload=normalized(fs.readFileSync(sourcePath,'utf8'));
 assert.equal(digest(upload),'a24e44c5d96f50caf678eb3f7ff16f6e45ef9b27ae4551e7db3c0351549fe943','Reviewed upload SQL changed; review before changing the pinned input.');
-const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite');
+const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite-pg17');
 const {installRepositorySchema}=await import(pathToFileURL(path.join(repo,'apps/web/scripts/security/postgres-fixture.mjs')).href);
 const db=new PGlite(),savedFetch=globalThis.fetch;
 globalThis.fetch=async()=>{throw new Error('External network is forbidden in the readiness generator.');};

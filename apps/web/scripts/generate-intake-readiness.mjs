@@ -24,7 +24,7 @@ const originalChecks = [...manifest.checks];
 const intakePath = path.resolve(option('--intake-sql') || path.join(output, 'supabase/migrations/20260917200000_account_deletion_intake.sql'));
 const intake = normalized(fs.readFileSync(intakePath, 'utf8'));
 assert.equal(digest(intake), '10683aafd633ced3f72ceb72cb10536f4e0a95f4b59aed3e09d7d6987a49430b', 'Reviewed intake SQL changed; explicitly review before changing the fingerprint input.');
-const { PGlite } = createRequire(path.join(repo, 'package.json'))('@electric-sql/pglite');
+const { PGlite } = createRequire(path.join(repo, 'package.json'))('@electric-sql/pglite-pg17');
 const { installRepositorySchema } = await import(pathToFileURL(path.join(repo, 'apps/web/scripts/security/postgres-fixture.mjs')));
 const db = new PGlite(), savedFetch = globalThis.fetch;
 globalThis.fetch = async () => { throw new Error('External network is forbidden in the readiness generator.'); };

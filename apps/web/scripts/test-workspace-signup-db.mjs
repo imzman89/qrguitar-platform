@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { installRepositorySchema } from './security/postgres-fixture.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
-const require=createRequire(root+'/apps/web/package.json'),{PGlite}=require('@electric-sql/pglite');
+const require=createRequire(root+'/apps/web/package.json'),{PGlite}=require('@electric-sql/pglite-pg17');
 const migration=fs.readFileSync(root+'/supabase/migrations/20261007022000_workspace_signup.sql','utf8');
 const db=new PGlite();let passed=0,sequence=0,stage='repository fixture';
 async function test(name,run){stage=name;await run();passed++;console.log('PASS '+name);}

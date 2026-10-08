@@ -5,7 +5,7 @@ import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import {installRepositorySchema} from './postgres-fixture.mjs';
 const args=process.argv.slice(2),repo=path.resolve(args.includes('--repo')?args[args.indexOf('--repo')+1]:path.join(path.dirname(fileURLToPath(import.meta.url)),'../../../..'));
-const {PGlite}=createRequire(path.join(repo,'apps/web/package.json'))('@electric-sql/pglite');
+const {PGlite}=createRequire(path.join(repo,'apps/web/package.json'))('@electric-sql/pglite-pg17');
 const db=new PGlite(),owner='11111111-1111-4111-8111-111111111111',provider='22222222-2222-4222-8222-222222222222',other='33333333-3333-4333-8333-333333333333',guitar='44444444-4444-4444-8444-444444444444';
 let passed=0,number=0;
 const test=async(name,run)=>{await run();passed++;console.log('PASS '+name);};

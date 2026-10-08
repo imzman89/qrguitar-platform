@@ -8,7 +8,7 @@ import { randomUUID, createHash } from 'node:crypto';
 
 const here=path.dirname(fileURLToPath(import.meta.url)),repo=path.resolve(process.argv[2]||path.join(here,'../../../..')), sourceRoot=path.join(repo,'apps/web/lib/account-deletion'), sqlPath=path.join(repo,'supabase/migrations/20260917200000_account_deletion_intake.sql'), fulfillmentSqlPath=path.join(repo,'supabase/migrations/20260918170000_account_deletion_fulfillment.sql');
 assert.ok(fs.existsSync(path.join(repo,'supabase/schema.sql')),'Supply canonical repository path; no credentials are loaded.');
-const require=createRequire(path.join(repo,'apps/web/package.json')),ts=require('typescript'),{PGlite}=require('@electric-sql/pglite');
+const require=createRequire(path.join(repo,'apps/web/package.json')),ts=require('typescript'),{PGlite}=require('@electric-sql/pglite-pg17');
 const {installRepositorySchema}=await import(pathToFileURL(path.join(repo,'apps/web/scripts/security/postgres-fixture.mjs')));
 const cache=new Map();
 function load(name){if(cache.has(name))return cache.get(name);const source=fs.readFileSync(path.join(sourceRoot,name+'.ts'),'utf8'),output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,module={exports:{}};new Function('require','module','exports',output)(id=>id.startsWith('./')?load(id.slice(2)):require(id),module,module.exports);cache.set(name,module.exports);return module.exports;}

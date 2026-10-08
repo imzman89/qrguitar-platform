@@ -88,7 +88,8 @@ ok(
     && card.includes("collectible-card-gallery-controls"),
   "Public card carousel behavior missing"
 );
-const serialStyles = cardStyles.match(/\.collectible-card-serial small\s*,\s*\.collectible-card-serial strong\s*\{([^}]+)\}/)?.[1] || "";
+const serialStyles = cardStyles.match(/\.collectible-card-serial small\s*,\s*\.collectible-card-serial strong\s*\{([^}]+)\}/)?.[1]
+  || cardStyles.match(/\.collectible-card-serial\s+:is\(\s*small\s*,\s*strong\s*\)\s*\{([^}]+)\}/)?.[1] || "";
 ok(
   card.includes('import styles from "./CollectibleRecordCard.module.css"')
     && card.includes('className={styles["collectible-card-serial"]}')

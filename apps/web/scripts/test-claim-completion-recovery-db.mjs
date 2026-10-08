@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { PGlite } from '@electric-sql/pglite';
+import { PGlite } from '@electric-sql/pglite-pg17';
 import { installRepositorySchema } from './security/postgres-fixture.mjs';
 const root=path.resolve(import.meta.dirname,'../../..'), db=new PGlite();
 const owner=randomUUID(),claimant=randomUUID(),other=randomUUID(); let passed=0;

@@ -175,13 +175,13 @@ test("Transfer unmount aborts acceptance and ignores late completion", async () 
   d.resolve(ok({ transfer: { ...transfer, status: "accepted" } })); await tick(); await tick();
   assert.equal(h.afterUnmount(), 0); assert.equal(h.requests.find(r => r.method === "PATCH").signal.aborted, true); assert.equal(h.timers.size, 0);
 });
-test("Evidence renewal reads only evidence, replaces links, and preserves review draft/visibility", async () => {
+for (const shareDetails of [false, true]) test("Evidence renewal reads only evidence, replaces links, and preserves review draft/sharing choice " + shareDetails, async () => {
   let evidenceReads = 0;
   const submission = { id: "review-a", status: "submitted", title: "Fixture", requestedVisibility: "private", provider: {} };
   const h = await ready("service", { fetch: r => r.url.startsWith("/api/service-evidence") ? ok({ evidence: [{ id: "file-a", fileName: "receipt.pdf", type: "invoice", fileSizeBytes: 123, previewUrl: "https://fixture.invalid/signed-" + ++evidenceReads }] }) : r.method === "PATCH" ? ok({}) : ok({ submission }) });
-  draft(h, "Keep this owner note"); h.elements().find(n => n.type === "select").props.onChange({ target: { value: "public" } });
+  draft(h, "Keep this owner note"); const sharing = () => h.elements().find(n => n.type === "input" && n.props.type === "checkbox"); assert.equal(sharing().props.checked, false); sharing().props.onChange({ target: { checked: shareDetails } });
   const before = h.requests.length; h.button("Refresh evidence links").props.onClick(); await h.settle();
   assert.equal(h.requests.length, before + 1); assert.match(h.requests.at(-1).url, /^\/api\/service-evidence/); assert.equal(h.requests.at(-1).method, "GET");
-  assert.deepEqual(drafts(h), ["Keep this owner note"]); assert.equal(h.elements().find(n => n.type === "select").props.value, "public");
+  assert.deepEqual(drafts(h), ["Keep this owner note"]); assert.equal(sharing().props.checked, shareDetails);
   assert.ok(h.elements().find(n => n.type === "a" && n.props.href === "https://fixture.invalid/signed-2")); assert.equal(h.decisions().length, 0); h.unmount();
 });

@@ -28,7 +28,11 @@ const boundary = compile("lib/email-template-boundary.ts");
 const contentRegistry = compile("lib/content-registry.ts", {
   "./ui-text-registry": compile("lib/ui-text-registry.ts", {
     "./catalog-policy-ui-text": compile("lib/catalog-policy-ui-text.ts"),
-    "./owner-dashboard-policy-ui-text": compile("lib/owner-dashboard-policy-ui-text.ts")
+    "./owner-dashboard-policy-ui-text": compile("lib/owner-dashboard-policy-ui-text.ts"),
+    "./local-preview-ux-ui-text": compile("lib/local-preview-ux-ui-text.ts"),
+    "./service-review-privacy-ui-text": compile("lib/service-review-privacy-ui-text.ts"),
+    "./recorded-business-support-ui-text": compile("lib/recorded-business-support-ui-text.ts"),
+    "./free-profile-ui-text": compile("lib/free-profile-ui-text.ts")
   }),
   "./ui-text-protection": compile("lib/ui-text-protection.ts")
 });

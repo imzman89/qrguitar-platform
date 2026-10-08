@@ -1,6 +1,8 @@
 // Audited presentation strings whose wording communicates a product guarantee,
 // payment/consent boundary, trust status, or the fixed brand identity.
 export const protectedUiTextKeys = new Set<string>([
+  "ui.lib.account.deletion.admin.ui.AdminIntakeQueue.completedNotice",
+  "ui.lib.account.deletion.admin.ui.AdminIntakeQueue.9b8b72af38ec",
   "ui.app.handout.code.page.ownerCopyDescription",
   "ui.app.handout.code.page.ownerCopyNotice",
   "ui.app.handout.code.PrintDocument.serviceEvidenceNotice",

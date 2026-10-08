@@ -117,7 +117,7 @@ test("Edit pending write and returning actor cannot overwrite or silently unlock
   f.actor("actor-a");await f.flush();assert.equal(f.button("Add Media").props.disabled,true);assert.ok(f.button("Check saved result"));assert.equal(writeCount(f),1);
 });
 for(const stage of ["trust","safety"]) test("Edit confirmed details followed by "+stage+" failure has an honest partial receipt",async t=>{
-  const f=edit(t,{fetch:r=>r.method==="PATCH"&&((stage==="trust"&&r.body?.verificationOnly)||(stage==="safety"&&r.url==="/api/safety-status"))?Promise.reject(Error("lost stage")):undefined});await f.flush();const observedUpdatedAt=f.record.updatedAt;f.change("summary","Retained new draft");
+  const f=edit(t,{fetch:r=>r.method==="PATCH"&&((stage==="trust"&&r.body?.verificationOnly)||(stage==="safety"&&r.url==="/api/safety-status"))?Promise.reject(Error("lost stage")):undefined});await f.flush();const observedUpdatedAt=f.record.updatedAt;f.change("summary","Retained new draft");if(stage==="safety")f.change("safetyNote","Retained changed safety note");
   f.click("Save Changes");await f.flush();assert.match(f.text(),stage==="trust"?/Profile details were saved.*Trust settings were not confirmed; safety was not sent/:/Profile details and trust settings were saved.*Safety status was not confirmed/);
   const details=f.requests.find(r=>r.url==="/api/instruments"&&r.method==="PATCH"&&!r.body?.verificationOnly);assert.ok(details);
   assert.equal(details.body.expectedUpdatedAt,observedUpdatedAt);assert.deepEqual(details.body.expectedDocuments,[]);
@@ -275,7 +275,7 @@ for(const kind of ["media","history","details","safety"]) test("Edit same-actor 
   await f.flush();
   if(kind==="media"){f.change("externalMediaUrl","https://fixture.invalid/demo");f.change("externalMediaTitle","A media");f.click("Add Media");}
   else if(kind==="history"){f.change("serviceTitle","A history");f.click("Add Timeline Entry");}
-  else f.click("Save Changes");
+  else {if(kind==="safety")f.change("safetyNote","Retained changed safety note");f.click("Save Changes");}
   await f.flush();const markerKind=kind==="safety"?"details":kind,key="qrguitar.editor.pending.actor-a.FIXTURE."+markerKind;assert.equal(f.storage.get(key),"FIXTURE");
   f.code("SECOND");await f.flush();assert.equal(f.button("Save Changes").props.disabled,false);assert.equal(f.button("Add Media").props.disabled,false);assert.equal(f.button("Add Timeline Entry").props.disabled,false);
   assert.equal(f.storage.get(key),"FIXTURE");assert.equal(f.all().some(n=>n.type==="button"&&words(n)==="Check saved result"),false);

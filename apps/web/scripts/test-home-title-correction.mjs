@@ -21,7 +21,7 @@ function selectSourceMode(scriptDirectory, referenceDirectory, requested = '') {
 }
 const { mode: sourceMode, sourceRoot: proposal } = selectSourceMode(scriptRoot, repo, option('--mode'));
 const require = createRequire(path.join(repo, 'package.json')), ts = require('typescript');
-const { PGlite } = require('@electric-sql/pglite');
+const { PGlite } = require('@electric-sql/pglite-pg17');
 const { installRepositorySchema } = await import(pathToFileURL(path.join(repo, 'apps/web/scripts/security/postgres-fixture.mjs')));
 const fixtureBytes = fs.readFileSync(fixturePath);
 const fixture = JSON.parse(fixtureBytes.toString('utf8'));

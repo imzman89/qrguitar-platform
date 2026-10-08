@@ -9,7 +9,7 @@ const option = (name) => args[args.indexOf(name) + 1];
 const repo = path.resolve(args.includes("--repo") ? option("--repo") : path.join(path.dirname(fileURLToPath(import.meta.url)), "../../../.."));
 const proposal = args.includes("--proposal") ? path.resolve(option("--proposal")) : repo;
 const runtime = args.includes("--runtime") ? path.resolve(option("--runtime")) : repo;
-const { PGlite } = createRequire(path.join(runtime, "package.json"))("@electric-sql/pglite");
+const { PGlite } = createRequire(path.join(runtime, "package.json"))("@electric-sql/pglite-pg17");
 const db = new PGlite();
 const first = "11111111-1111-4111-8111-111111111111";
 const second = "22222222-2222-4222-8222-222222222222";

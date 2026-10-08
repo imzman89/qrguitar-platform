@@ -13,7 +13,7 @@ const normalize=s=>s.replaceAll('\r\n','\n'),sha=s=>createHash('sha256').update(
 const recovery=fs.readFileSync(source,'utf8'),readiness=fs.readFileSync(readinessPath,'utf8'),manifestText=readiness.match(/\$manifest\$([\s\S]*?)\$manifest\$/)[1],manifest=JSON.parse(manifestText);
 const helperPermissionsPath=path.join(overlay,'supabase/migrations/20260917220500_site_editor_helper_permissions.sql'),helperPermissions=fs.readFileSync(helperPermissionsPath,'utf8');
 assert.equal(manifest.releaseVersion,'2026-09-17.6');assert.equal(sha(recovery),manifest.serviceEvidenceRecoverySourceSha256);
-const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite');
+const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite-pg17');
 const {installRepositorySchema}=await import(pathToFileURL(path.join(repo,'apps/web/scripts/security/postgres-fixture.mjs')));
 const db=new PGlite(),savedFetch=globalThis.fetch;globalThis.fetch=async()=>{throw Error('External requests forbidden');};
 let passed=0;const ident=s=>'"'+s.replaceAll('"','""')+'"';

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {randomUUID,createHash} from 'node:crypto';
-import {PGlite} from '@electric-sql/pglite';
+import {PGlite} from '@electric-sql/pglite-pg17';
 import pg from 'pg';
 import {installRepositorySchema} from './security/postgres-fixture.mjs';
 import {buildWorkflowSchemaBundle,source,postconditions} from './prepare-workflow-email-schema.mjs';

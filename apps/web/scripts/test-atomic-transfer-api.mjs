@@ -19,21 +19,21 @@ const route=await import(pathToFileURL(entry).href);
 const buyer='10000000-0000-4000-8000-000000000002',owner='10000000-0000-4000-8000-000000000001',guitarId='20000000-0000-4000-8000-000000000001',id='30000000-0000-4000-8000-000000000001';
 let passed=0;async function test(name,fn){await fn();console.log('PASS '+name);passed++;}
 function snapshot(name,args,{replayed=false,wrongActor=false}={}){
- const status=name==='prepare_ownership_transfer'?'sent':name==='complete_ownership_transfer'?'accepted':args.p_action==='cancel'?'cancelled':'sent';
+ const status=name==='prepare_ownership_transfer_with_documents'?'sent':name==='complete_ownership_transfer_with_documents'?'accepted':args.p_action==='cancel'?'cancelled':'sent';
  return{ok:true,replayed,guitar:{id:guitarId,owner_id:status==='accepted'?buyer:owner,qr_code:'TRANS1',permanent_path:'/i/TRANS1',name:'Private Guitar',brand:'Fender',model:'Strat',visibility:'private'},
- transfer:{id,guitar_id:guitarId,from_owner_id:owner,to_email:'buyer@example.test',to_name:'Buyer',status,accepted_by:status==='accepted'?(wrongActor?owner:buyer):null,
+ transfer:{id,guitar_id:guitarId,from_owner_id:owner,to_email:name==='prepare_ownership_transfer_with_documents'?args.p_to_email:'buyer@example.test',to_name:'Buyer',status,accepted_by:status==='accepted'?(wrongActor?owner:buyer):null,
  accepted_at:status==='accepted'?'2026-09-01T12:00:00Z':null,created_at:'2026-09-01T11:00:00Z',fee_cents:0,purchaser_code_hash:args.p_buyer_code_hash||null,claim_token_hash:args.p_order_reference_hash||null}};
 }
 function backend(options={}){return{calls:{rpc:[],emails:[],from:0},from(){this.calls.from++;throw new Error('Route must not pre-read, upsert, reload, or write transfer rows');},async rpc(name,args){this.calls.rpc.push({name,args});if(options.throws)throw new Error('Lost database response');return{error:options.error||null,data:options.malformed?{}:snapshot(name,args,options)};}};}
 async function request(method,body,db=backend(),options={}){route.setBackend(db,options);return route[method]({url:'https://example.invalid/api/transfers',json:async()=>body});}
-const post={qrCode:'trans1',toEmail:'buyer@example.test',mode:'email'};
+const post={qrCode:'trans1',toEmail:'buyer@example.test',mode:'email',expectedUpdatedAt:'2026-09-01T11:00:00Z',expectedDocuments:[],selectedPrivateDocumentIds:[]};
 const accept={id,action:'accept'},redeem={action:'redeem_code',code:'ABCD-EFGH-JKLM',orderReference:' ORDER   12 '};
 await test('signed-out mutations fail before any RPC or email',async()=>{for(const method of ['POST','PATCH']){const db=backend(),r=await request(method,method==='POST'?post:accept,db,{signedOut:true});assert.equal(r.status,401);assert.equal(db.calls.rpc.length,0);assert.equal(db.calls.emails.length,0);}});
 await test('account read failure never resets profile plan or role',async()=>{const db=backend(),r=await request('PATCH',accept,db,{accountError:true});assert.equal(r.status,500);assert.equal(db.calls.rpc.length,0);assert.equal(db.calls.from,0);});
 await test('malformed requests fail before writes',async()=>{for(const [method,body]of[['POST',null],['POST',{qrCode:'x',toEmail:'a@b@c'}],['PATCH',null],['PATCH',{action:'redeem_code',code:'short'}]]){const db=backend(),r=await request(method,body,db);assert.equal(r.status,400);assert.equal(db.calls.rpc.length,0);}});
 await test('missing transaction RPC fails closed without direct-write fallback',async()=>{for(const method of ['POST','PATCH']){const db=backend({error:{code:'PGRST202'}}),r=await request(method,method==='POST'?post:accept,db);assert.equal(r.status,503);assert.equal(r.body.ok,false);assert.equal(db.calls.from,0);assert.equal(db.calls.emails.length,0);}});
 await test('unknown commit outcome is explicitly uncertain and preserves same-action retry',async()=>{for(const options of[{throws:true},{error:{code:'XX000'}},{malformed:true}]){const db=backend(options),r=await request('PATCH',accept,db);assert.equal(r.status,502);assert.equal(r.body.code,'transfer_unconfirmed');assert.equal(r.body.uncertain,true);assert.equal(r.body.retryable,true);}});
-await test('prepare calls only atomic owner-checked RPC and keeps the free fee contract',async()=>{const db=backend(),r=await request('POST',post,db);assert.equal(r.status,200);assert.equal(r.body.transfer.feeCents,0);assert.equal(db.calls.rpc[0].name,'prepare_ownership_transfer');assert.equal(db.calls.rpc[0].args.p_actor_id,buyer);assert.equal(db.calls.rpc[0].args.p_qr_code,'TRANS1');assert.equal(db.calls.from,0);});
+await test('prepare calls only atomic owner-checked RPC and keeps the free fee contract',async()=>{const db=backend(),r=await request('POST',post,db);assert.equal(r.status,200);assert.equal(r.body.transfer.feeCents,0);assert.equal(db.calls.rpc[0].name,'prepare_ownership_transfer_with_documents');assert.equal(db.calls.rpc[0].args.p_actor_id,buyer);assert.equal(db.calls.rpc[0].args.p_qr_code,'TRANS1');assert.equal(db.calls.from,0);});
 await test('buyer code and order reference are hashed before the service RPC',async()=>{const db=backend(),r=await request('POST',{...post,mode:'buyer_code',orderReference:'ORDER 12',expiresInDays:300},db);assert.equal(r.status,200);assert.match(r.body.buyerCode,/^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/);const args=db.calls.rpc[0].args;assert.match(args.p_buyer_code_hash,/^[a-f0-9]{64}$/);assert.match(args.p_order_reference_hash,/^[a-f0-9]{64}$/);assert.equal(args.p_expires_in_days,30);assert.equal(JSON.stringify(args).includes(r.body.buyerCode),false);});
 await test('committed preparation remains successful when the email call throws',async()=>{const db=backend(),r=await request('POST',{...post,mode:'buyer_code'},db,{emailThrows:true});assert.equal(r.status,200);assert.equal(r.body.ok,true);assert.equal(r.body.emailSent,false);assert.ok(r.body.buyerCode);assert.equal(db.calls.from,0);});
 await test('repeated matching email preparation preserves the old invitation without another OTP',async()=>{const db=backend({replayed:true}),r=await request('POST',post,db);assert.equal(r.status,200);assert.equal(r.body.replayed,true);assert.equal(r.body.transfer.id,id);assert.equal(db.calls.emails.length,0);assert.equal(r.body.emailSent,false);assert.match(r.body.message,/already ready/i);assert.match(r.body.message,/no new email/i);assert.doesNotMatch(r.body.message,/delivery could not be confirmed/i);});
@@ -50,3 +50,15 @@ await test('cancel replay uses the atomic snapshot and performs no post-commit a
 await test('stale owner resend fails before the email provider is called',async()=>{const db=backend({error:{code:'42501'}}),r=await request('PATCH',{id,action:'resend'},db);assert.equal(r.status,403);assert.equal(db.calls.emails.length,0);});
 await test('resend email exception becomes a handled delivery failure',async()=>{const db=backend(),r=await request('PATCH',{id,action:'resend'},db,{emailThrows:true});assert.equal(r.status,502);assert.equal(r.body.ok,false);assert.equal(db.calls.rpc[0].name,'manage_ownership_transfer');});
 console.log('Completed '+passed+' ownership API behavior tests; all emails were mocked.');
+
+await test('missing or malformed private-file selection is rejected before RPC or email',async()=>{
+ const variants=[];
+ for(const key of ['expectedUpdatedAt','expectedDocuments','selectedPrivateDocumentIds']) {const body={...post};delete body[key];variants.push(body);}
+ variants.push({...post,expectedUpdatedAt:'invalid-date'}, {...post,expectedDocuments:[{id:'bad-id',updatedAt:post.expectedUpdatedAt}]}, {...post,selectedPrivateDocumentIds:[id,id]});
+ for(const body of variants){const db=backend(),r=await request('POST',body,db);assert.equal(r.status,400);assert.equal(db.calls.rpc.length,0);assert.equal(db.calls.emails.length,0);}
+});
+await test('unchecked private files and exact reviewed Profile version reach the guarded wrapper',async()=>{
+ const db=backend(),r=await request('POST',{...post,mode:'buyer_code',toEmail:''},db);assert.equal(r.status,200);
+ assert.equal(db.calls.rpc[0].name,'prepare_ownership_transfer_with_documents');assert.equal(db.calls.rpc[0].args.p_expected_updated_at,post.expectedUpdatedAt);
+ assert.deepEqual(db.calls.rpc[0].args.p_expected_documents,[]);assert.deepEqual(db.calls.rpc[0].args.p_selected_private_ids,[]);assert.equal(db.calls.emails.length,0);
+});

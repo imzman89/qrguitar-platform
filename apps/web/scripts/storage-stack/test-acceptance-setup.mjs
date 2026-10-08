@@ -73,7 +73,7 @@ test('actual route and protocol load with synthetic environment and forbidden ne
   } finally { process.env = savedEnv; globalThis.fetch = savedFetch; }
 });
 test('fresh full repository schema needs exactly two operator-provisioned private buckets', async () => {
-  const { PGlite } = require('@electric-sql/pglite');
+  const { PGlite } = require('@electric-sql/pglite-pg17');
   const { installRepositorySchema } = await import(pathToFileURL(path.join(repo, 'apps/web/scripts/security/postgres-fixture.mjs')));
   const db = new PGlite(), savedFetch = globalThis.fetch;
   globalThis.fetch = async () => { throw Error('Network forbidden in synthetic readiness reproduction'); };
@@ -108,7 +108,7 @@ test('fresh full repository schema needs exactly two operator-provisioned privat
   } finally { globalThis.fetch = savedFetch; await db.close(); }
 });
 test('real Supabase default grants require the permanent editor-helper permission migration', async () => {
-  const { PGlite } = require('@electric-sql/pglite');
+  const { PGlite } = require('@electric-sql/pglite-pg17');
   const { installRepositorySchema } = await import(pathToFileURL(path.join(repo, 'apps/web/scripts/security/postgres-fixture.mjs')));
   const migrationName = '20260917220500_site_editor_helper_permissions.sql';
   const migrationPath = process.argv.find(arg => arg.startsWith('--permissions-sql='))?.slice(18) || path.join(repo, 'supabase/migrations', migrationName);

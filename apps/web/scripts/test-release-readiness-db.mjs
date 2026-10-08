@@ -3,7 +3,9 @@ const scripts=path.dirname(fileURLToPath(import.meta.url));
 const option=name=>{const i=process.argv.indexOf(name);return i<0?null:process.argv[i+1];};
 const repo=path.resolve(option('--repo')||path.resolve(scripts,'../../..')),overlay=option('--migration-root');
 const source=overlay?path.resolve(overlay):repo;
-const manifest=JSON.parse(fs.readFileSync(path.join(source,'apps/web/scripts/release-readiness-manifest.json'),'utf8'));
+const bridgeSql=fs.readFileSync(path.join(source,'supabase/migrations/20261004170000_release_readiness.sql'),'utf8');
+const bridgeEmbedded=bridgeSql.match(/\$manifest\$([\s\S]*?)\$manifest\$/);assert(bridgeEmbedded,'Exact historical bridge manifest required');
+const manifest=JSON.parse(bridgeEmbedded[1]);
 const migrationSha=relative=>createHash('sha256').update(fs.readFileSync(path.join(source,relative),'utf8').replaceAll('\r\n','\n')).digest('hex');
 assert.equal(manifest.paypalWebhookSourceSha256,migrationSha('supabase/migrations/20260918132000_paypal_webhook_inbox.sql'));
 assert.equal(manifest.paypalAdminReviewSourceSha256,migrationSha('supabase/migrations/20260918133000_paypal_admin_reviews.sql'));
@@ -33,15 +35,15 @@ assert.equal(manifest.memberMessageUploadReplaySourceSha256,migrationSha('supaba
 assert.equal(manifest.fingerprints.find(f=>f.signature==='public.complete_ownership_transfer(uuid,uuid,text,text,boolean,text)').source_hash,'ee851211fa2dcd5dc4038852e1b2d9e8e3cc6a6af6408c33476a1f021a593ed9');
 assert.deepEqual(manifest.catalogFunctionSignatures,["public.create_catalog_instrument_profile(uuid,text,text,jsonb,boolean,text,text)","public.save_catalog_instrument_profile(uuid,uuid,timestamp with time zone,jsonb)"]);
 assert.deepEqual(manifest.forbiddenCatalogFunctionNames,['_ensure_saved_instrument_collection']);
-const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite');
+const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite-pg17');
 const {installRepositorySchema}=await import(pathToFileURL(path.join(repo,'apps/web/scripts/security/postgres-fixture.mjs')));
-const db=new PGlite();await installRepositorySchema(db,repo,overlay?'20260917190000':undefined);
-if(overlay)for(const file of fs.readdirSync(path.join(source,'supabase/migrations')).filter(file=>file.endsWith('.sql')&&file>='20260917190000').sort())await db.exec(fs.readFileSync(path.join(source,'supabase/migrations',file),'utf8').replaceAll('\r\n','\n'));await db.exec("insert into storage.buckets(id,name,public)values('instrument-media','instrument-media',false),('instrument-documents','instrument-documents',false),('service-evidence','service-evidence',false) on conflict(id)do update set public=false;");
+const db=new PGlite();await installRepositorySchema(db,repo,overlay?'20260917190000':'20261005213000');
+if(overlay)for(const file of fs.readdirSync(path.join(source,'supabase/migrations')).filter(file=>file.endsWith('.sql')&&file>='20260917190000'&&file<'20261005213000').sort())await db.exec(fs.readFileSync(path.join(source,'supabase/migrations',file),'utf8').replaceAll('\r\n','\n'));await db.exec("insert into storage.buckets(id,name,public)values('instrument-media','instrument-media',false),('instrument-documents','instrument-documents',false),('service-evidence','service-evidence',false) on conflict(id)do update set public=false;");
 const ready=async()=> (await db.query('select public.qrguitar_release_readiness() result')).rows[0].result;
 let passed=0;async function test(name,fn){await db.exec('begin');try{await fn();console.log('PASS '+name);passed++;}finally{await db.exec('rollback');}}
 function assertShape(result){assert.deepEqual(Object.keys(result).sort(),['checks','ready','releaseVersion']);assert.equal(result.releaseVersion,'2026-10-04.1');assert.equal(typeof result.ready,'boolean');assert.deepEqual(result.checks.map(c=>c.name),manifest.checks);assert.equal(new Set(result.checks.map(c=>c.name)).size,manifest.checks.length);for(const check of result.checks){assert.deepEqual(Object.keys(check).sort(),['name','ok']);assert.equal(typeof check.ok,'boolean');}}
 async function expectFalse(name){const result=await ready();assertShape(result);assert.equal(result.ready,false);assert.equal(result.checks.find(c=>c.name===name)?.ok,false);}
-await test('complete schema returns exact version and all14 checks true',async()=>{const result=await ready();assertShape(result);assert.equal(result.ready,true,JSON.stringify(result));assert.equal(result.checks.length,14);assert.ok(result.checks.every(c=>c.ok));});
+await test('historical bridge schema returns exact version and all14 checks true',async()=>{const result=await ready();assertShape(result);assert.equal(result.ready,true,JSON.stringify(result));assert.equal(result.checks.length,14);assert.ok(result.checks.every(c=>c.ok));});
 await test('readiness pins the five-free database contract',async()=>{
  const owner='10000000-0000-4000-8000-000000000025';
  const status=(await db.query("select billing_account_status($1,'live') result",[owner])).rows[0].result;

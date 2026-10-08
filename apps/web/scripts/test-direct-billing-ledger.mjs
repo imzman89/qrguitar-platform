@@ -4,11 +4,11 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { PGlite } from '@electric-sql/pglite';
+import { PGlite } from '@electric-sql/pglite-pg17';
 import { installRepositorySchema } from './security/postgres-fixture.mjs';
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
 const db=new PGlite();
-await installRepositorySchema(db,repo);
+await installRepositorySchema(db,repo,'20261007010000'); // Historical paid-Profile contract; current full-schema unlimited free creation and unchanged ledgers are tested in beta-entitlement-transaction.test.mjs.
 const owner=randomUUID(),other=randomUUID(),admin=randomUUID();
 await db.query('insert into auth.users(id) values($1),($2),($3)',[owner,other,admin]);
 await db.query("insert into profiles(id,display_name,role) values($1,'Synthetic owner','owner'),($2,'Synthetic other','owner'),($3,'Synthetic admin','admin')",[owner,other,admin]);

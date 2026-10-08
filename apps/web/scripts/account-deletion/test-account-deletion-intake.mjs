@@ -9,7 +9,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(process.argv[2] || path.join(here, "../../../.."));
 assert.ok(fs.existsSync(path.join(repo, "supabase/schema.sql")), "Supply the canonical repository path; this script never reads database credentials.");
 const require = createRequire(path.join(repo, "apps/web/package.json"));
-const { PGlite } = require("@electric-sql/pglite");
+const { PGlite } = require("@electric-sql/pglite-pg17");
 const { installRepositorySchema } = await import(pathToFileURL(path.join(repo, "apps/web/scripts/security/postgres-fixture.mjs")));
 const sqlPath = path.join(repo, "supabase/migrations/20260917200000_account_deletion_intake.sql");
 const source = fs.readFileSync(sqlPath, "utf8");

@@ -13,7 +13,7 @@ const readinessPath=path.join(overlay,'supabase/migrations/20260917211000_releas
 const sha=value=>createHash('sha256').update(value).digest('hex'),normalized=value=>value.replaceAll('\r\n','\n');
 const upload=fs.readFileSync(uploadPath,'utf8'),readiness=fs.readFileSync(readinessPath,'utf8'),manifest=JSON.parse(readiness.match(/\$manifest\$([\s\S]*?)\$manifest\$/)[1]);
 assert.equal(manifest.releaseVersion,'2026-09-17.5');assert.equal(sha(normalized(upload)),manifest.serviceEvidenceSourceSha256);
-const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite');
+const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite-pg17');
 const {installRepositorySchema}=await import(pathToFileURL(path.join(repo,'apps/web/scripts/security/postgres-fixture.mjs')).href);
 const db=new PGlite(),savedFetch=globalThis.fetch;
 globalThis.fetch=async()=>{throw new Error('External network forbidden in readiness fault tests.');};

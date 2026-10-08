@@ -32,9 +32,9 @@ const retentionReviews = [
   { domain: "service", policyVersion: 1, contentFingerprint: serviceFingerprint, required: true, decisionCode: null, attested: false, attestedAt: null }
 ];
 const reviews = { profileReviews, retentionReviews, storageReviews: [] };
-const profileSectionCodes = ["guitar","redirects","specs","media","documents","externalMedia","serialAliases","timeline","transfers","claims","claimEvidence","claimEvents","serviceAccess","serviceSubmissions","serviceEvidence","serviceTokens","serviceActivity","serviceNotifications","serviceUploads","serviceUploadScopes","serviceDiscardReceipts","createReceipts","stagedUploads","siteContent"];
+const profileSectionCodes = ["guitar","redirects","specs","media","documents","documentSelections","externalMedia","serialAliases","timeline","transfers","claims","claimEvidence","claimEvents","serviceAccess","serviceSubmissions","serviceEvidence","serviceTokens","serviceActivity","serviceNotifications","serviceCorrections","serviceCorrectionDecisions","serviceUploads","serviceUploadScopes","serviceDiscardReceipts","createReceipts","stagedUploads","siteContent","ownerNameConsents"];
 const billingSectionCodes = ["customers","orders","receipts","grants","consumptions","holds","decisions","promotions","directOrders","directClaims","directPayments","providerReferences","paypalOrders","paypalBindings","webhookDeliveries","webhookPayloads","webhookOutcomes","webhookActions"];
-const serviceSectionCodes = ["submissions","evidence","uploads","discards","activity","timeline"];
+const serviceSectionCodes = ["submissions","evidence","uploads","discards","activity","timeline","corrections","correctionDecisions"];
 const sha256 = bytes => createHash("sha256").update(bytes).digest("hex");
 const reviewHashes = new WeakMap();
 const relocation = (overrides = {}) => { const { reviewByteSha256 = "9".repeat(64), ...values } = overrides,
@@ -506,6 +506,11 @@ await check("private Profile and retention inspections expose complete fingerpri
   assert.equal(profile.body.reviewSnapshot.profile.sections.length,profileSectionCodes.length);assert.equal(billing.body.reviewSnapshot.retention.sections.length,billingSectionCodes.length);
   assert.deepEqual(f.calls.rpc.map(call=>call.name),["inspect_account_deletion_review_page","read_account_deletion_fulfillment","inspect_account_deletion_review_page","read_account_deletion_fulfillment"]);
   assert.equal(f.calls.rpc[0].args.p_admin_id,ADMIN);assert.equal(f.calls.rpc[0].args.p_operation_id,profile.body.reviewSnapshot?f.calls.rpc[0].args.p_operation_id:null);assert.equal(f.calls.rpc[0].args.p_page_index,0);assert.equal(f.calls.rpc[0].args.p_kind,"profile");
+});
+
+await check("incomplete privacy section sets fail closed and complete service corrections remain reviewable", async () => {
+  for (const missing of ["documentSelections","serviceCorrections","serviceCorrectionDecisions","ownerNameConsents"]) { const snapshot=profileSnapshot(); snapshot.profile.sections=snapshot.profile.sections.filter(section=>section.code!==missing); const f=fixture({rpc:async name=>name==="inspect_account_deletion_review_page"?{data:snapshot,error:null}:{data:{ok:true,fulfillment:job("blocked",["profile_history_privacy_review_required"]),...reviews},error:null}}); const result=await inspect(await f.handlers.item(f.request("POST",{operationId:randomUUID(),action:"inspect_profile",guitarId:profileReviews[0].guitarId,expectedFingerprint:profileFingerprint,pageIndex:0}),REQUEST));assert.equal(result.status,503);assert.equal(Object.hasOwn(result.body,"reviewSnapshot"),false); }
+  const f=fixture();const service=await inspect(await f.handlers.item(f.request("POST",{operationId:randomUUID(),action:"inspect_retention",domain:"service",expectedFingerprint:serviceFingerprint,pageIndex:0}),REQUEST));assert.equal(service.status,200);assert.equal(service.body.reviewSnapshot.retention.domain,"service");for(const code of ["corrections","correctionDecisions"])assert.ok(service.body.reviewSnapshot.retention.sections.some(section=>section.code===code));
 });
 
 await check("Profile redaction sends exact normalized terms and requires a fresh fulfillment read", async()=>{

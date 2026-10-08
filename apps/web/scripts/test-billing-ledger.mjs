@@ -11,15 +11,15 @@ const repo=path.resolve(option('--repo')||path.resolve(here,'../../..'));
 const overlay=option('--migration-root');
 const migrationRoot=path.resolve(overlay||repo);
 const billingSql=fs.readFileSync(path.join(migrationRoot,'supabase/migrations/20260917190000_billing_credits.sql'),'utf8').replaceAll('\r\n','\n');
-const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite');
+const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite-pg17');
 process.on('uncaughtException',error=>{console.error({message:error.message,code:error.code,where:error.where,actual:error.actual,expected:error.expected});process.exit(1);});
 const {installRepositorySchema}=await import(pathToFileURL(path.join(repo,'apps/web/scripts/security/postgres-fixture.mjs')));
-const db=new PGlite();await installRepositorySchema(db,repo,overlay?'20260917190000':undefined);
+const db=new PGlite();await installRepositorySchema(db,repo,overlay?'20260917190000':'20261007010000'); // Historical paid-Profile billing contract before unlimited free Profiles; current full-schema creation is tested in beta-entitlement-transaction.test.mjs.
 // The common fixture scaffolds Storage minimally; real Storage also has this metadata column.
 await db.exec("alter table storage.objects add column if not exists metadata jsonb; alter table storage.objects alter column metadata set default '{}'::jsonb, alter column metadata set not null");
 if(overlay){
  await db.exec(billingSql);
- for(const name of fs.readdirSync(path.join(repo,'supabase/migrations')).filter(name=>name.endsWith('.sql')&&name>'20260917190000_billing_credits.sql').sort())await db.exec(fs.readFileSync(path.join(repo,'supabase/migrations',name),'utf8').replaceAll('\r\n','\n'));
+ for(const name of fs.readdirSync(path.join(repo,'supabase/migrations')).filter(name=>name.endsWith('.sql')&&name>'20260917190000_billing_credits.sql'&&name<'20261007010000').sort())await db.exec(fs.readFileSync(path.join(repo,'supabase/migrations',name),'utf8').replaceAll('\r\n','\n'));
 }
 const actor='10000000-0000-4000-8000-000000000001',other='20000000-0000-4000-8000-000000000002',admin='30000000-0000-4000-8000-000000000003';
 await db.query('insert into auth.users(id) values($1),($2),($3)',[actor,other,admin]);

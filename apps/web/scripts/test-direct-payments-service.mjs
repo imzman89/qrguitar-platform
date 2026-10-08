@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { installRepositorySchema } from './security/postgres-fixture.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url)), repo = path.resolve(here, '../../..');
-const require = createRequire(path.join(repo, 'package.json')), ts = require('typescript'), { PGlite } = require('@electric-sql/pglite');
+const require = createRequire(path.join(repo, 'package.json')), ts = require('typescript'), { PGlite } = require('@electric-sql/pglite-pg17');
 const modules = new Map();
 function load(name) {
   if (modules.has(name)) return modules.get(name);

@@ -5,7 +5,7 @@ import {createRequire} from 'node:module';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 let stage='install';
 process.on('uncaughtException',e=>{console.error(JSON.stringify({stage,message:e.message,code:e.code,position:e.position,where:e.where,internalPosition:e.internalPosition,actual:e.actual,expected:e.expected}));process.exit(1);});
-const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..'),req=createRequire(root+'/package.json'),{PGlite}=req('@electric-sql/pglite');
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..'),req=createRequire(root+'/package.json'),{PGlite}=req('@electric-sql/pglite-pg17');
 const {installRepositorySchema}=await import(pathToFileURL(root+'/apps/web/scripts/security/postgres-fixture.mjs'));
 const db=new PGlite(),migration=fs.readFileSync(root+'/supabase/migrations/20261007010000_free_instrument_profiles.sql','utf8'),readiness=fs.readFileSync(root+'/supabase/migrations/20261007011000_free_profiles_readiness.sql','utf8');
 let passed=0;

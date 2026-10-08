@@ -8,7 +8,7 @@ const here=path.dirname(fileURLToPath(import.meta.url));
 const option=(name,fallback)=>process.argv.includes(name)?process.argv[process.argv.indexOf(name)+1]:fallback;
 const repo=path.resolve(option('--repo',path.resolve(here,'../../..')));
 const migration=path.resolve(option('--migration',path.join(repo,'supabase/migrations/20260917210000_service_evidence_uploads.sql')));
-const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite');
+const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite-pg17');
 const {installRepositorySchema}=await import(pathToFileURL(path.join(repo,'apps/web/scripts/security/postgres-fixture.mjs')).href);
 const db=new PGlite();
 const uuid=n=>`10000000-0000-4000-8000-${String(n).padStart(12,'0')}`;

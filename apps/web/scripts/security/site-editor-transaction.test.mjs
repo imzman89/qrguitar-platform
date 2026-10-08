@@ -9,7 +9,7 @@ const inferredRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 const repo=path.resolve(args.includes('--repo')?option('--repo'):process.env.QRGUITAR_TEST_REPO||inferredRoot);
 const proposal=path.resolve(args.includes('--proposal')?option('--proposal'):inferredRoot);
 const require=createRequire(path.join(repo,'package.json'));
-const {PGlite}=require('@electric-sql/pglite');
+const {PGlite}=require('@electric-sql/pglite-pg17');
 const {installRepositorySchema}=await import(pathToFileURL(path.join(repo,'apps/web/scripts/security/postgres-fixture.mjs')));
 const db=new PGlite();
 const actor='11111111-1111-4111-8111-111111111111', other='22222222-2222-4222-8222-222222222222';

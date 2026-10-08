@@ -170,7 +170,7 @@ function renderBilling(state, query = "", choice = { actorId: "", offerKey: "" }
 }
 const ready = patch => ({ ...initialDirectPaymentsState(), phase: "ready", actorId: A, snapshot: snapshot(), ...patch });
 test("real payer UI puts free capacity first and collapses optional packs", () => {
-  const html = renderBilling(ready()); assert.match(html, /first 5 Profiles are free/); assert.match(html, /continue without buying a pack/); assert.match(html, /Create a Profile/); assert.match(html, /<details class="packDisclosure">/); assert.doesNotMatch(html, /Most popular|subscription plan|Stripe|Apple Pay/);
+  const html = renderBilling(ready()); assert.match(html, /Profiles are always free/); assert.match(html, /continue without buying a pack/); assert.match(html, /Create a Profile/); assert.match(html, /<details class="packDisclosure">/); assert.doesNotMatch(html, /Most popular|subscription plan|Stripe|Apple Pay/);
 });
 test("pack totals and unit prices are explicit with no unsupported popularity claim", () => {
   const html = renderBilling(ready({ snapshot: snapshot({ freeRemaining: 0, paidGranted: 0, paidConsumed: 0, paidRemaining: 0, paidAvailable: 0 }) }));

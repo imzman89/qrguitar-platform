@@ -94,6 +94,12 @@ Object.assign(manifest,{
 });
 const guard="  -- Current release families admit reviewed signatures, reject API-role owners and restrict execution roles.\n  for p in select oid,proowner,proname from pg_proc where pronamespace='public'::regnamespace\n    and proname in (select jsonb_array_elements_text(manifest->'currentFunctionNames')) loop\n    signature:='public.'||p.oid::regprocedure::text;\n    if not ((manifest->'currentFunctionSignatures') ? signature)\n      or (manifest->'forbiddenCatalogFunctionNames') ? p.proname\n      or pg_get_userbyid(p.proowner) in ('anon','authenticated','service_role')\n      or exists(select 1 from pg_proc f\n        cross join lateral aclexplode(coalesce(f.proacl,acldefault('f',f.proowner))) a\n        where f.oid=p.oid and a.privilege_type='EXECUTE' and a.grantee<>f.proowner\n          and (a.is_grantable or not ((manifest->'serviceFunctions') ? signature)\n            or coalesce(pg_get_userbyid(a.grantee),'')<>'service_role')) then\n      flags:=jsonb_set(flags,'{function_security}','false');\n    end if;\n  end loop;\n",anchor="  for signature in select jsonb_array_elements_text(manifest->'serviceFunctions') loop";assert.equal(previous.split(anchor).length,2);
 const sql=previous.replace(/\$manifest\$[\s\S]*?\$manifest\$/,()=>'$manifest$'+JSON.stringify(manifest)+'$manifest$').replace(anchor,()=>guard+anchor).replace("-- Release 2026-09-23.1: all prior contracts plus five free owned Profiles.","-- Release 2026-10-04.1: prior contracts, reviewed offer closing, privacy-preserving Catalog wrappers and upload replay.");
-const artifacts=new Map([[manifestPath,JSON.stringify(manifest,null,2)+'\n'],[currentSqlPath,sql]]);
+const artifacts=new Map([[currentSqlPath,sql]]);
 for(const [name,text]of artifacts)assert.equal(read(name),text,name+' differs from explicit reviewed composition');
-console.log('Current source contract composed/verified; full final DB readiness is the separate test-release-readiness-db gate.');
+const activeSql=read('supabase/migrations/20261008014600_deletion_review_replay_readiness.sql');
+assert.equal(sha(activeSql),'13d8ee43a1a486935dd9e2b0c33c68c3cebc267597e2ffb9bfdd232a9afd5c49','Active readiness SQL differs from reviewed final source');
+const activeEmbedded=activeSql.match(/\$manifest\$([\s\S]*?)\$manifest\$/);assert(activeEmbedded);
+const activeManifest=JSON.parse(activeEmbedded[1]);
+assert.deepEqual(JSON.parse(read(manifestPath)),activeManifest,'Active manifest differs from reviewed final SQL');
+assert.equal(activeManifest.releaseVersion,'2026-10-08.1');assert.equal(activeManifest.previousReleaseVersion,'2026-10-07.1');assert.deepEqual(activeManifest.checks,manifest.checks);
+console.log('Historical bridge composition and active final manifest verified against their exact reviewed SQL; current DB readiness requires its separate backend gate.');

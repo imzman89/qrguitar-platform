@@ -20,7 +20,7 @@ const match=previous.match(/\$manifest\$([\s\S]*?)\$manifest\$/);
 assert.ok(match,'Historical manifest missing');
 const manifest=JSON.parse(match[1]);
 assert.equal(manifest.releaseVersion,'2026-09-17.2');
-const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite');
+const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite-pg17');
 const {installRepositorySchema}=await import(pathToFileURL(path.join(repo,'apps/web/scripts/security/postgres-fixture.mjs')));
 const db=new PGlite();
 try {

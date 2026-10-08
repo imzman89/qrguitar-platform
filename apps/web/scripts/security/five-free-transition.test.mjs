@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {PGlite} from '@electric-sql/pglite';
+import {PGlite} from '@electric-sql/pglite-pg17';
 import {installRepositorySchema} from './postgres-fixture.mjs';
 
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../../..');

@@ -6,7 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { fixture, identity } from './test-service-evidence-upload.mjs';
 const overlay = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const repo = path.resolve(process.env.QRGUITAR_SOURCE_ROOT || overlay);
-const { PGlite } = createRequire(path.join(repo, 'package.json'))('@electric-sql/pglite');
+const { PGlite } = createRequire(path.join(repo, 'package.json'))('@electric-sql/pglite-pg17');
 const { installRepositorySchema } = await import(pathToFileURL(path.join(repo, 'apps/web/scripts/security/postgres-fixture.mjs')));
 const db = new PGlite();
 const provider = '11111111-1111-4111-8111-111111111111', owner = '22222222-2222-4222-8222-222222222222', stranger = '33333333-3333-4333-8333-333333333333';

@@ -10,7 +10,7 @@ const repo = path.resolve(path.join(here, "../../../.."));
 const option = name => { const index = process.argv.indexOf(name); return index < 0 ? null : process.argv[index + 1]; };
 const baselineRoot = path.resolve(option("--baseline-root") || process.env.QRGUITAR_READINESS_BASELINE_ROOT || repo);
 const require = createRequire(path.join(repo, "apps/web/package.json"));
-const { PGlite } = require("@electric-sql/pglite");
+const { PGlite } = require("@electric-sql/pglite-pg17");
 const { installRepositorySchema } = await import(pathToFileURL(path.join(repo, "apps/web/scripts/security/postgres-fixture.mjs")));
 const promoSource = fs.readFileSync(path.join(repo, "supabase/migrations/20260918172000_billing_promo_codes.sql"), "utf8");
 const compatibilitySource = fs.readFileSync(path.join(repo, "supabase/migrations/20260918172500_account_deletion_promo_compatibility.sql"), "utf8");

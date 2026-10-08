@@ -20,7 +20,7 @@ function compile(file, overrides = {}, sourceSuffix = "") {
   return module.exports;
 }
 const localDemo = { instrumentDisplayName: (record) => record.name || [record.brand, record.model].filter(Boolean).join(" "), getInstrumentVerificationStatus: (record) => record.verificationStatus || "unverified", getInstrumentCondition: (record) => record.instrumentCondition || "used" };
-const contract = compile("lib/instrument-profile-contract.ts");
+const contract = compile("lib/instrument-profile-contract.ts", { "./owner-name-consent": compile("lib/owner-name-consent.ts") });
 const badges = compile("components/ProfileStatusBadges.tsx", { "next/link": Link, "../lib/local-demo": localDemo });
 const identity = compile("components/ProfileIdentity.tsx");
 const uiText = compile("lib/ui-text.ts");

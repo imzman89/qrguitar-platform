@@ -8,7 +8,7 @@ const repo = path.resolve(process.cwd(), "../..");
 // This regression uses synthetic accounts and a fresh in-memory database. All
 // schema writes target the new in-memory PGlite instance below, never a URL.
 const require = createRequire(path.join(repo, "apps/web/package.json"));
-const { PGlite } = require("@electric-sql/pglite");
+const { PGlite } = require("@electric-sql/pglite-pg17");
 const { installRepositorySchema } = await import(pathToFileURL(path.join(repo, "apps/web/scripts/security/postgres-fixture.mjs")));
 const proposalPath = path.join(repo, 'supabase/migrations/20260930010000_member_message_upload_replay.sql');
 const rollbackPath = path.join(repo, 'apps/web/scripts/fixtures/member-message-upload-replay-rollback.sql');

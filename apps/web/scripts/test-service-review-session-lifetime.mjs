@@ -8,8 +8,8 @@ const deferred = () => { let resolve; const promise = new Promise(r => { resolve
 const response = submission => Response.json({ ok: true, submission });
 const serviceFetch = run => request => request.body?.action === "mark_read" ? Response.json({ ok: true }) : request.url.startsWith("/api/service-evidence") ? Response.json({ ok: true, evidence: [] }) : run(request);
 const note = h => h.elements().find(n => n.type === "textarea");
-const visibility = h => h.elements().find(n => n.type === "select");
-const writeDraft = h => { note(h).props.onChange({ target: { value: "Keep this private owner note." } }); visibility(h).props.onChange({ target: { value: "public" } }); };
+const visibility = h => h.elements().find(n => n.type === "input" && n.props.type === "checkbox");
+const writeDraft = h => { note(h).props.onChange({ target: { value: "Keep this private owner note." } }); visibility(h).props.onChange({ target: { checked: true } }); };
 const changedCopy = { "ui.app.service.review.id.page.5300b43afac1": "Refreshed owner review error." };
 
 test("service review: CMS refresh preserves note, visibility and the established request scope", async () => {
@@ -17,7 +17,7 @@ test("service review: CMS refresh preserves note, visibility and the established
   const count = h.requests.length;
   h.content(changedCopy); await h.settle();
   assert.equal(note(h).props.value, "Keep this private owner note.");
-  assert.equal(visibility(h).props.value, "public");
+  assert.equal(visibility(h).props.checked, true);
   assert.equal(h.requests.length, count, "wording refresh must not reload or repeat mark_read");
   h.unmount();
 });
@@ -93,7 +93,7 @@ test("service review: same-actor token refresh preserves a draft and its decisio
 test("service review: account replacement clears the previous owner's draft", async () => {
   const h = fixture(); await h.settle(); writeDraft(h);
   h.auth({ access_token: "synthetic-other-token", user: { id: "actor-b" } }); await h.settle();
-  assert.equal(note(h).props.value, ""); assert.equal(visibility(h).props.value, "private"); h.unmount();
+  assert.equal(note(h).props.value, ""); assert.equal(visibility(h).props.checked, false); h.unmount();
 });
 
 test("service review: route replacement still hides previous private data during slow startup", async () => {
@@ -143,12 +143,12 @@ for (const mode of ["A-B", "A-B-A", "sign-out"]) {
     const staleCheck = h.button("Check review status").props.onClick;
     const staleEvidence = h.button("Refresh evidence links").props.onClick;
     switchWithoutRender(h, mode); const count = h.requests.length;
-    staleNote({ target: { value: "STALE OWNER NOTE" } }); staleVisibility({ target: { value: "public" } });
+    staleNote({ target: { value: "STALE OWNER NOTE" } }); staleVisibility({ target: { checked: true } });
     staleCheck(); staleEvidence(); await h.settle();
     assert.equal(h.requests.slice(count).filter(r => r.url.startsWith("/api/service-evidence")).length, mode === "sign-out" ? 0 : 1, "only the new scope's initial evidence read is allowed");
     assert.equal(h.requests.slice(count).filter(r => r.url.startsWith("/api/service-submissions?id=")).length, mode === "sign-out" ? 0 : 1, "only the final account's initial read is allowed; the intermediate account's scheduled read is aborted");
     assert.doesNotMatch(h.text(), /STALE OWNER NOTE/);
-    if (mode !== "sign-out") { assert.equal(note(h).props.value, ""); assert.equal(visibility(h).props.value, "private"); }
+    if (mode !== "sign-out") { assert.equal(note(h).props.value, ""); assert.equal(visibility(h).props.checked, false); }
     h.unmount();
   });
 }

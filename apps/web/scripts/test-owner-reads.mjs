@@ -11,14 +11,14 @@ const ts=require('typescript');
 const proposal=fs.existsSync(path.join(scriptRoot,'regions/loadRecordsForUser.ts.txt'));
 const overlay=proposal ? createRequire(import.meta.url)(path.join(scriptRoot,'overlay.cjs')).buildOverlay(root,ts,scriptRoot) : new Map();
 const read=file=>overlay.get(file) ?? fs.readFileSync(path.join(root,file),'utf8');
-const compile=(source, bindings={}, file='fixture.ts')=>{
+const compile=(source, bindings={}, file='fixture.ts', modules={})=>{
   const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022},fileName:file}).outputText;
   const module={exports:{}};
-  new Function('require','module','exports',...Object.keys(bindings),compiled)(name=>{throw new Error(`Unexpected import ${name}`);},module,module.exports,...Object.values(bindings));
+  new Function('require','module','exports',...Object.keys(bindings),compiled)(name=>{if(Object.hasOwn(modules,name)) return modules[name]; throw new Error(`Unexpected import ${name}`);},module,module.exports,...Object.values(bindings));
   return module.exports;
 };
 const helpers=compile(read('apps/web/lib/owner-record-read.ts'));
-const contract=compile(read('apps/web/lib/instrument-profile-contract.ts'));
+const contract=compile(read('apps/web/lib/instrument-profile-contract.ts'),{},'instrument-profile-contract.ts',{'./owner-name-consent':compile(read('apps/web/lib/owner-name-consent.ts'))});
 const trust=compile(read('apps/web/lib/record-trust.ts'));
 const {cleanPublicCollection,publicCollectionOwnerKey}=compile(read('apps/web/lib/public-collections.ts'));
 const route=read('apps/web/app/api/instruments/route.ts');

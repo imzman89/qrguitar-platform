@@ -12,12 +12,12 @@ const repo = path.resolve(args.includes("--repo") ? args[args.indexOf("--repo") 
 const code = "QRG-FILETEST";
 const storagePath = "owner/guitar/private-bucket-file";
 const route = "apps/web/app/api/public-file/[code]/[kind]/[token]/route.ts";
-function fixture(guitar = {}, owner = {}, isPublic = true, mime = "image/png", file = new Blob(["synthetic bytes"], { type: mime })) {
+function fixture(guitar = {}, owner = {}, isPublic = true, mime = "image/png", file = new Blob(["synthetic bytes"], { type: mime }), document = {}) {
   const db = createMemoryDatabase({
     guitars: [{ id: "guitar", owner_id: "owner", qr_code: code, visibility: "public", hero_image_path: storagePath, admin_archived_at: null, owner_removed_at: null, ...guitar }],
     profiles: [{ id: "owner", account_status: "active", hide_public_content: false, ...owner }],
     guitar_media: [{ guitar_id: "guitar", storage_path: storagePath }],
-    guitar_documents: [{ guitar_id: "guitar", storage_path: storagePath, is_public: isPublic }]
+    guitar_documents: [{ guitar_id: "guitar", storage_path: storagePath, is_public: isPublic, retained_private: false, ...document }]
   });
   const downloads = [];
   db.storage = { from: (bucket) => ({ download: async (name) => { downloads.push({ bucket, name }); return { data: file, error: null }; } }) };
@@ -172,4 +172,10 @@ test("oversized variant input fails closed without buffering while original medi
   assert.equal(original.status, 200);
   assert.equal(streamsOpened, 1);
   assert.deepEqual(new Uint8Array(await original.arrayBuffer()), bytes);
+});
+
+test("a retained private document never becomes public even with a stale public flag", async () => {
+  const item = fixture({}, {}, true, "application/pdf", undefined, { retained_private: true });
+  assert.equal((await item.get("document")).status, 404);
+  assert.equal(item.downloads.length, 0);
 });

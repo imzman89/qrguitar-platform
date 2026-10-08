@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash, randomUUID } from "node:crypto";
-import { PGlite } from "@electric-sql/pglite";
+import { PGlite } from "@electric-sql/pglite-pg17";
 import { installRepositorySchema } from "./security/postgres-fixture.mjs";
 
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"../../.."),db=new PGlite();let passed=0;

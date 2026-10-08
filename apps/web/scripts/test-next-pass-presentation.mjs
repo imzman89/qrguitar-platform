@@ -43,9 +43,9 @@ function billing(name, state, props) {
   new Function("require", "exports", "module", ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText)(modules, module.exports, module);
   return renderToStaticMarkup(module.exports.TestContent(props));
 }
-test("Manual recovery renders its purpose and five-free policy without a pack CTA", () => {
+test("Manual recovery renders its purpose and permanent free Profiles policy without a pack CTA", () => {
   const html = billing("DirectBillingPage", { phase: "ready", actorId: "fixture", snapshot }, { existingOnly: true });
-  assert.match(html, /Check an earlier payment/); assert.match(html, /does not start a new payment/); assert.match(html, /Your first 5 Profiles are free/);
+  assert.match(html, /Check an earlier payment/); assert.match(html, /does not start a new payment/); assert.match(html, /Profiles are always free/);
   assert.doesNotMatch(html, /Start with 25|Choose 25|Continue with|Send payment/);
 });
 test("Non-recovery Direct page retains its independent existing heading", () => {

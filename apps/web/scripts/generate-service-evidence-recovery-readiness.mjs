@@ -18,7 +18,7 @@ const historical=structuredClone(manifest),source=path.resolve(option('--recover
 const recovery=normalize(fs.readFileSync(source,'utf8'));
 const helperPermissions=normalize(fs.readFileSync(path.join(output,'supabase/migrations/20260917220500_site_editor_helper_permissions.sql'),'utf8'));
 assert.equal(sha(recovery),'1c3a791f583fee5509a09b972568321e2796a1835d095ff6b61404beef660dae','Recovery SQL changed; review before repinning.');
-const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite');
+const {PGlite}=createRequire(path.join(repo,'package.json'))('@electric-sql/pglite-pg17');
 const {installRepositorySchema}=await import(pathToFileURL(path.join(repo,'apps/web/scripts/security/postgres-fixture.mjs')));
 const db=new PGlite(),savedFetch=globalThis.fetch;
 globalThis.fetch=async()=>{throw Error('No network permitted in readiness generation');};

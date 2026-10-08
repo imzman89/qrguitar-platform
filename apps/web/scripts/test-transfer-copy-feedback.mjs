@@ -226,7 +226,7 @@ for(const history of [
  const f=await ready('dashboard',{latestTransfer:{...history,status:'accepted'}}),tree=f.render(),nodes=all(tree),outerSummary=React.Children.toArray(tree.props.children).find(n=>n.type==='summary');
  assert.equal(all(outerSummary).some(n=>n.type==='strong'),false);assert.match(words(nodes.find(n=>n.type==='p'&&n.props.className==='field-note')),/Start a new handoff/);
  const past=nodes.find(n=>n.type==='details'&&n.props.className==='previous-handoff');assert.ok(past);assert.equal(past.props.open,undefined);assert.match(words(past),/Previous handoff \(completed\)/);assert.match(words(past),/Handoff completed/);
- if(history.toEmail)assert.ok(words(past).includes(history.toEmail));else assert.match(words(past),/Recipient not email-bound/);
+ if(history.toEmail)assert.ok(words(past).includes(history.toEmail));else assert.match(words(past),/No recipient email specified/);
  assert.equal(all(past).some(n=>n.type==='code'),false);assert.equal(all(past).some(n=>n.type==='button'),false);assert.equal(all(past).some(n=>n.type==='time'),Boolean(history.acceptedAt&&Number.isFinite(Date.parse(history.acceptedAt))));
  assert.equal(f.button('Send Transfer Email').props.disabled,false);assert.equal(f.requests.length,0);f.unmount();
 });

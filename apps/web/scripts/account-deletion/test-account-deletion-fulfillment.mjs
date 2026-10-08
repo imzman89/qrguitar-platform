@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(process.argv[2] || path.join(here, "../../../.."));
 const require = createRequire(path.join(repo, "apps/web/package.json"));
-const { PGlite } = require("@electric-sql/pglite");
+const { PGlite } = require("@electric-sql/pglite-pg17");
 const { installRepositorySchema } = await import(pathToFileURL(path.join(repo, "apps/web/scripts/security/postgres-fixture.mjs")));
 const source = fs.readFileSync(path.join(repo, "supabase/migrations/20260918170000_account_deletion_fulfillment.sql"), "utf8");
 const db = new PGlite();

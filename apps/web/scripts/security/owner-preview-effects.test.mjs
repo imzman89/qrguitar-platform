@@ -34,7 +34,10 @@ function helper(fetch) {
   return module.exports;
 }
 const contractModule = { exports: {} };
-vm.runInNewContext(compile(source("apps/web/lib/instrument-profile-contract.ts")), { module: contractModule, exports: contractModule.exports, URL });
+const ownerNameConsentModule = { exports: {} };
+vm.runInNewContext(compile(source("apps/web/lib/owner-name-consent.ts")), { module: ownerNameConsentModule, exports: ownerNameConsentModule.exports });
+vm.runInNewContext(compile(source("apps/web/lib/instrument-profile-contract.ts")), { module: contractModule, exports: contractModule.exports, URL,
+  require: name => { if (name === "./owner-name-consent") return ownerNameConsentModule.exports; throw new Error("Unexpected contract import " + name); } });
 const record = (tag, visibility = "private") => ({ qrCode: "QRG-TEST", visibility, serial: "PRIVATE-" + tag, ownerUserEmail: tag + "@example.test", name: tag });
 const session = (tag) => ({ access_token: tag, user: { id: tag, email: tag + "@example.test" } });
 function fixture({ preview = false, initialRecord = null, configError = false } = {}) {

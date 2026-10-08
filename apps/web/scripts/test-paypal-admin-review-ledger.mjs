@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { installRepositorySchema } from "./security/postgres-fixture.mjs";
 
-const here = path.dirname(fileURLToPath(import.meta.url)), repo = path.resolve(here, "../../.."), require = createRequire(path.join(repo, "package.json")), { PGlite } = require("@electric-sql/pglite");
+const here = path.dirname(fileURLToPath(import.meta.url)), repo = path.resolve(here, "../../.."), require = createRequire(path.join(repo, "package.json")), { PGlite } = require("@electric-sql/pglite-pg17");
 const db = new PGlite(); let passed = 0;
 async function check(name, run) { await run(); passed++; console.log("PASS " + name); }
 async function rpc(name, args, role = "service_role") {

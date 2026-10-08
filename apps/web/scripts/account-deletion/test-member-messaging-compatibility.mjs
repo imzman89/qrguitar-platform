@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { PGlite } from "@electric-sql/pglite";
+import { PGlite } from "@electric-sql/pglite-pg17";
 import { installRepositorySchema } from "../security/postgres-fixture.mjs";
 
 const repo = path.resolve(process.cwd(), "../..");

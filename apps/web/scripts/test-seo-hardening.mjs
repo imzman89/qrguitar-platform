@@ -32,7 +32,11 @@ const seo = loadTypeScript("lib/seo.ts", {
 const contentRegistry = loadTypeScript("lib/content-registry.ts", {
   "./ui-text-registry": loadTypeScript("lib/ui-text-registry.ts", {
     "./catalog-policy-ui-text": loadTypeScript("lib/catalog-policy-ui-text.ts"),
-    "./owner-dashboard-policy-ui-text": loadTypeScript("lib/owner-dashboard-policy-ui-text.ts")
+    "./owner-dashboard-policy-ui-text": loadTypeScript("lib/owner-dashboard-policy-ui-text.ts"),
+    "./local-preview-ux-ui-text": loadTypeScript("lib/local-preview-ux-ui-text.ts"),
+    "./service-review-privacy-ui-text": loadTypeScript("lib/service-review-privacy-ui-text.ts"),
+    "./recorded-business-support-ui-text": loadTypeScript("lib/recorded-business-support-ui-text.ts"),
+    "./free-profile-ui-text": loadTypeScript("lib/free-profile-ui-text.ts")
   }),
   "./ui-text-protection": loadTypeScript("lib/ui-text-protection.ts")
 });
@@ -305,9 +309,11 @@ test("installer snippets and Profile breadcrumbs describe the rendered experienc
   const breadcrumbs = fs.readFileSync(path.join(webRoot, "app/i/[code]/ProfileBreadcrumbs.tsx"), "utf8");
   const profile = fs.readFileSync(path.join(webRoot, "app/i/[code]/ProfileClient.tsx"), "utf8");
   assert.match(breadcrumbs, /<Link href="\/">\{ui\("[^"]+", "Home"\)\}<\/Link>/);
-  assert.match(breadcrumbs, /<Link href="\/catalog">\{ui\("[^"]+", "Catalog"\)\}<\/Link>/);
+  assert.match(breadcrumbs, /catalogHref = "\/catalog"/);
+  assert.match(breadcrumbs, /<Link href=\{catalogHref\}>\{ancestorLabel \|\| ui\("[^"]+", "Catalog"\)\}<\/Link>/);
   assert.match(breadcrumbs, /aria-current="page"/);
-  assert.match(profile, /<ProfileBreadcrumbs current=\{instrumentDisplayName\(instrument\)\} \/>/);
+  assert.match(profile, /const catalogReturnHref = safeProfileReturnPath\(searchParams\.get\("returnTo"\)\);/);
+  assert.match(profile, /<ProfileBreadcrumbs current=\{instrumentDisplayName\(instrument\)\} catalogHref=\{ownerPreview \? "\/dashboard" : catalogReturnHref \|\| "\/catalog"\}/);
 });
 
 test("collection structured data contains public discovery fields only and is script safe", () => {

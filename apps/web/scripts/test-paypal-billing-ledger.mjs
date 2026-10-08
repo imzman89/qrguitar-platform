@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
-import {PGlite} from '@electric-sql/pglite';
+import {PGlite} from '@electric-sql/pglite-pg17';
 import {installRepositorySchema} from './security/postgres-fixture.mjs';
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
 const db=new PGlite();await installRepositorySchema(db,repo);

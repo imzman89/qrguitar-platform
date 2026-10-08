@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import {createRequire} from "node:module";
 import {pathToFileURL} from "node:url";
 export async function qualifyProfileMetadata({repo,sql,read=relative=>fs.readFileSync(path.join(repo,relative),"utf8"),installSchema,only=()=>true,providedDb}) {
- const require=createRequire(path.join(repo,"apps/web/package.json")),ts=require("typescript"),{PGlite}=require("@electric-sql/pglite");
+ const require=createRequire(path.join(repo,"apps/web/package.json")),ts=require("typescript"),{PGlite}=require("@electric-sql/pglite-pg17");
  const db=providedDb||new PGlite(),results=[];
  const install=installSchema||(await import(pathToFileURL(path.join(repo,"apps/web/scripts/security/postgres-fixture.mjs")))).installRepositorySchema;
  const seller="10000000-0000-4000-8000-000000000001",owner="10000000-0000-4000-8000-000000000002",foreign="10000000-0000-4000-8000-000000000003";

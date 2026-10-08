@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
-import {PGlite} from "@electric-sql/pglite";
+import {PGlite} from "@electric-sql/pglite-pg17";
 export const appRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
 export const repoRoot=path.resolve(appRoot,"../..");
 export const readRepo=(relative)=>fs.readFileSync(path.join(repoRoot,relative),"utf8").replace(/^\uFEFF/,"");

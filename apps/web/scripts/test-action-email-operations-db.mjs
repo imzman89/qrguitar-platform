@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import ts from 'typescript';
-import {PGlite} from '@electric-sql/pglite';
+import {PGlite} from '@electric-sql/pglite-pg17';
 import {installRepositorySchema} from './security/postgres-fixture.mjs';
 const root=path.resolve(import.meta.dirname,'../../..'),db=new PGlite();
 const url='https://abcdefghijklmnopqrst.supabase.co',sha='a'.repeat(40);

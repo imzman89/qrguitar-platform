@@ -13,7 +13,7 @@ const repo = path.resolve(process.argv[2] || candidateRoot);
 assert.ok(fs.existsSync(path.join(repo, "supabase/schema.sql")), "Run from the repository scripts directory or supply the repository root");
 const canonicalSql = path.join(repo, "supabase/migrations/20260917190000_billing_credits.sql");
 const sqlPath = process.argv[3] || (fs.existsSync(canonicalSql) ? canonicalSql : path.resolve(here, "../billing-credit-integration/supabase/migrations/20260917190000_billing_credits.sql"));
-const require = createRequire(path.join(repo, "package.json")), ts = require("typescript"), { PGlite } = require("@electric-sql/pglite");
+const require = createRequire(path.join(repo, "package.json")), ts = require("typescript"), { PGlite } = require("@electric-sql/pglite-pg17");
 const webRequire = createRequire(path.join(repo, "apps/web/package.json")), Stripe = webRequire("stripe");
 const { installRepositorySchema } = await import(pathToFileURL(path.join(repo, "apps/web/scripts/security/postgres-fixture.mjs")));
 const savedFetch = globalThis.fetch;
@@ -23,8 +23,8 @@ await installRepositorySchema(db, repo, "20260917190000");
 await db.exec("alter table storage.objects add column if not exists metadata jsonb; alter table storage.objects alter column metadata set default '{}'::jsonb, alter column metadata set not null");
 await db.exec(fs.readFileSync(sqlPath, "utf8").replaceAll("\r\n", "\n"));
 // Keep the real payment-to-Profile fixture on the current allowance contract,
-// including later migrations when a historical billing candidate is overlaid.
-for (const name of fs.readdirSync(path.join(repo, "supabase/migrations")).filter(name => name.endsWith(".sql") && name > "20260917190000_billing_credits.sql").sort()) {
+// including successor migrations up to the former paid-Profile contract. Current full-schema unlimited free creation and unchanged credit ledgers are tested in beta-entitlement-transaction.test.mjs.
+for (const name of fs.readdirSync(path.join(repo, "supabase/migrations")).filter(name => name.endsWith(".sql") && name > "20260917190000_billing_credits.sql" && name < "20261007010000").sort()) {
   await db.exec(fs.readFileSync(path.join(repo, "supabase/migrations", name), "utf8").replaceAll("\r\n", "\n"));
 }
 // A separate, empty in-memory TEST database is configured before any actor/history.

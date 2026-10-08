@@ -10,6 +10,8 @@ export async function installRepositorySchema(db, repo, beforeMigration = "99999
     "create function auth.role() returns text language sql stable as $$ select nullif(current_setting('request.jwt.claim.role',true),'') $$;",
     "grant usage on schema public,auth to anon,authenticated,service_role;",
     "create schema storage; create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);",
+    // Existing Supabase instrument buckets precede repository migrations; their privacy is still checked by the real readiness guards.
+    "insert into storage.buckets(id,name,public)values('instrument-media','instrument-media',false),('instrument-documents','instrument-documents',false);",
     "create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text references storage.buckets(id),name text,owner uuid,owner_id text,metadata jsonb,user_metadata jsonb,version text,updated_at timestamptz not null default now());",
     "alter table storage.objects enable row level security;",
     "create function storage.foldername(name text) returns text[] language sql immutable as $$ select (string_to_array(name,'/'))[1:array_length(string_to_array(name,'/'),1)-1] $$;",

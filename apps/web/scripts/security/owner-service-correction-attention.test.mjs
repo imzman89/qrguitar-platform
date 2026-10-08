@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { installRepositorySchema } from "./postgres-fixture.mjs";
 
 export async function qualifyOwnerServiceCorrectionAttention({ repo, read, sql }) {
- const require = createRequire(path.join(repo,"apps/web/package.json")), ts = require("typescript"), { PGlite } = require("@electric-sql/pglite");
+ const require = createRequire(path.join(repo,"apps/web/package.json")), ts = require("typescript"), { PGlite } = require("@electric-sql/pglite-pg17");
  const results = [], db = new PGlite();
  const same = (a,b) => assert.deepEqual(JSON.parse(JSON.stringify(a)),JSON.parse(JSON.stringify(b)));
  const tick = () => new Promise(resolve => setImmediate(resolve));

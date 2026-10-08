@@ -26,7 +26,7 @@ const normalize = value => value.replaceAll('\r\n','\n');
 assert.equal(manifest.releaseVersion,'2026-09-17.4'); assert.equal(manifest.checks.length,14);
 assert.deepEqual([...manifest.intakeTables].sort(),['account_deletion_actor_revisions','account_deletion_request_receipts','account_deletion_requests']);
 assert.equal(sha(normalize(intakeSql)),manifest.intakeSourceSha256,'Readiness manifest must bind the exact reviewed intake SQL');
-const { PGlite } = createRequire(path.join(repo,'apps/web/package.json'))('@electric-sql/pglite');
+const { PGlite } = createRequire(path.join(repo,'apps/web/package.json'))('@electric-sql/pglite-pg17');
 const { installRepositorySchema } = await import(pathToFileURL(path.join(repo,'apps/web/scripts/security/postgres-fixture.mjs')));
 const canonicalSources = () => ['apps/web/scripts/security/postgres-fixture.mjs',
   ...['schema.sql','security-rls.sql','admin-panel-foundation.sql','record-archive-controls.sql','service-history-timeline.sql','lost-stolen-safety-status.sql'].map(file=>'supabase/'+file),

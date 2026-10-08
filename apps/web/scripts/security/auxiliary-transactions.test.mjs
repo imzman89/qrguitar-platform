@@ -8,7 +8,7 @@ const args = process.argv.slice(2), option = (name) => args[args.indexOf(name) +
 const repo = path.resolve(args.includes("--repo") ? option("--repo") : path.join(path.dirname(fileURLToPath(import.meta.url)), "../../../.."));
 const proposal = args.includes("--proposal") ? path.resolve(option("--proposal")) : repo;
 const runtime = args.includes("--runtime") ? path.resolve(option("--runtime")) : repo;
-const { PGlite } = createRequire(path.join(runtime, "package.json"))("@electric-sql/pglite");
+const { PGlite } = createRequire(path.join(runtime, "package.json"))("@electric-sql/pglite-pg17");
 const db = new PGlite();
 const owner = "11111111-1111-4111-8111-111111111111", provider = "22222222-2222-4222-8222-222222222222", stranger = "33333333-3333-4333-8333-333333333333", guitar = "44444444-4444-4444-8444-444444444444", submission = "55555555-5555-4555-8555-555555555555";
 const uploadValues = (name) => ({ file_name: name + ".pdf", mime_type: "application/pdf", evidence_type: "receipt", file_size_bytes: 5, storage_path: submission + "/" + provider + "/" + name + ".pdf" });

@@ -11,7 +11,7 @@ const hash = value => createHash("sha256").update(value).digest("hex");
 const uid = n => "10000000-0000-4000-8000-"+String(n).padStart(12,"0");
 export async function qualify({repo,sql,installSchema,only=()=>true,read=relative=>fs.readFileSync(path.join(repo,relative),"utf8"),log=console.log}) {
   const require=createRequire(path.join(repo,"package.json"));
-  const {PGlite}=require("@electric-sql/pglite"),ts=require("typescript");
+  const {PGlite}=require("@electric-sql/pglite-pg17"),ts=require("typescript");
   const installRepositorySchema=installSchema || (await import(pathToFileURL(path.join(repo,"apps/web/scripts/security/postgres-fixture.mjs")))).installRepositorySchema;
   const db=new PGlite(),oldFetch=globalThis.fetch,results=[];
   globalThis.fetch=async()=>{throw Error("No network permitted in document qualification");};

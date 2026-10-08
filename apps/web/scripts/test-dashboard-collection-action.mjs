@@ -51,9 +51,9 @@ function render(node, accountType, handle, content = {}) {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX }
   }).outputText;
   const jsx = (type, props) => ({ type, props });
-  return new Function("require", "exports", "Link", "Wrench", "FileSpreadsheet", "UsersRound", "styles", "collectionAccountType", "collectionHandle", "ui", "content", "getContentValue", code + "\nreturn element;")(
+  return new Function("require", "exports", "Link", "Wrench", "FileSpreadsheet", "UsersRound", "Printer", "styles", "collectionAccountType", "collectionHandle", "ui", "content", "getContentValue", code + "\nreturn element;")(
     name => { assert.equal(name, "react/jsx-runtime"); return { jsx, jsxs: jsx }; },
-    {}, "Link", "Wrench", "FileSpreadsheet", "UsersRound", { headerActions: "headerActions" }, accountType, handle,
+    {}, "Link", "Wrench", "FileSpreadsheet", "UsersRound", "Printer", { headerActions: "headerActions" }, accountType, handle,
     createUiText(content, "app.dashboard.page"), content, getContentValue
   );
 }
@@ -75,14 +75,16 @@ test("new collections use the same settings/create destinations without a public
 });
 test("service-provider workbench and own-instrument actions are preserved", () => {
   for (const handle of ["", "saved-collection"]) assert.deepEqual(links(render(headerActions, "luthier", handle)), [
-    { href: "/dashboard/service", label: "Open service workbench", className: "button" },
-    { href: "/create", label: "Add your own instrument", className: "button secondary" }
+    { href: "/dashboard/service/slips", label: "Service slips", className: "button" },
+    { href: "/create", label: "Add your own instrument", className: "button secondary" },
+    { href: "/dashboard/service", label: "Registered service work", className: "text-link" }
   ]);
 });
 test("shop and builder keep their separate import action", () => {
-  for (const type of ["shop", "builder"]) assert.deepEqual(links(render(headerActions, type, "")), [
+  for (const type of ["shop", "builder", "brand"]) assert.deepEqual(links(render(headerActions, type, "")), [
     { href: "/create", label: "Create Profile", className: "button" },
-    { href: "/dashboard/import", label: "Bulk Import", className: "button secondary" }
+    { href: "/dashboard/import", label: "Bulk Import", className: "button secondary" },
+    { href: "/print/qr", label: "QR labels", className: "button secondary" }
   ]);
 });
 test("collection tool status follows the actual chosen handle, not publication", () => {
@@ -102,7 +104,8 @@ test("actual registered CMS keys edit action/status text without changing destin
     "ui.app.dashboard.page.ownerDashboardPolicy.namedCollection": "Edited named",
     "ui.app.dashboard.page.ownerDashboardPolicy.collectionDetails": "Edited details",
     "ui.app.dashboard.page.2c8274b24de5": "Edited collection",
-    "ui.app.dashboard.page.61669a91a83b": "Edited service",
+    "ui.app.dashboard.page.serviceSlips": "Edited service slips",
+    "ui.app.dashboard.page.registeredServiceWork": "Edited registered service",
     "ui.app.dashboard.page.3880eee7e45c": "Edited own instrument"
   };
   for (const key of Object.keys(overrides)) {
@@ -116,9 +119,10 @@ test("actual registered CMS keys edit action/status text without changing destin
   }
   for (const [type, labels] of [
     ["player", ["Edited create", "Edited settings"]],
-    ["shop", ["Edited create", "Edited import"]],
-    ["builder", ["Edited create", "Edited import"]],
-    ["luthier", ["Edited service", "Edited own instrument"]]
+    ["shop", ["Edited create", "Edited import", "QR labels"]],
+    ["builder", ["Edited create", "Edited import", "QR labels"]],
+    ["brand", ["Edited create", "Edited import", "QR labels"]],
+    ["luthier", ["Edited service slips", "Edited own instrument", "Edited registered service"]]
   ]) {
     const before = links(render(headerActions, type, "saved-collection"));
     const after = links(render(headerActions, type, "saved-collection", overrides));
@@ -130,5 +134,12 @@ test("actual registered CMS keys edit action/status text without changing destin
     assert.equal(tool.props.href, "/account?section=collection");
     assert.equal(text(tool).trim(), "Edited collection " + status);
     assert.equal(tool.props.title, "Edited inquiry help");
+  }
+});
+
+test("business-only shortcuts remain absent from ordinary and unknown workspaces", () => {
+  for (const type of ["", "player", "collector", "other", "unknown"]) {
+    const destinations = links(render(headerActions, type, "")).map(link => link.href);
+    assert.deepEqual(destinations, ["/create", "/account?section=collection"]);
   }
 });

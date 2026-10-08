@@ -4,7 +4,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 const repo=path.resolve(process.env.QRGUITAR_REPO || process.argv[2] || path.join(path.dirname(fileURLToPath(import.meta.url)),'../../../..'));
-const {PGlite}=createRequire(path.join(repo,'apps/web/package.json'))('@electric-sql/pglite');
+const {PGlite}=createRequire(path.join(repo,'apps/web/package.json'))('@electric-sql/pglite-pg17');
 const {installRepositorySchema}=await import(pathToFileURL(path.join(repo,'apps/web/scripts/security/postgres-fixture.mjs')).href);
 process.on('uncaughtException',e=>{console.error({message:e.message,code:e.code,where:e.where});process.exit(1);});
 const db=new PGlite();
@@ -71,10 +71,10 @@ try{
    await mixed.exec('rollback');
   }finally{await mixed.close();}
  });
- await installRepositorySchema(db,repo);
+ await installRepositorySchema(db,repo,'20261007010000');
  await db.exec("alter table storage.objects add column if not exists metadata jsonb; insert into storage.buckets(id,name,public)values('instrument-media','instrument-media',false),('instrument-documents','instrument-documents',false)on conflict(id)do nothing;");
- // Exercise the current complete schema. Reapplying the historical beta-quota
- // migration here would bypass the reviewed billing wrapper and its ledger.
+ // Historical five-Profile quota assertions are bound to their actual pre-free-Profile schema.
+ // The complete current PostgreSQL 17 schema and unlimited free creation are qualified separately below.
  for(const plan of ['single','pack_10','pack_25','bulk_50'])await test(plan+' at beta limit cannot create and leaves every row pristine',async()=>{const f=await staged(await owner(plan)),before=await snapshot();await assert.rejects(create(f),e=>e.code==='QG001');assert.deepEqual(await snapshot(),before);});
  for(const plan of ['business','enterprise'])await test(plan+' retains approved commercial access and counters',async()=>{const id=await owner(plan),f=await staged(id),before=(await db.query('select to_jsonb(p)as p from profiles p where id=$1',[id])).rows[0].p;assert.equal((await create(f)).ok,true);assert.deepEqual((await db.query('select to_jsonb(p)as p from profiles p where id=$1',[id])).rows[0].p,before);});
  for(const plan of ['single','pack_25'])await test(plan+' retains explicit server launch exception',async()=>{assert.equal((await create(await staged(await owner(plan)),true)).ok,true);});
@@ -82,5 +82,29 @@ try{
  await test('account at the 5-Profile allowance retains every Profile and credit history when another create is declined',async()=>{const id=await owner('single',5),f=await staged(id),before=await snapshot();await assert.rejects(create(f),e=>e.code==='QG001');assert.deepEqual(await snapshot(),before);const status=(await db.query("select billing_account_status($1,'live') as result",[id])).rows[0].result;assert.equal(status.freeLimit,5);assert.equal(status.ownedProfiles,5);assert.equal(status.freeRemaining,0);assert.equal(status.paidConsumed,0);});
  await test('commercial and launch exceptions never override banned account',async()=>{const id=await owner('business'),f=await staged(id);await db.query("update profiles set account_status='banned' where id=$1",[id]);const before=await snapshot();await assert.rejects(create(f,true),e=>e.code==='42501');assert.deepEqual(await snapshot(),before);});
  await test('service can use registered wrapper; nobody can call unsafe backing routine',async()=>{const rows=(await db.query("select r,has_function_privilege(r,'public.create_instrument_profile(uuid,text,text,jsonb,boolean,text)','EXECUTE')as allowed,has_function_privilege(r,'public.create_instrument_profile_unregistered(uuid,text,text,jsonb,boolean,text)','EXECUTE')as unsafe from unnest(array['anon','authenticated','service_role'])r")).rows;assert.deepEqual(rows.map(r=>[r.r,r.allowed,r.unsafe]),[['anon',false,false],['authenticated',false,false],['service_role',true,false]]);});
+ await test('current complete schema permits basic Profiles beyond former limits without paid-credit consumption',async()=>{
+  const current=new PGlite();try{
+   await installRepositorySchema(current,repo);
+   const readiness=(await current.query('select qrguitar_release_readiness() result')).rows[0].result;
+   assert.equal(readiness.ready,true);assert.equal(readiness.releaseVersion,'2026-10-08.1');assert.equal(readiness.checks.length,14);assert(readiness.checks.every(c=>c.ok===true));
+   for(const [i,plan] of ['single','pack_10','business'].entries()){
+    const id='73000000-0000-4000-8000-'+String(i+1).padStart(12,'0');
+    await current.query('insert into auth.users(id)values($1)',[id]);await current.query('insert into profiles(id,plan,purchased_code_count,remaining_code_count)values($1,$2,73,5)',[id,plan]);
+    for(let j=0;j<26;j++)await current.query("insert into guitars(owner_id,qr_code,permanent_path,name,brand)values($1,$2,$3,'Existing','Fixture')",[id,'QRG-FREE-'+i+'-'+j,'/i/QRG-FREE-'+i+'-'+j]);
+    const upload='current-free-upload-'+i,key='current-free-request-'+i,photo=id+'/profile-uploads/'+upload+'/image-01-fixture.jpg';
+    await current.query("insert into storage.objects(bucket_id,name,metadata)values('instrument-media',$1,'{\"size\":10,\"mimetype\":\"image/jpeg\"}')",[photo]);
+    await current.query("select register_staged_instrument_upload($1,$2,'instrument-media',$3)",[id,upload,photo]);
+    const payload={guitar:{name:'Current free fixture',brand:'Fixture',model:'Model',serial_number:null,visibility:'private',hero_image_path:photo},media:[{storage_path:photo,alt:'Fixture',sort_order:0}],documents:[],specs:[],service:null,show_serial_public:false,owner_name:''};
+    const ledger=async()=>{const rows={};for(const t of ['billing_credit_grants','billing_credit_consumptions'])rows[t]=(await current.query('select to_jsonb(t) row from public.'+t+' t')).rows;return rows;};const beforeLedger=await ledger();
+    const call=async(body=payload)=>{await current.exec('set role service_role');try{return(await current.query('select create_instrument_profile($1,$2,$3,$4::jsonb,false,null)result',[id,key,upload,JSON.stringify(body)])).rows[0].result;}finally{await current.exec('reset role');}};
+    const result=await call();assert.equal(result.ok,true);assert.equal((await call()).qrCode,result.qrCode);
+    assert.equal((await current.query('select count(*)::int n from guitars where owner_id=$1',[id])).rows[0].n,27);
+    assert.deepEqual((await current.query('select purchased_code_count,remaining_code_count from profiles where id=$1',[id])).rows[0],{purchased_code_count:73,remaining_code_count:5});assert.deepEqual(await ledger(),beforeLedger);
+    await assert.rejects(()=>call({...payload,owner_name:'Changed retry'}),e=>e.code==='QG004');
+    await current.query("update profiles set account_status='banned' where id=$1",[id]);await assert.rejects(()=>call(),e=>e.code==='42501');
+    assert.equal((await current.query('select count(*)::int n from guitars where owner_id=$1',[id])).rows[0].n,27);assert.deepEqual(await ledger(),beforeLedger);
+   }
+  }finally{await current.close();}
+ });
  console.log('Completed '+passed+' beta entitlement PostgreSQL tests.');
 }finally{await db.close();}
