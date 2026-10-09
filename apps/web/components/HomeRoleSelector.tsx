@@ -93,7 +93,7 @@ function roleHref(block: EditorialBlock) {
     : href;
 }
 
-export function HomeRoleSelector({ blocks, content, label, fallbackAction, installerLabel, compact = false }: { blocks: EditorialBlock[]; content: Record<string, string>; label: string; fallbackAction: string; installerLabel: string; compact?: boolean }) {
+export function HomeRoleSelector({ blocks, content, label, fallbackAction, installerLabel }: { blocks: EditorialBlock[]; content: Record<string, string>; label: string; fallbackAction: string; installerLabel: string }) {
   const [selectedId, setSelectedId] = useState(groups[0].id);
   const visibleBlocks = blocks.filter(block => block.visible);
   const available = groups.filter(group => visibleBlocks.some(block => group.blocks.includes(block.id)));
@@ -107,13 +107,13 @@ export function HomeRoleSelector({ blocks, content, label, fallbackAction, insta
   const primary = selectedBlocks[0];
   const workflowHref = roleHref(primary);
   const directSetup = selected.id !== "collection" && ["/how-it-works#service-providers", "/how-it-works#who-it-is-for"].includes(primary.ctaUrl || "");
-  return <div className={`${styles.selector} ${compact ? styles.compact : ""}`}>
+  return <div className={styles.selector}>
     <div className={styles.tabs} role="tablist" aria-label={label} onKeyDown={event => {
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
       const next = event.key === "ArrowRight" ? (selectedIndex + 1) % available.length : event.key === "ArrowLeft" ? (selectedIndex - 1 + available.length) % available.length : event.key === "Home" ? 0 : event.key === "End" ? available.length - 1 : null;
       if (next !== null) { event.preventDefault(); setSelectedId(available[next].id); event.currentTarget.querySelectorAll<HTMLButtonElement>("[role=tab]")[next]?.focus(); }
     }}>
-      {available.map((group, index) => <button type="button" role="tab" key={group.id} id={`home-role-${group.id}`} aria-controls="home-role-panel" aria-label={text(group.label)} aria-selected={index === selectedIndex} tabIndex={index === selectedIndex ? 0 : -1} onClick={() => setSelectedId(group.id)}><span><strong>{text(group.label)}</strong>{!compact ? <small>{text(group.features[0].title)}</small> : null}</span><ArrowRight size={16} aria-hidden="true" /></button>)}
+      {available.map((group, index) => <button type="button" role="tab" key={group.id} id={`home-role-${group.id}`} aria-controls="home-role-panel" aria-label={text(group.label)} aria-selected={index === selectedIndex} tabIndex={index === selectedIndex ? 0 : -1} onClick={() => setSelectedId(group.id)}><span><strong>{text(group.label)}</strong><small>{text(group.features[0].title)}</small></span><ArrowRight size={16} aria-hidden="true" /></button>)}
     </div>
     <article className={styles.panel} role="tabpanel" id="home-role-panel" aria-labelledby={`home-role-${selected.id}`} tabIndex={0}>
       <div className={styles.statement}>
@@ -122,12 +122,11 @@ export function HomeRoleSelector({ blocks, content, label, fallbackAction, insta
           <Link className={styles.action} href={directSetup ? "/account?section=profile" : workflowHref}>{directSetup ? text(`home.roles.${selected.id}.startCta`) : primary.ctaLabel || fallbackAction}<ArrowRight size={18} aria-hidden="true" /></Link>
           {directSetup ? <Link className={styles.workflow} href={workflowHref}>{text("home.roles.workflowCta")}<ArrowRight size={16} aria-hidden="true" /></Link> : null}
         </div>
-        {!compact ? <p className={styles.access}>{getContentValue(content, "home.hero.accessNote")}</p> : null}
+        <p className={styles.access}>{getContentValue(content, "home.hero.accessNote")}</p>
       </div>
-      {!compact ? <ol className={styles.features}>
+      <details className={styles.details} key={selected.id}><summary>{text(selected.details)}<span aria-hidden="true">+</span></summary><ol className={styles.features}>
         {selected.features.map((feature, index) => <li key={feature.title}><span className={styles.number} aria-hidden="true">{String(index+1).padStart(2,"0")}</span><div><h4>{text(feature.title)}</h4><p>{text(feature.body)}</p></div></li>)}
-      </ol> : null}
-      <details className={styles.details} key={selected.id}><summary>{text(selected.details)}<span aria-hidden="true">+</span></summary><div className={styles.roleDetails}>{selectedBlocks.map(block => <div key={block.id}><h4>{block.title}</h4><p>{block.body}</p><Link href={roleHref(block)}>{block.ctaLabel || fallbackAction}<ArrowRight size={16} aria-hidden="true" /></Link></div>)}</div>{selected.id !== "collection" ? <Link className={styles.installer} href="/installers">{installerLabel}<ArrowRight size={16} aria-hidden="true" /></Link> : null}</details>
+      </ol><div className={styles.roleDetails}>{selectedBlocks.map(block => <div key={block.id}><h4>{block.title}</h4><p>{block.body}</p><Link href={roleHref(block)}>{block.ctaLabel || fallbackAction}<ArrowRight size={16} aria-hidden="true" /></Link></div>)}</div>{selected.id !== "collection" ? <Link className={styles.installer} href="/installers">{installerLabel}<ArrowRight size={16} aria-hidden="true" /></Link> : null}</details>
     </article>
     {otherRoles}
   </div>;

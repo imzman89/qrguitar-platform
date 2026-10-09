@@ -26,3 +26,6 @@
 .kicker { font-size:10px; letter-spacing:.11em; text-transform:uppercase; }
 .identity h3 { font-size:22px; font-weight:500; letter-spacing:-.01em; }
 @media(max-width:760px) { .showcase { padding:0; }.identity h3 { font-size:20px; } }
+/* Original photo proportions: the whole instrument remains visible. */
+.photoStage { height:470px; aspect-ratio:auto; }
+@media(max-width:760px) { .photoStage { height:320px; aspect-ratio:auto; } }

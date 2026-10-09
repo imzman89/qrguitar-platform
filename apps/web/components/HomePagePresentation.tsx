@@ -60,7 +60,7 @@ export function HomePagePresentation({ records, settings, pending = false, faile
           const gutter = parseFloat(getComputedStyle(rail).scrollPaddingInlineStart) || 0;
           if (bounds.left < view.left + gutter - 1 || bounds.right > view.right - gutter + 1) rail.scrollTo({left:rail.scrollLeft + bounds.left - view.left - gutter, behavior:"instant"});
         }}>
-          {profiles.map((record, index) => <div key={record.qrCode} data-home-featured="true"><HomeProfileShowcase record={record} prioritizeLeadImage={index === 0} /></div>)}
+          {profiles.map((record) => <div key={record.qrCode} data-home-featured="true"><HomeProfileShowcase record={record} /></div>)}
         </div>
         {failed ? <div className={styles.galleryStatus} role="status">{ui("ui.components.LatestPublicRecord.unavailable", "The Profile example is temporarily unavailable.")}{" "}<button type="button" onClick={onRetry}>{ui("ui.components.LatestPublicRecord.retry", "Retry")}</button></div> : pending && !profiles.length ? <p className={styles.galleryStatus} role="status" aria-busy="true">{ui("ui.components.LatestPublicRecord.feef6ffa93b4", "Loading latest QRguitar Profile")}</p> : !profiles.length ? <p className={styles.galleryStatus}>{ui("ui.components.LatestPublicRecord.bf94b5d71589", "No public Profiles yet.")}</p> : null}
         <div className={styles.benefits}>
@@ -68,7 +68,7 @@ export function HomePagePresentation({ records, settings, pending = false, faile
         </div>
       </div>
     </section>),
-    roles: roleBlocks.length ? <section className={styles.start} id="audiences"><div className="shell"><h2>{text("home.roles.headline")}</h2><HomeRoleSelector compact blocks={roleBlocks} content={settings.content} label={ui("ui.components.HomePageClient.5545daa79d3d", "Choose how you use QRguitar")} fallbackAction={ui("ui.components.HomePageClient.cd7d731ce76a", "See the workflow")} installerLabel={ui("ui.components.HomePageClient.installerProgram", "Explore the Installer program")} /></div></section> : null,
+    roles: roleBlocks.length ? <section className={styles.start} id="audiences"><div className="shell"><h2>{text("home.roles.headline")}</h2><HomeRoleSelector blocks={roleBlocks} content={settings.content} label={ui("ui.components.HomePageClient.5545daa79d3d", "Choose how you use QRguitar")} fallbackAction={ui("ui.components.HomePageClient.cd7d731ce76a", "See the workflow")} installerLabel={ui("ui.components.HomePageClient.installerProgram", "Explore the Installer program")} /></div></section> : null,
     pricing: ( <section className={styles.services} id="pricing"><div className="shell"><div><h2>{text("home.pricing.creditsTitle")}</h2><p>{text("home.pricing.creditsBody")}</p></div><Link className={styles.secondary} href="/billing">{text("home.pricing.creditsCta")}<ArrowRight size={15} aria-hidden="true" /></Link></div></section>)
   };
   return <main className={`home-page ${styles.home}`} style={homeActionTextColors(settings.colors.gold)}>{sections.filter(section => section.visible && compactHomeSectionIds.has(section.id)).map(section => <div key={section.id}>{renderedSections[section.id]}</div>)}</main>;
