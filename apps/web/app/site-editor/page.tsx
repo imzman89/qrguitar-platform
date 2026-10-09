@@ -1,4 +1,5 @@
 "use client";
+import { compactHomeEditorSections, mergeCompactHomeEditorSections } from "../../lib/home-layout-contract";
 import { trapVisibleFocus } from "../../lib/modal-focus";
 import { useUiText } from "../../components/UiTextProvider";
 
@@ -920,13 +921,13 @@ function SiteEditorWorkspace() {
         <SiteCompositionEditor
           pageKey={compositionPageKey}
           focusError={compositionErrorTarget}
-          sections={settings.composition[compositionPageKey].sections}
+          sections={compositionPageKey === "home" ? compactHomeEditorSections(settings.composition.home.sections) : settings.composition[compositionPageKey].sections}
           errors={errors}
           onChange={(sections) => setSettings((current) => ({
             ...current,
             composition: {
               ...current.composition,
-              [compositionPageKey]: { sections }
+              [compositionPageKey]: { sections: compositionPageKey === "home" ? mergeCompactHomeEditorSections(current.composition.home.sections, sections) : sections }
             }
           }))}
         />

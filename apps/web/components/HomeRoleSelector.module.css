@@ -49,3 +49,15 @@
 .tabs button[aria-selected="true"] small { color:var(--text); }
 @media(min-width:761px) { .tabs button { min-height:92px; align-items:flex-start; } }
 @media(max-width:760px) { .tabs button small { display:none; } }
+
+/* Compact Home: one role introduction, with details available on request. */
+.compact .tabs { gap:28px; }
+.compact .tabs button { min-height:54px; padding:12px 0; font-size:15px; align-items:center; }
+.compact .panel { gap:18px; padding-top:24px; }
+.compact .statement { grid-template-columns:1fr 1.25fr; gap:12px 48px; }
+.compact .statement h3 { font-size:28px; max-width:24ch; grid-row:1 / span 2; }
+.compact .statement > p { font-size:14px; max-width:55ch; }
+.compact .action { margin-top:12px; min-height:44px; padding:8px 14px; font-size:13px; gap:14px; }
+.compact .workflow { margin-top:12px; }
+.compact .details summary { min-height:44px; font-size:13px; }
+@media(max-width:760px) { .compact .tabs { gap:12px; } .compact .tabs button { font-size:12px; min-height:62px; } .compact .statement { display:block; } .compact .statement h3 { font-size:25px; } .compact .statement > p { margin-top:10px; } .compact .panel { padding-top:20px; gap:16px; } }
