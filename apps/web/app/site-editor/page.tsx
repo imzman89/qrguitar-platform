@@ -1005,7 +1005,7 @@ function SiteEditorWorkspace() {
   const emailTemplatePrefix = emailTemplatePrefixFromKeys(activeSectionEntries.map((entry) => entry.key));
   const emailDeliveryBoundary = emailTemplateDeliveryBoundary(emailTemplatePrefix);
   const emailDeliveryLabel = emailDeliveryBoundary.kind === "application"
-    ? ui("ui.app.site.editor.page.emailApplicationDelivery", "Application delivery · Brevo")
+    ? ui("ui.app.site.editor.page.emailApplicationDelivery", "Application delivery · Zoho SMTP")
     : emailDeliveryBoundary.kind === "provider"
       ? ui("ui.app.site.editor.page.emailProviderDelivery", "Provider delivery · Supabase Auth")
       : ui("ui.app.site.editor.page.emailPreviewOnly", "Design preview · no production trigger");

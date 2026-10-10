@@ -188,6 +188,7 @@ test('editor headline autosave preserves explicitly saved typed defaults and unr
   expected.hero.headline = 'Browser CMS Review 20260920';
   const f = await editor(t, { payload: { published } });
   f.click('Content');
+  f.find(node => node.type === 'select' && node.props.id === 'cms-active-section').props.onChange({ target: { value: 'Hero' } }); f.render();
   f.find(node => node.type === 'input' && node.props.id === 'content-home-hero-headline').props.onChange({ target: { value: expected.hero.headline } });
   f.render(); f.runAutosave(); await f.flush();
   assert.equal(f.mutations.length, 1);
@@ -257,6 +258,7 @@ test('dirty edits still autosave using observed versions and preserving another 
     return { ...payload, draft: body.settings, draftVersion: 'd-saved', message: 'Draft saved.' };
   } });
   f.click('Content');
+  f.find(node => node.type === 'select' && node.props.id === 'cms-active-section').props.onChange({ target: { value: 'Hero' } }); f.render();
   const field = f.find(node => node.type === 'input' && node.props.id === 'content-home-hero-headline');
   field.props.onChange({ target: { value: 'An intentionally edited headline' } }); f.render();
   f.runAutosave(); await f.flush();
@@ -341,6 +343,7 @@ test('save recovery details remain outside the compact toolbar with usable actio
 
 test('editor content and arrangement navigation preserve draft text without mutations', async t => {
   const f = await editor(t); f.click('Content');
+  f.find(node => node.type === 'select' && node.props.id === 'cms-active-section').props.onChange({ target: { value: 'Hero' } }); f.render();
   const field = f.find(node => node.type === 'input' && node.props.id === 'content-home-hero-headline');
   field.props.onChange({ target: { value: 'My edited headline' } }); f.render();
   f.click('Section arrangement');
@@ -350,13 +353,14 @@ test('editor content and arrangement navigation preserve draft text without muta
   assert.equal(f.find(node => node.type === 'input' && node.props.id === 'content-home-hero-headline').props.value, 'My edited headline');
   assert.equal(f.mutations.length, 0);
   const nav = f.find(node => node.props?.['aria-label'] === 'Page content sections');
-  const other = nodes(nav).filter(node => node.type === 'button')[1];
+  const other = nodes(nav).find(node => node.type === 'button' && text(node).trim() !== 'Hero');
+  assert.ok(other, 'another registered section is available');
   other.props.onClick(); f.render();
   assert.equal(f.all().some(node => node.props?.id === 'content-home-hero-headline'), false);
   assert.equal(f.all().filter(node => String(node.props?.className || '').includes('cms-content-section is-open')).length, 1);
   const sectionPicker = f.find(node => node.type === 'select' && node.props.id === 'cms-active-section');
-  const firstSection = sectionPicker.props.children[0].props.value;
-  sectionPicker.props.onChange({ target: { value: firstSection } }); f.render();
+  const restoredSection = 'Hero';
+  sectionPicker.props.onChange({ target: { value: restoredSection } }); f.render();
   assert.equal(f.find(node => node.props?.id === 'content-home-hero-headline').props.value, 'My edited headline');
   f.click('Section arrangement'); f.click('Homepage'); f.click('Page content');
   assert.equal(f.mutations.length, 0);
@@ -364,6 +368,7 @@ test('editor content and arrangement navigation preserve draft text without muta
 
 test('publishing confirmation states the complete shared-draft scope', async t => {
   const f = await editor(t); f.click('Content');
+  f.find(node => node.type === 'select' && node.props.id === 'cms-active-section').props.onChange({ target: { value: 'Hero' } }); f.render();
   f.find(node => node.type === 'input' && node.props.id === 'content-home-hero-headline').props.onChange({ target: { value: 'Another edited headline' } }); f.render();
   f.click('Publish');
   assert.match(f.text(), /Publish all draft changes\?/);
@@ -464,6 +469,7 @@ test('whole-draft publish errors navigate to another page field without a publis
   let focused = 0;
   const f = await editor(t, { focusFields: { 'content-home-hero-headline': { focus() { focused++; }, scrollIntoView() {} } } });
   f.click('Content');
+  f.find(node => node.type === 'select' && node.props.id === 'cms-active-section').props.onChange({ target: { value: 'Hero' } }); f.render();
   f.find(node => node.props?.id === 'content-home-hero-headline').props.onChange({ target: { value: '' } }); f.render();
   f.click('Catalog'); f.click('Publish');
   const dialog = f.find(node => node.props?.role === 'dialog' && node.props['aria-labelledby'] === 'cms-confirm-title');

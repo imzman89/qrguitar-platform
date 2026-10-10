@@ -389,64 +389,46 @@ export const localPreviewRetiredUiTextEntries = [
     "section": "Page text",
     "source": "components/BulkProfileImport.tsx"
   },
-  {
-    "key": "ui.components.HomePageClient.bec4c56fb4cb",
+{
+    "key": "ui.components.HomePageClient.5545daa79d3d",
     "scope": "components.HomePageClient",
-    "text": "What stays with your instrument",
+    "text": "Choose how you use QRguitar",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Accessibility",
     "source": "components/HomePageClient.tsx"
   },
   {
-    "key": "ui.components.HomePageClient.ecbcf256c14d",
+    "key": "ui.components.HomePageClient.cd7d731ce76a",
     "scope": "components.HomePageClient",
-    "text": "Permanent Profile",
+    "text": "See the workflow",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
     "source": "components/HomePageClient.tsx"
   },
   {
-    "key": "ui.components.HomePageClient.bc615fcc90ab",
+    "key": "ui.components.HomePageClient.b655c5fb6426",
     "scope": "components.HomePageClient",
-    "text": "One permanent link.",
+    "text": "Service and ownership",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
     "source": "components/HomePageClient.tsx"
   },
   {
-    "key": "ui.components.HomePageClient.eb341bf13357",
+    "key": "ui.components.HomePageClient.9a4346833f50",
     "scope": "components.HomePageClient",
-    "text": "Documents",
+    "text": "Approved service and completed transfers keep the same Profile and QR link.",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
     "source": "components/HomePageClient.tsx"
   },
   {
-    "key": "ui.components.HomePageClient.a4c1dff0c2e1",
+    "key": "ui.components.HomePageClient.7bf7f24c48ad",
     "scope": "components.HomePageClient",
-    "text": "Choose which documents to share.",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
-    "key": "ui.components.HomePageClient.f5ab906e49d7",
-    "scope": "components.HomePageClient",
-    "text": "Service history",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
-    "key": "ui.components.HomePageClient.104c2472352a",
-    "scope": "components.HomePageClient",
-    "text": "Keep service records with the Profile.",
+    "text": "How it works",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",

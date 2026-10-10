@@ -31,6 +31,19 @@ test("every connected interface call has a unique registered key, matching defau
       const file = path.join(directory, entry.name);
       if (entry.isDirectory()) { walk(file); continue; }
       if (!file.endsWith(".tsx")) continue;
+      if (path.relative(root, file).replaceAll("\\", "/") === "components/HomePagePresentation.tsx") {
+        function assertUnused(directory) {
+          for (const candidate of fs.readdirSync(directory, { withFileTypes: true })) {
+            const candidatePath = path.join(directory, candidate.name);
+            if (candidate.isDirectory()) { assertUnused(candidatePath); continue; }
+            if (!/\.tsx?$/.test(candidate.name) || candidatePath === file) continue;
+            assert.doesNotMatch(fs.readFileSync(candidatePath, "utf8"), /\bHomePagePresentation\b/, "Retained compatibility module became connected: "+candidatePath);
+          }
+        }
+        for (const directory of ["app", "components", "lib"]) assertUnused(path.join(root, directory));
+        continue;
+      }
+
       const source = fs.readFileSync(file, "utf8"), ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
       const uiAliases = new Set(["ui"]);
       function findUiAliases(node) {

@@ -44,7 +44,10 @@ const emailEntries = new Map([
   ["email.service.submitted.cta", { area: "Emails", allowedVariables: [] }],
   ["email.service.submitted.footer", { area: "Emails", allowedVariables: [] }]
 ]);
+const relayCalls = [];
+let relayResult = { ok: true, status: "sent", outcome: "accepted", message: "Relay accepted fixture" };
 const transactional = compile("lib/transactional-email.ts", {
+  "./zoho-smtp-transport": { deliverZohoSmtpEmail: async (to, document, options) => { relayCalls.push({ to, document, options }); return relayResult; } },
   "./content-registry": {
     contentRegistryByKey: emailEntries,
     getContentValue: (content, key) => content[key],
@@ -258,143 +261,44 @@ test("Content Studio renderer-backed previews use fixed notices, inert links, an
   assert.match(editor, /emailDeliveryBoundary\.canSendApplicationTest \? <>/);
 });
 
-async function withEmailEnvironment(run) {
-  const before = {
-    BREVO_API_KEY: process.env.BREVO_API_KEY,
-    SMTP_FROM: process.env.SMTP_FROM,
-    EMAIL_FROM: process.env.EMAIL_FROM,
-    SMTP_REPLY_TO: process.env.SMTP_REPLY_TO
-  };
-  process.env.BREVO_API_KEY = "test-only-key";
-  process.env.SMTP_FROM = "QRguitar <noreply@qrguitar.com>";
-  delete process.env.EMAIL_FROM;
-  process.env.SMTP_REPLY_TO = "support@qrguitar.com";
-  try {
-    await run();
-  } finally {
-    for (const [key, value] of Object.entries(before)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
+test("application delivery delegates one complete document and bounded caller options to Zoho without Brevo fallback", async () => {
+  relayCalls.length = 0;
+  relayResult = { ok: true, status: "sent", outcome: "accepted", message: "Relay accepted fixture" };
+  const document = renderer.renderBrandedTransactionalEmail(baseEmail), controller = new AbortController();
+  const options = { idempotencyKey: "11111111-1111-4111-8111-111111111111", timeoutMs: 1200, signal: controller.signal, successMessage: "Accepted", failureMessage: "Not accepted" };
+  assert.strictEqual(await transactional.deliverApplicationEmail("owner@example.test", document, options), relayResult);
+  assert.equal(relayCalls.length, 1); assert.deepEqual(relayCalls[0], { to: "owner@example.test", document, options });
+  assert.ok(relayCalls[0].document.htmlContent && relayCalls[0].document.textContent);
+  assert.equal(typeof transactional.deliverBrevoEmail, "undefined");
+});
+test("invalid durable intent rejects before the relay and unknown acceptance never becomes sent or retries", async () => {
+  relayCalls.length = 0;
+  const document = renderer.renderBrandedTransactionalEmail(baseEmail), options = { successMessage: "Accepted", failureMessage: "Not accepted" };
+  const invalid = await transactional.deliverApplicationEmail("owner@example.test", document, { ...options, idempotencyKey: "not-a-uuid" });
+  assert.equal(invalid.ok, false); assert.equal(invalid.outcome, "rejected"); assert.equal(invalid.retryable, false); assert.equal(relayCalls.length, 0);
+  for (const outcome of ["rejected", "unknown"]) {
+    relayCalls.length = 0; relayResult = { ok: false, status: "failed", outcome, message: "Acceptance unconfirmed", retryable: outcome === "rejected" };
+    assert.strictEqual(await transactional.deliverApplicationEmail("owner@example.test", document, options), relayResult);
+    assert.equal(relayCalls.length, 1); assert.equal(relayCalls[0].options.idempotencyKey, "");
   }
-}
-
-test("Brevo transport sends HTML, plaintext, and a UUID idempotency key without retrying", async () => {
-  await withEmailEnvironment(async () => {
-    const calls = [];
-    const fetcher = async (url, init) => {
-      calls.push({ url, init });
-      return new Response(JSON.stringify({ messageId: "<accepted@example.test>" }), {
-        status: 201,
-        headers: { "content-type": "application/json" }
-      });
-    };
-    const document = renderer.renderBrandedTransactionalEmail(baseEmail);
-    const result = await transactional.deliverBrevoEmail("owner@example.test", document, {
-      fetcher,
-      timeoutMs: 50,
-      idempotencyKey: "123e4567-e89b-42d3-a456-426614174000",
-      successMessage: "Accepted.",
-      failureMessage: "Rejected"
-    });
-    assert.deepEqual(result, {
-      ok: true,
-      status: "sent",
-      outcome: "accepted",
-      message: "Accepted.",
-      providerMessageId: "<accepted@example.test>"
-    });
-    assert.equal(calls.length, 1);
-    assert.equal(calls[0].url, "https://api.brevo.com/v3/smtp/email");
-    const body = JSON.parse(calls[0].init.body);
-    assert.equal(body.htmlContent, document.htmlContent);
-    assert.equal(body.textContent, document.textContent);
-    assert.equal(body.headers.idempotencyKey, "123e4567-e89b-42d3-a456-426614174000");
-    assert.equal(body.to[0].email, "owner@example.test");
-    assert.equal(calls[0].init.redirect, "error");
-  });
 });
-
-test("Brevo transport separates retryable provider rejection from unknown network outcome", async () => {
-  await withEmailEnvironment(async () => {
-    const document = renderer.renderBrandedTransactionalEmail(baseEmail);
-    const rejected = await transactional.deliverBrevoEmail("owner@example.test", document, {
-      fetcher: async () => new Response("{}", { status: 429, headers: { "retry-after": "12" } }),
-      successMessage: "Accepted.",
-      failureMessage: "Rejected"
-    });
-    assert.equal(rejected.outcome, "rejected");
-    assert.equal(rejected.retryable, true);
-    assert.equal(rejected.retryAfterSeconds, 12);
-
-    const missingReceipt = await transactional.deliverBrevoEmail("owner@example.test", document, {
-      fetcher: async () => new Response("{}", { status: 201, headers: { "content-type": "application/json" } }),
-      successMessage: "Accepted.",
-      failureMessage: "Rejected"
-    });
-    assert.equal(missingReceipt.outcome, "unknown");
-    assert.match(missingReceipt.message, /receipt missing/);
-
-    const unknown = await transactional.deliverBrevoEmail("owner@example.test", document, {
-      fetcher: async () => { throw new TypeError("response lost"); },
-      successMessage: "Accepted.",
-      failureMessage: "Rejected"
-    });
-    assert.equal(unknown.outcome, "unknown");
-    assert.equal(unknown.retryable, false);
-  });
+test("service review renders registered content and carries intent and caller cancellation to its single relay", async () => {
+  relayCalls.length = 0; relayResult = { ok: true, status: "sent", outcome: "accepted", message: "Accepted fixture" };
+  const controller = new AbortController(), idempotencyKey = "22222222-2222-4222-8222-222222222222";
+  assert.strictEqual(await transactional.sendServiceReviewEmail({ to: "owner@example.test", profileTitle: "Private fixture", providerName: "Fixture workshop", reviewUrl: "https://www.qrguitar.com/service-review/fixture", idempotencyKey, signal: controller.signal }), relayResult);
+  assert.equal(relayCalls.length, 1); assert.equal(relayCalls[0].options.idempotencyKey, idempotencyKey); assert.strictEqual(relayCalls[0].options.signal, controller.signal);
+  assert.match(relayCalls[0].document.subject, /Private fixture/); assert.match(relayCalls[0].document.htmlContent, /Fixture workshop/); assert.match(relayCalls[0].document.textContent, /Fixture workshop/);
+  relayCalls.length = 0;
+  const invalid = await transactional.sendServiceReviewEmail({ to: "owner@example.test", profileTitle: "Private fixture", providerName: "Fixture workshop", reviewUrl: "https://attacker.example/service-review/fixture" });
+  assert.equal(invalid.outcome, "rejected"); assert.equal(relayCalls.length, 0);
 });
-
-test("Brevo transport requires an explicit sender, times out, honors caller abort, and rejects malformed idempotency keys", async () => {
-  await withEmailEnvironment(async () => {
-    const document = renderer.renderBrandedTransactionalEmail(baseEmail);
-    let calls = 0;
-
-    delete process.env.SMTP_FROM;
-    delete process.env.EMAIL_FROM;
-    const missingSender = await transactional.deliverBrevoEmail("owner@example.test", document, {
-      fetcher: async () => { calls += 1; return new Response("{}", { status: 201 }); },
-      successMessage: "Accepted.",
-      failureMessage: "Rejected"
-    });
-    assert.equal(missingSender.outcome, "rejected");
-    assert.match(missingSender.message, /configuration is invalid/);
-    assert.equal(calls, 0);
-    process.env.SMTP_FROM = "QRguitar <noreply@qrguitar.com>";
-
-    const invalid = await transactional.deliverBrevoEmail("owner@example.test", document, {
-      fetcher: async () => { calls += 1; return new Response("{}", { status: 201 }); },
-      idempotencyKey: "not-a-uuid",
-      successMessage: "Accepted.",
-      failureMessage: "Rejected"
-    });
-    assert.equal(invalid.outcome, "rejected");
-    assert.equal(calls, 0);
-
-    const waitingFetcher = async (_url, init) => new Promise((_resolve, reject) => {
-      init.signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
-    });
-    const timedOut = await transactional.deliverBrevoEmail("owner@example.test", document, {
-      fetcher: waitingFetcher,
-      timeoutMs: 5,
-      successMessage: "Accepted.",
-      failureMessage: "Rejected"
-    });
-    assert.equal(timedOut.outcome, "unknown");
-    assert.match(timedOut.message, /timed out/);
-
-    const caller = new AbortController();
-    const callerAbort = transactional.deliverBrevoEmail("owner@example.test", document, {
-      fetcher: waitingFetcher,
-      signal: caller.signal,
-      successMessage: "Accepted.",
-      failureMessage: "Rejected"
-    });
-    caller.abort();
-    const callerAborted = await callerAbort;
-    assert.equal(callerAborted.outcome, "unknown");
-    assert.equal(callerAborted.retryable, false);
-  });
+test("service configuration failure stays unconfigured and unsafe admin preview cannot invoke a relay", async () => {
+  relayCalls.length = 0; relayResult = { ok: false, status: "failed", outcome: "rejected", message: "Zoho SMTP delivery is not configured for application messages." };
+  const result = await transactional.sendServiceReviewEmail({ to: "owner@example.test", profileTitle: "Private fixture", providerName: "Fixture workshop", reviewUrl: "https://www.qrguitar.com/service-review/fixture" });
+  assert.equal(result.ok, false); assert.equal(result.outcome, "rejected"); assert.match(result.message, /email delivery is not configured/); assert.equal(relayCalls.length, 1);
+  relayCalls.length = 0;
+  const unsafe = await transactional.sendAdminTemplateTestEmail({ to: "admin@example.test", subject: "Fixture", heading: "Fixture", body: "Fixture", ctaUrl: "https://attacker.example/review" });
+  assert.equal(unsafe.outcome, "rejected"); assert.equal(relayCalls.length, 0);
 });
 
 test("only the real application-bound family can use Content Studio delivery", () => {
@@ -403,7 +307,9 @@ test("only the real application-bound family can use Content Studio delivery", (
   assert.match(route, /templatePrefix !== "email\.service\.submitted"/);
   assert.match(route, /not bound to application delivery/);
   assert.doesNotMatch(sender, /sendCollectionInquiryEmail/);
-  assert.match(sender, /textContent: document\.textContent/);
+  assert.match(sender, /import \{ deliverZohoSmtpEmail \} from "\.\/zoho-smtp-transport"/);
+  assert.match(sender, /return deliverZohoSmtpEmail\(to, document/);
+  assert.doesNotMatch(sender, /BREVO_API_KEY|api\.brevo|deliverBrevoEmail/);
 });
 test("Account notification presentation names implemented email without advertising unconnected families", () => {
   const account = fs.readFileSync(path.join(webRoot, "app/account/page.tsx"), "utf8");
@@ -418,7 +324,7 @@ test("Account notification presentation names implemented email without advertis
 test("email ownership map matches all delivery families without widening test-send access", () => {
   assert.deepEqual(boundary.emailTemplateDeliveryBoundary("email.service.submitted"), {
     kind: "application",
-    owner: "qrguitar-brevo",
+    owner: "qrguitar-zoho-smtp",
     canSendApplicationTest: true,
     providerTemplate: null,
     providerArtifact: null
@@ -433,7 +339,7 @@ test("email ownership map matches all delivery families without widening test-se
     const prefix = `email.${family}`;
     const delivery = boundary.emailTemplateDeliveryBoundary(prefix);
     assert.equal(delivery.kind, "application");
-    assert.equal(delivery.owner, "qrguitar-brevo");
+    assert.equal(delivery.owner, "qrguitar-zoho-smtp");
     assert.equal(delivery.canSendApplicationTest, family === "service.submitted");
     const exported = boundary.createEmailTemplateSetupExport(prefix, {});
     assert.equal(exported.delivery.kind, "application");

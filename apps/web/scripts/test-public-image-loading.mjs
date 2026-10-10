@@ -234,15 +234,31 @@ test("Catalog grants high priority to exactly the first visible Profile card", (
   assert.equal((catalog.match(/prioritizeLeadImage=/g) || []).length, 1);
 });
 
-test("Homepage prioritizes only the first gallery Profile and defers supporting media", () => {
-  assert.match(showcase, /loading="eager" fetchPriority="high" decoding="async" width=\{1200\} height=\{900\}/);
-  const heroPhotos = [...renderHomepageShowcase().matchAll(/<img\b[^>]*>/g)].map((match) => match[0]);
+test("Homepage prioritizes its one hero Profile and defers archive and supporting media", () => {
+  const heroPhotos = [...renderHomepageShowcase().matchAll(/<img\b[^>]*>/g)].map(match => match[0]);
   assert.equal(heroPhotos.length, 1);
   assert.match(heroPhotos[0], /loading="eager"/);
-  assert.equal((showcase.match(/fetchPriority="high"/g) || []).length, 1);
+  assert.match(heroPhotos[0], /fetchPriority="high"/i);
   assert.match(homepage, /loading="lazy" fetchPriority="low" decoding="async" width=\{1200\} height=\{900\}/);
-  assert.match(homepage, /galleryRecords\.map\(\(record, index\) =>[\s\S]*?prioritizeLeadImage=\{index === 0\}/);
-  assert.equal((homepage.match(/prioritizeLeadImage=/g) || []).length, 1);
+  const tree = ts.createSourceFile("HomePageClient.tsx", homepage, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const showcases = [], archiveCards = [];
+  function visit(node) {
+    if (ts.isJsxSelfClosingElement(node)) {
+      if (node.tagName.getText(tree) === "HomeProfileShowcase") showcases.push(node);
+      if (node.tagName.getText(tree) === "CollectibleRecordCard") archiveCards.push(node);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(tree);
+  assert.equal(showcases.length, 1, "Exactly one current hero may use showcase image priority");
+  const attr = (node, name) => node.attributes.properties.find(p => ts.isJsxAttribute(p) && p.name.getText(tree) === name);
+  assert.equal(attr(showcases[0], "record").initializer.expression.getText(tree), "initialLatestRecord");
+  assert.equal(archiveCards.length, 1, "Actual archive map must render the shared Profile card");
+  assert.equal(attr(archiveCards[0], "variant").initializer.text, "archive");
+  assert.equal(attr(archiveCards[0], "prioritizeLeadImage"), undefined, "Archive keeps the shared card lazy-loading default");
+  const archivePhotos = [...renderToStaticMarkup(React.createElement(compileCard(), { record: { qrCode: "TEST" }, variant: "archive" })).matchAll(/<img\b[^>]*>/g)].map(match => match[0]);
+  assert.ok(archivePhotos.length);
+  for (const image of archivePhotos) { assert.match(image, /loading="lazy"/); assert.match(image, /fetchPriority="low"/i); }
 });
 
 test("shared Profile cards show the category selected for that Profile", () => {
@@ -268,10 +284,28 @@ test("homepage Profile copy uses the saved category instead of a hard-coded inst
   assert.doesNotMatch(showcase, /A real QRguitar Profile|THE INSTRUMENT/);
 });
 
-test("homepage opening and archive reflow while the featured phone gallery can scroll", () => {
-  assert.match(homeStyles, /@media\s*\(max-width:760px\)[\s\S]*?\.galleryIntro\s*\{[^}]*grid-template-columns:1fr/);
-  assert.match(homeStyles, /@media\s*\(max-width:520px\)[\s\S]*?\.profileGallery,\.home :global\(\.home-archive-rail\)\s*\{[^}]*grid-template-columns:1fr/);
-  assert.match(homeStyles, /@media\s*\(max-width:520px\)\s*\{[\s\S]*?\.profileGallery\s*\{[^}]*scroll-snap-type:\s*x mandatory/);
+test("current homepage hero and archive reflow to one column on phones", () => {
+  const css = require("postcss").parse(homeStyles);
+  function columnsAt(selector, width) {
+    let columns;
+    css.walkRules(rule => {
+      if (!rule.selectors.includes(selector)) return;
+      for (let parent = rule.parent; parent; parent = parent.parent) {
+        if (parent.type !== "atrule") continue;
+        assert.equal(parent.name, "media", "Responsive grid must use an understood media condition");
+        const match = /^\(max-width:\s*(\d+)px\)$/.exec(parent.params);
+        assert.ok(match, "Responsive grid width condition must remain source-bound");
+        if (width > Number(match[1])) return;
+      }
+      rule.walkDecls("grid-template-columns", declaration => { columns = declaration.value; });
+    });
+    return columns;
+  }
+  assert.equal(columnsAt(".heroGrid", 390), "1fr");
+  assert.equal(columnsAt(".heroGrid", 760), "1fr");
+  assert.equal(columnsAt(".home :global(.home-archive-rail)", 1440), "repeat(3,minmax(0,1fr))");
+  assert.equal(columnsAt(".home :global(.home-archive-rail)", 700), "repeat(2,minmax(0,1fr))");
+  assert.equal(columnsAt(".home :global(.home-archive-rail)", 390), "1fr");
 });
 
 test("homepage photo count and accessible image total agree after a failed source", () => {

@@ -23656,7 +23656,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.components.HomePageClient.ecbcf256c14d",
     "scope": "components.HomePageClient",
-    "text": "Permanent Profile",
+    "text": "One permanent identity",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
@@ -23665,7 +23665,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.components.HomePageClient.bc615fcc90ab",
     "scope": "components.HomePageClient",
-    "text": "One permanent link.",
+    "text": "The same Profile. Every chapter.",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
@@ -23674,7 +23674,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.components.HomePageClient.eb341bf13357",
     "scope": "components.HomePageClient",
-    "text": "Documents",
+    "text": "Your privacy, your choice",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
@@ -23683,7 +23683,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.components.HomePageClient.a4c1dff0c2e1",
     "scope": "components.HomePageClient",
-    "text": "Choose which documents to share.",
+    "text": "Public, unlisted, or just for you.",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
@@ -23692,7 +23692,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.components.HomePageClient.f5ab906e49d7",
     "scope": "components.HomePageClient",
-    "text": "Service history",
+    "text": "A history that carries forward",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
@@ -23701,7 +23701,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.components.HomePageClient.104c2472352a",
     "scope": "components.HomePageClient",
-    "text": "Keep service records with the Profile.",
+    "text": "Service and ownership, connected.",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",

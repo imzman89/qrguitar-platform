@@ -656,6 +656,12 @@ export const defaultContentValues: Record<string, string> = Object.fromEntries(
 );
 
 const legacyContentDefaults: Record<string, string[]> = {
+  "ui.components.HomePageClient.ecbcf256c14d": ["Permanent Profile"],
+  "ui.components.HomePageClient.bc615fcc90ab": ["One permanent link."],
+  "ui.components.HomePageClient.eb341bf13357": ["Documents"],
+  "ui.components.HomePageClient.a4c1dff0c2e1": ["Choose which documents to share."],
+  "ui.components.HomePageClient.f5ab906e49d7": ["Service history"],
+  "ui.components.HomePageClient.104c2472352a": ["Keep service records with the Profile."],
   "ui.app.site.editor.page.emailApplicationDelivery": ["Application delivery · Brevo"],
   "ui.app.dashboard.page.b90f83fb529f": ["Recipient not email-bound"],
   "ui.components.OwnerNameConsentSection.empty": ["You have no eligible outgoing ownership events."],
