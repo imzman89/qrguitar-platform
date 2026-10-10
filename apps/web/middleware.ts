@@ -27,6 +27,13 @@ export function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   if (draftPreviewRequest) requestHeaders.set("x-qrguitar-site-preview", "draft");
   else requestHeaders.delete("x-qrguitar-site-preview");
+  // Derive private auth-page metadata from the URL; never trust a supplied mode header.
+  if (request.nextUrl.pathname === "/login") {
+    const authMode = request.nextUrl.searchParams.get("mode");
+    requestHeaders.set("x-qrguitar-auth-mode", authMode === "register" || authMode === "reset" ? authMode : "login");
+  } else {
+    requestHeaders.delete("x-qrguitar-auth-mode");
+  }
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   if (isNoindexPathname(request.nextUrl.pathname)) {
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
