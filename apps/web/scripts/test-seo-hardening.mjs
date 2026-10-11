@@ -95,7 +95,7 @@ test("middleware emits X-Robots-Tag for protected families and leaves public pag
     assert.equal(middleware.middleware(request(pathname)).headers.get("x-robots-tag"), null, pathname);
 });
 
-test("private route layouts clear inherited canonical and social metadata", () => {
+test("private route layouts clear inherited canonical and social metadata", async () => {
   const layouts = [
     "app/account/layout.tsx", "app/admin/layout.tsx", "app/dashboard/layout.tsx", "app/edit/layout.tsx",
     "app/handout/layout.tsx", "app/login/layout.tsx", "app/ownership-claim/layout.tsx",
@@ -103,9 +103,39 @@ test("private route layouts clear inherited canonical and social metadata", () =
     "app/site-editor/layout.tsx", "app/transfer/layout.tsx"
   ];
   for (const relative of layouts) {
-    const module = loadTypeScript(relative, { "../../lib/seo": seo, "../lib/seo": seo });
-    assert.deepEqual(module.metadata.robots, { index: false, follow: false }, relative);
-    assert.equal(module.metadata.alternates, null, relative);
+    const module = loadTypeScript(relative, {
+      "../../lib/seo": seo,
+      "../lib/seo": seo,
+      "next/headers": { headers: async () => new Headers() }
+    });
+    const metadata = typeof module.generateMetadata === "function"
+      ? await module.generateMetadata()
+      : module.metadata;
+    assert.deepEqual(metadata.robots, { index: false, follow: false }, relative);
+    assert.equal(metadata.alternates, null, relative);
+    assert.equal(metadata.openGraph, null, relative);
+    assert.equal(metadata.twitter, null, relative);
+  }
+});
+
+test("all login modes retain private metadata and describe the current task", async () => {
+  for (const [mode, title] of [
+    [null, "Sign in to QRguitar"],
+    ["register", "Create your QRguitar account"],
+    ["reset", "Reset your QRguitar password"],
+    ["unexpected", "Sign in to QRguitar"]
+  ]) {
+    const requestHeaders = new Headers();
+    if (mode !== null) requestHeaders.set("x-qrguitar-auth-mode", mode);
+    const module = loadTypeScript("app/login/layout.tsx", {
+      "../../lib/seo": seo,
+      "next/headers": { headers: async () => requestHeaders }
+    });
+    const metadata = await module.generateMetadata();
+    assert.equal(metadata.title, title, String(mode));
+    assert.deepEqual(metadata.robots, { index: false, follow: false }, String(mode));
+    for (const key of ["alternates", "openGraph", "twitter"])
+      assert.equal(metadata[key], null, `${mode}: ${key}`);
   }
 });
 
