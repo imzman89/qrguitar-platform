@@ -72,7 +72,9 @@ function fixture(page, options = {}) {
   const router = { replace: href => f.navigations.push(href) };
   const location = new URL('https://www.qrguitar.com/' + page + (options.search || '?next=%2Fdashboard'));
   location.replace = href => f.documentNavigations.push(href);
-  f.document = { title: '' };
+  f.titleWrites = [];
+  let documentTitle = '';
+  f.document = { get title() { return documentTitle; }, set title(value) { documentTitle = value; f.titleWrites.push(value); } };
   const globals = {
     document: f.document,
     window: { location, history: { replaceState(_state, _title, href) { f.history.push(href); } }, setTimeout: setTimer, clearTimeout: clearTimer, dispatchEvent() {} },
@@ -95,7 +97,7 @@ function fixture(page, options = {}) {
       dispatchOptionalTrackingProductEvent: async event => { f.tracking.push(event); return true; },
     },
   };
-  const Component = compile('app/' + page + '/page.tsx', imports, globals, withUiTextTestContext(require, options.content || {})).default;
+  const Component = compile(page === 'login' ? 'app/login/LoginClient.tsx' : 'app/' + page + '/page.tsx', imports, globals, withUiTextTestContext(require, options.content || {})).default;
   // Commit only the registration callback refs. Record requested focus, not native keyboard focus.
   function commitRegistrationRefs(node, hidden = false, disabled = false) {
     if (!node || typeof node !== 'object') return;
@@ -114,7 +116,7 @@ function fixture(page, options = {}) {
   f.render = () => {
     assert.equal(f.disposed, false); dirty = true; let remaining = 30;
     while (dirty) {
-      assert.ok(remaining--, 'render loop'); dirty = false; cursor = effectCursor = 0; tree = Component();
+      assert.ok(remaining--, 'render loop'); dirty = false; cursor = effectCursor = 0; tree = Component(page === 'login' ? { initialMode: options.initialMode ?? (location.searchParams.get('mode') === 'register' || location.searchParams.get('mode') === 'reset' ? location.searchParams.get('mode') : 'login') } : undefined);
       for (const effect of effects) if (effect.pending) { effect.pending = false; effect.cleanup?.(); effect.cleanup = effect.run(); }
     }
     commitRegistrationRefs(tree);
@@ -162,6 +164,22 @@ function fixture(page, options = {}) {
 }
 
 
+test('login: trusted server mode reaches the first client render without a sign-in flash', async () => {
+  const Client = () => null;
+  for (const [header, mode, title] of [['register', 'register', 'Create your QRguitar account'], ['reset', 'reset', 'Reset your QRguitar password'], ['login', 'login', 'Sign in to QRguitar'], [null, 'login', 'Sign in to QRguitar'], ['REGISTER', 'login', 'Sign in to QRguitar']]) {
+    const Page = compile('app/login/page.tsx', { 'next/headers': { headers: async () => ({ get: name => { assert.equal(name, 'x-qrguitar-auth-mode'); return header; } }) }, './LoginClient': { default: Client, __esModule: true } }, {}).default;
+    const element = await Page(); assert.equal(element.type, Client); assert.equal(element.props.initialMode, mode);
+    const f = fixture('login', { initialMode: element.props.initialMode, search: '?mode=' + mode + '&next=%2Fcreate' });
+    assert.equal(f.titleWrites[0], title); assert.equal(f.titleWrites.every(value => value === title), true); f.dispose();
+  }
+});
+for (const [mode, title] of [['register', 'Create your QRguitar account'], ['reset', 'Reset your QRguitar password']]) {
+  test('login: first announcement title matches direct ' + mode + ' navigation', () => {
+    const f = fixture('login', { search: '?mode=' + mode + '&next=%2Fcreate' });
+    assert.equal(f.titleWrites[0], title);
+    assert.equal(f.titleWrites.every(value => value === title), true); f.dispose();
+  });
+}
 test('login: tab keyboard activation updates focus, one tab stop and labelled panel without losing the return path', async () => {
   const f = fixture('login', { search: '?next=%2Fownership-claim%3Fcode%3DQRG-TEST' }); await f.flush(); f.fill();
   const focused = [];
@@ -419,7 +437,7 @@ test('auth, Account and navigation pages typecheck against the actual canonical 
   const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, path.dirname(configPath));
   const options = { ...parsed.options, noEmit: true, incremental: false };
   const host = ts.createCompilerHost(options), read = host.readFile.bind(host);
-  const checkedSources = ['app/login/page.tsx', 'app/reset-password/page.tsx', 'app/account/page.tsx', 'components/Nav.tsx'];
+  const checkedSources = ['app/login/page.tsx', 'app/login/LoginClient.tsx', 'app/reset-password/page.tsx', 'app/account/page.tsx', 'components/Nav.tsx'];
   const roots = checkedSources.map(relative => path.join(repo, 'apps/web', relative));
   host.readFile = file => {
     const relative = path.relative(path.join(repo, 'apps/web'), file).replaceAll('\\', '/');

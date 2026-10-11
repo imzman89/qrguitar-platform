@@ -13,7 +13,7 @@ const nav = read("components/Nav.tsx");
 const qrDownload = read("components/QrDownload.tsx");
 const profile = read("app/i/[code]/ProfileClient.tsx");
 const layout = read("app/layout.tsx");
-const login = read("app/login/page.tsx");
+const login = read("app/login/LoginClient.tsx");
 const admin = read("app/admin/page.tsx");
 const siteEditor = read("app/site-editor/page.tsx");
 const themeRuntime = read("components/ThemeRuntime.tsx");
@@ -64,7 +64,7 @@ for (const legacy of ["This record", "this record", "Could not load record", "Co
 }
 includes(editor, "This Profile is verified by QRguitar.", "The owner editor must describe the QRguitar Profile consistently.");
 includes(transfer, "This Profile now belongs to the accepting account", "Transfer completion must describe the Profile consistently.");
-includes(siteCompositionEditor, 'section.visible ? "Shown" : "Hidden"', "Content Studio visibility states must use Shown/Hidden language.");
+assert(/section\.visible \? ui\("ui\.components\.SiteCompositionEditor\.[a-f0-9]+", "Shown"\) : ui\("ui\.components\.SiteCompositionEditor\.[a-f0-9]+", "Hidden"\)/.test(siteCompositionEditor), "Content Studio visibility states must use Shown/Hidden language through the published-copy boundary.");
 includes(collectibleCard, "Photo unavailable", "Collectible cards need a concise photo fallback.");
 includes(account, "createAccountSettings", "Account must use the authenticated account lifecycle controller.");
 includes(account, "Loading your account...", "Account must show a neutral loading state while authentication resolves.");
@@ -73,7 +73,7 @@ includes(quickEdit, 'document.body.style.overflow = "hidden"', "Quick Edit must 
 includes(quickEdit, 'event.key === "Escape"', "Quick Edit must close with Escape.");
 includes(quickEdit, 'returnFocusRef.current?.focus()', "Quick Edit must restore focus to its trigger.");
 includes(quickEdit, 'event.key !== "Tab"', "Quick Edit must keep keyboard focus inside the modal.");
-includes(homePage, 'closest(".collectible-card")', "Homepage archive dragging must not capture clicks inside Profile cards.");
+assert(homePage.includes('className="home-archive-rail"') && (homePage.includes('closest(".collectible-card")') || !/onPointerDown|setPointerCapture/.test(homePage)), "Homepage archive must preserve Profile clicks through guarded dragging or native scrolling.");
 includes(collectibleCard, "onClick={handleContentClick}", "Profile card bodies must open their Profile.");
 includes(collectibleCard, 'closest("a, button")', "Profile card body navigation must preserve nested actions.");
 

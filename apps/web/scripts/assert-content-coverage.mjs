@@ -26,6 +26,7 @@ const runtimeFiles = [
   "app/handout/[code]/page.tsx",
   "app/installers/page.tsx",
   "app/login/page.tsx",
+  "app/login/LoginClient.tsx",
   "app/reset-password/page.tsx",
   "app/contact/page.tsx",
   "app/privacy/page.tsx",

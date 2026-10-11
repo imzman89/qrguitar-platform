@@ -424,7 +424,7 @@ test("the UI contract stays compact, accessible, balanced, and hidden without ex
 test("authoritative product success call sites use the consent-gated boundary and never claim every visit is a QR scan", () => {
   const read = (relative) => fs.readFileSync(path.join(webRoot, relative), "utf8");
   const profile = read("app/i/[code]/ProfileClient.tsx");
-  const login = read("app/login/page.tsx");
+  const login = read("app/login/LoginClient.tsx");
   const create = read("app/create/page.tsx");
   const paypal = read("lib/paypal-payments-client.ts");
   const transfer = read("app/transfer/[id]/page.tsx");
