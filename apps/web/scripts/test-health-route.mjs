@@ -26,3 +26,17 @@ test("all documented release entrypoints use the guarded command",()=>{
  assert.equal(pkg.scripts["deploy:web"],"npm run push:live");assert.equal(pkg.scripts["push:live"],"node scripts/push-live.mjs");
  const batch=fs.readFileSync(path.join(root,"push-live.cmd"),"utf8");assert.match(batch,/call npm.cmd run push:live/);assert.doesNotMatch(batch,/SUPABASE_SERVICE_ROLE_KEY|vercel.*--prod|Set-Content/);
 });
+
+test("health works through a read-only RPC gateway using the actual SDK transport",async()=>{
+ const {PostgrestClient}=require("@supabase/postgrest-js");
+ const calls=[];
+ const db=new PostgrestClient("https://readiness.invalid/rest/v1",{fetch:async(input,init)=>{
+  const url=new URL(String(input));calls.push({method:init.method,path:url.pathname,search:url.search,body:init.body});
+  if(init.method!=="GET")return Response.json({code:"READ_ONLY_GATEWAY",message:"Writes are not admitted"},{status:405});
+  assert.equal(url.pathname,"/rest/v1/rpc/qrguitar_release_readiness");assert.equal(url.search,"");
+  return Response.json(valid());
+ }});
+ const res=await route(db).GET();assert.equal(res.status,200);
+ assert.deepEqual(calls,[{method:"GET",path:"/rest/v1/rpc/qrguitar_release_readiness",search:"",body:undefined}]);
+ assert.deepEqual(await res.json(),{status:"ready",releaseVersion:contract.RELEASE_VERSION});
+});

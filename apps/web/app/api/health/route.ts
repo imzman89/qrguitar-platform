@@ -15,7 +15,7 @@ export async function GET() {
   try {
     const supabase = createServerSupabaseClientWithTimeout(8000);
     if (!supabase) return status(false);
-    const result = await supabase.rpc("qrguitar_release_readiness").abortSignal(AbortSignal.timeout(8000));
+    const result = await supabase.rpc("qrguitar_release_readiness", {}, { get: true }).abortSignal(AbortSignal.timeout(8000));
     return status(!result.error && isReleaseReady(result.data));
   } catch { return status(false); }
 }
