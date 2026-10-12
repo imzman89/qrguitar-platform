@@ -141,7 +141,7 @@ export function HomePageClient({
               <Link className="button" href="/create">{copy.hero.primaryCta}<ArrowRight size={17} aria-hidden="true" /></Link>
               <Link className="text-link" href={initialLatestRecord ? "/i/"+encodeURIComponent(initialLatestRecord.qrCode) : "/catalog"}>{initialLatestRecord ? getContentValue(settings?.content || {}, "home.hero.viewProfile") : copy.hero.secondaryCta}<ArrowRight size={15} aria-hidden="true" /></Link>
             </div>
-            <a className={styles.betaNote} href="#pricing">{getContentValue(settings?.content || {}, "home.hero.accessNote")}</a>
+            <a className={styles.betaNote} href="/billing">{getContentValue(settings?.content || {}, "home.hero.accessNote")}</a>
           </div>
           <div className={styles.heroShowcase}>
             {initialLatestRecord ? <HomeProfileShowcase record={initialLatestRecord} /> : null}
