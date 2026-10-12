@@ -287,7 +287,7 @@ export const defaultSiteSettings: EditableSiteSettings = {
         name: typedPlan.name,
         price: typedPlan.price,
         copy: typedPlan.copy,
-        badge: typedPlan.badge,
+        badge: typedPlan.badge?.trim() || "",
         features: [...typedPlan.features]
       };
     }),

@@ -828,7 +828,6 @@ const legacyContentDefaults: Record<string, string[]> = {
     "Free Profiles during public beta."
   ],
   "home.pricing.body": [
-    "",
     "Create and maintain QRguitar Profiles without a hard paywall while the registry grows. Paid help is available separately.",
     "Start with five free Profiles, or ask QRguitar for hands-on commercial setup."
   ],
