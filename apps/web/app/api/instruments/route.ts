@@ -1,3 +1,4 @@
+import { reportPublicReadFailure } from "../../../lib/public-read-diagnostics";
 import { cleanPublicCollection, publicCollectionOwnerKey } from "../../../lib/public-collections";
 import { OwnerReadError, readAllOwnerPages, readOwnerBatches, groupOwnerRows, signOwnerSources } from "../../../lib/owner-record-read";
 import { buildCreateProfilePayload, createProfileFailure, CreateProfileError } from "../../../lib/profile-create";
@@ -1422,7 +1423,8 @@ export async function GET(request: Request) {
       { ok: true, instruments: publicRecords.map(sanitizePublicInstrumentWithConfirmedOwnerNames), count: publicRecords.length } satisfies SupabaseReadResponse,
       { status: 200 }
     );
-  } catch {
+  } catch (error) {
+    reportPublicReadFailure(error);
     return noStoreJson(
       { ok: false, message: "Profiles are temporarily unavailable. Please try again.", retryable: true },
       { status: 503, headers: { "Retry-After": "10" } }
