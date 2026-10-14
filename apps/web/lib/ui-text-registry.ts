@@ -18931,7 +18931,7 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {
     "key": "ui.app.privacy.page.602456163092",
     "scope": "app.privacy.page",
-    "text": "When optional analytics is enabled and accepted, QRguitar can measure successful public Profile views, registrations, Profile creation, checkout starts, completed credit purchases, and completed ownership transfers using fixed event properties that exclude direct identifiers. Business conversion events also include a stable pseudonymous idempotency token. The Google Analytics adapter sends it as",
+    "text": "When optional analytics is enabled and accepted, QRguitar can measure successful public Profile views, registrations, Profile creation, checkout starts, completed purchases where payments are available, and completed ownership transfers using fixed event properties that exclude direct identifiers. Business conversion events also include a stable pseudonymous idempotency token. The Google Analytics adapter sends it as",
     "page": "Privacy",
     "area": "Support & Legal",
     "section": "Page text",
