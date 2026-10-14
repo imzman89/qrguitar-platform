@@ -92,6 +92,12 @@ function previewFor(entry) {
 }
 
 function bindingFor(entry) {
+  if (registry.retiredHomepageContentKeys.has(entry.key)) return {
+    kind: "retained-legacy-homepage-copy",
+    status: "retired-compatible-saved-value",
+    sourceFiles: ["components/HomePageClient.tsx"],
+    note: "Retained for existing saved settings and revisions; this section is no longer rendered on the homepage."
+  };
   const retired = retiredByKey.get(entry.key);
   if (retired) return {
     kind: "retained-legacy-ui-copy",

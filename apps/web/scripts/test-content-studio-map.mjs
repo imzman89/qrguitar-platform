@@ -124,3 +124,24 @@ test("retired security warnings preserve independent locks and reject changed wo
     assert.match(registry.validateProtectedContentValues(changed, published)[key], /protected wording/);
   }
 });
+
+test("retired homepage section fields preserve values and advertise no live preview binding", () => {
+  const byKey = new Map(map.surfaces.map(entry => [entry.key, entry]));
+  assert.equal(registry.retiredHomepageContentKeys.size, 28);
+  let required = 0, optional = 0;
+  for (const key of registry.retiredHomepageContentKeys) {
+    const entry = registry.contentRegistryByKey.get(key), surface = byKey.get(key);
+    assert.ok(entry && surface, key);
+    assert.equal(entry.section, "Legacy editor controls (not displayed)");
+    assert.equal(entry.classification, "editable-advanced");
+    assert.equal(surface.classification, entry.classification);
+    assert.equal(surface.defaultValue, entry.defaultValue);
+    assert.equal(surface.binding.status, "retired-compatible-saved-value");
+    assert.deepEqual(surface.binding.sourceFiles, ["components/HomePageClient.tsx"]);
+    assert.equal(surface.preview.mode, "unavailable");
+    assert.equal(surface.preview.route, null);
+    assert.equal(entry.previewPath, undefined);
+    if (entry.required) required++; else optional++;
+  }
+  assert.deepEqual({ required, optional }, { required: 19, optional: 9 });
+});

@@ -42,7 +42,8 @@ test("reordering and hiding current sections retains every retired section and i
 test("repeated editor projection and save round trips neither drop nor duplicate legacy content", () => {
   let current = saved;
   for (let index = 0; index < 3; index++) current = mergeHomeSignupSections(current, homeSignupSections(current));
-  assert.deepEqual(current, saved);
+  assert.deepEqual(current, mergeHomeSignupSections(saved, homeSignupSections(saved)));
+  assert.deepEqual(current.map(item => item.id).sort(), saved.map(item => item.id).sort());
   assert.equal(new Set(current.map(item => item.id)).size, saved.length);
 });
 
@@ -50,6 +51,26 @@ test("future unrendered saved sections survive edits without becoming visible ho
   const future = section("future-editor-section");
   const input = [future, ...saved];
   const merged = mergeHomeSignupSections(input, homeSignupSections(input));
-  assert.strictEqual(merged[0], future);
+  assert.strictEqual(merged.find(item => item.id === future.id), future);
   assert.deepEqual(homeSignupSections(merged).map(item => item.id), ["hero", "roles", "archive"]);
+});
+
+const oldNames = ["Hero and latest Profile", "Profile lifecycle", "Profile anatomy", "Role and use cases", "Service, ownership, and provenance", "Profile access", "Public Profile archive", "Closing action"];
+const oldDefault = saved.map((item, index) => ({ ...item, name: oldNames[index] }));
+test("only the known legacy default adopts gallery-before-signup without altering visibility or content", () => {
+  const input = oldDefault.map(item => item.id === "archive" ? { ...item, visible: false } : item);
+  const before = JSON.stringify(input);
+  assert.deepEqual(homeSignupSections(input).map(item => [item.id, item.visible]), [["hero", true], ["archive", false], ["roles", true]]);
+  assert.equal(JSON.stringify(input), before);
+  assert.deepEqual(homeSignupSections([...input].reverse()).map(item => item.id), ["archive", "roles", "hero"]);
+  assert.deepEqual(homeSignupSections(input.map(item => item.id === "roles" ? { ...item, name: "Gary's arrangement" } : item)).map(item => item.id), ["hero", "roles", "archive"]);
+});
+test("an explicit saved owner order remains authoritative even when it matches the old visible order", () => {
+  const projected = homeSignupSections(oldDefault);
+  const edited = ["hero", "roles", "archive"].map(id => projected.find(item => item.id === id));
+  const firstSave = mergeHomeSignupSections(oldDefault, edited);
+  assert.deepEqual(homeSignupSections(firstSave).map(item => item.id), ["hero", "roles", "archive"]);
+  const secondSave = mergeHomeSignupSections(firstSave, homeSignupSections(firstSave));
+  assert.deepEqual(secondSave, firstSave);
+  for (const original of oldDefault.filter(item => !["hero", "roles", "archive"].includes(item.id))) assert.strictEqual(secondSave.find(item => item.id === original.id), original);
 });

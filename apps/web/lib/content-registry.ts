@@ -613,6 +613,37 @@ export function contentPreviewPathForUiText(source: string, page: string): strin
   const normalized = source.replaceAll("\\", "/");
   return uiTextSourcePreviewPaths[normalized] || uiTextPagePreviewPaths[page];
 }
+export const retiredHomepageContentKeys = new Set([
+  "home.lifecycle.eyebrow",
+  "home.lifecycle.headline",
+  "home.lifecycle.body",
+  "home.lifecycle.step1.title",
+  "home.lifecycle.step1.body",
+  "home.lifecycle.step2.title",
+  "home.lifecycle.step2.body",
+  "home.lifecycle.step3.title",
+  "home.lifecycle.step3.body",
+  "home.anatomy.eyebrow",
+  "home.anatomy.headline",
+  "home.anatomy.body",
+  "home.anatomy.cta",
+  "home.anatomy.fallback",
+  "home.pricing.eyebrow",
+  "home.pricing.headline",
+  "home.pricing.body",
+  "home.pricing.creditsTitle",
+  "home.pricing.creditsBody",
+  "home.pricing.creditsCta",
+  "home.finalCta.headline",
+  "home.finalCta.body",
+  "home.finalCta.eyebrow",
+  "home.finalCta.primaryCta",
+  "home.finalCta.secondaryCta",
+  "home.signup.benefit1",
+  "home.signup.benefit2",
+  "home.signup.benefit3"
+]);
+
 export const contentRegistry: ContentRegistryEntry[] = Array.from(
   new Map([...coreContentRegistry, ...completionRegistry, ...emailRegistry, ...seoRegistry, ...[...uiTextEntries, ...retiredUiTextEntries].map((entry) => field(
     entry.key, entry.area as ContentArea, entry.page, retiredUiTextEntries.includes(entry) ? "Legacy editor controls (not displayed)" : entry.section,
@@ -623,7 +654,13 @@ export const contentRegistry: ContentRegistryEntry[] = Array.from(
       classification: protectedUiTextKeys.has(entry.key) ? "security-locked" : retiredUiTextEntries.includes(entry) ? "editable-advanced" : "editable-standard",
       help: retiredUiTextEntries.includes(entry) ? "Compatibility value for a removed editor control. Retained to preserve saved content; changing it does not change the current interface." : "Site interface wording. Values in {{braces}} come from the application; keep those placeholders. This does not edit anyone’s saved Profile or account data." }
   ))].map((entry) => [entry.key, entry])).values()
-);
+).map(entry => retiredHomepageContentKeys.has(entry.key) ? {
+  ...entry,
+  section: "Legacy editor controls (not displayed)",
+  classification: entry.classification === "editable-standard" ? "editable-advanced" : entry.classification,
+  help: "Compatibility value for a removed editor control. Retained to preserve saved content; changing it does not change the current interface.",
+  previewPath: undefined
+} : entry);
 
 export type ContentCoverageEntry = {
   source: string;
