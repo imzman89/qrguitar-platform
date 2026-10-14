@@ -33,6 +33,31 @@ catalog_guard constant text := $correction_catalog_guard$  -- Correction-ledger 
   end loop;
   if (select count(*) from public.account_deletion_identity_inventory i where i.table_name in (select jsonb_array_elements_text(manifest->'serviceCorrectionTables')))<>jsonb_array_length(manifest->'serviceCorrectionIdentityInventory') then flags:=jsonb_set(flags,'{schema_columns}','false');end if;
 $correction_catalog_guard$;
+check_old_0 constant text := $check_old_0$  for item in select value from jsonb_array_elements(manifest->'billingConstraints') loop
+    if not exists(select 1 from pg_constraint c where c.conrelid=to_regclass('public.'||(item->>'table'))
+      and c.conname=item->>'name' and c.contype::text=item->>'type' and c.convalidated and not c.condeferrable
+      and pg_get_constraintdef(c.oid)=item->>'definition') then flags:=jsonb_set(flags,'{receipt_constraints}','false'); end if;
+  end loop;$check_old_0$;
+check_new_0 constant text := $check_new_0$  for item in select value from jsonb_array_elements(manifest->'billingConstraints') loop
+    if not exists(select 1 from pg_constraint c where c.conrelid=to_regclass('public.'||(item->>'table'))
+      and c.conname=item->>'name' and c.contype::text=item->>'type' and c.convalidated and not c.condeferrable
+      and (pg_get_constraintdef(c.oid)=item->>'definition' or
+        (item->>'table',item->>'name',item->>'definition',pg_get_constraintdef(c.oid)) =
+        ('billing_paypal_webhook_outcomes','billing_paypal_webhook_outcomes_resource_id_check',$check_original$CHECK (((resource_id IS NULL) OR (((char_length(resource_id) >= 1) AND (char_length(resource_id) <= 255)) AND (resource_id !~ '[[:cntrl:]]'::text))))$check_original$,$check_restored$CHECK (((resource_id IS NULL) OR ((char_length(resource_id) >= 1) AND (char_length(resource_id) <= 255) AND (resource_id !~ '[[:cntrl:]]'::text))))$check_restored$))) then flags:=jsonb_set(flags,'{receipt_constraints}','false'); end if;
+  end loop;$check_new_0$;
+check_old_1 constant text := $check_old_1$  for item in select value from jsonb_array_elements(manifest->'serviceEvidenceConstraints') loop
+    if not exists(select 1 from pg_constraint c where c.conrelid=to_regclass('public.'||(item->>'table'))
+      and c.conname=item->>'name' and c.contype::text=item->>'type' and c.convalidated and not c.condeferrable
+      and pg_get_constraintdef(c.oid)=item->>'definition') then flags:=jsonb_set(flags,'{receipt_constraints}','false'); end if;
+  end loop;$check_old_1$;
+check_new_1 constant text := $check_new_1$  for item in select value from jsonb_array_elements(manifest->'serviceEvidenceConstraints') loop
+    if not exists(select 1 from pg_constraint c where c.conrelid=to_regclass('public.'||(item->>'table'))
+      and c.conname=item->>'name' and c.contype::text=item->>'type' and c.convalidated and not c.condeferrable
+      and (pg_get_constraintdef(c.oid)=item->>'definition' or
+        (item->>'table',item->>'name',item->>'definition',pg_get_constraintdef(c.oid)) =
+        ('service_evidence_uploads','service_evidence_uploads_file_name_check',$check_original$CHECK ((((char_length(file_name) >= 1) AND (char_length(file_name) <= 120)) AND (file_name ~ '^[A-Za-z0-9_][A-Za-z0-9._-]*$'::text)))$check_original$,$check_restored$CHECK (((char_length(file_name) >= 1) AND (char_length(file_name) <= 120) AND (file_name ~ '^[A-Za-z0-9_][A-Za-z0-9._-]*$'::text)))$check_restored$))) then flags:=jsonb_set(flags,'{receipt_constraints}','false'); end if;
+  end loop;$check_new_1$;
+compat_preimage text;
 begin
  proc_oid:=to_regprocedure('public.qrguitar_release_readiness()');
  if proc_oid is null then raise exception 'Missing readiness predecessor.';end if;
@@ -57,6 +82,13 @@ begin
  next_source:=replace(next_source,$table_anchor$  for table_name in select jsonb_array_elements_text(manifest->'tables') loop$table_anchor$,table_guard||$table_anchor$  for table_name in select jsonb_array_elements_text(manifest->'tables') loop$table_anchor$);
  next_source:=replace(next_source,$catalog_anchor$  for item in select value from jsonb_array_elements(manifest->'columns') loop$catalog_anchor$,catalog_guard||$catalog_anchor$  for item in select value from jsonb_array_elements(manifest->'columns') loop$catalog_anchor$);
  if replace(replace(replace(next_source,next_token,old_token),table_guard,''),catalog_guard,'') is distinct from source then raise exception 'Existing readiness guards changed.';end if;
+ -- Accept only two named, source-bound equivalent CHECK serializations after restore.
+ compat_preimage:=next_source;
+ if (length(next_source)-length(replace(next_source,check_old_0,'')))/length(check_old_0)<>1 then raise exception 'Exact CHECK compatibility anchor required.';end if;
+ next_source:=replace(next_source,check_old_0,check_new_0);
+ if (length(next_source)-length(replace(next_source,check_old_1,'')))/length(check_old_1)<>1 then raise exception 'Exact CHECK compatibility anchor required.';end if;
+ next_source:=replace(next_source,check_old_1,check_new_1);
+ if replace(replace(next_source,check_new_1,check_old_1),check_new_0,check_old_0) is distinct from compat_preimage then raise exception 'Unexpected CHECK compatibility change.';end if;
  if (length(definition)-length(replace(definition,source,'')))/length(source)<>1 then raise exception 'Exact readiness function definition required.';end if;
  execute replace(definition,source,next_source);
  outcome:=public.qrguitar_release_readiness();
