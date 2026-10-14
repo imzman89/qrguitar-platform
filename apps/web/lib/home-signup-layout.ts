@@ -1,22 +1,24 @@
 import type { EditorialSection } from "./site-settings";
 
-/** The signup panel replaces the old role picker and service disclosure. */
+const visibleHomeSections = new Set(["hero", "archive", "roles"]);
+
+/** Keep the homepage focused while preserving the owner's section order and visibility. */
 export function homeSignupSections(sections: EditorialSection[]) {
-  return sections.filter(section => section.id !== "continuity").map(section =>
+  return sections.filter(section => visibleHomeSections.has(section.id)).map(section =>
     section.id === "roles" ? { ...section, name: "Free signup", blocks: [] } : section
   );
 }
 
-/** Keep saved legacy content when the owner reorders or hides current sections. */
+/** Editing this presentation must not erase saved content from retired homepage sections. */
 export function mergeHomeSignupSections(saved: EditorialSection[], edited: EditorialSection[]) {
   const previousRoles = saved.find(section => section.id === "roles");
-  const current = edited.filter(section => section.id !== "continuity").map(section =>
+  const current = edited.filter(section => visibleHomeSections.has(section.id)).map(section =>
     section.id === "roles" && previousRoles
       ? { ...section, name: previousRoles.name, blocks: previousRoles.blocks }
       : section
   );
   for (let index = 0; index < saved.length; index++) {
-    if (saved[index].id === "continuity") current.splice(Math.min(index, current.length), 0, saved[index]);
+    if (!visibleHomeSections.has(saved[index].id)) current.splice(Math.min(index, current.length), 0, saved[index]);
   }
   return current;
 }

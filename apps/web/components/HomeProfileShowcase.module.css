@@ -29,3 +29,12 @@
 /* Original photo proportions: the whole instrument remains visible. */
 .photoStage { height:470px; aspect-ratio:auto; }
 @media(max-width:760px) { .photoStage { height:320px; aspect-ratio:auto; } }
+
+/* Equal gallery photographs keep every whole instrument visible. */
+.gallery .photoStage { height:auto; aspect-ratio:4/5; padding:20px; background:var(--surface); }
+.gallery .details { flex-wrap:wrap; gap:4px 16px; padding-top:20px; }
+.gallery .identity { flex-basis:100%; }
+.gallery .identity h3 { font-size:19px; }
+.gallery .identity h3 a { min-height:44px; }
+.gallery .galleryLink { min-height:44px; }
+@media(max-width:540px) { .gallery .photoStage { aspect-ratio:1; padding:24px; } }

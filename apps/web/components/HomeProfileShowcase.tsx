@@ -11,7 +11,7 @@ import { publicMediaVariantSrcSet, publicMediaVariantUrl } from "../lib/public-m
 import { PhotoViewer } from "./PhotoViewer";
 import styles from "./HomeProfileShowcase.module.css";
 
-export function HomeProfileShowcase({ record }: { record: DemoInstrument }) {
+export function HomeProfileShowcase({ record, variant = "hero" }: { record: DemoInstrument; variant?: "hero" | "gallery" }) {
   const ui = useUiText("components.HomeProfileShowcase");
   const card = resolveCollectibleCard(record);
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -21,9 +21,9 @@ export function HomeProfileShowcase({ record }: { record: DemoInstrument }) {
   const activePhoto = Math.min(selectedPhoto, Math.max(0, photos.length - 1));
 
   return (
-    <article className={styles.showcase} aria-label={"Explore the public Profile for " + card.title}>
+    <article className={styles.showcase + (variant === "gallery" ? " " + styles.gallery : "")} aria-label={"Explore the public Profile for " + card.title}>
       <button type="button" className={styles.photoStage} onClick={() => setViewerOpen(true)} disabled={!photos.length} aria-label={"View photos of " + card.title}>
-        {photos.length ? <img className={styles.mainPhoto} src={publicMediaVariantUrl(photos[activePhoto], 1200)} srcSet={publicMediaVariantSrcSet(photos[activePhoto])} sizes="(max-width: 760px) calc(100vw - 40px), (max-width: 900px) 720px, 620px" alt={card.title + ", photo " + (activePhoto + 1) + " of " + photos.length} loading="eager" fetchPriority="high" decoding="async" width={1200} height={900} referrerPolicy="no-referrer" onError={() => setFailedPhotos((current) => current.includes(photos[activePhoto]) ? current : [...current, photos[activePhoto]])} />
+        {photos.length ? <img className={styles.mainPhoto} src={publicMediaVariantUrl(photos[activePhoto], 1200)} srcSet={publicMediaVariantSrcSet(photos[activePhoto])} sizes={variant === "gallery" ? "(max-width: 540px) calc(100vw - 40px), (max-width: 760px) 50vw, 400px" : "(max-width: 760px) calc(100vw - 40px), (max-width: 900px) 720px, 620px"} alt={card.title + ", photo " + (activePhoto + 1) + " of " + photos.length} loading={variant === "hero" ? "eager" : "lazy"} fetchPriority={variant === "hero" ? "high" : "low"} decoding="async" width={1200} height={900} referrerPolicy="no-referrer" onError={() => setFailedPhotos((current) => current.includes(photos[activePhoto]) ? current : [...current, photos[activePhoto]])} />
           : <div className={styles.noPhoto}><Camera size={36} aria-hidden="true" /><span>{ui("ui.components.HomeProfileShowcase.44cebddc8ad6", "Photos are currently unavailable")}</span></div>}
       </button>
       <div className={styles.details}>

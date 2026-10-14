@@ -28,7 +28,7 @@ const publicMediaVariant = read("lib/public-media-variant.ts");
 const collection = read("app/collections/[handle]/page.tsx");
 const collectionDirectory = read("app/collections/CollectionsDirectoryClient.tsx");
 const dashboard = read("app/dashboard/page.tsx");
-const homeStyles = read("components/HomePageClient.module.css");
+const homeStyles = read("components/BoutiqueHome.module.css");
 
 function compileImageFallbackHelpers() {
   const module = { exports: {} };
@@ -122,7 +122,7 @@ function compileCollectibleResolver() {
   return module.exports.resolveCollectibleCard;
 }
 
-function renderHomepageShowcase(failedPhotos = []) {
+function renderHomepageShowcase(failedPhotos = [], variant = "hero") {
   const module = { exports: {} };
   const code = ts.transpileModule(showcase, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX }
@@ -142,7 +142,7 @@ function renderHomepageShowcase(failedPhotos = []) {
     "./PhotoViewer": { PhotoViewer: () => null }
   };
   new Function("require", "module", "exports", code)((name) => overrides[name] || require(name), module, module.exports);
-  return renderToStaticMarkup(React.createElement(module.exports.HomeProfileShowcase, { record: { qrCode: "QRG-TEST" } }));
+  return renderToStaticMarkup(React.createElement(module.exports.HomeProfileShowcase, { record: { qrCode: "QRG-TEST" }, variant }));
 }
 
 function compileInstrumentCategories() {
@@ -180,10 +180,9 @@ test("public media variants are added only to checked public media proxy URLs", 
 
 test("public image surfaces request bounded variants while keeping original URLs as identity", () => {
   assert.match(showcase, /publicMediaVariantUrl\(photos\[activePhoto\], 1200\)/);
-  assert.match(showcase, /srcSet=\{publicMediaVariantSrcSet\(photos\[activePhoto\]\)\} sizes="\(max-width: 760px\) calc\(100vw - 40px\), \(max-width: 900px\) 720px, 620px"/);
+  assert.match(renderHomepageShowcase(), /sizes="\(max-width: 760px\) calc\(100vw - 40px\), \(max-width: 900px\) 720px, 620px"/);
   assert.equal((renderHomepageShowcase().match(/<img\b/g) || []).length, 1, "The homepage loads its lead photo; additional photos open on demand in the gallery.");
-  assert.match(homepage, /src=\{publicMediaVariantUrl\(recordPhoto, 640\)\} srcSet=\{publicMediaVariantSrcSet\(recordPhoto, \[160, 640\]\)\} sizes="\(max-width: 700px\) 360px, 320px"/);
-  assert.doesNotMatch(homepage, /<img src=\{recordPhoto\}/);
+  assert.doesNotMatch(homepage, /<img\b/, "Homepage photographs use the shared bounded, failure-aware gallery.");
   assert.match(card, /publicMediaVariantUrl\(imageUrl, 640\)/);
   assert.match(profile, /publicMediaVariantUrl\(galleryImages\[mediaIndex\], 1200\)/);
   assert.match(profile, /srcSet=\{publicMediaVariantSrcSet\(galleryImages\[mediaIndex\]\)\}[^>]*sizes="\(max-width: 540px\) calc\(100vw - 32px\), \(max-width: 760px\) calc\(100vw - 40px\), \(max-width: 900px\) 720px, 684px"/);
@@ -234,31 +233,29 @@ test("Catalog grants high priority to exactly the first visible Profile card", (
   assert.equal((catalog.match(/prioritizeLeadImage=/g) || []).length, 1);
 });
 
-test("Homepage prioritizes its one hero Profile and defers archive and supporting media", () => {
+test("Homepage prioritizes its one hero and defers all gallery photographs", () => {
   const heroPhotos = [...renderHomepageShowcase().matchAll(/<img\b[^>]*>/g)].map(match => match[0]);
   assert.equal(heroPhotos.length, 1);
   assert.match(heroPhotos[0], /loading="eager"/);
   assert.match(heroPhotos[0], /fetchPriority="high"/i);
-  assert.match(homepage, /loading="lazy" fetchPriority="low" decoding="async" width=\{1200\} height=\{900\}/);
   const tree = ts.createSourceFile("HomePageClient.tsx", homepage, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  const showcases = [], archiveCards = [];
+  const showcases = [];
   function visit(node) {
-    if (ts.isJsxSelfClosingElement(node)) {
-      if (node.tagName.getText(tree) === "HomeProfileShowcase") showcases.push(node);
-      if (node.tagName.getText(tree) === "CollectibleRecordCard") archiveCards.push(node);
-    }
+    if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(tree) === "HomeProfileShowcase") showcases.push(node);
     ts.forEachChild(node, visit);
   }
   visit(tree);
-  assert.equal(showcases.length, 1, "Exactly one current hero may use showcase image priority");
   const attr = (node, name) => node.attributes.properties.find(p => ts.isJsxAttribute(p) && p.name.getText(tree) === name);
+  assert.equal(showcases.length, 2);
   assert.equal(attr(showcases[0], "record").initializer.expression.getText(tree), "initialLatestRecord");
-  assert.equal(archiveCards.length, 1, "Actual archive map must render the shared Profile card");
-  assert.equal(attr(archiveCards[0], "variant").initializer.text, "archive");
-  assert.equal(attr(archiveCards[0], "prioritizeLeadImage"), undefined, "Archive keeps the shared card lazy-loading default");
-  const archivePhotos = [...renderToStaticMarkup(React.createElement(compileCard(), { record: { qrCode: "TEST" }, variant: "archive" })).matchAll(/<img\b[^>]*>/g)].map(match => match[0]);
-  assert.ok(archivePhotos.length);
-  for (const image of archivePhotos) { assert.match(image, /loading="lazy"/); assert.match(image, /fetchPriority="low"/i); }
+  assert.equal(attr(showcases[0], "variant"), undefined, "Only the hero uses default priority");
+  assert.equal(attr(showcases[1], "variant").initializer.text, "gallery");
+  const galleryPhotos = [...renderHomepageShowcase([], "gallery").matchAll(/<img\b[^>]*>/g)].map(match => match[0]);
+  assert.equal(galleryPhotos.length, 1, "Additional photos remain on demand");
+  assert.match(galleryPhotos[0], /loading="lazy"/);
+  assert.match(galleryPhotos[0], /fetchPriority="low"/i);
+  assert.match(galleryPhotos[0], /sizes="\(max-width: 540px\) calc\(100vw - 40px\), \(max-width: 760px\) 50vw, 400px"/);
+  assert.match(galleryPhotos[0], /referrerPolicy="no-referrer"/i);
 });
 
 test("shared Profile cards show the category selected for that Profile", () => {
@@ -303,9 +300,9 @@ test("current homepage hero and archive reflow to one column on phones", () => {
   }
   assert.equal(columnsAt(".heroGrid", 390), "1fr");
   assert.equal(columnsAt(".heroGrid", 760), "1fr");
-  assert.equal(columnsAt(".home :global(.home-archive-rail)", 1440), "repeat(3,minmax(0,1fr))");
-  assert.equal(columnsAt(".home :global(.home-archive-rail)", 700), "repeat(2,minmax(0,1fr))");
-  assert.equal(columnsAt(".home :global(.home-archive-rail)", 390), "1fr");
+  assert.equal(columnsAt(".archiveGrid", 1440), "repeat(3,minmax(0,1fr))");
+  assert.equal(columnsAt(".archiveGrid", 700), "repeat(2,minmax(0,1fr))");
+  assert.equal(columnsAt(".archiveGrid", 390), "1fr");
 });
 
 test("homepage photo count and accessible image total agree after a failed source", () => {
@@ -371,7 +368,7 @@ test("editor and supporting UI images declare stable geometry and low-priority d
   assert.match(dashboard, /loading="lazy"[\s\S]{0,100}fetchPriority="low"[\s\S]{0,100}decoding="async"[\s\S]{0,100}width=\{1200\}[\s\S]{0,80}height=\{900\}/);
   assert.match(showcase, /referrerPolicy="no-referrer"/);
   assert.match(card, /referrerPolicy="no-referrer"/);
-  assert.match(homepage, /referrerPolicy="no-referrer"/);
+  assert.doesNotMatch(homepage, /<img\b/, "Homepage image privacy is handled by HomeProfileShowcase");
 });
 
 test("avatars, compact QR previews, and brand marks replace failed sources with usable fallbacks", () => {

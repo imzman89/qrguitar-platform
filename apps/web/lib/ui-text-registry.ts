@@ -620,7 +620,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
   {"key":"ui.components.Footer.installers","scope":"components.Footer","text":"Installer program","area":"Global","page":"Shared Footer","section":"Public navigation and discovery","source":"components/Footer.tsx"},
   {"key":"ui.components.Footer.accountAccess","scope":"components.Footer","text":"Account access","area":"Global","page":"Shared Footer","section":"Public navigation and discovery","source":"components/Footer.tsx"},
   {"key":"ui.components.Footer.copyright","scope":"components.Footer","text":"Copyright {{year}} QRguitar. All rights reserved.","area":"Global","page":"Shared Footer","section":"Public navigation and discovery","source":"components/Footer.tsx"},
-  {"key":"ui.components.HomePageClient.installerProgram","scope":"components.HomePageClient","text":"Explore the Installer program","area":"Marketing","page":"Homepage","section":"Public navigation and discovery","source":"components/HomePageClient.tsx"},
   {"key":"ui.app.contact.page.draftHeading","scope":"app.contact.page","text":"Contact support","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
   {"key":"ui.app.contact.page.draftIntro","scope":"app.contact.page","text":"Send a message here or use your email app.","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
   {"key":"ui.app.contact.page.draftName","scope":"app.contact.page","text":"Name","area":"Support & Legal","page":"Contact","section":"Email draft","source":"app/contact/page.tsx"},
@@ -23645,129 +23644,12 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "source": "components/Footer.tsx"
   },
   {
-    "key": "ui.components.HomePageClient.bec4c56fb4cb",
-    "scope": "components.HomePageClient",
-    "text": "What stays with your instrument",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Accessibility",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
-    "key": "ui.components.HomePageClient.ecbcf256c14d",
-    "scope": "components.HomePageClient",
-    "text": "One permanent identity",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
-    "key": "ui.components.HomePageClient.bc615fcc90ab",
-    "scope": "components.HomePageClient",
-    "text": "The same Profile. Every chapter.",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
-    "key": "ui.components.HomePageClient.eb341bf13357",
-    "scope": "components.HomePageClient",
-    "text": "Your privacy, your choice",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
-    "key": "ui.components.HomePageClient.a4c1dff0c2e1",
-    "scope": "components.HomePageClient",
-    "text": "Public, unlisted, or just for you.",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
-    "key": "ui.components.HomePageClient.f5ab906e49d7",
-    "scope": "components.HomePageClient",
-    "text": "A history that carries forward",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
-    "key": "ui.components.HomePageClient.104c2472352a",
-    "scope": "components.HomePageClient",
-    "text": "Service and ownership, connected.",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
-    "key": "ui.components.HomePageClient.3b67d76945bd",
-    "scope": "components.HomePageClient",
-    "text": "Profiles",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
-    "key": "ui.components.HomePageClient.025320721b82",
-    "scope": "components.HomePageClient",
-    "text": "Catalog",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
     "key": "ui.components.HomePageClient.230cdd8c2e80",
     "scope": "components.HomePageClient",
     "text": "Explore additional QRguitar Profiles",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Accessibility",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
-    "key": "ui.components.HomePageClient.4c90147fd5f7",
-    "scope": "components.HomePageClient",
-    "text": "A QRguitar Profile keeps the instrument and its history together",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Accessibility",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
-    "key": "ui.components.HomePageClient.d28da756523e",
-    "scope": "components.HomePageClient",
-    "text": "Documented {{value1}} in QRguitar",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Labels and help",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
-    "key": "ui.components.HomePageClient.42ab3b00b1c2",
-    "scope": "components.HomePageClient",
-    "text": "A permanent identity for every instrument",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
-    "key": "ui.components.HomePageClient.8969d61bdcd8",
-    "scope": "components.HomePageClient",
-    "text": "One Profile",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Page text",
     "source": "components/HomePageClient.tsx"
   },
   {
@@ -23810,33 +23692,6 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
     "key": "ui.components.HomePageClient.7bf7f24c48ad",
     "scope": "components.HomePageClient",
     "text": "How it works",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
-    "key": "ui.components.HomePageClient.b575d2660321",
-    "scope": "components.HomePageClient",
-    "text": "Create a Profile",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
-    "key": "ui.components.HomePageClient.8088497eb587",
-    "scope": "components.HomePageClient",
-    "text": "Create a Profile",
-    "page": "Home Page Client",
-    "area": "Global",
-    "section": "Page text",
-    "source": "components/HomePageClient.tsx"
-  },
-  {
-    "key": "ui.components.HomePageClient.004ca2d8b070",
-    "scope": "components.HomePageClient",
-    "text": "Catalog",
     "page": "Home Page Client",
     "area": "Global",
     "section": "Page text",
@@ -28166,6 +28021,151 @@ export const uiTextEntries: Array<{ key: string; scope: string; text: string; ar
 
 // Compatibility only: retained for saved CMS snapshots; these removed controls are not displayed.
 export const retiredUiTextEntries = [
+  {"key":"ui.components.HomePageClient.installerProgram","scope":"components.HomePageClient","text":"Explore the Installer program","area":"Marketing","page":"Homepage","section":"Public navigation and discovery","source":"components/HomePageClient.tsx"},
+  {
+    "key": "ui.components.HomePageClient.bec4c56fb4cb",
+    "scope": "components.HomePageClient",
+    "text": "What stays with your instrument",
+    "page": "Home Page Client",
+    "area": "Global",
+    "section": "Accessibility",
+    "source": "components/HomePageClient.tsx"
+  },
+  {
+    "key": "ui.components.HomePageClient.ecbcf256c14d",
+    "scope": "components.HomePageClient",
+    "text": "One permanent identity",
+    "page": "Home Page Client",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/HomePageClient.tsx"
+  },
+  {
+    "key": "ui.components.HomePageClient.bc615fcc90ab",
+    "scope": "components.HomePageClient",
+    "text": "The same Profile. Every chapter.",
+    "page": "Home Page Client",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/HomePageClient.tsx"
+  },
+  {
+    "key": "ui.components.HomePageClient.eb341bf13357",
+    "scope": "components.HomePageClient",
+    "text": "Your privacy, your choice",
+    "page": "Home Page Client",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/HomePageClient.tsx"
+  },
+  {
+    "key": "ui.components.HomePageClient.a4c1dff0c2e1",
+    "scope": "components.HomePageClient",
+    "text": "Public, unlisted, or just for you.",
+    "page": "Home Page Client",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/HomePageClient.tsx"
+  },
+  {
+    "key": "ui.components.HomePageClient.f5ab906e49d7",
+    "scope": "components.HomePageClient",
+    "text": "A history that carries forward",
+    "page": "Home Page Client",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/HomePageClient.tsx"
+  },
+  {
+    "key": "ui.components.HomePageClient.104c2472352a",
+    "scope": "components.HomePageClient",
+    "text": "Service and ownership, connected.",
+    "page": "Home Page Client",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/HomePageClient.tsx"
+  },
+  {
+    "key": "ui.components.HomePageClient.3b67d76945bd",
+    "scope": "components.HomePageClient",
+    "text": "Profiles",
+    "page": "Home Page Client",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/HomePageClient.tsx"
+  },
+  {
+    "key": "ui.components.HomePageClient.025320721b82",
+    "scope": "components.HomePageClient",
+    "text": "Catalog",
+    "page": "Home Page Client",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/HomePageClient.tsx"
+  },
+  {
+    "key": "ui.components.HomePageClient.4c90147fd5f7",
+    "scope": "components.HomePageClient",
+    "text": "A QRguitar Profile keeps the instrument and its history together",
+    "page": "Home Page Client",
+    "area": "Global",
+    "section": "Accessibility",
+    "source": "components/HomePageClient.tsx"
+  },
+  {
+    "key": "ui.components.HomePageClient.d28da756523e",
+    "scope": "components.HomePageClient",
+    "text": "Documented {{value1}} in QRguitar",
+    "page": "Home Page Client",
+    "area": "Global",
+    "section": "Labels and help",
+    "source": "components/HomePageClient.tsx"
+  },
+  {
+    "key": "ui.components.HomePageClient.42ab3b00b1c2",
+    "scope": "components.HomePageClient",
+    "text": "A permanent identity for every instrument",
+    "page": "Home Page Client",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/HomePageClient.tsx"
+  },
+  {
+    "key": "ui.components.HomePageClient.8969d61bdcd8",
+    "scope": "components.HomePageClient",
+    "text": "One Profile",
+    "page": "Home Page Client",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/HomePageClient.tsx"
+  },
+  {
+    "key": "ui.components.HomePageClient.b575d2660321",
+    "scope": "components.HomePageClient",
+    "text": "Create a Profile",
+    "page": "Home Page Client",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/HomePageClient.tsx"
+  },
+  {
+    "key": "ui.components.HomePageClient.8088497eb587",
+    "scope": "components.HomePageClient",
+    "text": "Create a Profile",
+    "page": "Home Page Client",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/HomePageClient.tsx"
+  },
+  {
+    "key": "ui.components.HomePageClient.004ca2d8b070",
+    "scope": "components.HomePageClient",
+    "text": "Catalog",
+    "page": "Home Page Client",
+    "area": "Global",
+    "section": "Page text",
+    "source": "components/HomePageClient.tsx"
+  },
   ...freeProfileRetiredUiTextEntries,
   ...localPreviewRetiredUiTextEntries,
   {
