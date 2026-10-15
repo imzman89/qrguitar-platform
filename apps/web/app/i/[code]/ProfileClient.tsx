@@ -893,8 +893,26 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
             ) : null}
           </section>
           <div className={styles["scan-hero-info"]}>
-            <details className={styles["profile-identity-details"]}>
-              <summary>{ui("ui.app.i.code.ProfileClient.instrumentIdentity", "Instrument identity")}</summary>
+        <footer aria-label="Profile QR and share">
+        <div className={styles["scan-qr"]}>
+          <ProfileQr code={instrument.qrCode} />
+          <div>
+            <strong>{instrument.qrCode}</strong>
+            <span>{ui("ui.app.i.code.ProfileClient.5139e0f92e71", "Scan to view")}</span>
+            <span>{shareUrl ? shareUrl.replace(/^https?:\/\//, "") : ui("ui.app.i.code.ProfileClient.58a595439cb9", "qrguitar.com/i/{{value1}}", { value1: instrument.qrCode.toLowerCase() })}</span>
+          </div>
+          <RecordShareButton className={styles["scan-share-button"]} code={instrument.qrCode} title={instrumentDisplayName(instrument)} />
+          <button className="button secondary" type="button" onClick={copyProfileUrl}>
+            <Copy size={14} />
+            {copyStatus === "copied" ? ui("ui.app.i.code.ProfileClient.8d525e5f158b", "Copied") : ui("ui.app.i.code.ProfileClient.b26d1037f1c2", "Copy URL")}
+          </button>
+        </div>
+        {shareNotice === "failed" ? (
+          <small className={styles["scan-copy-notice"]}>{ui("ui.app.i.code.ProfileClient.0854b0c9c202", "Copy failed. You can copy the URL from your browser bar.")}</small>
+        ) : null}
+
+        </footer>
+            <div className={styles["profile-identity-details"]}>
             <ProfileIdentity
               heading={ui("ui.app.i.code.ProfileClient.instrumentIdentity", "Instrument identity")}
               values={identityValues}
@@ -914,7 +932,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                 </p>
               ) : null}
             </ProfileIdentity>
-            </details>
+            </div>
               {trustItems.length ? (
                 <div className={styles["profile-trust-summary"]} aria-label={ui("ui.app.i.code.ProfileClient.66e1c9549fde", "Trust review")}>
                   {trustItems.map((item) => (
@@ -1125,24 +1143,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
           </details>
         </section> : null}
 
-        <footer aria-label="Profile QR and share">
-        <div className={styles["scan-qr"]}>
-          <ProfileQr code={instrument.qrCode} />
-          <div>
-            <strong>{ui("ui.app.i.code.ProfileClient.5139e0f92e71", "Scan to view")}</strong>
-            <span>{shareUrl ? shareUrl.replace(/^https?:\/\//, "") : ui("ui.app.i.code.ProfileClient.58a595439cb9", "qrguitar.com/i/{{value1}}", { value1: instrument.qrCode.toLowerCase() })}</span>
-          </div>
-          <RecordShareButton className={styles["scan-share-button"]} code={instrument.qrCode} title={instrumentDisplayName(instrument)} />
-          <button className="button secondary" type="button" onClick={copyProfileUrl}>
-            <Copy size={14} />
-            {copyStatus === "copied" ? ui("ui.app.i.code.ProfileClient.8d525e5f158b", "Copied") : ui("ui.app.i.code.ProfileClient.b26d1037f1c2", "Copy URL")}
-          </button>
-        </div>
-        {shareNotice === "failed" ? (
-          <small className={styles["scan-copy-notice"]}>{ui("ui.app.i.code.ProfileClient.0854b0c9c202", "Copy failed. You can copy the URL from your browser bar.")}</small>
-        ) : null}
 
-        </footer>
 
         {activeMedia ? (
           <PhotoViewer

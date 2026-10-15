@@ -10,7 +10,7 @@ import { Nav } from "./Nav";
 import { useUiText } from "./UiTextProvider";
 import { siteCopy } from "../content/site-copy";
 import type { DemoInstrument } from "../lib/local-demo";
-import { getProfilePhotoUrls } from "../lib/instrument-profile-contract";
+import { getProfilePhotoUrls, resolveInstrumentPresentation } from "../lib/instrument-profile-contract";
 import { buildEditableHomeCopy, fetchPublishedSiteSettings, mergeSiteSettings, type EditableSiteSettings } from "../lib/site-settings";
 import { selectHomeFeaturedProfile } from "../lib/home-featured-profile";
 import { isEligiblePublicProfile } from "../lib/public-profile-eligibility";
@@ -53,6 +53,7 @@ export function HomePageClient({ initialRecords, initialSettings }: {
     && isEligiblePublicProfile(record) && record.safetyStatus !== "lost" && record.safetyStatus !== "stolen"
     && getProfilePhotoUrls(record).length > 0);
   const initialLatestRecord = selectHomeFeaturedProfile(eligibleRecords);
+  const storyRecord = eligibleRecords.find(record => resolveInstrumentPresentation(record, "public").serviceEntries.some(event => event.title.trim())) || initialLatestRecord;
   const seenCodes = new Set(initialLatestRecord ? [initialLatestRecord.qrCode.trim().toUpperCase()] : []);
   const seenPhotos = new Set(initialLatestRecord ? getProfilePhotoUrls(initialLatestRecord) : []);
   const orderedRecords = [...eligibleRecords.filter(record => /guitar/i.test(record.instrumentType || "")),
@@ -93,7 +94,7 @@ export function HomePageClient({ initialRecords, initialSettings }: {
           </div>
         </div>
       </section>
-      <HomeProductStory record={initialLatestRecord} content={content} />
+      <HomeProductStory record={storyRecord} content={content} />
       </>
     ),
     archive: archiveRecords.length ? (

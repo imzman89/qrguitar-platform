@@ -1,16 +1,5 @@
-.identity-card { min-width: 0; color: var(--text); }
-.identity-card-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 18px; font-size: 13px; font-weight: 600; }
-.identity-media-summary { color: var(--muted); font-size: 12px; font-weight: 400; }
-.identity-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px 24px; margin: 0; padding: 0; }
-.identity-cell { min-width: 0; }
-.identity-cell dt { color: var(--muted); font-size: 12px; line-height: 1.5; margin-bottom: 4px; }
-.identity-cell dd { margin: 0; color: var(--text); font-size: 14px; font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
-
-
-/* v30: a readable record, rather than a generic summary card. */
-.identity-card { padding:22px 0 0; border-top:1px solid var(--line); background:transparent; }
-.identity-card-header { display:grid; justify-content:start; gap:8px; margin-bottom:24px; font-family:var(--font-ui); font-size:10px; font-weight:500; letter-spacing:.12em; text-transform:uppercase; }
-.identity-media-summary { font-size:13px; letter-spacing:0; line-height:1.6; text-transform:none; }
-.identity-grid { gap:24px 32px; }
-.identity-cell dt { font-size:11px; margin-bottom:7px; }
-.identity-cell dd { font-family:var(--font-ui); font-size:16px; font-weight:500; line-height:1.45; }
+.identity-card { min-width:0; color:var(--text); }
+.identity-card-header { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:baseline; gap:8px 16px; margin-bottom:20px; font-size:14px; font-weight:600; line-height:1.5; }
+.identity-media-summary { color:var(--muted); font-size:12px; font-weight:400; line-height:1.6; }
+.identity-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px 24px; margin:0; padding:0; }
+.identity-cell { min-width:0; }.identity-cell dt { color:var(--muted); font-size:12px; line-height:1.5; margin-bottom:5px; }.identity-cell dd { margin:0; color:var(--text); font:500 15px/1.5 var(--font-ui); overflow-wrap:anywhere; }

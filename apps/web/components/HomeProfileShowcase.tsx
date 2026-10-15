@@ -30,7 +30,7 @@ export function HomeProfileShowcase({ record, variant = "hero" }: { record: Demo
       </button>
       <div className={styles.details}>
         <div className={styles.identity}>
-          <span className={styles.kicker}>{ui("ui.components.HomeProfileShowcase.1dd0ddc0cf78", "QRguitar Profile ·")}{" "}{card.typeLabel}</span>
+          <span className={styles.kicker}>{card.typeLabel}</span>
           <h3><Link href={card.profileUrl}>{card.title}<ArrowUpRight size={19} aria-hidden="true" /></Link></h3>
           {card.factLine ? <p>{card.factLine}</p> : null}
         </div>

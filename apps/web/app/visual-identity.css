@@ -3,19 +3,19 @@
 @media screen {
  body[data-product-theme] {
   --font-ui:"QRguitar Modern","Aptos","Segoe UI",sans-serif; --font-display:var(--font-ui);
-  --canvas:#090b0d; --bg:#090b0d; --bg-2:#0d1114; --surface:#11161b; --surface-subtle:#171e24; --surface-raised:#1c252c; --surface-soft:#151c22;
+  --canvas:#0d0f11; --bg:#0d0f11; --bg-2:#121416; --surface:#16191d; --surface-subtle:#1b1e22; --surface-raised:#20252b; --surface-soft:#181b1f;
   --panel:#11161b; --panel-2:#171e24; --text:#f4f1e9; --ink:#090b0d; --muted:#a9b2b8; --muted-strong:#d0d5d7;
-  --line:#303b43; --border:#303b43; --border-soft:#252f37; --border-strong:#56636d;
+  --line:#343b44; --border:#343b44; --border-soft:#292e34; --border-strong:#58616b;
   --field-surface:#0c1014; --field-text:#f4f1e9; --field-muted:#9ca8b0;
   --action:#edaa58; --action-hover:#f4bd78; --gold:#edaa58; --gold-2:#e7c38b; --on-action:#15100a; --action-ink:#15100a;
-  --positive:#9cddb1; --negative:#ffb4aa; --warning:#e9c57e; --photo-mat:#0d1216;
+  --positive:#9cddb1; --negative:#ffb4aa; --warning:#e9c57e; --photo-mat:#141618;
   --selected-surface:#29241b; --dark-text:var(--text); --muted-light:var(--muted); --line-light:var(--line);
-  --shadow-card:0 14px 34px rgba(0,0,0,.3); --collector-line:#7c6848; --collector-metal:#d7b67b;
+  --shadow-card:none; --collector-line:#343b44; --collector-metal:#d7b67b;
   color-scheme:dark; background:var(--canvas); color:var(--text); font-family:var(--font-ui); font-synthesis:none; -webkit-font-smoothing:antialiased;
  }
  body[data-product-theme] main:not(:is(.cms-page,.admin-page,.admin-service-page,.handout-page)) h1 { font-family:var(--font-display); font-weight:650; letter-spacing:-.045em; line-height:1.12; }
  body[data-product-theme] :is(input,select,textarea) { color-scheme:dark; }
  body[data-product-theme] .brand-frame { background:var(--canvas); }
- body[data-product-theme] .brand-frame a[href="/create"] { border-radius:8px; background:var(--action); color:var(--on-action); border-color:var(--action); }
- body[data-product-theme] .brand-frame a[href="/create"]:hover { background:var(--action-hover); border-color:var(--action-hover); color:var(--on-action); }
+ body[data-product-theme] .brand-frame a[href="/create"] { border-radius:6px; background:transparent; color:var(--text); border-color:var(--line); }
+ body[data-product-theme] .brand-frame a[href="/create"]:hover { background:var(--surface); border-color:var(--muted); color:var(--text); }
 }

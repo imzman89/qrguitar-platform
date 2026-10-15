@@ -287,9 +287,9 @@ export function CollectibleRecordCard({
             {createdLabel ? <span className={styles["collectible-card-age"]}>{createdLabel}</span> : null}
           </div> : null}
           <Link className={styles["collectible-card-profile-link"]} href={localProfileHref}>
-            <span className={styles["collectible-card-type"]}>{card.typeLabel}</span>
+            <span className={styles["collectible-card-type"]}><span>{record.brand || card.typeLabel}</span>{record.year ? <strong className={styles["collectible-card-year"]}>{record.year}</strong> : null}</span>
             <h3>{isHomeFeatured ? <><span>{card.title}</span><ArrowRight size={16} aria-hidden="true" /></> : card.title}</h3>
-            <p className={styles["collectible-card-subtitle"]}>{card.factLine}</p>
+            <p className={styles["collectible-card-subtitle"]}>{card.typeLabel}</p>
             {summary ? <p className={styles["collectible-card-summary"]}>{summary}</p> : null}
           </Link>
 
@@ -305,6 +305,7 @@ export function CollectibleRecordCard({
             {showSecondaryText ? <span className={styles["collectible-card-secondary"]}>{secondaryLabel}</span> : null}
           </div>
           <details className={styles["collectible-card-details"]}><summary>Record details</summary><div className={styles["collectible-card-facts"]} aria-label="Profile contents">
+            {card.factLine ? <span>{card.factLine}</span> : null}
             {card.publicSerial ? (
               <span className={styles["collectible-card-serial"]}>
                 <Hash size={13} aria-hidden="true" />
