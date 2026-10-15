@@ -4,6 +4,7 @@ import Link from "./CheckoutAwareLink";
 import { ArrowRight } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useMemo, useState } from "react";
 import { HomeProfileShowcase } from "./HomeProfileShowcase";
+import { HomeProductStory, HomeAudiences } from "./HomeProductStory";
 import { Footer } from "./Footer";
 import { Nav } from "./Nav";
 import { useUiText } from "./UiTextProvider";
@@ -69,6 +70,7 @@ export function HomePageClient({ initialRecords, initialSettings }: {
 
   const renderedSections: Record<string, ReactNode> = {
     hero: (
+      <>
       <section className={styles.opening} aria-labelledby="home-title">
         <div className={"shell " + styles.heroGrid}>
           <div className={styles.heroCopy}>
@@ -91,6 +93,8 @@ export function HomePageClient({ initialRecords, initialSettings }: {
           </div>
         </div>
       </section>
+      <HomeProductStory record={initialLatestRecord} content={content} />
+      </>
     ),
     archive: archiveRecords.length ? (
       <section className={styles.archiveSection} aria-labelledby="home-archive-title">
@@ -110,6 +114,8 @@ export function HomePageClient({ initialRecords, initialSettings }: {
       </section>
     ) : null,
     roles: (
+      <>
+      <HomeAudiences content={content} />
       <section className={styles.signupSection} id="audiences" aria-labelledby="home-signup-title">
         <div className={"shell " + styles.signupPanel}>
           <div className={styles.signupCopy}>
@@ -123,6 +129,7 @@ export function HomePageClient({ initialRecords, initialSettings }: {
           </div>
         </div>
       </section>
+      </>
     )
   };
 

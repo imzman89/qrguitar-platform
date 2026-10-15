@@ -124,7 +124,7 @@ export function CollectibleRecordCard({
     const rail = railRef.current;
     if (!rail || galleryImages.length < 2) return;
     const next = (activeImageIndex + direction + galleryImages.length) % galleryImages.length;
-    rail.scrollTo({ left: next * rail.clientWidth, behavior: "smooth" });
+    rail.scrollTo({ left: next * rail.clientWidth, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
     selectGalleryPhoto(next);
   }
 
@@ -160,7 +160,7 @@ export function CollectibleRecordCard({
     if (rail.hasPointerCapture?.(event.pointerId)) rail.releasePointerCapture(event.pointerId);
     dragState.current.pointerId = -1;
     const next = Math.max(0, Math.min(galleryImages.length - 1, Math.round(rail.scrollLeft / Math.max(1, rail.clientWidth))));
-    rail.scrollTo({ left: next * rail.clientWidth, behavior: "smooth" });
+    rail.scrollTo({ left: next * rail.clientWidth, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
     selectGalleryPhoto(next);
   }
 
@@ -300,11 +300,11 @@ export function CollectibleRecordCard({
           {card.publicHistoryCount ? <p className={styles["collectible-card-provenance"]}>{card.publicHistoryCount} {card.publicHistoryCount === 1 ? "recorded history entry" : "recorded history entries"}</p> : null}
 
 
-          {!isHomeFeatured ? <div className={styles["collectible-card-actions"]}>
+          {!isHomeFeatured ? <div className={styles["collectible-card-footer"]}><div className={styles["collectible-card-actions"]}>
             <Link className={styles["collectible-card-cta"]} href={localProfileHref}>{ctaLabel} <ArrowRight size={14} /></Link>
             {showSecondaryText ? <span className={styles["collectible-card-secondary"]}>{secondaryLabel}</span> : null}
-          </div> : null}
-          {!isHomeFeatured ? <details className={styles["collectible-card-details"]}><summary>Record details</summary><div className={styles["collectible-card-facts"]} aria-label="Profile contents">
+          </div>
+          <details className={styles["collectible-card-details"]}><summary>Record details</summary><div className={styles["collectible-card-facts"]} aria-label="Profile contents">
             {card.publicSerial ? (
               <span className={styles["collectible-card-serial"]}>
                 <Hash size={13} aria-hidden="true" />
@@ -319,7 +319,7 @@ export function CollectibleRecordCard({
             <div className={styles["collectible-card-utilities"]}>
               <RecordShareButton className={styles["collectible-card-share"]} showLabel={variant === "catalog"} code={card.code} title={card.title} />
             </div>
-          </details> : null}
+          </details></div> : null}
         </div>
       </div>
 

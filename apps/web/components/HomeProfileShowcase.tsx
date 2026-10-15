@@ -9,6 +9,7 @@ import { resolveCollectibleCard } from "../lib/collectible-card";
 import type { DemoInstrument } from "../lib/local-demo";
 import { publicMediaVariantSrcSet, publicMediaVariantUrl } from "../lib/public-media-variant";
 import { PhotoViewer } from "./PhotoViewer";
+import { CompactQr } from "./CompactQr";
 import styles from "./HomeProfileShowcase.module.css";
 
 export function HomeProfileShowcase({ record, variant = "hero" }: { record: DemoInstrument; variant?: "hero" | "gallery" }) {
@@ -35,6 +36,7 @@ export function HomeProfileShowcase({ record, variant = "hero" }: { record: Demo
         </div>
         {photos.length ? <button className={styles.galleryLink} type="button" onClick={() => setViewerOpen(true)} aria-label={(photos.length < card.photoCount ? "View available photos of " : "View all photos of ") + card.title}><Camera size={16} aria-hidden="true" />{photos.length} {photos.length === 1 ? ui("ui.components.HomeProfileShowcase.55c64d0fcd6f", "photo") : ui("ui.components.HomeProfileShowcase.84a6dae49cf0", "photos")}{photos.length < card.photoCount ? ui("ui.components.HomeProfileShowcase.033eefff7069", " available") : ""}</button> : null}
       </div>
+      {variant === "hero" ? <div className={styles.qrIdentity}><Link className={styles.qrLink} href={card.profileUrl} aria-label={"Open the Profile for " + card.title}><CompactQr code={card.code} label={card.title} /></Link><div><span>{ui("ui.components.HomeProfileShowcase.permanentIdentity", "ONE PERMANENT IDENTITY")}</span><strong>{card.code}</strong><Link href={card.profileUrl}>{ui("ui.components.HomeProfileShowcase.scanProfile", "Scan or open this Profile")}<ArrowUpRight size={15} aria-hidden="true" /></Link></div></div> : null}
       <div className={styles.profileCode}><span>{ui("ui.components.HomeProfileShowcase.profileLabel", "PROFILE")}</span><strong>{card.code}</strong></div>
       {viewerOpen ? <PhotoViewer images={photos} initialIndex={activePhoto} title={card.title} onClose={() => setViewerOpen(false)} onIndexChange={setSelectedPhoto} onImageError={(photo) => setFailedPhotos((current) => current.includes(photo) ? current : [...current, photo])} /> : null}
     </article>
