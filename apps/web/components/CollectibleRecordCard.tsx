@@ -293,6 +293,8 @@ export function CollectibleRecordCard({
             {summary ? <p className={styles["collectible-card-summary"]}>{summary}</p> : null}
           </Link>
 
+          <span className={styles["collectible-card-code"]}>{card.code}</span>
+
           <ProfileStatusBadges record={record} includeCondition={false} ownerCollection={card.collection || undefined} />
 
           {card.publicHistoryCount ? <p className={styles["collectible-card-provenance"]}>{card.publicHistoryCount} {card.publicHistoryCount === 1 ? "recorded history entry" : "recorded history entries"}</p> : null}
@@ -317,9 +319,7 @@ export function CollectibleRecordCard({
             <div className={styles["collectible-card-utilities"]}>
               <RecordShareButton className={styles["collectible-card-share"]} showLabel={variant === "catalog"} code={card.code} title={card.title} />
             </div>
-            {variant === "catalog" ? <span className={styles["collectible-card-code"]}>{card.code}</span> : null}
           </details> : null}
-          {variant !== "catalog" ? <span className={styles["collectible-card-code"]}>{card.code}</span> : null}
         </div>
       </div>
 

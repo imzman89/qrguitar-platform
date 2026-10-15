@@ -199,7 +199,7 @@ function AccountSettingsPage() {
             </nav>
 
             <div className={styles.content}>
-            {activeSection === "overview" ? <PwaInstall /> : null}
+
 
             {(activeSection === "profile" || activeSection === "collection" || dirtySections.length > 0) ? <div className={styles.saveFeedback}>
             {(activeSection === "profile" || activeSection === "collection" || dirtySections.length > 0) ? <p className="field-note" id="account-save-scope">{ui("ui.app.account.page.catalogSaveScope", "Saving updates Account details and your named collection together. Password and sign-out actions are separate.")}</p> : null}
@@ -224,6 +224,8 @@ function AccountSettingsPage() {
                 <Link className={styles.textLink} href="/dashboard">{ui("ui.app.account.page.a1464d30c916", "Open your collection")}{" "}<span aria-hidden="true">↗</span></Link>
               </section>
             ) : null}
+
+            {activeSection === "overview" ? <PwaInstall /> : null}
 
             {activeSection === "profile" ? <section className={styles.panel}>
               <div className={styles.panelHeading}>

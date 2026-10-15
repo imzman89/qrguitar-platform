@@ -683,7 +683,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
           <button type="button" aria-label={ownerPreview || catalogReturnHref === "/dashboard" || catalogReturnHref?.startsWith("/collections/") ? ui("ui.app.i.code.ProfileClient.4466f3a00b0b", "Back to collection") : catalogReturnHref ? ui("ui.app.i.code.ProfileClient.backToCatalog", "Back to Catalog") : ui("ui.app.i.code.ProfileClient.cb35f7332137", "Back to homepage")} onClick={() => router.push(ownerPreview ? "/dashboard" : catalogReturnHref || "/")}>
             <ArrowLeft size={24} />
           </button>
-          <BrandLogo className={styles["scan-brand"]} appearance="paper" />
+          <BrandLogo className={styles["scan-brand"]} appearance="dark" />
           <span className={styles["profile-topbar-label"]}>Profile</span>
         </div>
 

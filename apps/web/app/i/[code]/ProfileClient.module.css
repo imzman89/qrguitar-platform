@@ -311,3 +311,13 @@
   .scan-hero-media,.scan-hero-media[data-shape="wide"] { height:clamp(220px,64vw,270px); padding:8px; border-radius:10px; }
   .scan-hero-gallery { gap:4px 6px; }.scan-hero-gallery-footer { gap:4px; }.scan-tabs { margin-top:20px; gap:20px; }
 }
+
+/* Preserve compact113 gallery behavior within the shared black collector frame. */
+@media screen {
+ .scan-hero-gallery { padding:10px; border:1px solid var(--collector-line); border-radius:14px; background:linear-gradient(145deg,#20282e,#10161b); box-shadow:inset 0 0 0 4px #0d1115,var(--shadow-card); }
+ .scan-hero-media { background:radial-gradient(ellipse at center,#26323b,#0d1216); border:1px solid var(--border-soft); border-radius:7px; }
+ .profile-heading h1 { font-family:var(--font-ui); font-weight:650; }
+ .profile-identity-details { border-block-color:var(--collector-line); }
+ .scan-hero-thumbnails button { border-radius:5px; }.scan-hero-gallery-controls button { border:1px solid var(--line); border-radius:6px; background:var(--surface); }
+ .scan-tabs { border-color:var(--line); }.scan-tab-panel { padding-top:28px; }
+}

@@ -15,6 +15,7 @@ import { ProfileSaleFields } from "../../../components/ProfileSaleFields";
 import { isSaleDetail, profileSaleFieldsError } from "../../../lib/profile-sale";
 import { EditorTimelineEntry } from "../../../components/EditorTimelineEntry";
 import { Nav } from "../../../components/Nav";
+import { OwnerWorkspace } from "../../../components/OwnerWorkspace";
 import { PhotoOrganizer, type PhotoOrganizerStatus } from "../../../components/PhotoOrganizer";
 import { getContentValue } from "../../../lib/content-registry";
 import { createSubmissionFingerprint, isRepeatedBrowserSubmission, validateInstrumentSubmission } from "../../../lib/security";
@@ -1331,7 +1332,7 @@ export default function EditInstrumentPage() {
   return ready && original && !forbidden ? (
     <>
       <Nav />
-      <main className={`${styles.page} section create-page`} aria-label={ui("ui.app.edit.code.page.fec2ac0f4cf1", "Edit Profile")}
+      <OwnerWorkspace current="collection"><div className={`${styles.page} section create-page`} aria-label={ui("ui.app.edit.code.page.fec2ac0f4cf1", "Edit Profile")}
         onClickCapture={event => { if (!isCurrent(renderedOperation)) { event.preventDefault(); event.stopPropagation(); } }}
         onChangeCapture={event => { if (!isCurrent(renderedOperation)) { event.preventDefault(); event.stopPropagation(); } }}>
         <div className={`${styles.layout} shell create-layout`}>
@@ -2088,7 +2089,7 @@ export default function EditInstrumentPage() {
 
 
         </div>
-      </main>
+      </div></OwnerWorkspace>
       <Footer />
     </>
   ) : (

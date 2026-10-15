@@ -67,3 +67,12 @@
   :global(body):has(:global(.boutique-gallery)) .registrationRoleChoice strong { font-weight:600; }
 }
 @media screen and (max-width:600px) { :global(body):has(:global(.boutique-gallery)) .formPanel { padding:22px; } }
+
+@media screen {
+ .formPanel { border:1px solid var(--line); border-radius:16px; background:linear-gradient(145deg,#1b232a,#11161b); box-shadow:var(--shadow-card); }
+ .heading h1,.formPanel > :is(h1,h2) { font-family:var(--font-ui); font-weight:650; }
+ :global(body):has(:global(.boutique-gallery)) .formPanel :global(.button),.formPanel :global(.button) { border-radius:8px; background:var(--action); color:var(--on-action); border-color:var(--action); }
+ .registrationRoleChoice { padding-inline:12px; border:1px solid var(--line); border-radius:8px; background:var(--canvas); }.registrationRoleChoice:has(input:checked) { border-color:var(--collector-line); background:var(--selected-surface); }
+}
+
+@media screen { :global(body):has(:global(.boutique-gallery)) .formPanel :global(.button):hover:not(:disabled),.formPanel :global(.button):hover:not(:disabled) { background:var(--action-hover); border-color:var(--action-hover); color:var(--on-action); } }

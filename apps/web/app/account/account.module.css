@@ -78,3 +78,13 @@
   .mobileSectionNav select { min-height:46px; width:100%; padding:10px 12px; background:var(--field-surface,var(--canvas)); color:var(--text); border:1px solid var(--border-strong); border-radius:2px; font:inherit; font-size:1rem; }
   .mobileSectionNav select:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
 }
+
+@media screen {
+ .header h1,.identity h2,.panelHeading strong { font-family:var(--font-ui); font-weight:650; }.header { padding-bottom:22px; border-bottom:1px solid var(--line); }
+ .content { max-width:1000px; }.panel { gap:22px; padding:26px; border:1px solid var(--line); border-radius:14px; background:linear-gradient(130deg,#171e24,#11161b); }
+ .panelHeading { padding-bottom:16px; border-bottom:1px solid var(--line); }.panelHeading strong { font-size:22px; }.panelHeading strong svg { color:var(--collector-metal); }
+ .identity { padding-bottom:18px; border-bottom:1px solid var(--line); }.avatar { border-color:var(--collector-line); background:var(--selected-surface); color:var(--collector-metal); }
+ .metrics { gap:12px; }.metrics > div { padding:16px; border:1px solid var(--border-soft); border-radius:9px; background:var(--canvas); }.metrics strong { font-family:var(--font-ui); font-weight:650; color:var(--collector-metal); }
+ .sectionNav button.active { border-bottom-color:var(--action); }.overviewRows > div { min-height:70px; padding-block:16px; }
+}
+@media screen and (max-width:600px) { .panel { padding:18px; }.metrics { gap:8px; }.metrics > div { padding:12px; }.metrics strong { font-size:24px; } }

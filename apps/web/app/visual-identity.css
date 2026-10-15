@@ -1,45 +1,21 @@
-@font-face {
-  font-family: "QRguitar Modern";
-  src: url("/fonts/manrope/Manrope-Variable.ttf") format("truetype");
-  font-style: normal;
-  font-weight: 200 800;
-  font-display: swap;
-}
-/* Screen typography only: printed documents retain their qualified geometry. */
+@font-face { font-family:"QRguitar Modern"; src:url("/fonts/manrope/Manrope-Variable.ttf") format("truetype"); font-style:normal; font-weight:200 800; font-display:swap; }
+/* One black screen system. Dedicated printed documents retain their physical palette. */
 @media screen {
-  body[data-product-theme] {
-    --font-display: Georgia, "Times New Roman", serif;
-    --font-ui: "QRguitar Modern", "Aptos", "Segoe UI", sans-serif;
-    font-family: var(--font-ui);
-    font-synthesis: none;
-    -webkit-font-smoothing: antialiased;
-  }
+ body[data-product-theme] {
+  --font-ui:"QRguitar Modern","Aptos","Segoe UI",sans-serif; --font-display:var(--font-ui);
+  --canvas:#090b0d; --bg:#090b0d; --bg-2:#0d1114; --surface:#11161b; --surface-subtle:#171e24; --surface-raised:#1c252c; --surface-soft:#151c22;
+  --panel:#11161b; --panel-2:#171e24; --text:#f4f1e9; --ink:#090b0d; --muted:#a9b2b8; --muted-strong:#d0d5d7;
+  --line:#303b43; --border:#303b43; --border-soft:#252f37; --border-strong:#56636d;
+  --field-surface:#0c1014; --field-text:#f4f1e9; --field-muted:#9ca8b0;
+  --action:#edaa58; --action-hover:#f4bd78; --gold:#edaa58; --gold-2:#e7c38b; --on-action:#15100a; --action-ink:#15100a;
+  --positive:#9cddb1; --negative:#ffb4aa; --warning:#e9c57e; --photo-mat:#0d1216;
+  --selected-surface:#29241b; --dark-text:var(--text); --muted-light:var(--muted); --line-light:var(--line);
+  --shadow-card:0 14px 34px rgba(0,0,0,.3); --collector-line:#7c6848; --collector-metal:#d7b67b;
+  color-scheme:dark; background:var(--canvas); color:var(--text); font-family:var(--font-ui); font-synthesis:none; -webkit-font-smoothing:antialiased;
+ }
+ body[data-product-theme] main:not(:is(.cms-page,.admin-page,.admin-service-page,.handout-page)) h1 { font-family:var(--font-display); font-weight:650; letter-spacing:-.045em; line-height:1.12; }
+ body[data-product-theme] :is(input,select,textarea) { color-scheme:dark; }
+ body[data-product-theme] .brand-frame { background:var(--canvas); }
+ body[data-product-theme] .brand-frame a[href="/create"] { border-radius:8px; background:var(--action); color:var(--on-action); border-color:var(--action); }
+ body[data-product-theme] .brand-frame a[href="/create"]:hover { background:var(--action-hover); border-color:var(--action-hover); color:var(--on-action); }
 }
-
-/* Public and customer headings share the instrument-led showroom language.
-   Administrative/editor controls and all printed documents retain their geometry. */
-@media screen {
-  body[data-product-theme] main:not(:is(.home-page,.cms-page,.admin-page,.admin-service-page,.handout-page)) h1 {
-    font-family: var(--font-display);
-    font-weight: 400;
-    letter-spacing: -.035em;
-    line-height: 1.12;
-  }
-}
-
-/* Public gallery and signup opt in. Print/admin retain their established palette and geometry. */
-@media screen {
-  body[data-product-theme]:has(.boutique-gallery) {
-    --canvas:#f5f1e8; --bg:#f5f1e8; --bg-2:#f5f1e8; --surface:#fcfaf6; --surface-raised:#fffdfa;
-    --surface-subtle:#eee8dc; --surface-soft:#f0ebdf; --panel:#fcfaf6; --panel-2:#eee8dc; --field-surface:#fcfaf6;
-    --text:#25231f; --ink:#25231f; --muted:#71695e; --muted-strong:#514a40;
-    --line:rgba(68,55,35,.14); --border-soft:rgba(68,55,35,.1); --border-strong:rgba(68,55,35,.24);
-    --field-muted:var(--muted); color-scheme:light; --photo-mat:#eee9de; --action:#a84d2b; --action-hover:#8d3d20; --on-action:#fffaf2;
-    --positive:#376347; --negative:#a22f2b; --warning:#856014; background:var(--canvas); color:var(--text);
-  }
-  body[data-product-theme]:has(.boutique-gallery) .brand-frame { background:var(--canvas); }
-  body[data-product-theme]:has(.boutique-gallery) .brand-frame a[href="/create"] { border-radius:999px; background:var(--text); color:var(--canvas); border-color:var(--text); }
-  body[data-product-theme]:has(.boutique-gallery) .brand-frame a[href="/create"]:hover { background:#444039; border-color:#444039; color:var(--canvas); }
-}
-
-@media screen { .boutique-gallery :is(input,select,textarea) { color-scheme:light; } }

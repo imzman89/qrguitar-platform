@@ -88,7 +88,7 @@ export function HowItWorksClient({ settings, example = null, initialAudienceId =
                   <Link className="button secondary" href="/catalog">{ui("ui.app.how.it.works.HowItWorksClient.004ca2d8b070", "Explore the Catalog")}</Link>
                 </div>
               </div>
-
+              {example && visibleSectionIds.has("lifecycle") ? <aside className={styles.example} aria-label={ui("ui.app.how.it.works.HowItWorksClient.9238fe0c58c9", "A real QRguitar Profile")}><CollectibleRecordCard record={example} variant="archive" content={settings.content} /></aside> : null}
             </div>
           </section>
         ) : null}
@@ -107,7 +107,7 @@ export function HowItWorksClient({ settings, example = null, initialAudienceId =
                     <div><h3>{item.title}</h3><p>{item.body}</p>{item.id === "how-step-create" ? <p className={styles.serialCaveat}>{getContentValue(content, "howItWorks.lifecycle.serialHelp")}</p> : null}</div>
                   </li>
                 ))}
-              </ol>{example ? <aside className={styles.example} aria-label={ui("ui.app.how.it.works.HowItWorksClient.9238fe0c58c9", "A real QRguitar Profile")}><CollectibleRecordCard record={example} variant="archive" content={settings.content} /></aside> : null}</div>
+              </ol>{example && !visibleSectionIds.has("hero") ? <aside className={styles.example} aria-label={ui("ui.app.how.it.works.HowItWorksClient.9238fe0c58c9", "A real QRguitar Profile")}><CollectibleRecordCard record={example} variant="archive" content={settings.content} /></aside> : null}</div>
             </div>
           </section>
         ) : null}

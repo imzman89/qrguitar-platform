@@ -247,3 +247,6 @@
 @media screen and (max-width:600px) {
  :is(.claims,.transfer,.service,.bulk) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),select,textarea) { font-size:16px; }
 }
+
+@media screen { .claims :is(h1,h2) { font-family:var(--font-ui); font-weight:650; }.claims :global(.claim-callout),.claims :global(.claim-form),.claims :global(.claim-status-card) { padding:24px; border:1px solid var(--line); border-radius:14px; background:linear-gradient(145deg,#1c242b,#11161b); }.claims :global(.button:not(.secondary)) { border-radius:8px; border-color:var(--action); background:var(--action); color:var(--on-action); }.claims :global(.button:not(.secondary)):hover:not(:disabled) { background:var(--action-hover); color:var(--on-action); } }
+@media screen and (max-width:600px) { .claims :global(.claim-callout),.claims :global(.claim-form),.claims :global(.claim-status-card) { padding:18px; } }

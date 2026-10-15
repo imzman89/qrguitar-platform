@@ -7,7 +7,7 @@ import { Boxes, CircleUserRound, CreditCard, MessageCircle, Plus, Wrench } from 
 import styles from "./OwnerWorkspace.module.css";
 import { getWorkspace } from "../lib/workspace-tools";
 
-type OwnerWorkspaceProps = { current: "collection" | "create" | "account"; accountType?: string; children: ReactNode };
+type OwnerWorkspaceProps = { current: "collection" | "create" | "account" | "messages" | "billing"; accountType?: string; children: ReactNode };
 const destinations = [
   { key: "collection", href: "/dashboard", label: "My collection", icon: Boxes },
   { key: "create", href: "/create", label: "Create Profile", icon: Plus },

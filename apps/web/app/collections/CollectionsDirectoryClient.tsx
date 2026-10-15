@@ -19,6 +19,12 @@ export function CollectionsDirectoryClient({ collections }: { collections: Direc
 
   if (!collections.length) return <div className={styles.empty}>
     <UsersRound size={30} aria-hidden="true" /><h2>{ui("ui.app.collections.CollectionsDirectoryClient.8bf60f64c1e2", "No collections yet.")}</h2>
+    <p>{ui("ui.app.collections.empty.intro", "A collection brings your instruments and their stories together. You choose which Profiles to make public.")}</p>
+    <ol className={styles.emptySteps}>
+      <li><strong>{ui("ui.app.collections.empty.addTitle", "Add your instruments")}</strong><span>{ui("ui.app.collections.empty.addBody", "Create a free Profile with photographs, details and history.")}</span></li>
+      <li><strong>{ui("ui.app.collections.empty.curateTitle", "Make it yours")}</strong><span>{ui("ui.app.collections.empty.curateBody", "Set your collection name, image and introduction in Collection settings.")}</span></li>
+      <li><strong>{ui("ui.app.collections.empty.shareTitle", "Share on your terms")}</strong><span>{ui("ui.app.collections.empty.shareBody", "Choose what becomes public. Private files and ownership controls stay separate.")}</span></li>
+    </ol>
     <div className="form-actions"><Link className="button" href="/account?section=collection">{ui("ui.app.collections.CollectionsDirectoryClient.82a7887fd1d5", "Collection settings")}</Link><Link className="button secondary" href="/catalog">{ui("ui.app.collections.CollectionsDirectoryClient.f507fb6c23a7", "Catalog")}</Link></div>
   </div>;
 

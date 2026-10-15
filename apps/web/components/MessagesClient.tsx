@@ -356,7 +356,7 @@ export function MessagesClient({ conversationId = "" }: { conversationId?: strin
               </div>
               {conversation.unread ? <i aria-label={ui("ui.components.MessagesClient.9021d87e3048", "Unread message")} /> : null}
             </Link>
-          )) : <MessageState compact icon={<Inbox />} title={ui("ui.components.MessagesClient.4c6806ae9de5", "Your inbox is ready")} copy={ui("ui.components.MessagesClient.482ca0d75627", "Open a member page or public QRguitar Profile to start a private conversation.")} action={<Link className="button" href="/collections">{ui("ui.components.MessagesClient.1fbba5113528", "Browse member collections")}</Link>} />}
+          )) : <MessageState compact icon={<Inbox />} title={ui("ui.components.MessagesClient.4c6806ae9de5", "Your inbox is ready")} copy={ui("ui.components.MessagesClient.482ca0d75627", "Open a member page or public QRguitar Profile to start a private conversation.")} action={<Link className="button" href="/catalog">{ui("ui.components.MessagesClient.browsePublicProfiles", "Explore public Profiles")}</Link>} />}
         </div>
         {conversationCursor ? <div className={styles.paginationRow}><button className="button secondary" type="button" disabled={loadingMoreConversations} onClick={() => void loadMoreConversations()}>{loadingMoreConversations ? ui("ui.components.MessagesClient.ba3bbbe10d8b", "Loading…") : ui("ui.components.MessagesClient.cc4b4d7fdcea", "Load older conversations")}</button></div> : null}
       </section>

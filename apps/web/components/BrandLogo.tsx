@@ -2,7 +2,7 @@
 "use client";
 import { useUiText } from "./UiTextProvider";
 import { FallbackImage } from "./FallbackImage";
-import { usePathname } from "next/navigation";
+
 
 type BrandLogoProps = {
   className?: string;
@@ -11,9 +11,7 @@ type BrandLogoProps = {
 
 export function BrandLogo({ className, appearance = "auto" }: BrandLogoProps) {
   const ui = useUiText("components.BrandLogo");
-  const pathname = usePathname();
-  const galleryRoute = pathname === "/" || pathname === "/catalog" || pathname === "/login" || pathname?.startsWith("/i/");
-  const paper = appearance === "paper" || (appearance === "auto" && galleryRoute);
+  const paper = appearance === "paper";
   const source = paper ? "/qrguitar-logo-ink-orange.svg" : "/qrguitar-logo-white-orange.svg";
   return (
     <FallbackImage

@@ -1,12 +1,12 @@
 /* One public-safe instrument identity across Home, Catalog and collections. */
-.collectible-card { position:relative; display:flex; flex-direction:column; height:100%; min-width:0; border:0; border-radius:0; background:transparent; color:var(--text); }
+.collectible-card { position:relative; display:flex; flex-direction:column; height:100%; min-width:0; border:1px solid var(--collector-line); border-radius:14px; background:linear-gradient(145deg,#20282e 0%,#11161b 40%,#0c1014 100%); color:var(--text); box-shadow:inset 0 0 0 4px #0d1115,0 12px 30px rgba(0,0,0,.28); padding:10px; }
 .collectible-card-link { display:flex; flex:1; flex-direction:column; min-width:0; }
 .collectible-card-gallery { position:relative; min-width:0; }
-.collectible-card-media { position:relative; width:100%; aspect-ratio:1 / 1; overflow:hidden; background:transparent; }
+.collectible-card-media { position:relative; width:100%; height:280px; overflow:hidden; border:1px solid var(--border-soft); border-radius:7px; background:radial-gradient(ellipse at 50% 30%,#26323b,#0d1216 75%); }
 .collectible-card-media-rail { display:flex; position:relative; width:100%; height:100%; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; scroll-snap-type:x mandatory; overscroll-behavior-inline:contain; touch-action:pan-x pan-y pinch-zoom; cursor:pointer; text-decoration:none; }
 .collectible-card-media-rail::-webkit-scrollbar { display:none; }
 .collectible-card-media-slide { position:relative; flex:0 0 100%; width:100%; height:100%; scroll-snap-align:start; scroll-snap-stop:always; }
-.collectible-card-image { position:relative; z-index:1; display:block; width:100%; height:100%; object-fit:contain; user-select:none; }
+.collectible-card-image { position:relative; z-index:1; display:block; width:100%; height:100%; object-fit:contain; object-position:center; padding:12px; user-select:none; }
 .collectible-card-loading-media,.collectible-card-empty-media { display:grid; position:absolute; inset:0; place-content:center; gap:8px; color:var(--muted); font-size:13px; text-align:center; }
 .collectible-card-empty-media span { color:var(--action); font-size:11px; letter-spacing:.1em; }
 .collectible-card-empty-media strong { font-weight:500; }
@@ -15,13 +15,13 @@
 .collectible-card-gallery-controls { display:flex; gap:4px; margin-left:auto; }
 .collectible-card-gallery-controls button { display:grid; place-items:center; width:44px; height:44px; border:0; border-radius:0; padding:0; color:var(--text); background:transparent; cursor:pointer; }
 .collectible-card-gallery-controls button:hover { color:var(--action); }
-.collectible-card-content { display:flex; flex:1; flex-direction:column; gap:12px; min-width:0; padding:16px 0 0; cursor:pointer; border-top:1px solid color-mix(in srgb,var(--text) 15%,var(--canvas)); }
+.collectible-card-content { display:flex; flex:1; flex-direction:column; gap:12px; min-width:0; padding:16px 10px 0; cursor:pointer; border-top:1px solid color-mix(in srgb,var(--text) 15%,var(--canvas)); }
 .collectible-card-topline { display:flex; flex-wrap:wrap; align-items:baseline; gap:8px 14px; }
 .collectible-card-eyebrow,.collectible-card-age { display:inline-flex; align-items:center; gap:6px; color:var(--muted); font-size:11px; line-height:1.5; }
 .collectible-card-profile-link { display:block; text-decoration:none; color:inherit; }
-.collectible-card-type { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:10px; font-weight:550; letter-spacing:.14em; text-transform:uppercase; line-height:1.6; }
+.collectible-card-type { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:10px; font-weight:650; letter-spacing:.12em; text-transform:uppercase; line-height:1.6; }
 .collectible-card-type::before { content:""; width:5px; height:5px; flex:none; background:var(--action); }
-.collectible-card-profile-link h3 { margin:9px 0 10px; color:var(--text); font-family:var(--font-display); font-size:clamp(20px,1.8vw,25px); font-weight:550; line-height:1.2; letter-spacing:-.045em; overflow-wrap:anywhere; }
+.collectible-card-profile-link h3 { margin:9px 0 10px; color:var(--text); font-family:var(--font-display); font-size:clamp(20px,1.6vw,24px); font-weight:700; line-height:1.2; letter-spacing:-.045em; overflow-wrap:anywhere; }
 .collectible-card-profile-link:hover h3 { text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:5px; }
 .collectible-card-subtitle { margin:0; color:var(--muted); font-size:12px; line-height:1.6; }
 .collectible-card-summary { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; margin:12px 0 0; color:var(--muted-strong); font-size:14px; line-height:1.65; }
@@ -46,88 +46,28 @@
 .collectible-card-serial small { color:var(--muted); }
 .collectible-card-utilities { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
 .collectible-card-share :global(.record-share-button) { display:grid; place-items:center; width:44px; height:44px; min-height:44px; padding:0; border:0; border-radius:0; background:transparent; color:var(--muted-strong); }
-.collectible-card-code { display:block; padding:12px 0 0; border-top:1px solid color-mix(in srgb,var(--text) 9%,var(--canvas)); color:var(--muted); font-size:10px; font-variant-numeric:tabular-nums; letter-spacing:.12em; overflow-wrap:anywhere; }
+.collectible-card-code { display:flex; flex-wrap:wrap; justify-content:space-between; gap:6px 14px; padding:12px 0; margin-top:2px; border-top:1px solid var(--collector-line); color:var(--collector-metal); font-family:var(--font-ui); font-size:11px; font-weight:650; font-variant-numeric:tabular-nums; letter-spacing:.07em; overflow-wrap:anywhere; }
+.collectible-card-code::before { content:"PROFILE"; color:var(--muted); font-size:9px; letter-spacing:.16em; }
 .collectible-card-secondary,.collectible-card-secondary-link { color:var(--muted); font-size:12px; }
 .collectible-card-secondary-link { min-height:44px; display:inline-flex; align-items:center; }
 .collectible-card :is(a,button,[tabindex],summary):focus-visible { outline:2px solid var(--action); outline-offset:4px; }
-.collectible-card-media-rail:focus-visible { outline-offset:-3px; }
-/* Only the Home opening gallery opts into the quieter featured caption. */
-.collectible-card[data-home-featured="true"] .collectible-card-media-toolbar { min-height:20px; margin-top:12px; }
-.collectible-card[data-home-featured="true"] .collectible-card-content { gap:10px; padding-top:12px; border-top:0; }
-.collectible-card[data-home-featured="true"] .collectible-card-type::before { display:none; }
-.collectible-card[data-home-featured="true"] .collectible-card-profile-link h3 { display:flex; align-items:flex-start; gap:14px; margin:6px 0 8px; font-size:clamp(24px,2vw,28px); line-height:1.15; letter-spacing:-.035em; }
-.collectible-card[data-home-featured="true"] .collectible-card-profile-link h3 > span { flex:1; min-width:0; }
-.collectible-card[data-home-featured="true"] .collectible-card-profile-link h3 > svg { flex:none; margin-top:4px; color:var(--action); }
-.collectible-card[data-home-featured="true"] .collectible-card-code { padding-top:0; border-top:0; }
-@media(max-width:600px) {
-  .collectible-card-media { aspect-ratio:1.08 / 1; }
-  .collectible-card-profile-link h3 { font-size:24px; }
-  .collectible-card-content { padding-top:20px; }
-  .collectible-card-content :global(.record-badge) { font-size:11px; }
-}
+.collectible-card .collectible-card-media-rail:focus-visible { outline-offset:-3px; }
 
-/* Catalog utilities retain a visible action label without changing other card variants. */
-.collectible-card[data-card-variant="catalog"] .collectible-card-share :global(.record-share-button) { display:inline-flex; gap:8px; width:auto; min-width:44px; }
-
-/* Home captions keep documented identity readable beneath the photographs. */
-.collectible-card[data-home-featured="true"] .collectible-card-content { gap:12px; }
-.collectible-card[data-home-featured="true"] .collectible-card-subtitle { font-size:13px; line-height:1.65; }
-.collectible-card[data-home-featured="true"] .collectible-card-content :global(.record-badge) { font-size:11px; line-height:1.65; }
-.collectible-card[data-home-featured="true"] .collectible-card-code { margin-top:auto; padding-top:14px; border-top:1px solid var(--line); font-size:11px; letter-spacing:.08em; }
-
-/* Catalog opts into a shallower desktop frame; other card contexts retain square media. */
-@media screen and (min-width:1101px) {
-  .collectible-card[data-card-variant="catalog"] .collectible-card-media { aspect-ratio:var(--catalog-media-ratio,1 / 1); }
-}
-
-/* Only Catalog opts into the phone frame; shared card contexts keep their existing ratio. */
-@media screen and (max-width:600px) {
-  .collectible-card[data-card-variant="catalog"] .collectible-card-media { aspect-ratio:var(--catalog-mobile-media-ratio,1.08 / 1); }
-}
-@media screen and (max-width: 760px) {
-  .collectible-card[data-home-featured="true"] .collectible-card-media-rail {
-    overflow: visible;
-    scroll-snap-type: none;
-    overscroll-behavior-inline: auto;
-  }
-}
-
-.collectible-card[data-home-featured="true"] .collectible-card-media:focus-within {
-  outline: 2px solid var(--action);
-  outline-offset: 4px;
-}
-
-/* Home previews lead with readable identity and real public history. */
-.collectible-card[data-home-featured="true"] .collectible-card-media-toolbar { display:none; }
-.collectible-card[data-home-featured="true"] .collectible-card-code { display:none; }
+.collectible-card::before { content:""; pointer-events:none; position:absolute; inset:4px; border:1px solid rgba(215,182,123,.13); border-radius:10px; }
+.collectible-card:hover { border-color:var(--collector-metal); }
+.collectible-card-media-toolbar { padding-inline:8px; margin-top:2px; }
+.collectible-card-gallery-controls button { border:1px solid var(--line); border-radius:6px; background:var(--surface); }
+.collectible-card-gallery-controls button:hover { background:var(--surface-raised); border-color:var(--collector-metal); }
+.collectible-card-content :global(.record-badge) { font-size:11px; }
+.collectible-card-cta { color:var(--collector-metal); border-top:1px solid var(--border-soft); }
+.collectible-card-details summary { min-height:44px; }
 .collectible-card[data-home-featured="true"] .collectible-card-content { gap:10px; }
-
-
-/* Catalog identity leads; status remains readable without competing color chips. */
-@media screen {
-  .collectible-card[data-card-variant="catalog"] .collectible-card-content :global(.record-badge:not(.record-badge--safety)) { color:var(--muted-strong); }
-  .collectible-card[data-card-variant="catalog"] .collectible-card-profile-link h3 { font-weight:400; letter-spacing:-.025em; }
-}
-
-/* Catalog photographs and their factual captions form one collectible object. */
-@media screen {
-  .collectible-card[data-card-variant="catalog"] { overflow:hidden; border:1px solid var(--line); border-radius:16px; background:var(--surface); box-shadow:0 6px 24px rgba(51,40,24,.04); }
-  .collectible-card[data-card-variant="catalog"] .collectible-card-gallery { background:var(--photo-mat,var(--surface-subtle)); }
-  .collectible-card[data-card-variant="catalog"] .collectible-card-media { aspect-ratio:4/5; }
-  .collectible-card[data-card-variant="catalog"] .collectible-card-image { padding:20px; object-fit:contain; }
-  .collectible-card[data-card-variant="catalog"] .collectible-card-media-toolbar { min-height:44px; margin:0; padding:0 14px 6px 20px; }
-  .collectible-card[data-card-variant="catalog"] .collectible-card-image-count { font-size:12px; }
-  .collectible-card[data-card-variant="catalog"] .collectible-card-gallery-controls button { border-radius:50%; }
-  .collectible-card[data-card-variant="catalog"] .collectible-card-gallery-controls button:hover { background:var(--surface); }
-  .collectible-card[data-card-variant="catalog"] .collectible-card-content { padding:20px 22px 16px; gap:10px; border-top:1px solid var(--line); }
-  .collectible-card[data-card-variant="catalog"] .collectible-card-type { font-size:11px; letter-spacing:.035em; text-transform:none; }
-  .collectible-card[data-card-variant="catalog"] .collectible-card-type::before { width:5px; height:5px; border-radius:50%; }
-  .collectible-card[data-card-variant="catalog"] .collectible-card-profile-link h3 { margin:7px 0 8px; font-family:var(--font-ui); font-size:21px; font-weight:600; line-height:1.3; letter-spacing:-.025em; }
-  .collectible-card[data-card-variant="catalog"] .collectible-card-subtitle { font-size:13px; line-height:1.65; }
-  .collectible-card[data-card-variant="catalog"] .collectible-card-content :global(.record-badge) { font-size:12px; line-height:1.6; }
-  .collectible-card[data-card-variant="catalog"] .collectible-card-provenance { font-size:12px; }
-  .collectible-card[data-card-variant="catalog"] .collectible-card-cta { font-size:13px; letter-spacing:0; }
-  .collectible-card[data-card-variant="catalog"] .collectible-card-details { font-size:12px; }
-  .collectible-card[data-card-variant="catalog"] .collectible-card-details summary { color:var(--muted); }
-}
-@media screen and (max-width:600px) { .collectible-card[data-card-variant="catalog"] .collectible-card-content { padding-inline:20px; } }
+.collectible-card[data-home-featured="true"] .collectible-card-media-toolbar { display:none; }
+.collectible-card[data-home-featured="true"] .collectible-card-profile-link h3 { display:flex; gap:12px; align-items:start; }
+.collectible-card[data-home-featured="true"] .collectible-card-profile-link h3 > span { flex:1; min-width:0; }
+.collectible-card[data-home-featured="true"] .collectible-card-profile-link h3 > svg { flex:none; color:var(--collector-metal); margin-top:4px; }
+.collectible-card[data-card-variant="catalog"] .collectible-card-share :global(.record-share-button) { display:inline-flex; gap:8px; width:auto; min-width:44px; }
+.collectible-card-secondary-link { padding:10px; }
+@media(max-width:1100px) { .collectible-card-media { height:300px; } }
+@media(max-width:600px) { .collectible-card-media { height:290px; }.collectible-card-profile-link h3 { font-size:22px; }.collectible-card-content { padding-inline:10px; } }
+@media(prefers-reduced-motion:no-preference) { .collectible-card { transition:border-color .18s,box-shadow .18s; }.collectible-card:hover { box-shadow:inset 0 0 0 4px #0d1115,0 18px 40px rgba(0,0,0,.4); } }
