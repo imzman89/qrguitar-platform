@@ -127,7 +127,7 @@ export function HomePageClient({ initialRecords, initialSettings }: {
   };
 
   return (
-    <div className={styles.page} style={homeActionTextColors(settings.colors.gold)}>
+    <div className={styles.page + " boutique-gallery"} style={homeActionTextColors(settings.colors.gold)}>
       <Nav />
       <main className={`home-page ${styles.home}`}>
         {homeSections.filter(section => section.visible).map(section => <Fragment key={section.id}>{renderedSections[section.id] || null}</Fragment>)}

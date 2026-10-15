@@ -545,7 +545,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
 
   if (!resolved) {
     return (
-      <main className={styles["scan-profile"]}>
+      <main className={styles["scan-profile"] + " boutique-gallery"}>
         <section className={styles["scan-shell"]}>
           <section className={styles["scan-tab-panel"]} aria-label={ui("ui.app.i.code.ProfileClient.3535ababfaeb", "Loading profile")}>
             <h2>{ui("ui.app.i.code.ProfileClient.d7e30b9a3297", "Loading instrument profile")}</h2>
@@ -558,7 +558,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
 
   if (!instrument) {
     return (
-      <main className={styles["scan-profile"]}>
+      <main className={styles["scan-profile"] + " boutique-gallery"}>
         <section className={styles["scan-shell"]}>
           <section className={styles["scan-tab-panel"]} aria-label={profileLoadError ? ui("ui.app.i.code.ProfileClient.158e5a22a48c", "Profile unavailable") : ui("ui.app.i.code.ProfileClient.999930725d06", "Profile not found")}>
             <h2>{profileLoadError ? ui("ui.app.i.code.ProfileClient.6dc65e966b93", "Profile temporarily unavailable") : ui("ui.app.i.code.ProfileClient.6cbb97fa27b9", "Instrument profile not found")}</h2>
@@ -668,7 +668,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
   const officialBrandLogoUrl = instrument.brand ? brandLogos[normalizeBrandLogoKey(instrument.brand)] || "" : "";
 
   return (
-    <main className={styles["scan-profile"]}>
+    <main className={styles["scan-profile"] + " boutique-gallery"}>
       <section className={styles["scan-shell"]}>
         {publicReviewSnapshot ? <div className={styles["profile-refresh-notice"]} role="note">{ui("ui.app.i.code.ProfileClient.localReadOnlyNotice", "Read-only local preview. You can view this Profile and its history. Ownership changes, messages and service requests are unavailable here.")}</div> : null}
         {ownerPreview && instrument ? <div className={styles["profile-refresh-notice"]} role="status"><p><strong>{ui("ui.app.i.code.ProfileClient.cca6a9866dcc", "Your Profile.")}</strong> {instrument.visibility === "private" ? ui("ui.app.i.code.ProfileClient.b1eaa5bd6fae", "This Profile is private. Visitors cannot open its QR link.") : ui("ui.app.i.code.ProfileClient.43c30bfc7680", "You are viewing this Profile from your account.")}</p><Link className="button secondary" href={"/edit/" + encodeURIComponent(instrument.qrCode)}>{ui("ui.app.i.code.ProfileClient.fec2ac0f4cf1", "Edit Profile")}</Link><Link href="/dashboard">{ui("ui.app.i.code.ProfileClient.4466f3a00b0b", "Back to collection")}</Link></div> : null}
@@ -683,7 +683,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
           <button type="button" aria-label={ownerPreview || catalogReturnHref === "/dashboard" || catalogReturnHref?.startsWith("/collections/") ? ui("ui.app.i.code.ProfileClient.4466f3a00b0b", "Back to collection") : catalogReturnHref ? ui("ui.app.i.code.ProfileClient.backToCatalog", "Back to Catalog") : ui("ui.app.i.code.ProfileClient.cb35f7332137", "Back to homepage")} onClick={() => router.push(ownerPreview ? "/dashboard" : catalogReturnHref || "/")}>
             <ArrowLeft size={24} />
           </button>
-          <BrandLogo className={styles["scan-brand"]} />
+          <BrandLogo className={styles["scan-brand"]} appearance="paper" />
           <span className={styles["profile-topbar-label"]}>Profile</span>
         </div>
 

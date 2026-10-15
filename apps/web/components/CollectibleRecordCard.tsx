@@ -265,7 +265,7 @@ export function CollectibleRecordCard({
 
         </div>
 
-        <div className={styles["collectible-card-media-toolbar"]}>
+        {card.photoCount > 1 ? <div className={styles["collectible-card-media-toolbar"]}>
             {card.photoCount > 1 ? <span className={styles["collectible-card-image-count"]}><Camera size={12} aria-hidden="true" /> {showGalleryControls ? `${activeImageIndex + 1}/${card.photoCount}` : `${card.photoCount} photos`}</span> : null}
 
           {showGalleryControls ? (
@@ -278,7 +278,7 @@ export function CollectibleRecordCard({
               </button>
             </div>
           ) : null}
-        </div>
+        </div> : null}
 
         </div>
         <div className={styles["collectible-card-content"]} onClick={handleContentClick}>

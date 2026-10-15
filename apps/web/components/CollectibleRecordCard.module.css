@@ -108,3 +108,26 @@
   .collectible-card[data-card-variant="catalog"] .collectible-card-content :global(.record-badge:not(.record-badge--safety)) { color:var(--muted-strong); }
   .collectible-card[data-card-variant="catalog"] .collectible-card-profile-link h3 { font-weight:400; letter-spacing:-.025em; }
 }
+
+/* Catalog photographs and their factual captions form one collectible object. */
+@media screen {
+  .collectible-card[data-card-variant="catalog"] { overflow:hidden; border:1px solid var(--line); border-radius:16px; background:var(--surface); box-shadow:0 6px 24px rgba(51,40,24,.04); }
+  .collectible-card[data-card-variant="catalog"] .collectible-card-gallery { background:var(--photo-mat,var(--surface-subtle)); }
+  .collectible-card[data-card-variant="catalog"] .collectible-card-media { aspect-ratio:4/5; }
+  .collectible-card[data-card-variant="catalog"] .collectible-card-image { padding:20px; object-fit:contain; }
+  .collectible-card[data-card-variant="catalog"] .collectible-card-media-toolbar { min-height:44px; margin:0; padding:0 14px 6px 20px; }
+  .collectible-card[data-card-variant="catalog"] .collectible-card-image-count { font-size:12px; }
+  .collectible-card[data-card-variant="catalog"] .collectible-card-gallery-controls button { border-radius:50%; }
+  .collectible-card[data-card-variant="catalog"] .collectible-card-gallery-controls button:hover { background:var(--surface); }
+  .collectible-card[data-card-variant="catalog"] .collectible-card-content { padding:20px 22px 16px; gap:10px; border-top:1px solid var(--line); }
+  .collectible-card[data-card-variant="catalog"] .collectible-card-type { font-size:11px; letter-spacing:.035em; text-transform:none; }
+  .collectible-card[data-card-variant="catalog"] .collectible-card-type::before { width:5px; height:5px; border-radius:50%; }
+  .collectible-card[data-card-variant="catalog"] .collectible-card-profile-link h3 { margin:7px 0 8px; font-family:var(--font-ui); font-size:21px; font-weight:600; line-height:1.3; letter-spacing:-.025em; }
+  .collectible-card[data-card-variant="catalog"] .collectible-card-subtitle { font-size:13px; line-height:1.65; }
+  .collectible-card[data-card-variant="catalog"] .collectible-card-content :global(.record-badge) { font-size:12px; line-height:1.6; }
+  .collectible-card[data-card-variant="catalog"] .collectible-card-provenance { font-size:12px; }
+  .collectible-card[data-card-variant="catalog"] .collectible-card-cta { font-size:13px; letter-spacing:0; }
+  .collectible-card[data-card-variant="catalog"] .collectible-card-details { font-size:12px; }
+  .collectible-card[data-card-variant="catalog"] .collectible-card-details summary { color:var(--muted); }
+}
+@media screen and (max-width:600px) { .collectible-card[data-card-variant="catalog"] .collectible-card-content { padding-inline:20px; } }

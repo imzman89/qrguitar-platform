@@ -26,3 +26,20 @@
     line-height: 1.12;
   }
 }
+
+/* Public gallery and signup opt in. Print/admin retain their established palette and geometry. */
+@media screen {
+  body[data-product-theme]:has(.boutique-gallery) {
+    --canvas:#f5f1e8; --bg:#f5f1e8; --bg-2:#f5f1e8; --surface:#fcfaf6; --surface-raised:#fffdfa;
+    --surface-subtle:#eee8dc; --surface-soft:#f0ebdf; --panel:#fcfaf6; --panel-2:#eee8dc; --field-surface:#fcfaf6;
+    --text:#25231f; --ink:#25231f; --muted:#71695e; --muted-strong:#514a40;
+    --line:rgba(68,55,35,.14); --border-soft:rgba(68,55,35,.1); --border-strong:rgba(68,55,35,.24);
+    --field-muted:var(--muted); color-scheme:light; --photo-mat:#eee9de; --action:#a84d2b; --action-hover:#8d3d20; --on-action:#fffaf2;
+    --positive:#376347; --negative:#a22f2b; --warning:#856014; background:var(--canvas); color:var(--text);
+  }
+  body[data-product-theme]:has(.boutique-gallery) .brand-frame { background:var(--canvas); }
+  body[data-product-theme]:has(.boutique-gallery) .brand-frame a[href="/create"] { border-radius:999px; background:var(--text); color:var(--canvas); border-color:var(--text); }
+  body[data-product-theme]:has(.boutique-gallery) .brand-frame a[href="/create"]:hover { background:#444039; border-color:#444039; color:var(--canvas); }
+}
+
+@media screen { .boutique-gallery :is(input,select,textarea) { color-scheme:light; } }

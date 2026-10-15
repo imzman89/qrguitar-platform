@@ -238,7 +238,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
   return (
     <>
       <Nav />
-      <main className={styles["catalog-page"]}>
+      <main className={styles["catalog-page"] + " boutique-gallery"}>
         <div className={styles["shell"]}>
           <div className={styles["dashboard-hero"]} data-long-heading={catalogHeading.trim().length > 24 ? "true" : undefined}>
             <div>

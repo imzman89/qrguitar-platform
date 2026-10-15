@@ -56,3 +56,14 @@
 /* Keep the single next action beside the chosen workspace, without an overlay. */
 .registrationRoleChoices > div { min-width:0; }
 .registrationRoleChoices .registrationContinue { margin:12px 0; }
+
+@media screen {
+  :global(body):has(:global(.boutique-gallery)) .layout { max-width:480px; gap:26px; }
+  :global(body):has(:global(.boutique-gallery)) .formPanel { padding:28px; border:1px solid var(--line); border-radius:18px; background:var(--surface); box-shadow:0 8px 28px rgba(51,40,24,.04); }
+  :global(body):has(:global(.boutique-gallery)) .formPanel :global(.field) input { border-radius:10px; background:var(--canvas); }
+  :global(body):has(:global(.boutique-gallery)) .formPanel :global(.button) { border-radius:999px; background:var(--text); color:var(--canvas); border-color:var(--text); }
+  :global(body):has(:global(.boutique-gallery)) .formPanel :global(.button):hover:not(:disabled) { background:#444039; border-color:#444039; }
+  :global(body):has(:global(.boutique-gallery)) .registrationRoleChoice { padding-block:16px; }
+  :global(body):has(:global(.boutique-gallery)) .registrationRoleChoice strong { font-weight:600; }
+}
+@media screen and (max-width:600px) { :global(body):has(:global(.boutique-gallery)) .formPanel { padding:22px; } }

@@ -266,3 +266,32 @@
 
 /* Long instrument notes keep a readable measure on every screen. */
 .profile-data-grid > span[data-long-value="true"] { grid-column:1 / -1; max-width:72ch; }
+
+/* A photographed instrument and its documented record; record behavior is unchanged. */
+@media screen {
+  .scan-profile { padding:20px 0 80px; }.scan-shell { width:min(1280px,calc(100% - 96px)); }
+  .scan-topbar { padding-bottom:24px; }.profile-topbar-label { font-size:12px; letter-spacing:.04em; text-transform:none; }
+  .scan-hero { grid-template-columns:minmax(0,1.45fr) minmax(0,1fr); gap:24px 40px; padding:28px; border:1px solid var(--line); border-radius:22px; background:var(--surface); box-shadow:0 8px 28px rgba(51,40,24,.035); }
+  .profile-heading { padding-top:16px; }.profile-kicker { margin-bottom:14px; font-size:12px; letter-spacing:.04em; text-transform:none; }
+  .profile-heading h1 { margin-bottom:20px; font-size:clamp(34px,3.7vw,52px); font-weight:400; line-height:1.1; letter-spacing:-.035em; }
+  .profile-condition,.profile-heading :global(.record-badge),.profile-heading :global(.record-owner-link) { font-size:13px; }
+  .scan-hero-media { height:clamp(420px,43vw,600px); padding:22px; border-radius:14px; background:var(--photo-mat,var(--surface-subtle)); }
+  .scan-hero-media[data-shape="wide"] { height:auto; aspect-ratio:4/3; }.scan-hero-media img { object-fit:contain; }
+  .scan-hero-thumbnails { gap:10px; }.scan-hero-thumbnails button { border-radius:8px; background:var(--photo-mat,var(--surface-subtle)); opacity:.72; }
+  .scan-hero-thumbnails button.active { outline:2px solid var(--action); outline-offset:2px; }
+  .scan-hero-gallery-controls button { border-radius:50%; }.scan-hero-gallery-controls button:hover { background:var(--surface-subtle); }
+  .scan-hero-photo-count { font-size:12px; letter-spacing:0; }.profile-trust-summary { margin-top:20px; padding-top:12px; }
+  .profile-trust-summary summary,.profile-trust-summary p { font-size:13px; }.profile-purchase-link { border-radius:999px; padding:12px 18px; }
+  .profile-action { border:1px solid var(--line); border-radius:999px; padding-inline:16px; background:var(--surface); }
+  .scan-tabs { margin-top:40px; gap:30px; }.scan-tabs button { font-size:14px; }.scan-tab-panel { padding-block:32px; }
+  .scan-tab-panel h2 { font-family:var(--font-display); font-size:30px; font-weight:400; }
+  .timeline-item { padding-bottom:22px; border-bottom:1px solid var(--line); }.timeline-item h3 { font-weight:600; }
+}
+@media screen and (max-width:900px) {
+  .scan-shell { width:min(720px,calc(100% - 40px)); }.scan-hero { grid-template-columns:minmax(0,1fr); grid-template-areas:'gallery' 'heading' 'facts'; gap:24px; padding:22px; }
+  .profile-heading { padding-top:0; }.scan-hero-media { height:clamp(340px,76vw,540px); }
+}
+@media screen and (max-width:540px) {
+  .scan-profile { padding-top:12px; }.scan-shell { width:calc(100% - 32px); }.scan-hero { padding:16px; gap:20px; border-radius:18px; }
+  .scan-hero-media { height:clamp(300px,95vw,440px); padding:16px; }.profile-heading h1 { font-size:34px; }.scan-tabs { margin-top:28px; gap:24px; }
+}

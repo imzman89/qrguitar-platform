@@ -20,7 +20,7 @@ export function UnavailablePage({ title, description, children, alert = false }:
     <div className={styles.page}>
       <header className={styles.header}>
         <Link className={styles.brand} href="/" aria-label={ui("ui.components.UnavailablePage.33b14c935c51", "QRguitar homepage")}>
-          <BrandLogo className={styles.logo} />
+          <BrandLogo className={styles.logo} appearance="dark" />
         </Link>
         <nav className={styles.navigation} aria-label={ui("ui.components.UnavailablePage.7b06d0dd6977", "Site navigation")}>
           <Link href="/catalog">{ui("ui.components.UnavailablePage.3877d14889a9", "Catalog")}</Link>

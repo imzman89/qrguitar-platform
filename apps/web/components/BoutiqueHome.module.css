@@ -1,14 +1,5 @@
 /* A quiet, instrument-led homepage. Other pages keep their own palette. */
-.page {
-  --canvas:#121310;
-  --surface:#1a1b17;
-  --text:#f0eee6;
-  --muted:#aaa99f;
-  --muted-strong:#cfcdc2;
-  --line:rgba(240,238,230,.13);
-  color:var(--text);
-  background:var(--canvas);
-}
+.page { color:var(--text); background:var(--canvas); }
 .page :global(.shell) { width:min(1280px,calc(100% - 96px)); max-width:1280px; }
 .page :global(.brand-frame) { background:var(--canvas); border-bottom:1px solid var(--line); }
 .home { color:var(--text); background:var(--canvas); }
@@ -68,4 +59,29 @@
   .sectionHeading { flex-direction:column; align-items:flex-start; gap:18px; }
   .sectionHeading > div { min-width:0; }
   .sectionHeading p:not(.eyebrow) { max-width:29ch; }
+}
+
+@media screen {
+  .opening { padding:64px 0 76px; }
+  .heroGrid { grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr); gap:clamp(40px,6vw,88px); }
+  .heroCopy h1 { max-width:13ch; font-size:clamp(46px,4.8vw,72px); font-weight:400; letter-spacing:-.035em; line-height:1.08; }
+  .eyebrow { color:var(--muted-strong); font-size:11px; letter-spacing:.1em; }
+  .heroCopy > .eyebrow::before { width:7px; height:7px; margin:0 10px 1px 0; border-radius:50%; }
+  .introduction { font-size:17px; line-height:1.75; }
+  .home .primaryAction { min-height:50px; padding:14px 22px; border-radius:999px; border-color:var(--text); background:var(--text); color:var(--canvas); font-size:14px; }
+  .home .primaryAction:hover { border-color:#444039; background:#444039; color:var(--canvas); }
+  .textLink { font-size:14px; }.accessNote { margin-top:18px; font-size:13px; }
+  .archiveSection { padding:56px 0 80px; }.archiveGrid { align-items:stretch; gap:28px; }
+  .sectionHeading { margin-bottom:30px; }
+  .sectionHeading h2,.signupCopy h2 { font-size:clamp(32px,3.1vw,44px); line-height:1.14; letter-spacing:-.025em; }
+  .sectionHeading p:not(.eyebrow) { font-size:15px; }
+  .signupSection { padding:64px 0; background:var(--surface-subtle); border-top:1px solid var(--line); }
+  .signupPanel { gap:40px; }.signupCopy > p:not(.eyebrow) { font-size:16px; }.signupAction > p { font-size:13px; }
+}
+@media screen and (max-width:1000px) { .heroGrid { gap:40px; }.archiveGrid { gap:24px; } }
+@media screen and (max-width:760px) {
+  .opening { padding:36px 0 48px; }.heroGrid { grid-template-columns:1fr; gap:32px; }
+  .heroCopy h1 { font-size:clamp(40px,8.5vw,58px); max-width:15ch; }.introduction { font-size:16px; }
+  .archiveSection { padding:40px 0 52px; }.archiveGrid { gap:24px; }
+  .signupSection { padding:44px 0; }.signupPanel { gap:26px; }
 }

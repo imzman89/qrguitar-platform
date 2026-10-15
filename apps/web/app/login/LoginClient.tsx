@@ -290,7 +290,7 @@ export default function LoginClient({ initialMode }: { initialMode: LoginMode })
   return (
     <>
       <Nav />
-      <main className={styles.page}>
+      <main className={styles.page + " boutique-gallery"}>
         <div className={styles.layout}>
           <header className={styles.heading}>
             <div className="eyebrow">{isSignedIn ? ui("ui.app.login.page.ff66ee6c3c61", "Account ready") : getContentValue(content, "login.hero.eyebrow")}</div>
