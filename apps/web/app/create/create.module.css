@@ -109,17 +109,13 @@
  .sectionHeading h2 { font-family:var(--font-display,Georgia,serif); font-size:clamp(24px,2.5vw,30px); font-weight:400; line-height:1.2; }
 }
 
-/* Screen-only native document picker; input geometry and behavior remain unchanged. */
+/* Screen-only native document picker with a full touch target; upload behavior is unchanged. */
 @media screen {
-  .form :global(#profileDocuments)::file-selector-button {
-    background: var(--surface-subtle);
-    color: var(--text);
-    border-radius: 2px;
-    box-shadow: inset 0 0 0 1px var(--border-strong);
-  }
-  .form :global(#profileDocuments:not(:disabled))::file-selector-button:hover {
-    background: var(--surface-raised);
-  }
+  .form :global(#profileDocuments) { display:block; width:100%; max-width:100%; min-height:54px; margin-top:4px; padding:4px; border:1px solid var(--border-strong); border-radius:8px; background:var(--field-surface,var(--canvas)); color:var(--text); font:inherit; font-size:16px; line-height:1.5; }
+  .form :global(#profileDocuments)::file-selector-button { min-width:44px; min-height:44px; margin-inline-end:12px; padding:10px 14px; border:1px solid var(--border-strong); border-radius:6px; background:var(--surface-subtle); color:var(--text); font:inherit; cursor:pointer; box-shadow:none; }
+  .form :global(#profileDocuments:not(:disabled))::file-selector-button:hover { background:var(--surface-raised); border-color:var(--action); }
+  .form :global(#profileDocuments):focus-visible { outline:2px solid var(--action); outline-offset:3px; }
+  .form :global(#profileDocuments:disabled)::file-selector-button { opacity:.55; cursor:not-allowed; }
 }
 
 @media screen {

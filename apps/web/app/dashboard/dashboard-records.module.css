@@ -460,3 +460,21 @@
 
 @media screen { :global(body[data-product-theme]) .dashboard .header h1 { font-family:var(--font-ui); font-size:clamp(30px,3vw,40px); font-weight:650; }.header { padding:0 0 16px; }.header p { line-height:1.55; }.collectionControls { padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface); } }
 @media screen and (max-width:760px) { .dashboard { gap:16px; }.header { gap:12px; }.header > div:first-child { gap:6px; }:global(body[data-product-theme]) .dashboard .header h1 { font-size:30px; }.header p { font-size:13px; }.headerActions { gap:6px; }.headerActions :global(.button) { padding:10px 12px; }.collectionControls { gap:8px; padding:8px; }.filters button { padding:8px; font-size:12px; }.instrumentList:not(.personalRecords) .instrumentThumb { height:240px; max-height:240px; } }
+
+/* Retained-file disclosure shares the workspace spacing and accessible controls. */
+@media screen {
+  .toolsBody > :global(details.panel) { min-width:0; padding:16px 20px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
+  .toolsBody > :global(details.panel) > summary { min-height:44px; padding-block:10px; color:var(--text); font-size:14px; font-weight:600; line-height:1.5; cursor:pointer; }
+  .toolsBody > :global(details.panel) > summary::marker { color:var(--action); }
+  .toolsBody > :global(details.panel[open]) > summary { padding-bottom:14px; border-bottom:1px solid var(--line); }
+  .toolsBody > :global(details.panel) > p { margin:14px 0 0; color:var(--muted); font-size:14px; line-height:1.6; overflow-wrap:anywhere; }
+  .toolsBody > :global(details.panel) > p:empty,.toolsBody > :global(details.panel) > ul:empty { display:none; }
+  .toolsBody > :global(details.panel) > ul { display:grid; gap:12px; margin:16px 0 0; padding:0; list-style:none; }
+  .toolsBody > :global(details.panel) > ul > li { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; min-width:0; padding:12px 0; border-bottom:1px solid var(--line); color:var(--text); overflow-wrap:anywhere; }
+  .toolsBody > :global(details.panel) button { min-width:44px; min-height:44px; max-width:100%; padding:10px 14px; border:1px solid var(--border-strong); border-radius:8px; background:var(--surface-subtle); color:var(--text); font:inherit; font-size:14px; white-space:normal; cursor:pointer; }
+  .toolsBody > :global(details.panel) > button { margin-top:14px; margin-right:8px; }
+  .toolsBody > :global(details.panel) button:hover:not(:disabled) { border-color:var(--action); }
+  .toolsBody > :global(details.panel) :is(summary,button):focus-visible { outline:2px solid var(--action); outline-offset:3px; }
+  .toolsBody > :global(details.panel) button:disabled { opacity:.55; cursor:not-allowed; }
+}
+@media screen and (max-width:600px) { .toolsBody > :global(details.panel) { padding:14px 16px; } }
