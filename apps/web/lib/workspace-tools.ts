@@ -36,6 +36,21 @@ export function getWorkspace(value: unknown, content: Record<string, string> = {
   return { ...original, label: text(original.label), title: text(original.title), description: text(original.description), actions: original.actions.map(action => ({ ...action, title: text(action.title), description: text(action.description) })) };
 }
 
+const registrationDescriptions: Record<WorkspaceType, string> = {
+  player: "Your instruments and their history.",
+  collector: "Your collection, organized.",
+  shop: "Inventory and buyer handoffs.",
+  builder: "Build records and handoffs.",
+  luthier: "Service records and owner feedback.",
+  other: "Instrument Profiles and collections."
+};
+
+// Signup-only presentation; retain the shared description when it was customized.
+export function getRegistrationWorkspaceDescription(value: WorkspaceType, content: Record<string, string> = {}) {
+  const description = getWorkspace(value, content).description;
+  return description === workspaces[value].description ? registrationDescriptions[value] : description;
+}
+
 const workspaceCopyKeys: Record<string, string> = {
   "Player / owner": "ui.workspace.faae0c421967",
   "Collector": "ui.workspace.9d0081a4f3d6",

@@ -644,6 +644,12 @@ export const retiredHomepageContentKeys = new Set([
   "home.signup.benefit3"
 ]);
 
+const optionalRoleDescriptionKeys: readonly string[] = [
+  "ui.workspace.11c503369f69", "ui.workspace.b5efa61cb710",
+  "ui.workspace.15aa16da501a", "ui.workspace.c110fe1e6af2",
+  "ui.workspace.93363fe59878", "ui.workspace.23160d470c3a"
+];
+
 export const contentRegistry: ContentRegistryEntry[] = Array.from(
   new Map([...coreContentRegistry, ...completionRegistry, ...emailRegistry, ...seoRegistry, ...[...uiTextEntries, ...retiredUiTextEntries].map((entry) => field(
     entry.key, entry.area as ContentArea, entry.page, retiredUiTextEntries.includes(entry) ? "Legacy editor controls (not displayed)" : entry.section,
@@ -651,6 +657,7 @@ export const contentRegistry: ContentRegistryEntry[] = Array.from(
     entry.text,
     { maxLength: Math.max(240, entry.text.length * 3), allowedVariables: Array.from(entry.text.matchAll(/\{\{([a-zA-Z0-9_]+)\}\}/g), (match) => match[1]),
       previewPath: contentPreviewPathForUiText(entry.source, entry.page),
+      required: !optionalRoleDescriptionKeys.includes(entry.key),
       classification: protectedUiTextKeys.has(entry.key) ? "security-locked" : retiredUiTextEntries.includes(entry) ? "editable-advanced" : "editable-standard",
       help: retiredUiTextEntries.includes(entry) ? "Compatibility value for a removed editor control. Retained to preserve saved content; changing it does not change the current interface." : "Site interface wording. Values in {{braces}} come from the application; keep those placeholders. This does not edit anyone’s saved Profile or account data." }
   ))].map((entry) => [entry.key, entry])).values()
@@ -691,6 +698,20 @@ export const contentRegistryByKey = new Map(contentRegistry.map((entry) => [entr
 export const defaultContentValues: Record<string, string> = Object.fromEntries(
   contentRegistry.map((entry) => [entry.key, entry.defaultValue])
 );
+
+// Match raw saved defaults only; custom text and intentional blanks stay intact.
+const exactLegacyContentDefaults: Readonly<Record<string, string>> = {
+  "ui.app.create.page.d7f3b884c97a": "Sign in to create a Profile",
+  "ui.app.create.page.798ca2ce18bf": "Create account",
+  "ui.app.login.page.registrationRoleHelp": "Choose how you use QRguitar. You can change this later in Account settings.",
+  "ui.app.i.code.ProfileClient.afterPurchase": "After you buy it, ask the seller to transfer this Profile to you for free. Its photos, specifications and history stay together."
+};
+
+// These optional screen descriptions retain editorial overrides, including blanks.
+export const verbatimShowroomCopyKeys: readonly string[] = [
+  ...Object.keys(exactLegacyContentDefaults),
+  ...optionalRoleDescriptionKeys
+];
 
 const legacyContentDefaults: Record<string, string[]> = {
   "privacy.sections.payments.body": ["PayPal processes checkout payment details under its own privacy statement. QRguitar does not receive or store card numbers or Apple Pay tokens. QRguitar keeps the account, order, pack, amount, provider transaction identifiers, payment status, and review history needed to add Profile credits, recover interrupted payments, prevent duplicate fulfillment, and handle refunds or disputes."],
@@ -1162,8 +1183,8 @@ export function mergeContentValues(value?: Record<string, unknown> | null) {
     const candidate = value?.[entry.key];
     if (typeof candidate !== "string") continue;
     const clean = candidate.replace(/\u0000/g, "").slice(0, entry.maxLength);
-    if (entry.required && !clean.trim()) continue;
-    merged[entry.key] = legacyContentDefaults[entry.key]?.includes(clean) || isPreviousFreeAllowanceDefault(entry, clean) ? entry.defaultValue : clean;
+    if (entry.required && !clean.trim() && !verbatimShowroomCopyKeys.includes(entry.key)) continue;
+    merged[entry.key] = candidate === exactLegacyContentDefaults[entry.key] || legacyContentDefaults[entry.key]?.includes(clean) || isPreviousFreeAllowanceDefault(entry, clean) ? entry.defaultValue : clean;
   }
   return merged;
 }
@@ -1231,7 +1252,7 @@ export function getContentValue(values: Record<string, string> | undefined, key:
   if (typeof value !== "string") return entry?.defaultValue ?? "";
 
   const clean = value.replace(/\u0000/g, "").slice(0, entry?.maxLength || value.length);
-  return entry && (legacyContentDefaults[key]?.includes(clean.trim()) || isPreviousFreeAllowanceDefault(entry, clean.trim())) ? entry.defaultValue : clean;
+  return entry && (value === exactLegacyContentDefaults[key] || legacyContentDefaults[key]?.includes(clean.trim()) || isPreviousFreeAllowanceDefault(entry, clean.trim())) ? entry.defaultValue : clean;
 }
 
 export function contentPagesForArea(area: ContentArea) {

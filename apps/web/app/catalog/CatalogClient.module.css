@@ -146,3 +146,8 @@
   .dashboard-hero[data-long-heading="true"] { grid-template-columns:minmax(0,1fr); }
   .dashboard-hero[data-long-heading="true"] .catalog-hero-actions { display:flex; }
 }
+
+/* Give each instrument a substantial photographic stage on phones. */
+@media screen and (max-width:600px) {
+  .catalog-grid { --catalog-mobile-media-ratio:1.08 / 1; }
+}

@@ -1,6 +1,6 @@
 import { CheckCircle2 } from "lucide-react";
 import { siteCopy } from "../content/site-copy";
-import { defaultContentValues, getContentValue, mergeContentValues } from "./content-registry";
+import { defaultContentValues, getContentValue, mergeContentValues, verbatimShowroomCopyKeys } from "./content-registry";
 import { defaultInstrumentCategories, normalizeInstrumentCategories } from "./instrument-categories";
 import { approvedExactCopyAfterValues } from "./site-copy-reconciliation-pairs";
 
@@ -249,8 +249,8 @@ export const defaultSiteSettings: EditableSiteSettings = {
   instrumentCategories: [...defaultInstrumentCategories],
   brandLogos: {},
   colors: {
-    background: "#070c10",
-    panel: "#11191e",
+    background: "#121310",
+    panel: "#1b1d18",
     gold: "#f0a12b",
     cream: "#f5f0df",
     text: "#f8f6f2"
@@ -721,18 +721,22 @@ function normalizeProfileCopy(value: string) {
   return replacements.reduce((copy, [pattern, replacement]) => copy.replace(pattern, replacement), value);
 }
 
-function normalizeCopyObject<T>(value: T): T {
+function normalizeCopyObject<T>(value: T, defaults: unknown): T {
   if (typeof value === "string") {
-    return normalizeProfileCopy(value) as T;
+    // Migrate stock wording only; editorial overrides stay exactly as supplied.
+    return (value === defaults ? normalizeProfileCopy(value) : value) as T;
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => normalizeCopyObject(item)) as T;
+    const items = Array.isArray(defaults) ? defaults : [];
+    return value.map((item, index) => normalizeCopyObject(item, items[index])) as T;
   }
 
   if (value && typeof value === "object") {
+    const fields = defaults && typeof defaults === "object" && !Array.isArray(defaults)
+      ? defaults as Record<string, unknown> : {};
     return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, normalizeCopyObject(item)])
+      Object.entries(value).map(([key, item]) => [key, normalizeCopyObject(item, fields[key])])
     ) as T;
   }
 
@@ -781,7 +785,11 @@ export function mergeSiteSettings(settings?: Partial<EditableSiteSettings> | nul
       : hasInstrumentCategories ? [] : defaultSiteSettings.instrumentCategories,
     colors: {
       ...defaultSiteSettings.colors,
-      ...(settings?.colors || {})
+      ...(settings?.colors || {}),
+      // Only the prior stock palette follows the showroom refresh.
+      // Any custom color, including an explicitly stored blank, stays unchanged.
+      ...(settings?.colors?.background === "#070c10" ? { background: defaultSiteSettings.colors.background } : {}),
+      ...(settings?.colors?.panel === "#11191e" ? { panel: defaultSiteSettings.colors.panel } : {})
     },
     hero: {
       ...defaultSiteSettings.hero,
@@ -815,7 +823,11 @@ export function mergeSiteSettings(settings?: Partial<EditableSiteSettings> | nul
     composition: normalizeEditorialComposition(settings?.composition),
     content: mergeLegacyContent(settings)
   };
-  const merged = normalizeCopyObject(beforeCopyNormalization);
+  const merged = normalizeCopyObject(beforeCopyNormalization, defaultSiteSettings);
+  // The registry has already migrated exact defaults; keep custom wording verbatim.
+  for (const key of verbatimShowroomCopyKeys) {
+    merged.content[key] = beforeCopyNormalization.content[key];
+  }
   for (const [key, approvedAfter] of Object.entries(approvedExactCopyAfterValues)) {
     if (beforeCopyNormalization.content[key] === approvedAfter) merged.content[key] = approvedAfter;
   }

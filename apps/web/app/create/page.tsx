@@ -837,15 +837,15 @@ function CreateOwnerDraft({ user, authChecked, isCurrent }: { user: CreateOwner 
         <div className={authStyles.layout}>
           <section className={authStyles.formPanel}>
             <div className="eyebrow">{ui("ui.app.create.page.de02ab7a9a50", "Create instrument")}</div>
-            <h1>{ui("ui.app.create.page.d7f3b884c97a", "Sign in to create a Profile")}</h1>
+            <h1>{ui("ui.app.create.page.d7f3b884c97a", "Create a free Profile")}</h1>
             {!authChecked ? (
               <p role="status" aria-live="polite" aria-busy="true">{sessionUi("ui.components.Nav.checkingSignIn", "Checking sign-in...")}</p>
             ) : (
               <>
             <p>{ui("ui.app.create.page.325a8c093318", "Create QRguitar Profiles from your account so the QR, photos, documents, and ownership stay tied to the right owner.")}</p>
             <div className="form-actions">
-              <Link className="button" href={`/login?next=${encodeURIComponent("/create")}`}>{ui("ui.app.create.page.bfd402b2f6f3", "Sign in")}</Link>
-              <Link className="button secondary" href={`/login?mode=register&next=${encodeURIComponent("/create")}`}>{ui("ui.app.create.page.798ca2ce18bf", "Create account")}</Link>
+              <Link className="button" href={`/login?mode=register&next=${encodeURIComponent("/create")}`}>{ui("ui.app.create.page.798ca2ce18bf", "Create free account")}</Link>
+              <Link className="button secondary" href={`/login?next=${encodeURIComponent("/create")}`}>{ui("ui.app.create.page.bfd402b2f6f3", "Sign in")}</Link>
               <Link className="button secondary" href="/catalog">{ui("ui.app.create.page.4d05dc6da837", "Browse catalog")}</Link>
             </div>
               </>

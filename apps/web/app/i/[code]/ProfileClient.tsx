@@ -1113,7 +1113,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
 
         {!publicReviewSnapshot && !canEdit ? <section className={styles["profile-claim-entry"]}>
           <h2>{ui("ui.app.i.code.ProfileClient.lifetimeProfile", "One Profile, for its whole life.")}</h2>
-          <p>{ui("ui.app.i.code.ProfileClient.afterPurchase", "After you buy it, ask the seller to transfer this Profile to you for free. Its photos, specifications and history stay together.")}</p>
+          <p>{ui("ui.app.i.code.ProfileClient.afterPurchase", "If ownership changes, ask the current owner to transfer this Profile to you for free. Its photos, specifications and history stay together.")}</p>
           <details>
             <summary>{ui("ui.app.i.code.ProfileClient.alreadyOwn", "Already own it?")}</summary>
             <p>{ui("ui.app.i.code.ProfileClient.b5c3490dde3a", "Scanning this QR code opens the Profile. It never changes ownership. Ask the current owner for a transfer, or start a private request if they cannot send one.")}</p>

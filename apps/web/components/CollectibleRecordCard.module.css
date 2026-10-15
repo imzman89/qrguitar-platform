@@ -102,3 +102,9 @@
 .collectible-card[data-home-featured="true"] .collectible-card-code { display:none; }
 .collectible-card[data-home-featured="true"] .collectible-card-content { gap:10px; }
 
+
+/* Catalog identity leads; status remains readable without competing color chips. */
+@media screen {
+  .collectible-card[data-card-variant="catalog"] .collectible-card-content :global(.record-badge:not(.record-badge--safety)) { color:var(--muted-strong); }
+  .collectible-card[data-card-variant="catalog"] .collectible-card-profile-link h3 { font-weight:400; letter-spacing:-.025em; }
+}

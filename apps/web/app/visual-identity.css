@@ -8,10 +8,21 @@
 /* Screen typography only: printed documents retain their qualified geometry. */
 @media screen {
   body[data-product-theme] {
-    --font-display: "QRguitar Modern", "Aptos", "Segoe UI", sans-serif;
+    --font-display: Georgia, "Times New Roman", serif;
     --font-ui: "QRguitar Modern", "Aptos", "Segoe UI", sans-serif;
     font-family: var(--font-ui);
     font-synthesis: none;
     -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Public and customer headings share the instrument-led showroom language.
+   Administrative/editor controls and all printed documents retain their geometry. */
+@media screen {
+  body[data-product-theme] main:not(:is(.home-page,.cms-page,.admin-page,.admin-service-page,.handout-page)) h1 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -.035em;
+    line-height: 1.12;
   }
 }

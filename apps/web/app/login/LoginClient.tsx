@@ -13,7 +13,7 @@ import { getContentValue } from "../../lib/content-registry";
 import { useSiteContent } from "../../lib/use-site-content";
 
 import { safeAuthRedirect } from "../../lib/auth-redirect";
-import { WORKSPACE_OPTIONS, getWorkspace, workspaceOptionLabel, type WorkspaceType } from "../../lib/workspace-tools";
+import { WORKSPACE_OPTIONS, getRegistrationWorkspaceDescription, workspaceOptionLabel, type WorkspaceType } from "../../lib/workspace-tools";
 import { replaceWithCheckoutPolicy } from "../../lib/checkout-navigation";
 import { dispatchOptionalTrackingProductEvent, optionalTrackingProductEvents } from "../../lib/optional-tracking-consent";
 
@@ -330,7 +330,7 @@ export default function LoginClient({ initialMode }: { initialMode: LoginMode })
                 {mode === "register" && !buyerRegistration ? (
                   <fieldset id="registration-role-choices" className={styles.registrationRoles} hidden={!registrationRoleStep} disabled={isWorking || !registrationRoleStep} aria-describedby="registration-role-help">
                     <legend>{ui("ui.app.login.page.registrationRole", "Choose your workspace")}</legend>
-                    <p id="registration-role-help">{ui("ui.app.login.page.registrationRoleHelp", "Choose how you use QRguitar. You can change this later in Account settings.")}</p>
+                    <p id="registration-role-help">{ui("ui.app.login.page.registrationRoleHelp", "Change this later in Account settings.")}</p>
                     <div className={styles.registrationRoleChoices}>
                       {WORKSPACE_OPTIONS.map(option => (
                         <div key={option.value}>
@@ -340,7 +340,7 @@ export default function LoginClient({ initialMode }: { initialMode: LoginMode })
                               registrationFocus.current = null; node.focus();
                             }
                           }} type="radio" name="workspace-role" value={option.value} required checked={registrationRole === option.value} onChange={() => setRegistrationRole(option.value)} />
-                          <span><strong>{workspaceOptionLabel(option.label, content)}</strong><small>{getWorkspace(option.value, content).description}</small></span>
+                          <span><strong>{workspaceOptionLabel(option.label, content)}</strong><small>{getRegistrationWorkspaceDescription(option.value, content)}</small></span>
                         </label>
                         {registrationRoleStep && registrationRole === option.value ? registrationContinueAction : null}
                         </div>
@@ -353,7 +353,7 @@ export default function LoginClient({ initialMode }: { initialMode: LoginMode })
                   <div className={styles.registrationSummary}>
                     <div className={styles.stateHeading}>
                       <strong>{workspaceOptionLabel(selectedRegistration.label, content)}</strong>
-                      <span>{getWorkspace(selectedRegistration.value, content).description}</span>
+                      <span>{getRegistrationWorkspaceDescription(selectedRegistration.value, content)}</span>
                     </div>
                     <button className="link-button" type="button" disabled={isWorking} aria-controls="registration-role-choices" onClick={changeRegistration}>{ui("ui.app.login.page.registrationChange", "Change workspace")}</button>
                   </div>

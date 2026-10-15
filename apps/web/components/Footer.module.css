@@ -9,3 +9,9 @@
 @media(max-width:700px) { .footer { padding:32px 0 24px; } .footer :global(.footer-grid) { width:calc(100% - 40px); grid-template-columns:1fr; gap:24px; } .footer :global(.footer-links) { grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 20px; } }
 .footer .sessionStatus { display:flex; align-items:center; min-height:44px; color:var(--muted); font-size:14px; font-weight:400; line-height:1.5; text-transform:none; letter-spacing:0; }
 .footer .sessionNotice { grid-column:1/-1; max-width:62ch; margin:4px 0 12px; color:var(--negative); font-size:14px; font-weight:400; line-height:1.5; text-transform:none; letter-spacing:0; overflow-wrap:anywhere; }
+
+/* Give the six navigation links room before switching to the phone layout. */
+@media screen and (min-width:701px) and (max-width:1050px) {
+  .footer :global(.footer-grid) { grid-template-columns:minmax(180px,.8fr) minmax(0,1.2fr); gap:32px; }
+  .footer :global(.footer-links) { grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px 24px; }
+}

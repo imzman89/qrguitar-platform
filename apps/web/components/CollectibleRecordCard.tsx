@@ -317,8 +317,9 @@ export function CollectibleRecordCard({
             <div className={styles["collectible-card-utilities"]}>
               <RecordShareButton className={styles["collectible-card-share"]} showLabel={variant === "catalog"} code={card.code} title={card.title} />
             </div>
+            {variant === "catalog" ? <span className={styles["collectible-card-code"]}>{card.code}</span> : null}
           </details> : null}
-          <span className={styles["collectible-card-code"]}>{card.code}</span>
+          {variant !== "catalog" ? <span className={styles["collectible-card-code"]}>{card.code}</span> : null}
         </div>
       </div>
 
