@@ -1,4 +1,5 @@
 import { createUiText } from "./ui-text";
+import { approvedCopyPairs } from "./site-copy-reconciliation-pairs";
 export type WorkspaceType = "player" | "collector" | "shop" | "builder" | "luthier" | "other";
 export const WORKSPACE_OPTIONS: ReadonlyArray<{ value: WorkspaceType; label: string }> = [
   { value: "player", label: "Player / owner" },
@@ -48,7 +49,12 @@ const registrationDescriptions: Record<WorkspaceType, string> = {
 // Signup-only presentation; retain the shared description when it was customized.
 export function getRegistrationWorkspaceDescription(value: WorkspaceType, content: Record<string, string> = {}) {
   const description = getWorkspace(value, content).description;
-  return description === workspaces[value].description ? registrationDescriptions[value] : description;
+  const defaultDescription = workspaces[value].description;
+  const descriptionKey = workspaceCopyKeys[defaultDescription];
+  const isApprovedLegacyDefault = approvedCopyPairs.some(pair =>
+    pair.selector.kind === "content" && pair.selector.key === descriptionKey &&
+    pair.beforeDefault === description && pair.afterDefault === defaultDescription);
+  return description === defaultDescription || isApprovedLegacyDefault ? registrationDescriptions[value] : description;
 }
 
 const workspaceCopyKeys: Record<string, string> = {
