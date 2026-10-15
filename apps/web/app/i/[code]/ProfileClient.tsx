@@ -893,6 +893,8 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
             ) : null}
           </section>
           <div className={styles["scan-hero-info"]}>
+            <details className={styles["profile-identity-details"]}>
+              <summary>{ui("ui.app.i.code.ProfileClient.instrumentIdentity", "Instrument identity")}</summary>
             <ProfileIdentity
               heading={ui("ui.app.i.code.ProfileClient.instrumentIdentity", "Instrument identity")}
               values={identityValues}
@@ -911,6 +913,8 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                   {" · "}{ui("ui.app.i.code.ProfileClient.serviceDatePrivacy", "Details stay private unless shared.")}
                 </p>
               ) : null}
+            </ProfileIdentity>
+            </details>
               {trustItems.length ? (
                 <div className={styles["profile-trust-summary"]} aria-label={ui("ui.app.i.code.ProfileClient.66e1c9549fde", "Trust review")}>
                   {trustItems.map((item) => (
@@ -921,7 +925,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                   ))}
                 </div>
               ) : null}
-            </ProfileIdentity>
+
           </div>
         </section>
 
