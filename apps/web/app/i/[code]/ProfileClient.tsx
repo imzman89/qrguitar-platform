@@ -98,7 +98,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
   const heroThumbnailRailRef = useRef<HTMLDivElement | null>(null);
   const heroThumbnailDragRef = useRef<{ pointerId: number; startX: number; scrollLeft: number } | null>(null);
   const heroThumbnailDidDragRef = useRef(false);
-  const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
+  const [activeTab, setActiveTab] = useState<ProfileTab>("specs");
   const [brandLogos, setBrandLogos] = useState<Record<string, string>>({});
   const [publicContent, setPublicContent] = useState<Record<string, string>>({});
   const code = codeParam || initialInstrument?.qrCode || "";
@@ -374,7 +374,6 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
   const meaningfulTimelineEvents = presentation?.meaningfulTimelineEvents || [];
   const visibleTabs = useMemo<Array<{ id: ProfileTab; label: string; count?: number }>>(() => {
     const tabs: Array<{ id: ProfileTab; label: string; count?: number }> = [
-      { id: "overview", label: getContentValue(publicContent, "profile.tabs.overview") },
       { id: "specs", label: getContentValue(publicContent, "profile.tabs.specifications") }
     ];
 
@@ -495,13 +494,17 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
   }, [instrument]);
 
   useEffect(() => {
+    if (queryTab === "overview") {
+      setActiveTab("specs");
+      return;
+    }
     if (queryTab && visibleTabs.some((tab) => tab.id === queryTab)) {
       setActiveTab(queryTab as ProfileTab);
       return;
     }
 
     if (!visibleTabs.some((tab) => tab.id === activeTab)) {
-      setActiveTab("overview");
+      setActiveTab("specs");
     }
   }, [activeTab, queryTab, visibleTabs]);
 
@@ -906,25 +909,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
             {ownerPreview ? ownerWorkspaceContent : null}
           </header>
           <div className={styles["scan-hero-info"]}>
-        <footer aria-label="Profile QR and share">
-        <div className={styles["scan-qr"]}>
-          <ProfileQr code={instrument.qrCode} />
-          <div>
-            <strong>{instrument.qrCode}</strong>
-            <span>{ui("ui.app.i.code.ProfileClient.5139e0f92e71", "Scan to view")}</span>
-            <span>{shareUrl ? shareUrl.replace(/^https?:\/\//, "") : ui("ui.app.i.code.ProfileClient.58a595439cb9", "qrguitar.com/i/{{value1}}", { value1: instrument.qrCode.toLowerCase() })}</span>
-          </div>
-          <RecordShareButton className={styles["scan-share-button"]} code={instrument.qrCode} title={instrumentDisplayName(instrument)} />
-          <button className="button secondary" type="button" onClick={copyProfileUrl}>
-            <Copy size={14} />
-            {copyStatus === "copied" ? ui("ui.app.i.code.ProfileClient.8d525e5f158b", "Copied") : ui("ui.app.i.code.ProfileClient.b26d1037f1c2", "Copy URL")}
-          </button>
-        </div>
-        {shareNotice === "failed" ? (
-          <small className={styles["scan-copy-notice"]}>{ui("ui.app.i.code.ProfileClient.0854b0c9c202", "Copy failed. You can copy the URL from your browser bar.")}</small>
-        ) : null}
 
-        </footer>
             <div className={styles["profile-identity-details"]}>
             <ProfileIdentity
               heading={ui("ui.app.i.code.ProfileClient.instrumentIdentity", "Instrument identity")}
@@ -957,6 +942,25 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                 </div>
               ) : null}
 
+        <footer aria-label="Profile QR and share">
+        <div className={styles["scan-qr"]}>
+          <ProfileQr code={instrument.qrCode} />
+          <div>
+            <strong>{instrument.qrCode}</strong>
+            <span>{ui("ui.app.i.code.ProfileClient.5139e0f92e71", "Scan to view")}</span>
+            <span>{shareUrl ? shareUrl.replace(/^https?:\/\//, "") : ui("ui.app.i.code.ProfileClient.58a595439cb9", "qrguitar.com/i/{{value1}}", { value1: instrument.qrCode.toLowerCase() })}</span>
+          </div>
+          <RecordShareButton className={styles["scan-share-button"]} code={instrument.qrCode} title={instrumentDisplayName(instrument)} />
+          <button className="button secondary" type="button" onClick={copyProfileUrl}>
+            <Copy size={14} />
+            {copyStatus === "copied" ? ui("ui.app.i.code.ProfileClient.8d525e5f158b", "Copied") : ui("ui.app.i.code.ProfileClient.b26d1037f1c2", "Copy URL")}
+          </button>
+        </div>
+        {shareNotice === "failed" ? (
+          <small className={styles["scan-copy-notice"]}>{ui("ui.app.i.code.ProfileClient.0854b0c9c202", "Copy failed. You can copy the URL from your browser bar.")}</small>
+        ) : null}
+
+        </footer>
           </div>
         </section>
 
@@ -1149,21 +1153,6 @@ function ProfilePanel({
 }) {
   const ui = useUiText("app.i.code.ProfileClient");
   const profileTypeLabel = String(instrument.instrumentType || "").trim() || "Profile";
-
-  if (activeTab === "specs") {
-    const visibleSpecs = [...specs, ...optionalSpecs].filter((spec) => hasMeaningfulPublicValue(spec.value));
-
-    return (
-      <section className={styles["scan-tab-panel"]}>
-        <PanelHeader icon={<SlidersHorizontal />} label={ui("ui.app.i.code.ProfileClient.73949bb1bdba", "Profile details")} title={detailsHeading} />
-        <div className={styles["profile-data-grid"]}>
-          {visibleSpecs.map((spec) => (
-            <span key={spec.label} data-long-value={String(spec.value).length > 96 ? "true" : undefined}><strong>{spec.label}</strong>{spec.value}</span>
-          ))}
-        </div>
-      </section>
-    );
-  }
 
   if (activeTab === "timeline") return <ProfileHistory instrument={instrument} latestTransfer={latestTransfer} timelineEvents={timelineEvents} serviceEntries={serviceEntries} />;
 
