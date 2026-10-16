@@ -152,4 +152,4 @@
  .memberFilters { padding:8px 0 0; }
 }
 
-@media screen { .card > img { display:block;height:auto;aspect-ratio:auto;max-height:480px;object-fit:contain; } }
+@media screen { .grid { align-items:start; }.card > img { display:block;height:auto;aspect-ratio:auto;max-height:480px;object-fit:contain; } }
