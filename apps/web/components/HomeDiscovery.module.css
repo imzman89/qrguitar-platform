@@ -1,5 +1,5 @@
 /* One canvas, one four-column module: a double-size feature and equal supporting tiles. */
-.discovery{--grid-gap:12px;--tile-height:clamp(270px,calc((100svh - 202px)/2),460px);width:calc(100% - 48px);margin-inline:auto;padding-bottom:32px;color:var(--text)}
+.discovery{--grid-gap:12px;--tile-height:clamp(240px,calc(50svh - 109px),460px);width:calc(100% - 48px);margin-inline:auto;padding-bottom:32px;color:var(--text)}
 .discovery *{box-sizing:border-box}
 .discovery a{text-decoration:none}
 .discovery :is(a,button,summary):focus-visible{outline:3px solid var(--action);outline-offset:4px}
@@ -17,13 +17,16 @@
 .discoveryHeading>a,.sectionHeading>a,.introduction>a,.collectionFallback>div>a,.compactEmpty>a,.qrStrip>a,.emptyCategory>a,.noInstruments>a{display:inline-flex;align-items:center;justify-content:space-between;gap:14px;min-height:44px;color:var(--text);font:550 13px/1.4 var(--font-ui)}
 .discoveryHeading>a,.sectionHeading>a{flex:none}
 .discoveryHeading>a:hover,.sectionHeading>a:hover,.introduction>a:hover,.qrStrip>a:hover{color:var(--action)}
-.editorialGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(2,minmax(var(--tile-height),1fr));gap:var(--grid-gap)}
+.editorialGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(2,var(--tile-height));gap:var(--grid-gap)}
 .editorialGrid>div{min-width:0;min-height:0}
 .leadInstrument{grid-column:1/3;grid-row:1/3}
 .secondInstrument{grid-column:3;grid-row:1}
 .thirdInstrument{grid-column:4;grid-row:1}
 .heroCollection{grid-column:3;grid-row:2}
-.introduction{grid-column:4;grid-row:2;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;padding:clamp(20px,2.4vw,40px);background:#181b19;border-radius:4px}
+.introduction{grid-column:4;grid-row:2;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;overflow:auto;padding:clamp(20px,2.4vw,40px);background:#181b19;border-radius:4px}
+.introduction>*{flex-shrink:0}
+.introduction>:first-child{margin-top:auto}
+.introduction>:last-child{margin-bottom:auto}
 .editionMark{font:650 11px/1 var(--font-ui);letter-spacing:.22em;color:var(--action);margin-bottom:18px}
 .introduction h2{font:550 clamp(22px,2vw,32px)/1.13 var(--font-ui);letter-spacing:-.035em;margin:0 0 12px;max-width:17ch}
 .introduction p{font-size:13px;line-height:1.65;color:var(--muted-strong);margin:0 0 12px;max-width:38ch}
@@ -51,7 +54,7 @@
 .collage[data-photos="2"]{grid-template-rows:1fr}
 .collage[data-photos="2"]>img[data-first]{grid-row:auto}
 .heroCollection .collectionTile{position:relative}
-.heroCollection .collage{flex:1}
+.heroCollection .collage{position:absolute;inset:0}
 .heroCollection .collectionCaption{position:absolute;inset:auto 0 0;padding:40px 20px 18px;background:linear-gradient(transparent,#000d)}
 .collectionCaption{padding:20px}
 .collectionCaption h3,.businessCard h3{display:flex;justify-content:space-between;gap:12px;font:550 24px/1.15 var(--font-ui);letter-spacing:-.035em;margin:0 0 8px}
@@ -139,13 +142,13 @@
  .mobileExplore>div{position:absolute;right:0;top:100%;z-index:5;display:flex;flex-direction:column;gap:2px;min-width:180px;padding:8px 12px;background:#1b1e1c;border:1px solid var(--line);border-radius:4px;box-shadow:0 8px 24px #0008}
  .mobileExplore>div>a{margin:0;white-space:nowrap}
  .discoveryHeading{padding:10px 0 16px;gap:12px}.discoveryHeading h1{font-size:27px}.discoveryHeading>a{display:none}
- .editorialGrid{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:350px repeat(2,minmax(230px,1fr))}
+ .editorialGrid{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:350px 230px minmax(230px,auto)}
  .leadInstrument{grid-column:1/3;grid-row:1}.secondInstrument{grid-column:1;grid-row:2}.thirdInstrument{grid-column:2;grid-row:2}
  .heroCollection{grid-column:1;grid-row:3}.introduction{grid-column:2;grid-row:3;padding:16px}
  .editorialGrid[data-count="1"]{grid-template-rows:350px minmax(230px,auto)}
  .editorialGrid[data-count="1"] .leadInstrument{grid-column:1/3;grid-row:1}
  .editorialGrid[data-count="1"] .introduction{grid-column:2;grid-row:2}.editorialGrid[data-count="1"] .heroCollection{grid-column:1;grid-row:2}
- .editorialGrid[data-count="2"]{grid-template-rows:350px repeat(2,minmax(230px,1fr))}
+ .editorialGrid[data-count="2"]{grid-template-rows:350px 230px minmax(230px,auto)}
  .editorialGrid[data-count="2"] .secondInstrument{grid-column:1/3;grid-row:2}
  .introduction h2{font-size:21px}.introduction p{font-size:12px;line-height:1.5}.introduction>a{font-size:12px;gap:8px}.editionMark{margin-bottom:12px}
  .instrumentCaption{padding:36px 13px 13px}.instrumentCaption h2{font-size:18px}.instrumentMeta{font-size:10px}
