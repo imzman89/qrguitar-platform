@@ -27,3 +27,24 @@
   .accountButton { width:100%; }
   .dropdown { position:static; max-width:none; margin-top:4px; box-shadow:none; border:0; border-left:1px solid var(--line); background:transparent; border-radius:0; }
 }
+
+/* Shared discovery search, with the existing account/menu states preserved. */
+@media screen {
+ .inner { width:min(1320px,calc(100% - 64px)); min-height:88px; gap:24px; }
+ .logo { width:145px; }
+ .links { gap:4px; }.links > a,.accountButton { padding-inline:10px; font-size:12px; white-space:nowrap; }
+ .links > .primary { margin-left:0; padding-inline:14px; }
+ .search { display:flex; align-items:center; flex:1; min-width:150px; max-width:420px; height:46px; background:var(--surface); border:1px solid var(--line); border-radius:6px; }
+ .search:focus-within { border-color:var(--action); }
+ .search input { flex:1; width:100%; min-width:0; height:44px; min-height:44px; padding:0 0 0 14px; border:0; background:transparent; color:var(--text); font:inherit; font-size:13px; box-shadow:none; }
+ .search input::placeholder { color:var(--muted); }
+ .search button { display:grid; place-items:center; flex-shrink:0; height:44px; width:44px; padding:0; border:0; border-radius:5px; background:transparent; color:var(--text); cursor:pointer; }
+ .searchLabel { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+}
+@media screen and (max-width:1100px) and (min-width:961px) { .inner { gap:14px; }.logo { width:126px; }.links > a,.accountButton { padding-inline:7px; font-size:11px; }.search { min-width:130px; } }
+@media screen and (max-width:960px) {
+ .inner { width:calc(100% - 32px); min-height:68px; gap:0 16px; padding-bottom:12px; }
+ .brand { order:1; height:68px; }.toggle { order:2; margin-left:auto; }.search { order:3; flex:0 0 100%; max-width:none; }.links { order:4; max-height:calc(100dvh - 136px); }.search input { font-size:16px; }
+ .links > a,.accountButton { font-size:16px; min-height:48px; padding-inline:12px; }.links > .primary { margin-top:8px; }
+}
+@media print { .search { display:none; } }

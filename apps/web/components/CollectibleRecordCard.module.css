@@ -93,3 +93,17 @@
  .collectible-card-footer .collectible-card-details[open] { border:0; }
 }
 @media screen and (max-width:600px) { .collectible-card-profile-link h3 { font-size:25px; } }
+
+/* A flexible photograph/caption system shared by discovery mosaics and Catalog. */
+@media screen {
+ .collectible-card { border-radius:8px; overflow:hidden; }
+ .collectible-card-media { aspect-ratio:var(--record-photo-ratio,4/3); min-height:var(--record-photo-min,0px); border-radius:8px 8px 0 0; }
+ .collectible-card-content { gap:8px; padding:18px; }
+ .collectible-card-profile-link h3 { margin:10px 0 7px; font:650 var(--record-title-size,24px)/1.22 var(--font-ui); letter-spacing:-.04em; }
+ .collectible-card-type { font-size:10px; letter-spacing:.07em; font-weight:550; }
+ .collectible-card-year { font:550 17px/1.3 var(--font-ui); letter-spacing:-.035em; }
+ .collectible-card-code { margin-top:12px; font-size:11px; letter-spacing:.035em; }
+ .collectible-card-code::before { font-size:9px; }
+ .collectible-card-content :global(.record-badge) { font-size:12px; }
+}
+@media screen and (max-width:760px) { .collectible-card[data-home-featured="true"] .collectible-card-content { padding:14px; gap:6px; }.collectible-card[data-home-featured="true"] .collectible-card-code { gap:3px; font-size:10px; }.collectible-card[data-home-featured="true"] .collectible-card-profile-link h3 { gap:5px; }.collectible-card[data-home-featured="true"] .collectible-card-profile-link h3 > svg { width:16px; }.collectible-card[data-home-featured="true"] .collectible-card-content :global(.record-badge) { font-size:11px; } }

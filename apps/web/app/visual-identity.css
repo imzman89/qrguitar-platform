@@ -2,18 +2,18 @@
 /* One black screen system. Dedicated printed documents retain their physical palette. */
 @media screen {
  body[data-product-theme] {
-  --font-ui:"QRguitar Modern","Aptos","Segoe UI",sans-serif; --font-display:Georgia,"Times New Roman",serif;
+  --font-ui:"QRguitar Modern","Aptos","Segoe UI",sans-serif; --font-display:"QRguitar Modern","Aptos","Segoe UI",sans-serif;
   --canvas:#090a0b; --bg:#090a0b; --bg-2:#111213; --surface:#141516; --surface-subtle:#191a1b; --surface-raised:#1c1d1e; --surface-soft:#171819;
   --panel:#111213; --panel-2:#191a1b; --text:#eee9df; --ink:#090b0d; --muted:#b5b0a6; --muted-strong:#d5d0c6;
   --line:#373634; --border:#373634; --border-soft:#2b2a28; --border-strong:#65615a;
   --field-surface:#0d0e0f; --field-text:#eee9df; --field-muted:#b5b0a6;
-  --action:#bda17a; --action-hover:#d0b590; --gold:#bda17a; --gold-2:#d0b590; --on-action:#15100a; --action-ink:#15100a;
+  --action:#f3b16a; --action-hover:#ffd0a0; --gold:#f3b16a; --gold-2:#ffd0a0; --on-action:#15100a; --action-ink:#15100a;
   --positive:#9cddb1; --negative:#ffb4aa; --warning:#e9c57e; --photo-mat:#111213;
   --selected-surface:#30291f; --dark-text:var(--text); --muted-light:var(--muted); --line-light:var(--line);
-  --shadow-card:none; --collector-line:#373634; --collector-metal:#bda17a;
+  --shadow-card:none; --collector-line:#373634; --collector-metal:#f3b16a;
   color-scheme:dark; background:var(--canvas); color:var(--text); font-family:var(--font-ui); font-synthesis:none; -webkit-font-smoothing:antialiased;
  }
- body[data-product-theme] main:not(:is(.cms-page,.admin-page,.admin-service-page,.handout-page)) h1 { font-family:var(--font-display); font-weight:400; letter-spacing:-.025em; line-height:1.1; }
+ body[data-product-theme] main:not(:is(.cms-page,.admin-page,.admin-service-page,.handout-page)) h1 { font-family:var(--font-display); font-weight:650; letter-spacing:-.025em; line-height:1.1; }
  body[data-product-theme] :is(input,select,textarea) { color-scheme:dark; }
  body[data-product-theme] .brand-frame { background:var(--canvas); }
  body[data-product-theme] .brand-frame a[href="/create"] { border-radius:6px; background:transparent; color:var(--text); border-color:var(--line); }

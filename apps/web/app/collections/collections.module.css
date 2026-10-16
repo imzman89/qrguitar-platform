@@ -123,3 +123,11 @@
 
 @media screen { .directory .empty { grid-template-columns:minmax(0,1fr); padding:clamp(24px,4vw,44px); border:1px solid var(--collector-line); border-radius:14px; background:var(--surface); gap:20px; }.directory .empty h2 { font-family:var(--font-ui); font-weight:650; }.directory .empty > svg[aria-hidden="true"] { display:block; color:var(--collector-metal); }.directory .empty :global(.button:not(.secondary)) { border-radius:8px; background:var(--action); border-color:var(--action); color:var(--on-action); }.directory .empty :global(.button:not(.secondary):hover) { background:var(--action-hover); border-color:var(--action-hover); color:var(--on-action); } }
 @media screen and (max-width:600px) { .directory .empty { padding:22px; } }
+
+@media screen {
+ .card { border:0; border-radius:8px; background:var(--surface); }
+ .cardBody h2,.memberIdentity h1,.empty h2 { font-family:var(--font-ui); font-weight:650; letter-spacing:-.04em; }
+ .cardBody { padding:22px; }.cardFooter { border:0; margin-top:16px; padding-top:0; }
+ .filters { padding:0; background:transparent; }
+ .memberHero { padding-top:18px; }.role { color:var(--action); font-size:12px; }
+}

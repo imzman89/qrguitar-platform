@@ -4,6 +4,7 @@ import { useUiText } from "../../components/UiTextProvider";
 
 import { requestPublicProfiles } from "../../lib/public-profile-request";
 import { matchesCatalogQuery } from "../../lib/catalog-search";
+import { discoveryCategories, discoveryCategoryLabel, matchesDiscoveryCategory } from "../../lib/discovery-catalog";
 
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import Link from "next/link";
@@ -32,7 +33,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
   const [recordsLoading, setRecordsLoading] = useState(false);
   const [hasLoadedRecords, setHasLoadedRecords] = useState(initialRecords.length > 0);
   const [filters, setFilters] = useState<CatalogFilters>({ ...defaultCatalogFilters });
-  const { brand, availability, condition, trust, authenticity, originality, safety, service, query, sortMode } = filters;
+  const { category, brand, availability, condition, trust, authenticity, originality, safety, service, query, sortMode } = filters;
   const serialLookupRevision = useRef(0);
   const [exactMatchCode, setExactMatchCode] = useState("");
   const [serialLookupMessage, setSerialLookupMessage] = useState("");
@@ -115,7 +116,8 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
 
   const brands = useMemo(() => ["All brands", ...unique([...records.map((record) => record.brand), brand === "All brands" ? "" : brand].filter(Boolean))], [records, brand]);
 
-  const hasFilterOrSearch = brand !== "All brands"
+  const categories = useMemo(() => discoveryCategories(records), [records]);
+  const hasFilterOrSearch = category !== "all" || brand !== "All brands"
     || availability !== "All availability"
     || condition !== "All conditions"
     || trust !== "All trust statuses"
@@ -127,6 +129,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
 
   const filtered = records
     .filter((record) => !exactMatchCode || record.qrCode === exactMatchCode)
+    .filter((record) => Boolean(exactMatchCode) || matchesDiscoveryCategory(record, category))
     .filter((record) => Boolean(exactMatchCode) || brand === "All brands" || record.brand === brand)
     .filter((record) => {
       if (exactMatchCode) return true;
@@ -181,7 +184,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
   };
   const hasAdvancedFilters = Object.values(availableFilters).some(Boolean);
 
-  const filterLabels: Record<keyof CatalogFilters, string> = { query: "Search", brand: "Brand", availability: "Availability", condition: "Condition", trust: "Trust", authenticity: "Authenticity", originality: "Originality", safety: "Safety", service: "Service", sortMode: "Sort" };
+  const filterLabels: Record<keyof CatalogFilters, string> = { query: "Search", category: "Category", brand: "Brand", availability: "Availability", condition: "Condition", trust: "Trust", authenticity: "Authenticity", originality: "Originality", safety: "Safety", service: "Service", sortMode: "Sort" };
   const activeFilters = (Object.keys(filters) as Array<keyof CatalogFilters>).filter((key) => key !== "sortMode" && filters[key] !== defaultCatalogFilters[key]);
 
   async function searchExactSerial(serialQuery = query) {
@@ -250,6 +253,9 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
             </div>
           </div>
 
+          <nav className={styles.categoryNav} aria-label={ui("ui.app.catalog.CatalogClient.categories", "Instrument categories")}>
+            {[{ id: "all", label: ui("ui.app.catalog.CatalogClient.allCategories", "All instruments") }, ...categories].map(item => <button key={item.id} type="button" aria-pressed={category === item.id} onClick={() => updateFilters({ category: item.id })}>{item.label}</button>)}
+          </nav>
           <section className={styles["catalog-filters"]} aria-label={ui("ui.app.catalog.CatalogClient.10d44ee84f0d", "Catalog filters")}>
             <label className={styles["catalog-search"]}>{ui("ui.app.catalog.CatalogClient.49c266baaaa7", "Search")}<span>
                 <Search size={16} />
@@ -333,7 +339,7 @@ export function CatalogClient({ initialRecords, content }: { initialRecords: Dem
 
           {activeFilters.length ? (
             <div className={styles["catalog-active-filters"]} aria-label={ui("ui.app.catalog.CatalogClient.213a9822c38a", "Active filters")}>
-              {activeFilters.map((key) => <button key={key} type="button" onClick={() => updateFilters({ [key]: defaultCatalogFilters[key] })} aria-label={ui("ui.app.catalog.CatalogClient.b6b852bd01cc", "Remove {{value1}} filter: {{value2}}", { value1: filterLabels[key], value2: filters[key] })}><span>{filterLabels[key]}: {filters[key]}</span><X size={12} aria-hidden="true" /></button>)}
+              {activeFilters.map((key) => <button key={key} type="button" onClick={() => updateFilters({ [key]: defaultCatalogFilters[key] })} aria-label={ui("ui.app.catalog.CatalogClient.b6b852bd01cc", "Remove {{value1}} filter: {{value2}}", { value1: filterLabels[key], value2: filters[key] })}><span>{filterLabels[key]}: {key === "category" ? discoveryCategoryLabel(filters[key]) : filters[key]}</span><X size={12} aria-hidden="true" /></button>)}
             </div>
           ) : null}
 

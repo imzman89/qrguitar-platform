@@ -378,3 +378,15 @@
  .scan-profile .profile-heading h1 { font-size:32px; }
  .scan-tab-panel h2 { font-size:28px; }
 }
+
+/* Permanent identity remains below the photograph; detail tabs stay keyboard-operable. */
+@media screen {
+ .scan-shell { width:min(1000px,calc(100% - 64px)); }
+ .scan-profile .profile-heading h1 { font-weight:650; font-size:clamp(32px,3.3vw,46px); letter-spacing:-.045em; }
+ .scan-tab-panel h2 { font-weight:600; font-size:28px; letter-spacing:-.035em; }
+ .scan-tabs { padding:5px; gap:5px; border-radius:7px; }
+ .scan-tabs button { font:550 13px/1.4 var(--font-ui); }
+ .scan-tabs button.active { background:var(--action); color:var(--on-action); font-weight:700; }
+ .scan-hero-media img { max-height:520px; }
+}
+@media screen and (max-width:700px) { .scan-shell { width:calc(100% - 32px); }.scan-profile .profile-heading h1 { font-size:30px; }.scan-hero-media img { max-height:400px; }.scan-tabs button { padding:12px; font-size:12px; } }

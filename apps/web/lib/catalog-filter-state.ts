@@ -1,10 +1,10 @@
 export type CatalogFilters = {
-  query: string; brand: string; availability: string; condition: string; trust: string;
+  query: string; category: string; brand: string; availability: string; condition: string; trust: string;
   authenticity: string; originality: string; safety: string; service: string;
   sortMode: "Newest" | "Oldest" | "Title" | "Year";
 };
 export const defaultCatalogFilters: CatalogFilters = {
-  query: "", brand: "All brands", availability: "All availability", condition: "All conditions",
+  query: "", category: "all", brand: "All brands", availability: "All availability", condition: "All conditions",
   trust: "All trust statuses", authenticity: "All authenticity statuses", originality: "All originality statuses",
   safety: "All safety statuses", service: "All service histories", sortMode: "Newest"
 };

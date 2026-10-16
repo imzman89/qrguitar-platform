@@ -4,7 +4,7 @@ import { useUiText } from "./UiTextProvider";
 
 import Link from "./CheckoutAwareLink";
 import { usePathname } from "next/navigation";
-import { LogOut, Menu, MessageCircle, UserRound, X } from "lucide-react";
+import { LogOut, Menu, MessageCircle, Search, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { BrandLogo } from "./BrandLogo";
 import { useAuthNavigation } from "../lib/use-auth-navigation";
@@ -96,6 +96,11 @@ export function Nav() {
         <Link className={styles.brand} href="/" aria-label={ui("ui.components.Nav.33b14c935c51", "QRguitar homepage")}>
           <BrandLogo className={styles.logo} />
         </Link>
+        <form action="/catalog" method="get" role="search" className={styles.search} aria-label={ui("ui.components.Nav.publicSearch", "Search public instruments")}>
+          <label className={styles.searchLabel} htmlFor="global-instrument-search">{ui("ui.components.Nav.searchLabel", "Search instruments, brands and models")}</label>
+          <input id="global-instrument-search" name="q" type="search" placeholder={ui("ui.components.Nav.searchPlaceholder", "Find your next discovery")} />
+          <button type="submit" aria-label={ui("ui.components.Nav.searchSubmit", "Search instruments")}><Search size={18} aria-hidden="true" /></button>
+        </form>
         <button ref={toggleRef} className={styles.toggle} type="button" onClick={() => setIsOpen((open) => !open)}
           aria-expanded={isOpen} aria-controls="primary-navigation" aria-label={isOpen ? ui("ui.components.Nav.99904db30de4", "Close navigation") : ui("ui.components.Nav.0ed77fd2619b", "Open navigation")}>
           {isOpen ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
