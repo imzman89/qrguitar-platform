@@ -81,7 +81,7 @@
 
 @media screen {
  .header h1,.identity h2,.panelHeading strong { font-family:var(--font-ui); font-weight:650; }.header { padding-bottom:22px; border-bottom:1px solid var(--line); }
- .content { max-width:1000px; }.panel { gap:22px; padding:26px; border:1px solid var(--line); border-radius:14px; background:linear-gradient(130deg,#171e24,#11161b); }
+ .content { max-width:1000px; }.panel { gap:22px; padding:26px; border:1px solid var(--line); border-radius:14px; background:var(--surface); }
  .panelHeading { padding-bottom:16px; border-bottom:1px solid var(--line); }.panelHeading strong { font-size:22px; }.panelHeading strong svg { color:var(--collector-metal); }
  .identity { padding-bottom:18px; border-bottom:1px solid var(--line); }.avatar { border-color:var(--collector-line); background:var(--selected-surface); color:var(--collector-metal); }
  .metrics { gap:12px; }.metrics > div { padding:16px; border:1px solid var(--border-soft); border-radius:9px; background:var(--canvas); }.metrics strong { font-family:var(--font-ui); font-weight:650; color:var(--collector-metal); }

@@ -60,7 +60,7 @@
 /* Shared guest and sign-in panels use the same dark action hierarchy. */
 @media screen {
  .layout { max-width:480px; gap:26px; }
- .formPanel { padding:28px; border:1px solid var(--line); border-radius:12px; background:linear-gradient(145deg,#1b232a,#11161b); box-shadow:var(--shadow-card); }
+ .formPanel { padding:28px; border:1px solid var(--line); border-radius:12px; background:var(--surface); box-shadow:var(--shadow-card); }
  .heading h1,.formPanel > :is(h1,h2) { font-family:var(--font-ui); font-weight:650; }
  .formPanel :global(.field) input { border-radius:8px; background:var(--canvas); }
  .formPanel :global(.button) { border-radius:8px; }
