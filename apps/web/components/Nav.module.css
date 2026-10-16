@@ -48,3 +48,8 @@
  .links > a,.accountButton { font-size:16px; min-height:48px; padding-inline:12px; }.links > .primary { margin-top:8px; }
 }
 @media print { .search { display:none; } }
+
+/* Homepage masthead shares the edge-to-edge discovery canvas; interiors keep their reading width. */
+@media screen and (min-width:1101px){.homeHeader .inner{width:calc(100% - 48px);max-width:none;min-height:76px}.homeHeader .search{max-width:520px}}
+@media screen and (min-width:761px) and (max-width:1100px){.homeHeader .inner{width:calc(100% - 32px)}}
+@media screen and (max-width:760px){.homeHeader .inner{width:calc(100% - 24px)}}

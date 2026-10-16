@@ -86,7 +86,7 @@ export function Nav() {
   const signInHref = `/login?next=${encodeURIComponent(signInReturnPath(pathname, typeof window === "undefined" ? "" : window.location.search, typeof window === "undefined" ? "" : window.location.hash))}`;
 
   return (
-    <header className={`brand-frame ${styles.header}`} ref={headerRef} onBlur={(event) => {
+    <header className={`brand-frame ${styles.header} ${pathname === "/" ? styles.homeHeader : ""}`} ref={headerRef} onBlur={(event) => {
       if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
         setIsOpen(false);
         setAccountMenuOpen(false);

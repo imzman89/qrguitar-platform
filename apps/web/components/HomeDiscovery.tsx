@@ -128,6 +128,8 @@ export function HomeDiscovery({ records, settings, hero, pending, failed, onRetr
       {first ? <div className={styles.editorialGrid} data-count={Math.min(unique.length, 3)}>
         <div className={styles.leadInstrument}><DiscoveryInstrument record={first} lead /></div>
         {second ? <div className={styles.secondInstrument}><DiscoveryInstrument record={second} /></div> : null}
+        {third ? <div className={styles.thirdInstrument}><DiscoveryInstrument record={third} photoIndex={1} /></div> : null}
+        <div className={styles.heroCollection}>{personalCollections[0] ? collectionTile(personalCollections[0]) : fourth ? <DiscoveryInstrument record={fourth} photoIndex={1} /> : <Link className={styles.catalogNote} href="/catalog"><Layers3 size={25} aria-hidden="true" /><span>{ui("ui.components.HomeDiscovery.archiveLink", "Explore the public catalog")}<ArrowUpRight size={18} aria-hidden="true" /></span></Link>}</div>
         <div className={styles.introduction}>
           <span className={styles.editionMark} aria-hidden="true">Q / G</span>
           <h2>{ui("ui.components.HomeDiscovery.collectionPointOfView", "A collection is a point of view.")}</h2>
@@ -135,8 +137,6 @@ export function HomeDiscovery({ records, settings, hero, pending, failed, onRetr
           <Link href="/create">{hero.primaryCta}<ArrowUpRight size={18} aria-hidden="true" /></Link>
           {managedHeroExtras}
         </div>
-        {third ? <div className={styles.thirdInstrument}><DiscoveryInstrument record={third} photoIndex={1} /></div> : null}
-        <div className={styles.heroCollection}>{personalCollections[0] ? collectionTile(personalCollections[0]) : fourth ? <DiscoveryInstrument record={fourth} photoIndex={1} /> : <Link className={styles.catalogNote} href="/catalog"><Layers3 size={25} aria-hidden="true" /><span>{ui("ui.components.HomeDiscovery.archiveLink", "Explore the public catalog")}<ArrowUpRight size={18} aria-hidden="true" /></span></Link>}</div>
       </div> : <div className={styles.noInstruments}>
         <h2>{ui("ui.components.HomeDiscovery.publicArchive", "The public instrument catalog")}</h2>
         {hero.body ? <p>{hero.body}</p> : null}
@@ -162,7 +162,7 @@ export function HomeDiscovery({ records, settings, hero, pending, failed, onRetr
       })}</div>
       <section className={styles.brandsSection} id="home-brands" aria-labelledby="home-brand-title">
         {sectionTitle("home-brand-title", ui("ui.components.HomeDiscovery.brands", "Browse by brand"), "/catalog", ui("ui.components.HomeDiscovery.allInstruments", "All instruments"))}
-        {brands.length ? <div className={styles.brandGrid}>{brands.slice(0, 8).map(brand => {
+        {brands.length ? <div className={styles.brandGrid}>{brands.slice(0, 4).map(brand => {
           const matchingBrand = brandRecords.filter(record => record.brand === brand), photoRecord = unique.find(record => record.brand === brand && !record.qrCode.startsWith("QRG-DEMO-"));
           const brandPhotos = photoRecord ? getProfilePhotoUrls(photoRecord) : [];
           const photo = brandPhotos[1] || brandPhotos[0];
