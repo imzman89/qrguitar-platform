@@ -1,0 +1,63 @@
+{
+  "schema": "qrguitar-illustrative-category-art/r1",
+  "generator": "built-in image_gen",
+  "atUtc": "2026-10-16T17:20:37.241Z",
+  "purpose": "Labeled fictional navigation artwork, not customer inventory/provenance/rarity/appraisal/authenticity.",
+  "assets": [
+    {
+      "path": "apps/web/public/images/archive-walnut-illustration-v1.webp",
+      "bytes": 1174052,
+      "sha256": "bf60ebf607bf9475d0de94db0402d5762171533ced8f91391b36976956c219fe",
+      "originalSha256": "5c12e246e98ddf9bf756008711eb23c1908080e4ad9d670c29f7ff3f31a464ca",
+      "originalBytes": 1896206,
+      "width": 1024,
+      "height": 1536,
+      "kind": "AI-generated fictional navigation illustration; not an instrument record",
+      "encoding": "Lossless WebP, original dimensions, no visual edits"
+    },
+    {
+      "path": "apps/web/public/images/archive-amp-illustration-v1.webp",
+      "bytes": 1732058,
+      "sha256": "5b70294e707a4be588f43c7cd4ff6bb88dffe053186e68909dfb5ffe8f13b2b9",
+      "originalSha256": "4055e69a8e4759201b9aff0f5803cf578bc00727eac4c4a7a7fb77cae75c2158",
+      "originalBytes": 2799252,
+      "width": 1536,
+      "height": 1024,
+      "kind": "AI-generated fictional navigation illustration; not an instrument record",
+      "encoding": "Lossless WebP, original dimensions, no visual edits"
+    },
+    {
+      "path": "apps/web/public/images/archive-pedal-illustration-v1.webp",
+      "bytes": 1588082,
+      "sha256": "ce69621b80a6b667b7e8814aecc24ff7744d173fb226685054ef231b50682ab9",
+      "originalSha256": "effa54c2d2d12961e6dafbaf6dfce588d77050c5d72ab2a630715ceb11bcb3ac",
+      "originalBytes": 2314030,
+      "width": 1254,
+      "height": 1254,
+      "kind": "AI-generated fictional navigation illustration; not an instrument record",
+      "encoding": "Lossless WebP, original dimensions, no visual edits"
+    },
+    {
+      "path": "apps/web/public/images/archive-workbench-illustration-v1.webp",
+      "bytes": 1520056,
+      "sha256": "0fcabb19d3bee663a436b482d066a57a6386ddfdac36be94f90fb0f50faf5300",
+      "originalSha256": "3074f3abffaed69fb3be5891770fe9e61e10a9542aafc5b5216c710329b29827",
+      "originalBytes": 2361111,
+      "width": 1536,
+      "height": 1024,
+      "kind": "AI-generated fictional navigation illustration; not an instrument record",
+      "encoding": "Lossless WebP, original dimensions, no visual edits"
+    },
+    {
+      "path": "apps/web/public/images/archive-guitar-detail-illustration-v1.webp",
+      "bytes": 1587480,
+      "sha256": "3b692ac92d78f2d0aad712114ffac217b6413c079c91665bbbe6cb62b31506b7",
+      "originalSha256": "ae3989654815f8665538a78890c55459f33b907e64f0852529e4c12794294205",
+      "originalBytes": 2378917,
+      "width": 1122,
+      "height": 1402,
+      "kind": "AI-generated fictional navigation illustration; not an instrument record",
+      "encoding": "Lossless WebP, original dimensions, no visual edits"
+    }
+  ]
+}

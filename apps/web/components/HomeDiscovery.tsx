@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "./CheckoutAwareLink";
+import Image from "next/image";
 import { useState } from "react";
-import { ArrowRight, ArrowUpRight, Layers3, QrCode, ScanLine, Store, AudioLines } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Layers3, QrCode, ScanLine, Store } from "lucide-react";
 import { CollectibleRecordCard } from "./CollectibleRecordCard";
 import { HomeAudiences } from "./HomeProductStory";
 import { CompactQr } from "./CompactQr";
@@ -52,19 +53,18 @@ export function HomeDiscovery({ records, settings, hero, pending, failed, onRetr
   const businessHref = homeSignupSections(settings.composition.home.sections).some(section => section.id === "archive" && section.visible) ? "#business-archives" : "/collections";
   const businesses = collections.filter(collection => ["builder", "shop", "luthier"].includes(collection.accountType));
   const individualCollections = collections.filter(collection => !["builder", "shop", "luthier"].includes(collection.accountType));
-  const coverFor = (id: string) => unique.find(record => matchesDiscoveryCategory(record, id));
-  const archivePhotos = unique.filter(record => record !== coverFor("guitars") && record !== coverFor("amps")).slice(0, 2);
-  const openingCodes = new Set([coverFor("guitars"), coverFor("amps"), ...archivePhotos].filter((record): record is DemoInstrument => Boolean(record)).map(record => record.qrCode));
-  const categoryTile = (id: string, className: string) => {
+  // Category illustrations are navigation artwork, never instrument evidence.
+  const artwork = { guitars: "guitar-detail", amps: "amp", pedals: "pedal" };
+  const categoryTile = (id: keyof typeof artwork, className: string) => {
     const category = categories.find(item => item.id === id);
     if (!category) return null;
-    const cover = coverFor(id), photo = cover && getProfilePhotoUrls(cover)[0];
     const count = publicRecords.filter(record => matchesDiscoveryCategory(record, id)).length;
     return <Link className={styles.categoryTile + " " + className} href={discoveryCategoryHref(id)}>
-      <div className={styles.tilePhoto}>{photo ? <FallbackImage src={publicMediaVariantUrl(photo, 640)} alt="" width={640} height={640} loading={id === "guitars" ? "eager" : "lazy"} fetchPriority={id === "guitars" ? "high" : "auto"} decoding="async" referrerPolicy="no-referrer" fallback={<AudioLines size={40} aria-hidden="true" />} /> : <AudioLines size={40} aria-hidden="true" />}</div>
+      <div className={styles.tilePhoto}><Image src={"/images/archive-" + artwork[id] + "-illustration-v1.webp"} alt="" fill sizes="(max-width: 760px) 50vw, 35vw" /></div>
       <div className={styles.tileCaption}><div><h2>{category.label}</h2><span>{failed ? ui("ui.components.HomeDiscovery.feedUnavailable", "Browse the archive") : pending ? ui("ui.components.HomeDiscovery.feedLoading", "Explore Profiles") : count ? publicCount(count) : ui("ui.components.HomeDiscovery.noPublicYet", "No public Profiles yet")}</span></div><ArrowUpRight size={22} aria-hidden="true" /></div>
     </Link>;
   };
+
   const onCategoryKey = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
     const next = event.key === "ArrowRight" ? (index + 1) % categories.length : event.key === "ArrowLeft" ? (index - 1 + categories.length) % categories.length : event.key === "Home" ? 0 : event.key === "End" ? categories.length - 1 : null;
     if (next === null) return;
@@ -84,16 +84,25 @@ export function HomeDiscovery({ records, settings, hero, pending, failed, onRetr
         <Link href="/collections">{ui("ui.components.HomeDiscovery.collections", "Collections")}</Link>
       </nav>
       <header className={styles.discoveryHeading}><h1 id="home-title">{ui("ui.components.HomeDiscovery.discoverHeadline", "Every instrument has a story.")}</h1><Link href="/catalog">{ui("ui.components.HomeDiscovery.exploreArchive", "Explore the archive")}<ArrowUpRight size={17} aria-hidden="true" /></Link></header>
-      <div className={styles.discoveryWall}>
+      <div className={styles.discoveryWall} aria-describedby="home-cover-note">
+        <Link className={styles.archiveTile} href="/catalog">
+          <div className={styles.tilePhoto}><Image src="/images/archive-walnut-illustration-v1.webp" alt="" fill sizes="(max-width: 760px) 100vw, 45vw" priority /></div>
+          <div className={styles.tileCaption}><div><span className={styles.coverEyebrow}>{ui("ui.components.HomeDiscovery.coverEyebrow", "The instrument archive")}</span><h2>{ui("ui.components.HomeDiscovery.oneOfAKind", "One of a kind.")}</h2><span>{ui("ui.components.HomeDiscovery.lookCloser", "Get to know the instruments.")}</span></div><ArrowUpRight size={24} aria-hidden="true" /></div>
+        </Link>
         {categoryTile("guitars", styles.wallGuitars)}
         {categoryTile("amps", styles.wallAmps)}
-        <Link className={styles.archiveTile} href="/catalog">
-          <div className={styles.archivePhotos}>{archivePhotos.length ? archivePhotos.map(record => <FallbackImage key={record.qrCode} src={publicMediaVariantUrl(getProfilePhotoUrls(record)[0], 640)} alt="" width={640} height={640} loading="lazy" decoding="async" referrerPolicy="no-referrer" fallback={<Layers3 size={28} aria-hidden="true" />} />) : <Layers3 size={40} aria-hidden="true" />}</div>
-          <div className={styles.tileCaption}><div><h2>{ui("ui.components.HomeDiscovery.oneOfAKind", "One of a kind.")}</h2><span>{ui("ui.components.HomeDiscovery.lookCloser", "Get to know the instruments.")}</span></div><ArrowUpRight size={22} aria-hidden="true" /></div>
+        <Link className={styles.businessPortal} href={businessHref}>
+          <div className={styles.tilePhoto}><Image src="/images/archive-workbench-illustration-v1.webp" alt="" fill sizes="(max-width: 760px) 100vw, 35vw" /></div>
+          <div className={styles.tileCaption}><div><h2>{ui("ui.components.HomeDiscovery.businessHeading", "Builders, shops & luthiers.")}</h2><span>{ui("ui.components.HomeDiscovery.peopleBehind", "The people behind the instruments")}</span></div><ArrowUpRight size={22} aria-hidden="true" /></div>
         </Link>
-        <Link className={styles.businessPortal} href={businessHref}><Store size={26} aria-hidden="true" /><div><span>{ui("ui.components.HomeDiscovery.peopleBehind", "The people behind the instruments")}</span><h2>{ui("ui.components.HomeDiscovery.businessHeading", "Builders, shops & luthiers.")}</h2></div><ArrowUpRight size={24} aria-hidden="true" /></Link>
         {categoryTile("pedals", styles.wallPedals)}
+        <Link className={styles.wallCollections} href="/collections">
+          <div className={styles.tilePhoto}><Image src="/images/archive-walnut-illustration-v1.webp" alt="" fill sizes="50vw" /></div>
+          <div className={styles.tileCaption}><div><h2>{ui("ui.components.HomeDiscovery.collections", "Collections")}</h2><span>{ui("ui.components.HomeDiscovery.collectionCover", "A personal point of view")}</span></div><ArrowUpRight size={20} aria-hidden="true" /></div>
+        </Link>
       </div>
+      <p id="home-cover-note" className={styles.coverNote}>{ui("ui.components.HomeDiscovery.coverNote", "Illustrative cover artwork. Public Profiles below use their owners’ photos.")}</p>
+
       {failed ? <div role="status" className={styles.feedStatus}>{ui("ui.components.HomeDiscovery.failed", "Public Profiles could not be refreshed.")} <button type="button" onClick={onRetry}>{ui("ui.components.HomeDiscovery.retry", "Retry")}</button></div>
         : pending && !unique.length ? <p role="status" aria-busy="true" className={styles.feedStatus}>{ui("ui.components.HomeDiscovery.loading", "Loading public Profiles...")}</p> : null}
       <div className={styles.archiveNote}><p>{ui("ui.components.HomeDiscovery.archiveIntro", "Discover the photographs, identities and stories of real instruments. An archive built by players, collectors and the people who make and care for them.")}</p><Link href="/create">{hero.primaryCta}<ArrowUpRight size={17} aria-hidden="true" /></Link></div>
@@ -119,8 +128,8 @@ export function HomeDiscovery({ records, settings, hero, pending, failed, onRetr
         </div>
       {categories.map((category, categoryIndex) => {
         const matching = unique.filter(record => matchesDiscoveryCategory(record, category.id));
-        // Show different discoveries first; retain every real category and its Catalog path.
-        const items = [...matching.filter(record => !openingCodes.has(record.qrCode)), ...matching.filter(record => openingCodes.has(record.qrCode))].slice(0, 3);
+        // Actual public identities, photographs and trust details remain on the record cards.
+        const items = matching.slice(0, 3);
         const hasPublicRecords = publicRecords.some(record => matchesDiscoveryCategory(record, category.id));
         return <section className={styles.categorySection} key={category.id} role="tabpanel" id={"discovery-panel-" + categoryIndex} hidden={activeCategory !== category.id} aria-labelledby={"discovery-tab-" + categoryIndex}>
           {sectionTitle("category-" + categoryIndex, category.label, discoveryCategoryHref(category.id), ui("ui.components.HomeDiscovery.viewAll", "View all"))}
