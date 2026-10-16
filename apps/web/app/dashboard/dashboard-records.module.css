@@ -6,7 +6,10 @@
 .header p { margin: 0; max-width: 58ch; color: var(--muted); font-size: .875rem; line-height: 1.6; }
 .headerActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; flex: 0 0 auto; max-width: 235px; }
 .headerActions :global(.button) { min-height: 44px; font-size: .8125rem; }
-.collectionControls { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-width: 0; }
+.collectionToolbar { display:grid; gap:12px; min-width:0; padding-block:12px 18px; border-block:1px solid var(--line); }
+.collectionToolbar .headerActions { justify-content:flex-start; max-width:none; }
+.collectionControls { display: flex; flex-wrap:wrap; align-items: center; gap: 12px; min-width: 0; }
+.collectionControls .search { flex:1 1 240px; margin-left:auto; }
 .search { display: flex; align-items: center; gap: 9px; min-width: 180px; width: min(280px,100%); padding: 0 13px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--field-surface,var(--surface)); color: var(--muted); }
 .search:focus-within { outline: 2px solid var(--action); outline-offset: 2px; }
 .search svg { flex-shrink: 0; }
@@ -44,7 +47,7 @@
 .transfers summary { display: flex; align-items: center; gap: 12px; min-height: 44px; color: var(--text); font-size: .875rem; font-weight: 550; cursor: pointer; }
 .transfers summary span { color: var(--muted); font-size: .75rem; font-weight: 400; }
 .transfers > p { margin: 6px 0 16px; max-width: 76ch; color: var(--muted); font-size: .8125rem; line-height: 1.6; }
-@media(max-width: 1120px) { .collectionControls { align-items: stretch; flex-direction: column; gap: 12px; } .search { width: 100%; } .header { flex-direction: column; gap: 18px; } .headerActions { justify-content: flex-start; max-width: none; } }
+@media(max-width: 1120px) { .collectionControls { align-items: center; flex-direction: row; gap: 12px; } .search { width: 100%; } .header { flex-direction: column; gap: 18px; } .headerActions { justify-content: flex-start; max-width: none; } }
 @media(max-width: 760px) { .search input { font-size: 1rem; } .dashboard { gap: 20px; } .header h1 { font-size: 1.875rem; } .headerActions { gap: 8px; } .filters { gap: 4px; } .filters button { padding-inline: 11px; } .taskPanel { align-items: stretch; flex-direction: column; gap: 12px; } .taskActions { justify-content: stretch; } .taskActions button { flex: 1 1 100%; } .toolsArea { padding-top: 4px; } }
 
 /* Owner collection: photographs, useful details, and direct controls. */
@@ -421,7 +424,7 @@
 
 /* Personal Collection can switch presentation without changing its records or actions. */
 @media screen {
-  .collectionViewToggle { display:flex; flex-wrap:wrap; align-items:center; gap:16px; min-width:0; }
+  .collectionViewToggle { display:flex; flex-wrap:wrap; align-items:center; gap:4px; min-width:0; padding-inline:8px; border-inline:1px solid var(--line); }
   .collectionViewToggle button { display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding:8px 12px; border:0; border-radius:6px; background:transparent; color:var(--muted-strong); font:inherit; font-size:13px; cursor:pointer; }
   .collectionViewToggle button[aria-pressed="true"] { color:var(--text); background:var(--surface-raised); border-radius:6px; font-weight:650; text-decoration:none; }
   .collectionViewToggle button:hover { color:var(--text); }
@@ -458,7 +461,7 @@
 }
 @media screen and (max-width:600px) { .instrumentList:not(.personalRecords),.instrumentList:not(.personalRecords):has(> .instrumentRow:only-child) { grid-template-columns:minmax(0,1fr); }.instrumentList:not(.personalRecords) .instrumentRow { max-width:380px; }.personalRecords .instrumentRow { padding:14px; } }
 
-@media screen { :global(body[data-product-theme]) .dashboard .header h1 { font-family:var(--font-ui); font-size:clamp(30px,3vw,40px); font-weight:650; }.header { padding:0 0 16px; }.header p { line-height:1.55; }.collectionControls { padding:4px 0; border:0; border-radius:0; background:transparent; } }
+@media screen { :global(body[data-product-theme]) .dashboard .header h1 { font-family:var(--font-ui); font-size:clamp(30px,3vw,40px); font-weight:650; }.header { padding:0; }.header p { line-height:1.55; }.collectionControls { padding:4px 0; border:0; border-radius:0; background:transparent; } }
 @media screen and (max-width:760px) { .dashboard { gap:16px; }.header { gap:12px; }.header > div:first-child { gap:6px; }:global(body[data-product-theme]) .dashboard .header h1 { font-size:30px; }.header p { font-size:13px; }.headerActions { gap:6px; }.headerActions :global(.button) { padding:10px 12px; }.collectionControls { gap:8px; padding:0; }.filters button { padding:8px; font-size:12px; }.instrumentList:not(.personalRecords) .instrumentThumb { height:240px; max-height:240px; } }
 
 /* Retained-file disclosure shares the workspace spacing and accessible controls. */
@@ -506,7 +509,7 @@
 
 /* The owner's collection shares the public card identity; working controls remain UI type. */
 @media screen {
- :global(body[data-product-theme]) .dashboard .header h1 { font-family:var(--font-display); font-size:clamp(36px,3.6vw,48px); font-weight:400; line-height:1.1; letter-spacing:-.025em; }
+ :global(body[data-product-theme]) .dashboard .header h1 { font-family:var(--font-display); font-size:clamp(32px,3vw,40px); font-weight:400; line-height:1.1; letter-spacing:-.025em; }
  .instrumentList:not(.personalRecords) .instrumentRow { border:0; border-radius:6px; background:var(--surface); }
  .instrumentList:not(.personalRecords) .instrumentThumb { border-radius:6px 6px 0 0; }
  .instrumentList:not(.personalRecords) .instrumentInfo > strong { font-family:var(--font-display); font-size:26px; font-weight:400; line-height:1.23; letter-spacing:-.02em; }
@@ -515,6 +518,6 @@
  .instrumentList:not(.personalRecords) .dashboardIdentity > span:first-child { font-weight:500; letter-spacing:.03em; }
 }
 @media screen and (max-width:760px) {
- :global(body[data-product-theme]) .dashboard .header h1 { font-size:36px; }
+ :global(body[data-product-theme]) .dashboard .header h1 { font-size:30px; }
  .instrumentList:not(.personalRecords) .instrumentInfo > strong { font-size:25px; }
 }

@@ -154,7 +154,7 @@
   .studio.studio :global(.cms-workspace), .studio.studio :global(.cms-workspace.is-preview-collapsed) { display: block; }
   .studio.studio :global(.cms-sidebar) { position: fixed; z-index: 1100; top: 0; left: 0; width: min(300px, calc(100vw - 42px)); height: 100dvh; padding: 24px 14px; background: var(--surface); transform: translateX(-105%); box-shadow: 20px 0 70px rgb(0 0 0 / .18); }
   .studio.studio :global(.cms-sidebar.is-open) { transform: none; }
-  .studio.studio :global(.cms-sidebar-head button) { display: grid; }
+  .studio.studio :global(.cms-sidebar-head button) { display: grid; place-items:center; flex:0 0 44px; width:44px; height:44px; min-width:44px; min-height:44px; padding:0; }
   .studio.studio :global(.cms-editor) { max-width: 860px; padding: 28px 24px 60px; }
   .studio.studio :global(.cms-preview-panel) { position: relative; top: auto; inset: auto; width: 100%; height: calc(100dvh - 72px); min-height: 500px; }
 }

@@ -486,12 +486,6 @@ export default function DashboardPage() {
               <h1>{getContentValue(content, "dashboard.hero.headline")}</h1>
               <p>{collectionAccountType ? workspace.description : getContentValue(content, "dashboard.hero.body")}</p>
             </div>
-            <div className={styles.headerActions}>
-              {collectionAccountType === "luthier" ? <Link className="button" href="/dashboard/service/slips"><Wrench size={16} />{" "}{ui("ui.app.dashboard.page.serviceSlips", "Service slips")}</Link> : <Link className="button" href="/create">{getContentValue(content, "dashboard.actions.create")}</Link>}
-              {["shop", "builder", "brand"].includes(collectionAccountType) ? <Link className="button secondary" href="/dashboard/import"><FileSpreadsheet size={16} /> {getContentValue(content, "dashboard.actions.bulk")}</Link> : <Link className="button secondary" href={collectionAccountType === "luthier" ? "/create" : "/account?section=collection"}>{collectionAccountType === "luthier" ? ui("ui.app.dashboard.page.3880eee7e45c", "Add your own instrument") : ui("ui.app.dashboard.page.ownerDashboardPolicy.collectionSettings", "Collection settings")}</Link>}
-              {["shop", "builder", "brand"].includes(collectionAccountType) ? <Link className="button secondary" href="/print/qr"><Printer size={16} /> QR labels</Link> : null}
-              {collectionAccountType === "luthier" ? <Link className="text-link" href="/dashboard/service">{ui("ui.app.dashboard.page.registeredServiceWork", "Registered service work")}</Link> : null}
-            </div>
           </div>
 
           {workspaceStatus === "pending" ? <div className="profile-refresh-notice" role="status" aria-busy="true">{ui("ui.app.dashboard.page.workspacePending", "Loading your workspace...")}</div> : null}
@@ -515,6 +509,7 @@ export default function DashboardPage() {
             </section>
           ) : <DashboardServiceCorrectionAttention state={currentCorrectionAttention} retry={() => setCorrectionAttentionAttempt(value => value + 1)} standalone />}
 
+          <div className={styles.collectionToolbar}>
           <div className={styles.collectionControls}>
           <div className={styles.filters} aria-label={ui("ui.app.dashboard.page.c4e6f5e2cc0b", "Collection overview")}>
             <button className={styles.filterActive} type="button" title={ui("ui.app.dashboard.page.ownerDashboardPolicy.showAllProfiles", "Show all Profiles")} onClick={() => setSearchQuery("")}>
@@ -536,6 +531,13 @@ export default function DashboardPage() {
             <Search size={17} aria-hidden="true" />
             <input type="search" aria-label={ui("ui.app.dashboard.page.61d5a3e9beca", "Search your collection")} placeholder={ui("ui.app.dashboard.page.61d5a3e9beca", "Search your collection")} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
           </label>
+          </div>
+            <div className={styles.headerActions}>
+              {collectionAccountType === "luthier" ? <Link className="button" href="/dashboard/service/slips"><Wrench size={16} />{" "}{ui("ui.app.dashboard.page.serviceSlips", "Service slips")}</Link> : <Link className="button" href="/create">{getContentValue(content, "dashboard.actions.create")}</Link>}
+              {["shop", "builder", "brand"].includes(collectionAccountType) ? <Link className="button secondary" href="/dashboard/import"><FileSpreadsheet size={16} /> {getContentValue(content, "dashboard.actions.bulk")}</Link> : <Link className="button secondary" href={collectionAccountType === "luthier" ? "/create" : "/account?section=collection"}>{collectionAccountType === "luthier" ? ui("ui.app.dashboard.page.3880eee7e45c", "Add your own instrument") : ui("ui.app.dashboard.page.ownerDashboardPolicy.collectionSettings", "Collection settings")}</Link>}
+              {["shop", "builder", "brand"].includes(collectionAccountType) ? <Link className="button secondary" href="/print/qr"><Printer size={16} /> QR labels</Link> : null}
+              {collectionAccountType === "luthier" ? <Link className="text-link" href="/dashboard/service">{ui("ui.app.dashboard.page.registeredServiceWork", "Registered service work")}</Link> : null}
+            </div>
           </div>
           <section className={styles.instrumentTable} id="saved-profiles">
             <div className={styles.tableHeader}>

@@ -41,8 +41,8 @@
 @media(max-width:760px) { .workspace { padding-top:16px; }.layout { grid-template-columns:minmax(0,1fr); gap:24px; } }
 
 /* Consistent editorial page identity across collection, Create and account workspaces. */
-:global(body[data-product-theme]) .content h1 { font-family:var(--font-display); font-weight:400; font-size:clamp(36px,4vw,52px); line-height:1.08; letter-spacing:-.035em; }
-@media(max-width:760px) { :global(body[data-product-theme]) .content h1 { font-size:36px; } }
+:global(body[data-product-theme]) .content h1 { font-family:var(--font-display); font-weight:400; font-size:clamp(32px,3vw,40px); line-height:1.08; letter-spacing:-.035em; }
+@media(max-width:760px) { :global(body[data-product-theme]) .content h1 { font-size:30px; } }
 
 @media screen {
  :global(body[data-product-theme]) .content h1 { font-family:var(--font-display); font-weight:400; line-height:1.1; letter-spacing:-.025em; }

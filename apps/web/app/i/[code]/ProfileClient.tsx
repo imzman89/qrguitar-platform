@@ -877,6 +877,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                 showAuthenticityBadge
               }}
               includeCondition={false}
+              hideConfirmedTrust
               className={styles["profile-hero-badges"]}
               ownerCollection={publicReviewSnapshot || companyCredit ? undefined : instrument.publicCollection}
             />

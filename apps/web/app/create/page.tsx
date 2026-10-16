@@ -694,9 +694,11 @@ function CreateOwnerDraft({ user, authChecked, isCurrent }: { user: CreateOwner 
                     <Field label={ui("ui.app.create.page.246c90b63eac", "Year (optional)")} id="year" value={form.year} onChange={(value) => updateField("year", value)} placeholder={ui("ui.app.create.page.862e62134ba9", "Leave blank if unknown")} />
                     <CategoryField required error={fieldErrors.instrumentType} label={ui("ui.app.create.page.29df4f02b24a", "Instrument type")} id="instrumentType" value={form.instrumentType} options={categoryOptions} onChange={(value) => updateField("instrumentType", value)} />
                   </div>
+                  <div className={styles.serialHelp}>
                   <label className="toggle-field create-inline-toggle">
-                    <input type="checkbox" checked={form.serialNotUsed} onChange={(event) => setForm((current) => ({ ...current, serialNotUsed: event.target.checked, serial: event.target.checked ? "" : current.serial, showSerialPublic: event.target.checked ? false : current.showSerialPublic }))} />{ui("ui.app.create.page.eb8fe6031206", "This instrument has no Serial Number")}</label>
-                  <p className="fine-print">{getContentValue(content, "create.serial.generatedHelp")}{" "}{ui("ui.app.create.page.d9b8971b5432", "Verification without a Serial Number requires prior QRguitar approval.")}</p>
+                    <input type="checkbox" aria-describedby="create-serial-help" checked={form.serialNotUsed} onChange={(event) => setForm((current) => ({ ...current, serialNotUsed: event.target.checked, serial: event.target.checked ? "" : current.serial, showSerialPublic: event.target.checked ? false : current.showSerialPublic }))} />{ui("ui.app.create.page.eb8fe6031206", "This instrument has no Serial Number")}</label>
+                  <p id="create-serial-help" className="fine-print">{getContentValue(content, "create.serial.generatedHelp")}{" "}{ui("ui.app.create.page.d9b8971b5432", "Verification without a Serial Number requires prior QRguitar approval.")}</p>
+                  </div>
                 </section>
 
 
