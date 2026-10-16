@@ -25,7 +25,7 @@
 body[data-product-theme] .instrument-preview{border:0;border-radius:0;background:transparent;box-shadow:none;}
 body[data-product-theme] .instrument-preview-photo{display:grid;place-items:center;min-height:260px;padding:0;border:0;border-radius:0;background:var(--photo-mat);}
 body[data-product-theme] .instrument-preview-photo img{width:100%;height:clamp(280px,40vw,480px);object-fit:contain;}
-body[data-product-theme] .instrument-preview-hero{padding:22px 0 16px;background:transparent;}
+body[data-product-theme] .instrument-preview-hero{display:grid;min-height:0;align-content:start;gap:8px;padding:22px 0 16px;background:transparent;}
 body[data-product-theme] .instrument-preview-hero h3{font-family:var(--font-ui);font-weight:650;font-size:clamp(24px,2.5vw,32px);letter-spacing:-.035em;}
 body[data-product-theme] .preview-topline{color:var(--muted);}
 body[data-product-theme] .preview-identity-grid{padding:18px 0;border-block:1px solid var(--line);border-radius:0;background:transparent;}

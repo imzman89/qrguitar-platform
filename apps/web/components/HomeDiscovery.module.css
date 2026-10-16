@@ -132,3 +132,7 @@
  .managedIntroduction { grid-template-columns:1fr; gap:20px; }.discoveryTabs { gap:6px; }.discoveryTabs button { padding:10px 15px; }
 }
 @media print { .discoveryWall { display:block; }.categoryTile,.archiveTile { min-height:220px; }.businessPortal { display:none; }.discoveryTabs { display:none; } }
+
+/* Preserve whole brand words on narrow phones. */
+@media screen { .brandGrid strong { word-break:normal;overflow-wrap:break-word; } }
+@media screen and (max-width:420px) { .brandGrid { grid-template-columns:minmax(0,1fr); }.brandGrid a { min-height:64px; }.brandGrid strong { font-size:20px; } }

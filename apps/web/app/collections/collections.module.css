@@ -131,3 +131,25 @@
  .filters { padding:0; background:transparent; }
  .memberHero { padding-top:18px; }.role { color:var(--action); font-size:12px; }
 }
+
+/* Collection photos stay within reach on a phone; detailed filters are disclosed. */
+@media screen {
+ .memberFilters { grid-template-columns:minmax(0,1fr); padding:12px 0 4px; }
+ .memberAdvanced { margin:4px 0 12px; }
+ .memberPage :global(.collection-result-count) { margin:8px 0 18px; }
+ .memberPage .actionRow:empty { display:none; }
+}
+@media screen and (max-width:600px) {
+ .memberPage .navigation { gap:8px 20px; margin-bottom:12px; }
+ .memberPage .memberHero { gap:12px; padding-bottom:12px; }
+ .businessCollection .memberPage .memberIdentity { grid-template-columns:56px minmax(0,1fr); gap:14px; align-items:start; }
+ .businessCollection .memberPage .memberIdentity > img,.businessCollection .memberPage :global(.collection-avatar) { width:56px;height:56px;object-fit:contain; }
+ .memberPage h1 { margin:0 0 6px;font-size:30px;line-height:1.1; }
+ .memberPage :global(.collection-role) { margin:0;font-size:13px; }
+ .memberPage .memberBio { margin:10px 0 0;font-size:14px;line-height:1.5; }
+ .memberPage :global(.collection-count) { font-size:18px; }
+ .memberPage .memberActions { gap:8px; }
+ .memberFilters { padding:8px 0 0; }
+}
+
+@media screen { .card > img { display:block;height:auto;aspect-ratio:auto;max-height:480px;object-fit:contain; } }

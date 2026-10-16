@@ -28,6 +28,12 @@ type Props = {
 
 export function HomeDiscovery({ records, settings, hero, pending, failed, onRetry }: Props) {
   const ui = useUiText("components.HomeDiscovery");
+  function publicCount(count: number) {
+    const label = ui("ui.components.HomeDiscovery.publicCount", "{{count}} public Profiles", { count });
+    return count === 1 && label === "1 public Profiles"
+      ? ui("ui.components.HomeDiscovery.publicCountSingular", "{{count}} public Profile", { count })
+      : label;
+  }
   const text = (key: string) => getContentValue(settings.content, key);
   const publicRecords = records.filter(record => record.visibility === "public" && !record.collectionRemovedAt && isEligiblePublicProfile(record));
   const featured = publicRecords.filter(record => record.safetyStatus !== "lost" && record.safetyStatus !== "stolen" && getProfilePhotoUrls(record).length);
@@ -56,7 +62,7 @@ export function HomeDiscovery({ records, settings, hero, pending, failed, onRetr
     const count = publicRecords.filter(record => matchesDiscoveryCategory(record, id)).length;
     return <Link className={styles.categoryTile + " " + className} href={discoveryCategoryHref(id)}>
       <div className={styles.tilePhoto}>{photo ? <FallbackImage src={publicMediaVariantUrl(photo, 640)} alt="" width={640} height={640} loading={id === "guitars" ? "eager" : "lazy"} fetchPriority={id === "guitars" ? "high" : "auto"} decoding="async" referrerPolicy="no-referrer" fallback={<AudioLines size={40} aria-hidden="true" />} /> : <AudioLines size={40} aria-hidden="true" />}</div>
-      <div className={styles.tileCaption}><div><h2>{category.label}</h2><span>{failed ? ui("ui.components.HomeDiscovery.feedUnavailable", "Browse the archive") : pending ? ui("ui.components.HomeDiscovery.feedLoading", "Explore Profiles") : count ? ui("ui.components.HomeDiscovery.publicCount", "{{count}} public Profiles", { count }) : ui("ui.components.HomeDiscovery.noPublicYet", "No public Profiles yet")}</span></div><ArrowUpRight size={22} aria-hidden="true" /></div>
+      <div className={styles.tileCaption}><div><h2>{category.label}</h2><span>{failed ? ui("ui.components.HomeDiscovery.feedUnavailable", "Browse the archive") : pending ? ui("ui.components.HomeDiscovery.feedLoading", "Explore Profiles") : count ? publicCount(count) : ui("ui.components.HomeDiscovery.noPublicYet", "No public Profiles yet")}</span></div><ArrowUpRight size={22} aria-hidden="true" /></div>
     </Link>;
   };
   const onCategoryKey = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -98,7 +104,7 @@ export function HomeDiscovery({ records, settings, hero, pending, failed, onRetr
         {sectionTitle("home-businesses", ui("ui.components.HomeDiscovery.businessHeading", "Builders, shops & luthiers."), "/collections", ui("ui.components.HomeDiscovery.browsePeople", "Explore public archives"))}
         {businesses.length ? <div className={styles.businessGrid}>{businesses.map(business => <Link href={"/collections/" + encodeURIComponent(business.handle)} className={styles.businessCard} key={business.handle}>
           {business.image ? <FallbackImage src={publicMediaVariantUrl(business.image, 640)} alt="" width={640} height={480} loading="lazy" decoding="async" referrerPolicy="no-referrer" fallback={<Store size={32} aria-hidden="true" />} /> : <Store size={32} aria-hidden="true" />}
-          <div><span>{collectionRoleLabel(business.accountType)}</span><h3>{business.name}</h3><p>{ui("ui.components.HomeDiscovery.publicCount", "{{count}} public Profiles", { count: business.count })}</p></div><ArrowUpRight size={22} aria-hidden="true" />
+          <div><span>{collectionRoleLabel(business.accountType)}</span><h3>{business.name}</h3><p>{publicCount(business.count)}</p></div><ArrowUpRight size={22} aria-hidden="true" />
         </Link>)}</div> : <div className={styles.businessInvitation}><Store size={30} aria-hidden="true" /><div><h3>{ui("ui.components.HomeDiscovery.yourWork", "Give your work a place in the archive.")}</h3><p>{failed ? ui("ui.components.HomeDiscovery.businessUnavailable", "Public business archives could not be refreshed.") : pending ? ui("ui.components.HomeDiscovery.businessLoading", "Checking public business archives...") : ui("ui.components.HomeDiscovery.noBusinesses", "No public business archives are listed here yet. Builders, shops and luthiers can create a public identity and choose which instrument Profiles to share.")}</p></div><Link href="/account?section=collection">{ui("ui.components.HomeDiscovery.setUpArchive", "Set up your public archive")}<ArrowUpRight size={18} aria-hidden="true" /></Link></div>}
       </section>
       <section className={styles.brandsSection} aria-labelledby="home-brands">
