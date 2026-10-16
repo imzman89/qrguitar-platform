@@ -1,3 +1,4 @@
+import { OwnerWorkspace } from "../../../components/OwnerWorkspace";
 
 import { createUiText } from "../../../lib/ui-text";
 import { loadPublishedSiteSettings } from "../../../lib/site-settings-server";
@@ -19,5 +20,5 @@ export default async function NewConversationPage({ searchParams }: { searchPara
   const profileCode = /^QRG-[A-Z0-9-]{4,40}$/.test(String(query.profile || "").toUpperCase()) ? String(query.profile).toUpperCase() : "";
   const transferId = String(query.transfer || "");
   const validTransfer = !transferId || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(transferId);
-  return <><Nav /><main>{handle && validTransfer ? <StartConversation handle={handle} profileCode={transferId ? "" : profileCode} transferId={transferId} /> : <div className={styles.state}><h1>{ui("ui.app.messages.new.page.258150cb3ee4", "Start a conversation")}</h1><p>{ui("ui.app.messages.new.page.67127f31e1ba", "Choose a member to start a private conversation.")}</p><Link className="button" href="/collections">{ui("ui.app.messages.new.page.1fbba5113528", "Browse member collections")}</Link></div>}</main><Footer /></>;
+  return <><Nav /><OwnerWorkspace current="messages"><div className="owner-messages">{handle && validTransfer ? <StartConversation handle={handle} profileCode={transferId ? "" : profileCode} transferId={transferId} /> : <div className={styles.state}><h1>{ui("ui.app.messages.new.page.258150cb3ee4", "Start a conversation")}</h1><p>{ui("ui.app.messages.new.page.67127f31e1ba", "Choose a member to start a private conversation.")}</p><Link className="button" href="/collections">{ui("ui.app.messages.new.page.1fbba5113528", "Browse member collections")}</Link></div>}</div></OwnerWorkspace><Footer /></>;
 }

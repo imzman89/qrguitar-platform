@@ -1,5 +1,6 @@
 import { readConfirmedPublicOwnerNames } from "./owner-name-consent-server";
 import { readPublicReviewSnapshot, readPublicReviewState } from "./public-review-snapshot";
+import { readThemeReviewFixtures } from "./theme-review-fixtures";
 import { defaultQrStyle, type DemoInstrument } from "./local-demo";
 import { mergeRecordTrustSettings, recordTrustContentKey, type RecordTrustSettings } from "./record-trust";
 import { unstable_noStore as noStore } from "next/cache";
@@ -483,6 +484,15 @@ async function loadRelated(guitars: GuitarRow[], serviceRole = true, allowUnlist
 
 export async function getPublicInstruments(ownerId?: string) {
   noStore();
+  if (ownerId !== undefined) {
+    const fixtures = await readThemeReviewFixtures();
+    if (ownerId.startsWith("demo:")) {
+      const collection = fixtures?.collections.find(item => item.ownerId === ownerId);
+      return fixtures && collection
+        ? fixtures.instruments.filter(record => record.publicCollection?.handle === collection.handle)
+        : [];
+    }
+  }
   const review = ownerId === undefined ? await readPublicReviewState() : null;
   const snapshot = review?.instruments.filter(record => !review.workflowCodes.includes(record.qrCode)) || [];
   if (review && !review.workflowCodes.length) return snapshot;

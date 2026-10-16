@@ -175,3 +175,11 @@
  .root :global(.print-kit-toolbar-actions) { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; align-items:center; }
  .root :global(.print-kit-toolbar-actions) > button { grid-column:1 / -1; width:100%; min-height:46px; }
 }
+
+/* Archive theme: consistent screen typography and actions. */
+@media screen {
+.root :global(.print-kit-toolbar) h1 {font-family:var(--font-ui); font-weight:650; letter-spacing:-.035em; line-height:1.12;}
+.controlRail h2,.mobileControlsHeader h2 {font-family:var(--font-ui);font-weight:600;}
+.root :global(.print-kit-toolbar-actions) > button {border-radius:6px; background:var(--action); color:var(--on-action); border-color:var(--action); font-weight:650; box-shadow:none;}
+.root :global(.print-kit-toolbar-actions) > button:hover:not(:disabled){background:var(--action-hover);color:var(--on-action);}
+}

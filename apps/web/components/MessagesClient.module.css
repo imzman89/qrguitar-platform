@@ -118,3 +118,10 @@
 
 @media screen { :global(.owner-messages) .workspace { width:100%; margin:0; padding:0 0 32px; }.inboxList { border:1px solid var(--line); border-radius:14px; background:var(--surface); }.inboxHeader h1 { font-family:var(--font-ui); font-weight:650; }.inboxHeader :global(.button) { border-radius:8px; }.state { border:1px solid var(--line); border-radius:14px; background:var(--surface); } }
 @media screen and (max-width:600px) { .inboxHeader { flex-direction:column; align-items:flex-start; gap:12px; margin-bottom:20px; }.inboxHeader p { font-size:14px; line-height:1.6; } }
+
+/* Archive theme: consistent screen typography and actions. */
+@media screen {
+.inboxHeader h1 {font-family:var(--font-ui); font-weight:650; letter-spacing:-.035em; line-height:1.12;}
+.threadHeader {padding-bottom:22px;border-bottom:1px solid var(--line);}
+:global(.owner-messages) .workspace {width:100%;margin:0;padding:0;}
+}

@@ -3,12 +3,17 @@ import { isAbsolute } from "node:path";
 import type { DemoInstrument } from "./local-demo";
 import { sanitizePublicInstrument } from "./instrument-profile-contract";
 import { normalizePublicProfileCode, isRetiredPublicProfileCode } from "./public-profile-eligibility";
+import { readThemeReviewFixtures } from "./theme-review-fixtures";
 
 const sourceOrigin = "https://www.qrguitar.com";
 
 export async function readPublicReviewState(): Promise<{ instruments: DemoInstrument[]; workflowCodes: string[] } | null> {
+  const fixtures = await readThemeReviewFixtures();
   const filename = process.env.QRGUITAR_PUBLIC_REVIEW_SNAPSHOT;
-  if (!filename) return null;
+  if (!filename) {
+    if (fixtures) throw new Error("Theme review fixtures require an existing public review snapshot.");
+    return null;
+  }
 
   const site = new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://invalid.example");
   if (process.env.QRGUITAR_BUILD_ENV !== "isolated-local" ||
@@ -67,7 +72,10 @@ export async function readPublicReviewState(): Promise<{ instruments: DemoInstru
       new Set(workflowCodes).size !== workflowCodes.length) {
     throw new Error("Local workflow codes must identify distinct existing snapshot Profiles.");
   }
-  return { instruments, workflowCodes: workflowCodes as string[] };
+  if (fixtures?.instruments.some(record => codes.has(record.qrCode))) {
+    throw new Error("Theme review fixture codes must not overlap the public review snapshot.");
+  }
+  return { instruments: [...instruments, ...(fixtures?.instruments || [])], workflowCodes: workflowCodes as string[] };
 }
 
 export async function readPublicReviewSnapshot(): Promise<DemoInstrument[] | null> {

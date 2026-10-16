@@ -112,3 +112,9 @@
   .admin.admin :global(.admin-modal) { padding: 24px; }
 }
 @media (prefers-reduced-motion: reduce) { .admin.admin :global(.admin-sidebar) { transition: none; } }
+
+/* Archive theme: consistent screen typography and actions. */
+@media screen {
+.admin.admin :is(h1,h2){font-family:var(--font-ui);font-weight:650;letter-spacing:-.025em;}
+.admin.admin :global(.admin-command-bar){background:var(--canvas);}
+}

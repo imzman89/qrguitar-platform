@@ -201,3 +201,10 @@
   .editModes button { padding-inline: 12px; font-size: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .studio.studio :global(.cms-sidebar) { transition: none; } }
+
+/* Archive theme: consistent screen typography and actions. */
+@media screen {
+.studio.studio :global(.cms-editor-heading h1),.access.access h1 {font-family:var(--font-ui); font-weight:650; letter-spacing:-.035em; line-height:1.12;}
+.studio.studio :global(.cms-field-group h2),.studio.studio :global(.cms-focused-block h3){font-family:var(--font-ui);font-weight:600;}
+.studio.studio :global(.cms-commandbar){background:var(--canvas);}
+}

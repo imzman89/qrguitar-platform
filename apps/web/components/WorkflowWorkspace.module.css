@@ -250,3 +250,13 @@
 
 @media screen { .claims :is(h1,h2) { font-family:var(--font-ui); font-weight:650; }.claims :global(.claim-callout),.claims :global(.claim-form),.claims :global(.claim-status-card) { padding:24px; border:1px solid var(--line); border-radius:14px; background:var(--surface); }.claims :global(.button:not(.secondary)) { border-radius:8px; border-color:var(--action); background:var(--action); color:var(--on-action); }.claims :global(.button:not(.secondary)):hover:not(:disabled) { background:var(--action-hover); color:var(--on-action); } }
 @media screen and (max-width:600px) { .claims :global(.claim-callout),.claims :global(.claim-form),.claims :global(.claim-status-card) { padding:18px; } }
+
+/* Archive theme: consistent screen typography and actions. */
+@media screen {
+:is(.claims,.transfer,.service,.bulk) h1 {font-family:var(--font-ui); font-weight:650; letter-spacing:-.035em; line-height:1.12;}
+:is(.claims,.transfer,.service,.bulk) h2, .corrections :global(h2) {font-family:var(--font-ui);font-weight:600;letter-spacing:-.025em;}
+:is(.transfer,.service,.bulk,.corrections) :global(.button:not(.secondary):not(.danger):not(.destructive)) {border-radius:6px; background:var(--action); color:var(--on-action); border-color:var(--action); font-weight:650; box-shadow:none;}
+:is(.transfer,.service,.bulk,.corrections) :global(.button.secondary) {border-radius:6px; background:transparent; color:var(--text); border-color:var(--line); box-shadow:none;}
+:is(.transfer,.service,.bulk,.corrections) :global(.button:not(.secondary):not(.danger):not(.destructive)):hover:not(:disabled) {background:var(--action-hover);color:var(--on-action);border-color:var(--action-hover);}
+:is(.transfer,.service,.bulk,.corrections) :global(.button.secondary):hover:not(:disabled) {background:var(--surface-raised);color:var(--text);border-color:var(--muted);}
+}

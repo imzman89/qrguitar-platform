@@ -12,3 +12,10 @@
 .technicalDetails summary { padding:12px 0; min-height:44px; color:var(--text); cursor:pointer; line-height:1.5; }
 .technicalDetails summary:focus-visible { outline:2px solid var(--action); outline-offset:4px; }
 @media(max-width:600px) { .document > section { padding:24px 0 40px; }.document :global(.legal-page) > p { font-size:16px; margin-bottom:20px; }.document :global(.legal-card) { padding-block:20px; }.document h2 { font-size:21px; } }
+
+/* Archive theme: consistent screen typography and actions. */
+@media screen {
+.document h1 {font-family:var(--font-ui); font-weight:650; letter-spacing:-.035em; line-height:1.12;}
+.document h2 {font-family:var(--font-ui);font-weight:600;letter-spacing:-.025em;}
+.document :global(.legal-card){border-radius:8px;border-color:var(--line);background:var(--surface);}
+}

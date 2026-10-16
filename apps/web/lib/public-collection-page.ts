@@ -1,9 +1,14 @@
 import { cleanCollectionHandle, cleanPublicCollection, publicCollectionHandleKey, publicCollectionOwnerKey } from "./public-collections";
 import { createServerSupabaseClient } from "./supabase-server";
+import { readThemeReviewFixtures } from "./theme-review-fixtures";
 
 /** Resolve only a published collection belonging to a publicly visible account. */
 export async function loadPublicCollectionSettings(handleValue: string) {
+  const fixtures = await readThemeReviewFixtures();
   const handle = cleanCollectionHandle(handleValue);
+  if (fixtures && handle.startsWith("demo-")) {
+    return fixtures.collections.find(collection => collection.handle === handle) || null;
+  }
   if (!handle) return null;
   const supabase = createServerSupabaseClient();
   if (!supabase) throw new Error("Public collections are temporarily unavailable.");

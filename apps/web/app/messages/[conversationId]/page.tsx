@@ -1,3 +1,4 @@
+import { OwnerWorkspace } from "../../../components/OwnerWorkspace";
 import type { Metadata } from "next";
 import { Footer } from "../../../components/Footer";
 import { MessagesClient } from "../../../components/MessagesClient";
@@ -8,5 +9,5 @@ export const metadata: Metadata = buildPrivatePageMetadata("Conversation", "A pr
 
 export default async function ConversationPage({ params }: { params: Promise<{ conversationId: string }> }) {
   const { conversationId } = await params;
-  return <><Nav /><main><MessagesClient conversationId={conversationId} /></main><Footer /></>;
+  return <><Nav /><OwnerWorkspace current="messages"><div className="owner-messages"><MessagesClient conversationId={conversationId} /></div></OwnerWorkspace><Footer /></>;
 }

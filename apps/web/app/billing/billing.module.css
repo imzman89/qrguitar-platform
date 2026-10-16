@@ -210,3 +210,9 @@
 @media (prefers-reduced-motion: reduce) { .shell * { scroll-behavior: auto; } }
 
 @media (max-width: 720px) { .field input,.field textarea,.field select,.promoDisclosure input { font-size: 16px; } .packDisclosure > summary,.promoDisclosure > summary { min-height: 44px; padding-block: 12px; } .automaticHeader > span,.billingFootnote,.paymentPrivacy { font-size: 12px; } }
+
+/* Archive theme: consistent screen typography and actions. */
+@media screen {
+.header h1,.shell > h1 {font-family:var(--font-ui); font-weight:650; letter-spacing:-.035em; line-height:1.12;}
+.page h2 {font-family:var(--font-ui);font-weight:600;letter-spacing:-.025em;}
+}
