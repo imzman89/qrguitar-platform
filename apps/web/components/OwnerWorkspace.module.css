@@ -33,10 +33,10 @@
 .workspace { padding-top:44px; }
 .layout { grid-template-columns:156px minmax(0,1fr); gap:48px; }
 .rail nav a { border-radius:0; font-family:var(--font-ui); font-size:12px; font-weight:400; }
-.rail nav a[aria-current="page"] { background:transparent; color:var(--text); box-shadow:inset 2px 0 0 var(--text); }
+.rail nav a[aria-current="page"] { background:var(--surface); color:var(--text); box-shadow:none; border-radius:6px; font-weight:600; }
 .explore { padding-inline:12px; font-size:11px; }
 .mobileNav summary { min-height:44px; }
-.mobileNav nav { padding:8px 0; background:transparent; border-radius:0; border-block:1px solid var(--line); }
+.mobileNav nav { padding:8px 0; background:transparent; border-radius:0; border-block:0; }
 @media(max-width:1050px) { .layout { grid-template-columns:140px minmax(0,1fr); gap:32px; } }
 @media(max-width:760px) { .workspace { padding-top:16px; }.layout { grid-template-columns:minmax(0,1fr); gap:24px; } }
 

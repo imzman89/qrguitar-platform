@@ -74,7 +74,7 @@
 .catalog-hero-actions { flex-direction:row; flex-wrap:wrap; align-items:center; gap:12px 24px; }
 .catalog-hero-actions :global(.button) { min-height:44px; border:1px solid var(--line); border-radius:6px; background:transparent; color:var(--text); box-shadow:none; }
 .catalog-hero-actions :global(.button):hover { border-color:var(--muted); background:var(--surface); transform:none; }
-.catalog-refinements { border-bottom:1px solid var(--line); padding-bottom:8px; margin-bottom:24px; }
+.catalog-refinements { border-bottom:0; padding-bottom:8px; margin-bottom:24px; }
 .catalog-filters select,.catalog-filter-grid select { background:var(--surface); }
 .catalog-toolbar :global(.button) { min-height:44px; }.catalog-filter-grid label { font-size:12px; }
 @media(min-width:1700px) { .shell { width:min(1600px,calc(100% - 96px)); }.catalog-grid { grid-template-columns:repeat(4,minmax(0,1fr)); } }

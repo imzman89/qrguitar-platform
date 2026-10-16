@@ -10,9 +10,10 @@ import type { DemoInstrument } from "../lib/local-demo";
 import { publicMediaVariantSrcSet, publicMediaVariantUrl } from "../lib/public-media-variant";
 import { PhotoViewer } from "./PhotoViewer";
 import { CompactQr } from "./CompactQr";
+import { ProfileStatusBadges } from "./ProfileStatusBadges";
 import styles from "./HomeProfileShowcase.module.css";
 
-export function HomeProfileShowcase({ record, variant = "hero" }: { record: DemoInstrument; variant?: "hero" | "gallery" }) {
+export function HomeProfileShowcase({ record, variant = "hero" }: { record: DemoInstrument; variant?: "hero" | "gallery" | "story" }) {
   const ui = useUiText("components.HomeProfileShowcase");
   const card = resolveCollectibleCard(record);
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -23,7 +24,7 @@ export function HomeProfileShowcase({ record, variant = "hero" }: { record: Demo
   const activePhoto = Math.min(selectedPhoto, Math.max(0, photos.length - 1));
 
   return (
-    <article className={styles.showcase + (variant === "gallery" ? " " + styles.gallery : "")} aria-label={"Explore the public Profile for " + card.title}>
+    <article className={styles.showcase + (variant === "gallery" ? " " + styles.gallery : variant === "story" ? " " + styles.story : " " + styles.hero)} aria-label={"Explore the public Profile for " + card.title}>
       <button type="button" className={styles.photoStage} onClick={() => setViewerOpen(true)} disabled={!photos.length} aria-label={"View photos of " + card.title}>
         {photos.length ? <>{!loadedPhotos.includes(photos[activePhoto]) ? <span className={styles.loadingPhoto} aria-hidden="true">{ui("ui.components.HomeProfileShowcase.loading", "Loading photo…")}</span> : null}<img className={styles.mainPhoto} src={publicMediaVariantUrl(photos[activePhoto], 1200)} srcSet={publicMediaVariantSrcSet(photos[activePhoto])} sizes={variant === "gallery" ? "(max-width: 540px) calc(100vw - 40px), (max-width: 760px) 50vw, 400px" : "(max-width: 760px) calc(100vw - 40px), (max-width: 900px) 720px, 620px"} alt={card.title + ", photo " + (activePhoto + 1) + " of " + photos.length} loading={variant === "hero" ? "eager" : "lazy"} fetchPriority={variant === "hero" ? "high" : "low"} decoding="async" width={1200} height={900} referrerPolicy="no-referrer" onLoad={() => setLoadedPhotos((current) => current.includes(photos[activePhoto]) ? current : [...current, photos[activePhoto]])} onError={() => setFailedPhotos((current) => current.includes(photos[activePhoto]) ? current : [...current, photos[activePhoto]])} /></>
           : <div className={styles.noPhoto}><Camera size={36} aria-hidden="true" /><span>{ui("ui.components.HomeProfileShowcase.44cebddc8ad6", "Photos are currently unavailable")}</span></div>}
@@ -36,6 +37,7 @@ export function HomeProfileShowcase({ record, variant = "hero" }: { record: Demo
         </div>
         {photos.length ? <button className={styles.galleryLink} type="button" onClick={() => setViewerOpen(true)} aria-label={(photos.length < card.photoCount ? "View available photos of " : "View all photos of ") + card.title}><Camera size={16} aria-hidden="true" />{photos.length} {photos.length === 1 ? ui("ui.components.HomeProfileShowcase.55c64d0fcd6f", "photo") : ui("ui.components.HomeProfileShowcase.84a6dae49cf0", "photos")}{photos.length < card.photoCount ? ui("ui.components.HomeProfileShowcase.033eefff7069", " available") : ""}</button> : null}
       </div>
+      <ProfileStatusBadges record={record} includeCondition={true} className={styles.trust} />
       {variant === "hero" ? <div className={styles.qrIdentity}><Link className={styles.qrLink} href={card.profileUrl} aria-label={"Open the Profile for " + card.title}><CompactQr code={card.code} label={card.title} /></Link><div><span>{ui("ui.components.HomeProfileShowcase.permanentIdentity", "ONE PERMANENT IDENTITY")}</span><strong>{card.code}</strong><Link href={card.profileUrl}>{ui("ui.components.HomeProfileShowcase.scanProfile", "Scan or open this Profile")}<ArrowUpRight size={15} aria-hidden="true" /></Link></div></div> : null}
       <div className={styles.profileCode}><span>{ui("ui.components.HomeProfileShowcase.profileLabel", "PROFILE")}</span><strong>{card.code}</strong></div>
       {viewerOpen ? <PhotoViewer images={photos} initialIndex={activePhoto} title={card.title} onClose={() => setViewerOpen(false)} onIndexChange={setSelectedPhoto} onImageError={(photo) => setFailedPhotos((current) => current.includes(photo) ? current : [...current, photo])} /> : null}

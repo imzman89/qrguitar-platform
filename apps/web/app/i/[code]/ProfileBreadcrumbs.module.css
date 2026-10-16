@@ -47,7 +47,7 @@
 
 @media (max-width: 640px) {
   .breadcrumbs {
-    padding: 0 0 16px;
+    display: none;
   }
 
   .current {

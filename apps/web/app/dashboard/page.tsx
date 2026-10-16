@@ -561,7 +561,7 @@ export default function DashboardPage() {
                   const serviceEntries = getServiceHistoryEntries(instrument);
                   const condition = getInstrumentCondition(instrument);
                   const title = dashboardRecordTitle(instrument);
-                  const meta = dashboardRecordMeta(instrument, condition);
+                  const meta = dashboardRecordMeta(instrument, condition, personalCollection && collectionView === "list");
                   const ownerMaker = String(instrument.brand || "").trim();
                   const ownerYear = String(instrument.year || "").trim();
                   const profileNumber = profileNumbers.get(instrument.qrCode) || 1;
@@ -1190,10 +1190,10 @@ function latestTransferForInstrument(transfers: DemoTransfer[], qrCode: string) 
     })[0];
 }
 
-function dashboardRecordMeta(instrument: DemoInstrument, condition: "new" | "used") {
+function dashboardRecordMeta(instrument: DemoInstrument, condition: "new" | "used", includeYear = true) {
   return [
     instrument.instrumentType,
-    instrument.year,
+    includeYear ? instrument.year : "",
     condition === "new" ? "New" : "Used"
   ].filter(Boolean).join(" · ");
 }

@@ -314,7 +314,7 @@
 :global(body[data-product-theme]) .headerActions :global(.button):first-child { border-color:color-mix(in srgb,var(--text) 30%,var(--canvas)); background:color-mix(in srgb,var(--text) 10%,var(--canvas)); color:var(--text); }
 :global(body[data-product-theme]) .headerActions :global(.button):hover { border-color:var(--text); background:var(--surface); color:var(--text); }
 .filters button { padding-inline:0; border-radius:0; }
-.filters button.filterActive, .filters button:hover { background:transparent; color:var(--text); text-decoration:underline; text-underline-offset:6px; }
+.filters button.filterActive, .filters button:hover { background:transparent; color:var(--text); text-decoration:none; font-weight:600; }
 .tableHeader { margin-bottom:24px; }
 .tableHeader h3 { color:var(--muted); font-family:var(--font-ui); font-size:11px; font-weight:500; letter-spacing:.1em; text-transform:uppercase; }
 .instrumentList { grid-template-columns:repeat(2,minmax(0,1fr)); gap:40px 32px; }
@@ -422,8 +422,8 @@
 /* Personal Collection can switch presentation without changing its records or actions. */
 @media screen {
   .collectionViewToggle { display:flex; flex-wrap:wrap; align-items:center; gap:16px; min-width:0; }
-  .collectionViewToggle button { display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding:8px 4px; border:0; border-radius:0; background:transparent; color:var(--muted-strong); font:inherit; font-size:13px; cursor:pointer; }
-  .collectionViewToggle button[aria-pressed="true"] { color:var(--text); text-decoration:underline; text-decoration-color:var(--action); text-decoration-thickness:2px; text-underline-offset:8px; }
+  .collectionViewToggle button { display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding:8px 12px; border:0; border-radius:6px; background:transparent; color:var(--muted-strong); font:inherit; font-size:13px; cursor:pointer; }
+  .collectionViewToggle button[aria-pressed="true"] { color:var(--text); background:var(--surface-raised); border-radius:6px; font-weight:650; text-decoration:none; }
   .collectionViewToggle button:hover { color:var(--text); }
   .collectionViewToggle button:focus-visible { outline:2px solid var(--action); outline-offset:4px; }
   .personalGallery .qrActionColumn { flex-wrap:wrap; gap:12px; }
@@ -441,29 +441,29 @@
 /* The owner's gallery uses bounded collector cards; list mode remains a working list. */
 @media screen {
  .instrumentList:not(.personalRecords),.instrumentList:not(.personalRecords):has(> .instrumentRow:only-child) { grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),340px)); gap:24px; justify-content:start; }
- .instrumentList:not(.personalRecords) .instrumentRow { width:100%; max-width:340px; padding:0; border:1px solid var(--line); border-radius:6px; background:var(--surface); box-shadow:none; align-self:start; }
- .instrumentList:not(.personalRecords) .instrumentThumb { height:270px; max-height:270px; aspect-ratio:auto; border:0; border-radius:5px 5px 0 0; background:var(--photo-mat); }
+ .instrumentList:not(.personalRecords) .instrumentRow { width:100%; max-width:340px; padding:0; border:1px solid transparent; border-radius:10px; background:var(--surface); box-shadow:none; align-self:start; }
+ .instrumentList:not(.personalRecords) .instrumentThumb { height:270px; max-height:270px; aspect-ratio:auto; border:0; border-radius:9px 9px 0 0; background:var(--photo-mat); }
  .instrumentList:not(.personalRecords) .instrumentThumb img { padding:0; object-fit:contain; }
  .instrumentList:not(.personalRecords) .instrumentDetails { padding:16px; gap:12px; }
  .instrumentList:not(.personalRecords) .instrumentInfo > strong { font-size:22px; font-weight:600; line-height:1.25; }
- .instrumentList:not(.personalRecords) .recordIdentity { border-top:1px solid var(--collector-line); padding-top:12px; }
+ .instrumentList:not(.personalRecords) .recordIdentity { border-top:0; padding-top:16px; }
  .instrumentList:not(.personalRecords) .dashboardIdentity { color:var(--collector-metal); }
- .instrumentList:not(.personalRecords) .qrActionColumn { margin:0; padding:12px 16px 16px; border-top:1px solid var(--line); flex-wrap:wrap; gap:8px; }
+ .instrumentList:not(.personalRecords) .qrActionColumn { margin:0; padding:4px 20px 20px; border-top:0; flex-wrap:wrap; gap:8px; }
  .instrumentList:not(.personalRecords) .primaryActions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; gap:8px; }
  .instrumentList:not(.personalRecords) .primaryActions :global(.button) { border-radius:7px; min-height:44px; }
  .instrumentList:not(.personalRecords) .moreButton { margin-left:auto; border-radius:6px; }
- .personalRecords .instrumentRow { padding:18px; border:1px solid var(--line); border-radius:12px; background:var(--surface); margin-bottom:12px; }
- .header { padding-bottom:22px; border-bottom:1px solid var(--line); }.header :global(.eyebrow) { color:var(--collector-metal); letter-spacing:.12em; text-transform:uppercase; }
- .filters button.filterActive { border:1px solid var(--collector-line); background:var(--selected-surface); }.tableHeader h3 { font-weight:650; }
+ .personalRecords .instrumentRow { padding:18px; border:0; border-radius:10px; background:var(--surface); margin-bottom:12px; }
+ .header { padding-bottom:22px; border-bottom:0; }.header :global(.eyebrow) { color:var(--collector-metal); letter-spacing:.12em; text-transform:uppercase; }
+ .filters button.filterActive { border:0; background:transparent; color:var(--text); }.tableHeader h3 { font-weight:650; }
 }
 @media screen and (max-width:600px) { .instrumentList:not(.personalRecords),.instrumentList:not(.personalRecords):has(> .instrumentRow:only-child) { grid-template-columns:minmax(0,1fr); }.instrumentList:not(.personalRecords) .instrumentRow { max-width:380px; }.personalRecords .instrumentRow { padding:14px; } }
 
-@media screen { :global(body[data-product-theme]) .dashboard .header h1 { font-family:var(--font-ui); font-size:clamp(30px,3vw,40px); font-weight:650; }.header { padding:0 0 16px; }.header p { line-height:1.55; }.collectionControls { padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface); } }
-@media screen and (max-width:760px) { .dashboard { gap:16px; }.header { gap:12px; }.header > div:first-child { gap:6px; }:global(body[data-product-theme]) .dashboard .header h1 { font-size:30px; }.header p { font-size:13px; }.headerActions { gap:6px; }.headerActions :global(.button) { padding:10px 12px; }.collectionControls { gap:8px; padding:8px; }.filters button { padding:8px; font-size:12px; }.instrumentList:not(.personalRecords) .instrumentThumb { height:240px; max-height:240px; } }
+@media screen { :global(body[data-product-theme]) .dashboard .header h1 { font-family:var(--font-ui); font-size:clamp(30px,3vw,40px); font-weight:650; }.header { padding:0 0 16px; }.header p { line-height:1.55; }.collectionControls { padding:4px 0; border:0; border-radius:0; background:transparent; } }
+@media screen and (max-width:760px) { .dashboard { gap:16px; }.header { gap:12px; }.header > div:first-child { gap:6px; }:global(body[data-product-theme]) .dashboard .header h1 { font-size:30px; }.header p { font-size:13px; }.headerActions { gap:6px; }.headerActions :global(.button) { padding:10px 12px; }.collectionControls { gap:8px; padding:0; }.filters button { padding:8px; font-size:12px; }.instrumentList:not(.personalRecords) .instrumentThumb { height:240px; max-height:240px; } }
 
 /* Retained-file disclosure shares the workspace spacing and accessible controls. */
 @media screen {
-  .toolsBody > :global(details.panel) { min-width:0; padding:16px 20px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
+  .toolsBody > :global(details.panel) { min-width:0; padding:16px 20px; border:0; border-radius:10px; background:var(--surface); }
   .toolsBody > :global(details.panel) > summary { min-height:44px; padding-block:10px; color:var(--text); font-size:14px; font-weight:600; line-height:1.5; cursor:pointer; }
   .toolsBody > :global(details.panel) > summary::marker { color:var(--action); }
   .toolsBody > :global(details.panel[open]) > summary { padding-bottom:14px; border-bottom:1px solid var(--line); }
@@ -482,13 +482,24 @@
 /* Owner-gallery identity follows the public archive; working list and actions stay intact. */
 .ownerIdentityHeading { display:none; }
 @media screen {
-  .instrumentList:not(.personalRecords) .instrumentDetails { border-left:2px solid var(--action); background:var(--canvas); padding:16px; }
+  .instrumentList:not(.personalRecords) .instrumentDetails { border-left:0; background:transparent; padding:20px; }
   .instrumentList:not(.personalRecords) .ownerIdentityHeading { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; min-width:0; }
-  .instrumentList:not(.personalRecords) .ownerMaker { min-width:0; padding-top:4px; color:var(--muted-strong); font-size:14px; font-weight:650; line-height:1.5; letter-spacing:.09em; text-transform:uppercase; overflow-wrap:anywhere; }
-  .instrumentList:not(.personalRecords) .ownerYear { flex:0 0 auto; margin-left:auto; padding-left:14px; border-left:1px solid var(--line); color:var(--text); font:500 30px/1.1 var(--font-ui); letter-spacing:-.05em; }
-  .instrumentList:not(.personalRecords) .instrumentInfo > strong { font-size:23px; font-weight:600; line-height:1.25; letter-spacing:-.035em; }
+  .instrumentList:not(.personalRecords) .ownerMaker { min-width:0; padding-top:4px; color:var(--muted-strong); font-size:13px; font-weight:600; line-height:1.5; letter-spacing:.08em; text-transform:uppercase; overflow-wrap:anywhere; }
+  .instrumentList:not(.personalRecords) .ownerYear { flex:0 0 auto; margin-left:auto; padding-left:0; border-left:0; color:var(--text); font:500 24px/1.2 var(--font-ui); letter-spacing:-.05em; }
+  .instrumentList:not(.personalRecords) .instrumentInfo > strong { font-size:23px; font-weight:550; line-height:1.3; letter-spacing:-.035em; }
   .instrumentList:not(.personalRecords) .compactQr { flex-basis:80px; width:80px; height:80px; }
   .instrumentList:not(.personalRecords) .compactQr img { width:80px; height:80px; border-radius:0; }
   .instrumentList:not(.personalRecords) .dashboardIdentity > span:first-child { display:grid; gap:4px; color:var(--text); font-family:ui-monospace,monospace; font-size:13px; font-weight:650; letter-spacing:.04em; }
-  .instrumentList:not(.personalRecords) .dashboardIdentity > span:first-child > b { margin:0; color:var(--muted); font-family:var(--font-ui); font-size:9px; font-weight:500; letter-spacing:.1em; text-transform:uppercase; }
+  .instrumentList:not(.personalRecords) .dashboardIdentity > span:first-child > b { margin:0; color:var(--muted); font-family:var(--font-ui); font-size:11px; font-weight:500; letter-spacing:.08em; text-transform:uppercase; }
 }
+
+@media screen {
+ .instrumentList:not(.personalRecords) .instrumentInfo > span,.instrumentList:not(.personalRecords) .instrumentMeta,.instrumentList:not(.personalRecords) .dashboardIdentity > span { font-size:13px; line-height:1.6; }
+}
+@media screen and (min-width:761px) {
+ .instrumentList:not(.personalRecords):has(> .instrumentRow:only-child),.instrumentList:not(.personalRecords):has(> .instrumentRow:nth-child(2):last-child) { grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),420px)); justify-content:center; gap:32px; }
+ .instrumentList:not(.personalRecords):has(> .instrumentRow:only-child) .instrumentRow,.instrumentList:not(.personalRecords):has(> .instrumentRow:nth-child(2):last-child) .instrumentRow { max-width:420px; }
+ .instrumentList:not(.personalRecords):has(> .instrumentRow:only-child) .instrumentThumb,.instrumentList:not(.personalRecords):has(> .instrumentRow:nth-child(2):last-child) .instrumentThumb { height:320px; max-height:320px; }
+}
+
+@media print { .ownerIdentityHeading { display:flex; gap:8px; align-items:baseline; } }

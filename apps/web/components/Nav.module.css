@@ -1,11 +1,11 @@
-.header { position:relative; z-index:40; background:var(--canvas); color:var(--text); border-bottom:1px solid color-mix(in srgb,var(--text) 12%,var(--canvas)); }
+.header { position:relative; z-index:40; background:var(--canvas); color:var(--text); border-bottom:0; }
 .inner { min-height:80px; display:flex; align-items:center; justify-content:space-between; gap:32px; max-width:1360px; width:min(1360px,calc(100% - 96px)); margin-inline:auto; }
 .brand { display:inline-flex; align-items:center; min-height:44px; flex-shrink:0; }
 .logo { display:block; width:160px; height:auto; }
 .links { display:flex; align-items:center; gap:16px; min-width:0; }
 .links > a,.accountButton { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:10px 14px; border:1px solid transparent; border-radius:2px; background:transparent; color:var(--muted-strong); font:inherit; font-size:13px; font-weight:500; text-transform:none; letter-spacing:.02em; cursor:pointer; text-decoration:none; }
 .links > a:hover,.accountButton:hover { color:var(--text); background:transparent; }
-.links > a[aria-current="page"]:not(.primary) { color:var(--text); text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:7px; }
+.links > a[aria-current="page"]:not(.primary) { color:var(--text); font-weight:650; background:var(--surface); border-radius:6px; text-decoration:none; }
 .links > .primary { margin-left:8px; border-color:color-mix(in srgb,var(--text) 28%,var(--canvas)); border-radius:2px; background:transparent; color:var(--text); padding-inline:20px; }
 .links > .primary:hover { border-color:var(--text); background:color-mix(in srgb,var(--text) 8%,var(--canvas)); color:var(--text); }
 .toggle { display:none; align-items:center; justify-content:center; width:44px; height:44px; border:0; border-radius:8px; background:transparent; color:var(--text); cursor:pointer; }

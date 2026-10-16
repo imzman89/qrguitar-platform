@@ -371,7 +371,6 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
     date: instrument.latestServiceDate, datePrecision: instrument.latestServiceDatePrecision
   }) : undefined;
   const timelineEvents = presentation?.timelineEvents || [];
-  const publicServiceEntries = (presentation?.serviceEntries || []).filter(entry => entry.isPublic === true);
   const meaningfulTimelineEvents = presentation?.meaningfulTimelineEvents || [];
   const visibleTabs = useMemo<Array<{ id: ProfileTab; label: string; count?: number }>>(() => {
     const tabs: Array<{ id: ProfileTab; label: string; count?: number }> = [
@@ -379,16 +378,12 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
       { id: "specs", label: getContentValue(publicContent, "profile.tabs.specifications") }
     ];
 
-    if (presentation?.tabs.timeline) {
-      tabs.push({
-        id: "timeline",
-        label: getContentValue(publicContent, "profile.tabs.timeline"),
-        count: presentation.counts.timeline
-      });
-    }
-    if (presentation?.tabs.service) {
-      tabs.push({ id: "service", label: getContentValue(publicContent, "profile.tabs.service"), count: presentation.counts.service });
-    }
+    tabs.push({
+      id: "timeline",
+      label: getContentValue(publicContent, "profile.tabs.timeline"),
+      count: presentation?.counts.timeline || 0
+    });
+    tabs.push({ id: "service", label: getContentValue(publicContent, "profile.tabs.service"), count: presentation?.counts.service || 0 });
     if (presentation?.tabs.media) {
       tabs.push({ id: "media", label: getContentValue(publicContent, "profile.tabs.media"), count: externalMedia.length });
     }
@@ -410,6 +405,21 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
     presentation?.tabs.timeline,
     publicContent
   ]);
+  useEffect(() => {
+    if (queryTab) return;
+    let frame = 0;
+    const openLinkedSection = () => {
+      const links: Record<string, ProfileTab> = { "#profile-specifications": "specs", "#profile-history": "timeline", "#profile-service": "service", "#profile-documents": "documents", "#profile-media": "media" };
+      const tab = links[window.location.hash];
+      if (!tab || !visibleTabs.some(item => item.id === tab)) return;
+      setActiveTab(tab);
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => document.getElementById("profile-tab-panel")?.scrollIntoView({ block: "start", behavior: "auto" }));
+    };
+    openLinkedSection();
+    window.addEventListener("hashchange", openLinkedSection);
+    return () => { cancelAnimationFrame(frame); window.removeEventListener("hashchange", openLinkedSection); };
+  }, [queryTab, visibleTabs]);
   const isVerifiedRecord = instrument ? getInstrumentVerificationStatus(instrument) === "verified" : false;
   const isAuthenticityConfirmed = instrument?.authenticityStatus === "confirmed";
   const showVerificationBadge = instrument?.showVerificationBadge !== false;
@@ -671,72 +681,27 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
     <main className={styles["scan-profile"] + " boutique-gallery"}>
       <section className={styles["scan-shell"]}>
         {publicReviewSnapshot ? <div className={styles["profile-refresh-notice"]} role="note">{ui("ui.app.i.code.ProfileClient.localReadOnlyNotice", "Read-only local preview. You can view this Profile and its history. Ownership changes, messages and service requests are unavailable here.")}</div> : null}
-        {ownerPreview && instrument ? <div className={styles["profile-refresh-notice"]} role="status"><p><strong>{ui("ui.app.i.code.ProfileClient.cca6a9866dcc", "Your Profile.")}</strong> {instrument.visibility === "private" ? ui("ui.app.i.code.ProfileClient.b1eaa5bd6fae", "This Profile is private. Visitors cannot open its QR link.") : ui("ui.app.i.code.ProfileClient.43c30bfc7680", "You are viewing this Profile from your account.")}</p><Link className="button secondary" href={"/edit/" + encodeURIComponent(instrument.qrCode)}>{ui("ui.app.i.code.ProfileClient.fec2ac0f4cf1", "Edit Profile")}</Link><Link href="/dashboard">{ui("ui.app.i.code.ProfileClient.4466f3a00b0b", "Back to collection")}</Link></div> : null}
+        {ownerPreview && instrument ? <header className={styles["owner-profile-header"]}>
+          <Link className={styles["owner-profile-back"]} href="/dashboard"><ArrowLeft size={20} aria-hidden="true" />{ui("ui.app.i.code.ProfileClient.4466f3a00b0b", "Back to collection")}</Link>
+          <p role="status"><strong>{ui("ui.app.i.code.ProfileClient.cca6a9866dcc", "Your Profile.")}</strong> {instrument.visibility === "private" ? ui("ui.app.i.code.ProfileClient.b1eaa5bd6fae", "This Profile is private. Visitors cannot open its QR link.") : ui("ui.app.i.code.ProfileClient.43c30bfc7680", "You are viewing this Profile from your account.")}</p>
+          <Link className="button secondary" href={"/edit/" + encodeURIComponent(instrument.qrCode)}>{ui("ui.app.i.code.ProfileClient.fec2ac0f4cf1", "Edit Profile")}</Link>
+        </header> : null}
         {profileLoadError ? (
           <div className={styles["profile-refresh-notice"]} role="status">
             <p>{ui("ui.app.i.code.ProfileClient.6e8c3c83d96f", "This is the last loaded Profile. We could not check for updates.")}</p>
             <button type="button" className="button secondary" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>{ui("ui.app.i.code.ProfileClient.d8b8392e2c54", "Try again")}</button>
           </div>
         ) : null}
-        <ProfileBreadcrumbs current={instrumentDisplayName(instrument)} catalogHref={ownerPreview ? "/dashboard" : catalogReturnHref || "/catalog"} ancestorLabel={ownerPreview || catalogReturnHref === "/dashboard" || catalogReturnHref?.startsWith("/collections/") ? ui("ui.app.i.code.ProfileClient.4466f3a00b0b", "Back to collection") : undefined} />
-        <div className={styles["scan-topbar"]}>
+        {!ownerPreview ? <ProfileBreadcrumbs current={instrumentDisplayName(instrument)} catalogHref={ownerPreview ? "/dashboard" : catalogReturnHref || "/catalog"} ancestorLabel={ownerPreview || catalogReturnHref === "/dashboard" || catalogReturnHref?.startsWith("/collections/") ? ui("ui.app.i.code.ProfileClient.4466f3a00b0b", "Back to collection") : undefined} /> : null}
+        {!ownerPreview ? <div className={styles["scan-topbar"]}>
           <button type="button" aria-label={ownerPreview || catalogReturnHref === "/dashboard" || catalogReturnHref?.startsWith("/collections/") ? ui("ui.app.i.code.ProfileClient.4466f3a00b0b", "Back to collection") : catalogReturnHref ? ui("ui.app.i.code.ProfileClient.backToCatalog", "Back to Catalog") : ui("ui.app.i.code.ProfileClient.cb35f7332137", "Back to homepage")} onClick={() => router.push(ownerPreview ? "/dashboard" : catalogReturnHref || "/")}>
             <ArrowLeft size={24} />
           </button>
           <BrandLogo className={styles["scan-brand"]} appearance="dark" />
           <span className={styles["profile-topbar-label"]}>Profile</span>
-        </div>
+        </div> : null}
 
         <section className={styles["scan-hero"]}>
-          <header className={styles["profile-heading"]}>
-            <p className={styles["profile-kicker"]}>{[instrument.brand, instrument.year, instrument.instrumentType].filter(Boolean).join(" · ")}</p>
-            <h1>{instrumentDisplayName(instrument)}</h1>
-            {companyCredit ? <Link className={styles["profile-company-credit"]} href={"/collections/" + encodeURIComponent(companyCredit.handle)}>{companyCredit.publicName}</Link> : null}
-            <p className={styles["profile-condition"]}>
-              <span>{ui("ui.app.i.code.ProfileClient.conditionLabel", "Condition")}</span>
-              <strong>{getInstrumentCondition(instrument) === "new"
-                ? ui("ui.app.i.code.ProfileClient.conditionNew", "New")
-                : ui("ui.app.i.code.ProfileClient.conditionUsed", "Used")}</strong>
-            </p>
-            <ProfileStatusBadges
-              record={{
-                ...instrument,
-                showVerificationBadge,
-                showAuthenticityBadge
-              }}
-              includeCondition={false}
-              hideConfirmedTrust={true}
-              className={styles["profile-hero-badges"]}
-              ownerCollection={publicReviewSnapshot || companyCredit ? undefined : instrument.publicCollection}
-            />
-            {saleOffer ? <section className={styles["profile-sale-area"]} aria-label={ui("ui.app.i.code.ProfileClient.saleDetails", "Sale details")}>
-              <div className={styles["profile-sale-price"]}>
-                <span>{ui("ui.app.i.code.ProfileClient.askingPrice", "Asking price")}</span>
-                {saleOffer.price ? <strong>{saleOffer.price}</strong> : <span>{purchaseLink ? ui("ui.app.i.code.ProfileClient.priceAtStore", "Price at {{store}}", { store: saleOffer.storeName }) : ui("ui.app.i.code.ProfileClient.noPrice", "Price not provided")}</span>}
-              </div>
-              {purchaseLink ? <a className={styles["profile-purchase-link"]} href={purchaseLink.href} target="_blank" rel="ugc nofollow noopener noreferrer" aria-label={ui("ui.app.i.code.ProfileClient.buyFromStoreAccessible", "Buy from {{store}} (opens in a new tab)", { store: saleOffer.storeName })}>
-                <span><strong>{ui("ui.app.i.code.ProfileClient.buyFromStore", "Buy from {{store}}", { store: saleOffer.storeName })}</strong><small>{purchaseLink.host}</small></span><ArrowUpRight size={19} aria-hidden="true" />
-              </a> : <p>{ui("ui.app.i.code.ProfileClient.noPurchaseLink", "Purchase details unavailable.")}</p>}
-              {purchaseLink ? <p className={styles["profile-sale-note"]}>{ui("ui.app.i.code.ProfileClient.storeConfirms", "Store confirms price and availability.")}</p> : null}
-            </section> : null}
-            {!publicReviewSnapshot && instrument.publicCollection ? <div className={styles["profile-member-actions"]}>
-              {!saleOffer ? <SellerWebsiteLink {...instrument.publicCollection} /> : null}
-              {instrument.publicCollection?.allowMessages ? <MemberMessageLink className={styles["profile-message-link"]} handle={instrument.publicCollection.handle} profileCode={instrument.qrCode} label={ui("ui.app.i.code.ProfileClient.577c10d6f210", "Message {{value1}}", { value1: instrument.publicCollection.publicName })} /> : null}
-            </div> : null}
-
-        {safetyStatus === "lost" || safetyStatus === "stolen" ? (
-          <section className={styles["scan-safety-alert"]} aria-label={ui("ui.app.i.code.ProfileClient.88e9f0875799", "Reported {{value1}}", { value1: safetyStatus })}>
-            <strong>{safetyStatus === "lost" ? ui("ui.app.i.code.ProfileClient.299f098db192", "Reported Lost") : ui("ui.app.i.code.ProfileClient.44d0eeb2a64d", "Reported Stolen")}</strong>
-            <p>
-              {safetyStatus === "lost"
-                ? ui("ui.app.i.code.ProfileClient.911804584a25", "This instrument has been marked lost by the current owner.")
-                : ui("ui.app.i.code.ProfileClient.f724a4ca52d7", "This instrument has been marked stolen by the current owner.")}
-            </p>
-            {isDistinctSafetyNote(instrument.publicSafetyNote, safetyStatus) ? <p>{instrument.publicSafetyNote}</p> : null}
-          </section>
-        ) : null}
-            {ownerPreview ? ownerWorkspaceContent : null}
-          </header>
           <section
             className={styles["scan-hero-gallery"]}
             aria-label={getContentValue(publicContent, "profile.gallery.label")}
@@ -892,6 +857,54 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
               </div>
             ) : null}
           </section>
+          <header className={styles["profile-heading"]}>
+            <p className={styles["profile-kicker"]}>{[instrument.brand, instrument.year, instrument.instrumentType].filter(Boolean).join(" · ")}</p>
+            <h1>{instrumentDisplayName(instrument)}</h1>
+            {companyCredit ? <Link className={styles["profile-company-credit"]} href={"/collections/" + encodeURIComponent(companyCredit.handle)}>{companyCredit.publicName}</Link> : null}
+            <p className={styles["profile-condition"]}>
+              <span>{ui("ui.app.i.code.ProfileClient.conditionLabel", "Condition")}</span>
+              <strong>{getInstrumentCondition(instrument) === "new"
+                ? ui("ui.app.i.code.ProfileClient.conditionNew", "New")
+                : ui("ui.app.i.code.ProfileClient.conditionUsed", "Used")}</strong>
+            </p>
+            <ProfileStatusBadges
+              record={{
+                ...instrument,
+                showVerificationBadge,
+                showAuthenticityBadge
+              }}
+              includeCondition={false}
+              className={styles["profile-hero-badges"]}
+              ownerCollection={publicReviewSnapshot || companyCredit ? undefined : instrument.publicCollection}
+            />
+            {saleOffer ? <section className={styles["profile-sale-area"]} aria-label={ui("ui.app.i.code.ProfileClient.saleDetails", "Sale details")}>
+              <div className={styles["profile-sale-price"]}>
+                <span>{ui("ui.app.i.code.ProfileClient.askingPrice", "Asking price")}</span>
+                {saleOffer.price ? <strong>{saleOffer.price}</strong> : <span>{purchaseLink ? ui("ui.app.i.code.ProfileClient.priceAtStore", "Price at {{store}}", { store: saleOffer.storeName }) : ui("ui.app.i.code.ProfileClient.noPrice", "Price not provided")}</span>}
+              </div>
+              {purchaseLink ? <a className={styles["profile-purchase-link"]} href={purchaseLink.href} target="_blank" rel="ugc nofollow noopener noreferrer" aria-label={ui("ui.app.i.code.ProfileClient.buyFromStoreAccessible", "Buy from {{store}} (opens in a new tab)", { store: saleOffer.storeName })}>
+                <span><strong>{ui("ui.app.i.code.ProfileClient.buyFromStore", "Buy from {{store}}", { store: saleOffer.storeName })}</strong><small>{purchaseLink.host}</small></span><ArrowUpRight size={19} aria-hidden="true" />
+              </a> : <p>{ui("ui.app.i.code.ProfileClient.noPurchaseLink", "Purchase details unavailable.")}</p>}
+              {purchaseLink ? <p className={styles["profile-sale-note"]}>{ui("ui.app.i.code.ProfileClient.storeConfirms", "Store confirms price and availability.")}</p> : null}
+            </section> : null}
+            {!publicReviewSnapshot && instrument.publicCollection ? <div className={styles["profile-member-actions"]}>
+              {!saleOffer ? <SellerWebsiteLink {...instrument.publicCollection} /> : null}
+              {instrument.publicCollection?.allowMessages ? <MemberMessageLink className={styles["profile-message-link"]} handle={instrument.publicCollection.handle} profileCode={instrument.qrCode} label={ui("ui.app.i.code.ProfileClient.577c10d6f210", "Message {{value1}}", { value1: instrument.publicCollection.publicName })} /> : null}
+            </div> : null}
+
+        {safetyStatus === "lost" || safetyStatus === "stolen" ? (
+          <section className={styles["scan-safety-alert"]} aria-label={ui("ui.app.i.code.ProfileClient.88e9f0875799", "Reported {{value1}}", { value1: safetyStatus })}>
+            <strong>{safetyStatus === "lost" ? ui("ui.app.i.code.ProfileClient.299f098db192", "Reported Lost") : ui("ui.app.i.code.ProfileClient.44d0eeb2a64d", "Reported Stolen")}</strong>
+            <p>
+              {safetyStatus === "lost"
+                ? ui("ui.app.i.code.ProfileClient.911804584a25", "This instrument has been marked lost by the current owner.")
+                : ui("ui.app.i.code.ProfileClient.f724a4ca52d7", "This instrument has been marked stolen by the current owner.")}
+            </p>
+            {isDistinctSafetyNote(instrument.publicSafetyNote, safetyStatus) ? <p>{instrument.publicSafetyNote}</p> : null}
+          </section>
+        ) : null}
+            {ownerPreview ? ownerWorkspaceContent : null}
+          </header>
           <div className={styles["scan-hero-info"]}>
         <footer aria-label="Profile QR and share">
         <div className={styles["scan-qr"]}>
@@ -949,7 +962,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
 
         {canEdit ? (
         <section className={styles["scan-actions"]} aria-label={ui("ui.app.i.code.ProfileClient.bfeb7617d7e2", "Owner profile actions")}>
-          {canEdit ? (
+          {canEdit && !ownerPreview ? (
             <Action
               icon={<SlidersHorizontal />}
               label={ui("ui.app.i.code.ProfileClient.fec2ac0f4cf1", "Edit Profile")}
@@ -1007,75 +1020,6 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
           </section>
         ) : null}
 
-        {!ownerPreview ? <div className={styles["profile-record-body"]}>
-          <nav className={styles["profile-section-links"]} aria-label={ui("ui.app.i.code.ProfileClient.4d2046641397", "Instrument profile sections")}>
-            <a href="#profile-specifications">{getContentValue(publicContent, "profile.tabs.specifications")}</a>
-            <a href="#profile-history">{getContentValue(publicContent, "profile.tabs.timeline")}</a>
-            {publicServiceEntries.length ? <a href="#profile-service">{getContentValue(publicContent, "profile.tabs.service")}</a> : null}
-            {documentFiles.length ? <a href="#profile-documents">{getContentValue(publicContent, "profile.tabs.documents")}</a> : null}
-            {externalMedia.length ? <a href="#profile-media">{getContentValue(publicContent, "profile.tabs.media")}</a> : null}
-          </nav>
-          <ProfilePanel
-            detailsHeading={getContentValue(publicContent, "profile.details.heading")}
-          activeTab="overview"
-          instrument={instrument}
-          specs={specs}
-          optionalSpecs={optionalSpecs}
-          profileLinks={profileLinks}
-          officialBrandLogoUrl={officialBrandLogoUrl}
-          externalMedia={externalMedia}
-          documentFiles={documentFiles}
-          onDocumentView={() => setActionNotice("documents")}
-          transferMessage={transferMessage}
-          latestTransfer={latestTransfer}
-          isVerifiedRecord={isVerifiedRecord}
-          timelineEvents={timelineEvents}
-          serviceEntries={presentation?.serviceEntries || []}
-        />
-          {publicServiceEntries.length ? <div id="profile-service"><ProfilePanel
-            detailsHeading={getContentValue(publicContent, "profile.details.heading")}
-            activeTab="service" instrument={instrument} specs={specs} optionalSpecs={optionalSpecs}
-            profileLinks={profileLinks} officialBrandLogoUrl={officialBrandLogoUrl}
-            externalMedia={externalMedia} documentFiles={documentFiles}
-            onDocumentView={() => setActionNotice("documents")} transferMessage={transferMessage}
-            latestTransfer={latestTransfer} isVerifiedRecord={isVerifiedRecord}
-            timelineEvents={timelineEvents} serviceEntries={publicServiceEntries}
-          /></div> : null}
-          {documentFiles.length ? <div id="profile-documents">          <ProfilePanel
-            detailsHeading={getContentValue(publicContent, "profile.details.heading")}
-          activeTab="documents"
-          instrument={instrument}
-          specs={specs}
-          optionalSpecs={optionalSpecs}
-          profileLinks={profileLinks}
-          officialBrandLogoUrl={officialBrandLogoUrl}
-          externalMedia={externalMedia}
-          documentFiles={documentFiles}
-          onDocumentView={() => setActionNotice("documents")}
-          transferMessage={transferMessage}
-          latestTransfer={latestTransfer}
-          isVerifiedRecord={isVerifiedRecord}
-          timelineEvents={timelineEvents}
-          serviceEntries={presentation?.serviceEntries || []}
-        /></div> : null}
-          {externalMedia.length ? <div id="profile-media">          <ProfilePanel
-            detailsHeading={getContentValue(publicContent, "profile.details.heading")}
-          activeTab="media"
-          instrument={instrument}
-          specs={specs}
-          optionalSpecs={optionalSpecs}
-          profileLinks={profileLinks}
-          officialBrandLogoUrl={officialBrandLogoUrl}
-          externalMedia={externalMedia}
-          documentFiles={documentFiles}
-          onDocumentView={() => setActionNotice("documents")}
-          transferMessage={transferMessage}
-          latestTransfer={latestTransfer}
-          isVerifiedRecord={isVerifiedRecord}
-          timelineEvents={timelineEvents}
-          serviceEntries={presentation?.serviceEntries || []}
-        /></div> : null}
-        </div> : <>
         <nav className={styles["scan-tabs"]} aria-label={ui("ui.app.i.code.ProfileClient.4d2046641397", "Instrument profile sections")} role="tablist">
           {visibleTabs.map((tab) => (
             <button
@@ -1092,11 +1036,12 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
                 switchTab(tab.id);
               }}
               onKeyDown={(event) => {
-                if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+                if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
                 event.preventDefault();
                 const currentIndex = visibleTabs.findIndex((item) => item.id === tab.id);
                 const direction = event.key === "ArrowRight" ? 1 : -1;
-                const nextTab = visibleTabs[(currentIndex + direction + visibleTabs.length) % visibleTabs.length];
+                const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? visibleTabs.length - 1 : (currentIndex + direction + visibleTabs.length) % visibleTabs.length;
+                const nextTab = visibleTabs[nextIndex];
                 switchTab(nextTab.id);
                 requestAnimationFrame(() => {
                   document.querySelector<HTMLButtonElement>(`[data-profile-tab="${nextTab.id}"]`)?.focus();
@@ -1128,7 +1073,7 @@ export function ProfileClient({ code: codeParam, initialInstrument, ownerPreview
           serviceEntries={presentation?.serviceEntries || []}
         />
         </div>
-        </>}
+
 
         {!publicReviewSnapshot && <PublicServiceCorrections qrCode={instrument.qrCode} />}
         {!publicReviewSnapshot && canEdit && <OwnerServiceCorrectionLinks entries={[...(instrument.timelineEvents || []), ...(instrument.serviceEvents || [])]} />}
@@ -1226,7 +1171,7 @@ function ProfilePanel({
     return (
       <section className={styles["scan-tab-panel"]}>
         <PanelHeader icon={<Wrench />} label={ui("ui.app.i.code.ProfileClient.d677190e0a99", "Service")} title={ui("ui.app.i.code.ProfileClient.serviceAttributionHeading", "Owner-reported work and owner-approved provider records.")} />
-        <div className={styles["timeline-list"]}>
+        {serviceEntries.length ? <div className={styles["timeline-list"]}>
           {serviceEntries.map((entry) => (
             <TimelineItem
               date={formatTimelineEntryDate(entry)}
@@ -1235,7 +1180,7 @@ function ProfilePanel({
               key={entry.id}
             />
           ))}
-        </div>
+        </div> : <EmptyPanel title={ui("ui.app.i.code.ProfileClient.serviceEmptyTitle", "No service records to display.")} copy={ui("ui.app.i.code.ProfileClient.serviceEmptyBody", "Service records appear here when they are available to you.")} />}
       </section>
     );
   }
@@ -1362,7 +1307,6 @@ function ProfilePanel({
           <summary>{ui("ui.app.i.code.ProfileClient.191c6a87f0f4", "About this")}{" "}{profileTypeLabel.toLowerCase()}</summary>
           <p>{meaningfulProfileSummary(instrument.summary)}</p>
         </details> : null}
-        <ProfileHistory instrument={instrument} latestTransfer={latestTransfer} timelineEvents={timelineEvents} serviceEntries={serviceEntries} />
         {profileLinks.length ? (
           <div className={styles["public-link-list"]}>
             {profileLinks.map((link) => (
