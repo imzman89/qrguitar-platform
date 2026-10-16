@@ -149,11 +149,12 @@ export function HomeDiscovery({ records, settings, hero, pending, failed, onRetr
       <div className={styles.categoryDirectory}>{categories.map((category, index) => {
         const matching = unique.filter(record => matchesDiscoveryCategory(record, category.id) && !heroCodes.has(record.qrCode));
         const alreadyFeatured = unique.filter(record => matchesDiscoveryCategory(record, category.id) && heroCodes.has(record.qrCode));
+        const categoryTiles = matching.length === 1 ? [...matching, ...alreadyFeatured.slice(0, 1)] : matching;
         const categoryRecords = publicRecords.filter(record => matchesDiscoveryCategory(record, category.id));
-        return <section className={styles.categorySection} data-count={Math.min(matching.length, 4)} id={"discover-" + category.id.replace(/[^a-z0-9-]/gi, "-")} aria-labelledby={"home-category-" + index} key={category.id}>
+        return <section className={styles.categorySection} data-count={Math.min(categoryTiles.length, 4)} id={"discover-" + category.id.replace(/[^a-z0-9-]/gi, "-")} aria-labelledby={"home-category-" + index} key={category.id}>
           {sectionTitle("home-category-" + index, category.label, discoveryCategoryHref(category.id), ui("ui.components.HomeDiscovery.viewAll", "View all"), countCopy(categoryRecords.length))}
-          {matching.length ? <div className={styles.categoryMosaic} data-count={Math.min(matching.length, 4)} data-category={category.id}>
-            {matching.slice(0, 4).map(record => <DiscoveryInstrument key={record.qrCode} record={record} />)}
+          {categoryTiles.length ? <div className={styles.categoryMosaic} data-count={Math.min(categoryTiles.length, 4)} data-category={category.id}>
+            {categoryTiles.slice(0, 4).map(record => <DiscoveryInstrument key={record.qrCode} record={record} photoIndex={heroCodes.has(record.qrCode) ? 1 : 0} />)}
           </div> : alreadyFeatured.length ? <div className={styles.featuredCategory}><span>{ui("ui.components.HomeDiscovery.featuredAbove", "In the featured selection")}</span>{alreadyFeatured.map(record => <Link key={record.qrCode} href={"/i/" + encodeURIComponent(record.qrCode)}>{resolveCollectibleCard(record).title}<ArrowUpRight size={17} aria-hidden="true" /></Link>)}</div> : <div className={styles.emptyCategory}>
             <span>{failed ? ui("ui.components.HomeDiscovery.failedCategory", "Public Profiles could not be refreshed.") : pending ? ui("ui.components.HomeDiscovery.loadingCategory", "Checking public Profiles…") : categoryRecords.length ? ui("ui.components.HomeDiscovery.moreInCatalog", "Explore this category in the Catalog.") : ui("ui.components.HomeDiscovery.emptyCategory", "No public Profiles in this category yet.")}</span>
             <Link href={discoveryCategoryHref(category.id)}>{ui("ui.components.HomeDiscovery.browseCategory", "Browse category")}<ArrowUpRight size={18} aria-hidden="true" /></Link>
