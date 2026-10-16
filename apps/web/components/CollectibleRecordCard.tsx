@@ -286,6 +286,7 @@ export function CollectibleRecordCard({
             {eyebrow ? <span className={styles["collectible-card-eyebrow"]}><Globe2 size={13} aria-hidden="true" /> {eyebrow}</span> : null}
             {createdLabel ? <span className={styles["collectible-card-age"]}>{createdLabel}</span> : null}
           </div> : null}
+          <div className={styles["collectible-card-identity"]}>
           <Link className={styles["collectible-card-profile-link"]} href={localProfileHref}>
             <span className={styles["collectible-card-type"]}><span>{record.brand || card.typeLabel}</span>{record.year ? <strong className={styles["collectible-card-year"]}>{record.year}</strong> : null}</span>
             <h3>{isHomeFeatured ? <><span>{card.title}</span><ArrowRight size={16} aria-hidden="true" /></> : card.title}</h3>
@@ -294,6 +295,7 @@ export function CollectibleRecordCard({
           </Link>
 
           <span className={styles["collectible-card-code"]}>{card.code}</span>
+          </div>
 
           <ProfileStatusBadges record={record} includeCondition={false} ownerCollection={card.collection || undefined} />
 
