@@ -35,8 +35,11 @@
 .guide :global(.product-guide-role-panel) { background:transparent; border-radius:0; padding:24px 0; border-top:1px solid var(--line); }
 .guide :global(.product-guide-role-tabs button) { border-radius:0; border-bottom:1px solid transparent; }
 .guide :global(.product-guide-role-tabs button.is-active) { color:var(--text); background:transparent; border-bottom-color:var(--text); }
-.guide :global(.button) { background:color-mix(in srgb,var(--text) 8%,var(--canvas)); color:var(--text); border:1px solid color-mix(in srgb,var(--text) 28%,var(--canvas)); border-radius:2px; font-weight:500; }
-.guide :global(.button:hover) { background:color-mix(in srgb,var(--text) 14%,var(--canvas)); color:var(--text); border-color:var(--text); }
+.guide :global(.button) { min-height:48px; padding:12px 18px; gap:14px; background:var(--action); color:var(--on-action); border:1px solid var(--action); border-radius:5px; font-size:14px; font-weight:700; line-height:1.5; }
+.guide :global(.button:hover) { background:var(--action-hover); border-color:var(--action-hover); color:var(--on-action); }
+.guide :global(.button.secondary) { background:transparent; color:var(--text); border-color:var(--line); font-weight:600; }
+.guide :global(.button.secondary:hover) { background:var(--surface-raised); border-color:var(--muted); }
+.guide :global(.button:focus-visible) { outline:3px solid var(--action); outline-offset:4px; }
 @media(max-width:700px) { .guide :global(.shell) { width:calc(100% - 40px); }.guide :global(.product-guide-hero) { padding-block:32px; }.guide h1 { font-size:40px; }.guide :global(.product-guide-role-panel) { grid-template-columns:24px minmax(0,1fr); padding:24px 0; } }
 
 @media screen { .guide :global(.product-guide-hero-inner) { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(280px,.75fr); align-items:center; gap:48px; }.guide h1,.guide h2 { font-family:var(--font-ui); font-weight:650; }.guide h1 { margin:14px 0 18px; font-size:clamp(36px,4vw,54px); }.guide :global(.product-guide-hero) { padding-block:32px; }.guide :global(.product-guide-hero) p { font-size:16px; line-height:1.65; }.example { width:100%; max-width:380px; justify-self:center; }.walkthrough:not(:has(.example)) { grid-template-columns:1fr; }.walkthrough:not(:has(.example)) :global(.product-guide-steps) { grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; }.guide :global(.product-guide-steps li),.guide :global(.product-guide-capability-grid article) { padding:20px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }.guide :global(.product-guide-steps li > span) { color:var(--collector-metal); }.guide :global(.product-guide-steps p) { font-size:14px; } }
