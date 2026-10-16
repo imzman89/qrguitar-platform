@@ -562,6 +562,8 @@ export default function DashboardPage() {
                   const condition = getInstrumentCondition(instrument);
                   const title = dashboardRecordTitle(instrument);
                   const meta = dashboardRecordMeta(instrument, condition);
+                  const ownerMaker = String(instrument.brand || "").trim();
+                  const ownerYear = String(instrument.year || "").trim();
                   const profileNumber = profileNumbers.get(instrument.qrCode) || 1;
 
                   return (
@@ -570,6 +572,12 @@ export default function DashboardPage() {
                         <DashboardInstrumentThumb sources={imageSources} title={title} />
                         <div className={styles.instrumentDetails}>
                           <div className={styles.instrumentInfo}>
+                            {ownerMaker || ownerYear ? (
+                              <div className={styles.ownerIdentityHeading}>
+                                {ownerMaker ? <span className={styles.ownerMaker}>{ownerMaker}</span> : null}
+                                {ownerYear ? <span className={styles.ownerYear}>{ownerYear}</span> : null}
+                              </div>
+                            ) : null}
                             <strong>{title}</strong>
                             <span title={meta}>{meta}</span>
                             <ProfileStatusBadges record={instrument} includeCondition={false} />

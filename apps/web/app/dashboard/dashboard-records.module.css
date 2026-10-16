@@ -478,3 +478,17 @@
   .toolsBody > :global(details.panel) button:disabled { opacity:.55; cursor:not-allowed; }
 }
 @media screen and (max-width:600px) { .toolsBody > :global(details.panel) { padding:14px 16px; } }
+
+/* Owner-gallery identity follows the public archive; working list and actions stay intact. */
+.ownerIdentityHeading { display:none; }
+@media screen {
+  .instrumentList:not(.personalRecords) .instrumentDetails { border-left:2px solid var(--action); background:var(--canvas); padding:16px; }
+  .instrumentList:not(.personalRecords) .ownerIdentityHeading { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; min-width:0; }
+  .instrumentList:not(.personalRecords) .ownerMaker { min-width:0; padding-top:4px; color:var(--muted-strong); font-size:14px; font-weight:650; line-height:1.5; letter-spacing:.09em; text-transform:uppercase; overflow-wrap:anywhere; }
+  .instrumentList:not(.personalRecords) .ownerYear { flex:0 0 auto; margin-left:auto; padding-left:14px; border-left:1px solid var(--line); color:var(--text); font:500 30px/1.1 var(--font-ui); letter-spacing:-.05em; }
+  .instrumentList:not(.personalRecords) .instrumentInfo > strong { font-size:23px; font-weight:600; line-height:1.25; letter-spacing:-.035em; }
+  .instrumentList:not(.personalRecords) .compactQr { flex-basis:80px; width:80px; height:80px; }
+  .instrumentList:not(.personalRecords) .compactQr img { width:80px; height:80px; border-radius:0; }
+  .instrumentList:not(.personalRecords) .dashboardIdentity > span:first-child { display:grid; gap:4px; color:var(--text); font-family:ui-monospace,monospace; font-size:13px; font-weight:650; letter-spacing:.04em; }
+  .instrumentList:not(.personalRecords) .dashboardIdentity > span:first-child > b { margin:0; color:var(--muted); font-family:var(--font-ui); font-size:9px; font-weight:500; letter-spacing:.1em; text-transform:uppercase; }
+}
