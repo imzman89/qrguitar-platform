@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import Link from "./CheckoutAwareLink";
 import { ArrowRight, ArrowUpRight, Camera, Layers3, QrCode, Store } from "lucide-react";
-import { CollectibleRecordCard } from "./CollectibleRecordCard";
 import { CompactQr } from "./CompactQr";
 import { FallbackImage } from "./FallbackImage";
 import { useUiText } from "./UiTextProvider";
@@ -27,20 +26,19 @@ type Props = {
 };
 
 /** A compact entry to an existing public Profile, with its owner's photograph intact. */
-function DiscoveryInstrument({ record, lead = false }: { record: DemoInstrument; lead?: boolean }) {
+function DiscoveryInstrument({ record, lead = false, photoIndex = 0 }: { record: DemoInstrument; lead?: boolean; photoIndex?: number }) {
   const card = resolveCollectibleCard(record);
   return <Link href={"/i/" + encodeURIComponent(record.qrCode)} className={styles.instrumentTile} data-lead={lead || undefined}>
     <div className={styles.instrumentPhoto}>
-      <FallbackImage src={publicMediaVariantUrl(card.images[0], lead ? 1200 : 640)} alt={card.title}
+      <FallbackImage src={publicMediaVariantUrl(card.images[photoIndex] || card.images[0], lead ? 1200 : 640)} alt={photoIndex && card.images[photoIndex] ? card.title + " — detail" : card.title}
         width={lead ? 1200 : 640} height={lead ? 960 : 480} loading={lead ? "eager" : "lazy"}
         decoding="async" referrerPolicy="no-referrer"
         fallback={<span className={styles.imageFallback}>Photo unavailable</span>} />
       <span className={styles.photoCount}><Camera size={12} aria-hidden="true" />{card.images.length}</span>
     </div>
     <div className={styles.instrumentCaption}>
-      <div className={styles.instrumentMeta}><span>{card.typeLabel}</span>{record.year ? <span>{record.year}</span> : null}</div>
+      <div className={styles.instrumentMeta}><span>{card.typeLabel}</span></div>
       <h2>{card.title}<ArrowUpRight size={20} aria-hidden="true" /></h2>
-      <span className={styles.recordCode}>{card.code}</span>
     </div>
   </Link>;
 }
@@ -51,7 +49,8 @@ export function HomeDiscovery({ records, settings, hero, pending, failed, onRetr
   const changed = (key: string) => text(key) !== defaultContentValues[key];
   const publicRecords = records.filter(record => record.visibility === "public" && !record.collectionRemovedAt && isEligiblePublicProfile(record));
   const featured = publicRecords.filter(record => record.safetyStatus !== "lost" && record.safetyStatus !== "stolen" && getProfilePhotoUrls(record).length);
-  const first = selectHomeFeaturedProfile(featured);
+  // Editorial curation selects only from the current eligible public feed; withdrawn Profiles immediately fall out.
+  const first = featured.find(record => record.qrCode === "QRG-SI98092154") || selectHomeFeaturedProfile(featured);
   const seen = new Set<string>();
   const unique = [first, ...featured].filter((record): record is DemoInstrument => {
     if (!record || seen.has(record.qrCode)) return false;
@@ -63,11 +62,15 @@ export function HomeDiscovery({ records, settings, hero, pending, failed, onRetr
   const collections = buildCollectionDirectory(publicRecords);
   const businesses = collections.filter(collection => ["builder", "shop", "luthier"].includes(collection.accountType));
   const personalCollections = collections.filter(collection => !["builder", "shop", "luthier"].includes(collection.accountType));
-  const brands = [...new Set(publicRecords.map(record => record.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  const second = unique.find(record => record !== first && !matchesDiscoveryCategory(record, "guitars")) || unique[1];
+  const brandRecords = publicRecords.filter(record => !record.qrCode.startsWith("QRG-DEMO-"));
+  const brands = [...new Set(brandRecords.map(record => record.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const second = unique.find(record => record !== first && record.qrCode === "QRG-M1627825") || unique.find(record => record !== first && !matchesDiscoveryCategory(record, "guitars")) || unique[1];
   const third = unique.find(record => record !== first && record !== second);
+  const fourth = !personalCollections.length ? unique.find(record => record !== first && record !== second && record !== third) : undefined;
+  const heroVisible = homeSignupSections(settings.composition.home.sections).some(section => section.id === "hero" && section.visible);
+  const heroCodes = new Set(heroVisible ? [first, second, third, fourth].filter(Boolean).map(record => record!.qrCode) : []);
   const photosFor = (collection?: DirectoryCollection) => {
-    const matches = collection ? publicRecords.filter(record => record.publicCollection?.handle === collection.handle) : unique;
+    const matches = collection ? publicRecords.filter(record => record.publicCollection?.handle === collection.handle) : unique.filter(record => !heroCodes.has(record.qrCode));
     const covers = matches.map(record => getProfilePhotoUrls(record)[0]).filter(Boolean);
     return [...new Set([...covers, ...matches.flatMap(record => getProfilePhotoUrls(record))])].slice(0, 3);
   };
@@ -111,12 +114,11 @@ export function HomeDiscovery({ records, settings, hero, pending, failed, onRetr
   const sections: Record<string, ReactNode> = {
     hero: <section className={styles.opening} aria-labelledby="home-title">
       <nav className={styles.categoryNav} aria-label={ui("ui.components.HomeDiscovery.categories", "Explore instrument categories")}>
-        {categories.map(category => <Link href={discoveryCategoryHref(category.id)} key={category.id}>{category.label}<ArrowUpRight size={14} aria-hidden="true" /></Link>)}
-        <Link href="/collections">{ui("ui.components.HomeDiscovery.collections", "Collections")}</Link>
-        <Link href={archiveVisible ? "#home-brands" : "/catalog"}>{ui("ui.components.HomeDiscovery.brands", "Browse by brand")}</Link>
-        <Link href={archiveVisible ? "#business-archives" : "/collections"}>{ui("ui.components.HomeDiscovery.businessNav", "Builders & shops")}</Link>
+        {categories.slice(0, 3).map(category => <Link href={discoveryCategoryHref(category.id)} key={category.id}>{category.label}<ArrowUpRight size={14} aria-hidden="true" /></Link>)}
+        <span className={styles.desktopBrowseLinks}>{categories.slice(3).map(category => <Link href={discoveryCategoryHref(category.id)} key={category.id}>{category.label}<ArrowUpRight size={14} aria-hidden="true" /></Link>)}<Link href="/collections">{ui("ui.components.HomeDiscovery.collections", "Collections")}</Link><Link href={archiveVisible ? "#home-brands" : "/catalog"}>{ui("ui.components.HomeDiscovery.brands", "Browse by brand")}</Link><Link href={archiveVisible ? "#business-archives" : "/collections"}>{ui("ui.components.HomeDiscovery.businessNav", "Builders & shops")}</Link></span>
+        <details className={styles.mobileExplore}><summary>{ui("ui.components.HomeDiscovery.explore", "Explore")}<ArrowUpRight size={14} aria-hidden="true" /></summary><div>{categories.slice(3).map(category => <Link href={discoveryCategoryHref(category.id)} key={category.id}>{category.label}<ArrowUpRight size={14} aria-hidden="true" /></Link>)}<Link href="/collections">{ui("ui.components.HomeDiscovery.collections", "Collections")}</Link><Link href={archiveVisible ? "#home-brands" : "/catalog"}>{ui("ui.components.HomeDiscovery.brands", "Browse by brand")}</Link><Link href={archiveVisible ? "#business-archives" : "/collections"}>{ui("ui.components.HomeDiscovery.businessNav", "Builders & shops")}</Link></div></details>
       </nav>
-      <header className={styles.discoveryHeading}>
+      <header className={styles.discoveryHeading} data-default-eyebrow={!changed("home.hero.eyebrow") || undefined}>
         <div>{hero.eyebrow ? <span className={styles.eyebrow}>{hero.eyebrow}</span> : null}
           <h1 id="home-title">{changed("home.hero.headline") ? hero.headline : ui("ui.components.HomeDiscovery.collectorHeadline", "Instruments worth knowing.")}</h1>
         </div>
@@ -133,8 +135,8 @@ export function HomeDiscovery({ records, settings, hero, pending, failed, onRetr
           <Link href="/create">{hero.primaryCta}<ArrowUpRight size={18} aria-hidden="true" /></Link>
           {managedHeroExtras}
         </div>
-        {third ? <div className={styles.thirdInstrument}><DiscoveryInstrument record={third} /></div> : null}
-        <div className={styles.heroCollection}>{collectionTile(personalCollections[0])}</div>
+        {third ? <div className={styles.thirdInstrument}><DiscoveryInstrument record={third} photoIndex={1} /></div> : null}
+        <div className={styles.heroCollection}>{personalCollections[0] ? collectionTile(personalCollections[0]) : fourth ? <DiscoveryInstrument record={fourth} photoIndex={1} /> : <Link className={styles.catalogNote} href="/catalog"><Layers3 size={25} aria-hidden="true" /><span>{ui("ui.components.HomeDiscovery.archiveLink", "Explore the public catalog")}<ArrowUpRight size={18} aria-hidden="true" /></span></Link>}</div>
       </div> : <div className={styles.noInstruments}>
         <h2>{ui("ui.components.HomeDiscovery.publicArchive", "The public instrument catalog")}</h2>
         {hero.body ? <p>{hero.body}</p> : null}
@@ -144,34 +146,36 @@ export function HomeDiscovery({ records, settings, hero, pending, failed, onRetr
       </div>}
     </section>,
     archive: <>
-      {categories.map((category, index) => {
-        const matching = unique.filter(record => matchesDiscoveryCategory(record, category.id));
+      <div className={styles.categoryDirectory}>{categories.map((category, index) => {
+        const matching = unique.filter(record => matchesDiscoveryCategory(record, category.id) && !heroCodes.has(record.qrCode));
+        const alreadyFeatured = unique.filter(record => matchesDiscoveryCategory(record, category.id) && heroCodes.has(record.qrCode));
         const categoryRecords = publicRecords.filter(record => matchesDiscoveryCategory(record, category.id));
-        return <section className={styles.categorySection} id={"discover-" + category.id.replace(/[^a-z0-9-]/gi, "-")} aria-labelledby={"home-category-" + index} key={category.id}>
+        return <section className={styles.categorySection} data-count={Math.min(matching.length, 4)} id={"discover-" + category.id.replace(/[^a-z0-9-]/gi, "-")} aria-labelledby={"home-category-" + index} key={category.id}>
           {sectionTitle("home-category-" + index, category.label, discoveryCategoryHref(category.id), ui("ui.components.HomeDiscovery.viewAll", "View all"), countCopy(categoryRecords.length))}
           {matching.length ? <div className={styles.categoryMosaic} data-count={Math.min(matching.length, 4)} data-category={category.id}>
-            {matching.slice(0, 4).map(record => <CollectibleRecordCard key={record.qrCode} record={record} variant="latest" homeFeatured />)}
-          </div> : <div className={styles.emptyCategory}>
+            {matching.slice(0, 4).map(record => <DiscoveryInstrument key={record.qrCode} record={record} />)}
+          </div> : alreadyFeatured.length ? <div className={styles.featuredCategory}><span>{ui("ui.components.HomeDiscovery.featuredAbove", "In the featured selection")}</span>{alreadyFeatured.map(record => <Link key={record.qrCode} href={"/i/" + encodeURIComponent(record.qrCode)}>{resolveCollectibleCard(record).title}<ArrowUpRight size={17} aria-hidden="true" /></Link>)}</div> : <div className={styles.emptyCategory}>
             <span>{failed ? ui("ui.components.HomeDiscovery.failedCategory", "Public Profiles could not be refreshed.") : pending ? ui("ui.components.HomeDiscovery.loadingCategory", "Checking public Profiles…") : categoryRecords.length ? ui("ui.components.HomeDiscovery.moreInCatalog", "Explore this category in the Catalog.") : ui("ui.components.HomeDiscovery.emptyCategory", "No public Profiles in this category yet.")}</span>
             <Link href={discoveryCategoryHref(category.id)}>{ui("ui.components.HomeDiscovery.browseCategory", "Browse category")}<ArrowUpRight size={18} aria-hidden="true" /></Link>
           </div>}
         </section>;
-      })}
+      })}</div>
       <section className={styles.brandsSection} id="home-brands" aria-labelledby="home-brand-title">
         {sectionTitle("home-brand-title", ui("ui.components.HomeDiscovery.brands", "Browse by brand"), "/catalog", ui("ui.components.HomeDiscovery.allInstruments", "All instruments"))}
         {brands.length ? <div className={styles.brandGrid}>{brands.slice(0, 8).map(brand => {
-          const brandRecords = publicRecords.filter(record => record.brand === brand), photoRecord = unique.find(record => record.brand === brand);
-          const photo = photoRecord && getProfilePhotoUrls(photoRecord)[0];
+          const matchingBrand = brandRecords.filter(record => record.brand === brand), photoRecord = unique.find(record => record.brand === brand && !record.qrCode.startsWith("QRG-DEMO-"));
+          const brandPhotos = photoRecord ? getProfilePhotoUrls(photoRecord) : [];
+          const photo = brandPhotos[1] || brandPhotos[0];
           return <Link key={brand} href={"/catalog?" + new URLSearchParams({ brand }).toString()} className={styles.brandTile}>
             <div className={styles.brandPhoto}>{photo ? <FallbackImage src={publicMediaVariantUrl(photo, 400)} alt="" width={320} height={240} loading="lazy" decoding="async" referrerPolicy="no-referrer" fallback={<span>{brand}</span>} /> : <span>{brand.slice(0, 1)}</span>}</div>
-            <div><h3>{brand}</h3><span>{countCopy(brandRecords.length)}</span></div><ArrowUpRight size={18} aria-hidden="true" />
+            <div><h3>{brand}</h3><span>{countCopy(matchingBrand.length)}</span></div><ArrowUpRight size={18} aria-hidden="true" />
           </Link>;
         })}</div> : <p className={styles.compactEmpty}>{ui("ui.components.HomeDiscovery.noBrands", "Brands appear here as public Profiles are added.")}</p>}
         <p className={styles.captionNote}>{ui("ui.components.HomeDiscovery.brandNote", "Names from the public collection of instruments.")}</p>
       </section>
       <section className={styles.collectionsSection} aria-labelledby="home-collections">
         {sectionTitle("home-collections", ui("ui.components.HomeDiscovery.inside", "Every collection has a point of view."), "/collections", ui("ui.components.HomeDiscovery.seeCollections", "Explore collections"))}
-        {personalCollections.length ? <div className={styles.collectionGrid}>{personalCollections.slice(0, 3).map(collection => <div key={collection.handle}>{collectionTile(collection)}</div>)}</div>
+        {personalCollections.length ? <div className={styles.collectionGrid} data-count={Math.min(personalCollections.length, 3)}>{personalCollections.slice(0, 3).map(collection => <div key={collection.handle}>{collectionTile(collection)}</div>)}</div>
           : <div className={styles.collectionFallback}>{collectionTile()}<div><h3>{ui("ui.components.HomeDiscovery.yourCollection", "Make a collection that’s yours.")}</h3><p>{failed ? ui("ui.components.HomeDiscovery.personalCollectionsFailed", "Public personal collections could not be refreshed.") : pending ? ui("ui.components.HomeDiscovery.personalCollectionsPending", "Checking public personal collections…") : ui("ui.components.HomeDiscovery.noPersonalCollections", "No public personal collections are listed yet. Explore individual Profiles, or choose the instruments you want to share together.")}</p><Link href="/account?section=collection">{ui("ui.components.HomeDiscovery.collectionSettings", "Collection settings")}<ArrowUpRight size={18} aria-hidden="true" /></Link></div></div>}
       </section>
       <section className={styles.businessSection} id="business-archives" aria-labelledby="home-businesses">
