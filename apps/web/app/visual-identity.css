@@ -2,18 +2,18 @@
 /* One black screen system. Dedicated printed documents retain their physical palette. */
 @media screen {
  body[data-product-theme] {
-  --font-ui:"QRguitar Modern","Aptos","Segoe UI",sans-serif; --font-display:var(--font-ui);
-  --canvas:#0d0f11; --bg:#0d0f11; --bg-2:#121416; --surface:#16191d; --surface-subtle:#1b1e22; --surface-raised:#20252b; --surface-soft:#181b1f;
-  --panel:#11161b; --panel-2:#171e24; --text:#f4f1e9; --ink:#090b0d; --muted:#a9b2b8; --muted-strong:#d0d5d7;
-  --line:#343b44; --border:#343b44; --border-soft:#292e34; --border-strong:#58616b;
-  --field-surface:#0c1014; --field-text:#f4f1e9; --field-muted:#9ca8b0;
-  --action:#edaa58; --action-hover:#f4bd78; --gold:#edaa58; --gold-2:#e7c38b; --on-action:#15100a; --action-ink:#15100a;
-  --positive:#9cddb1; --negative:#ffb4aa; --warning:#e9c57e; --photo-mat:#141618;
-  --selected-surface:#29241b; --dark-text:var(--text); --muted-light:var(--muted); --line-light:var(--line);
-  --shadow-card:none; --collector-line:#343b44; --collector-metal:#d7b67b;
+  --font-ui:"QRguitar Modern","Aptos","Segoe UI",sans-serif; --font-display:Georgia,"Times New Roman",serif;
+  --canvas:#090a0b; --bg:#090a0b; --bg-2:#111213; --surface:#141516; --surface-subtle:#191a1b; --surface-raised:#1c1d1e; --surface-soft:#171819;
+  --panel:#111213; --panel-2:#191a1b; --text:#eee9df; --ink:#090b0d; --muted:#b5b0a6; --muted-strong:#d5d0c6;
+  --line:#373634; --border:#373634; --border-soft:#2b2a28; --border-strong:#65615a;
+  --field-surface:#0d0e0f; --field-text:#eee9df; --field-muted:#b5b0a6;
+  --action:#bda17a; --action-hover:#d0b590; --gold:#bda17a; --gold-2:#d0b590; --on-action:#15100a; --action-ink:#15100a;
+  --positive:#9cddb1; --negative:#ffb4aa; --warning:#e9c57e; --photo-mat:#111213;
+  --selected-surface:#30291f; --dark-text:var(--text); --muted-light:var(--muted); --line-light:var(--line);
+  --shadow-card:none; --collector-line:#373634; --collector-metal:#bda17a;
   color-scheme:dark; background:var(--canvas); color:var(--text); font-family:var(--font-ui); font-synthesis:none; -webkit-font-smoothing:antialiased;
  }
- body[data-product-theme] main:not(:is(.cms-page,.admin-page,.admin-service-page,.handout-page)) h1 { font-family:var(--font-display); font-weight:650; letter-spacing:-.045em; line-height:1.12; }
+ body[data-product-theme] main:not(:is(.cms-page,.admin-page,.admin-service-page,.handout-page)) h1 { font-family:var(--font-display); font-weight:400; letter-spacing:-.025em; line-height:1.1; }
  body[data-product-theme] :is(input,select,textarea) { color-scheme:dark; }
  body[data-product-theme] .brand-frame { background:var(--canvas); }
  body[data-product-theme] .brand-frame a[href="/create"] { border-radius:6px; background:transparent; color:var(--text); border-color:var(--line); }

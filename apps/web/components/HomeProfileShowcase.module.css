@@ -46,3 +46,10 @@
 .trust :global(.record-badge) { padding:0; border:0; background:transparent; font-size:13px; line-height:1.6; }
 .hero .qrIdentity { padding-top:8px; gap:16px; }
 .hero .qrIdentity > div > span { font-size:11px; letter-spacing:.06em; }
+
+@media screen {
+ .identity h3,.gallery .identity h3,.story .identity h3 { font-family:var(--font-display); font-size:26px; font-weight:400; line-height:1.22; letter-spacing:-.02em; }
+ .hero .identity h3 { font-size:28px; }
+ .identity .kicker { color:var(--muted); }
+}
+@media screen and (max-width:760px) { .identity h3,.gallery .identity h3,.story .identity h3,.hero .identity h3 { font-size:25px; } }

@@ -46,3 +46,17 @@
 .storyEvidence .serviceExample p,.storySummary { color:var(--muted-strong); font-size:14px; line-height:1.7; }
 .storyEvidence .textLink { margin-top:16px; }
 @media(max-width:760px) { .productCopy { grid-template-columns:1fr; gap:24px; }.storyEvidence { padding:0; } }
+
+/* Luxury showroom: editorial titles, authentic photographs and one restrained action. */
+@media screen {
+ .home .heroCopy h1 { max-width:12ch; font-family:var(--font-display); font-size:clamp(60px,5.6vw,84px); font-weight:400; line-height:1.02; letter-spacing:-.035em; }
+ .heroCopy > .eyebrow { color:var(--collector-metal); letter-spacing:.14em; }
+ .productCopy h2,.sectionHeading h2,.signupCopy h2 { font-family:var(--font-display); font-size:clamp(34px,3.3vw,48px); font-weight:400; line-height:1.12; letter-spacing:-.025em; }
+ .recordPreview h3,.storyEvidence .serviceExample h3 { font-family:var(--font-display); font-size:clamp(28px,2.6vw,36px); font-weight:400; line-height:1.16; letter-spacing:-.02em; }
+ .home .primaryAction { border-radius:4px; font-weight:600; }
+ .signupSection { background:var(--surface); }
+}
+@media screen and (max-width:760px) {
+ .home .heroCopy h1 { max-width:17ch; font-size:clamp(38px,10.8vw,44px); line-height:1.08; letter-spacing:-.025em; }
+ .productCopy h2,.sectionHeading h2,.signupCopy h2 { font-size:34px; }
+}

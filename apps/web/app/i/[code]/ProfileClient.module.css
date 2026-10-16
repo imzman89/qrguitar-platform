@@ -365,3 +365,16 @@
  .scan-hero-media img { max-height:360px; }
  .scan-tabs { gap:4px; margin-top:20px; }.scan-tabs button { padding:10px 12px; }
 }
+
+/* Keep the proved photo/facts/tabs structure; match the shared showroom typography. */
+@media screen {
+ .scan-profile .profile-heading h1 { font-family:var(--font-display); font-size:clamp(34px,3.2vw,44px); font-weight:400; line-height:1.1; letter-spacing:-.025em; }
+ .scan-tab-panel h2 { font-family:var(--font-display); font-size:30px; font-weight:400; line-height:1.16; letter-spacing:-.02em; }
+ .scan-hero-info .scan-qr { grid-template-columns:80px minmax(0,1fr) 44px; }
+ .scan-qr .qr-placeholder { width:80px; height:80px; }
+ .profile-history-highlights { border-top:0; }
+}
+@media screen and (max-width:540px) {
+ .scan-profile .profile-heading h1 { font-size:32px; }
+ .scan-tab-panel h2 { font-size:28px; }
+}

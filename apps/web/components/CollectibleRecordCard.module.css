@@ -80,3 +80,16 @@
 .collectible-card-footer .collectible-card-actions { margin-top:0; }.collectible-card-footer .collectible-card-cta { border-top:0; gap:8px; }.collectible-card-footer .collectible-card-details summary { gap:10px; }.collectible-card-footer .collectible-card-details[open] { grid-column:1/-1; border-top:1px solid var(--line); }.collectible-card-footer .collectible-card-details[open] summary { justify-content:flex-start; }
 
 .collectible-card-year { color:var(--text); flex-shrink:0; padding-left:0; border-left:0; font:500 24px/1.2 var(--font-ui); letter-spacing:-.05em; }
+
+/* The photograph and its factual caption form one collectible record. */
+@media screen {
+ .collectible-card { border:0; border-radius:6px; background:var(--surface); }
+ .collectible-card-media { border-radius:6px 6px 0 0; }
+ .collectible-card-profile-link h3 { font-size:26px; font-weight:400; line-height:1.23; letter-spacing:-.02em; }
+ .collectible-card-type { color:var(--muted); font-weight:500; letter-spacing:.06em; }
+ .collectible-card-year { font-size:20px; font-weight:400; letter-spacing:-.02em; }
+ .collectible-card-code { font-weight:500; letter-spacing:.03em; }
+ .collectible-card-code::before { font-family:var(--font-ui); font-size:10px; letter-spacing:.08em; }
+ .collectible-card-footer .collectible-card-details[open] { border:0; }
+}
+@media screen and (max-width:600px) { .collectible-card-profile-link h3 { font-size:25px; } }
