@@ -172,7 +172,7 @@
  .collectionFallback>.collectionTile{grid-template-columns:112px minmax(0,1fr)}.collectionFallback .collage{height:112px}
  .collectionFallback .collectionCaption{padding:0 0 0 16px}.collectionFallback .collectionCaption h3{display:block;font-size:20px;line-height:1.2}
  .collectionFallback .collectionCaption h3>svg{display:inline-block;vertical-align:middle;margin-left:8px}
- .compactEmpty{flex-wrap:wrap;gap:8px 12px}.compactEmpty>p{flex:1}.compactEmpty>a{margin-left:34px}
+ div.compactEmpty{display:grid;grid-template-columns:22px minmax(0,1fr);align-items:start;gap:8px 12px}.compactEmpty>p{min-width:0}.compactEmpty>a{grid-column:2;margin-left:0}
  .qrStrip{grid-template-columns:72px minmax(0,1fr);gap:18px;padding:20px 16px;margin-top:30px;align-items:start}.qrStrip>a{grid-column:1/-1}.qrStrip h2{font-size:25px}
  .signup{display:block;margin-top:24px;padding:20px 0}.signup h2{font-size:29px}.signup>div:last-child{margin-top:20px}
  .editorialNotes>div{grid-template-columns:1fr}
