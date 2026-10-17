@@ -178,3 +178,60 @@
  .editorialNotes>div{grid-template-columns:1fr}
 }
 @media(prefers-reduced-motion:reduce){.discovery *{scroll-behavior:auto!important}}
+
+/* The ending continues the same four-column photo grid, including genuinely sparse data. */
+.discovery{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));column-gap:var(--grid-gap);row-gap:0}
+.sectionHost{display:contents}
+.opening,.categoryDirectory,.brandsSection{grid-column:1/-1;min-width:0}
+.communityTile,.profileTile{grid-column:span 2;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));min-width:0;min-height:var(--tile-height);overflow:hidden;border-radius:4px;background:#181b19;scroll-margin-top:90px}
+.communityTile{margin-top:32px}
+.invitationMedia,.profileMedia{position:relative;min-width:0;min-height:var(--tile-height);overflow:hidden;background:#111413;isolation:isolate}
+.invitationMedia>.collage{height:100%;min-height:var(--tile-height)}
+.invitationMedia>span,.profilePhotoCaption{position:absolute;inset:auto 0 0;padding:42px 16px 16px;background:linear-gradient(transparent,#000d);color:#f5f5ef;font:500 11px/1.5 var(--font-ui)}
+.invitationCopy{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0;padding:clamp(22px,2vw,36px)}
+.invitationCopy h2{font:550 clamp(25px,1.8vw,32px)/1.12 var(--font-ui);letter-spacing:-.035em;margin:0 0 14px;max-width:20ch}
+.invitationCopy>p{margin:0 0 14px;color:var(--muted-strong);font:400 14px/1.65 var(--font-ui);max-width:42ch}
+.tileAction{display:inline-flex;align-items:center;gap:14px;min-height:44px;color:var(--action);font:550 13px/1.4 var(--font-ui)}
+.tileAction>svg{flex:none}.tileAction:hover{color:var(--text)}
+.invitationNote{display:block;margin-top:12px;color:var(--muted);font:400 11px/1.6 var(--font-ui);max-width:42ch}
+.directoryLinks{display:grid;gap:4px;width:100%;margin:0 0 12px}
+.directoryLinks>a{display:grid;grid-template-columns:minmax(0,1fr) 16px;gap:2px 12px;align-items:center;min-height:48px;padding:8px 0;border-bottom:1px solid var(--line);color:var(--text);font:550 14px/1.4 var(--font-ui)}
+.directoryLinks>a>span{grid-column:1;font-size:11px;font-weight:400;color:var(--muted)}
+.directoryLinks>a>svg{grid-column:2;grid-row:1/3;color:var(--action)}
+.profileTile{grid-column:1/-1;margin-top:var(--grid-gap)}
+.profileMedia>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.profilePhotoCaption{font-size:16px;padding-top:60px}
+.qrBadge{position:absolute;top:20px;left:20px;width:128px;padding:8px;background:#fff;border-radius:3px;color:#081014}
+.qrBadge .qrMark{width:112px;height:112px;display:flex;align-items:center;justify-content:center;padding:0;background:#fff}
+.qrBadge .qrMark>img{width:112px;height:112px;max-width:none}
+.qrBadge>span{display:block;margin-top:6px;font:550 10px/1.4 var(--font-ui);text-align:center}
+.profileTile .editorialNotes{margin-top:12px;font-size:12px;width:100%}
+.profileTile .editorialNotes>div{grid-template-columns:1fr;gap:8px}
+.profileTile .editorialNotes p{margin:0 0 8px}
+.signup{grid-column:1/-1;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:24px;margin-top:var(--grid-gap);padding:clamp(28px,3vw,52px);background:#202720;border:1px solid #354033;border-radius:4px;min-width:0;min-height:var(--tile-height)}
+.signup h2{max-width:20ch;font-size:clamp(30px,2.7vw,44px)}
+.signup p{max-width:46ch;color:var(--muted-strong);margin:12px 0 0}
+.signup>div:last-child{margin:0;flex:none;max-width:100%}
+.signup .createAction{justify-content:space-between;gap:24px;max-width:100%}
+.signup .createAction>svg{flex:none}
+.signup .captionNote{font-size:12px;color:var(--muted)}
+.discovery[data-closing-pair] .profileTile,.discovery[data-closing-pair] .signup{grid-column:span 2}
+@media(min-width:761px) and (max-width:1250px){
+ .communityTile,.profileTile{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr)}
+ .invitationCopy{padding:20px}.invitationCopy h2{font-size:25px}.invitationCopy>p{font-size:13px}
+ .qrBadge{top:12px;left:12px;width:112px}.qrBadge .qrMark,.qrBadge .qrMark>img{width:96px;height:96px}
+ .signup{padding:28px}.signup h2{font-size:32px}
+}
+@media(max-width:1000px){
+ .communityTile{grid-column:1/-1;margin-top:var(--grid-gap)}
+ .communityTile:first-of-type{margin-top:28px}
+ .discovery[data-closing-pair] .profileTile,.discovery[data-closing-pair] .signup{grid-column:1/-1}
+ .signup{min-height:0;padding:32px}
+}
+@media(max-width:760px){
+ .communityTile,.profileTile{grid-template-columns:1fr;min-height:0}
+ .invitationMedia,.profileMedia,.invitationMedia>.collage{min-height:0;height:240px}
+ .invitationCopy{padding:24px}.invitationCopy h2{font-size:28px}.invitationCopy>p{font-size:14px}
+ .invitationNote{font-size:12px}.profilePhotoCaption{font-size:16px}
+ .signup{padding:28px 24px;gap:20px}.signup h2{font-size:32px}.signup>div:last-child{margin:0}
+}

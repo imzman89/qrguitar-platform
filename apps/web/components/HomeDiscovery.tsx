@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "./CheckoutAwareLink";
-import { ArrowRight, ArrowUpRight, Camera, Layers3, QrCode, Store } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Camera, Layers3, QrCode } from "lucide-react";
 import { CompactQr } from "./CompactQr";
 import { FallbackImage } from "./FallbackImage";
 import { useUiText } from "./UiTextProvider";
@@ -111,6 +111,10 @@ export function HomeDiscovery({ records, settings, hero, pending, failed, onRetr
     {changed("home.hero.accessNote") && text("home.hero.accessNote").trim() ? <Link className={styles.captionNote} href="/billing">{text("home.hero.accessNote")}</Link> : null}
     {changed("home.hero.viewProfile") && text("home.hero.viewProfile").trim() ? first ? <Link href={"/i/" + encodeURIComponent(first.qrCode)}>{text("home.hero.viewProfile")}<ArrowRight size={16} aria-hidden="true" /></Link> : <span className={styles.captionNote}>{text("home.hero.viewProfile")}</span> : null}
   </>;
+  const visibleSections = homeSignupSections(settings.composition.home.sections).filter(section => section.visible);
+  const archiveIndex = visibleSections.findIndex(section => section.id === "archive");
+  const pairClosingTiles = archiveIndex >= 0 && visibleSections[archiveIndex + 1]?.id === "roles";
+  const businessPhotos = businesses[0] ? photosFor(businesses[0]) : unique.slice().reverse().flatMap(record => getProfilePhotoUrls(record)).slice(0, 1);
   const sections: Record<string, ReactNode> = {
     hero: <section className={styles.opening} aria-labelledby="home-title">
       <nav className={styles.categoryNav} aria-label={ui("ui.components.HomeDiscovery.categories", "Explore instrument categories")}>
@@ -174,29 +178,48 @@ export function HomeDiscovery({ records, settings, hero, pending, failed, onRetr
         })}</div> : <p className={styles.compactEmpty}>{ui("ui.components.HomeDiscovery.noBrands", "Brands appear here as public Profiles are added.")}</p>}
         <p className={styles.captionNote}>{ui("ui.components.HomeDiscovery.brandNote", "Names from the public collection of instruments.")}</p>
       </section>
-      <section className={styles.collectionsSection} aria-labelledby="home-collections">
-        {sectionTitle("home-collections", ui("ui.components.HomeDiscovery.inside", "Every collection has a point of view."), "/collections", ui("ui.components.HomeDiscovery.seeCollections", "Explore collections"))}
-        {personalCollections.length ? <div className={styles.collectionGrid} data-count={Math.min(personalCollections.length, 3)}>{personalCollections.slice(0, 3).map(collection => <div key={collection.handle}>{collectionTile(collection)}</div>)}</div>
-          : <div className={styles.collectionFallback}>{collectionTile()}<div><h3>{ui("ui.components.HomeDiscovery.yourCollection", "Make a collection that’s yours.")}</h3><p>{failed ? ui("ui.components.HomeDiscovery.personalCollectionsFailed", "Public personal collections could not be refreshed.") : pending ? ui("ui.components.HomeDiscovery.personalCollectionsPending", "Checking public personal collections…") : ui("ui.components.HomeDiscovery.noPersonalCollections", "No public personal collections are listed yet. Explore individual Profiles, or choose the instruments you want to share together.")}</p><Link href="/account?section=collection">{ui("ui.components.HomeDiscovery.collectionSettings", "Collection settings")}<ArrowUpRight size={18} aria-hidden="true" /></Link></div></div>}
+      <section className={styles.communityTile} aria-labelledby="home-collections">
+        <div className={styles.invitationMedia}>{collage(photosFor(personalCollections[0]))}<span>{personalCollections[0] ? personalCollections[0].name : ui("ui.components.HomeDiscovery.publicPhotoSelection", "Photographs from the public catalog")}</span></div>
+        <div className={styles.invitationCopy}>
+          <span className={styles.eyebrow}>{ui("ui.components.HomeDiscovery.collections", "Collections")}</span>
+          <h2 id="home-collections">{ui("ui.components.HomeDiscovery.yourCollection", "Make a collection that’s yours.")}</h2>
+          <p>{failed ? ui("ui.components.HomeDiscovery.personalCollectionsFailed", "Public personal collections could not be refreshed.") : pending ? ui("ui.components.HomeDiscovery.personalCollectionsPending", "Checking public personal collections…") : personalCollections.length ? ui("ui.components.HomeDiscovery.collectionInvitation", "Different instruments. A shared point of view. Explore the collections their owners have made public.") : ui("ui.components.HomeDiscovery.collectionInvitationEmpty", "Bring your instruments together. Choose which Profiles to share, and keep the rest private.")}</p>
+          {personalCollections.length ? <div className={styles.directoryLinks}>{personalCollections.slice(0, 3).map(collection => <Link key={collection.handle} href={"/collections/" + encodeURIComponent(collection.handle)}>{collection.name}<span>{countCopy(collection.count)}</span><ArrowUpRight size={16} aria-hidden="true" /></Link>)}</div> : null}
+          <Link className={styles.tileAction} href={personalCollections.length ? "/collections" : "/account?section=collection"}>{personalCollections.length ? ui("ui.components.HomeDiscovery.seeCollections", "Explore collections") : ui("ui.components.HomeDiscovery.collectionSettings", "Collection settings")}<ArrowUpRight size={18} aria-hidden="true" /></Link>
+          {!failed && !pending && !personalCollections.length ? <span className={styles.invitationNote}>{ui("ui.components.HomeDiscovery.collectionsAwaiting", "Public collections will appear here as owners share them.")}</span> : null}
+        </div>
       </section>
-      <section className={styles.businessSection} id="business-archives" aria-labelledby="home-businesses">
-        {sectionTitle("home-businesses", ui("ui.components.HomeDiscovery.businessHeading", "Builders, shops & luthiers."), "/collections", ui("ui.components.HomeDiscovery.browsePeople", "Explore public archives"))}
-        {businesses.length ? <div className={styles.businessGrid}>{businesses.slice(0, 3).map(business => <Link href={"/collections/" + encodeURIComponent(business.handle)} className={styles.businessCard} key={business.handle}>
-          {collage(photosFor(business))}<div><span className={styles.eyebrow}>{collectionRoleLabel(business.accountType)}</span><h3>{business.name}<ArrowUpRight size={19} aria-hidden="true" /></h3><span>{countCopy(business.count)}</span></div>
-        </Link>)}</div> : <div className={styles.compactEmpty}><Store size={22} aria-hidden="true" /><p>{failed ? ui("ui.components.HomeDiscovery.businessUnavailable", "Public business archives could not be refreshed.") : pending ? ui("ui.components.HomeDiscovery.businessLoading", "Checking public business archives...") : ui("ui.components.HomeDiscovery.noBusinessesCompact", "No public business archives are listed yet.")}</p><Link href="/account?section=collection">{ui("ui.components.HomeDiscovery.setUpArchive", "Set up your public archive")}<ArrowUpRight size={18} aria-hidden="true" /></Link></div>}
+      <section className={styles.communityTile} id="business-archives" aria-labelledby="home-businesses">
+        <div className={styles.invitationMedia}>{collage(businessPhotos)}<span>{businesses[0] ? businesses[0].name : ui("ui.components.HomeDiscovery.publicPhotoSelection", "Photographs from the public catalog")}</span></div>
+        <div className={styles.invitationCopy}>
+          <span className={styles.eyebrow}>{ui("ui.components.HomeDiscovery.craftAndCare", "Craft & care")}</span>
+          <h2 id="home-businesses">{ui("ui.components.HomeDiscovery.businessHeading", "Builders, shops & luthiers.")}</h2>
+          <p>{failed ? ui("ui.components.HomeDiscovery.businessUnavailable", "Public business archives could not be refreshed.") : pending ? ui("ui.components.HomeDiscovery.businessLoading", "Checking public business archives...") : businesses.length ? ui("ui.components.HomeDiscovery.businessInvitation", "Meet the people behind the instruments. Browse the work they have chosen to share.") : ui("ui.components.HomeDiscovery.businessInvitationEmpty", "Give your work a home. Share an archive of the instruments you build, sell or care for.")}</p>
+          {businesses.length ? <div className={styles.directoryLinks}>{businesses.slice(0, 3).map(business => <Link key={business.handle} href={"/collections/" + encodeURIComponent(business.handle)}>{business.name}<span>{collectionRoleLabel(business.accountType)}</span><ArrowUpRight size={16} aria-hidden="true" /></Link>)}</div> : null}
+          <Link className={styles.tileAction} href={businesses.length ? "/collections" : "/account?section=collection"}>{businesses.length ? ui("ui.components.HomeDiscovery.browsePeople", "Explore public archives") : ui("ui.components.HomeDiscovery.setUpArchive", "Set up your public archive")}<ArrowUpRight size={18} aria-hidden="true" /></Link>
+          {!failed && !pending && !businesses.length ? <span className={styles.invitationNote}>{ui("ui.components.HomeDiscovery.businessAwaiting", "An invitation to share your work. No public business archives are listed yet.")}</span> : null}
+        </div>
       </section>
-      <section className={styles.qrStrip} aria-labelledby="home-qr">
-        <div className={styles.qrMark}>{first ? <CompactQr code={first.qrCode} label={first.name || first.model || first.qrCode} /> : <QrCode size={64} aria-hidden="true" />}</div>
-        <div>{text("home.product.eyebrow") ? <span className={styles.eyebrow}>{text("home.product.eyebrow")}</span> : null}<h2 id="home-qr">{text("home.product.headline")}</h2>{text("home.product.body") ? <p>{text("home.product.body")}</p> : null}{text("home.product.privacy") ? <p className={styles.captionNote}>{text("home.product.privacy")}</p> : null}</div>
-        <Link href={first ? "/i/" + encodeURIComponent(first.qrCode) : "/how-it-works"}>{first ? text("home.product.cta") : text("home.steps.cta")}<ArrowRight size={18} aria-hidden="true" /></Link>
+      <section className={styles.profileTile} aria-labelledby="home-qr">
+        <div className={styles.profileMedia}>
+          {first ? <FallbackImage src={publicMediaVariantUrl(getProfilePhotoUrls(first)[0], 640)} alt={resolveCollectibleCard(first).title} width={640} height={640} loading="lazy" decoding="async" referrerPolicy="no-referrer" fallback={<span className={styles.imageFallback}>{ui("ui.components.HomeDiscovery.photoUnavailable", "Photo unavailable")}</span>} /> : <span className={styles.imageFallback}><QrCode size={64} aria-hidden="true" /></span>}
+          {first ? <div className={styles.qrBadge}><div className={styles.qrMark}><CompactQr code={first.qrCode} label={first.name || first.model || first.qrCode} /></div><span>{ui("ui.components.HomeDiscovery.scanProfile", "Scan this Profile")}</span></div> : null}
+          {first ? <span className={styles.profilePhotoCaption}>{resolveCollectibleCard(first).title}</span> : null}
+        </div>
+        <div className={styles.invitationCopy}>
+          {text("home.product.eyebrow") ? <span className={styles.eyebrow}>{text("home.product.eyebrow")}</span> : null}<h2 id="home-qr">{text("home.product.headline")}</h2>
+          {text("home.product.body") ? <p>{text("home.product.body")}</p> : null}
+          <Link className={styles.tileAction} href={first ? "/i/" + encodeURIComponent(first.qrCode) : "/how-it-works"}>{first ? text("home.product.cta") : text("home.steps.cta")}<ArrowRight size={18} aria-hidden="true" /></Link>
+          {text("home.product.privacy") ? <span className={styles.invitationNote}>{text("home.product.privacy")}</span> : null}
+          {extraKeys.length ? <details className={styles.editorialNotes}><summary>{ui("ui.components.HomeDiscovery.moreAbout", "More about QRguitar")}</summary><div>{extraKeys.map(key => <p key={key}>{text(key)}</p>)}</div></details> : null}
+        </div>
       </section>
-      {extraKeys.length ? <details className={styles.editorialNotes}><summary>{ui("ui.components.HomeDiscovery.moreAbout", "More about QRguitar")}</summary><div>{extraKeys.map(key => <p key={key}>{text(key)}</p>)}</div></details> : null}
     </>,
     roles: <section className={styles.signup} id="audiences" aria-labelledby="home-signup-title"><div>
       {text("home.signup.eyebrow") ? <span className={styles.eyebrow}>{text("home.signup.eyebrow")}</span> : null}<h2 id="home-signup-title">{text("home.signup.headline")}</h2>
       {text("home.signup.body") ? <p>{text("home.signup.body")}</p> : null}
     </div><div><Link className={styles.createAction} href="/login?mode=register&next=%2Fcreate">{text("home.signup.cta")}<ArrowUpRight size={18} aria-hidden="true" /></Link>{text("home.signup.note") ? <p className={styles.captionNote}>{text("home.signup.note")}</p> : null}</div></section>
   };
-  return <div className={styles.discovery}>{homeSignupSections(settings.composition.home.sections).filter(section => section.visible).map(section => <div key={section.id}>{sections[section.id] || null}</div>)}</div>;
+  return <div className={styles.discovery} data-closing-pair={pairClosingTiles || undefined}>{visibleSections.map(section => <div className={styles.sectionHost} key={section.id}>{sections[section.id] || null}</div>)}</div>;
 }
 

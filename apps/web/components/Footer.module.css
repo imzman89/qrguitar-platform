@@ -1,12 +1,12 @@
-.footer { padding:56px 0 40px; background:var(--canvas); color:var(--muted); border-top:1px solid color-mix(in srgb,var(--text) 12%,var(--canvas)); }
-.footer :global(.footer-grid) { width:min(1240px,calc(100% - 80px)); margin-inline:auto; display:grid; grid-template-columns:1fr 1fr; gap:clamp(40px,7vw,100px); align-items:start; }
+.footer { padding:28px 0 32px; background:var(--canvas); color:var(--muted); border-top:1px solid color-mix(in srgb,var(--text) 12%,var(--canvas)); }
+.footer :global(.footer-grid) { width:calc(100% - 48px); margin-inline:auto; display:grid; grid-template-columns:1fr 1fr; gap:32px; align-items:start; }
 .footer :global(.brand-logo--footer) { width:152px; height:auto; }
 .footer :global(.footer-brand-block p) { max-width:32ch; margin:20px 0 0; font-size:12px; line-height:1.8; }
 .footer :global(.footer-links) { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px 20px; }
 .footer :global(.footer-links) :is(a,button) { display:flex; align-items:center; min-height:44px; padding:6px 0; border:0; background:transparent; color:var(--muted); font:inherit; font-size:13px; line-height:1.5; text-align:left; text-transform:none; letter-spacing:.02em; }
 .footer :global(.footer-links) :is(a,button):hover { color:var(--text); }
 .footer a[href^="mailto:"] { grid-column:1/-1; }
-@media(max-width:700px) { .footer { padding:32px 0 24px; } .footer :global(.footer-grid) { width:calc(100% - 40px); grid-template-columns:1fr; gap:24px; } .footer :global(.footer-links) { grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 20px; } }
+@media(max-width:700px) { .footer { padding:32px 0 24px; } .footer :global(.footer-grid) { width:calc(100% - 24px); grid-template-columns:1fr; gap:24px; } .footer :global(.footer-links) { grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 20px; } }
 .footer .sessionStatus { display:flex; align-items:center; min-height:44px; color:var(--muted); font-size:14px; font-weight:400; line-height:1.5; text-transform:none; letter-spacing:0; }
 .footer .sessionNotice { grid-column:1/-1; max-width:62ch; margin:4px 0 12px; color:var(--negative); font-size:14px; font-weight:400; line-height:1.5; text-transform:none; letter-spacing:0; overflow-wrap:anywhere; }
 
@@ -15,3 +15,5 @@
   .footer :global(.footer-grid) { grid-template-columns:minmax(180px,.8fr) minmax(0,1.2fr); gap:32px; }
   .footer :global(.footer-links) { grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px 24px; }
 }
+
+@media(min-width:701px) and (max-width:1100px){.footer :global(.footer-grid){width:calc(100% - 32px)}}
